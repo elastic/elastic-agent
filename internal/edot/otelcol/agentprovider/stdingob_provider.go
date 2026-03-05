@@ -31,10 +31,7 @@ var _ confmap.Provider = (*StdinGobProvider)(nil)
 // Per the confmap.Provider contract, Retrieve and Shutdown are never called
 // concurrently with themselves or each other.
 type StdinGobProvider struct {
-	// reader is the pipe/stdin reader (set by NewStdinGobFactoryWithReader).
-	reader io.ReadCloser
-
-	// decoder is created on first Retrieve call
+	// decoder reads from stdin and decodes the output
 	decoder *gob.Decoder
 
 	logger *zap.Logger
@@ -63,7 +60,7 @@ func NewFactory() confmap.ProviderFactory {
 // NewStdinGobFactoryWithReader returns a confmap.ProviderFactory using the
 // given reader (typically stdin). The provider reads gob-encoded configs
 // directly from the reader.
-func NewStdinGobFactoryWithReader(reader io.ReadCloser) confmap.ProviderFactory {
+func NewStdinGobFactoryWithReader(reader io.Reader) confmap.ProviderFactory {
 	return confmap.NewProviderFactory(
 		func(settings confmap.ProviderSettings) confmap.Provider {
 			return newProvider(reader, settings)
@@ -71,10 +68,10 @@ func NewStdinGobFactoryWithReader(reader io.ReadCloser) confmap.ProviderFactory 
 	)
 }
 
-func newProvider(reader io.ReadCloser, settings confmap.ProviderSettings) confmap.Provider {
+func newProvider(reader io.Reader, settings confmap.ProviderSettings) confmap.Provider {
 	backgroundReaderCtx, cancel := context.WithCancel(context.Background())
 	return &StdinGobProvider{
-		reader:                 reader,
+		decoder:                gob.NewDecoder(reader),
 		logger:                 settings.Logger,
 		watchers:               make(map[int]confmap.WatcherFunc),
 		backgroundReaderCtx:    backgroundReaderCtx,
@@ -153,14 +150,8 @@ func (p *StdinGobProvider) Retrieve(ctx context.Context, _ string, watcher confm
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.readErr != nil {
-		return nil, fmt.Errorf("config read error: %w", p.readErr)
-	}
-
-	// On first Retrieve call: set up the decoder and read initial config
-	if p.decoder == nil {
-		p.decoder = gob.NewDecoder(p.reader)
-
+	// On first Retrieve call, read the initial config synchronously
+	if p.yamlCfg == nil && p.readErr == nil {
 		yamlBytes, err := p.readCfgBytes(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read initial config: %w", err)
@@ -170,12 +161,12 @@ func (p *StdinGobProvider) Retrieve(ctx context.Context, _ string, watcher confm
 		p.backgroundReaderOnce.Do(p.startBackgroundReader)
 	}
 
+	if p.readErr != nil {
+		return nil, fmt.Errorf("config read error: %w", p.readErr)
+	}
+
 	// Get latest config at time of call
 	yamlCfg := p.yamlCfg
-
-	if yamlCfg == nil {
-		return nil, errors.New("no configuration available")
-	}
 
 	// Register watcher if provided. Retrieved.Close removes it from the map.
 	var opts []confmap.RetrievedOption
