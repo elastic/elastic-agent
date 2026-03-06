@@ -3,6 +3,7 @@ COVERAGE_DIR=$(BUILD_DIR)/coverage
 BEATS?=elastic-agent
 PROJECTS= $(BEATS)
 PYTHON_ENV?=$(BUILD_DIR)/python-env
+GOLANGCI_LINT_VERSION := v$(shell awk '/^golangci-lint / {print $$2}' .tool-versions)
 
 ## mage : Sets mage
 .PHONY: mage
@@ -18,6 +19,11 @@ install-gotestsum:
 	@echo Installing gotestsum
 	go install gotest.tools/gotestsum
 	@-gotestsum --version
+
+## install-golangci-lint : Install golangci-lint
+.PHONY: install-golangci-lint
+install-golangci-lint:
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION)
 
 ## help : Show this help.
 help: Makefile
@@ -52,9 +58,17 @@ check:
 
 ## check-go: download and run the go linter.
 .PHONY: check-go
-check-go: ## - Run golangci-lint
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.64.5
-	@./bin/golangci-lint run -v
+check-go: lint
+
+## lint: download and run the go linter on current changes.
+.PHONY: lint
+lint: install-golangci-lint
+	@./bin/golangci-lint run -v --timeout=30m --whole-files --new
+
+## lint-all: download and run the go linter on the whole codebase.
+.PHONY: lint-all
+lint-all: install-golangci-lint
+	@./bin/golangci-lint run -v --timeout=30m
 
 ## check-no-changes : Check there is no local changes.
 .PHONY: check-no-changes
