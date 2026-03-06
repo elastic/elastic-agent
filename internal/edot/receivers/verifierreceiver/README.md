@@ -362,7 +362,7 @@ exporters:
   elasticsearch:
     endpoints: ["${ES_ENDPOINT}"]
     api_key: "${ES_API_KEY}"
-    logs_index: "logs-cloud_connector.permission_verification-default"
+    logs_index: "logs-verifier_otel.verification-default"
 
 service:
   pipelines:
