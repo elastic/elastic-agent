@@ -83,6 +83,88 @@
                 "output"
             ]
         },
+        "cloudDefend": {
+            "type": "object",
+            "description": "Configuration for cloud-defend (Defend for Containers) integration.",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable cloud-defend integration."
+                },
+                "output": {
+                    "type": "string",
+                    "description": "Name of the output used in cloud-defend integration. Must be defined in outputs."
+                },
+                "namespace": {
+                    "type": "string",
+                    "description": "Output namespace.",
+                    "default": "default"
+                },
+                "securityPolicy": {
+                    "type": "object",
+                    "description": "Security policy with process and file selectors/responses. Embedded into the alerts stream.",
+                    "properties": {
+                        "process": {
+                            "type": "object",
+                            "description": "Process selectors and responses.",
+                            "properties": {
+                                "selectors": {
+                                    "type": "array"
+                                },
+                                "responses": {
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "file": {
+                            "type": "object",
+                            "description": "File selectors and responses.",
+                            "properties": {
+                                "selectors": {
+                                    "type": "array"
+                                },
+                                "responses": {
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    }
+                },
+                "heartbeat": {
+                    "type": "object",
+                    "properties": {
+                        "period": {
+                            "type": "string",
+                            "description": "Heartbeat stream period.",
+                            "default": "30m"
+                        }
+                    }
+                },
+                "metrics": {
+                    "type": "object",
+                    "properties": {
+                        "metricsets": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Metrics stream metricsets."
+                        },
+                        "hosts": {
+                            "description": "Metrics stream hosts."
+                        },
+                        "period": {
+                            "type": "string",
+                            "description": "Metrics stream period.",
+                            "default": "24h"
+                        }
+                    }
+                }
+            },
+            "required": [
+                "enabled"
+            ]
+        },
         "kubernetes": {
             "type": "object",
             "description": "Configuration for Kubernetes integration.",
