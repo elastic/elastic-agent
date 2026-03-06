@@ -9,6 +9,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -300,7 +301,7 @@ func (typ PackageType) PackagingDir(home string, target BuildPlatform, spec Pack
 }
 
 // Build builds a package based on the provided spec.
-func (typ PackageType) Build(spec PackageSpec) error {
+func (typ PackageType) Build(ctx context.Context, spec PackageSpec) error {
 	switch typ {
 	case RPM:
 		return PackageRPM(spec)
@@ -311,7 +312,7 @@ func (typ PackageType) Build(spec PackageSpec) error {
 	case TarGz:
 		return PackageTarGz(spec)
 	case Docker:
-		return PackageDocker(spec)
+		return PackageDocker(ctx, spec)
 	default:
 		return fmt.Errorf("unknown package type: %v", typ)
 	}
@@ -1105,7 +1106,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 }
 
 // PackageDocker packages the Beat into a docker image.
-func PackageDocker(spec PackageSpec) error {
+func PackageDocker(ctx context.Context, spec PackageSpec) error {
 	if err := HaveDocker(); err != nil {
 		return fmt.Errorf("docker daemon required to build images: %w", err)
 	}
@@ -1114,7 +1115,7 @@ func PackageDocker(spec PackageSpec) error {
 	if err != nil {
 		return err
 	}
-	return b.Build()
+	return b.Build(ctx)
 }
 
 func mustConvertToUnit32(i int64) uint32 {

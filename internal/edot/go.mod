@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => github.com/VihasMakwana/beats/v7 v7.0.0-20260306060228-d1a0f47dcbbc
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260226174817-c6f22b080eb8
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260305175215-8ed67e48c418
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.33.3
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -20,7 +20,6 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.29.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.29.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.29.0
-	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.145.0
@@ -98,6 +97,7 @@ require (
 	github.com/go-openapi/swag/stringutils v0.25.4 // indirect
 	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
+	github.com/gofrs/uuid/v5 v5.4.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
 	github.com/gosnmp/gosnmp v1.43.2 // indirect
@@ -351,7 +351,7 @@ require (
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/elastic-agent-autodiscover v0.10.2 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.18.0 // indirect
-	github.com/elastic/elastic-agent-system-metrics v0.14.1 // indirect
+	github.com/elastic/elastic-agent-system-metrics v0.14.3 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.9.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.12.1 // indirect
@@ -364,7 +364,7 @@ require (
 	github.com/elastic/go-sfdc v0.0.0-20251207194532-c5aadd4a4e06 // indirect
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-sysinfo v1.15.4 // indirect
-	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea // indirect
+	github.com/elastic/go-ucfg v0.9.1 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
