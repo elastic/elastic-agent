@@ -270,7 +270,7 @@ func (r *verifierReceiver) verifyPermissions(ctx context.Context) error {
 	// Data stream routing attributes for the Elasticsearch exporter.
 	// Native OTel inputs must set these explicitly for dynamic index routing.
 	resource.Attributes().PutStr("data_stream.type", "logs")
-	resource.Attributes().PutStr("data_stream.dataset", "cloud_connector.permission_verification")
+	resource.Attributes().PutStr("data_stream.dataset", "verifier_otel.verification")
 	resource.Attributes().PutStr("data_stream.namespace", namespace)
 
 	resource.Attributes().PutStr("verification.id", r.config.VerificationID)

@@ -269,7 +269,7 @@ processors:
 exporters:
   elasticsearch:
     endpoints: ["http://localhost:9200"]
-    logs_index: "logs-cloud_connector.permission_verification-default"
+    logs_index: "logs-verifier_otel.verification-default"
     mapping:
       mode: ecs
 
@@ -284,7 +284,7 @@ service:
 Then query Elasticsearch:
 
 ```bash
-curl -X GET "localhost:9200/logs-cloud_connector.permission_verification-default/_search?pretty" -H 'Content-Type: application/json' -d'
+curl -X GET "localhost:9200/logs-verifier_otel.verification-default/_search?pretty" -H 'Content-Type: application/json' -d'
 {
   "query": {
     "match": {
