@@ -60,6 +60,14 @@ extraVolumeMounts:
 {{- if eq $.Values.cloudDefend.enabled true }}
 - name: sys-kernel-debug
   mountPath: /sys/kernel/debug
+- name: boot
+  mountPath: /boot
+  readOnly: true
+- name: sys-fs-bpf
+  mountPath: /sys/fs/bpf
+- name: sys-kernel-security
+  mountPath: /sys/kernel/security
+  readOnly: true
 {{- end }}
 {{- end }}
 
@@ -96,6 +104,15 @@ extraVolumes:
 - name: sys-kernel-debug
   hostPath:
     path: /sys/kernel/debug
+- name: boot
+  hostPath:
+    path: /boot
+- name: sys-fs-bpf
+  hostPath:
+    path: /sys/fs/bpf
+- name: sys-kernel-security
+  hostPath:
+    path: /sys/kernel/security
 {{- end }}
 {{- end -}}
 
