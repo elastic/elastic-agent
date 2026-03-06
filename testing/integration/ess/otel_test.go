@@ -1061,8 +1061,6 @@ agent.monitoring:
   http:
     enabled: true
     port: 6790
-agent.internal.runtime.metricbeat:
-  http/metrics: otel
 `
 	index := ".ds-metrics-e2e-*"
 	var configBuffer bytes.Buffer
@@ -2141,8 +2139,6 @@ outputs:
     preset: "balanced"
     status_reporting:
       enabled: {{.StatusReportingEnabled}}
-agent.internal.runtime.metricbeat:
-  system/metrics: otel
 `
 
 	var configBuffer bytes.Buffer

@@ -21,21 +21,20 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
-	"github.com/elastic/go-elasticsearch/v8"
-
 	"github.com/gofrs/uuid/v5"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 
 	"github.com/stretchr/testify/assert"
@@ -831,8 +830,6 @@ func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
 
 	config := fmt.Sprintf(`agent.logging.to_stderr: true
 agent.logging.to_files: false
-agent.internal.runtime.metricbeat:
-  system/metrics: otel
 inputs:
   - type: system/metrics
     id: unique-system-metrics-input
@@ -842,7 +839,6 @@ inputs:
   - type: system/metrics
     id: unique-system-metrics-input-2
     use_output: supported
-    _runtime_experimental: otel
     streams:
       - metricsets:
         - cpu
