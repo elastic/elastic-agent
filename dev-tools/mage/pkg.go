@@ -17,9 +17,9 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-// Package packages the Beat for distribution using the provided config.
-// It generates packages based on the set of target platforms and registered packaging specifications.
-func Package(ctx context.Context, cfg *Settings) error {
+// Package packages the Beat for distribution using the provided config and package specifications.
+// It generates packages based on the set of target platforms and the given packaging specifications.
+func Package(ctx context.Context, cfg *Settings, packages []OSPackageArgs) error {
 	fmt.Println("--- Package artifact")
 	platforms := cfg.GetPlatforms()
 	if len(platforms) == 0 {
@@ -27,14 +27,14 @@ func Package(ctx context.Context, cfg *Settings) error {
 		return nil
 	}
 
-	if len(Packages) == 0 {
-		return fmt.Errorf("no package specs are registered. Call " +
-			"UseCommunityBeatPackaging, UseElasticBeatPackaging or USeElasticBeatWithoutXPackPackaging first")
+	if len(packages) == 0 {
+		return fmt.Errorf("no package specs provided. Use " +
+			"LoadElasticAgentPackageSpec or LoadElasticAgentCorePackageSpec to load them")
 	}
 
 	if mg.Verbose() {
-		debugSelectedPackageSpecsWithPlatform := make([]string, 0, len(Packages))
-		for _, p := range Packages {
+		debugSelectedPackageSpecsWithPlatform := make([]string, 0, len(packages))
+		for _, p := range packages {
 			debugSelectedPackageSpecsWithPlatform = append(debugSelectedPackageSpecsWithPlatform, fmt.Sprintf("spec %s on %s/%s", p.Spec.Name, p.OS, p.Arch))
 		}
 
@@ -43,7 +43,7 @@ func Package(ctx context.Context, cfg *Settings) error {
 
 	tasks := make(map[string][]interface{})
 	for _, target := range platforms {
-		for _, pkg := range Packages {
+		for _, pkg := range packages {
 			if pkg.OS != target.GOOS() || pkg.Arch != "" && pkg.Arch != target.Arch() {
 				continue
 			}
