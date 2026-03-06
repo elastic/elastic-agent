@@ -101,7 +101,7 @@ func TestReceiver_StartShutdown(t *testing.T) {
 
 	dsDataset, ok := attrs.Get("data_stream.dataset")
 	require.True(t, ok)
-	assert.Equal(t, "cloud_connector.permission_verification", dsDataset.Str())
+	assert.Equal(t, "verifier_otel.verification", dsDataset.Str())
 
 	dsNamespace, ok := attrs.Get("data_stream.namespace")
 	require.True(t, ok)
