@@ -8,9 +8,41 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v2"
 )
+
+// --- Packaging spec loading ---
+
+const packageSpecFile = "dev-tools/packaging/packages.yml"
+
+// LoadElasticAgentCorePackageSpec loads and returns the elastic_agent_core
+// package spec from packages.yml under beatsDir.
+func LoadElasticAgentCorePackageSpec(beatsDir string) ([]OSPackageArgs, error) {
+	return loadPackageSpec(beatsDir, "elastic_agent_core")
+}
+
+// LoadElasticAgentPackageSpec loads and returns the elastic_agent_packaging
+// package spec from packages.yml under beatsDir.
+func LoadElasticAgentPackageSpec(beatsDir string) ([]OSPackageArgs, error) {
+	return loadPackageSpec(beatsDir, "elastic_agent_packaging")
+}
+
+// loadPackageSpec loads the named spec from packages.yml under beatsDir.
+func loadPackageSpec(beatsDir, specName string) ([]OSPackageArgs, error) {
+	pkgSpecFile := filepath.Join(beatsDir, packageSpecFile)
+	packageSpecs, err := LoadSpecs(pkgSpecFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load package specs: %w", err)
+	}
+
+	spec, ok := packageSpecs[specName]
+	if !ok {
+		return nil, fmt.Errorf("%v not found in package specs", specName)
+	}
+	return spec, nil
+}
 
 // LoadSpecs loads the packaging specifications from the specified YAML files.
 func LoadSpecs(files ...string) (map[string][]OSPackageArgs, error) {

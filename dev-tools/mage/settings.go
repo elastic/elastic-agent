@@ -651,16 +651,6 @@ type Settings struct {
 	// BuildDate is the timestamp when settings were loaded (build started).
 	// Initialized during LoadSettings().
 	BuildDate string
-
-	// package specs that we directly use in the course of packaging agents
-	// these also appear in packageSpecs above, but we extract them specifically to ensure they exist
-	// when loading Settings
-	agentCorePackageSpec []OSPackageArgs
-	agentPackageSpec     []OSPackageArgs
-
-	// Packages holds the selected package specifications for the current build.
-	// This is set by UseElasticAgentPackaging etc.
-	Packages []OSPackageArgs
 }
 
 // DefaultSettings returns a new Settings instance with all default values.
@@ -777,10 +767,6 @@ func (s *Settings) Clone() *Settings {
 	if s.SelectedDockerVariants != nil {
 		clone.SelectedDockerVariants = make([]DockerVariant, len(s.SelectedDockerVariants))
 		copy(clone.SelectedDockerVariants, s.SelectedDockerVariants)
-	}
-	if s.Packages != nil {
-		clone.Packages = make([]OSPackageArgs, len(s.Packages))
-		copy(clone.Packages, s.Packages)
 	}
 	return &clone
 }
@@ -1686,34 +1672,6 @@ func (s *Settings) initBuildVariables() error {
 		return fmt.Errorf("failed to parse flavors: %w", err)
 	}
 
-	// Load package specs from packages.yml
-	err = s.loadPackageSpecs()
-	if err != nil {
-		return fmt.Errorf("failed to load package specs")
-	}
-
-	return nil
-}
-
-func (s *Settings) loadPackageSpecs() error {
-	pkgSpecFile := filepath.Join(s.ElasticBeatsDir, packageSpecFile)
-	packageSpecs, err := LoadSpecs(pkgSpecFile)
-	if err != nil {
-		return fmt.Errorf("failed to load package specs: %w", err)
-	}
-
-	if agentCoreSpec, ok := packageSpecs["elastic_agent_core"]; ok {
-		s.agentCorePackageSpec = agentCoreSpec
-	} else {
-		return fmt.Errorf("%v not found in package specs", "elastic_agent_core")
-	}
-
-	if agentPackageSpec, ok := packageSpecs["elastic_agent_packaging"]; ok {
-		s.agentPackageSpec = agentPackageSpec
-	} else {
-		return fmt.Errorf("%v not found in package specs", "elastic_agent_packaging")
-	}
-
 	return nil
 }
 
@@ -1879,20 +1837,4 @@ func (s *Settings) IsDockerVariantSelected(docVariant DockerVariant) bool {
 		}
 	}
 	return false
-}
-
-// --- Packaging spec selection ---
-
-const packageSpecFile = "dev-tools/packaging/packages.yml"
-
-// UseElasticAgentCorePackaging selects the elastic_agent_core package spec
-// for building binary packages for an Elastic Agent.
-func (s *Settings) UseElasticAgentCorePackaging() {
-	s.Packages = s.agentCorePackageSpec
-}
-
-// UseElasticAgentPackaging selects the elastic_agent_packaging package spec
-// for building packages for an Elastic Agent.
-func (s *Settings) UseElasticAgentPackaging() {
-	s.Packages = s.agentPackageSpec
 }
