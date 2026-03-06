@@ -93,8 +93,6 @@ func (r *RuntimeConfig) Validate() error {
 				return err
 			}
 		}
-		// workaround for https://github.com/elastic/go-ucfg/issues/215
-		delete(beatConfig.InputType, "default")
 	}
 
 	allowedOutput := []string{"elasticsearch", "logstash"}
