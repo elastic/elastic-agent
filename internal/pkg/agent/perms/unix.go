@@ -12,9 +12,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"syscall"
-	"strings"
 	"runtime"
+	"strings"
+	"syscall"
 
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
