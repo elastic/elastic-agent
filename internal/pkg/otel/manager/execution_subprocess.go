@@ -275,9 +275,8 @@ func (r *subprocessExecution) startCollector(
 		r.reportErrFn(ctx, processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
 	}()
 
-	// The pipeWriter goroutine takes ownership of the pipe. It writes the
-	// initial config and subsequent updates asynchronously. Any errors are
-	// reported directly to processErrCh via reportErrFn.
+	// The pipeWriter goroutine writes the initial config and subsequent updates asynchronously to the pipe.
+	// Any errors are reported directly to processErrCh via reportErrFn.
 	go func() {
 		defer ctl.wg.Done()
 		ctl.writeToPipe(processInfo.Stdin)
