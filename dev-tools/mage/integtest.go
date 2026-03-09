@@ -122,7 +122,7 @@ type IntegrationTester interface {
 	// Test performs executing the test inside the environment.
 	Test(dir string, mageTarget string, cfg *Settings, env map[string]string) error
 	// InsideTest performs the actual test on the inside of environment.
-	InsideTest(test func() error) error
+	InsideTest(test func() error, cfg *Settings) error
 	// StepRequirements returns the steps this tester requires. These
 	// are always placed before other autodiscover steps.
 	StepRequirements() IntegrationTestSteps
@@ -231,7 +231,7 @@ func initRunner(cfg *Settings, tester IntegrationTester, dir string, passInEnv m
 func (r *IntegrationRunner) Test(mageTarget string, test func() error) error {
 	// Inside the testing environment just run the test.
 	if IsInIntegTestEnv() {
-		return r.tester.InsideTest(test)
+		return r.tester.InsideTest(test, r.cfg)
 	}
 
 	// Honor the TEST_ENVIRONMENT value if set.
