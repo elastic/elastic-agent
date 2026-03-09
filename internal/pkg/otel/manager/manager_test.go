@@ -173,6 +173,7 @@ func (e *mockExecution) startCollector(
 		collectorLogLevel: level,
 	}
 	if e.collectorStarted != nil {
+		e.collectorStartCount++
 		e.collectorStarted <- struct{}{}
 	}
 	return handle, nil
@@ -1833,6 +1834,8 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		require.NotNil(t, aggStatus)
 		assert.Equal(t, aggStatus.Status(), componentstatus.StatusFatalError)
 	})
+
+	assert.Equal(t, 1, execution.collectorStartCount)
 }
 
 // TestOTelManager_RestartOnLogLevelChange verifies that the collector subprocess is restarted
