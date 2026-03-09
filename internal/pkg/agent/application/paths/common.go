@@ -391,6 +391,11 @@ func SetDiagnosticsExtensionSocket(path string) {
 	diagnosticsExtensionSocket = path
 }
 
+func HealthcheckExtensionSocket(uid string) string {
+	socketFileName := fmt.Sprintf(HealthcheckExtensionSocketNameTemplate, uid)
+	return SocketFromPath(runtime.GOOS, topPath, socketFileName)
+}
+
 func pathSplit(path string) []string {
 	dir, file := filepath.Split(path)
 	if dir == "" && file == "" {

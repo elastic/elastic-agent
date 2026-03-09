@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"go.opentelemetry.io/collector/confmap"
@@ -34,14 +35,13 @@ const (
 )
 
 // AllComponentsStatuses retrieves the status of all components from the health check endpoint.
-func AllComponentsStatuses(ctx context.Context, client http.Client, httpHealthCheckPort int) (*otelstatus.AggregateStatus, error) {
+func AllComponentsStatuses(ctx context.Context, client http.Client) (*otelstatus.AggregateStatus, error) {
 	var err error
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://127.0.0.1:%d%s?verbose",
-		httpHealthCheckPort, healthCheckHealthStatusPath), http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://127.0.0.1%s?verbose", healthCheckHealthStatusPath), http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http request: %w", err)
 	}
@@ -71,8 +71,12 @@ func AllComponentsStatuses(ctx context.Context, client http.Client, httpHealthCh
 }
 
 // injectHealthCheckV2Extension injects the healthcheckv2 extension into the provided configuration.
-func injectHealthCheckV2Extension(conf *confmap.Conf, healthCheckExtensionID string, httpHealthCheckPort int) error {
-	err := conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
+func injectHealthCheckV2Extension(conf *confmap.Conf, healthCheckExtensionID string, endpoint string) error {
+	endpointUrl, err := url.Parse(endpoint)
+	if err != nil {
+		return fmt.Errorf("error parsing url %s: %w", endpoint, err)
+	}
+	err = conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
 		"extensions": map[string]interface{}{
 			healthCheckExtensionID: map[string]interface{}{
 				"use_v2": true,
@@ -82,7 +86,8 @@ func injectHealthCheckV2Extension(conf *confmap.Conf, healthCheckExtensionID str
 					"recovery_duration":          healthCheckRecoveryDuration,
 				},
 				"http": map[string]interface{}{
-					"endpoint":            fmt.Sprintf("localhost:%d", httpHealthCheckPort),
+					"endpoint":            endpointUrl.Path,
+					"transport":           endpointUrl.Scheme,
 					"keep_alives_enabled": true,
 					"status": map[string]interface{}{
 						"enabled":            healthCheckHealthStatusEnabled,

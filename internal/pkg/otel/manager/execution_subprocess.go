@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,8 +18,12 @@ import (
 	"sync"
 	"time"
 
-	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"github.com/elastic/elastic-agent/pkg/ipc"
 	"go.opentelemetry.io/collector/component"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
@@ -120,13 +125,19 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("could not find port for collector: %w", err)
 	}
 
+	healthcheckSocket := paths.HealthcheckExtensionSocket(r.healthCheckExtensionID)
+	if l, lErr := ipc.CreateListener(logger, healthcheckSocket); lErr != nil {
+		return nil, lErr
+	} else {
+		_ = l.Close()
+	}
 	var configModifier ConfigModifier = func(cfg *confmap.Conf) error {
-		if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
-			return fmt.Errorf("failed to inject health check extension: %w", err)
-		}
-
 		if err := addCollectorMetricsReader(cfg, r.collectorMetricsPort); err != nil {
 			return fmt.Errorf("failed to add collector metrics reader: %w", err)
+		}
+
+		if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, healthcheckSocket); err != nil {
+			return fmt.Errorf("failed to inject health check extension: %w", err)
 		}
 
 		return nil
@@ -195,9 +206,14 @@ func (r *subprocessExecution) startCollector(
 		const healthCheckPollDuration = 1 * time.Second
 		healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
 		defer healthCheckPollTimer.Stop()
-		client := http.Client{}
+		tr := &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return client.Dialer(ctx, healthcheckSocket)
+			},
+		}
+		httpClient := http.Client{Transport: tr}
 		for {
-			statuses, err := AllComponentsStatuses(procCtx, client, httpHealthCheckPort)
+			statuses, err := AllComponentsStatuses(procCtx, httpClient)
 			if err != nil {
 				switch {
 				case errors.Is(err, context.Canceled):

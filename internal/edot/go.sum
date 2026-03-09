@@ -1545,6 +1545,8 @@ github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXl
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
+github.com/swiatekm/opentelemetry-collector/config/confignet v0.0.0-20260306162146-5c6e44867617 h1:izUig7oqJLqokr6AyzL0kTgVFtZN2eVP4q9iUSG7iB8=
+github.com/swiatekm/opentelemetry-collector/config/confignet v0.0.0-20260306162146-5c6e44867617/go.mod h1:Op+r1B/DtzXgIuKEL7/JkTqtJdL9veu2uEXvSxH3lks=
 github.com/teambition/rrule-go v1.8.2 h1:lIjpjvWTj9fFUZCmuoVDrKVOtdiyzbzc93qTmRVe/J8=
 github.com/teambition/rrule-go v1.8.2/go.mod h1:Ieq5AbrKGciP1V//Wq8ktsTXwSwJHDD5mD/wLBGl3p4=
 github.com/testcontainers/testcontainers-go v0.40.0 h1:pSdJYLOVgLE8YdUY2FHQ1Fxu+aMnb6JfVz1mxk7OeMU=
@@ -1688,8 +1690,6 @@ go.opentelemetry.io/collector/config/confighttp v0.147.0 h1:DDZT5/CVZUJoXv3tcKIV
 go.opentelemetry.io/collector/config/confighttp v0.147.0/go.mod h1:K7Qw/xGXCuoduoKvE4ImXOCEPTfAipkE7QMsgqcllq0=
 go.opentelemetry.io/collector/config/configmiddleware v1.53.0 h1:7GPw68VbMAeCh7L4+cYX7xFyLhI8qehIac1WxYS8Ctc=
 go.opentelemetry.io/collector/config/configmiddleware v1.53.0/go.mod h1:25XTB96jdlp1xb1z3rkme/xxD144CLydZZX3zA0B+5k=
-go.opentelemetry.io/collector/config/confignet v1.53.0 h1:12xlR5F1A16EUqnqKc99AzUPp4uvPqe8tLoBq6c9jo0=
-go.opentelemetry.io/collector/config/confignet v1.53.0/go.mod h1:okpHzgIUQW9ga1P9PXzUsggmG1woR1rYsfZGDWKAC6c=
 go.opentelemetry.io/collector/config/configopaque v1.53.0 h1:xuXfIl0PIQjuTg8TZ/tRtdkAtXEBUVH2FekC/c46Wco=
 go.opentelemetry.io/collector/config/configopaque v1.53.0/go.mod h1:4zVbxe+oVVcYTl9xH2ww/4p8NDmlzvFKmy8cIm7FAXo=
 go.opentelemetry.io/collector/config/configoptional v1.53.0 h1:ltapYduU3tEzY+4Dl1JO8Vmlp0XAsEbCQi13PsUXnWE=

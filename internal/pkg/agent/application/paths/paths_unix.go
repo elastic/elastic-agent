@@ -13,7 +13,9 @@ import (
 	"strings"
 )
 
-const ()
+const (
+	HealthcheckExtensionSocketNameTemplate = "edot-healthcheck-extension-%s.sock"
+)
 
 // shellWrapperPathForNamespace is a helper to work around not being able to use fmt.Sprintf
 // unconditionally since shellWrapperPathNamespaceFmt is empty on Windows. The provided namespace is
