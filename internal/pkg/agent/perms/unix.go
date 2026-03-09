@@ -13,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"strings"
+	"runtime"
 
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
@@ -39,6 +41,11 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 				return fmt.Errorf("cannot update ownership of %q: %w", topPath, err)
 			}
 
+			if isOSQueryApp(name) {
+				// ignore the error if the file is osquery.app
+				return nil
+			}
+
 			// check desired owner is same as current file owner, if so, ignore the error as it is likely a permission issue with the user running the agent and not an issue with the file ownership
 			if same, sErr := isSameUser(info, o.ownership); sErr != nil || !same {
 				return fmt.Errorf("cannot update ownership of %q: %w", topPath, err)
@@ -50,6 +57,11 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 			if !errors.Is(err, syscall.EPERM) {
 				// fail right away if the error is not a permission error
 				return fmt.Errorf("cannot update ownership of %q: %w", topPath, err)
+			}
+
+			if isOSQueryApp(name) {
+				// ignore the error if the file is osquery.app
+				return nil
 			}
 
 			// check desired mode is same as current file mode, if so, ignore the error as it is likely a permission issue with the user running the agent and not an issue with the file permissions
@@ -73,4 +85,12 @@ func isSameUser(info fs.FileInfo, ownership utils.FileOwner) (bool, error) {
 
 func maskIsStripped(info fs.FileInfo, mask os.FileMode) bool {
 	return info.Mode().Perm()&mask == 0
+}
+
+func isOSQueryApp(path string) bool {
+	// on mac check if part of the path is "osquery.app"
+	if runtime.GOOS == "darwin" {
+		return strings.Contains(path, "osquery.app")
+	}
+	return false
 }
