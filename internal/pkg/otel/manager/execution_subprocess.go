@@ -146,18 +146,6 @@ func (r *subprocessExecution) startCollector(
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
 
-	// Create a pipe for streaming config to the subprocess via stdin
-	pipeReader, pipeWriter, err := os.Pipe()
-	if err != nil {
-		procCtxCancel()
-		return nil, fmt.Errorf("failed to create config pipe: %w", err)
-	}
-	defer func() {
-		if closeErr := pipeReader.Close(); closeErr != nil {
-			logger.Warnf("Error closing read end of the collector config pipe: %v", err)
-		}
-	}()
-
 	// set collector args and add --config flag with the elasticagent:stdin URI
 	// set collector args and add --config flag with the stdingob:stdin URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
@@ -167,7 +155,6 @@ func (r *subprocessExecution) startCollector(
 		process.WithArgs(collectorArgs),
 		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
-			c.Stdin = pipeReader
 			c.Stdout = stdOut
 			c.Stderr = stdErr
 			return nil
@@ -178,7 +165,6 @@ func (r *subprocessExecution) startCollector(
 		if err == nil {
 			err = errors.New("process is nil")
 		}
-		_ = pipeWriter.Close()
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
@@ -293,7 +279,10 @@ func (r *subprocessExecution) startCollector(
 	// The pipeWriter goroutine takes ownership of the pipe. It writes the
 	// initial config and subsequent updates asynchronously. Any errors are
 	// reported directly to processErrCh via reportErrFn.
-	go ctl.writeToPipe(pipeWriter)
+	go func() {
+		defer ctl.wg.Done()
+		ctl.writeToPipe(processInfo.Stdin)
+	}()
 	ctl.updateConfigYamlBytes(cfgYamlBytes)
 
 	return ctl, nil
@@ -413,13 +402,6 @@ func newProcHandle(
 // writeToPipe owns the pipe lifecycle. It loops writing configs queued via configCh until the process
 // exits. Errors are reported via reportErrFn.
 func (s *procHandle) writeToPipe(pipeWriter io.WriteCloser) {
-	defer func() {
-		if err := pipeWriter.Close(); err != nil {
-			s.log.Warnf("Error closing collector config pipe: %v", err)
-		}
-		s.wg.Done()
-	}()
-
 	encoder := gob.NewEncoder(pipeWriter)
 
 	// Loop: write configs until the process exits.
@@ -429,7 +411,16 @@ func (s *procHandle) writeToPipe(pipeWriter io.WriteCloser) {
 			return
 		case cfgBytes := <-s.configCh:
 			if err := encoder.Encode(cfgBytes); err != nil {
-				s.reportErrFn(fmt.Errorf("failed to write config update: %w", err))
+				// We may get an error here if we're trying to write a config, but the process exits. This isn't
+				// really an error, so it's best to avoid reporting it. Check processDoneCh to be sure.
+				select {
+				case <-s.processDoneCh:
+				default:
+					if !errors.Is(err, io.ErrClosedPipe) {
+						s.reportErrFn(fmt.Errorf("failed to write config update: %w", err))
+					}
+				}
+
 				return
 			}
 		}

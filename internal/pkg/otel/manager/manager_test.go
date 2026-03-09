@@ -138,11 +138,12 @@ func (e *testExecution) getProcessHandle() collectorHandle {
 var _ collectorExecution = &mockExecution{}
 
 type mockExecution struct {
-	errCh            chan error
-	statusCh         chan *status.AggregateStatus
-	cfg              *confmap.Conf
-	collectorStarted chan struct{}
-	configUpdated    chan struct{}
+	errCh               chan error
+	statusCh            chan *status.AggregateStatus
+	cfg                 *confmap.Conf
+	collectorStarted    chan struct{}
+	collectorStartCount int
+	configUpdated       chan struct{}
 }
 
 func (e *mockExecution) startCollector(

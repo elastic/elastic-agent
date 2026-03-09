@@ -140,7 +140,10 @@ func TestProcHandle_WriteToPipe(t *testing.T) {
 	h := newTestProcHandle(t, doneCh, func(err error) { reportedErr = err }, nil)
 	h.wg.Add(1)
 
-	go h.writeToPipe(pipeWriter)
+	go func() {
+		defer h.wg.Done()
+		h.writeToPipe(pipeWriter)
+	}()
 
 	// Send a config and read it from the pipe.
 	expected := []byte("receivers:\n  nop:\n")
@@ -157,13 +160,9 @@ func TestProcHandle_WriteToPipe(t *testing.T) {
 	h.wg.Wait()
 
 	assert.NoError(t, reportedErr)
-
-	// The pipe writer should be closed, so reading should return EOF.
-	err = decoder.Decode(&got)
-	assert.ErrorIs(t, err, io.EOF)
 }
 
-func TestProcHandle_WriteToPipe_ReportsErrorOnClosedPipe(t *testing.T) {
+func TestProcHandle_WriteToPipe_SuppressesClosedPipeError(t *testing.T) {
 	doneCh := make(chan struct{})
 	_, pipeWriter := io.Pipe()
 
@@ -171,18 +170,21 @@ func TestProcHandle_WriteToPipe_ReportsErrorOnClosedPipe(t *testing.T) {
 	h := newTestProcHandle(t, doneCh, func(err error) { errCh <- err }, nil)
 	h.wg.Add(1)
 
-	// Close the write end before writing to force an error.
+	// Close the write end before writing — io.ErrClosedPipe should be suppressed.
 	pipeWriter.Close()
-	go h.writeToPipe(pipeWriter)
+	go func() {
+		defer h.wg.Done()
+		h.writeToPipe(pipeWriter)
+	}()
 
 	h.updateConfigYamlBytes([]byte("test"))
 
+	// Give the goroutine time to process, then verify no error was reported.
 	select {
 	case err := <-errCh:
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to write config update")
-	case <-time.After(5 * time.Second):
-		t.Fatal("timed out waiting for error report")
+		t.Fatalf("expected no error to be reported for closed pipe, got: %v", err)
+	case <-time.After(200 * time.Millisecond):
+		// no error reported — expected
 	}
 
 	close(doneCh)
