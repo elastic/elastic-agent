@@ -9,6 +9,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -110,6 +111,7 @@ type PackageSpec struct {
 	ExtraVars               map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
 	Components              []packaging.BinarySpec `yaml:"components"`            // Optional: Components required for this package
 
+	cfg                    *Settings
 	evalContext            map[string]interface{}
 	packageDir             string
 	localPreInstallScript  string
@@ -290,7 +292,7 @@ func (typ PackageType) PackagingDir(home string, target BuildPlatform, spec Pack
 }
 
 // Build builds a package based on the provided spec.
-func (typ PackageType) Build(spec PackageSpec) error {
+func (typ PackageType) Build(ctx context.Context, spec PackageSpec) error {
 	switch typ {
 	case RPM:
 		return PackageRPM(spec)
@@ -301,7 +303,7 @@ func (typ PackageType) Build(spec PackageSpec) error {
 	case TarGz:
 		return PackageTarGz(spec)
 	case Docker:
-		return PackageDocker(spec)
+		return PackageDocker(ctx, spec)
 	default:
 		return fmt.Errorf("unknown package type: %v", typ)
 	}
@@ -342,8 +344,8 @@ func (s *PackageSpec) ExtraVar(key, value string) {
 
 // Expand expands a templated string using data from the spec.
 func (s PackageSpec) Expand(in string, args ...map[string]interface{}) (string, error) {
-	return expandTemplate("inline", in, FuncMap,
-		EnvMap(append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
+	return expandTemplate("inline", in, FuncMap(s.cfg),
+		EnvMap(s.cfg, append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
 }
 
 // MustExpand expands a templated string using data from the spec. It panics if
@@ -358,8 +360,8 @@ func (s PackageSpec) MustExpand(in string, args ...map[string]interface{}) strin
 
 // ExpandFile expands a template file using data from the spec.
 func (s PackageSpec) ExpandFile(src, dst string, args ...map[string]interface{}) error {
-	return expandFile(src, dst,
-		EnvMap(append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
+	return expandFile(s.cfg, src, dst,
+		EnvMap(s.cfg, append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
 }
 
 // MustExpandFile expands a template file using data from the spec. It panics if
@@ -378,7 +380,7 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 		if in == "" {
 			return ""
 		}
-		return MustExpand(in, args...)
+		return MustExpand(s.cfg, in, args...)
 	}
 
 	if s.evalContext == nil {
@@ -484,7 +486,7 @@ func (s PackageSpec) ImageName() string {
 		}
 
 		data := s.toMap()
-		for k, v := range varMap() {
+		for k, v := range varMap(s.cfg) {
 			data[k] = v
 		}
 
@@ -1084,7 +1086,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 }
 
 // PackageDocker packages the Beat into a docker image.
-func PackageDocker(spec PackageSpec) error {
+func PackageDocker(ctx context.Context, spec PackageSpec) error {
 	if err := HaveDocker(); err != nil {
 		return fmt.Errorf("docker daemon required to build images: %w", err)
 	}
@@ -1093,5 +1095,5 @@ func PackageDocker(spec PackageSpec) error {
 	if err != nil {
 		return err
 	}
-	return b.Build()
+	return b.Build(ctx)
 }

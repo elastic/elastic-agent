@@ -10,10 +10,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
-func testPackageSpec() PackageSpec {
+func testPackageSpec(t testing.TB) PackageSpec {
+	t.Helper()
+	cfg, err := LoadSettings()
+	require.NoError(t, err)
 	return PackageSpec{
 		Name:     "brewbeat",
 		Version:  "7.0.0",
@@ -30,6 +34,7 @@ func testPackageSpec() PackageSpec {
 				Mode:    0644,
 			},
 		},
+		cfg: cfg,
 	}
 }
 
@@ -60,7 +65,7 @@ func TestPackageDeb(t *testing.T) {
 }
 
 func testPackage(t testing.TB, pack func(PackageSpec) error) {
-	spec := testPackageSpec().Evaluate()
+	spec := testPackageSpec(t).Evaluate()
 
 	readme := spec.Files["README.txt"]
 	readmePath := filepath.ToSlash(filepath.Clean(readme.Source))
@@ -72,22 +77,20 @@ func testPackage(t testing.TB, pack func(PackageSpec) error) {
 }
 
 func TestRepoRoot(t *testing.T) {
-	repo, err := GetProjectRepoInfo()
-	if err != nil {
-		t.Error(err)
-	}
+	cfg, err := LoadSettings()
+	require.NoError(t, err)
 
-	assert.Equal(t, "github.com/elastic/elastic-agent", repo.RootImportPath)
-	assert.True(t, filepath.IsAbs(repo.RootDir))
-	cwd := filepath.Join(repo.RootDir, repo.SubDir)
+	assert.Equal(t, "github.com/elastic/elastic-agent", cfg.RepoInfo.RootImportPath)
+	assert.True(t, filepath.IsAbs(cfg.RepoInfo.RootDir))
+	cwd := filepath.Join(cfg.RepoInfo.RootDir, cfg.RepoInfo.SubDir)
 	assert.Equal(t, CWD(), cwd)
 }
 
 func TestDumpVariables(t *testing.T) {
-	out, err := dumpVariables()
-	if err != nil {
-		t.Fatal(err)
-	}
+	cfg, err := LoadSettings()
+	require.NoError(t, err)
+	out, err := dumpVariables(cfg)
+	require.NoError(t, err)
 	t.Log(out)
 }
 

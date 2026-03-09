@@ -10,8 +10,8 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1771117289"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1771117289"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1772525581"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1772525581"
 
 steps:
   - input: "Build parameters"
@@ -214,3 +214,11 @@ steps:
         buildkite-agent meta-data set "triggered_build_id" "$BUILDKITE_BUILD_ID" --job $TRIGGER_JOB_ID
         buildkite-agent meta-data set "triggered_commit_hash" "$BUILDKITE_COMMIT" --job $TRIGGER_JOB_ID
       fi
+
+notify:
+- slack:
+    channels:
+      - "#ingest-notifications"
+    message: ":traffic_cone: elastic-agent-package failed! <!subteam^S030QSX59PH> please investigate."
+  if: build.state == "failed" && (build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+\$/)
+

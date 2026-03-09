@@ -46,7 +46,7 @@ func CopyComponentSpecs(componentName, versionedDropPath string) (string, error)
 // (a directory containing all the extracted dependencies per platform) to the versionedDropPath (a drop path by platform
 // that will be used to compose the package content)
 // ChecksumsWithoutManifest will accumulate the checksums of each component spec that is copied, and return it to the caller.
-func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, dependencies []packaging.BinarySpec) map[string]string {
+func ChecksumsWithoutManifest(cfg *Settings, platform string, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, dependencies []packaging.BinarySpec) map[string]string {
 	checksums := make(map[string]string)
 
 	for _, dep := range dependencies {
@@ -67,7 +67,7 @@ func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versi
 
 		atLeastOnePackageTypeSelected := false
 		for _, pkgType := range dep.PackageTypes {
-			if IsPackageTypeSelected(PackageType(pkgType)) {
+			if cfg.IsPackageTypeSelected(PackageType(pkgType)) {
 				atLeastOnePackageTypeSelected = true
 				break
 			}
@@ -75,7 +75,7 @@ func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versi
 
 		if !atLeastOnePackageTypeSelected {
 			if mg.Verbose() {
-				log.Printf(">>>>>>> Component %s/%s supported package types %v do not overlap selected package types %v, skipping", dep.ProjectName, dep.BinaryName, dep.PackageTypes, SelectedPackageTypes)
+				log.Printf(">>>>>>> Component %s/%s supported package types %v do not overlap selected package types, skipping", dep.ProjectName, dep.BinaryName, dep.PackageTypes)
 			}
 			continue
 		}
