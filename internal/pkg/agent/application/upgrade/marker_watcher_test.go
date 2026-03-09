@@ -30,7 +30,10 @@ func TestMarkerWatcher(t *testing.T) {
 	markerWatcher := newMarkerFileWatcher(testMarkerFile, testLogger)
 
 	testCtx, testCancel := context.WithCancel(context.Background())
-	defer testCancel()
+	defer func() {
+		testCancel()
+		<-markerWatcher.Done()
+	}()
 
 	var testDetails *details.Details
 	var testDetailsMu sync.Mutex
@@ -270,7 +273,7 @@ details:
 				mfw.SetUpgradeStarted()
 			}
 
-			mfw.processMarker(currentVersion, currentCommit)
+			mfw.processMarker(context.Background(), currentVersion, currentCommit)
 
 			// error loading marker
 			if test.expectedErrLogMsg {
