@@ -7,72 +7,41 @@ package mage
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
 	"gopkg.in/yaml.v2"
 )
 
+// --- Packaging spec loading ---
+
 const packageSpecFile = "dev-tools/packaging/packages.yml"
 
-// Packages defines the set of packages to be built when the package target is
-// executed.
-var Packages []OSPackageArgs
-
-// UseElasticAgentCorePackaging configures the package target to build binary packages
-// for an Elastic Agent.
-func UseElasticAgentCorePackaging(cfg *Settings) {
-	MustUsePackaging(cfg, "elastic_agent_core", packageSpecFile)
+// LoadElasticAgentCorePackageSpec loads and returns the elastic_agent_core
+// package spec from packages.yml under beatsDir.
+func LoadElasticAgentCorePackageSpec(beatsDir string) ([]OSPackageArgs, error) {
+	return loadPackageSpec(beatsDir, "elastic_agent_core")
 }
 
-// UseElasticAgentPackaging configures the package target to build packages for
-// an Elastic Agent.
-func UseElasticAgentPackaging(cfg *Settings) {
-	// Prepare binaries so they can be packed into agent
-	MustUsePackaging(cfg, "elastic_agent_packaging", packageSpecFile)
+// LoadElasticAgentPackageSpec loads and returns the elastic_agent_packaging
+// package spec from packages.yml under beatsDir.
+func LoadElasticAgentPackageSpec(beatsDir string) ([]OSPackageArgs, error) {
+	return loadPackageSpec(beatsDir, "elastic_agent_packaging")
 }
 
-// MustUsePackaging will load a named spec from a named file, if any errors
-// occurs when loading the specs it will panic.
-//
-// NOTE: we assume that specFile is relative to the beatsDir.
-func MustUsePackaging(cfg *Settings, specName, specFile string) {
-	beatsDir := cfg.ElasticBeatsDir
-
-	err := LoadNamedSpec(specName, filepath.Join(beatsDir, specFile))
+// loadPackageSpec loads the named spec from packages.yml under beatsDir.
+func loadPackageSpec(beatsDir, specName string) ([]OSPackageArgs, error) {
+	pkgSpecFile := filepath.Join(beatsDir, packageSpecFile)
+	packageSpecs, err := LoadSpecs(pkgSpecFile)
 	if err != nil {
-		panic(err)
-	}
-}
-
-// LoadLocalNamedSpec loads the named package spec from the packages.yml in the
-// current directory.
-func LoadLocalNamedSpec(cfg *Settings, name string) {
-	beatsDir := cfg.ElasticBeatsDir
-
-	err := LoadNamedSpec(name, filepath.Join(beatsDir, packageSpecFile), "packages.yml")
-	if err != nil {
-		panic(err)
-	}
-}
-
-// LoadNamedSpec loads a packaging specification with the given name from the
-// specified YAML file. name should be a sub-key of 'specs'.
-func LoadNamedSpec(name string, files ...string) error {
-	specs, err := LoadSpecs(files...)
-	if err != nil {
-		return fmt.Errorf("failed to load spec file: %w", err)
+		return nil, fmt.Errorf("failed to load package specs: %w", err)
 	}
 
-	packages, found := specs[name]
-	if !found {
-		return fmt.Errorf("%v not found in package specs", name)
+	spec, ok := packageSpecs[specName]
+	if !ok {
+		return nil, fmt.Errorf("%v not found in package specs", specName)
 	}
-
-	log.Printf("%v package spec loaded from %v", name, files)
-	Packages = packages
-	return nil
+	return spec, nil
 }
 
 // LoadSpecs loads the packaging specifications from the specified YAML files.
