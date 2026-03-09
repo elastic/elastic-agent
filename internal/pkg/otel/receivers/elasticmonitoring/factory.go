@@ -25,6 +25,10 @@ type Config struct {
 	} `mapstructure:"event_template"`
 
 	Interval time.Duration `mapstructure:"interval"`
+
+	// A map from OTel exporter IDs to the component name that should be used
+	// when reporting their metrics.
+	ExporterNames map[string]string `mapstructure:"exporter_names"`
 }
 
 func NewFactory() receiver.Factory {

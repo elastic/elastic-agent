@@ -40,7 +40,7 @@ func TestGetConfigFiles(t *testing.T) {
 	require.NoError(t, cmd.Flag(otelSetFlagName).Value.Set(setVal))
 
 	expectedConfigFiles := append([]string{configFile}, sets...)
-	configFiles, err := GetConfigFiles(cmd, false)
+	configFiles, err := GetConfigFiles(cmd.Flags(), false)
 	require.NoError(t, err)
 	require.Equal(t, expectedConfigFiles, configFiles)
 }
@@ -54,7 +54,7 @@ func TestGetConfigFilesWithDefault(t *testing.T) {
 	require.NoError(t, cmd.Flag(otelSetFlagName).Value.Set(setVal))
 
 	expectedConfigFiles := append([]string{paths.OtelConfigFile()}, sets...)
-	configFiles, err := GetConfigFiles(cmd, true)
+	configFiles, err := GetConfigFiles(cmd.Flags(), true)
 	require.NoError(t, err)
 	require.Equal(t, expectedConfigFiles, configFiles)
 }
@@ -62,7 +62,7 @@ func TestGetConfigFilesWithDefault(t *testing.T) {
 func TestGetConfigErrorWhenNoConfig(t *testing.T) {
 	cmd := NewOtelCommandWithArgs(nil, nil)
 
-	_, err := GetConfigFiles(cmd, false)
+	_, err := GetConfigFiles(cmd.Flags(), false)
 	require.Error(t, err)
 }
 

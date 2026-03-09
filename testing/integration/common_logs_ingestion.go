@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,6 +24,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"go.opentelemetry.io/otel/sdk/metric"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -113,7 +115,8 @@ func LogIngestionFleetManaged(t *testing.T, info *define.Info) {
 // It registers a cleanup function to close the server when the test finishes.
 // The server will respond with the passed error probabilities. If they add
 // up to zero, all requests are a success.
-func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge uint) string {
+func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge uint) *url.URL {
+	t.Helper()
 	uid := uuid.Must(uuid.NewV4())
 	clusterUUID := uuid.Must(uuid.NewV4()).String()
 
@@ -125,6 +128,36 @@ func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex
 		time.Now().Add(time.Hour),
 		0,
 		percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge, 0))
+
+	s := httptest.NewServer(mux)
+	t.Cleanup(s.Close)
+
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+
+	return u
+}
+
+// StartMockESDeterministic starts a MockES on a random port using httptest.NewServer
+// with a deterministic handler. It registers a cleanup function to close the server
+// when the test finishes. The server will use deterministic responses based on the
+// provided handler.
+func StartMockESDeterministic(t *testing.T, deterministicHandler func(action mockes.Action, event []byte) int) string {
+	uid := uuid.Must(uuid.NewV4())
+
+	reader := metric.NewManualReader()
+	provider := metric.NewMeterProvider(metric.WithReader(reader))
+
+	mux := http.NewServeMux()
+	mux.Handle("/", mockes.NewDeterministicAPIHandler(
+		uid,
+		"",
+		provider,
+		time.Now().Add(24*time.Hour),
+		0,
+		0,
+		deterministicHandler,
+	))
 
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)
@@ -194,7 +227,8 @@ func TestMonitoringLogsAreShipped(
 	docs = queryESDocs(t, func() (estools.Documents, error) {
 		return estools.CheckForErrorsInLogs(ctx, info.ESClient, info.Namespace, []string{
 			// acceptable error messages (include reason)
-			"Error dialing dial tcp 127.0.0.1:9200: connect: connection refused", // beat is running default config before its config gets updated
+			"Error dialing dial tcp 127.0.0.1:9200: connect: connection refused",                                                            // beat is running default config before its config gets updated
+			"Error dialing dial tcp 127.0.0.1:9200: connectex: No connection could be made because the target machine actively refused it.", // beat is running default config before its config gets updated
 			"Failed to apply initial policy from on disk configuration",
 			"Failed to connect to backoff(elasticsearch(http://127.0.0.1:9200)): Get \"http://127.0.0.1:9200\": dial tcp 127.0.0.1:9200: connect: connection refused", // Deb test
 			"Failed to download artifact",

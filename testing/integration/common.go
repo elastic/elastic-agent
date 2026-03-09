@@ -7,6 +7,7 @@
 package integration
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -21,6 +22,9 @@ import (
 
 func GetESHost() (string, error) {
 	fixedESHost := os.Getenv("ELASTICSEARCH_HOST")
+	if len(fixedESHost) == 0 {
+		return "", errors.New("ELASTICSEARCH_HOST cannot be empty")
+	}
 	parsedES, err := url.Parse(fixedESHost)
 	if err != nil {
 		return "", err

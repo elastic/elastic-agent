@@ -2,11 +2,11 @@
 navigation_title: Profiles collection
 description: Learn how to configure and customize profiles collection through the Elastic Distribution of OpenTelemetry Collector.
 applies_to:
-  stack: preview 9.3
+  stack: preview 9.2+
   serverless:
-    observability:
+    observability: preview
   product:
-    edot_collector: preview
+    edot_collector: preview 9.2+
 products:
   - id: observability
   - id: edot-collector
@@ -24,7 +24,53 @@ OpenTelemetry profiling is still under active development. Refer to [The State o
 
 ## Turn on profiling
 
-Follow these steps to turn on profiles collection through the EDOT Collector.
+Follow these steps to turn on profiling.
+
+### Prepare Elasticsearch for profiling data
+
+Before EDOT Collector ingests profiling data into Elasticsearch, make sure that [Universal Profiling](https://www.elastic.co/docs/solutions/observability/infra-and-hosts/get-started-with-universal-profiling#profiling-configure-data-ingestion) is configured for ingestion.
+
+### Configure and run EDOT Collector with profiling
+
+Follow these steps to configure profiles collection through the EDOT Collector.
+
+::::{applies-switch}
+
+:::{applies-item} stack: preview 9.3+
+```yaml
+receivers:
+  profiling:
+
+service:
+  pipelines:
+    profiles:
+      receivers: [ profiling ]
+      exporters: [ elasticsearch ]
+```
+:::
+
+:::{applies-item} stack: preview =9.2
+```yaml
+receivers:
+  profiling:
+    SamplesPerSecond: 19
+
+service:
+  pipelines:
+    profiles:
+      receivers: [ profiling ]
+      exporters: [ elasticsearch ]
+```
+:::
+
+::::
+
+:::{note}
+{{es}} OTel Profiles is still under development and therefore protected by a feature gate.
+:::
+
+### Activate profiling in the Collector
+
 
 :::::{stepper}
 ::::{step} Activate profiling in the Collector
@@ -38,12 +84,59 @@ sudo ./otelcol --config otel.yml --feature-gates=service.profilesSupport
 ::::
 :::::
 
+## System requirements
+
+The profiling receiver is only available on Linux. Running it on an operating system other than Linux results in an error.
+
+The supported Linux kernel versions are either 5.4 and later for x86_64 or 5.5 and later for ARM64.
+
+## Supported runtimes
+
+The profiling receiver handles native runtimes, like C, C++, Go and Rust, as well as various interpreters.
+
+The minimum supported versions of each interpreter are:
+
+- JVM/JDK: 7
+- Python: 3.6
+- V8: 8.1.0
+- Perl: 5.28
+- PHP: 7.3
+- Ruby: 2.5
+- .Net: 6
+- Erlang/OTP 27.2.4 
+
 ## Generate metrics from profiles
 
 You can configure the components to generate and report metrics exclusively from profile information. This method contributes to a reduction in ingest traffic and storage costs.
 
 The following example generates profiling metrics by frame, frame type, and classification:
 
+::::{applies-switch}
+
+:::{applies-item} stack: preview =9.2
+```yaml
+connectors:
+  profilingmetrics:
+    by_frame: true
+    by_frametype: true
+    by_classification: true
+
+receivers:
+  profiling:
+    SamplesPerSecond: 19
+
+service:
+  pipelines:
+    profiles:
+      receivers: [ profiling ]
+      exporters: [ profilingmetrics ]
+    metrics:
+      receivers: [ profilingmetrics ]
+      exporters: [ elasticsearch ]
+```
+:::
+
+:::{applies-item} stack: preview 9.3+
 ```yaml
 connectors:
   profilingmetrics:
@@ -60,6 +153,9 @@ service:
       receivers: [ profilingmetrics ]
       exporters: [ elasticsearch ]
 ```
+:::
+
+::::
 
 ## Kubernetes deployments
 

@@ -81,6 +81,9 @@ exporters:
         insecure: true
 
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     logs:
       receivers: [filelog]
@@ -104,6 +107,9 @@ func TestOtelStartShutdown(t *testing.T) {
 exporters:
   nop:
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     logs:
       receivers:
@@ -209,6 +215,9 @@ exporters:
   file:
     path: {{.OutputPath}}
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     logs:
       receivers:
@@ -511,6 +520,8 @@ service:
       receivers:
         - filelog
   telemetry:
+    metrics:
+      level: none
     logs:
       level: DEBUG
       encoding: json
@@ -546,9 +557,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 
 	esClient := info.ESClient
 	require.NotNil(t, esClient)
-	esApiKey, err := createESApiKey(esClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, esClient)
 
 	logsIngestionConfig := logsIngestionConfigTemplate
 	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.ESApiKey}}", esApiKey.Encoded)
@@ -671,9 +680,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	require.True(t, len(esHost) > 0)
 
 	esClient := info.ESClient
-	esApiKey, err := createESApiKey(esClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(esApiKey.APIKey) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, esClient)
 
 	apmArgs := []string{
 		"run",
@@ -782,8 +789,21 @@ func TestOtelAPMIngestion(t *testing.T) {
 	apmFixtureWg.Wait()
 }
 
-func createESApiKey(esClient *elasticsearch.Client) (estools.APIKeyResponse, error) {
-	return estools.CreateAPIKey(context.Background(), esClient, estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
+func createESApiKey(t *testing.T, esClient *elasticsearch.Client) estools.APIKeyResponse {
+	esApiKey, err := estools.CreateAPIKey(
+		t.Context(),
+		esClient,
+		estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"},
+	)
+
+	require.NoError(t, err, "error creating API key")
+	require.Truef(
+		t,
+		len(esApiKey.APIKey) > 1 && len(esApiKey.Encoded) > 1,
+		"api key is invalid %q",
+		esApiKey)
+
+	return esApiKey
 }
 
 // getDecodedApiKey returns a decoded API key appropriate for use in beats configurations.
@@ -868,9 +888,7 @@ func TestOtelFilestreamInput(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 	configTemplate := `
@@ -1013,9 +1031,7 @@ func TestOTelHTTPMetricsInput(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 	configTemplate := `
@@ -1045,8 +1061,6 @@ agent.monitoring:
   http:
     enabled: true
     port: 6790
-agent.internal.runtime.metricbeat:
-  http/metrics: otel
 `
 	index := ".ds-metrics-e2e-*"
 	var configBuffer bytes.Buffer
@@ -1172,9 +1186,7 @@ func TestHybridAgentE2E(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 
 	configTemplate := `agent.logging.level: info
 agent.logging.to_stderr: true
@@ -1241,8 +1253,6 @@ exporters:
       block_on_overflow: true
       batch:
         flush_timeout: 1s
-    mapping:
-      mode: bodymap
 service:
   pipelines:
     logs:
@@ -1360,6 +1370,186 @@ service:
 	cmd.Wait()
 }
 
+func TestHybridAgentGlobalProcessors(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+	tmpDir := t.TempDir()
+	numEvents := 1
+	fbIndex := "logs-generic-default"
+
+	inputFile, err := os.CreateTemp(tmpDir, "input-*.log")
+	require.NoError(t, err, "failed to create input log file")
+	inputFilePath := inputFile.Name()
+	for i := 0; i < numEvents; i++ {
+		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d", i)))
+		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		_, err = inputFile.Write([]byte("\n"))
+		require.NoErrorf(t, err, "failed to write newline to input file")
+		time.Sleep(100 * time.Millisecond)
+	}
+	err = inputFile.Close()
+	require.NoError(t, err, "failed to close data input file")
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			contents, err := os.ReadFile(inputFilePath)
+			if err != nil {
+				t.Logf("no data file to import at %s", inputFilePath)
+				return
+			}
+			t.Logf("contents of input file: %s\n", string(contents))
+		}
+	})
+
+	type configOptions struct {
+		InputPath     string
+		HomeDir       string
+		ESEndpoint    string
+		BeatsESApiKey string
+	}
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey := createESApiKey(t, info.ESClient)
+
+	configTemplate := `agent:
+  grpc:
+    port: 0
+  internal:
+    runtime:
+      default: otel
+  logging:
+    level: info
+    to_stderr: true
+inputs:
+  - id: filestream-filebeat
+    type: filestream
+    paths:
+      - {{.InputPath}}
+    prospector.scanner.fingerprint.enabled: false
+    file_identity.native: ~
+    use_output: default
+    queue.mem.flush.timeout: 0s
+    path.home: {{.HomeDir}}/filebeat
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: {{.BeatsESApiKey}}
+    compression_level: 0
+    processors:
+      - beat/host
+      - beat/field
+      - batch
+processors:
+  beat/host:
+    processors:
+      - add_host_metadata: ~
+  beat/field:
+    processors:
+      - add_fields:
+          fields:
+            custom_field: "custom-value"
+  batch:
+`
+
+	beatsApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err, "error decoding api key")
+
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				InputPath:     inputFilePath,
+				HomeDir:       tmpDir,
+				ESEndpoint:    esEndpoint,
+				BeatsESApiKey: string(beatsApiKey),
+			}))
+	configContents := configBuffer.Bytes()
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("Contents of agent config file:\n%s\n", string(configContents))
+		}
+	})
+
+	// Now we can actually create the fixture and run it
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, configContents)
+	require.NoError(t, err)
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+	cmd.WaitDelay = 1 * time.Second
+
+	var output strings.Builder
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second)
+
+	var docs estools.Documents
+	actualHits := &struct {
+		Hits int
+	}{}
+	require.Eventually(t,
+		func() bool {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
+
+			docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbIndex+"*", map[string]interface{}{
+				"log.file.path": inputFilePath,
+			})
+			require.NoError(t, err)
+
+			actualHits.Hits = docs.Hits.Total.Value
+
+			return actualHits.Hits == numEvents
+		},
+		1*time.Minute, 1*time.Second,
+		"Expected %d logs in elasticsearch, got: %v", numEvents, actualHits)
+
+	require.Equal(t, 1, len(docs.Hits.Hits), "should have exactly 1 document")
+	doc := mapstr.M(docs.Hits.Hits[0].Source)
+
+	_, err = doc.GetValue("host.architecture")
+	require.NoError(t, err, "document should include host.architecture added by add_host_metadata processor")
+
+	customFieldValue, err := doc.GetValue("fields.custom_field")
+	require.NoError(t, err, "document should include custom_field added by add_fields processor")
+	require.Equal(t, "custom-value", customFieldValue, "custom_field should be equal to custom-value")
+}
+
 func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
 	t.Helper()
 
@@ -1437,9 +1627,8 @@ func TestFBOtelRestartE2E(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
+
 	// Use a unique index to avoid conflicts with other parallel runners
 	index := strings.ToLower("logs-generic-default-" + randStr(8))
 	otelConfigTemplate := `receivers:
@@ -1477,8 +1666,6 @@ exporters:
       block_on_overflow: true
       batch:
         flush_timeout: 1s
-    mapping:
-      mode: bodymap
     logs_dynamic_id:
       enabled: true
 service:
@@ -1490,6 +1677,8 @@ service:
         - elasticsearch/log
         #- debug
   telemetry:
+    metrics:
+      level: none
     logs:
       level: DEBUG
       encoding: json
@@ -1645,9 +1834,7 @@ func TestOtelBeatsAuthExtension(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	index := "logs-integration-" + info.Namespace
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -1708,8 +1895,6 @@ exporters:
       ca_file: {{ .CAFile }}
     auth:
       authenticator: beatsauth
-    mapping:
-      mode: bodymap
 service:
   extensions: [beatsauth]
   pipelines:
@@ -1801,9 +1986,7 @@ func TestOtelBeatsAuthExtensionInvalidCertificates(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	index := "logs-integration-" + info.Namespace
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -1852,8 +2035,6 @@ exporters:
         min_size: 1
     auth:
       authenticator: beatsauth
-    mapping:
-      mode: bodymap
 service:
   extensions: [beatsauth]
   pipelines:
@@ -1958,16 +2139,6 @@ outputs:
     preset: "balanced"
     status_reporting:
       enabled: {{.StatusReportingEnabled}}
-agent.monitoring:
-  metrics: false
-  logs: false
-  http:
-    enabled: true
-    port: 6792
-agent.grpc:
-    port: 6790
-agent.internal.runtime.metricbeat:
-  system/metrics: otel
 `
 
 	var configBuffer bytes.Buffer
@@ -2080,7 +2251,7 @@ outputs:
     hosts:
       - %s
     preset: balanced
-    protocol: http	
+    protocol: http
 agent.logging.level: %s
 agent.grpc.port: 6793
 agent.monitoring.enabled: true
@@ -2091,7 +2262,7 @@ agent.reload:
 
 	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 	// start with debug logs
-	cfg := fmt.Sprintf(logConfig, esURL, "debug")
+	cfg := fmt.Sprintf(logConfig, esURL.String(), "debug")
 
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
 
@@ -2135,11 +2306,8 @@ agent.reload:
 		return (zapLogs.FilterMessageSnippet("otelcol.component.kind").FilterMessageSnippet(`"log.level":"debug"`).Len() > 1)
 	}, 1*time.Minute, 10*time.Second, "could not find debug logs")
 
-	// reset logs
-	zapLogs.TakeAll()
-
 	// set agent.logging.level: info
-	cfg = fmt.Sprintf(logConfig, esURL, "info")
+	cfg = fmt.Sprintf(logConfig, esURL.String(), "info")
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
 
 	// wait for elastic agent to be healthy and OTel collector to start
@@ -2149,11 +2317,11 @@ agent.reload:
 			t.Logf("waiting for agent healthy: %s", err.Error())
 			return false
 		}
-		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
+		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 1
 	}, 90*time.Second, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
 
-	// if debug level was enabled, we would find this message
-	require.Zero(t, zapLogs.FilterMessageSnippet(`Starting health check extension V2`).Len())
+	// this debug log should not be present again after re-loading
+	require.Equal(t, 1, zapLogs.FilterMessageSnippet(`Starting health check extension V2`).Len())
 
 	// set collector logs to debug
 	logConfig = logConfig + `
@@ -2167,7 +2335,7 @@ service:
 	zapLogs.TakeAll()
 
 	// add service::telemetry::logs::level:debug
-	cfg = fmt.Sprintf(logConfig, esURL, "info")
+	cfg = fmt.Sprintf(logConfig, esURL.String(), "info")
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
 
 	// wait for elastic agent to be healthy and OTel collector to re-start
@@ -2185,6 +2353,188 @@ service:
 		// and not just agent logs
 		return (zapLogs.FilterMessageSnippet("otelcol.component.kind").FilterMessageSnippet(`"log.level":"debug"`).Len() > 1)
 	}, 1*time.Minute, 10*time.Second, "collector setting for log level was not given precedence")
+}
+
+func TestMonitoringReceiver(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	indexName := strings.ToLower("logs-generic-default-" + info.Namespace)
+
+	esHost, err := integration.GetESHost()
+	require.NoError(t, err, "failed to get ES host")
+	require.True(t, len(esHost) > 0)
+
+	esClient := info.ESClient
+	require.NotNil(t, esClient)
+	esApiKey := createESApiKey(t, esClient)
+
+	cfg := `
+agent.logging.to_stderr: true
+receivers:
+  elasticmonitoringreceiver:
+    interval: 3s
+exporters:
+  elasticsearch/1:
+    endpoints:
+      - {{.ESEndpoint}}
+    api_key: {{.ESApiKey}}
+    max_conns_per_host: 1
+    logs_index: {{.Index}}
+    retry:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 1m0s
+      max_retries: 3
+    sending_queue:
+      batch:
+        flush_timeout: 10s
+        max_size: 1
+        min_size: 1
+        sizer: items
+      block_on_overflow: true
+      enabled: true
+      num_consumers: 1
+      queue_size: 3200
+      wait_for_result: true
+processors:
+  beat/1:
+    processors:
+      - add_host_metadata: null
+
+service:
+  pipelines:
+    logs:
+      receivers: [elasticmonitoringreceiver]
+      processors: [beat/1]
+      exporters:
+        - elasticsearch/1
+`
+
+	configParams := struct {
+		ESEndpoint string
+		ESApiKey   string
+		Index      string
+	}{
+		ESEndpoint: esHost,
+		ESApiKey:   esApiKey.Encoded,
+		Index:      indexName,
+	}
+
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(cfg)).Execute(&configBuffer, configParams),
+	)
+
+	// Create fixture and prepare agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+	cmd.WaitDelay = 1 * time.Second
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	require.NoError(t, cmd.Start(), "could not start otel collector")
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second)
+
+	// Wait for monitoring events to be indexed in Elasticsearch
+	var docs estools.Documents
+	require.EventuallyWithT(
+		t,
+		func(c *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer findCancel()
+
+			result, err := estools.GetAllLogsForIndexWithContext(
+				findCtx,
+				esClient,
+				".ds-"+indexName+"*")
+			require.NoError(c, err)
+			require.Equalf(
+				c,
+				2,
+				result.Hits.Total.Value,
+				"expecting exactly 2 monitoring events, got %d",
+				result.Hits.Total.Value)
+			docs = result
+		},
+		90*time.Second,
+		100*time.Millisecond,
+		"did not find the expected number of monitoring events")
+
+	require.Equal(t, 2, len(docs.Hits.Hits), "should have exactly 2 monitoring documents")
+	var ev mapstr.M
+	ev = docs.Hits.Hits[0].Source
+
+	// Check the hostname first (add_host_metadata is noisy so we exclude
+	// its entire subtree from the diff below)
+	reportedHostname, err := ev.GetValue("host.name")
+	assert.NoError(t, err, "monitoring events should include host.name")
+	if err == nil {
+		hostname, err := os.Hostname()
+		assert.NoError(t, err, "couldn't get local hostname")
+		if err == nil {
+			assert.Equal(t, reportedHostname, hostname, "monitoring event host.name should match hostname")
+		}
+	}
+	_ = ev.Delete("host")
+
+	ev = ev.Flatten()
+
+	require.NotEmpty(t, ev["@timestamp"], "expected @timestamp to be set")
+	ev.Delete("@timestamp")
+	require.Greater(t, ev["beat.stats.libbeat.output.write.bytes"], float64(0))
+	ev.Delete("beat.stats.libbeat.output.write.bytes")
+
+	expected := mapstr.M{
+		"beat.stats.libbeat.pipeline.queue.max_events":    float64(3200),
+		"beat.stats.libbeat.pipeline.queue.filled.events": float64(0),
+		"beat.stats.libbeat.pipeline.queue.filled.pct":    float64(0),
+		"beat.stats.libbeat.output.events.total":          float64(1),
+		"beat.stats.libbeat.output.events.active":         float64(0),
+		"beat.stats.libbeat.output.events.acked":          float64(1),
+		"beat.stats.libbeat.output.events.dropped":        float64(0),
+		"beat.stats.libbeat.output.events.batches":        float64(1),
+		"component.id": "elasticsearch/1",
+	}
+
+	require.Empty(t, cmp.Diff(expected, ev), "metrics do not match expected values")
+
+	cancel()
 }
 
 type ZapWriter struct {

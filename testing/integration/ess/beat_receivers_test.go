@@ -21,21 +21,20 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
-	"github.com/elastic/go-elasticsearch/v8"
-
 	"github.com/gofrs/uuid/v5"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 
 	"github.com/stretchr/testify/assert"
@@ -188,9 +187,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	require.NoError(t, err, "error reading policy response")
 	defer resp.Body.Close()
 
-	apiKeyResponse, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
+	apiKeyResponse := createESApiKey(t, info.ESClient)
 	apiKey, err := getDecodedApiKey(apiKeyResponse)
 	require.NoError(t, err, "error decoding api key")
 
@@ -462,9 +459,7 @@ outputs:
 
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 
 	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
 	require.NoError(t, err, "error decoding api key")
@@ -831,10 +826,10 @@ func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
 		Stack: nil,
 	})
 
-	config := `agent.logging.to_stderr: true
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
+	config := fmt.Sprintf(`agent.logging.to_stderr: true
 agent.logging.to_files: false
-agent.internal.runtime.metricbeat:
-  system/metrics: otel
 inputs:
   - type: system/metrics
     id: unique-system-metrics-input
@@ -844,25 +839,20 @@ inputs:
   - type: system/metrics
     id: unique-system-metrics-input-2
     use_output: supported
-    _runtime_experimental: otel
     streams:
       - metricsets:
         - cpu
 outputs:
   default:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [%s]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
-    status_reporting:
-      enabled: false
   supported:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [%s]
     api_key: placeholder
-    status_reporting:
-      enabled: false
-`
+`, esURL.Host, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
@@ -938,6 +928,252 @@ outputs:
 
 	assert.Len(t, unsupportedLogRecords, 1, "one log line for each component we try to run")
 	assert.NotEmpty(t, monitoringOutputUnsupportedLogRecord, "should get a log line about monitoring output not being supported")
+}
+
+const (
+	otelDynamicVariableLogLineTemplate = "Component %s uses dynamic variable providers, switching to process runtime"
+)
+
+// TestBeatsReceiverDynamicInputProcessRuntimeFallback verifies that we fall back to the process runtime if the input
+// uses variables from a dynamic provider.
+func TestBeatsReceiverDynamicInputProcessRuntimeFallback(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
+	config := fmt.Sprintf(`agent.logging.to_stderr: true
+agent.logging.to_files: false
+agent.monitoring.enabled: false
+agent.internal.runtime.dynamic_inputs: process
+inputs:
+  - type: system/metrics
+    id: "${local_dynamic.id}"
+    streams:
+      - metricsets:
+        - cpu
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [%s]
+    api_key: placeholder
+providers:
+  local_dynamic:
+    items:
+    - vars:
+        id: system-metrics-1
+`, esURL.Host)
+
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, []byte(config))
+	require.NoError(t, err)
+
+	installOutput, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	require.NoError(t, err, "install failed, output: %s", string(installOutput))
+
+	var compId string
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		// we should be running a single component in a beat process
+		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+		require.Equal(collect, 1, len(status.Components))
+		comp := status.Components[0]
+
+		assert.Equal(collect, int(cproto.State_HEALTHY), comp.State)
+		expectedComponentVersionInfoName := componentVersionInfoNameForRuntime(component.ProcessRuntimeManager)
+		assert.Equal(collect, expectedComponentVersionInfoName, comp.VersionInfo.Name)
+		for _, unit := range comp.Units {
+			assert.Equal(collect, int(cproto.State_HEALTHY), unit.State)
+		}
+		compId = comp.ID
+	}, 1*time.Minute, 1*time.Second)
+	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
+	require.NoError(t, err)
+
+	// verify we've logged a warning about using the process runtime
+	foundLogMessage := false
+	expectedMessage := fmt.Sprintf(otelDynamicVariableLogLineTemplate, compId)
+	for _, line := range strings.Split(string(logsBytes), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var logRecord struct {
+			Message string
+		}
+		if unmarshalErr := json.Unmarshal([]byte(line), &logRecord); unmarshalErr != nil {
+			continue
+		}
+
+		foundLogMessage = foundLogMessage || logRecord.Message == expectedMessage
+	}
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent logs seen by the test:")
+			t.Log(string(logsBytes))
+		}
+	})
+
+	assert.True(t, foundLogMessage, "there should be a log line with a warning about falling back to process runtime")
+}
+
+// TestBeatsReceiverSubcomponentStatus verifies that we correctly reflect the status of beats inputs in the elastic
+// agent component and unit statuses.
+func TestBeatsReceiverSubcomponentStatus(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
+	// This configuration contains two system/metrics inputs, each with two identical metricsets:
+	// * one for cpu, always healthy
+	// * one for processes, can't read data for some processes if not running as root
+	// The second metricset will emit a message about not being able to read process data. For the first input, this
+	// results in a Healthy status, but the second input is configured to become degraded in that case. The test
+	// verifies both of these conditions.
+	config := fmt.Sprintf(`agent:
+  logging:
+    to_stderr: true
+    to_files: false
+    level: debug
+  monitoring:
+    enabled: false
+inputs:
+- data_stream:
+    namespace: default
+  id: unique-system-metrics-input
+  streams:
+  - data_stream:
+      dataset: system.cpu
+    metricsets:
+    - cpu
+    id: unique-system-metrics-input-cpu
+  - data_stream:
+      dataset: system.process
+    metricsets:
+    - process
+    id: unique-system-metrics-input-process
+  type: system/metrics
+  use_output: default
+- data_stream:
+    namespace: default
+  id: unique-system-metrics-input-2
+  streams:
+  - data_stream:
+      dataset: system.cpu
+    metricsets:
+    - cpu
+    id: unique-system-metrics-input-2-cpu
+  - data_stream:
+      dataset: system.process
+    metricsets:
+    - process
+    id: unique-system-metrics-input-2-process
+    degrade_on_partial: true
+  type: system/metrics
+  use_output: default
+outputs:
+  default:
+    api_key: placeholder
+    hosts:
+    - %s
+    type: elasticsearch
+`, esURL.Host)
+
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, []byte(config))
+	require.NoError(t, err)
+
+	installOutput, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: false, Force: true})
+	require.NoError(t, err, "install failed, output: %s", string(installOutput))
+
+	expectedComponentCount := 1
+	expectedUnitCountPerComponent := 3 // one unit per system/metrics input and one output
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		// we should be running beats processes for components, the whole agent should be degraded
+		assert.Equal(collect, int(cproto.State_DEGRADED), status.State)
+		require.Len(collect, status.Components, expectedComponentCount, "There should be one component")
+
+		comp := status.Components[0]
+		assert.Equal(collect, int(cproto.State_DEGRADED), comp.State)
+		expectedComponentVersionInfoName := componentVersionInfoNameForRuntime(component.OtelRuntimeManager)
+		assert.Equal(collect, expectedComponentVersionInfoName, comp.VersionInfo.Name)
+		assert.Lenf(collect, comp.Units, expectedUnitCountPerComponent, "There should be %d units", expectedUnitCountPerComponent)
+		for _, unit := range comp.Units {
+			if unit.UnitType == int(cproto.UnitType_OUTPUT) {
+				continue
+			}
+			var expectedUnitState int
+			if unit.UnitID == "system/metrics-default-unique-system-metrics-input-2" {
+				expectedUnitState = int(cproto.State_DEGRADED)
+			} else {
+				expectedUnitState = int(cproto.State_HEALTHY)
+			}
+			assert.Equalf(collect, expectedUnitState, unit.State,
+				"Expected unit %s to be in state %d, got %d", unit.UnitID, expectedUnitState, unit.State)
+			unitPayload := unit.Payload
+			require.Lenf(collect, unitPayload.Streams, 2,
+				"Expected unit %s to have 2 streams, got %d", unit.UnitID, len(unitPayload.Streams))
+			for streamName, streamState := range unitPayload.Streams {
+				if strings.Contains(streamName, "cpu") {
+					assert.Equal(collect, streamState.Status, "HEALTHY")
+					assert.Empty(collect, streamState.Error)
+				} else if strings.Contains(streamName, "process") {
+					var expectedStreamState string
+					if streamName == "unique-system-metrics-input-2-process" {
+						expectedStreamState = "DEGRADED"
+					} else {
+						expectedStreamState = "HEALTHY"
+					}
+					assert.Equalf(collect, streamState.Status, expectedStreamState,
+						"Expected stream %s to be in state %s, got %s", streamName, expectedStreamState, streamState.Status)
+					assert.Containsf(collect, streamState.Error, "Error fetching data for metricset system.process",
+						"Invalid error message for stream %s: %s", streamName, streamState.Error)
+				}
+			}
+		}
+	}, 1*time.Minute, 1*time.Second)
 }
 
 // TestComponentWorkDir verifies that the component working directory is not deleted when moving the component from
@@ -1120,7 +1356,7 @@ func getBeatStartLogRecords(logs string) []map[string]any {
 		}
 
 		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Beat name:") {
-			logRecords = append(logRecords, logRecord)
+			logRecords = append(logRecords, mapstr.M(logRecord).Flatten())
 		}
 	}
 	return logRecords
@@ -1189,9 +1425,7 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 
@@ -1372,9 +1606,7 @@ func TestSensitiveIncludeSourceOnError(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 

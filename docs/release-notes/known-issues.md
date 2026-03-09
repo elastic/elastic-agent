@@ -23,6 +23,38 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} Elastic Agent 9.3.x fails to start on MacOS when OSQuery Manager integration is used
+**Applies to: {{agent}} 9.3.0 9.3.1**
+On March 5, 2026, a known issue was discovered that prevents {{agent}} 9.3.0 and above from starting when:
+- {{agent}} is installed on MacOS.
+- The OSQuery Manager integration is installed.
+- The host or agent service is restarted.
+
+Users will see error failing with an error containing `lchown /Library/Elastic/Agent/data/elastic-agent-9.3.1-2ec825/components/osquery.app: operation not permitted` in `/Library/Elastic/Agent/co.elastic.elastic-agent.err.log` or other agent logs files:
+
+```json
+{"log.level":"error","@timestamp":"2026-02-25T07:19:14.101Z","log.origin":{"function":"github.com/elastic/elastic-agent/internal/pkg/agent/cmd.logReturn","file.name":"cmd/run.go","file.line":152}, "message":"failed to perform permission changes on path /Library/Elastic/Agent: cannot update ownership of \"/Library/Elastic/Agent\": lchown /Library/Elastic/Agent/data/elastic-agent-9.2.5-df1a8d/components/osquery.app: operation not permitted","log.source":"elastic-agent","ecs.version":"1.6.0"}
+```
+
+Upgrades from a previous version will succeed and Elastic Agent will operate normally until the host reboots or the Elastic Agent service is restarted for another reason.
+
+It will not be possible to collect agent diagnostics. If Elastic Defend is installed, Elastic Agent will show as orphaned.
+
+For more information, check [Issue #13059](https://github.com/elastic/elastic-agent/issues/13059).
+:::
+
+:::{dropdown} Elastic Agent becomes unhealthy when using the warning log level
+**Applies to: {{agent}} 9.3.0**
+
+On January 30th 2026, a known issue was discovered that causes Elastic Agent to become unhealthy with the message
+`Fatal: failed to unpack the log level 'WARN': invalid level 'warn'` when using the warning log level. Self-monitoring data
+and metrics data will fail to be collected.
+
+**Workaround**
+
+Affected users can use any other log level. A fix will be included in 9.3.1. See [Issue #12513](https://github.com/elastic/elastic-agent/issues/12513).
+:::
+
 :::{dropdown} Elastic Agent becomes unhealthy when an Elasticsearch output used for monitoring specifies any list parameter as a string
 **Applies to: {{agent}} 9.2.1, 9.2.2**
 

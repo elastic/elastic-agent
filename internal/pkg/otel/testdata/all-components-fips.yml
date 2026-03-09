@@ -39,6 +39,7 @@ processors:
     spike_limit_mib: 800
   elasticapm:
   tail_sampling:
+  beat:
 
 receivers:
   filelog:
@@ -58,6 +59,7 @@ receivers:
       grpc:
   zipkin:
   docker_stats:
+  elasticmonitoringreceiver:
 
 connectors:
   spanmetrics:
@@ -108,6 +110,7 @@ service:
       receivers:
         - filelog
         - otlp
+        - elasticmonitoringreceiver
 
     metrics:
       exporters:

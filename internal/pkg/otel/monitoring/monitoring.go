@@ -27,7 +27,7 @@ import (
 )
 
 // EDOTComponentID is the component ID for the EDOT collector.
-const EDOTComponentID = "elastic-agent/collector"
+const EDOTComponentID = "elastic-otel-collector"
 
 // EDOTMonitoringEndpoint returns the monitoring endpoint for the EDOT collector.
 func EDOTMonitoringEndpoint() string {

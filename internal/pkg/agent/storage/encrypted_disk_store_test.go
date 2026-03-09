@@ -6,8 +6,12 @@ package storage
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
+	"io/fs"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,8 +19,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
+
+//go:embed testdata/elastic-agent.yml
+var agentConfig []byte
 
 func TestNewEncryptedDiskStore(t *testing.T) {
 
@@ -104,4 +112,36 @@ func TestNewEncryptedDiskStore(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEncryptConfigOnPath(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "encrypted disk storage does not use NewGCMWithRandomNonce.")
+	dir := t.TempDir()
+	sourceCfg := filepath.Join(dir, paths.DefaultConfigName)
+	err := os.WriteFile(sourceCfg, agentConfig, 0640)
+	require.NoError(t, err)
+
+	err = EncryptConfigOnPath(dir)
+	require.NoError(t, err)
+
+	_, err = os.Stat(filepath.Join(dir, paths.DefaultAgentVaultPath))
+	require.NoError(t, err, "expected to create vault in destination dir")
+	_, err = os.Stat(filepath.Join(dir, "fleet.enc"))
+	require.NoError(t, err, "expected to create fleet.enc in destiniation dir")
+
+	_, err = os.Stat(sourceCfg)
+	require.NoError(t, err, "expected source config file to still exist.")
+	p, err := os.ReadFile(sourceCfg)
+	require.NoError(t, err, "unable to read source config file")
+	require.EqualValues(t, DefaultAgentEncryptedStandaloneConfig, p)
+	err = filepath.WalkDir(dir, func(dir string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if strings.HasSuffix(d.Name(), ".bak") {
+			return fmt.Errorf(".bak file detected: %s", d.Name())
+		}
+		return nil
+	})
+	require.NoError(t, err, "error when ensuring no .bak file exists")
 }

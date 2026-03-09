@@ -6,14 +6,18 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/jedib0t/go-pretty/v6/list"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -34,6 +38,10 @@ const (
 	flagPGPBytesURI    = "pgp-uri"
 	flagForce          = "force"
 	flagRollback       = "rollback"
+
+	// list rollbacks subcommand flags
+	flagOutput      = "output"
+	flagOutputShort = "o"
 )
 
 var (
@@ -43,7 +51,7 @@ var (
 	skipVerifyNotRootError          = errors.New(fmt.Sprintf("user needs to be root to use \"%s\" flag when upgrading standalone agents", flagSkipVerify))
 )
 
-func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
+func newUpgradeCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade <version>",
 		Short: "Upgrade the currently installed Elastic Agent to the specified version",
@@ -72,7 +80,126 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 		os.Exit(1)
 	}
 
+	listRollbacksCmd := newListRollbacksCmd(args, streams)
+	cmd.AddCommand(listRollbacksCmd)
+
 	return cmd
+}
+
+func newListRollbacksCmd(_ []string, streams *cli.IOStreams) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list-rollbacks <version>",
+		Short: "Lists the available rollbacks present on disk",
+		Long:  "This command lists the details about other agent installs present on disk, displaying versions that can be used with 'elastic-agent upgrade --rollback'.",
+		Args:  cobra.NoArgs,
+		Run: func(c *cobra.Command, args []string) {
+			c.SetContext(context.Background())
+			if err := listRollbacks(streams, c, args); err != nil {
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
+				os.Exit(1)
+			}
+		},
+	}
+	cmd.Flags().StringP(flagOutput, flagOutputShort, "human", "Output the available rollbacks in either 'human', 'json', or 'yaml'")
+	return cmd
+}
+
+func listRollbacks(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+	const outputHuman = "human"
+	const outputJSON = "json"
+	const outputYAML = "yaml"
+	const defaultOutputFmt = outputHuman
+
+	outputFmt, err := cmd.Flags().GetString(flagOutput)
+	if err != nil {
+		return fmt.Errorf("getting flag %s: %w", flagOutput, err)
+	}
+
+	type printFunc func(out io.Writer, data []client.AvailableRollback) error
+
+	var outputFunc printFunc
+	switch strings.ToLower(outputFmt) {
+	case outputHuman:
+		outputFunc = printRollbacksHuman
+	case outputJSON:
+		outputFunc = printJSON[[]client.AvailableRollback]
+	case outputYAML:
+		outputFunc = printYAML[[]client.AvailableRollback]
+	default:
+		fmt.Fprintf(streams.Err, "unsupported output format %q: defaulting to %q\n", outputFmt, defaultOutputFmt)
+		outputFunc = printRollbacksHuman
+	}
+
+	c := client.New()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	err = c.Connect(ctx)
+	if err != nil {
+		return errors.New(err, "failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
+	}
+	defer c.Disconnect()
+
+	rollbacks, err := c.AvailableRollbacks(ctx)
+	if err != nil {
+		return fmt.Errorf("getting available rollbacks: %w", err)
+	}
+
+	outputErr := outputFunc(streams.Out, rollbacks)
+
+	if outputErr != nil {
+		return fmt.Errorf("failed writing output: %w", outputErr)
+	}
+
+	return err
+}
+
+func printJSON[T any](out io.Writer, data T) error {
+	marshalledData, marshalErr := json.MarshalIndent(data, "", "  ")
+	if marshalErr != nil {
+		return fmt.Errorf("failed marshalling data: %w", marshalErr)
+	}
+
+	_, writeErr := out.Write(marshalledData)
+	if writeErr != nil {
+		return fmt.Errorf("failed writing output: %w", writeErr)
+	}
+
+	// JSON Marshal() does not add a newline at the end by itself so we add it here
+	_, _ = out.Write([]byte("\n"))
+	return nil
+}
+
+func printYAML[T any](out io.Writer, data T) error {
+	marshalledRollbacks, marshalErr := yaml.Marshal(data)
+	if marshalErr != nil {
+		return fmt.Errorf("failed marshalling data: %w", marshalErr)
+	}
+
+	_, writeErr := out.Write(marshalledRollbacks)
+	if writeErr != nil {
+		return fmt.Errorf("failed writing output: %w", writeErr)
+	}
+	return nil
+}
+
+func printRollbacksHuman(out io.Writer, data []client.AvailableRollback) error {
+	l := list.NewWriter()
+	l.SetStyle(list.StyleConnectedLight)
+	l.SetOutputMirror(out)
+	for _, availableRollback := range data {
+		appendRollbackHumanOutput(l, availableRollback)
+	}
+	_ = l.Render()
+	return nil
+}
+
+func appendRollbackHumanOutput(l list.Writer, availableRollback client.AvailableRollback) {
+	l.AppendItem(availableRollback.Version)
+	l.Indent()
+	l.AppendItem("VersionedHome: " + availableRollback.VersionedHome)
+	l.AppendItem("ValidUntil: " + availableRollback.ValidUntil.Format(time.RFC3339))
+	l.UnIndent()
 }
 
 type upgradeInput struct {

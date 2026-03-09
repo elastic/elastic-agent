@@ -18,7 +18,7 @@ If you think you found a bug, it probably is a bug. Fill it in [GitHub](https://
 ## Found a Security Issue?
 
 If you've found a security issue, before submitting anything via a PR, please
-get in touch with our security team [here](https://www.elastic.co/community/security).
+get in touch with our security team [here](https://github.com/elastic/.github/blob/main/SECURITY.md).
 
 # Pull Request Guidelines
 

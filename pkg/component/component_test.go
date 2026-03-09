@@ -1352,6 +1352,100 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
+			Name:     "RuntimeConfig: multiple input types with logstash output set to process runtime (output runtime takes precedence)",
+			Platform: linuxAMD64Platform,
+			RuntimeConfig: &RuntimeConfig{
+				Default: string(OtelRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default: string(ProcessRuntimeManager),
+					InputType: map[string]string{
+						"log": string(OtelRuntimeManager),
+					},
+				},
+				Output: map[string]string{
+					"logstash": string(ProcessRuntimeManager),
+				},
+			},
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "logstash",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+					map[string]interface{}{
+						"type": "log",
+						"id":   "log-0",
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "filestream",
+					OutputType: "logstash",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "logstash",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+					RuntimeManager: ProcessRuntimeManager,
+				},
+				{
+					InputType:  "log",
+					OutputType: "logstash",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "log",
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "log-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "logstash",
+							}),
+						},
+						{
+							ID:       "log-default-log-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "log",
+								"id":   "log-0",
+							}),
+						},
+					},
+					RuntimeManager: ProcessRuntimeManager,
+				},
+			},
+		},
+		{
 			Name:     "Simple representation (isolated units)",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
@@ -2831,7 +2925,7 @@ func TestToComponents(t *testing.T) {
 			}
 
 			result, err := specs.ToComponents(
-				scenario.Policy, runtimeConfig, nil, nil, scenario.LogLevel, scenario.headers, map[string]uint64{})
+				scenario.Policy, runtimeConfig, nil, nil, scenario.LogLevel, scenario.headers, map[string]uint64{}, map[string]bool{})
 			if scenario.Err != "" {
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {
@@ -2853,6 +2947,7 @@ func TestToComponents(t *testing.T) {
 					assert.Equal(t, expected.InputSpec.InputType, actual.InputSpec.InputType)
 					assert.Equal(t, expected.InputSpec.BinaryName, actual.InputSpec.BinaryName)
 					assert.Equal(t, expected.InputSpec.BinaryPath, actual.InputSpec.BinaryPath)
+					assert.Equal(t, expected.RuntimeManager, actual.RuntimeManager, "%s: input has wrong runtime manager", expected.InputType)
 					for i, eu := range expected.Units {
 						assert.EqualValues(t, eu.Config, actual.Units[i].Config)
 					}
@@ -3307,7 +3402,7 @@ func TestFlattenedDataStream(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, DefaultRuntimeConfig(), nil, nil, logp.DebugLevel, nil, map[string]uint64{})
+	result, err := runtime.ToComponents(policy, DefaultRuntimeConfig(), nil, nil, logp.DebugLevel, nil, map[string]uint64{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}
@@ -3408,7 +3503,7 @@ func TestFlattenedDataStreamIsolatedUnits(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, DefaultRuntimeConfig(), nil, nil, logp.DebugLevel, nil, map[string]uint64{})
+	result, err := runtime.ToComponents(policy, DefaultRuntimeConfig(), nil, nil, logp.DebugLevel, nil, map[string]uint64{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}
@@ -3632,6 +3727,24 @@ func TestRuntimeConfigValidate(t *testing.T) {
 				Default: "",
 			},
 		},
+		{
+			name: "valid output type",
+			config: &RuntimeConfig{
+				Output: map[string]string{
+					"elasticsearch": string(ProcessRuntimeManager),
+					"logstash":      string(ProcessRuntimeManager),
+				},
+			},
+		},
+		{
+			name: "invalid output type",
+			config: &RuntimeConfig{
+				Output: map[string]string{
+					"non-existent": string(ProcessRuntimeManager),
+				},
+			},
+			wantErr: "non-existent output is not supported",
+		},
 	}
 
 	for _, tt := range tests {
@@ -3706,6 +3819,7 @@ func TestRuntimeConfigRuntimeManagerForInputType(t *testing.T) {
 		inputType string
 		beatName  string
 		want      RuntimeManager
+		output    outputI
 	}{
 		{
 			name: "uses input type specific config for filebeat",
@@ -3721,6 +3835,29 @@ func TestRuntimeConfigRuntimeManagerForInputType(t *testing.T) {
 			inputType: "filestream",
 			beatName:  "filebeat",
 			want:      OtelRuntimeManager,
+		},
+		{
+			name: "use process runtime for all inputs when logstash output with process runtime is set",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default: string(ProcessRuntimeManager),
+					InputType: map[string]string{
+						"filestream": string(OtelRuntimeManager),
+					},
+				},
+				Output: map[string]string{
+					"logstash": string(ProcessRuntimeManager),
+				},
+			},
+			output: outputI{
+				Name:       "default",
+				Enabled:    true,
+				OutputType: "logstash",
+			},
+			inputType: "filestream",
+			beatName:  "filebeat",
+			want:      ProcessRuntimeManager,
 		},
 		{
 			name: "uses beat default when input type not configured",
@@ -3814,7 +3951,7 @@ func TestRuntimeConfigRuntimeManagerForInputType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.config.RuntimeManagerForInputType(tt.inputType, tt.beatName)
+			got := tt.config.RuntimeManagerForInputType(tt.inputType, tt.beatName, tt.output)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -3824,37 +3961,11 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	config := DefaultRuntimeConfig()
 	require.NotNil(t, config)
 	assert.Equal(t, string(DefaultRuntimeManager), config.Default)
+	assert.Equal(t, string(ProcessRuntimeManager), config.DynamicInputs)
 	assert.Equal(t, "", config.Filebeat.Default)
-	assert.Nil(t, config.Filebeat.InputType)
-	assert.Equal(t, "", config.Metricbeat.Default)
-	assert.Equal(t,
-		map[string]string{
-			"activemq/metrics":      string(OtelRuntimeManager),
-			"apache/metrics":        string(OtelRuntimeManager),
-			"beat/metrics":          string(OtelRuntimeManager),
-			"containerd/metrics":    string(OtelRuntimeManager),
-			"docker/metrics":        string(OtelRuntimeManager),
-			"elasticsearch/metrics": string(OtelRuntimeManager),
-			"etcd/metrics":          string(OtelRuntimeManager),
-			"http/metrics":          string(OtelRuntimeManager),
-			"jolokia/metrics":       string(OtelRuntimeManager),
-			"kafka/metrics":         string(OtelRuntimeManager),
-			"kibana/metrics":        string(OtelRuntimeManager),
-			"linux/metrics":         string(OtelRuntimeManager),
-			"logstash/metrics":      string(OtelRuntimeManager),
-			"memcached/metrics":     string(OtelRuntimeManager),
-			"mongodb/metrics":       string(OtelRuntimeManager),
-			"mysql/metrics":         string(OtelRuntimeManager),
-			"nats/metrics":          string(OtelRuntimeManager),
-			"nginx/metrics":         string(OtelRuntimeManager),
-			"rabbitmq/metrics":      string(OtelRuntimeManager),
-			"sql/metrics":           string(OtelRuntimeManager),
-			"stan/metrics":          string(OtelRuntimeManager),
-			"statsd/metrics":        string(OtelRuntimeManager),
-			"system/metrics":        string(OtelRuntimeManager),
-			"vsphere/metrics":       string(OtelRuntimeManager),
-		},
-		config.Metricbeat.InputType)
+	assert.Empty(t, config.Filebeat.InputType)
+	assert.Equal(t, string(OtelRuntimeManager), config.Metricbeat.Default)
+	assert.Equal(t, map[string]string{}, config.Metricbeat.InputType)
 }
 
 func TestToComponentsWithRuntimeConfig(t *testing.T) {
@@ -3927,39 +4038,6 @@ func TestToComponentsWithRuntimeConfig(t *testing.T) {
 					assert.Equal(t, ProcessRuntimeManager, comp.RuntimeManager,
 						"all components should use global default process runtime")
 				}
-			},
-		},
-		{
-			name: "beat-specific configs are ignored when beat name is empty",
-			policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "filestream",
-						"id":   "filestream-0",
-					},
-				},
-			},
-			runtimeConfig: &RuntimeConfig{
-				Default: string(ProcessRuntimeManager),
-				// These will be ignored because testbeat doesn't use elastic-otel-collector
-				Filebeat: BeatRuntimeConfig{
-					Default: string(OtelRuntimeManager),
-					InputType: map[string]string{
-						"filestream": string(OtelRuntimeManager),
-					},
-				},
-			},
-			wantCount: 1,
-			validate: func(t *testing.T, components []Component) {
-				// Should use global default, not filebeat config
-				assert.Equal(t, ProcessRuntimeManager, components[0].RuntimeManager,
-					"should use global default when beat name is empty")
 			},
 		},
 		{
@@ -4064,13 +4142,269 @@ func TestToComponentsWithRuntimeConfig(t *testing.T) {
 			require.NoError(t, err)
 
 			result, err := runtime.ToComponents(
-				tt.policy, tt.runtimeConfig, nil, nil, logp.InfoLevel, nil, map[string]uint64{})
+				tt.policy, tt.runtimeConfig, nil, nil, logp.InfoLevel, nil, map[string]uint64{}, map[string]bool{})
 			require.NoError(t, err)
 			require.Len(t, result, tt.wantCount)
 
 			if tt.validate != nil {
 				tt.validate(t, result)
 			}
+		})
+	}
+}
+
+func TestToComponentsWithDynamicInputs(t *testing.T) {
+	linuxAMD64Platform := PlatformDetail{
+		Platform: Platform{
+			OS:   Linux,
+			Arch: AMD64,
+			GOOS: Linux,
+		},
+	}
+
+	tests := []struct {
+		name          string
+		policy        map[string]interface{}
+		dynamicInputs map[string]bool
+		wantCount     int
+		validate      func(t *testing.T, components []Component)
+	}{
+		{
+			name: "no dynamic inputs",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+				},
+			},
+			dynamicInputs: map[string]bool{},
+			wantCount:     1,
+			validate: func(t *testing.T, components []Component) {
+				assert.False(t, components[0].Dynamic, "component should not be dynamic when no dynamic inputs")
+			},
+		},
+		{
+			name: "single dynamic input marks component as dynamic",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+				},
+			},
+			dynamicInputs: map[string]bool{
+				"filestream-0": true,
+			},
+			wantCount: 1,
+			validate: func(t *testing.T, components []Component) {
+				assert.True(t, components[0].Dynamic, "component should be dynamic when input is dynamic")
+			},
+		},
+		{
+			name: "multiple inputs one dynamic marks component as dynamic",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-1",
+					},
+				},
+			},
+			dynamicInputs: map[string]bool{
+				"filestream-1": true,
+			},
+			wantCount: 1,
+			validate: func(t *testing.T, components []Component) {
+				assert.True(t, components[0].Dynamic, "component should be dynamic when at least one input is dynamic")
+			},
+		},
+		{
+			name: "different input types different dynamic status",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+					map[string]interface{}{
+						"type": "log",
+						"id":   "log-0",
+					},
+				},
+			},
+			dynamicInputs: map[string]bool{
+				"filestream-0": true,
+				"log-0":        false,
+			},
+			wantCount: 2,
+			validate: func(t *testing.T, components []Component) {
+				for _, comp := range components {
+					switch comp.InputType {
+					case "filestream":
+						assert.True(t, comp.Dynamic, "filestream component should be dynamic")
+					case "log":
+						assert.False(t, comp.Dynamic, "log component should not be dynamic")
+					}
+				}
+			},
+		},
+		{
+			name: "input not in dynamicInputs map is not dynamic",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+				},
+			},
+			dynamicInputs: map[string]bool{
+				"other-input": true,
+			},
+			wantCount: 1,
+			validate: func(t *testing.T, components []Component) {
+				assert.False(t, components[0].Dynamic, "component should not be dynamic when input id not in map")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runtime, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), linuxAMD64Platform, SkipBinaryCheck())
+			require.NoError(t, err)
+
+			result, err := runtime.ToComponents(
+				tt.policy, DefaultRuntimeConfig(), nil, nil, logp.InfoLevel, nil, map[string]uint64{}, tt.dynamicInputs)
+			require.NoError(t, err)
+			require.Len(t, result, tt.wantCount)
+
+			if tt.validate != nil {
+				tt.validate(t, result)
+			}
+		})
+	}
+}
+
+func TestRuntimeConfig_UCFGUnpack(t *testing.T) {
+	tests := map[string]struct {
+		input  map[string]interface{}
+		mutate func(*RuntimeConfig) // applied to DefaultRuntimeConfig() to build expected value
+	}{
+		"empty_input_uses_defaults": {
+			input:  map[string]interface{}{},
+			mutate: func(c *RuntimeConfig) {},
+		},
+		"override_default_runtime": {
+			input: map[string]interface{}{
+				"default": "otel",
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.Default = "otel"
+			},
+		},
+		"override_metricbeat_input_type": {
+			input: map[string]interface{}{
+				"metricbeat": map[string]interface{}{
+					"system/metrics": "process",
+				},
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.Metricbeat.InputType["system/metrics"] = "process"
+			},
+		},
+		"set_filebeat_default": {
+			input: map[string]interface{}{
+				"filebeat": map[string]interface{}{
+					"default": "otel",
+				},
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.Filebeat.Default = "otel"
+			},
+		},
+		"set_filebeat_default_and_input_type": {
+			input: map[string]interface{}{
+				"filebeat": map[string]interface{}{
+					"default":     "otel",
+					"log/metrics": "process",
+				},
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.Filebeat.Default = "otel"
+				c.Filebeat.InputType = map[string]string{
+					"log/metrics": "process",
+				}
+			},
+		},
+		"set_metricbeat_default": {
+			input: map[string]interface{}{
+				"metricbeat": map[string]interface{}{
+					"default": "process",
+				},
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.Metricbeat.Default = "process"
+			},
+		},
+		"set_dynamic_inputs": {
+			input: map[string]interface{}{
+				"dynamic_inputs": "otel",
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.DynamicInputs = "otel"
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := DefaultRuntimeConfig()
+			ucfgCfg, err := ucfg.NewFrom(tt.input, ucfg.PathSep("."))
+			require.NoError(t, err)
+			require.NoError(t, ucfgCfg.Unpack(cfg, ucfg.PathSep(".")))
+			require.NoError(t, cfg.Validate())
+
+			expected := DefaultRuntimeConfig()
+			tt.mutate(expected)
+
+			assert.Equal(t, expected, cfg)
 		})
 	}
 }

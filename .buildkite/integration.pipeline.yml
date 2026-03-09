@@ -9,8 +9,8 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1765760468"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1765760468"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1772525581"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1772525581"
 
 common:
   - vault_docker_login: &vault_docker_login
@@ -178,3 +178,14 @@ steps:
         - .buildkite
         - .go-version
         - version/version.go
+
+  - label: "Test packages"
+    depends_on:
+    - int-packaging
+    command: |
+      .buildkite/scripts/steps/package-tests.sh
+    agents:
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      diskSizeGb: 200
+      image: "${IMAGE_UBUNTU_2204_X86_64}"

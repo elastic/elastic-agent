@@ -89,6 +89,7 @@ func TestGetSupported(t *testing.T) {
 			},
 			Results: []common.SupportedOS{
 				RhelAMD64_8,
+				RhelAMD64_10,
 			},
 		},
 		{

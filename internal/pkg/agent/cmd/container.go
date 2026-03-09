@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -852,6 +853,19 @@ func containerCfgOverrides(cfg *configuration.Configuration) {
 		cfg.Settings.LoggingConfig.ToFiles = false
 	}
 
+	if envBool("HTTPPROF") {
+		// sanity checks to ensure monitoring config is setup
+		if cfg.Settings.MonitoringConfig == nil {
+			cfg.Settings.MonitoringConfig = monitoringCfg.DefaultConfig()
+		}
+
+		if cfg.Settings.MonitoringConfig.Pprof == nil {
+			cfg.Settings.MonitoringConfig.Pprof = &monitoringCfg.PprofConfig{}
+		}
+
+		cfg.Settings.MonitoringConfig.Pprof.Enabled = true
+	}
+
 	eventsToStderrEnv := envWithDefault("false", "EVENTS_TO_STDERR")
 	eventsToStderr, err := strconv.ParseBool(eventsToStderrEnv)
 	if err != nil {
@@ -901,6 +915,8 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	paths.SetTop(topPath)
 	paths.SetConfig(configPath)
 	paths.SetControlSocket(socketPath)
+	diagnosticSocketPath := paths.SocketFromPath(runtime.GOOS, topPath, paths.DiagnosticsExtensionSocketName)
+	paths.SetDiagnosticsExtensionSocket(diagnosticSocketPath)
 	// when custom top path is provided the home directory is not versioned
 	paths.SetVersionHome(false)
 	// install path stays on container default mount (otherwise a bind mounted directory could have noexec set)

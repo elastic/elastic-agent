@@ -7,16 +7,14 @@ package application
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 
 	"go.elastic.co/apm/v2"
 
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-
 	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -54,6 +52,7 @@ import (
 type rollbacksSource interface {
 	Set(map[string]ttl.TTLMarker) error
 	Get() (map[string]ttl.TTLMarker, error)
+	Remove(string) error
 }
 
 // CfgOverrider allows for application driven overrides of configuration read from disk.
@@ -73,6 +72,7 @@ func New(
 	disableMonitoring bool,
 	override CfgOverrider,
 	initialUpdateMarker *upgrade.UpdateMarker,
+	availableRollbacksSource rollbacksSource,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -135,7 +135,6 @@ func New(
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
 
-	availableRollbacksSource := ttl.NewTTLMarkerRegistry(log, paths.Top())
 	if upgrade.IsUpgradeable() {
 		// If we are not running in a container, check and normalize the install descriptor before we start the agent
 		normalizeAgentInstalls(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
@@ -183,20 +182,35 @@ func New(
 		configMgr = newTestingModeConfigManager(log)
 	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
-
-		loader := config.NewLoader(log, paths.ExternalInputs())
-		rawCfgMap, err := rawConfig.ToMapStr()
+		flags, err := features.Parse(rawConfig)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
+			return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 		}
-		discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
-			kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
-		if !cfg.Settings.Reload.Enabled {
-			log.Debug("Reloading of configuration is off")
-			configMgr = newOnce(log, discover, loader)
+		if flags.EncryptedConfig() {
+			if hasEncryptedStandaloneConfigChanged(log, pathConfigFile) {
+				log.Debug("Detected config file change, re-encrypting...")
+				if err := storage.EncryptConfigOnPath(paths.Config()); err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to encrypt config file: %w", err)
+				}
+			}
+
+			log.Debug("Loading encrypted config")
+			configMgr = newEncryptedOnce(log, paths.AgentConfigFile())
 		} else {
-			log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
-			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
+			loader := config.NewLoader(log, paths.ExternalInputs())
+			rawCfgMap, err := rawConfig.ToMapStr()
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
+			}
+			discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
+				kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
+			if !cfg.Settings.Reload.Enabled {
+				log.Debug("Reloading of configuration is off")
+				configMgr = newOnce(log, discover, loader)
+			} else {
+				log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
+				configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
+			}
 		}
 	} else {
 		isManaged = true
@@ -331,57 +345,15 @@ func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, in
 		}
 	}
 
-	// check if we need to cleanup old agent installs
-	rollbacks, err := rollbackSource.Get()
+	absHomePath := paths.Home()
+	relHomePath, err := filepath.Rel(topDir, absHomePath)
 	if err != nil {
-		log.Warnf("Error getting available rollbacks during startup check: %s", err)
+		log.Warnf("Error calculating home path %q relative to top path %q: %s", absHomePath, topDir, err)
 		return
 	}
-
-	var versionedHomesToCleanup []string
-	for versionedHome, ttlMarker := range rollbacks {
-
-		versionedHomeAbsPath := filepath.Join(topDir, versionedHome)
-
-		if versionedHomeAbsPath == paths.HomeFrom(topDir) {
-			// skip the current install
-			log.Warnf("Found a TTL marker for the currently running agent at %s. Skipping cleanup...", versionedHome)
-			continue
-		}
-
-		_, err = os.Stat(versionedHomeAbsPath)
-		if errors.Is(err, os.ErrNotExist) {
-			log.Warnf("Versioned home %s corresponding to agent TTL marker %+v  is not found on disk", versionedHomeAbsPath, ttlMarker)
-			versionedHomesToCleanup = append(versionedHomesToCleanup, versionedHome)
-			continue
-		}
-
-		if err != nil {
-			log.Warnf("error checking versioned home %s for agent install: %s", versionedHomeAbsPath, err.Error())
-			continue
-		}
-
-		if now.After(ttlMarker.ValidUntil) {
-			// the install directory exists but it's expired. Remove the files.
-			log.Infof("agent TTL marker %+v marks %q as expired, removing directory", ttlMarker, versionedHomeAbsPath)
-			if cleanupErr := install.RemoveBut(versionedHomeAbsPath, true); cleanupErr != nil {
-				log.Warnf("Error removing directory %q: %s", versionedHomeAbsPath, cleanupErr)
-			} else {
-				log.Infof("Directory %q was removed", versionedHomeAbsPath)
-				versionedHomesToCleanup = append(versionedHomesToCleanup, versionedHome)
-			}
-		}
-	}
-
-	if len(versionedHomesToCleanup) > 0 {
-		log.Infof("removing install descriptor(s) for %v", versionedHomesToCleanup)
-		for _, versionedHomeToCleanup := range versionedHomesToCleanup {
-			delete(rollbacks, versionedHomeToCleanup)
-		}
-		err = rollbackSource.Set(rollbacks)
-		if err != nil {
-			log.Warnf("Error removing install descriptor(s): %s", err)
-		}
+	_, err = upgrade.CleanAvailableRollbacks(log, rollbackSource, topDir, relHomePath, now, upgrade.PreserveActiveUpgradeVersions(initialUpdateMarker, upgrade.CleanupExpiredRollbacks))
+	if err != nil {
+		log.Warnf("Error cleaning available rollbacks: %s", err)
 	}
 }
 
@@ -521,4 +493,38 @@ func isMissingError(err error) bool {
 		return v.Reason() == ucfg.ErrMissing
 	}
 	return false
+}
+
+// hasEncryptedStandaloneConfigChanged parses the file at pathConfigFile and checks if it has the same contents as storage.DefaultAgentEncryptedStandaloneConfig
+func hasEncryptedStandaloneConfigChanged(log *logger.Logger, pathConfigFile string) bool {
+	embeddedConfig, err := config.NewConfigFrom(storage.DefaultAgentEncryptedStandaloneConfig)
+	if err != nil {
+		log.Errorw("Unable to load embedded defaults as config.", "err", err)
+		return false
+	}
+
+	opts := make([]interface{}, 0, len(config.NoResolveOptions))
+	for _, opt := range config.NoResolveOptions {
+		opts = append(opts, opt)
+	}
+	embeddedMap, err := embeddedConfig.ToMapStr(opts...)
+	if err != nil {
+		log.Errorw("Unable to unpack ebedded defaults as map.", "err", err)
+		return false
+	}
+
+	// reread config file, rawConfig contains injected attributes, not just  the encryption feature flag.
+	fileConfig, err := config.LoadFile(pathConfigFile)
+	if err != nil {
+		log.Errorw("Unable to load file config.", "err", err)
+		return false
+
+	}
+	fileMap, err := fileConfig.ToMapStr(opts...)
+	if err != nil {
+		log.Errorw("Unable to unpack file config as map", "err", err)
+		return false
+	}
+
+	return !reflect.DeepEqual(embeddedMap, fileMap)
 }

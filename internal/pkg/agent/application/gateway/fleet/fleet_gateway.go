@@ -190,7 +190,6 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 			actions := make([]fleetapi.Action, len(resp.Actions))
 			copy(actions, resp.Actions)
 			if len(actions) > 0 {
-				f.log.Infow("received new actions from Fleet checkin", "actions", actions)
 				f.actionCh <- actions
 			}
 		}
