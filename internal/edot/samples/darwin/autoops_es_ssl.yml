@@ -41,7 +41,7 @@ receivers:
     telemetry_types: ["logs"]
 
 exporters:
-  otlphttp:
+  otlp_http:
     headers:
       Authorization: "AutoOpsToken ${env:AUTOOPS_TOKEN}"
     endpoint: ${env:AUTOOPS_OTEL_URL}
@@ -59,7 +59,7 @@ service:
   pipelines:
     logs:
       receivers: [metricbeatreceiver]
-      exporters: [otlphttp]
+      exporters: [otlp_http]
   telemetry:
     logs:
       encoding: json
