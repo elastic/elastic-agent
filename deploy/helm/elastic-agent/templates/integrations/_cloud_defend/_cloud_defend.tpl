@@ -18,37 +18,45 @@ extraEnvs:
 {{- end -}}
 
 {{- define "elasticagent.cloudDefend.config.input" -}}
-- id: cloud_defend-cloud_defend/control
+{{- $policyID := default (uuidv4) $.Values.cloudDefend.policy_id -}}
+- id: cloud_defend/control-cloud_defend-{{ $policyID }}
+  revision: 1
+  name: D4C
   type: cloud_defend/control
   use_output: {{ $.Values.cloudDefend.output }}
+  package_policy_id: {{ $policyID }}
+  meta:
+    package:
+      name: cloud_defend
+      version: 1.0.0
   data_stream:
     namespace: {{ $.Values.cloudDefend.namespace }}
   streams:
-    - id: cloud_defend/control-cloud_defend.alerts
+    - id: cloud_defend/control-cloud_defend.alerts-{{ $policyID }}
       data_stream:
         dataset: cloud_defend.alerts
         type: logs
       security-policy:
       {{- $.Values.cloudDefend.securityPolicy | toYaml | nindent 8 }}
-    - id: cloud_defend/control-cloud_defend.file
+    - id: cloud_defend/control-cloud_defend.file-{{ $policyID }}
       data_stream:
         dataset: cloud_defend.file
         type: logs
       file-config: null
-    - id: cloud_defend/control-cloud_defend.heartbeat
+    - id: cloud_defend/control-cloud_defend.heartbeat-{{ $policyID }}
       data_stream:
         dataset: cloud_defend.heartbeat
         type: metrics
       period: {{ $.Values.cloudDefend.heartbeat.period }}
-    - id: cloud_defend/control-cloud_defend.metrics
+    - id: cloud_defend/control-cloud_defend.metrics-{{ $policyID }}
       data_stream:
         dataset: cloud_defend.metrics
         type: metrics
       metricsets:
       {{- $.Values.cloudDefend.metrics.metricsets | toYaml | nindent 8 }}
-      hosts: {{ $.Values.cloudDefend.metrics.hosts }}
+      hosts: null
       period: {{ $.Values.cloudDefend.metrics.period }}
-    - id: cloud_defend/control-cloud_defend.process
+    - id: cloud_defend/control-cloud_defend.process-{{ $policyID }}
       data_stream:
         dataset: cloud_defend.process
         type: logs

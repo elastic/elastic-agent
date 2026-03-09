@@ -393,6 +393,9 @@ cloudDefend:
   # -- enable Cloud Defend (Defend for Containers) integration.
   # @section -- 4.1 - Cloud Defend integration
   enabled: false
+  # -- package policy ID used in cloud_defend input and stream IDs. If empty, a random UUID is generated with Helm uuidv4.
+  # @section -- 4.1 - Cloud Defend integration
+  policy_id: ""
   # -- name of the output used in Cloud Defend integration. Note that this output needs to be defined in
   # [outputs](#1-outputs)
   # @section -- 4.1 - Cloud Defend integration
@@ -434,9 +437,6 @@ cloudDefend:
     # @section -- 4.1 - Cloud Defend integration
     metricsets:
       - cloud_defend
-    # -- metrics stream hosts
-    # @section -- 4.1 - Cloud Defend integration
-    hosts: null
     # -- metrics stream period
     # @section -- 4.1 - Cloud Defend integration
     period: 24h
