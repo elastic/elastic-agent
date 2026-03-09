@@ -146,7 +146,6 @@ func (r *subprocessExecution) startCollector(
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
 
-	// set collector args and add --config flag with the elasticagent:stdin URI
 	// set collector args and add --config flag with the stdingob:stdin URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
 	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:", stdinGobProviderScheme))
