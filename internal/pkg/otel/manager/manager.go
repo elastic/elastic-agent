@@ -669,7 +669,7 @@ func (m *OTelManager) applyMergedConfig(
 
 	// Collector is running, update the configuration.
 
-	// If we changed the log level, we need to restart the collector, as out loggers read directly from the collector's
+	// If we changed the log level, we need to restart the collector, as our loggers read directly from the collector's
 	// stdout and stderr.
 	if m.proc.LogLevel() != m.collectorLogLevel {
 		m.stopCollector()
