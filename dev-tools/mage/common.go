@@ -820,4 +820,3 @@ func ParseVersion(version string) (int, int, int, error) {
 	patch, _ := strconv.Atoi(data["patch"])
 	return major, minor, patch, nil
 }
-

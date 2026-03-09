@@ -96,19 +96,12 @@ import (
 )
 
 const (
-	goLicenserRepo    = "github.com/elastic/go-licenser"
-	buildDir          = "build"
-	metaDir           = "_meta"
-	snapshotEnv       = "SNAPSHOT"
-	devEnv            = "DEV"
-	fipsEnv           = "FIPS"
-	externalArtifacts = "EXTERNAL"
-	platformsEnv      = "PLATFORMS"
-	packagesEnv       = "PACKAGES"
-	dockerVariants    = "DOCKER_VARIANTS"
-	configFile        = "elastic-agent.yml"
-	checksumFilename  = "checksum.yml"
-	commitLen         = 7
+	goLicenserRepo   = "github.com/elastic/go-licenser"
+	buildDir         = "build"
+	metaDir          = "_meta"
+	configFile       = "elastic-agent.yml"
+	checksumFilename = "checksum.yml"
+	commitLen        = 7
 
 	cloudImageTmpl = "docker.elastic.co/observability-ci/elastic-agent:%s"
 

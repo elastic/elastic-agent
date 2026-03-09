@@ -167,4 +167,3 @@ func TestPackages(cfg *Settings) error {
 
 	return nil
 }
-
