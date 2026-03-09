@@ -579,7 +579,10 @@ func Package(ctx context.Context) error {
 	mg.CtxDeps(ctx, PackageAgentCore)
 
 	// switch to the main package target
-	mage.UseElasticAgentPackaging(cfg)
+	pkgSpec, err := mage.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
+	if err != nil {
+		return err
+	}
 
 	if cfg.Packaging.PackagingFromManifest {
 		// manifest is not passed into packageAgent below because we want packageAgent to go through the
@@ -593,22 +596,25 @@ func Package(ctx context.Context) error {
 		cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
 
 		// don't download the elastic-agent-core components; built above
-		if err := downloadManifest(ctx, cfg, packaging.WithoutProjectName(agentCoreProjectName)); err != nil {
+		if err := downloadManifest(ctx, cfg, pkgSpec, packaging.WithoutProjectName(agentCoreProjectName)); err != nil {
 			return fmt.Errorf("failed downloading manifest components: %w", err)
 		}
 	}
-	return packageAgent(ctx, cfg, "", nil)
+	return packageAgent(ctx, cfg, pkgSpec, "", nil)
 }
 
 // DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
 func DownloadManifest(ctx context.Context) error {
-	cfg := mage.SettingsFromContext(ctx)
-	// Enforce that we use the correct elastic-agent packaging, to correctly load component dependencies
-	devtools.UseElasticAgentPackaging(cfg)
-	return downloadManifest(ctx, cfg)
+	// Load elastic-agent packaging specs to correctly load component dependencies
+	cfg := devtools.SettingsFromContext(ctx)
+	pkgSpec, err := mage.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
+	if err != nil {
+		return err
+	}
+	return downloadManifest(ctx, cfg, pkgSpec)
 }
 
-func downloadManifest(ctx context.Context, cfg *mage.Settings, filters ...packaging.ComponentFilter) error {
+func downloadManifest(ctx context.Context, cfg *mage.Settings, pkgSpecs []mage.OSPackageArgs, filters ...packaging.ComponentFilter) error {
 	fmt.Println("--- Downloading manifest")
 	start := time.Now()
 	defer func() { fmt.Println("Downloading manifest took", time.Since(start)) }()
@@ -628,7 +634,7 @@ func downloadManifest(ctx context.Context, cfg *mage.Settings, filters ...packag
 		return errAtLeastOnePlatform
 	}
 
-	dependencies, err := extractComponentsFromSelectedPkgSpecs(cfg, devtools.Packages)
+	dependencies, err := extractComponentsFromSelectedPkgSpecs(cfg, pkgSpecs)
 	if err != nil {
 		return fmt.Errorf("failed extracting dependencies: %w", err)
 	}
@@ -833,10 +839,12 @@ func PackageAgentCore(ctx context.Context) error {
 	mg.CtxDeps(ctx, Update, Otel.Prepare, Otel.CrossBuild, CrossBuild, Build.WindowsArchiveRootBinary)
 
 	fmt.Println("--- Package elastic-agent-core")
-	devtools.UseElasticAgentCorePackaging(cfg)
-
+	coreSpec, err := mage.LoadElasticAgentCorePackageSpec(cfg.ElasticBeatsDir)
+	if err != nil {
+		return err
+	}
 	// ran directly as we don't want mage to cache that it already called devtools.Package
-	return devtools.Package(ctx, devtools.SettingsFromContext(ctx))
+	return devtools.Package(ctx, cfg, coreSpec)
 }
 
 // Config generates both the short/reference/docker.
@@ -1059,8 +1067,11 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	// docker does not exists for this commit, build it
 	if !strings.Contains(dockerImageOut, tag) {
 		// produce docker package
-		mage.UseElasticAgentPackaging(cfg)
-		err = packageAgent(ctx, cfg, "", nil)
+		pkgSpec, err := mage.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
+		if err != nil {
+			return err
+		}
+		err = packageAgent(ctx, cfg, pkgSpec, "", nil)
 		if err != nil {
 			return fmt.Errorf("failed to package elastic-agent: %w", err)
 		}
@@ -1110,7 +1121,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, cfg *mage.Settings, dependenciesVersion string, manifestResponse *manifest.Build) error {
+func packageAgent(ctx context.Context, cfg *mage.Settings, pkgSpecs []mage.OSPackageArgs, dependenciesVersion string, manifestResponse *manifest.Build) error {
 	fmt.Println("--- Package elastic-agent")
 
 	if dependenciesVersion == "" {
@@ -1126,7 +1137,7 @@ func packageAgent(ctx context.Context, cfg *mage.Settings, dependenciesVersion s
 	}
 	log.Printf("Packaging with dependenciesVersion: %s", dependenciesVersion)
 
-	dependencies, err := extractComponentsFromSelectedPkgSpecs(cfg, devtools.Packages)
+	dependencies, err := extractComponentsFromSelectedPkgSpecs(cfg, pkgSpecs)
 	if err != nil {
 		return fmt.Errorf("failed extracting dependencies: %w", err)
 	}
@@ -1168,7 +1179,7 @@ func packageAgent(ctx context.Context, cfg *mage.Settings, dependenciesVersion s
 	}
 
 	// build package and test
-	if err := devtools.Package(ctx, cfg); err != nil {
+	if err := devtools.Package(ctx, cfg, pkgSpecs); err != nil {
 		return err
 	}
 	return nil
@@ -1456,11 +1467,13 @@ func PackageUsingDRA(ctx context.Context) error {
 	}
 
 	// final package build
-	mage.UseElasticAgentPackaging(cfg)
+	pkgSpec, err := mage.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
+	if err != nil {
+		return err
+	}
 
 	// When MANIFEST_URL is not provided in the environment elastic-agent-core packages from build/distributions
 	// will be used instead of pulling from the manifest.
-	var err error
 	var manifestResponse *manifest.Build
 	var dependenciesVersion string
 	manifestURL := cfg.Packaging.ManifestURL
@@ -1486,7 +1499,7 @@ func PackageUsingDRA(ctx context.Context) error {
 		ctx = devtools.ContextWithSettings(ctx, cfg)
 	}
 
-	return packageAgent(ctx, cfg, dependenciesVersion, manifestResponse)
+	return packageAgent(ctx, cfg, pkgSpec, dependenciesVersion, manifestResponse)
 }
 
 // downloadManifestAndParseVersion downloads the manifest and returns the build info and parsed version.
