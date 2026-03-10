@@ -43,6 +43,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 
 			if isOSQueryApp(name) {
 				// ignore the error if the file is osquery.app
+				// https://github.com/elastic/elastic-agent/issues/13059
 				return nil
 			}
 
@@ -61,6 +62,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 
 			if isOSQueryApp(name) {
 				// ignore the error if the file is osquery.app
+				// https://github.com/elastic/elastic-agent/issues/13059
 				return nil
 			}
 

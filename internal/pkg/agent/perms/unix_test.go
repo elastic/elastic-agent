@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"testing"
 	"time"
@@ -51,6 +52,42 @@ func TestFixPermissions_NonExistentRootIsIgnored(t *testing.T) {
 
 	err := FixPermissions(nonExistent)
 	require.NoError(t, err)
+}
+
+func TestFixPermissions_SkipsOSQueryAppOnDarwin(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("osquery.app skip is only applied on darwin")
+	}
+
+	tmpDir := t.TempDir()
+	// Simulate osquery.app bundle layout; FixPermissions skips EPERM for paths containing "osquery.app"
+	osqueryPath := filepath.Join(tmpDir, "osquery.app")
+	contents := filepath.Join(osqueryPath, "Contents", "MacOS")
+	require.NoError(t, os.MkdirAll(contents, 0755))
+	binPath := filepath.Join(contents, "osqueryd")
+	require.NoError(t, os.WriteFile(binPath, []byte("binary"), 0755))
+
+	// Request root ownership; as non-root we get EPERM on Lchown/Chmod. Path contains osquery.app so errors are skipped.
+	err := FixPermissions(osqueryPath, WithOwnership(utils.FileOwner{UID: 0, GID: 0}))
+	require.NoError(t, err)
+}
+
+func TestFixPermissions_OSQueryAppNonEPERMIsNotSkipped(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("osquery.app skip is only applied on darwin")
+	}
+
+	tmpDir := t.TempDir()
+	osqueryPath := filepath.Join(tmpDir, "osquery.app")
+	require.NoError(t, os.MkdirAll(osqueryPath, 0755))
+
+	// Use an invalid UID/GID so Lchown fails with EINVAL (or similar), not EPERM.
+	// When the error is not EPERM, we fail immediately and do not skip osquery.app.
+	// Max int32 can be an unsupported UID on some systems; -1 is "no change" so use a large positive.
+	const invalidUID = 2147483647
+	err := FixPermissions(osqueryPath, WithOwnership(utils.FileOwner{UID: invalidUID, GID: invalidUID}))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cannot update ownership")
 }
 
 func TestIsMaskStripped(t *testing.T) {
