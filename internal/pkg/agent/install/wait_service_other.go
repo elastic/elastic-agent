@@ -8,11 +8,13 @@ package install
 
 import (
 	"time"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 // isStopped waits until the service has stopped.  On non Windows
 // systems this isn't necessary so just return.
-func isStopped(timeout time.Duration, interval time.Duration, service string) error {
+func isStopped(_ *logp.Logger, _ time.Duration, _ time.Duration, _ string) error {
 	return nil
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/kardianos/service"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -27,7 +28,7 @@ type ProgressDescriber interface {
 // provided then it switched to running with that username and groupName.
 func SwitchExecutingMode(topPath string, pt ProgressDescriber, username string, groupName string, password string) error {
 	// ensure service is stopped
-	status, err := EnsureStoppedService(topPath, pt)
+	status, err := EnsureStoppedService(logp.L(), topPath, pt)
 	if err != nil {
 		// context for the error already provided in the EnsureStoppedService function
 		return err

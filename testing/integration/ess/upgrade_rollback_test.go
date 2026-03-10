@@ -23,6 +23,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -730,7 +731,7 @@ func restartAgentNTimes(t *testing.T, noOfRestarts int, sleepBetweenIterations t
 func restartAgent(t *testing.T, topPath string, operationTimeout time.Duration) {
 	t.Logf("Stopping agent via service to simulate crashing")
 	stopRequested := time.Now()
-	err := install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
+	err := install.StopService(logp.L(), topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
 	if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
 		// Due to the quick restarts every sleepBetweenIterations its possible that this is faster than Windows
 		// can handle. Decrementing restartIdx means that the loop will occur again.

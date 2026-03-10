@@ -396,7 +396,7 @@ func StartService(topPath string) error {
 }
 
 // StopService stops the installed service.
-func StopService(topPath string, timeout time.Duration, interval time.Duration) error {
+func StopService(log *logp.Logger, topPath string, timeout time.Duration, interval time.Duration) error {
 	// only stopping the service, so no need to set the username and group to any value
 	svc, err := newService(topPath)
 	if err != nil {
@@ -406,7 +406,7 @@ func StopService(topPath string, timeout time.Duration, interval time.Duration) 
 	if err != nil {
 		return fmt.Errorf("failed to stop service (%s): %w", paths.ServiceName(), err)
 	}
-	err = isStopped(timeout, interval, paths.ServiceName())
+	err = isStopped(log, timeout, interval, paths.ServiceName())
 	if err != nil {
 		return fmt.Errorf("failed to stop service (%s): %w", paths.ServiceName(), err)
 	}

@@ -108,7 +108,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	}
 
 	// ensure service is stopped
-	status, err := EnsureStoppedService(topPath, pt)
+	status, err := EnsureStoppedService(log, topPath, pt)
 	if err != nil {
 		// context for the error already provided in the EnsureStoppedService function
 		return err
@@ -235,11 +235,11 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt Progres
 }
 
 // EnsureStoppedService ensures that the installed service is stopped.
-func EnsureStoppedService(topPath string, pt ProgressDescriber) (service.Status, error) {
+func EnsureStoppedService(log *logp.Logger, topPath string, pt ProgressDescriber) (service.Status, error) {
 	status, _ := StatusService(topPath)
 	if status == service.StatusRunning {
 		pt.Describe("Stopping service")
-		err := StopService(topPath, 30*time.Second, 250*time.Millisecond)
+		err := StopService(log, topPath, 30*time.Second, 250*time.Millisecond)
 		if err != nil {
 			pt.Describe("Failed to issue stop service")
 			// context for the error already provided in the StopService function

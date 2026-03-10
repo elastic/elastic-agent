@@ -14,6 +14,8 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 // isStopped queries the Windows service manager to see if the state
@@ -22,7 +24,7 @@ import (
 // system is stopped within the timeout period.  An error is returned
 // if the service doesn't stop before the timeout or if there are
 // errors communicating with the service manager.
-func isStopped(timeout time.Duration, interval time.Duration, service string) error {
+func isStopped(log *logp.Logger, timeout time.Duration, interval time.Duration, service string) error {
 	var err error
 	var status svc.Status
 
@@ -45,6 +47,8 @@ func isStopped(timeout time.Duration, interval time.Duration, service string) er
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
+	var pid uint32
+	startTime := time.Now()
 	for {
 		select {
 		case <-ticker.C:
@@ -52,13 +56,57 @@ func isStopped(timeout time.Duration, interval time.Duration, service string) er
 			if err != nil {
 				return fmt.Errorf("error querying service (%s): %w", service, err)
 			}
+			if status.ProcessId != 0 {
+				pid = status.ProcessId
+			}
 			if status.State == svc.Stopped {
-				return nil
+				timeElapsed := time.Now().Sub(startTime)
+				remainingTimeout := timeout - timeElapsed
+				return waitForProcessExit(log, pid, remainingTimeout)
 			}
 		case <-timer.C:
 			return fmt.Errorf("timed out after %s waiting for service (%s) to stop, last state was: %d", timeout, service, status.State)
 		}
 	}
+}
+
+// waitForProcessExit waits for the process with the given PID to exit.
+// On Windows, the service can report as stopped while the process is still
+// alive (the SCM marks it stopped when the service handler returns, but the
+// process may still be running cleanup code). This ensures the process has
+// fully exited before we attempt to remove its files.
+func waitForProcessExit(log *logp.Logger, pid uint32, timeout time.Duration) error {
+	if pid == 0 {
+		return nil
+	}
+
+	h, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+	if err != nil {
+		// Process is already gone or we can't open it — either way, proceed.
+		log.Debugf("could not open process %d to wait for exit (likely already exited): %v", pid, err)
+		return nil
+	}
+	defer func() {
+		if closeErr := windows.CloseHandle(h); closeErr != nil {
+			log.Infof("failed to close process handle: %v", closeErr)
+		}
+	}()
+
+	log.Infof("service stopped but process %d is still alive, waiting for it to exit", pid)
+
+	event, err := windows.WaitForSingleObject(h, uint32(timeout.Milliseconds()))
+	if err != nil {
+		return fmt.Errorf("error waiting for process %d: %w", pid, err)
+	}
+	switch event {
+	case windows.WAIT_ABANDONED, windows.WAIT_FAILED:
+		return fmt.Errorf("waiting for process %d to exit failed", pid)
+	case windows.WAIT_OBJECT_0:
+	default:
+		return fmt.Errorf("unexpected return value from WaitForSingleObject on process %d: %d", pid, event)
+	}
+
+	return nil
 }
 
 // EnsureServiceRemoved opens the Windows service manager and checks if the
