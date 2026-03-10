@@ -37,9 +37,11 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | [apachereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/apachereceiver/v0.145.0/receiver/apachereceiver/README.md) | v0.145.0 |
 | [awss3receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awss3receiver/v0.145.0/receiver/awss3receiver/README.md) | v0.145.0 |
+| [couchdbreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/couchdbreceiver/v0.145.0/receiver/couchdbreceiver/README.md) | v0.145.0 |
 | [dockerstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/dockerstatsreceiver/v0.145.0/receiver/dockerstatsreceiver/README.md) | v0.145.0 |
 | [elasticapmintakereceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/elasticapmintakereceiver/v0.29.0/receiver/elasticapmintakereceiver/README.md) | v0.29.0 |
 | [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.145.0/receiver/filelogreceiver/README.md) | v0.145.0 |
+| [haproxyreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/haproxyreceiver/v0.145.0/receiver/haproxyreceiver/README.md) | v0.145.0 |
 | [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.145.0/receiver/hostmetricsreceiver/README.md) | v0.145.0 |
 | [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.145.0/receiver/httpcheckreceiver/README.md) | v0.145.0 |
 | [iisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/iisreceiver/v0.145.0/receiver/iisreceiver/README.md) | v0.145.0 |
@@ -51,19 +53,24 @@ This section provides a summary of components included in the Elastic Distributi
 | [kafkametricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kafkametricsreceiver/v0.145.0/receiver/kafkametricsreceiver/README.md) | v0.145.0 |
 | [kafkareceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kafkareceiver/v0.145.0/receiver/kafkareceiver/README.md) | v0.145.0 |
 | [kubeletstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kubeletstatsreceiver/v0.145.0/receiver/kubeletstatsreceiver/README.md) | v0.145.0 |
+| [memcachedreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/memcachedreceiver/v0.145.0/receiver/memcachedreceiver/README.md) | v0.145.0 |
+| [mongodbreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/mongodbreceiver/v0.145.0/receiver/mongodbreceiver/README.md) | v0.145.0 |
 | [mysqlreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/mysqlreceiver/v0.145.0/receiver/mysqlreceiver/README.md) | v0.145.0 |
 | [nginxreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/nginxreceiver/v0.145.0/receiver/nginxreceiver/README.md) | v0.145.0 |
 | [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.145.0/receiver/nopreceiver/README.md) | v0.145.0 |
+| [oracledbreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/oracledbreceiver/v0.145.0/receiver/oracledbreceiver/README.md) | v0.145.0 |
 | [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.145.0/receiver/otlpreceiver/README.md) | v0.145.0 |
 | [postgresqlreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/postgresqlreceiver/v0.145.0/receiver/postgresqlreceiver/README.md) | v0.145.0 |
 | [profiling](https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/v0.0.202601/README.md) | v0.0.202601 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.145.0/receiver/prometheusreceiver/README.md) | v0.145.0 |
 | [prometheusremotewritereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusremotewritereceiver/v0.145.0/receiver/prometheusremotewritereceiver/README.md) | v0.145.0 |
+| [rabbitmqreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/rabbitmqreceiver/v0.145.0/receiver/rabbitmqreceiver/README.md) | v0.145.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.145.0/receiver/receivercreator/README.md) | v0.145.0 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.145.0/receiver/redisreceiver/README.md) | v0.145.0 |
 | [snmpreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/snmpreceiver/v0.145.0/receiver/snmpreceiver/README.md) | v0.145.0 |
 | [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlserverreceiver/v0.145.0/receiver/sqlserverreceiver/README.md) | v0.145.0 |
 | [statsdreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/statsdreceiver/v0.145.0/receiver/statsdreceiver/README.md) | v0.145.0 |
+| [vcenterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/vcenterreceiver/v0.145.0/receiver/vcenterreceiver/README.md) | v0.145.0 |
 | [windowseventlogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowseventlogreceiver/v0.145.0/receiver/windowseventlogreceiver/README.md) | v0.145.0 |
 | [windowsperfcountersreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowsperfcountersreceiver/v0.145.0/receiver/windowsperfcountersreceiver/README.md) | v0.145.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.145.0/receiver/zipkinreceiver/README.md) | v0.145.0 |
