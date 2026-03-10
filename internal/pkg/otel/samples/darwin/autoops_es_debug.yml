@@ -37,11 +37,27 @@ receivers:
     telemetry_types: ["logs"]
 
 exporters:
+<<<<<<< HEAD:internal/pkg/otel/samples/darwin/autoops_es_debug.yml
   # Exporter to print the first 5 logs/metrics and then every 1000th
   debug:
     verbosity: detailed
     sampling_initial: 5
     sampling_thereafter: 1000
+=======
+  otlphttp:
+    headers:
+      Authorization: "AutoOpsToken ${env:AUTOOPS_TOKEN}"
+    endpoint: ${env:AUTOOPS_OTEL_URL}
+    sending_queue:
+      batch:
+        flush_timeout: 1s
+        min_size: 1048576 # 1 MiB uncompressed
+        max_size: 4194304 # 4 MiB uncompressed
+        sizer: bytes
+      block_on_overflow: true
+      enabled: true
+      queue_size: 52428800 # 50 MiB uncompressed
+>>>>>>> bbf380667 ([AutoOps] Move `sizer` under `batch` (#13093)):internal/edot/samples/darwin/autoops_es_ssl.yml
 
 service:
   pipelines:
