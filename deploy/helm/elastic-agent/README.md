@@ -184,6 +184,7 @@ The [cloud-defend](https://www.elastic.co/docs/current/integrations/cloud_defend
 |-----|------|---------|-------------|
 | cloudDefend.enabled | bool | `false` | enable Cloud Defend integration |
 | cloudDefend.policy_id | string | `""` | package policy ID used in cloud_defend input and stream IDs. If empty, a random UUID is generated via Helm `uuidv4` |
+| cloudDefend.revision | integer | `1` | package policy revision used in cloud_defend input |
 | cloudDefend.output | string | `"default"` | name of the output used in Cloud Defend integration. Note that this output needs to be defined in [outputs](#1-outputs) |
 | cloudDefend.namespace | string | `"default"` | output namespace |
 | cloudDefend.securityPolicy | object | `{process: {...}, file: {...}}` | security policy with process and file selectors/responses (standalone only). See [values.yaml](values.yaml) for the default policy |

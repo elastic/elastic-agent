@@ -396,6 +396,9 @@ cloudDefend:
   # -- package policy ID used in cloud_defend input and stream IDs. If empty, a random UUID is generated with Helm uuidv4.
   # @section -- 4.1 - Cloud Defend integration
   policy_id: ""
+  # -- package policy revision used in cloud_defend input.
+  # @section -- 4.1 - Cloud Defend integration
+  revision: 1
   # -- name of the output used in Cloud Defend integration. Note that this output needs to be defined in
   # [outputs](#1-outputs)
   # @section -- 4.1 - Cloud Defend integration
