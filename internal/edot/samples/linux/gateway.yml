@@ -26,15 +26,16 @@ extensions:
   #         #   key_file: your/path/to/server.key
 
 connectors:
-  elasticapm:
+  elasticapm: # Elastic APM Connector
 
 receivers:
+  # Receives data from other Collectors in Agent mode
   otlp:
     protocols:
       grpc:
         # auth:
         #  authenticator: apikeyauth
-        endpoint: 0.0.0.0:4317
+        endpoint: 0.0.0.0:4317 # Listen on all interfaces
         # https://www.elastic.co/docs/reference/edot-collector/config/default-config-standalone#collector-receiver-configuration
         # tls:
         #   cert_file: your/path/to/server.crt
@@ -42,7 +43,7 @@ receivers:
       http:
         # auth:
         #  authenticator: apikeyauth
-        endpoint: 0.0.0.0:4318
+        endpoint: 0.0.0.0:4318 # Listen on all interfaces
         # tls:
         #   cert_file: your/path/to/server.crt
         #   key_file: your/path/to/server.key
@@ -53,16 +54,16 @@ processors:
     timeout: 1s
     send_batch_max_size: 1500
   batch/metrics:
-    send_batch_max_size: 0
+    send_batch_max_size: 0 # Explicitly set to 0 to avoid splitting metrics requests
     timeout: 1s
-  elasticapm: {}
+  elasticapm: {} # Elastic APM Processor
 
 exporters:
   debug: {}
   elasticsearch/otel:
     endpoints:
-      - ${env:ELASTIC_ENDPOINT}
-    api_key: ${env:ELASTIC_API_KEY}
+      - ${env:ELASTIC_ENDPOINT} # Will be populated from environment variable
+    api_key: ${env:ELASTIC_API_KEY} # Will be populated from environment variable
     # https://www.elastic.co/docs/reference/edot-collector/config/default-config-standalone#secure-the-connection-between-the-edot-collector-and-elastic
     # tls:
     #   ca_file: "/path/to/elastic-ca.crt"
@@ -90,7 +91,7 @@ service:
     metrics/aggregated-otel-metrics:
       receivers:
         - elasticapm
-      processors: []
+      processors: [] # No processors defined in the original for this pipeline
       exporters:
         - debug
         - elasticsearch/otel
