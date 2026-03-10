@@ -25,9 +25,6 @@ extensions:
   #         #   cert_file: your/path/to/server.crt
   #         #   key_file: your/path/to/server.key
 
-connectors:
-  elasticapm: # Elastic APM Connector
-
 receivers:
   # Receives data from other Collectors in Agent mode
   otlp:
@@ -47,6 +44,9 @@ receivers:
         # tls:
         #   cert_file: your/path/to/server.crt
         #   key_file: your/path/to/server.key
+
+connectors:
+  elasticapm: # Elastic APM Connector
 
 processors:
   batch:
