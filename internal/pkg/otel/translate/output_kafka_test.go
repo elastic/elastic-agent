@@ -17,8 +17,16 @@ func TestKafkaTranslationLogic(t *testing.T) {
 	}{{
 		name: "basic kafka translation logic",
 		input: `
+  hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
+  topic: static-topic
+  required_acks: 1
+  compression: gzip
+  max_message_bytes: 1000000
 	`,
-		expectedMap: map[string]any{},
+		expectedMap: map[string]any{
+			"brokers": []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
+			"topic":   "static-topic",
+		},
 	}, {}}
 
 	for _, testc := range testCases {

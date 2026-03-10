@@ -1,6 +1,7 @@
 package translate
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/elastic/beats/v7/libbeat/outputs/kafka"
@@ -12,6 +13,10 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 	kConfig, err := kafka.ReadConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error reading kafka config: %w", err)
+	}
+
+	if err := checkUnsupportedKafkaConfig(config); err != nil {
+		return nil, err
 	}
 
 	kafkaExporter := map[string]any{
@@ -55,4 +60,19 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 		"timeout": kConfig.BrokerTimeout,
 	}
 	return kafkaExporter, nil
+}
+
+// log warning for unsupported config
+func checkUnsupportedKafkaConfig(cfg *config.C) error {
+	if cfg.HasField("topic") {
+		return fmt.Errorf("topic is currently not supported: %w", errors.ErrUnsupported)
+	} else if cfg.HasField("partition") {
+		return fmt.Errorf("partition is currently not supported: %w", errors.ErrUnsupported)
+	} else if cfg.HasField("keep_alive") {
+		return fmt.Errorf("keep_alive is currently not supported: %w", errors.ErrUnsupported)
+	} else if cfg.HasField("headers") {
+		return fmt.Errorf("headers is currently not supported: %w", errors.ErrUnsupported)
+	}
+
+	return nil
 }
