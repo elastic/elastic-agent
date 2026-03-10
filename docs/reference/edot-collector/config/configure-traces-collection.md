@@ -85,7 +85,7 @@ To enforce a specific order of calculations and sampling decisions in the EDOT C
 
 Configure a two-step trace pipeline, ensuring that the first step includes the `elasticapm` connector and `forward` connector under the `exporters` section, and that the second step includes the `tail_sampling` processor.
 
-The following configuration is a full working example with batching, the `elasticapm` processor and connector, tail-based sampling, and aggregated {{product.apm}} metrics:
+The following configuration is a full working example with the `elasticapm` processor and connector, tail-based sampling, and aggregated {{product.apm}} metrics:
 
 ```yaml
 receivers:
@@ -101,13 +101,6 @@ connectors:
   forward:
 
 processors:
-  batch:
-    send_batch_size: 1000
-    timeout: 1s
-    send_batch_max_size: 1500
-  batch/metrics:
-    send_batch_max_size: 0
-    timeout: 1s
   elasticapm: {}
   tail_sampling:
     decision_wait: 10s
@@ -135,7 +128,7 @@ service:
   pipelines:
     traces/1-process-elastic:
       receivers: [otlp]
-      processors: [batch, elasticapm]
+      processors: [elasticapm]
       exporters: [debug, elasticapm, forward]
     traces/2-process-tbs:
       receivers: [forward]
@@ -143,11 +136,11 @@ service:
       exporters: [debug, elasticsearch/otel]
     metrics:
       receivers: [otlp]
-      processors: [batch/metrics]
+      processors: []
       exporters: [debug, elasticsearch/otel]
     logs:
       receivers: [otlp]
-      processors: [batch]
+      processors: []
       exporters: [debug, elasticapm, elasticsearch/otel]
     metrics/aggregated-otel-metrics:
       receivers: [elasticapm]
@@ -204,13 +197,6 @@ connectors:
   forward:
 
 processors:
-  batch:
-    send_batch_size: 1000
-    timeout: 1s
-    send_batch_max_size: 1500
-  batch/metrics:
-    send_batch_max_size: 0
-    timeout: 1s
   elasticapm: {}
   tail_sampling:
     decision_wait: 10s
@@ -238,7 +224,7 @@ service:
   pipelines:
     traces/1-process-elastic:
       receivers: [otlp]
-      processors: [batch, elasticapm]
+      processors: [elasticapm]
       exporters: [debug, elasticapm, forward]
     traces/2-process-tbs:
       receivers: [forward]
@@ -246,11 +232,11 @@ service:
       exporters: [debug, elasticsearch/otel]
     metrics:
       receivers: [otlp]
-      processors: [batch/metrics]
+      processors: []
       exporters: [debug, elasticsearch/otel]
     logs:
       receivers: [otlp]
-      processors: [batch]
+      processors: []
       exporters: [debug, elasticapm, elasticsearch/otel]
     metrics/aggregated-otel-metrics:
       receivers: [elasticapm]
