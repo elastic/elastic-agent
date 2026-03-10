@@ -273,7 +273,7 @@ details:
 				mfw.SetUpgradeStarted()
 			}
 
-			mfw.processMarker(context.Background(), currentVersion, currentCommit)
+			mfw.processMarker(t.Context(), currentVersion, currentCommit)
 
 			// error loading marker
 			if test.expectedErrLogMsg {
