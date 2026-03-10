@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
