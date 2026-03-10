@@ -105,7 +105,10 @@ func openDeleteHandle(path string) (windows.Handle, error) {
 }
 
 func renameHandle(hHandle windows.Handle) error {
-	wRename, err := windows.UTF16FromString(":agentrm")
+	// Use a unique ADS name to avoid "file already exists" errors from
+	// previous attempts that may have left a stale alternate data stream.
+	adsName := fmt.Sprintf(":agentrm_%d", time.Now().UnixNano())
+	wRename, err := windows.UTF16FromString(adsName)
 	if err != nil {
 		return err
 	}
