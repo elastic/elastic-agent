@@ -248,6 +248,11 @@ inputs:
 #  # ignored by Fleet managed agents, which always use encrypted config.
 #  encrypted_config:
 #    enabled: false
+#  # allow fleet-managed agents to compress checkin request bodies.
+#  checkin_compress:
+#    enabled: false
+#    # threshold_size is the min size (in bytes) for a compress body that must be compressed.
+#    threshold_size: 1024
 
 # Logging
 

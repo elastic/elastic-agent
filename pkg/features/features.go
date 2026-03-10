@@ -31,10 +31,15 @@ const defaultDefaultProcessors = true
 // 9.4 - disabled (plaintext config)
 const defaultEncryptedConfig = false
 
+const defaultCheckinCompressEnabled = false
+const defaultCheckinCompressThresholdSize uint64 = 1024
+
 var (
 	current = Flags{
-		tamperProtection:  defaultTamperProtection,
-		defaultProcessors: defaultDefaultProcessors,
+		tamperProtection:             defaultTamperProtection,
+		defaultProcessors:            defaultDefaultProcessors,
+		checkinCompressEnabled:       defaultCheckinCompressEnabled,
+		checkinCompressThresholdSize: defaultCheckinCompressThresholdSize,
 	}
 )
 
@@ -47,10 +52,12 @@ type Flags struct {
 	fqdn          bool
 	fqdnCallbacks map[string]BoolValueOnChangeCallback
 
-	tamperProtection        bool
-	disablePolicyChangeAcks bool
-	defaultProcessors       bool
-	encryptedConfig         bool
+	tamperProtection             bool
+	disablePolicyChangeAcks      bool
+	defaultProcessors            bool
+	encryptedConfig              bool
+	checkinCompressEnabled       bool
+	checkinCompressThresholdSize uint64
 }
 
 type cfg struct {
@@ -71,6 +78,10 @@ type cfg struct {
 			EncryptedConfig *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"encrypted_config" yaml:"encrypted_config" config:"encrypted_config"`
+			CheckinCompress *struct {
+				Enabled       bool    `json:"enabled" yaml:"enabled" config:"enabled"`
+				ThresholdSize *uint64 `json:"threshold_size,omitempty" yaml:"threshold_size,omitempty" config:"threshold_size,omitempty"`
+			} `json:"checkin_compress,omitempty" yaml:"checkin_compress,omitempty" config:"checkin_compress,omitempty"`
 		} `json:"features" yaml:"features" config:"features"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
@@ -108,6 +119,13 @@ func (f *Flags) EncryptedConfig() bool {
 	defer f.mu.RUnlock()
 
 	return f.encryptedConfig
+}
+
+func (f *Flags) CheckinCompress() (bool, uint64) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.checkinCompressEnabled, f.checkinCompressThresholdSize
 }
 
 func (f *Flags) AsProto() *proto.Features {
@@ -186,6 +204,14 @@ func (f *Flags) setEncryptedConfig(newValue bool) {
 	f.encryptedConfig = newValue
 }
 
+func (f *Flags) setCheckinCompress(enabled bool, thresholdSize uint64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.checkinCompressEnabled = enabled
+	f.checkinCompressThresholdSize = thresholdSize
+}
+
 // setSource sets the source from he given cfg.
 func (f *Flags) setSource(c cfg) error {
 	// Use JSON marshalling-unmarshalling to convert cfg to mapstr
@@ -194,7 +220,7 @@ func (f *Flags) setSource(c cfg) error {
 		return fmt.Errorf("could not convert feature flags configuration to JSON: %w", err)
 	}
 
-	var s map[string]interface{}
+	var s map[string]any
 	if err := json.Unmarshal(data, &s); err != nil {
 		return fmt.Errorf("could not convert feature flags JSON to mapstr: %w", err)
 	}
@@ -269,6 +295,16 @@ func Parse(policy any) (*Flags, error) {
 		flags.setEncryptedConfig(defaultEncryptedConfig)
 	}
 
+	if parsedFlags.Agent.Features.CheckinCompress != nil {
+		thresholdSize := defaultCheckinCompressThresholdSize
+		if parsedFlags.Agent.Features.CheckinCompress.ThresholdSize != nil {
+			thresholdSize = *parsedFlags.Agent.Features.CheckinCompress.ThresholdSize
+		}
+		flags.setCheckinCompress(parsedFlags.Agent.Features.CheckinCompress.Enabled, thresholdSize)
+	} else {
+		flags.setCheckinCompress(defaultCheckinCompressEnabled, defaultCheckinCompressThresholdSize)
+	}
+
 	if err := flags.setSource(parsedFlags); err != nil {
 		return nil, fmt.Errorf("error creating feature flags source: %w", err)
 	}
@@ -294,6 +330,8 @@ func Apply(c *config.Config) error {
 	current.setDisablePolicyChangeAcks(parsed.DisablePolicyChangeAcks())
 	current.setDefaultProcessors(parsed.DefaultProcessors())
 	current.setEncryptedConfig(parsed.EncryptedConfig())
+	enabled, thresholdSize := parsed.CheckinCompress()
+	current.setCheckinCompress(enabled, thresholdSize)
 	return err
 }
 
@@ -319,4 +357,8 @@ func DefaultProcessors() bool {
 
 func EncryptedConfig() bool {
 	return current.EncryptedConfig()
+}
+
+func CheckinCompress() (bool, uint64) {
+	return current.CheckinCompress()
 }

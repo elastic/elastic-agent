@@ -5,11 +5,13 @@
 package fleetapi
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,8 +19,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 type agentinfo struct{}
@@ -314,4 +318,123 @@ func TestCheckin(t *testing.T) {
 			}
 		},
 	))
+}
+
+func TestCheckinCompression(t *testing.T) {
+	const withAPIKey = "secret"
+	const resp = `{"actions": []}`
+	agentInfo := &agentinfo{}
+
+	testCases := []struct {
+		name             string
+		enabled          bool
+		thresholdSize    *uint64
+		messageSizeBytes int
+		wantCompressed   bool
+	}{{
+		name:             "compression is enabled at a 1kb threshold_size - request body is at least 1kb",
+		enabled:          true,
+		thresholdSize:    uint64Ptr(1024),
+		messageSizeBytes: 2048,
+		wantCompressed:   true,
+	}, {
+		name:             "compression is enabled at a 1kb threshold_size - request body is smaller than size limit",
+		enabled:          true,
+		thresholdSize:    uint64Ptr(1024),
+		messageSizeBytes: 128,
+		wantCompressed:   false,
+	}, {
+		name:             "compression is enabled with 0 threshold_size - request body is always compressed",
+		enabled:          true,
+		thresholdSize:    uint64Ptr(0),
+		messageSizeBytes: 128,
+		wantCompressed:   true,
+	}, {
+		name:             "compression is disabled - request body is not compressed",
+		enabled:          false,
+		thresholdSize:    uint64Ptr(0),
+		messageSizeBytes: 2048,
+		wantCompressed:   false,
+	}}
+
+	// restore feature flag defaults after tests
+	t.Cleanup(func() {
+		defaultCfg, defaultErr := config.NewConfigFrom(`agent:
+  features:`)
+		require.NoError(t, defaultErr)
+		require.NoError(t, features.Apply(defaultCfg))
+	})
+
+	for _, tc := range testCases {
+		t.Run(tc.name, withServerWithAuthClient(
+			func(t *testing.T) *http.ServeMux {
+				t.Helper()
+
+				mux := http.NewServeMux()
+				path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
+				mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
+					checkinPayload, err := readMaybeCompressedCheckinBody(r)
+					require.NoError(t, err)
+
+					if tc.wantCompressed {
+						assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
+					} else {
+						assert.Empty(t, r.Header.Get("Content-Encoding"))
+					}
+
+					var checkinRequest CheckinRequest
+					require.NoError(t, json.Unmarshal(checkinPayload, &checkinRequest))
+					assert.Equal(t, strings.Repeat("a", tc.messageSizeBytes), checkinRequest.Message)
+
+					w.WriteHeader(http.StatusOK)
+					fmt.Fprint(w, resp)
+				}, withAPIKey))
+				return mux
+			},
+			withAPIKey,
+			func(t *testing.T, client client.Sender) {
+				applyCheckinCompressionFeatureFlag(t, tc.enabled, tc.thresholdSize)
+
+				cmd := NewCheckinCmd(agentInfo, client)
+				request := CheckinRequest{Message: strings.Repeat("a", tc.messageSizeBytes)}
+				_, _, err := cmd.Execute(t.Context(), &request)
+				require.NoError(t, err)
+			},
+		))
+	}
+}
+
+func applyCheckinCompressionFeatureFlag(t *testing.T, enabled bool, thresholdSize *uint64) {
+	t.Helper()
+
+	thresholdConfig := ""
+	if thresholdSize != nil {
+		thresholdConfig = fmt.Sprintf("\n      threshold_size: %d", *thresholdSize)
+	}
+
+	cfg, err := config.NewConfigFrom(fmt.Sprintf(`
+agent:
+  features:
+    checkin_compress:
+      enabled: %t%s`, enabled, thresholdConfig))
+	require.NoError(t, err)
+	require.NoError(t, features.Apply(cfg))
+}
+
+func readMaybeCompressedCheckinBody(r *http.Request) ([]byte, error) {
+	if r.Header.Get("Content-Encoding") != "gzip" {
+		return io.ReadAll(r.Body)
+	}
+
+	gzipReader, err := gzip.NewReader(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer gzipReader.Close()
+
+	return io.ReadAll(gzipReader)
+}
+
+func uint64Ptr(v uint64) *uint64 {
+	return &v
 }

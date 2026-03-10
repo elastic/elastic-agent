@@ -6,6 +6,7 @@ package fleetapi
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,9 +18,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 const checkingPath = "/api/fleet/agents/%s/checkin"
+const checkinContentEncodingHeader = "Content-Encoding"
+const checkinContentEncodingGzip = "gzip"
 
 // CheckinUnit provides information about a unit during checkin.
 type CheckinUnit struct {
@@ -126,9 +130,21 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 			errors.TypeUnexpected)
 	}
 
+	requestHeaders := http.Header{}
+	requestBody := bytes.NewBuffer(b)
+	if shouldCompressCheckinRequest(uint64(len(b))) {
+		requestBody, err = gzipEncodeCheckinRequestBody(b)
+		if err != nil {
+			return nil, 0, errors.New(err,
+				"fail to gzip encode checkin request",
+				errors.TypeUnexpected)
+		}
+		requestHeaders.Set(checkinContentEncodingHeader, checkinContentEncodingGzip)
+	}
+
 	cp := fmt.Sprintf(checkingPath, e.info.AgentID())
 	sendStart := time.Now()
-	resp, err := e.client.Send(ctx, "POST", cp, nil, nil, bytes.NewBuffer(b))
+	resp, err := e.client.Send(ctx, "POST", cp, nil, requestHeaders, requestBody)
 	sendDuration := time.Since(sendStart)
 	if err != nil {
 		return nil, sendDuration, errors.New(err,
@@ -162,4 +178,27 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 	}
 
 	return checkinResponse, sendDuration, nil
+}
+
+func shouldCompressCheckinRequest(bodySize uint64) bool {
+	enabled, thresholdSize := features.CheckinCompress()
+	if !enabled {
+		return false
+	}
+
+	return thresholdSize == 0 || bodySize >= thresholdSize
+}
+
+func gzipEncodeCheckinRequestBody(body []byte) (*bytes.Buffer, error) {
+	compressedBody := bytes.NewBuffer(nil)
+	gzipWriter := gzip.NewWriter(compressedBody)
+	if _, err := gzipWriter.Write(body); err != nil {
+		return nil, err
+	}
+
+	if err := gzipWriter.Close(); err != nil {
+		return nil, err
+	}
+
+	return compressedBody, nil
 }
