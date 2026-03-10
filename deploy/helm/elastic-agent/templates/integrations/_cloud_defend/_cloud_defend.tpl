@@ -19,9 +19,8 @@ extraEnvs:
 
 {{- define "elasticagent.cloudDefend.config.input" -}}
 {{- $policyID := default (uuidv4) $.Values.cloudDefend.policy_id -}}
-{{- $revision := default 1 $.Values.cloudDefend.revision -}}
 - id: cloud_defend/control-cloud_defend-{{ $policyID }}
-  revision: {{ $revision }}
+  revision: {{ $.Values.cloudDefend.revision }}
   name: D4C
   type: cloud_defend/control
   use_output: {{ $.Values.cloudDefend.output }}
