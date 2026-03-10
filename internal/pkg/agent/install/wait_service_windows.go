@@ -60,7 +60,7 @@ func isStopped(log *logp.Logger, timeout time.Duration, interval time.Duration, 
 				pid = status.ProcessId
 			}
 			if status.State == svc.Stopped {
-				timeElapsed := time.Now().Sub(startTime)
+				timeElapsed := time.Since(startTime)
 				remainingTimeout := timeout - timeElapsed
 				return waitForProcessExit(log, pid, remainingTimeout)
 			}
@@ -94,7 +94,8 @@ func waitForProcessExit(log *logp.Logger, pid uint32, timeout time.Duration) err
 
 	log.Infof("service stopped but process %d is still alive, waiting for it to exit", pid)
 
-	event, err := windows.WaitForSingleObject(h, uint32(timeout.Milliseconds()))
+	timeoutMs := uint32(timeout.Milliseconds()) //nolint: gosec // this timeout is around a minute in practice
+	event, err := windows.WaitForSingleObject(h, timeoutMs)
 	if err != nil {
 		return fmt.Errorf("error waiting for process %d: %w", pid, err)
 	}
