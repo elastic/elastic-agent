@@ -122,7 +122,7 @@ func ESToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, erro
 
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
-				"flush_timeout": "10s",
+				"flush_timeout": getFlushTimeout(logger, output),
 				"max_size":      escfg.BulkMaxSize, // bulk_max_size
 				"min_size":      0,                 // 0 means immediately trigger a flush
 				"sizer":         "items",
@@ -257,4 +257,13 @@ func getQueueSize(logger *logp.Logger, output *config.C) int {
 		return memqueue.DefaultEvents // return default queue.mem.events for sending_queue in case of an errr
 	}
 	return int(size)
+}
+
+func getFlushTimeout(logger *logp.Logger, output *config.C) string {
+	timeout, err := output.String("queue.mem.flush.timeout", -1)
+	if err != nil {
+		logger.Debugf("Failed to get flush timeout: %v", err)
+		return "10s" // return default queue.mem.flush.timeout for sending_queue in case of an errr
+	}
+	return timeout
 }
