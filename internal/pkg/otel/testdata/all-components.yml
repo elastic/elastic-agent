@@ -135,6 +135,8 @@ receivers:
     password: test
     tls:
       insecure_skip_verify: true
+  zookeeper:
+    endpoint: localhost:2181
 
 connectors:
   spanmetrics:
@@ -241,6 +243,7 @@ service:
         - couchdb
         - oracledb
         - vcenter
+        - zookeeper
 
     metrics/aggregated:
       receivers:

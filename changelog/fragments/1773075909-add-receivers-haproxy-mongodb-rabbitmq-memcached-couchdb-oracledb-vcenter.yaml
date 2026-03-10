@@ -13,7 +13,7 @@ kind: feature
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Add haproxy, mongodb, rabbitmq, memcached, couchdb, oracledb, vcenter receivers to EDOT Collector.
+summary: Add haproxy, mongodb, rabbitmq, memcached, couchdb, oracledb, vcenter, zookeeper receivers to EDOT Collector.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
