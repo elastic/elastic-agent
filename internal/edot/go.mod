@@ -36,23 +36,30 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/haproxyreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/iisreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkametricsreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/memcachedreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mongodbreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/oracledbreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postgresqlreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/rabbitmqreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/statsdreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/vcenterreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.145.0
