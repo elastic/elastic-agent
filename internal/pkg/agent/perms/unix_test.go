@@ -72,22 +72,36 @@ func TestFixPermissions_SkipsOSQueryAppOnDarwin(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestFixPermissions_OSQueryAppNonEPERMIsNotSkipped(t *testing.T) {
+// TestFixPermissions_NonOSQueryAppEPERMIsNotSkipped ensures that EPERM is only skipped for paths
+// containing "osquery.app"; other paths still get an error when Lchown fails with EPERM.
+func TestFixPermissions_NonOSQueryAppEPERMIsNotSkipped(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("osquery.app skip is only applied on darwin")
 	}
 
 	tmpDir := t.TempDir()
-	osqueryPath := filepath.Join(tmpDir, "osquery.app")
-	require.NoError(t, os.MkdirAll(osqueryPath, 0755))
+	otherPath := filepath.Join(tmpDir, "other.app")
+	require.NoError(t, os.MkdirAll(otherPath, 0755))
 
-	// Use an invalid UID/GID so Lchown fails with EINVAL (or similar), not EPERM.
-	// When the error is not EPERM, we fail immediately and do not skip osquery.app.
-	// Max int32 can be an unsupported UID on some systems; -1 is "no change" so use a large positive.
-	const invalidUID = 2147483647
-	err := FixPermissions(osqueryPath, WithOwnership(utils.FileOwner{UID: invalidUID, GID: invalidUID}))
+	// Request root ownership; as non-root we get EPERM. Path does not contain osquery.app so we must not skip.
+	err := FixPermissions(otherPath, WithOwnership(utils.FileOwner{UID: 0, GID: 0}))
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot update ownership")
+}
+
+func TestIsOsQueryApp(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("osquery.app skip is only applied on darwin")
+	}
+
+	require.True(t, isOSQueryApp("osquery.app"))
+	require.True(t, isOSQueryApp(filepath.Join("osquery.app", "Contents", "MacOS", "osqueryd")))
+	require.True(t, isOSQueryApp(filepath.Join("/Applications", "osquery.app")))
+	require.True(t, isOSQueryApp(filepath.Join("/Applications", "osquery.app", "Contents", "MacOS", "osqueryd")))
+	require.False(t, isOSQueryApp("other.app"))
+	require.False(t, isOSQueryApp(filepath.Join("other.app", "Contents", "MacOS", "otherd")))
+	require.False(t, isOSQueryApp(filepath.Join("/Applications", "other.app")))
+	require.False(t, isOSQueryApp(filepath.Join("/Applications", "other.app", "Contents", "MacOS", "otherd")))
 }
 
 func TestIsMaskStripped(t *testing.T) {
