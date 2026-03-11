@@ -8,12 +8,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/kardianos/service"
@@ -333,58 +335,127 @@ func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
 // state and fail on files that have been ADS-renamed. The simple path-based
 // approach using os.Remove works correctly with the ADS rename trick that
 // RemovePath uses to delete running executables on Windows.
+// See: https://cs.opensource.google/go/go/+/refs/tags/go1.24.13:src/os/removeall_noat.go;drc=a2baae6851a157d662dff7cc508659f66249698a;l=15
 func removeAll(path string) error {
-	// Try simple remove first (handles files and empty directories).
-	err := os.Remove(path)
-	if err == nil || errors.Is(err, fs.ErrNotExist) {
+	if path == "" {
+		// fail silently to retain compatibility with previous behavior
+		// of RemoveAll. See issue 28830.
 		return nil
 	}
 
-	// Check if it's a directory.
-	info, serr := os.Lstat(path)
+	// Simple case: if Remove works, we're done.
+	err := os.Remove(path)
+	if err == nil || os.IsNotExist(err) {
+		return nil
+	}
+
+	// Otherwise, is this a directory we need to recurse into?
+	dir, serr := os.Lstat(path)
 	if serr != nil {
-		if errors.Is(serr, fs.ErrNotExist) {
+		if serr, ok := serr.(*os.PathError); ok && (os.IsNotExist(serr.Err) || serr.Err == syscall.ENOTDIR) {
 			return nil
 		}
 		return serr
 	}
-	if !info.IsDir() {
-		// Not a directory — return the original Remove error.
+	if !dir.IsDir() {
+		// Not a directory; return the error from Remove.
 		return err
 	}
 
-	// Remove directory contents recursively.
-	err = removeAllChildren(path)
-	if err != nil {
-		return err
+	// Remove contents & return first error.
+	err = nil
+	for {
+		fd, err := os.Open(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// Already deleted by someone else.
+				return nil
+			}
+			return err
+		}
+
+		const reqSize = 1024
+		var names []string
+		var readErr error
+
+		for {
+			numErr := 0
+			names, readErr = fd.Readdirnames(reqSize)
+
+			for _, name := range names {
+				err1 := os.RemoveAll(path + string(os.PathSeparator) + name)
+				if err == nil {
+					err = err1
+				}
+				if err1 != nil {
+					numErr++
+				}
+			}
+
+			// If we can delete any entry, break to start new iteration.
+			// Otherwise, we discard current names, get next entries and try deleting them.
+			if numErr != reqSize {
+				break
+			}
+		}
+
+		// Removing files from the directory may have caused
+		// the OS to reshuffle it. Simply calling Readdirnames
+		// again may skip some entries. The only reliable way
+		// to avoid this is to close and re-open the
+		// directory. See issue 20841.
+		fd.Close()
+
+		if readErr == io.EOF {
+			break
+		}
+		// If Readdirnames returned an error, use it.
+		if err == nil {
+			err = readErr
+		}
+		if len(names) == 0 {
+			break
+		}
+
+		// We don't want to re-open unnecessarily, so if we
+		// got fewer than request names from Readdirnames, try
+		// simply removing the directory now. If that
+		// succeeds, we are done.
+		if len(names) < reqSize {
+			err1 := os.Remove(path)
+			if err1 == nil || os.IsNotExist(err1) {
+				return nil
+			}
+
+			if err != nil {
+				// We got some error removing the
+				// directory contents, and since we
+				// read fewer names than we requested
+				// there probably aren't more files to
+				// remove. Don't loop around to read
+				// the directory again. We'll probably
+				// just get the same error.
+				return err
+			}
+		}
 	}
 
-	// Remove the now-empty directory.
-	err = os.Remove(path)
-	if errors.Is(err, fs.ErrNotExist) {
+	// Remove directory.
+	err1 := os.Remove(path)
+	if err1 == nil || os.IsNotExist(err1) {
 		return nil
 	}
+	if runtime.GOOS == "windows" && os.IsPermission(err1) {
+		if fileInfo, err := os.Stat(path); err == nil {
+			if err = os.Chmod(path, os.FileMode(0200|int(fileInfo.Mode()))); err == nil {
+				err1 = os.Remove(path)
+			}
+		}
+	}
+	if err == nil {
+		err = err1
+	}
 	return err
-}
-
-func removeAllChildren(path string) error {
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil
-		}
-		return err
-	}
-
-	var firstErr error
-	for _, entry := range entries {
-		child := filepath.Join(path, entry.Name())
-		err := removeAll(child)
-		if err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return firstErr
 }
 
 func containsString(str string, a []string, caseSensitive bool) bool {
