@@ -63,6 +63,9 @@ func TestApplyComponentState_LateStoppedFromDifferentRuntimeIgnored(t *testing.T
 	})
 	require.Len(t, coord.state.Components, 2)
 
+	// simulate a delay
+	time.Sleep(100 * time.Millisecond)
+
 	// Runtime switch: both components start under the process runtime.
 	// The STARTING state is allowed to replace the existing entry even when
 	// the RuntimeManager differs.
