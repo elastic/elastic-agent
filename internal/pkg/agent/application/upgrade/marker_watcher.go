@@ -53,7 +53,7 @@ func (mfw *MarkerFileWatcher) SetUpgradeStarted() {
 	mfw.upgradeStarted.Store(true)
 }
 
-func (mfw *MarkerFileWatcher) Done() chan struct{} {
+func (mfw *MarkerFileWatcher) Done() <-chan struct{} {
 	return mfw.doneCh
 }
 
