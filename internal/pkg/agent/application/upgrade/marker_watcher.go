@@ -20,7 +20,7 @@ import (
 type MarkerWatcher interface {
 	Watch() <-chan UpdateMarker
 	Run(ctx context.Context) error
-	Done() chan struct{}
+	Done() <-chan struct{}
 	SetUpgradeStarted()
 }
 
