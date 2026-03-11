@@ -15,6 +15,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -298,6 +299,8 @@ type Component struct {
 	Component *proto.Component `yaml:"component,omitempty"`
 
 	OutputStatusReporting *StatusReporting `yaml:"-"`
+
+	StartTime int64 `yaml:"-"`
 }
 
 type StatusReporting struct {
@@ -637,6 +640,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
+					StartTime:             time.Now().Unix(),
 				})
 			}
 		}
