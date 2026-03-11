@@ -807,13 +807,11 @@ func (m *OTelManager) processComponentStates(componentStates []runtime.Component
 	for _, componentState := range componentStates {
 		componentIds[componentState.Component.ID] = true
 	}
-	for id := range m.currentComponentStates {
+	for id, comp := range m.currentComponentStates {
 		if _, ok := componentIds[id]; !ok {
 			// this component is not in the configuration anymore, emit a fake STOPPED state
 			componentStates = append(componentStates, runtime.ComponentComponentState{
-				Component: component.Component{
-					ID: id,
-				},
+				Component: comp.Component,
 				State: runtime.ComponentState{
 					State: client.UnitStateStopped,
 				},
