@@ -43,7 +43,7 @@ const (
 	outputOtelOverrideFieldName           = "otel"
 	outputOtelOverrideExporterFieldName   = "exporter"
 	outputOtelOverrideExtensionsFieldName = "extensions"
-	elasticsearchStateStoreExtensionName  = "elastic_storage"
+	elasticsearchStateStoreExtensionName  = "elasticsearch_storage"
 )
 
 // BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
@@ -393,7 +393,7 @@ func getReceiversConfigForComponent(
 			"inputs": inputs,
 		}
 		if fbfeatures.IsElasticsearchStateStoreEnabled() {
-			receiverConfig["storage"] = "elastic_storage"
+			receiverConfig["storage"] = elasticsearchStateStoreExtensionName
 		}
 	case "metricbeat":
 		receiverConfig[beatName] = map[string]any{
