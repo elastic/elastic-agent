@@ -157,14 +157,14 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	for i, other := range c.state.Components {
 		// We want to update the component state if the incoming update is from the same instance or a newer instance of the component.
 		// We determine this by comparing start times, since a newer instance would have a later start time.
-		if other.Component.ID == state.Component.ID && (other.Component.StartTime <= state.Component.StartTime) {
+		if other.Component.ID == state.Component.ID && (other.Component.StartTime.UnixNano() <= state.Component.StartTime.UnixNano()) {
 			if other.State.Pid != state.State.Pid {
 				c.componentPidRequiresUpdate.Store(true)
 			}
 			c.state.Components[i] = state
 			found = true
 			break
-		} else if other.Component.ID == state.Component.ID && other.Component.StartTime > state.Component.StartTime {
+		} else if other.Component.ID == state.Component.ID && other.Component.StartTime.UnixNano() > state.Component.StartTime.UnixNano() {
 			// This is a case where a component has transitioned to a new state but we receive a late update from the older component.
 			ignore = true
 			break

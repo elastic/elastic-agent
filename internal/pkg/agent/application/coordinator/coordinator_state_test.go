@@ -24,12 +24,12 @@ func TestApplyComponentState_LateStoppedFromDifferentRuntimeIgnored(t *testing.T
 	comp1 := pkgcomponent.Component{
 		ID:             "filestream-default",
 		RuntimeManager: pkgcomponent.OtelRuntimeManager,
-		StartTime:      time.Now().UnixNano(),
+		StartTime:      time.Now(),
 	}
 	comp2 := pkgcomponent.Component{
 		ID:             "system/metrics-default",
 		RuntimeManager: pkgcomponent.OtelRuntimeManager,
-		StartTime:      time.Now().UnixNano(),
+		StartTime:      time.Now(),
 	}
 	coord := &Coordinator{
 		state: State{
@@ -69,12 +69,12 @@ func TestApplyComponentState_LateStoppedFromDifferentRuntimeIgnored(t *testing.T
 	comp1New := pkgcomponent.Component{
 		ID:             "filestream-default",
 		RuntimeManager: pkgcomponent.ProcessRuntimeManager,
-		StartTime:      time.Now().UnixNano(),
+		StartTime:      time.Now(),
 	}
 	comp2New := pkgcomponent.Component{
 		ID:             "system/metrics-default",
 		RuntimeManager: pkgcomponent.ProcessRuntimeManager,
-		StartTime:      time.Now().UnixNano(),
+		StartTime:      time.Now(),
 	}
 
 	coord.applyComponentState(runtime.ComponentComponentState{
@@ -203,7 +203,7 @@ func TestApplyComponentState_StartingFromNewRuntimeReplacesExisting(t *testing.T
 		Component: pkgcomponent.Component{
 			ID:             "filestream-default",
 			RuntimeManager: pkgcomponent.OtelRuntimeManager,
-			StartTime:      time.Now().Unix(),
+			StartTime:      time.Now(),
 		},
 		State: runtime.ComponentState{
 			State:   client.UnitStateHealthy,
@@ -217,7 +217,7 @@ func TestApplyComponentState_StartingFromNewRuntimeReplacesExisting(t *testing.T
 		Component: pkgcomponent.Component{
 			ID:             "filestream-default",
 			RuntimeManager: pkgcomponent.ProcessRuntimeManager,
-			StartTime:      time.Now().Unix(),
+			StartTime:      time.Now(),
 		},
 		State: runtime.ComponentState{
 			State:   client.UnitStateStarting,

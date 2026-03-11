@@ -300,7 +300,8 @@ type Component struct {
 
 	OutputStatusReporting *StatusReporting `yaml:"-"`
 
-	StartTime int64 `yaml:"-"`
+	// StartTime is the time when the component was first created.
+	StartTime time.Time `yaml:"-"`
 }
 
 type StatusReporting struct {
@@ -640,7 +641,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
-					StartTime:             time.Now().Unix(),
+					StartTime:             time.Now(),
 				})
 			}
 		}
@@ -687,6 +688,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
+					StartTime:             time.Now(),
 				})
 			}
 		}
