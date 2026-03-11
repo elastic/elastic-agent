@@ -153,28 +153,20 @@ func (c *Coordinator) refreshState() {
 func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState) {
 	// check for any component updates to the known PID, so we can update the component monitoring
 	found := false
-	ignore := false
 	for i, other := range c.state.Components {
 		// We want to update the component state if the incoming update is from the same instance or a newer instance of the component.
 		// We determine this by comparing start times, since a newer instance would have a later start time.
-		if other.Component.ID == state.Component.ID && (other.Component.StartTime.UnixNano() <= state.Component.StartTime.UnixNano()) {
+		if other.Component.ID == state.Component.ID && other.Component.LastConfiguredAt.After(state.Component.LastConfiguredAt) {
+			// This is a case where a component has transitioned to a new state but we receive a late update from the older component.
+			return
+		} else if other.Component.ID == state.Component.ID {
 			if other.State.Pid != state.State.Pid {
 				c.componentPidRequiresUpdate.Store(true)
 			}
 			c.state.Components[i] = state
 			found = true
 			break
-		} else if other.Component.ID == state.Component.ID && other.Component.StartTime.UnixNano() > state.Component.StartTime.UnixNano() {
-			// This is a case where a component has transitioned to a new state but we receive a late update from the older component.
-			ignore = true
-			break
 		}
-	}
-	if ignore {
-		// we have received a component update from an older instance of a component.
-		// This can happen when the old instance takes a long time to stop and we have already processed the new instance's STARTING/HEALTHY state.
-		// In this case, we should ignore this update since it is stale and would incorrectly overwrite the current state of the component.
-		return
 	}
 	if !found {
 		c.state.Components = append(c.state.Components, state)
