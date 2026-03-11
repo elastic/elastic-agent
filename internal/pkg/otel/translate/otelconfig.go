@@ -55,6 +55,7 @@ var (
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): ESToOTelConfig,
 		otelcomponent.MustNewType("logstash"):      LogstashToOTelConfig,
+		otelcomponent.MustNewType("kafka"):         KafkaToOTelConfig,
 	}
 )
 
@@ -484,6 +485,8 @@ func OutputTypeToExporterType(outputType string) (otelcomponent.Type, error) {
 		return otelcomponent.MustNewType("elasticsearch"), nil
 	case "logstash":
 		return otelcomponent.MustNewType("logstash"), nil
+	case "kafka":
+		return otelcomponent.MustNewType("kafka"), nil
 	default:
 		return otelcomponent.Type{}, fmt.Errorf("unknown otel exporter type for output type: %s", outputType)
 	}
@@ -550,7 +553,7 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 	}
 
 	// beatsauth extension is not required with output other than elasticsearch
-	if exporterType.String() == "elasticsearch" {
+	if exporterType.String() == "elasticsearch" || exporterType.String() == "kafka" {
 		// get extension ID
 		extensionID := getBeatsAuthExtensionID(outputName)
 		extensionConfig, err := getBeatsAuthExtensionConfig(outputCfgC)

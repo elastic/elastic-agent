@@ -63,6 +63,7 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 		},
 		Output: map[string]string{
 			"logstash": string(ProcessRuntimeManager), // Force all inputs using the Logstash output to use the process runtime
+			"kafka":    string(ProcessRuntimeManager), // Force all inputs using the kafka output to use the process runtime
 		},
 	}
 }
@@ -95,7 +96,7 @@ func (r *RuntimeConfig) Validate() error {
 		}
 	}
 
-	allowedOutput := []string{"elasticsearch", "logstash"}
+	allowedOutput := []string{"elasticsearch", "logstash", "kafka"}
 	for name, runtime := range r.Output {
 		if !slices.Contains(allowedOutput, name) {
 			return fmt.Errorf("%s output is not supported", name)

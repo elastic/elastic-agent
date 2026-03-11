@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
 	"github.com/elastic/beats/v7/libbeat/outputs/kafka"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -22,14 +23,7 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 	kafkaExporter := map[string]any{
 		"brokers":          kConfig.Hosts,
 		"client_id":        kConfig.ClientID,
-		"protocol_version": kConfig.Version,
-		"auth": map[string]any{
-			"sasl": map[string]any{
-				"username":  kConfig.Username,
-				"password":  kConfig.Password,
-				"mechanism": kConfig.Sasl.SaslMechanism,
-			},
-		},
+		"protocol_version": string(kConfig.Version),
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
 				"max_size":      kConfig.BulkMaxSize,
@@ -42,8 +36,8 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 			"compression_param": map[string]any{
 				"level": kConfig.CompressionLevel,
 			},
-			"max_message_bytes": kConfig.MaxMessageBytes,
-			"required_acks":     kConfig.RequiredACKs,
+			"max_message_bytes": *kConfig.MaxMessageBytes,
+			"required_acks":     *kConfig.RequiredACKs,
 		},
 		"retry_on_failure": map[string]any{
 			"initial_interval": kConfig.Backoff.Init,
@@ -58,15 +52,43 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 			},
 		},
 		"timeout": kConfig.BrokerTimeout,
+		"topic":   kConfig.Topic,
+	}
+
+	if kConfig.Username != "" {
+		if kConfig.Sasl.SaslMechanism == "" {
+			kConfig.Sasl.SaslMechanism = "PLAIN"
+		}
+		kafkaExporter["auth"] = map[string]any{
+			"sasl": map[string]any{
+				"username":  kConfig.Username,
+				"password":  kConfig.Password,
+				"mechanism": kConfig.Sasl.SaslMechanism,
+			},
+		}
 	}
 	return kafkaExporter, nil
 }
 
 // log warning for unsupported config
 func checkUnsupportedKafkaConfig(cfg *config.C) error {
-	if cfg.HasField("topic") {
-		return fmt.Errorf("topic is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("partition") {
+
+	// topic field always exists here, otherwise Validate function above throws an error
+	str, err := cfg.String("topic", -1)
+	if err != nil {
+		return err
+	}
+
+	fmtstr, err := fmtstr.CompileEvent(str)
+	if err != nil {
+		return err
+	}
+
+	if !fmtstr.IsConst() {
+		return fmt.Errorf("dynamic topic selection is currently not supported: %w", errors.ErrUnsupported)
+	}
+
+	if cfg.HasField("partition") {
 		return fmt.Errorf("partition is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("keep_alive") {
 		return fmt.Errorf("keep_alive is currently not supported: %w", errors.ErrUnsupported)
