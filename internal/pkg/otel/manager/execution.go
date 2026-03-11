@@ -37,4 +37,11 @@ type collectorHandle interface {
 
 	// Stopped returns whether the process represented the handle has exited.
 	Stopped() bool
+
+	// UpdateConfig sends a new configuration to the running collector for in-place reload.
+	// Returns an error if the config could not be written.
+	UpdateConfig(cfg *confmap.Conf) error
+
+	// LogLevel returns the log level of the running collector.
+	LogLevel() logp.Level
 }
