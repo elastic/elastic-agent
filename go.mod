@@ -1,8 +1,8 @@
 module github.com/elastic/elastic-agent
 
-go 1.24.13
+go 1.25.8
 
-replace github.com/elastic/beats/v7 => github.com/VihasMakwana/beats/v7 v7.0.0-20260306060228-d1a0f47dcbbc
+replace github.com/elastic/beats/v7 => ./beats
 
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
