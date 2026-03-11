@@ -335,7 +335,9 @@ func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
 // state and fail on files that have been ADS-renamed. The simple path-based
 // approach using os.Remove works correctly with the ADS rename trick that
 // RemovePath uses to delete running executables on Windows.
-// See: https://cs.opensource.google/go/go/+/refs/tags/go1.24.13:src/os/removeall_noat.go;drc=a2baae6851a157d662dff7cc508659f66249698a;l=15
+// Taken from: https://cs.opensource.google/go/go/+/refs/tags/go1.24.13:src/os/removeall_noat.go;drc=a2baae6851a157d662dff7cc508659f66249698a;l=15
+// The implementation which breaks our install is here:
+// https://cs.opensource.google/go/go/+/refs/tags/go1.25.8:src/os/removeall_at.go;drc=e81c624656e415626c7ac3a97768f5c2717979a4;l=15
 func removeAll(path string) error {
 	if path == "" {
 		// fail silently to retain compatibility with previous behavior
