@@ -45,18 +45,19 @@ const (
 	beatsOutputEventsBatchesKey = "beat.stats.libbeat.output.events.batches"
 	beatsOutputWriteBytesKey    = "beat.stats.libbeat.output.write.bytes"
 
-	otelQueueCapacityKey = "otelcol_exporter_queue_capacity"
-	otelQueueSizeKey     = "otelcol_exporter_queue_size"
-	otelSentLogsKey      = "otelcol_exporter_sent_log_records"
-	otelSentSpansKey     = "otelcol_exporter_sent_spans"
-	otelSentMetricsKey   = "otelcol_exporter_sent_metric_points"
-	otelFailedLogsKey    = "otelcol_exporter_send_failed_log_records"
-	otelFailedSpansKey   = "otelcol_exporter_send_failed_spans"
-	otelFailedMetricsKey = "otelcol_exporter_send_failed_metric_points"
-	otelDocsProcessedKey = "otelcol.elasticsearch.docs.processed"
-	otelDocsRetriedKey   = "otelcol.elasticsearch.docs.retried"
-	otelBulkRequestsKey  = "otelcol.elasticsearch.bulk_requests.count"
-	otelFlushedBytesKey  = "otelcol.elasticsearch.flushed.bytes"
+	otelQueueCapacityKey       = "otelcol_exporter_queue_capacity"
+	otelQueueSizeKey           = "otelcol_exporter_queue_size"
+	otelSentLogsKey            = "otelcol_exporter_sent_log_records"
+	otelSentSpansKey           = "otelcol_exporter_sent_spans"
+	otelSentMetricsKey         = "otelcol_exporter_sent_metric_points"
+	otelFailedLogsKey          = "otelcol_exporter_send_failed_log_records"
+	otelFailedSpansKey         = "otelcol_exporter_send_failed_spans"
+	otelFailedMetricsKey       = "otelcol_exporter_send_failed_metric_points"
+	otelDocsProcessedKey       = "otelcol.elasticsearch.docs.processed"
+	otelDocsRetriedKey         = "otelcol.elasticsearch.docs.retried"
+	otelDocsRetriedHTTPRequest = "otelcol.elasticsearch.docs.retried_http_request"
+	otelBulkRequestsKey        = "otelcol.elasticsearch.bulk_requests.count"
+	otelFlushedBytesKey        = "otelcol.elasticsearch.flushed.bytes"
 
 	otelComponentIDKey   = "otelcol.component.id"
 	otelComponentKindKey = "otelcol.component.kind"
@@ -106,6 +107,8 @@ func addValue(metrics *exporterMetrics, name string, value int64) {
 		add(&metrics.failedMetrics, &value)
 	case otelDocsProcessedKey:
 		add(&metrics.docsProcessed, &value)
+	case otelDocsRetriedHTTPRequest:
+		fallthrough
 	case otelDocsRetriedKey:
 		add(&metrics.docsRetried, &value)
 	case otelBulkRequestsKey:
