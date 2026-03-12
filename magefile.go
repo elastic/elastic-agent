@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
+	"github.com/elastic/elastic-agent/dev-tools/mage/release"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	filecopy "github.com/otiai10/copy"
@@ -167,6 +168,9 @@ type Otel mg.Namespace
 
 // Devmachine namespace contains tasks related to remote development machines.
 type Devmachine mg.Namespace
+
+// Release namespace contains tasks for release automation.
+type Release mg.Namespace
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
@@ -4374,4 +4378,19 @@ func getMacOSMajorVersion() (int, error) {
 	}
 
 	return majorVer, nil
+}
+
+// UpdateVersion updates the version in version/version.go
+func (Release) UpdateVersion(version string) error {
+	return release.UpdateVersion(version)
+}
+
+// UpdateDocs updates version references in documentation and K8s manifests
+func (Release) UpdateDocs(version string) error {
+	return release.UpdateDocs(version)
+}
+
+// UpdateMergify adds a new backport rule to .mergify.yml
+func (Release) UpdateMergify(version string) error {
+	return release.UpdateMergify(version)
 }
