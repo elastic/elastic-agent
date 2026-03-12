@@ -4433,3 +4433,27 @@ func (Release) CreatePR() error {
 
 	return release.CreateReleasePR(cfg, ghClient)
 }
+
+// RunMajorMinor orchestrates the complete major/minor release workflow
+// Set DRY_RUN=true to preview changes without pushing
+func (Release) RunMajorMinor() error {
+	cfg, err := release.LoadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+
+	dryRun := os.Getenv("DRY_RUN") == "true"
+	return release.RunMajorMinorRelease(cfg, dryRun)
+}
+
+// RunPatch orchestrates the complete patch release workflow
+// Set DRY_RUN=true to preview changes without pushing
+func (Release) RunPatch() error {
+	cfg, err := release.LoadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+
+	dryRun := os.Getenv("DRY_RUN") == "true"
+	return release.RunPatchRelease(cfg, dryRun)
+}
