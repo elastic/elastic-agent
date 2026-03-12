@@ -64,6 +64,7 @@ func TestApplyComponentState_LateStoppedFromDifferentRuntimeIgnored(t *testing.T
 	require.Len(t, coord.state.Components, 2)
 
 	// simulate a delay
+	// TODO: use synctest once after we upgrade to Go 1.25
 	time.Sleep(100 * time.Millisecond)
 
 	// Runtime switch: both components start under the process runtime.
