@@ -308,3 +308,206 @@ func CreateReleasePR(cfg *ReleaseConfig, ghClient *GitHubClient) error {
 	fmt.Printf("✓ Created PR: %s\n", pr.GetHTMLURL())
 	return nil
 }
+
+// RunMajorMinorRelease orchestrates the complete major/minor release workflow
+func RunMajorMinorRelease(cfg *ReleaseConfig, dryRun bool) error {
+	if dryRun {
+		fmt.Println("🔍 DRY RUN MODE - No changes will be pushed or branches created remotely")
+		fmt.Println()
+	}
+
+	fmt.Printf("=== Starting Major/Minor Release Workflow for %s ===\n", cfg.Version)
+	fmt.Println()
+
+	// Step 1: Check requirements
+	fmt.Println("Step 1: Checking requirements...")
+	if err := checkRequirements(); err != nil {
+		return err
+	}
+	fmt.Println("✓ Requirements check passed")
+	fmt.Println()
+
+	// Step 2: Prepare release files
+	fmt.Println("Step 2: Preparing release files...")
+	if err := PrepareMajorMinorRelease(cfg); err != nil {
+		return err
+	}
+	fmt.Println()
+
+	// Step 3: Create release branch and commit
+	if !dryRun {
+		fmt.Println("Step 3: Creating release branch and committing changes...")
+		if err := CreateReleaseBranch(cfg, "."); err != nil {
+			return err
+		}
+		fmt.Println()
+
+		// Step 4: Push branch
+		fmt.Println("Step 4: Pushing release branch to remote...")
+		gitRepo, err := OpenRepo(".")
+		if err != nil {
+			return err
+		}
+		if err := gitRepo.Push("origin"); err != nil {
+			return err
+		}
+		fmt.Println()
+
+		// Step 5: Create PR
+		fmt.Println("Step 5: Creating pull request...")
+		ghClient, err := NewGitHubClientFromEnv()
+		if err != nil {
+			return err
+		}
+		if err := CreateReleasePR(cfg, ghClient); err != nil {
+			return err
+		}
+		fmt.Println()
+	} else {
+		fmt.Println("Step 3: [DRY RUN] Would create release branch and commit")
+		fmt.Printf("  Branch: %s\n", cfg.ReleaseBranch)
+		fmt.Printf("  Commit: [Release] Prepare release %s\n", cfg.Version)
+		fmt.Println()
+
+		fmt.Println("Step 4: [DRY RUN] Would push branch to remote")
+		fmt.Printf("  git push origin %s\n", cfg.ReleaseBranch)
+		fmt.Println()
+
+		fmt.Println("Step 5: [DRY RUN] Would create pull request")
+		fmt.Printf("  Title: [Release %s] Prepare release branch\n", cfg.Version)
+		fmt.Printf("  Head: %s\n", cfg.ReleaseBranch)
+		fmt.Printf("  Base: %s\n", cfg.BaseBranch)
+		fmt.Println()
+	}
+
+	fmt.Println("=== Major/Minor Release Workflow Complete ===")
+	if dryRun {
+		fmt.Println("\n⚠️  This was a DRY RUN. Review the changes with 'git diff' and run again without DRY_RUN=true")
+	} else {
+		fmt.Println("\n✓ Release PR created successfully. Review and merge when ready.")
+	}
+
+	return nil
+}
+
+// RunPatchRelease orchestrates the complete patch release workflow
+func RunPatchRelease(cfg *ReleaseConfig, dryRun bool) error {
+	if dryRun {
+		fmt.Println("🔍 DRY RUN MODE - No changes will be pushed")
+		fmt.Println()
+	}
+
+	fmt.Printf("=== Starting Patch Release Workflow for %s ===\n", cfg.Version)
+	fmt.Println()
+
+	// Step 1: Check requirements
+	fmt.Println("Step 1: Checking requirements...")
+	if err := checkRequirements(); err != nil {
+		return err
+	}
+	fmt.Println("✓ Requirements check passed")
+	fmt.Println()
+
+	// Step 2: Verify we're on the release branch
+	fmt.Println("Step 2: Verifying current branch...")
+	gitRepo, err := OpenRepo(".")
+	if err != nil {
+		return err
+	}
+	currentBranch, err := gitRepo.GetCurrentBranch()
+	if err != nil {
+		return err
+	}
+	if currentBranch != cfg.ReleaseBranch {
+		return fmt.Errorf("not on release branch %s (currently on %s). Run: git checkout %s",
+			cfg.ReleaseBranch, currentBranch, cfg.ReleaseBranch)
+	}
+	fmt.Printf("✓ On release branch: %s\n", currentBranch)
+	fmt.Println()
+
+	// Step 3: Update version files
+	fmt.Println("Step 3: Updating version files...")
+	if err := UpdateVersion(cfg.Version); err != nil {
+		return err
+	}
+	if err := UpdateDocs(cfg.Version); err != nil {
+		return err
+	}
+	fmt.Println()
+
+	// Step 4: Commit changes
+	if !dryRun {
+		fmt.Println("Step 4: Committing changes...")
+		commitMsg := fmt.Sprintf("[Release] Prepare patch release %s", cfg.Version)
+		if err := gitRepo.CommitAll(commitMsg, cfg.AuthorName, cfg.AuthorEmail); err != nil {
+			return err
+		}
+		fmt.Println()
+
+		// Step 5: Push changes
+		fmt.Println("Step 5: Pushing changes to remote...")
+		if err := gitRepo.Push("origin"); err != nil {
+			return err
+		}
+		fmt.Println()
+	} else {
+		fmt.Println("Step 4: [DRY RUN] Would commit changes")
+		fmt.Printf("  Commit: [Release] Prepare patch release %s\n", cfg.Version)
+		fmt.Println()
+
+		fmt.Println("Step 5: [DRY RUN] Would push changes to remote")
+		fmt.Printf("  git push origin %s\n", cfg.ReleaseBranch)
+		fmt.Println()
+	}
+
+	fmt.Println("=== Patch Release Workflow Complete ===")
+	if dryRun {
+		fmt.Println("\n⚠️  This was a DRY RUN. Review the changes with 'git diff' and run again without DRY_RUN=true")
+	} else {
+		fmt.Println("\n✓ Patch release changes pushed successfully.")
+		fmt.Println("Next steps:")
+		fmt.Printf("  1. Verify changes in branch %s\n", cfg.ReleaseBranch)
+		fmt.Println("  2. Wait for CI to pass")
+		fmt.Println("  3. Tag and release when ready")
+	}
+
+	return nil
+}
+
+// checkRequirements validates the environment is ready for a release
+func checkRequirements() error {
+	// Check git is available
+	gitRepo, err := OpenRepo(".")
+	if err != nil {
+		return fmt.Errorf("git repository not found: %w", err)
+	}
+
+	// Check for uncommitted changes
+	w, err := gitRepo.repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	status, err := w.Status()
+	if err != nil {
+		return fmt.Errorf("failed to get git status: %w", err)
+	}
+
+	// Allow modified files (they'll be committed), but warn about untracked files
+	hasUntracked := false
+	for path, fileStatus := range status {
+		if fileStatus.Worktree == '?' && fileStatus.Staging == '?' {
+			if !hasUntracked {
+				fmt.Println("⚠️  Warning: Untracked files detected:")
+				hasUntracked = true
+			}
+			fmt.Printf("  - %s\n", path)
+		}
+	}
+	if hasUntracked {
+		fmt.Println("  These files will not be included in the release.")
+		fmt.Println()
+	}
+
+	return nil
+}
