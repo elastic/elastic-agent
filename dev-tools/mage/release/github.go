@@ -6,6 +6,7 @@ package release
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -53,12 +54,12 @@ type PROptions struct {
 // CreatePR creates a new pull request
 func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
 	newPR := &github.NewPullRequest{
-		Title:               github.String(opts.Title),
-		Head:                github.String(opts.Head),
-		Base:                github.String(opts.Base),
-		Body:                github.String(opts.Body),
-		MaintainerCanModify: github.Bool(opts.Maintainers),
-		Draft:               github.Bool(opts.Draft),
+		Title:               github.Ptr(opts.Title),
+		Head:                github.Ptr(opts.Head),
+		Base:                github.Ptr(opts.Base),
+		Body:                github.Ptr(opts.Body),
+		MaintainerCanModify: github.Ptr(opts.Maintainers),
+		Draft:               github.Ptr(opts.Draft),
 	}
 
 	pr, _, err := gh.client.PullRequests.Create(gh.ctx, opts.Owner, opts.Repo, newPR)
@@ -110,7 +111,8 @@ func (gh *GitHubClient) GetDefaultBranch(owner, repo string) (string, error) {
 func (gh *GitHubClient) BranchExists(owner, repo, branch string) (bool, error) {
 	_, _, err := gh.client.Repositories.GetBranch(gh.ctx, owner, repo, branch, 0)
 	if err != nil {
-		if ghErr, ok := err.(*github.ErrorResponse); ok && ghErr.Response.StatusCode == 404 {
+		var ghErr *github.ErrorResponse
+		if errors.As(err, &ghErr) && ghErr.Response.StatusCode == 404 {
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to check branch: %w", err)
