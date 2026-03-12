@@ -1,0 +1,106 @@
+version: 8.19.13
+entries:
+    - kind: feature
+      summary: Add support for encrypted config for standalone agents
+      description: |
+        Add a new agent.features.encrypted_config.enabled config attribute
+        that enables the use of encrypted config when the agent is operating
+        in stand-alone mode. Agents managed through fleet will ignore this
+        flag and always use encrypted config. If this flag is present, the
+        agent will encrypt config, and replace the elastic-agent.yml file
+        contents with only the feature flag.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12852
+        - https://github.com/elastic/elastic-agent/pull/13075
+        - https://github.com/elastic/elastic-agent/pull/12909
+        - https://github.com/elastic/elastic-agent/pull/13128
+        - https://github.com/elastic/elastic-agent/pull/13129
+        - https://github.com/elastic/elastic-agent/pull/13134
+        - https://github.com/elastic/elastic-agent/pull/13127
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/7283
+      impact: ""
+      action: ""
+      timestamp: 1769800077
+      file:
+        name: 1769800077-Add-support-for-encrypted-config-for-standalone-agents.yaml
+        checksum: 588a429bd1c59d9fb3bfd1a373879712f44634ae
+    - kind: bug-fix
+      summary: Prevent permission fix from failing when file is protected
+      description: The permission fix was failing when the file was protected with permissions that do not allow reading its metadata.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12852
+        - https://github.com/elastic/elastic-agent/pull/13075
+        - https://github.com/elastic/elastic-agent/pull/12909
+        - https://github.com/elastic/elastic-agent/pull/13128
+        - https://github.com/elastic/elastic-agent/pull/13129
+        - https://github.com/elastic/elastic-agent/pull/13134
+        - https://github.com/elastic/elastic-agent/pull/13127
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12823
+        - https://github.com/elastic/elastic-agent/issues/13059
+      impact: ""
+      action: ""
+      timestamp: 1771854258
+      file:
+        name: 1771854258-do-not-fail-fix-permissions-when-file-is-protected.yaml
+        checksum: bfaee8b888292646425aa0decf0433e87e7b730b
+    - kind: enhancement
+      summary: Enrolling fleet-server uses internal port
+      description: |
+        The bootstraping process to enroll an agent into a local fleet-server instance
+        now uses the internal port (https://localhost:8221) instead of the URL flag.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12917
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1771868124
+      file:
+        name: 1771868124-Enrolling-fleet-server-uses-internal-port.yaml
+        checksum: ec2c1a78d8b4e0de92a1670d2ca6d4d167a7bb2b
+    - kind: unknown
+      summary: Handle multi-line otel collector errors correctly
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12852
+        - https://github.com/elastic/elastic-agent/pull/13075
+        - https://github.com/elastic/elastic-agent/pull/12909
+        - https://github.com/elastic/elastic-agent/pull/13128
+        - https://github.com/elastic/elastic-agent/pull/13129
+        - https://github.com/elastic/elastic-agent/pull/13134
+        - https://github.com/elastic/elastic-agent/pull/13127
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12823
+        - https://github.com/elastic/elastic-agent/issues/13059
+      impact: ""
+      action: ""
+      timestamp: 1772205184
+      file:
+        name: 1772205184-otel-collector-multiline-errors.yaml
+        checksum: ef30f2eda27de2b5b030b43fe4db5d66e56368d1
+    - kind: bug-fix
+      summary: Redact URL credentials in diagnostic outputs
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12852
+        - https://github.com/elastic/elastic-agent/pull/13075
+        - https://github.com/elastic/elastic-agent/pull/12909
+        - https://github.com/elastic/elastic-agent/pull/13128
+        - https://github.com/elastic/elastic-agent/pull/13129
+        - https://github.com/elastic/elastic-agent/pull/13134
+        - https://github.com/elastic/elastic-agent/pull/13127
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12823
+        - https://github.com/elastic/elastic-agent/issues/13059
+      impact: ""
+      action: ""
+      timestamp: 1772578978
+      file:
+        name: 1772578978-redact-url-credentials-in-diagnostic-outputs.yaml
+        checksum: 3a26629026b21dad3c0c8d73fe30fc0f60906a1b

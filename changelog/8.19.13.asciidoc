@@ -1,0 +1,58 @@
+// begin 8.19.13 relnotes
+
+[[release-notes-8.19.13]]
+==  8.19.13
+
+Review important information about the  8.19.13 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-8.19.13]]
+=== New features
+
+The 8.19.13 release adds the following new and notable features.
+
+
+
+
+* Add support for encrypted config for standalone agents. https://github.com/elastic/elastic-agent/pull/12852[#12852] https://github.com/elastic/elastic-agent/pull/13075[#13075] https://github.com/elastic/elastic-agent/pull/12909[#12909] https://github.com/elastic/elastic-agent/pull/13128[#13128] https://github.com/elastic/elastic-agent/pull/13129[#13129] https://github.com/elastic/elastic-agent/pull/13134[#13134] https://github.com/elastic/elastic-agent/pull/13127[#13127] https://github.com/elastic/elastic-agent/issues/7283[#7283]
++
+Add a new agent.features.encrypted_config.enabled config attribute
+that enables the use of encrypted config when the agent is operating
+in stand-alone mode. Agents managed through fleet will ignore this
+flag and always use encrypted config. If this flag is present, the
+agent will encrypt config, and replace the elastic-agent.yml file
+contents with only the feature flag.
+
+
+
+[discrete]
+[[enhancements-8.19.13]]
+=== Enhancements
+
+
+
+
+* Enrolling fleet-server uses internal port. https://github.com/elastic/elastic-agent/pull/12917[#12917] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.13]]
+=== Bug fixes
+
+
+
+
+* Prevent permission fix from failing when file is protected. https://github.com/elastic/elastic-agent/pull/12852[#12852] https://github.com/elastic/elastic-agent/pull/13075[#13075] https://github.com/elastic/elastic-agent/pull/12909[#12909] https://github.com/elastic/elastic-agent/pull/13128[#13128] https://github.com/elastic/elastic-agent/pull/13129[#13129] https://github.com/elastic/elastic-agent/pull/13134[#13134] https://github.com/elastic/elastic-agent/pull/13127[#13127] https://github.com/elastic/elastic-agent/issues/12823[#12823] https://github.com/elastic/elastic-agent/issues/13059[#13059]
+* Redact URL credentials in diagnostic outputs. https://github.com/elastic/elastic-agent/pull/12852[#12852] https://github.com/elastic/elastic-agent/pull/13075[#13075] https://github.com/elastic/elastic-agent/pull/12909[#12909] https://github.com/elastic/elastic-agent/pull/13128[#13128] https://github.com/elastic/elastic-agent/pull/13129[#13129] https://github.com/elastic/elastic-agent/pull/13134[#13134] https://github.com/elastic/elastic-agent/pull/13127[#13127] https://github.com/elastic/elastic-agent/issues/12823[#12823] https://github.com/elastic/elastic-agent/issues/13059[#13059]
+
+// end 8.19.13 relnotes
