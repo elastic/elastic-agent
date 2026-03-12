@@ -30,11 +30,13 @@ require (
 	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603
 	github.com/fatih/color v1.19.0
 	github.com/fsnotify/fsnotify v1.10.1
+	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/gofrs/flock v0.13.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.21.6
+	github.com/google/go-github/v68 v68.0.0
 	github.com/google/pprof v0.0.0-20260604005048-7023385849c0
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.24.0
