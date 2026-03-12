@@ -4400,3 +4400,36 @@ func (Release) UpdateDocs(version string) error {
 func (Release) UpdateMergify(version string) error {
 	return release.UpdateMergify(version)
 }
+
+// PrepareMajorMinor prepares files for a major/minor release using env vars
+func (Release) PrepareMajorMinor() error {
+	cfg, err := release.LoadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	return release.PrepareMajorMinorRelease(cfg)
+}
+
+// CreateBranch creates a release branch with all changes committed
+func (Release) CreateBranch() error {
+	cfg, err := release.LoadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	return release.CreateReleaseBranch(cfg, ".")
+}
+
+// CreatePR creates a pull request for the release (requires GITHUB_TOKEN)
+func (Release) CreatePR() error {
+	cfg, err := release.LoadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+
+	ghClient, err := release.NewGitHubClientFromEnv()
+	if err != nil {
+		return err
+	}
+
+	return release.CreateReleasePR(cfg, ghClient)
+}

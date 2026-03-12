@@ -158,3 +158,153 @@ func UpdateMergify(version string) error {
 	fmt.Printf("✓ Added backport rule for %s to %s\n", branchVersion, mergifyFile)
 	return nil
 }
+
+// ReleaseConfig holds configuration for release operations
+type ReleaseConfig struct {
+	Version       string
+	BaseBranch    string
+	ReleaseBranch string
+	Owner         string
+	Repo          string
+	AuthorName    string
+	AuthorEmail   string
+}
+
+// LoadReleaseConfigFromEnv loads release configuration from environment variables
+func LoadReleaseConfigFromEnv() (*ReleaseConfig, error) {
+	version := os.Getenv("CURRENT_RELEASE")
+	if version == "" {
+		return nil, fmt.Errorf("CURRENT_RELEASE environment variable not set")
+	}
+
+	baseBranch := os.Getenv("BASE_BRANCH")
+	if baseBranch == "" {
+		baseBranch = "main"
+	}
+
+	// Extract major.minor for release branch (e.g., "9.4.0" -> "9.4")
+	parts := strings.Split(version, ".")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid version format: %s", version)
+	}
+	releaseBranch := fmt.Sprintf("%s.%s", parts[0], parts[1])
+
+	owner := os.Getenv("PROJECT_OWNER")
+	if owner == "" {
+		owner = "elastic"
+	}
+
+	repo := os.Getenv("PROJECT_REPO")
+	if repo == "" {
+		repo = "elastic-agent"
+	}
+
+	authorName := os.Getenv("GIT_AUTHOR_NAME")
+	if authorName == "" {
+		authorName = "elastic-machine"
+	}
+
+	authorEmail := os.Getenv("GIT_AUTHOR_EMAIL")
+	if authorEmail == "" {
+		authorEmail = "infra-root+elasticmachine@elastic.co"
+	}
+
+	return &ReleaseConfig{
+		Version:       version,
+		BaseBranch:    baseBranch,
+		ReleaseBranch: releaseBranch,
+		Owner:         owner,
+		Repo:          repo,
+		AuthorName:    authorName,
+		AuthorEmail:   authorEmail,
+	}, nil
+}
+
+// PrepareMajorMinorRelease prepares files for a major/minor release
+func PrepareMajorMinorRelease(cfg *ReleaseConfig) error {
+	fmt.Printf("=== Preparing Major/Minor Release %s ===\n", cfg.Version)
+
+	// Update version files
+	if err := UpdateVersion(cfg.Version); err != nil {
+		return err
+	}
+
+	// Update documentation
+	if err := UpdateDocs(cfg.Version); err != nil {
+		return err
+	}
+
+	// Update mergify config
+	if err := UpdateMergify(cfg.Version); err != nil {
+		return err
+	}
+
+	fmt.Println("✓ All files updated for major/minor release")
+	return nil
+}
+
+// CreateReleaseBranch creates a release branch and commits changes
+func CreateReleaseBranch(cfg *ReleaseConfig, repoPath string) error {
+	fmt.Printf("=== Creating Release Branch %s ===\n", cfg.ReleaseBranch)
+
+	// Open the repository
+	gitRepo, err := OpenRepo(repoPath)
+	if err != nil {
+		return err
+	}
+
+	// Create the release branch
+	if err := gitRepo.CreateBranch(cfg.ReleaseBranch); err != nil {
+		return err
+	}
+
+	// Commit all changes
+	commitMsg := fmt.Sprintf("[Release] Prepare release %s", cfg.Version)
+	if err := gitRepo.CommitAll(commitMsg, cfg.AuthorName, cfg.AuthorEmail); err != nil {
+		return err
+	}
+
+	fmt.Printf("✓ Created release branch %s with changes\n", cfg.ReleaseBranch)
+	return nil
+}
+
+// CreateReleasePR creates a pull request for the release
+func CreateReleasePR(cfg *ReleaseConfig, ghClient *GitHubClient) error {
+	fmt.Printf("=== Creating Release PR ===\n")
+
+	prBody := fmt.Sprintf(`## Release %s
+
+### Changes
+- Updated version to %s
+- Updated documentation and K8s manifests
+- Added backport rule to .mergify.yml
+
+### Checklist
+- [ ] Verify version is correct in version/version.go
+- [ ] Check K8s manifests have correct image tags
+- [ ] Confirm mergify config is updated
+- [ ] Run integration tests
+
+---
+🤖 This PR was created by the release automation system.
+`, cfg.Version, cfg.Version)
+
+	prOpts := PROptions{
+		Owner:       cfg.Owner,
+		Repo:        cfg.Repo,
+		Title:       fmt.Sprintf("[Release %s] Prepare release branch", cfg.Version),
+		Head:        cfg.ReleaseBranch,
+		Base:        cfg.BaseBranch,
+		Body:        prBody,
+		Draft:       false,
+		Maintainers: true,
+	}
+
+	pr, err := ghClient.CreatePR(prOpts)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("✓ Created PR: %s\n", pr.GetHTMLURL())
+	return nil
+}
