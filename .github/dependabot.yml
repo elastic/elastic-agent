@@ -48,3 +48,13 @@ updates:
       - Team:Docs
       - documentation
     open-pull-requests-limit: 5
+
+  - package-ecosystem: pre-commit
+    directory: "/"
+    schedule:
+      interval: 'weekly'
+      day: 'sunday'
+      time: '22:00'
+    open-pull-requests-limit: 5
+    labels:
+      - 'changelog:dependencies'
