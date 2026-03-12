@@ -374,13 +374,18 @@ type createContextWithTimeout func(ctx context.Context, timeout time.Duration) (
 func waitForWatcherWithTimeoutCreationFunc(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout) error {
 	// Wait for the watcher to be up and running
 	watcherContext, cancel := createTimeoutContext(ctx, waitTime)
-	defer cancel()
 
 	markerWatcher := newMarkerFileWatcher(markerFilePath, log)
 	err := markerWatcher.Run(watcherContext)
 	if err != nil {
 		return fmt.Errorf("error starting update marker watcher: %w", err)
 	}
+	// Ensure the fsnotify watcher goroutine fully exits before returning,
+	// so that directory handles are released (needed on Windows for cleanup).
+	defer func() {
+		cancel()
+		<-markerWatcher.Done()
+	}()
 
 	log.Infof("waiting up to %s for upgrade watcher to set %s state in upgrade marker", waitTime, details.StateWatching)
 
