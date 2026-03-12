@@ -5,6 +5,7 @@
 package release
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -98,11 +99,11 @@ func (g *GitRepo) Push(remoteName string) error {
 	err := g.repo.Push(&git.PushOptions{
 		RemoteName: remoteName,
 	})
-	if err != nil && err != git.NoErrAlreadyUpToDate {
+	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
 		return fmt.Errorf("failed to push: %w", err)
 	}
 
-	if err == git.NoErrAlreadyUpToDate {
+	if errors.Is(err, git.NoErrAlreadyUpToDate) {
 		fmt.Println("  Branch already up to date on remote")
 	} else {
 		fmt.Printf("✓ Pushed to remote: %s\n", remoteName)
@@ -127,7 +128,7 @@ func (g *GitRepo) GetCurrentBranch() (string, error) {
 // SetRemoteURL sets the URL for a remote
 func (g *GitRepo) SetRemoteURL(remoteName, url string) error {
 	_, err := g.repo.Remote(remoteName)
-	if err == git.ErrRemoteNotFound {
+	if errors.Is(err, git.ErrRemoteNotFound) {
 		// Remote doesn't exist, create it
 		_, err = g.repo.CreateRemote(&config.RemoteConfig{
 			Name: remoteName,

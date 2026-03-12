@@ -253,7 +253,9 @@ func TestCommitAllErrorCases(t *testing.T) {
 
 	// Create a change and test normal commit
 	testFile := filepath.Join(tmpDir, "test2.txt")
-	os.WriteFile(testFile, []byte("test"), 0644)
+	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
 
 	err = gitRepo.CommitAll("Test commit", "Author", "author@test.com")
 	if err != nil {

@@ -39,8 +39,14 @@ const Agent = defaultBeatVersion
 
 	// Change to temp directory
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
-	os.Chdir(tmpDir)
+	defer func() {
+		if err := os.Chdir(originalWd); err != nil {
+			t.Logf("failed to restore working directory: %v", err)
+		}
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
 	tests := []struct {
 		name        string
@@ -127,8 +133,14 @@ spec:
 
 	// Change to temp directory
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
-	os.Chdir(tmpDir)
+	defer func() {
+		if err := os.Chdir(originalWd); err != nil {
+			t.Logf("failed to restore working directory: %v", err)
+		}
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
 	// Test UpdateDocs
 	newVersion := "9.5.0"
@@ -214,8 +226,14 @@ func TestUpdateMergify(t *testing.T) {
 
 	// Change to temp directory
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
-	os.Chdir(tmpDir)
+	defer func() {
+		if err := os.Chdir(originalWd); err != nil {
+			t.Logf("failed to restore working directory: %v", err)
+		}
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
 	// Create a basic .mergify.yml file
 	mergifyContent := `pull_request_rules:
@@ -311,8 +329,14 @@ func TestUpdateMergifyIdempotent(t *testing.T) {
 
 	// Change to temp directory
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
-	os.Chdir(tmpDir)
+	defer func() {
+		if err := os.Chdir(originalWd); err != nil {
+			t.Logf("failed to restore working directory: %v", err)
+		}
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
 	// Create a basic .mergify.yml file
 	mergifyContent := `pull_request_rules:
@@ -470,8 +494,14 @@ func TestPrepareMajorMinorRelease(t *testing.T) {
 
 	// Change to temp directory
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
-	os.Chdir(tmpDir)
+	defer func() {
+		if err := os.Chdir(originalWd); err != nil {
+			t.Logf("failed to restore working directory: %v", err)
+		}
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
 	// Create required directory structure
 	versionDir := filepath.Join(tmpDir, "version")
