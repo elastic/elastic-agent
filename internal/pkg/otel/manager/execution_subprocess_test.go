@@ -5,13 +5,21 @@
 package manager
 
 import (
+	"encoding/gob"
 	"fmt"
+	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 // noopZapWriter discards entries; used to terminate the writer chain in tests.
@@ -79,4 +87,178 @@ func TestLastMessage(t *testing.T) {
 			assert.Equal(t, tc.want, zl.LastMessage())
 		})
 	}
+}
+
+func newTestProcHandle(t *testing.T, doneCh chan struct{}, reportErrFn func(error), modifier ConfigModifier) *procHandle {
+	t.Helper()
+	log, err := logger.New("test", false)
+	require.NoError(t, err)
+	return newProcHandle(
+		&process.Info{PID: 42},
+		log,
+		logp.InfoLevel,
+		doneCh,
+		reportErrFn,
+		modifier,
+	)
+}
+
+func TestProcHandle_LogLevel(t *testing.T) {
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	h := newTestProcHandle(t, doneCh, func(error) {}, nil)
+	assert.Equal(t, logp.InfoLevel, h.LogLevel())
+}
+
+func TestProcHandle_UpdateConfigYamlBytes_LatestWins(t *testing.T) {
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	h := newTestProcHandle(t, doneCh, func(error) {}, nil)
+
+	// Send two configs rapidly; only the latest should remain.
+	h.updateConfigYamlBytes([]byte("first"))
+	h.updateConfigYamlBytes([]byte("second"))
+
+	got := <-h.configCh
+	assert.Equal(t, "second", string(got))
+
+	// Channel should be empty now.
+	select {
+	case v := <-h.configCh:
+		t.Fatalf("expected empty channel, got: %s", string(v))
+	default:
+	}
+}
+
+func TestProcHandle_WriteToPipe(t *testing.T) {
+	doneCh := make(chan struct{})
+	pipeReader, pipeWriter := io.Pipe()
+
+	var reportedErr error
+	h := newTestProcHandle(t, doneCh, func(err error) { reportedErr = err }, nil)
+	h.wg.Add(1)
+
+	go func() {
+		defer h.wg.Done()
+		h.writeToPipe(pipeWriter)
+	}()
+
+	// Send a config and read it from the pipe.
+	expected := []byte("receivers:\n  nop:\n")
+	h.updateConfigYamlBytes(expected)
+
+	decoder := gob.NewDecoder(pipeReader)
+	var got []byte
+	err := decoder.Decode(&got)
+	require.NoError(t, err)
+	assert.Equal(t, expected, got)
+
+	// Close process done to stop the writer goroutine.
+	close(doneCh)
+	h.wg.Wait()
+
+	assert.NoError(t, reportedErr)
+}
+
+func TestProcHandle_WriteToPipe_SuppressesClosedPipeError(t *testing.T) {
+	doneCh := make(chan struct{})
+	_, pipeWriter := io.Pipe()
+
+	errCh := make(chan error, 1)
+	h := newTestProcHandle(t, doneCh, func(err error) { errCh <- err }, nil)
+	h.wg.Add(1)
+
+	// Close the write end before writing — io.ErrClosedPipe should be suppressed.
+	pipeWriter.Close()
+	go func() {
+		defer h.wg.Done()
+		h.writeToPipe(pipeWriter)
+	}()
+
+	h.updateConfigYamlBytes([]byte("test"))
+
+	// Give the goroutine time to process, then verify no error was reported.
+	select {
+	case err := <-errCh:
+		t.Fatalf("expected no error to be reported for closed pipe, got: %v", err)
+	case <-time.After(200 * time.Millisecond):
+		// no error reported — expected
+	}
+
+	close(doneCh)
+	h.wg.Wait()
+}
+
+func TestProcHandle_UpdateConfig(t *testing.T) {
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	modifierCalled := false
+	modifier := func(cfg *confmap.Conf) error {
+		modifierCalled = true
+		return cfg.Merge(confmap.NewFromStringMap(map[string]any{
+			"injected": "value",
+		}))
+	}
+
+	h := newTestProcHandle(t, doneCh, func(error) {}, modifier)
+
+	cfg := confmap.NewFromStringMap(map[string]any{
+		"receivers": map[string]any{"nop": nil},
+	})
+	err := h.UpdateConfig(cfg)
+	require.NoError(t, err)
+	assert.True(t, modifierCalled)
+
+	got := <-h.configCh
+	assert.Contains(t, string(got), "injected: value")
+	assert.Contains(t, string(got), "receivers")
+}
+
+func TestProcHandle_UpdateConfig_NilConfig(t *testing.T) {
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	h := newTestProcHandle(t, doneCh, func(error) {}, nil)
+
+	err := h.UpdateConfig(nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no configuration provided")
+}
+
+func TestPrepareAndSerializeConfig(t *testing.T) {
+	t.Run("nil config", func(t *testing.T) {
+		_, err := prepareAndSerializeConfig(nil, nil)
+		assert.Error(t, err)
+	})
+
+	t.Run("no modifier", func(t *testing.T) {
+		cfg := confmap.NewFromStringMap(map[string]any{"key": "value"})
+		yamlBytes, err := prepareAndSerializeConfig(cfg, nil)
+		require.NoError(t, err)
+		assert.Contains(t, string(yamlBytes), "key: value")
+	})
+
+	t.Run("with modifier", func(t *testing.T) {
+		cfg := confmap.NewFromStringMap(map[string]any{"key": "value"})
+		modifier := func(c *confmap.Conf) error {
+			return c.Merge(confmap.NewFromStringMap(map[string]any{"extra": "data"}))
+		}
+		yamlBytes, err := prepareAndSerializeConfig(cfg, modifier)
+		require.NoError(t, err)
+		assert.Contains(t, string(yamlBytes), "key: value")
+		assert.Contains(t, string(yamlBytes), "extra: data")
+	})
+
+	t.Run("modifier error", func(t *testing.T) {
+		cfg := confmap.NewFromStringMap(map[string]any{"key": "value"})
+		modifier := func(c *confmap.Conf) error {
+			return fmt.Errorf("modifier failed")
+		}
+		_, err := prepareAndSerializeConfig(cfg, modifier)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "modifier failed")
+	})
 }
