@@ -51,7 +51,7 @@ receivers:
         #   key_file: your/path/to/server.key
 
 connectors:
-  elasticapm: # Elastic APM Connector
+  elasticapm: {} # Elastic APM Connector
 
 processors:
   batch:
