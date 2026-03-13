@@ -245,9 +245,9 @@ func (Build) GenerateConfig() error {
 // WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
 // is a thin proxy to the actual elastic-agent binary that resides in the data/elastic-agent-{commit-short-sha}
 // directory of the archive.
-func (Build) WindowsArchiveRootBinary() error {
+func (Build) WindowsArchiveRootBinary(ctx context.Context) error {
 	fmt.Println("--- Compiling root binary for windows archive")
-	cfg := devtools.MustLoadSettings()
+	cfg := devtools.SettingsFromContext(ctx)
 	hashShort, err := cfg.Build.CommitHashShort()
 	if err != nil {
 		return fmt.Errorf("error getting commit hash: %w", err)
@@ -289,7 +289,7 @@ func (Build) WindowsArchiveRootBinary() error {
 		args.CGO = true
 	}
 
-	return devtools.Build(context.Background(), cfg, args)
+	return devtools.Build(ctx, cfg, args)
 }
 
 // GolangCrossBuildOSS build the Beat binary inside of the golang-builder.
