@@ -8,13 +8,18 @@ extensions:
   #         privileges: ["config_agent:read"]
   #         resources: ["*"]
 
+  # Activate if central configuration with bearer token auth is needed
+  # bearertokenauth:
+  #   scheme: "APIKey"
+  #   token: ${env:ELASTIC_API_KEY}
+
   # Activate if central configuration is needed
   # apmconfig:
   #   source:
   #     elasticsearch:
   #       endpoint: ${env:ELASTIC_ENDPOINT}
   #       auth:
-  #         authenticator: apikeyauth
+  #         authenticator: bearertokenauth
   #   opamp:
   #     protocols:
   #       http:
@@ -74,6 +79,7 @@ exporters:
 service:
   # extensions:
     # - apikeyauth
+    # - bearertokenauth
     # - apmconfig
   pipelines:
     metrics:
