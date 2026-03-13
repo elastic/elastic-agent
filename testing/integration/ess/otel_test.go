@@ -13,6 +13,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -2535,6 +2537,269 @@ service:
 	require.Empty(t, cmp.Diff(expected, ev), "metrics do not match expected values")
 
 	cancel()
+}
+
+func TestOtelElasticsearchStateStore_Agentless(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey := createESApiKey(t, info.ESClient)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
+
+	mock := newHTTPJSONCursorMockServer(t)
+	defer mock.Close()
+
+	type configOptions struct {
+		ESEndpoint string
+		ESApiKey   string
+		InputURL   string
+	}
+
+	configTemplate := `
+agent.internal.runtime.filebeat.httpjson: otel
+agent.monitoring.enabled: false
+inputs:
+  - type: httpjson
+    id: httpjson-es-state-store
+    use_output: default
+    streams:
+      - id: httpjson-cursor-stream
+        data_stream:
+          dataset: httpjson_statestore
+        request.url: {{.InputURL}}
+        request.method: GET
+        request.transforms:
+          - set:
+              target: url.params.since
+              value: '[[.cursor.published]]'
+              default: '[[formatDate (now (parseDuration "-24h")) "RFC3339"]]'
+        cursor:
+          published:
+            value: '[[.last_event.published]]'
+        interval: 5s
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: balanced
+`
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				ESEndpoint: esEndpoint,
+				ESApiKey:   decodedApiKey,
+				InputURL:   mock.URL,
+			}))
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+
+	dataIndex := ".ds-logs-httpjson_statestore-*"
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+
+	cmd.Env = append(os.Environ(), "AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES=httpjson")
+
+	output := &strings.Builder{}
+	cmd.Stderr = output
+	cmd.Stdout = output
+
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = cmd.Wait()
+		if t.Failed() {
+			t.Log("Elastic-Agent output (1st run):")
+			t.Log(output.String())
+		}
+	})
+
+	// Wait for data to arrive in the data index
+	require.EventuallyWithT(t,
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			defer findCancel()
+
+			docs, err := estools.GetAllLogsForIndexWithContext(findCtx, info.ESClient, dataIndex)
+			assert.NoError(ct, err)
+			assert.GreaterOrEqual(ct, docs.Hits.Total.Value, 1, "expected at least 1 event")
+		},
+		2*time.Minute, 1*time.Second, "expected data in the data index")
+
+	// Wait for at least 2 polling cycles so the cursor is persisted to ES
+	require.Eventually(t, func() bool {
+		return mock.RequestCount() >= 2
+	}, 60*time.Second, 1*time.Second, "expected at least 2 httpjson poll cycles")
+
+	// Verify state exists in the agentless-state-* index
+	require.EventuallyWithT(t,
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			defer findCancel()
+
+			docs, err := estools.GetAllLogsForIndexWithContext(findCtx, info.ESClient, "agentless-state-*")
+			assert.NoError(ct, err)
+			assert.GreaterOrEqual(ct, docs.Hits.Total.Value, 1, "expected state document in agentless-state-* index")
+		},
+		30*time.Second, 1*time.Second, "expected cursor state in agentless-state-* index")
+
+	// Record the cursor timestamp just before stopping
+	lastCursorBeforeStop := mock.LastSinceParam()
+	require.False(t, lastCursorBeforeStop.IsZero(), "expected at least one 'since' parameter before stopping")
+	t.Logf("cursor before stop: %s (request count: %d)", lastCursorBeforeStop.Format(time.RFC3339), mock.RequestCount())
+
+	// Stop the first agent
+	requestCountBeforeRestart := mock.RequestCount()
+	cancel()
+	cmd.Wait()
+
+	mock.MarkRestart()
+
+	ctx, cancel = testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	cmd2, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+
+	cmd2.Env = append(os.Environ(), "AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES=httpjson")
+
+	output2 := &strings.Builder{}
+	cmd2.Stderr = output2
+	cmd2.Stdout = output2
+
+	err = cmd2.Start()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if cmd2.Process != nil {
+			_ = cmd2.Process.Kill()
+		}
+		_ = cmd2.Wait()
+		if t.Failed() {
+			t.Log("Elastic-Agent output (2nd run):")
+			t.Log(output2.String())
+		}
+	})
+
+	// Wait for the httpjson input to resume polling after restart
+	require.Eventually(t, func() bool {
+		return mock.RequestCount() > requestCountBeforeRestart
+	}, 60*time.Second, 1*time.Second, "expected httpjson to resume polling after restart")
+
+	// Verify the restored cursor: the first "since" parameter after restart
+	// should be recent (within 5 minutes), NOT the default 24h-ago value.
+	// If the cursor was not restored from ES, the httpjson input would fall
+	// back to its default: formatDate (now (parseDuration "-24h")).
+	firstSinceAfterRestart := mock.FirstSinceAfterRestart()
+	require.False(t, firstSinceAfterRestart.IsZero(), "expected a 'since' parameter after restart")
+
+	timeSinceCursor := time.Since(firstSinceAfterRestart)
+	t.Logf("first 'since' after restart: %s (age: %s)", firstSinceAfterRestart.Format(time.RFC3339), timeSinceCursor)
+
+	assert.Less(t, timeSinceCursor, 5*time.Minute,
+		"restored cursor should be recent (within 5 minutes), not the default 24h ago; "+
+			"got since=%s which is %s old", firstSinceAfterRestart.Format(time.RFC3339), timeSinceCursor)
+
+	cancel()
+}
+
+// httpJSONCursorMockServer is a test HTTP server for the httpjson input that
+// tracks the "since" cursor parameter across requests and restarts.
+type httpJSONCursorMockServer struct {
+	URL    string
+	server *http.Server
+
+	mu                     sync.Mutex
+	requestCount           int64
+	lastSince              time.Time
+	restartMarked          bool
+	firstSinceAfterRestart time.Time
+}
+
+func newHTTPJSONCursorMockServer(t *testing.T) *httpJSONCursorMockServer {
+	t.Helper()
+	mock := &httpJSONCursorMockServer{}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		mock.mu.Lock()
+		mock.requestCount++
+
+		// Parse the "since" query parameter sent by the httpjson cursor
+		sinceParam := r.URL.Query().Get("since")
+		if sinceParam != "" {
+			if parsed, err := time.Parse(time.RFC3339, sinceParam); err == nil {
+				mock.lastSince = parsed
+				if mock.restartMarked && mock.firstSinceAfterRestart.IsZero() {
+					mock.firstSinceAfterRestart = parsed
+				}
+			}
+		}
+		mock.mu.Unlock()
+
+		// Respond with a JSON body containing "published" — the httpjson
+		// cursor will store this and send it back as "since" next time.
+		published := time.Now().UTC()
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"message":"hello","published":"%s"}`, published.Format(time.RFC3339))
+	})
+
+	mock.server = &http.Server{Handler: mux}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	go func() { _ = mock.server.Serve(listener) }()
+	mock.URL = fmt.Sprintf("http://%s", listener.Addr().String())
+
+	return mock
+}
+
+func (m *httpJSONCursorMockServer) RequestCount() int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.requestCount
+}
+
+func (m *httpJSONCursorMockServer) LastSinceParam() time.Time {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.lastSince
+}
+
+func (m *httpJSONCursorMockServer) MarkRestart() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.restartMarked = true
+}
+
+func (m *httpJSONCursorMockServer) FirstSinceAfterRestart() time.Time {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.firstSinceAfterRestart
+}
+
+func (m *httpJSONCursorMockServer) Close() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = m.server.Shutdown(ctx)
 }
 
 type ZapWriter struct {
