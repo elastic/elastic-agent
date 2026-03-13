@@ -18,7 +18,6 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
-	"github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 )
@@ -248,22 +247,4 @@ func checkUnsupportedConfig(cfg *config.C) error {
 	}
 
 	return nil
-}
-
-func getQueueSize(logger *logp.Logger, output *config.C) int {
-	size, err := output.Int("queue.mem.events", -1)
-	if err != nil {
-		logger.Debugf("Failed to get queue size: %v", err)
-		return memqueue.DefaultEvents // return default queue.mem.events for sending_queue in case of an errr
-	}
-	return int(size)
-}
-
-func getFlushTimeout(logger *logp.Logger, output *config.C) string {
-	timeout, err := output.String("queue.mem.flush.timeout", -1)
-	if err != nil {
-		logger.Debugf("Failed to get flush timeout: %v", err)
-		return "10s" // return default queue.mem.flush.timeout for sending_queue in case of an errr
-	}
-	return timeout
 }
