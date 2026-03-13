@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"syscall"
-	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -39,37 +39,48 @@ func isRetryableError(err error) bool {
 	return errno == syscall.ERROR_ACCESS_DENIED || errno == windows.ERROR_SHARING_VIOLATION
 }
 
-func removeBlockingExe(blockingErr error) error {
+// removeBlockingExe moves a locked executable out of the way so that
+// os.RemoveAll can remove the directory it lived in. On Windows a running exe
+// cannot be deleted, but it *can* be renamed/moved (even across directories,
+// as long as it stays on the same volume). After the move we schedule the temp
+// file for deletion on the next reboot via MoveFileEx/MOVEFILE_DELAY_UNTIL_REBOOT.
+//
+// rootPath is the top-level directory being removed (e.g. C:\Program Files\Elastic\Agent).
+// The temp file is placed in the parent of rootPath so it is outside the tree
+// being deleted but on the same volume.
+func removeBlockingExe(blockingErr error, rootPath string) error {
 	path, _ := getPathFromError(blockingErr)
 	if path == "" {
 		return nil
 	}
 
-	// open handle for delete only
-	h, err := openDeleteHandle(path)
+	// Place the temp file in the parent of rootPath so it's outside the tree
+	// being removed but on the same volume (cross-volume rename won't work).
+	tmpDir := filepath.Dir(rootPath)
+	tmp, err := os.CreateTemp(tmpDir, ".elastic-agent-rm-*.exe")
 	if err != nil {
-		return fmt.Errorf("failed to open handle for %q: %w", path, err)
+		return fmt.Errorf("failed to create temp file in %q: %w", tmpDir, err)
+	}
+	tmpPath := tmp.Name()
+	_ = tmp.Close()
+
+	// os.Rename uses MoveFileEx(MOVEFILE_REPLACE_EXISTING) under the hood.
+	if err := os.Rename(path, tmpPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("failed to rename %q to %q: %w", path, tmpPath, err)
 	}
 
-	// rename handle
-	err = renameHandle(h)
-	_ = windows.CloseHandle(h)
+	// Schedule the temp file for deletion on next reboot.
+	tmpPathPtr, err := windows.UTF16PtrFromString(tmpPath)
 	if err != nil {
-		return fmt.Errorf("failed to rename handle for %q: %w", path, err)
+		return fmt.Errorf("failed to convert temp path: %w", err)
+	}
+	if err := windows.MoveFileEx(tmpPathPtr, nil, windows.MOVEFILE_DELAY_UNTIL_REBOOT); err != nil {
+		// Non-fatal: the file is already out of the way, it just won't be
+		// auto-cleaned. Log-worthy but not worth failing the uninstall.
+		return fmt.Errorf("failed to schedule %q for deletion on reboot: %w", tmpPath, err)
 	}
 
-	// re-open handle
-	h, err = openDeleteHandle(path)
-	if err != nil {
-		return fmt.Errorf("failed to open handle after rename for %q: %w", path, err)
-	}
-
-	// dispose of the handle
-	err = disposeHandle(h)
-	_ = windows.CloseHandle(h)
-	if err != nil {
-		return fmt.Errorf("failed to dispose handle for %q: %w", path, err)
-	}
 	return nil
 }
 
@@ -82,86 +93,6 @@ func getPathFromError(blockingErr error) (string, syscall.Errno) {
 		}
 	}
 	return "", 0
-}
-
-func openDeleteHandle(path string) (windows.Handle, error) {
-	wPath, err := windows.UTF16PtrFromString(path)
-	if err != nil {
-		return 0, err
-	}
-	handle, err := windows.CreateFile(
-		wPath,
-		windows.DELETE,
-		0,
-		nil,
-		windows.OPEN_EXISTING,
-		windows.FILE_ATTRIBUTE_NORMAL,
-		0,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return handle, nil
-}
-
-func renameHandle(hHandle windows.Handle) error {
-	wRename, err := windows.UTF16FromString(":agentrm")
-	if err != nil {
-		return err
-	}
-
-	var rename fileRenameInfo
-	lpwStream := &wRename[0]
-	rename.FileNameLength = uint32(unsafe.Sizeof(lpwStream))
-
-	// RtlCopyMemory (https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlcopymemory)
-	//   Return value - None
-	_, _, _ = windows.NewLazyDLL("kernel32.dll").NewProc("RtlCopyMemory").Call(
-		uintptr(unsafe.Pointer(&rename.FileName[0])),
-		uintptr(unsafe.Pointer(lpwStream)),
-		unsafe.Sizeof(lpwStream),
-	)
-
-	err = windows.SetFileInformationByHandle(
-		hHandle,
-		windows.FileRenameInfo,
-		(*byte)(unsafe.Pointer(&rename)),
-		uint32(unsafe.Sizeof(rename)+unsafe.Sizeof(lpwStream)),
-	)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func disposeHandle(hHandle windows.Handle) error {
-	var deleteFile fileDispositionInfo
-	deleteFile.DeleteFile = true
-
-	err := windows.SetFileInformationByHandle(
-		hHandle,
-		windows.FileDispositionInfo,
-		(*byte)(unsafe.Pointer(&deleteFile)),
-		uint32(unsafe.Sizeof(deleteFile)),
-	)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type fileRenameInfo struct {
-	Union struct {
-		ReplaceIfExists bool
-		Flags           uint32
-	}
-	RootDirectory  windows.Handle
-	FileNameLength uint32
-	FileName       [1]uint16
-}
-
-type fileDispositionInfo struct {
-	DeleteFile bool
 }
 
 // killNoneChildProcess provides a way of killing a process that is not started as a child of this process.

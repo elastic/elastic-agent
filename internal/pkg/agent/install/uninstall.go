@@ -292,8 +292,8 @@ func RemovePath(path string) error {
 		}
 
 		if isBlockingOnExe(lastErr) {
-			// try to remove the blocking exe and try again to clean up the path
-			_ = removeBlockingExe(lastErr)
+			// try to move the blocking exe out of the way and try again
+			_ = removeBlockingExe(lastErr, path)
 		}
 
 		time.Sleep(500 * time.Millisecond)
@@ -325,70 +325,6 @@ func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
 
 	return err
 }
-
-// TODO: Replace this with a more robust and less mysterious approach.
-// removeAll is a reimplementation of Go 1.24's os.RemoveAll. Go 1.25 switched
-// to directory-relative unlinkat/openat syscalls (removeall_at.go) which on
-// Windows use NtCreateFile with DELETE access — these are stricter about file
-// state and fail on files that have been ADS-renamed. The simple path-based
-// approach using os.Remove works correctly with the ADS rename trick that
-// RemovePath uses to delete running executables on Windows.
-// Taken from: https://cs.opensource.google/go/go/+/refs/tags/go1.24.13:src/os/removeall_noat.go;drc=a2baae6851a157d662dff7cc508659f66249698a;l=15
-// The implementation which breaks our install is here:
-// https://cs.opensource.google/go/go/+/refs/tags/go1.25.8:src/os/removeall_at.go;drc=e81c624656e415626c7ac3a97768f5c2717979a4;l=15
-//func removeAll(path string) error {
-//	// Try simple remove first (handles files and empty directories).
-//	err := os.Remove(path)
-//	if err == nil || errors.Is(err, fs.ErrNotExist) {
-//		return nil
-//	}
-//
-//	// Check if it's a directory.
-//	info, serr := os.Lstat(path)
-//	if serr != nil {
-//		if errors.Is(serr, fs.ErrNotExist) {
-//			return nil
-//		}
-//		return serr
-//	}
-//	if !info.IsDir() {
-//		// Not a directory — return the original Remove error.
-//		return err
-//	}
-//
-//	// Remove directory contents recursively.
-//	err = removeAllChildren(path)
-//	if err != nil {
-//		return err
-//	}
-//
-//	// Remove the now-empty directory.
-//	err = os.Remove(path)
-//	if errors.Is(err, fs.ErrNotExist) {
-//		return nil
-//	}
-//	return err
-//}
-//
-//func removeAllChildren(path string) error {
-//	entries, err := os.ReadDir(path)
-//	if err != nil {
-//		if errors.Is(err, fs.ErrNotExist) {
-//			return nil
-//		}
-//		return err
-//	}
-//
-//	var firstErr error
-//	for _, entry := range entries {
-//		child := filepath.Join(path, entry.Name())
-//		err := removeAll(child)
-//		if err != nil && firstErr == nil {
-//			firstErr = err
-//		}
-//	}
-//	return firstErr
-//}
 
 func containsString(str string, a []string, caseSensitive bool) bool {
 	if !caseSensitive {

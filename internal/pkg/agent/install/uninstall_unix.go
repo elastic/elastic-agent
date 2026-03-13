@@ -12,7 +12,7 @@ func isBlockingOnExe(_ error) bool {
 	return false
 }
 
-func removeBlockingExe(_ error) error {
+func removeBlockingExe(_ error, _ string) error {
 	return nil
 }
 
