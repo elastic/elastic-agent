@@ -602,6 +602,7 @@ func TestDefaultSettings(t *testing.T) {
 		assert.False(t, settings.Build.Snapshot)
 		assert.False(t, settings.Build.DevBuild)
 		assert.Greater(t, settings.Build.MaxParallel, 0)
+		assert.NotZero(t, settings.BuildDate)
 
 		// Dev machine defaults
 		assert.Equal(t, DefaultDevMachineImage, settings.DevMachine.MachineImage)
