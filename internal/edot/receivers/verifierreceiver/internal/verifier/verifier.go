@@ -58,10 +58,11 @@ const (
 type VerificationMethod string
 
 const (
-	MethodAPICall   VerificationMethod = "api_call"
-	MethodDryRun    VerificationMethod = "dry_run"
-	MethodHTTPProbe VerificationMethod = "http_probe"
-	MethodGraphQL   VerificationMethod = "graphql_query"
+	MethodAPICall              VerificationMethod = "api_call"
+	MethodDryRun               VerificationMethod = "dry_run"
+	MethodHTTPProbe            VerificationMethod = "http_probe"
+	MethodGraphQL              VerificationMethod = "graphql_query"
+	MethodPolicyAttachmentCheck VerificationMethod = "policy_attachment_check"
 )
 
 // Permission represents a permission to verify.
@@ -79,9 +80,8 @@ type ProviderConfig struct {
 	AccountID string
 
 	// Azure configuration
-	SubscriptionID string
-	ResourceGroup  string
-	TenantID       string
+	ResourceGroup string
+	TenantID      string
 
 	// GCP configuration
 	ProjectID string
@@ -154,9 +154,8 @@ type AzureAuthConfig struct {
 	// Cloud Connector OIDC field
 	IDTokenFile string // Path to the OIDC JWT token file
 
-	TenantID       string
-	ClientID       string
-	SubscriptionID string
+	TenantID string
+	ClientID string
 
 	// UseDefaultCredentials uses DefaultAzureCredential (for testing).
 	UseDefaultCredentials bool
@@ -175,9 +174,10 @@ func (c AzureAuthConfig) IsConfigured() bool {
 
 // GCPAuthConfig contains GCP authentication configuration.
 //
-// Cloud Connector flow (production):
+// Cloud Connector flow (production) — AWS-mediated WIF matching Cloudbeat:
 //
-//	JWT token file → GCP Workload Identity Federation(Audience) → Service Account Impersonation
+//	JWT → AssumeRoleWithWebIdentity(GlobalRoleARN) → AWS creds →
+//	GCP STS(WorkloadIdentityProvider) → Service Account Impersonation
 //
 // Default credentials flow (testing):
 //
@@ -188,6 +188,11 @@ type GCPAuthConfig struct {
 	WorkloadIdentityProvider string // Full resource name of the GCP WIF provider (audience)
 	ServiceAccountEmail      string // GCP service account to impersonate via WIF
 
+	// AWS-mediated WIF fields (populated from CloudConnectorConfig)
+	GlobalRoleARN    string // Elastic global AWS IAM role for the intermediate hop
+	CloudResourceID  string // Resource ID used in AWS session naming
+	CloudConnectorID string // Cloud connector identifier for session naming
+
 	ProjectID string
 
 	// UseDefaultCredentials uses Application Default Credentials (for testing).
@@ -196,9 +201,10 @@ type GCPAuthConfig struct {
 
 func (c GCPAuthConfig) ProviderType() ProviderType { return ProviderGCP }
 
-// IsCloudConnector returns true when configured for the cloud connector WIF flow.
+// IsCloudConnector returns true when configured for the cloud connector
+// AWS-mediated WIF flow (requires JWT, GCP WIF audience, and AWS global role).
 func (c GCPAuthConfig) IsCloudConnector() bool {
-	return c.IDTokenFile != "" && c.WorkloadIdentityProvider != ""
+	return c.IDTokenFile != "" && c.WorkloadIdentityProvider != "" && c.GlobalRoleARN != ""
 }
 
 func (c GCPAuthConfig) IsConfigured() bool {

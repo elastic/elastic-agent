@@ -351,9 +351,8 @@ func TestReceiver_AzureIntegrations(t *testing.T) {
 		Providers: ProvidersConfig{
 			Azure: AzureProviderConfig{
 				Credentials: AzureCredentials{
-					TenantID:       "00000000-0000-0000-0000-000000000000",
-					ClientID:       "11111111-1111-1111-1111-111111111111",
-					SubscriptionID: "22222222-2222-2222-2222-222222222222",
+					TenantID: "00000000-0000-0000-0000-000000000000",
+					ClientID: "11111111-1111-1111-1111-111111111111",
 				},
 			},
 		},
@@ -745,6 +744,8 @@ func TestPermissionRegistry(t *testing.T) {
 			"aws_route53",
 			"aws_elb",
 			"aws_cloudfront",
+			"aws_cspm",
+			"aws_asset_inventory",
 		}
 
 		for _, integration := range awsIntegrations {
@@ -760,6 +761,8 @@ func TestPermissionRegistry(t *testing.T) {
 			"azure_activitylogs",
 			"azure_auditlogs",
 			"azure_blob_storage",
+			"azure_cspm",
+			"azure_asset_inventory",
 		}
 
 		for _, integration := range azureIntegrations {
@@ -775,6 +778,8 @@ func TestPermissionRegistry(t *testing.T) {
 			"gcp_audit",
 			"gcp_storage",
 			"gcp_pubsub",
+			"gcp_cspm",
+			"gcp_asset_inventory",
 		}
 
 		for _, integration := range gcpIntegrations {
