@@ -950,6 +950,8 @@ func (f *Fixture) ExecRestart(ctx context.Context, opts ...process.CmdOption) er
 // ExecVersion executes the version subcommand on the prepared Elastic Agent binary
 // with '--binary-only'. It returns the parsed YAML output.
 func (f *Fixture) ExecVersion(ctx context.Context, opts ...process.CmdOption) (AgentVersionOutput, error) {
+	ent, err := os.ReadDir(f.workDir)
+	f.t.Log("ListDir for ", f.workDir, ent, err)
 	out, err := f.Exec(ctx, []string{"version", "--binary-only", "--yaml"}, opts...)
 	version := AgentVersionOutput{}
 	if uerr := yaml.Unmarshal(out, &version); uerr != nil {
