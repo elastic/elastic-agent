@@ -154,14 +154,21 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	// check for any component updates to the known PID, so we can update the component monitoring
 	found := false
 	for i, other := range c.state.Components {
-		if other.Component.ID == state.Component.ID {
-			if other.State.Pid != state.State.Pid {
-				c.componentPidRequiresUpdate.Store(true)
-			}
-			c.state.Components[i] = state
-			found = true
-			break
+		if other.Component.ID != state.Component.ID {
+			continue
 		}
+		// We want to update the component state if the incoming update is from the same instance or a newer instance of the component.
+		// We determine this by comparing start times, since a newer instance would have a later start time.
+		if other.Component.LastConfiguredAt.After(state.Component.LastConfiguredAt) {
+			// This is a case where a component has transitioned to a new state but we receive a late update from the older component.
+			return
+		}
+		if other.State.Pid != state.State.Pid {
+			c.componentPidRequiresUpdate.Store(true)
+		}
+		c.state.Components[i] = state
+		found = true
+		break
 	}
 	if !found {
 		c.state.Components = append(c.state.Components, state)
