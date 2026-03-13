@@ -71,6 +71,7 @@ common:
       .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
     artifact_paths: &k8s_test_artifact_paths
       - build/*
+      - build/integration/**
       - build/diagnostics/**
       - build/*.pod_logs_dump/*
 
@@ -91,6 +92,7 @@ steps:
       .buildkite/scripts/steps/integration_tests_tf.sh ech true
     artifact_paths:
       - build/*
+      - build/integration/**
       - build/diagnostics/**
     retry:
       automatic:
@@ -138,6 +140,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         agents:
           provider: "gcp"
@@ -159,6 +162,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         retry:
           automatic:
@@ -179,6 +183,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh fleet true
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         retry:
           automatic:
@@ -208,6 +213,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         agents:
           provider: "gcp"
@@ -238,6 +244,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         agents:
           provider: "gcp"
@@ -261,6 +268,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         agents:
           provider: "gcp"
@@ -291,6 +299,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         retry:
           automatic:
@@ -321,6 +330,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         retry:
           automatic:
@@ -346,6 +356,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         retry:
           automatic:
@@ -382,6 +393,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         agents:
           provider: "aws"
@@ -420,6 +432,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         retry:
           automatic:
@@ -450,6 +463,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.group}} false
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         retry:
           automatic:
@@ -480,6 +494,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.group}} true
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         retry:
           automatic:
@@ -530,6 +545,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         retry:
           automatic:
@@ -630,6 +646,7 @@ steps:
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         retry:
           automatic:
@@ -652,6 +669,7 @@ steps:
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         retry:
           automatic:
@@ -672,6 +690,7 @@ steps:
           sudo -E .buildkite/scripts/buildkite-integration-tests.sh fleet true
         artifact_paths:
           - build/*
+      - build/integration/**
           - build/diagnostics/**
         retry:
           automatic:

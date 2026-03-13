@@ -47,7 +47,7 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 		},
 	})
 
-	rootDir, err := filepath.Abs(filepath.Join("..", "..", "..", "build"))
+	rootDir, err := filepath.Abs(filepath.Join("..", "..", "..", "build", "integration"))
 	require.NoError(t, err, "cannot get absolute path of rootDir")
 	tmpDir := fs.TempDir(t, rootDir)
 	agentLogFilePath := filepath.Join(tmpDir, "ea-log.ndjson")
@@ -112,13 +112,11 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	// Start Elastic Agent/Filebeat receiver running the Log input
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(3*time.Minute))
 		defer cancel()
 		require.NoError(t, fixture.RunOtelWithClient(ctx))
-	}()
+	})
 
 	agentLogFile := fs.LogFile{}
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -151,13 +149,11 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	yamlCfg = renderCfg(t, cfgFile, cfg)
 	require.NoError(t, fixture.ConfigureOtel(t.Context(), yamlCfg), "cannot configure Otel")
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
 		defer cancel()
-		require.NoError(t, fixture.RunOtelWithClient(ctx))
-	}()
+		assert.NoError(t, fixture.RunOtelWithClient(ctx))
+	})
 
 	// Ensure the Filestream input starts
 	agentLogFile.WaitLogsContains(
@@ -196,14 +192,12 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	fixture.Stop()
 	wg.Wait()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(3*
 			time.Minute))
 		defer cancel()
 		require.NoError(t, fixture.RunOtelWithClient(ctx))
-	}()
+	})
 
 	// Start Elastic Agent again to ensure it is correctly tracking the state
 	agentLogFile.WaitLogsContains(
