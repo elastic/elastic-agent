@@ -1702,7 +1702,7 @@ func (s *Settings) TestTagsWithFIPS() []string {
 	tags := make([]string, len(s.Test.Tags))
 	copy(tags, s.Test.Tags)
 	if s.Build.FIPSBuild {
-		tags = append(tags, "requirefips", "ms_tls13kdf")
+		tags = append(tags, "requirefips")
 	}
 	return tags
 }
