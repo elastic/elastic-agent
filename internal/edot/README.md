@@ -46,7 +46,6 @@ This section provides a summary of components included in the Elastic Distributi
 | [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.145.0/receiver/httpcheckreceiver/README.md) | v0.145.0 |
 | [iisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/iisreceiver/v0.145.0/receiver/iisreceiver/README.md) | v0.145.0 |
 | [jaegerreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/jaegerreceiver/v0.145.0/receiver/jaegerreceiver/README.md) | v0.145.0 |
-| [jmxreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/jmxreceiver/v0.145.0/receiver/jmxreceiver/README.md) | v0.145.0 |
 | [k8sclusterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sclusterreceiver/v0.145.0/receiver/k8sclusterreceiver/README.md) | v0.145.0 |
 | [k8seventsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8seventsreceiver/v0.145.0/receiver/k8seventsreceiver/README.md) | v0.145.0 |
 | [k8sobjectsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sobjectsreceiver/v0.145.0/receiver/k8sobjectsreceiver/README.md) | v0.145.0 |
