@@ -159,9 +159,8 @@ type AzureProviderConfig struct {
 
 // AzureCredentials contains the Azure credentials.
 type AzureCredentials struct {
-	TenantID       string `mapstructure:"tenant_id"`
-	ClientID       string `mapstructure:"client_id"`
-	SubscriptionID string `mapstructure:"subscription_id"`
+	TenantID string `mapstructure:"tenant_id"`
+	ClientID string `mapstructure:"client_id"`
 
 	// UseDefaultCredentials uses DefaultAzureCredential which chains env vars,
 	// workload identity, managed identity, Azure CLI (az login), and azd CLI.
@@ -197,7 +196,6 @@ func (cfg *AzureCredentials) ToAuthConfig(cc CloudConnectorConfig) verifier.Azur
 		IDTokenFile:           cc.IDTokenFile,
 		TenantID:              cfg.TenantID,
 		ClientID:              cfg.ClientID,
-		SubscriptionID:        cfg.SubscriptionID,
 		UseDefaultCredentials: cfg.UseDefaultCredentials,
 	}
 }
@@ -237,11 +235,14 @@ func (cfg *GCPCredentials) IsConfigured() bool {
 
 // ToAuthConfig converts the config to a verifier.GCPAuthConfig, merging in
 // the shared cloud connector OIDC configuration.
-func (cfg *GCPCredentials) ToAuthConfig(cc CloudConnectorConfig) verifier.GCPAuthConfig {
+func (cfg *GCPCredentials) ToAuthConfig(cc CloudConnectorConfig, cloudConnectorID string) verifier.GCPAuthConfig {
 	return verifier.GCPAuthConfig{
 		IDTokenFile:              cc.IDTokenFile,
 		WorkloadIdentityProvider: cfg.WorkloadIdentityProvider,
 		ServiceAccountEmail:      cfg.ServiceAccountEmail,
+		GlobalRoleARN:            cc.GlobalRoleARN,
+		CloudResourceID:          cc.CloudResourceID,
+		CloudConnectorID:         cloudConnectorID,
 		ProjectID:                cfg.ProjectID,
 		UseDefaultCredentials:    cfg.UseDefaultCredentials,
 	}

@@ -19,10 +19,11 @@ type VerificationMethod = verifier.VerificationMethod
 
 // Re-export verification method constants for use by registry callers.
 var (
-	MethodAPICall   = verifier.MethodAPICall
-	MethodDryRun    = verifier.MethodDryRun
-	MethodHTTPProbe = verifier.MethodHTTPProbe
-	MethodGraphQL   = verifier.MethodGraphQL
+	MethodAPICall               = verifier.MethodAPICall
+	MethodDryRun                = verifier.MethodDryRun
+	MethodHTTPProbe             = verifier.MethodHTTPProbe
+	MethodGraphQL               = verifier.MethodGraphQL
+	MethodPolicyAttachmentCheck = verifier.MethodPolicyAttachmentCheck
 )
 
 // PermissionStatus represents the result of a permission verification.
@@ -637,78 +638,28 @@ func (r *PermissionRegistry) registerAWSIntegrations() {
 	})
 
 	// AWS CSPM - Cloud Security Posture Management
-	// Requires the SecurityAudit managed policy. These are representative checks
-	// that confirm the policy is attached.
+	// Verifies that the SecurityAudit managed policy is attached to the assumed role.
 	r.register("aws_cspm", ">=0.0.0", IntegrationPermissions{
 		Provider: verifier.ProviderAWS,
 		Permissions: []Permission{
 			{
-				Action:   "iam:GetAccountSummary",
+				Action:   "arn:aws:iam::aws:policy/SecurityAudit",
 				Required: true,
-				Method:   MethodAPICall,
-				Category: "security_posture",
-			},
-			{
-				Action:   "ec2:DescribeInstances",
-				Required: true,
-				Method:   MethodDryRun,
-				Category: "security_posture",
-			},
-			{
-				Action:   "s3:GetBucketAcl",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "security_posture",
-			},
-			{
-				Action:   "cloudtrail:DescribeTrails",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "security_posture",
-			},
-			{
-				Action:   "config:DescribeComplianceByConfigRule",
-				Required: true,
-				Method:   MethodAPICall,
+				Method:   MethodPolicyAttachmentCheck,
 				Category: "security_posture",
 			},
 		},
 	})
 
 	// AWS Asset Inventory - Cloud Asset Discovery
-	// Requires the SecurityAudit managed policy. These checks verify access to
-	// the core resource types inventoried by Cloud Asset Discovery.
+	// Verifies that the SecurityAudit managed policy is attached to the assumed role.
 	r.register("aws_asset_inventory", ">=0.0.0", IntegrationPermissions{
 		Provider: verifier.ProviderAWS,
 		Permissions: []Permission{
 			{
-				Action:   "ec2:DescribeInstances",
+				Action:   "arn:aws:iam::aws:policy/SecurityAudit",
 				Required: true,
-				Method:   MethodDryRun,
-				Category: "asset_inventory",
-			},
-			{
-				Action:   "ec2:DescribeSecurityGroups",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "asset_inventory",
-			},
-			{
-				Action:   "s3:ListAllMyBuckets",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "asset_inventory",
-			},
-			{
-				Action:   "iam:ListUsers",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "asset_inventory",
-			},
-			{
-				Action:   "rds:DescribeDBInstances",
-				Required: true,
-				Method:   MethodAPICall,
+				Method:   MethodPolicyAttachmentCheck,
 				Category: "asset_inventory",
 			},
 		},
@@ -757,64 +708,28 @@ func (r *PermissionRegistry) registerAzureIntegrations() {
 	})
 
 	// Azure CSPM - Cloud Security Posture Management
-	// Requires Reader built-in role + custom role with Microsoft.Web permissions.
+	// Verifies that the Reader built-in role is assigned at subscription scope.
 	r.register("azure_cspm", ">=0.0.0", IntegrationPermissions{
 		Provider: verifier.ProviderAzure,
 		Permissions: []Permission{
 			{
-				Action:   "Microsoft.Resources/subscriptions/read",
+				Action:   "Reader",
 				Required: true,
-				Method:   MethodAPICall,
-				Category: "security_posture",
-			},
-			{
-				Action:   "Microsoft.Compute/virtualMachines/read",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "security_posture",
-			},
-			{
-				Action:   "Microsoft.Storage/storageAccounts/read",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "security_posture",
-			},
-			{
-				Action:   "Microsoft.Web/sites/config/Read",
-				Required: true,
-				Method:   MethodAPICall,
+				Method:   MethodPolicyAttachmentCheck,
 				Category: "security_posture",
 			},
 		},
 	})
 
 	// Azure Asset Inventory - Cloud Asset Discovery
-	// Requires Reader built-in role.
+	// Verifies that the Reader built-in role is assigned at subscription scope.
 	r.register("azure_asset_inventory", ">=0.0.0", IntegrationPermissions{
 		Provider: verifier.ProviderAzure,
 		Permissions: []Permission{
 			{
-				Action:   "Microsoft.Resources/subscriptions/resources/read",
+				Action:   "Reader",
 				Required: true,
-				Method:   MethodAPICall,
-				Category: "asset_inventory",
-			},
-			{
-				Action:   "Microsoft.Compute/virtualMachines/read",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "asset_inventory",
-			},
-			{
-				Action:   "Microsoft.Network/networkSecurityGroups/read",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "asset_inventory",
-			},
-			{
-				Action:   "Microsoft.Storage/storageAccounts/read",
-				Required: true,
-				Method:   MethodAPICall,
+				Method:   MethodPolicyAttachmentCheck,
 				Category: "asset_inventory",
 			},
 		},
@@ -869,58 +784,42 @@ func (r *PermissionRegistry) registerGCPIntegrations() {
 	})
 
 	// GCP CSPM - Cloud Security Posture Management
-	// Requires roles/cloudasset.viewer and roles/browser.
+	// Verifies that roles/cloudasset.viewer and roles/browser are bound to the
+	// service account in the project's IAM policy.
 	r.register("gcp_cspm", ">=0.0.0", IntegrationPermissions{
 		Provider: verifier.ProviderGCP,
 		Permissions: []Permission{
 			{
-				Action:   "cloudasset.assets.searchAllResources",
+				Action:   "roles/cloudasset.viewer",
 				Required: true,
-				Method:   MethodAPICall,
+				Method:   MethodPolicyAttachmentCheck,
 				Category: "security_posture",
 			},
 			{
-				Action:   "resourcemanager.projects.get",
+				Action:   "roles/browser",
 				Required: true,
-				Method:   MethodAPICall,
-				Category: "security_posture",
-			},
-			{
-				Action:   "compute.instances.list",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "security_posture",
-			},
-			{
-				Action:   "storage.buckets.list",
-				Required: true,
-				Method:   MethodAPICall,
+				Method:   MethodPolicyAttachmentCheck,
 				Category: "security_posture",
 			},
 		},
 	})
 
 	// GCP Asset Inventory - Cloud Asset Discovery
-	// Requires roles/cloudasset.viewer and roles/browser.
+	// Verifies that roles/cloudasset.viewer and roles/browser are bound to the
+	// service account in the project's IAM policy.
 	r.register("gcp_asset_inventory", ">=0.0.0", IntegrationPermissions{
 		Provider: verifier.ProviderGCP,
 		Permissions: []Permission{
 			{
-				Action:   "cloudasset.assets.searchAllResources",
+				Action:   "roles/cloudasset.viewer",
 				Required: true,
-				Method:   MethodAPICall,
+				Method:   MethodPolicyAttachmentCheck,
 				Category: "asset_inventory",
 			},
 			{
-				Action:   "resourcemanager.projects.get",
+				Action:   "roles/browser",
 				Required: true,
-				Method:   MethodAPICall,
-				Category: "asset_inventory",
-			},
-			{
-				Action:   "compute.instances.list",
-				Required: true,
-				Method:   MethodAPICall,
+				Method:   MethodPolicyAttachmentCheck,
 				Category: "asset_inventory",
 			},
 		},
