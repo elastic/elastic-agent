@@ -643,34 +643,50 @@ func injectMonitoringReceiver(
 	return config.Merge(confmap.NewFromStringMap(collectorCfg))
 }
 
-func (m *OTelManager) applyMergedConfig(ctx context.Context,
+func (m *OTelManager) applyMergedConfig(
+	ctx context.Context,
 	collectorStatusCh chan *status.AggregateStatus,
 	collectorRunErr chan error,
 	forceFetchStatusCh chan struct{},
 ) error {
-	if m.collectorRunning() {
-		// We wait here for the collector to exit before possibly starting a new one. stopCollector is blocking and will
-		// only exit after the process and the monitoring goroutines exit. It will also send a nil status that we'll
-		// either process after exiting from this function and going back to the main loop, or it will be overridden by
-		// the status from the newly started collector.
-		m.stopCollector()
-	}
-
+	// No configuration, the collector should not be running.
 	if !m.collectorShouldRun() {
-		// no configuration then the collector should not be
-		// running.
-		// ensure that the coordinator knows that there is no error
-		// as the collector is not running anymore
+		m.stopCollector()
 		return nil
 	}
-	// either a new configuration or the first configuration
-	// that results in the collector being started
-	err := m.startCollector(ctx, collectorStatusCh, collectorRunErr, forceFetchStatusCh)
-	if err != nil {
-		// this is a new configuration, so reset the recovery timer
-		m.recoveryTimer.ResetInitial()
+
+	// We have a configuration, need to apply it.
+
+	// Collector isn't running yet, start it.
+	if !m.collectorRunning() {
+		err := m.startCollector(ctx, collectorStatusCh, collectorRunErr, forceFetchStatusCh)
+		if err != nil {
+			// this is a new configuration, so reset the recovery timer
+			m.recoveryTimer.ResetInitial()
+		}
+		return err
 	}
-	return err
+
+	// Collector is running, update the configuration.
+
+	// If we changed the log level, we need to restart the collector, as our loggers read directly from the collector's
+	// stdout and stderr.
+	if m.proc.LogLevel() != m.collectorLogLevel {
+		m.stopCollector()
+		err := m.startCollector(ctx, collectorStatusCh, collectorRunErr, forceFetchStatusCh)
+		if err != nil {
+			// this is a new configuration, so reset the recovery timer
+			m.recoveryTimer.ResetInitial()
+		}
+		return err
+	}
+
+	// Normal config update
+	if err := m.proc.UpdateConfig(m.mergedCollectorCfg); err != nil {
+		return fmt.Errorf("collector config reload failed: %w", err)
+	}
+
+	return nil
 }
 
 // Update sends collector configuration and component updates to the manager's run loop.
@@ -807,13 +823,11 @@ func (m *OTelManager) processComponentStates(componentStates []runtime.Component
 	for _, componentState := range componentStates {
 		componentIds[componentState.Component.ID] = true
 	}
-	for id := range m.currentComponentStates {
+	for id, comp := range m.currentComponentStates {
 		if _, ok := componentIds[id]; !ok {
 			// this component is not in the configuration anymore, emit a fake STOPPED state
 			componentStates = append(componentStates, runtime.ComponentComponentState{
-				Component: component.Component{
-					ID: id,
-				},
+				Component: comp.Component,
 				State: runtime.ComponentState{
 					State: client.UnitStateStopped,
 				},

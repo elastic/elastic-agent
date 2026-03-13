@@ -2,11 +2,9 @@
 navigation_title: APM Config extension
 description: The APM Config extension is an OpenTelemetry Collector component that enables central configuration delivery for EDOT SDKs using the Open Agent Management Protocol (OpAMP).
 applies_to:
-  stack:
+  stack: ga
   serverless:
-  observability:
-  product:
-    edot_collector:
+    observability: ga
 products:
   - id: elastic-agent
   - id: observability

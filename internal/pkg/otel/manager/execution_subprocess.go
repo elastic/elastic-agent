@@ -5,10 +5,11 @@
 package manager
 
 import (
-	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -16,19 +17,19 @@ import (
 	"sync"
 	"time"
 
-	"go.opentelemetry.io/collector/component"
-	"gopkg.in/yaml.v3"
-
 	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/yaml.v3"
+
+	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
-	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
@@ -39,7 +40,16 @@ const (
 	OtelSupervisedMonitoringURLFlagName       = "supervised.monitoring.url"
 	OtelFeatureGatesFlagName                  = "feature-gates"
 	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
+
+	// stdinGobProviderScheme must match agentprovider.StdinGobProviderSchemeName.
+	// Duplicated here to avoid a cross-module import from the main module into
+	// the internal/edot submodule.
+	stdinGobProviderScheme = "stdingob"
 )
+
+// ConfigModifier is a function that can modify an otel config.
+// Used for injecting a healthcheck extension and telemetry config.
+type ConfigModifier func(cfg *confmap.Conf) error
 
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
 // A healthCheckPort of 0 will result in a random port being used. A metricsPort of 0 means the
@@ -110,18 +120,21 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("could not find port for collector: %w", err)
 	}
 
-	if err := addCollectorMetricsReader(cfg, r.collectorMetricsPort); err != nil {
-		return nil, fmt.Errorf("failed to add collector metrics reader: %w", err)
-	}
+	var configModifier ConfigModifier = func(cfg *confmap.Conf) error {
+		if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
+			return fmt.Errorf("failed to inject health check extension: %w", err)
+		}
 
-	if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
-		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
-	}
+		if err := addCollectorMetricsReader(cfg, r.collectorMetricsPort); err != nil {
+			return fmt.Errorf("failed to add collector metrics reader: %w", err)
+		}
 
-	confMap := cfg.ToStringMap()
-	confBytes, err := yaml.Marshal(confMap)
+		return nil
+	}
+	// prepare and serialize config first so we can exit early if there's a problem
+	cfgYamlBytes, err := prepareAndSerializeConfig(cfg, configModifier)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
+		return nil, err
 	}
 
 	stdOutLast := newZapLast(collectorLogger.Core())
@@ -133,43 +146,42 @@ func (r *subprocessExecution) startCollector(
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
 
-	// set collector args
+	// set collector args and add --config flag with the stdingob:stdin URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:", stdinGobProviderScheme))
 
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(collectorArgs),
 		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
-			c.Stdin = bytes.NewReader(confBytes)
 			c.Stdout = stdOut
 			c.Stderr = stdErr
 			return nil
 		}),
 	)
-	if err != nil {
+	if err != nil || processInfo.Process == nil {
 		// we failed to start the process
+		if err == nil {
+			err = errors.New("process is nil")
+		}
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
+
 	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
-	if processInfo.Process == nil {
-		// this should not happen but just in case
-		procCtxCancel()
-		return nil, fmt.Errorf("failed to start supervised collector: process is nil")
+
+	processDoneCh := make(chan struct{})
+	reportPipeErrFn := func(err error) {
+		r.reportErrFn(ctx, processErrCh, err)
 	}
 
-	ctl := &procHandle{
-		processDoneCh: make(chan struct{}),
-		processInfo:   processInfo,
-		log:           logger,
-	}
-
+	ctl := newProcHandle(processInfo, logger, lvl, processDoneCh, reportPipeErrFn, configModifier)
 	healthCheckDone := make(chan struct{})
-	ctl.processMonitoringWg.Add(2)
+	ctl.wg.Add(3)
 	go func() {
 		defer func() {
 			close(healthCheckDone)
-			ctl.processMonitoringWg.Done()
+			ctl.wg.Done()
 		}()
 		currentStatus := status.AggregateStatus(componentstatus.StatusStarting, nil)
 		r.reportSubprocessCollectorStatus(ctx, statusCh, currentStatus)
@@ -228,7 +240,7 @@ func (r *subprocessExecution) startCollector(
 	}()
 
 	go func() {
-		defer ctl.processMonitoringWg.Done()
+		defer ctl.wg.Done()
 		procState, procErr := processInfo.Process.Wait()
 		logger.Debugf("wait for pid %d returned", processInfo.PID)
 		procCtxCancel()
@@ -262,6 +274,14 @@ func (r *subprocessExecution) startCollector(
 
 		r.reportErrFn(ctx, processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
 	}()
+
+	// The pipeWriter goroutine writes the initial config and subsequent updates asynchronously to the pipe.
+	// Any errors are reported directly to processErrCh via reportErrFn.
+	go func() {
+		defer ctl.wg.Done()
+		ctl.writeToPipe(processInfo.Stdin)
+	}()
+	ctl.updateConfigYamlBytes(cfgYamlBytes)
 
 	return ctl, nil
 }
@@ -320,10 +340,8 @@ func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
 		"pull": map[string]any{
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
-					"host": "localhost",
-					"port": port,
-					// this is the default configuration from the otel collector
-					"without_scope_info":  true,
+					"host":                "localhost",
+					"port":                port,
 					"without_units":       true,
 					"without_type_suffix": true,
 				},
@@ -351,16 +369,66 @@ func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus,
 }
 
 type procHandle struct {
-	processDoneCh       chan struct{}
-	processInfo         *process.Info
-	processMonitoringWg sync.WaitGroup
-	log                 *logger.Logger
+	processDoneCh     chan struct{}
+	processInfo       *process.Info
+	log               *logger.Logger
+	collectorLogLevel logp.Level
+	configCh          chan []byte // buffered(1), latest-config-wins
+	configModifier    ConfigModifier
+	reportErrFn       func(error)    // reports pipe write errors to processErrCh
+	wg                sync.WaitGroup // covers process monitoring and config submission
+}
+
+func newProcHandle(
+	processInfo *process.Info,
+	log *logger.Logger,
+	collectorLogLevel logp.Level,
+	processDoneCh chan struct{},
+	reportErrFn func(error),
+	configModifier ConfigModifier) *procHandle {
+	return &procHandle{
+		processDoneCh:     processDoneCh,
+		processInfo:       processInfo,
+		log:               log,
+		collectorLogLevel: collectorLogLevel,
+		configCh:          make(chan []byte, 1),
+		reportErrFn:       reportErrFn,
+		configModifier:    configModifier,
+	}
+}
+
+// writeToPipe owns the pipe lifecycle. It loops writing configs queued via configCh until the process
+// exits. Errors are reported via reportErrFn.
+func (s *procHandle) writeToPipe(pipeWriter io.WriteCloser) {
+	encoder := gob.NewEncoder(pipeWriter)
+
+	// Loop: write configs until the process exits.
+	for {
+		select {
+		case <-s.processDoneCh:
+			return
+		case cfgBytes := <-s.configCh:
+			if err := encoder.Encode(cfgBytes); err != nil {
+				// We may get an error here if we're trying to write a config, but the process exits. This isn't
+				// really an error, so it's best to avoid reporting it. Check processDoneCh to be sure.
+				select {
+				case <-s.processDoneCh:
+				default:
+					if !errors.Is(err, io.ErrClosedPipe) {
+						s.reportErrFn(fmt.Errorf("failed to write config update: %w", err))
+					}
+				}
+
+				return
+			}
+		}
+	}
 }
 
 // Stop stops the process. If the process is already stopped, it does nothing. If the process does not stop within
 // processKillAfter or due to an error, it will be killed.
 func (s *procHandle) Stop(waitTime time.Duration) {
-	defer s.processMonitoringWg.Wait()
+	defer s.wg.Wait()
 	select {
 	case <-s.processDoneCh:
 		// process has already exited
@@ -399,6 +467,54 @@ func (s *procHandle) Stopped() bool {
 	default:
 	}
 	return false
+}
+
+// UpdateConfig submits a new configuration to the collector process.
+func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
+	yamlBytes, err := prepareAndSerializeConfig(cfg, s.configModifier)
+	if err != nil {
+		return err
+	}
+
+	s.updateConfigYamlBytes(yamlBytes)
+
+	return nil
+}
+
+// updateConfigYamlBytes submits a new serialized configuration to the collector process.
+func (s *procHandle) updateConfigYamlBytes(cfgYamlBytes []byte) {
+	// Drain any pending config (latest-wins semantics).
+	select {
+	case <-s.configCh:
+	default:
+	}
+	s.configCh <- cfgYamlBytes
+}
+
+// LogLevel return the otel collector's log level.
+func (s *procHandle) LogLevel() logp.Level {
+	return s.collectorLogLevel
+}
+
+// prepareAndSerializeConfig prepares the configuration, modifying it if needed, and then serializes it to yaml.
+func prepareAndSerializeConfig(cfg *confmap.Conf, configModifier ConfigModifier) ([]byte, error) {
+	if cfg == nil {
+		return nil, errors.New("no configuration provided")
+	}
+
+	if configModifier != nil {
+		if err := configModifier(cfg); err != nil {
+			return nil, err
+		}
+	}
+
+	confMap := cfg.ToStringMap()
+	yamlBytes, err := yaml.Marshal(confMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
+	}
+
+	return yamlBytes, nil
 }
 
 type zapWriter interface {
