@@ -7,6 +7,7 @@ package verifier // import "github.com/elastic/elastic-agent/internal/edot/recei
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -126,17 +127,17 @@ func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthC
 		baseCfg.Credentials = aws.NewCredentialsCache(webIdentityProvider)
 
 		// Step 2: Assume the customer's role from the global role session.
+		// ExternalID follows the Cloudbeat/Beats convention: ResourceID-ExternalID.
 		assumeRoleProvider := stscreds.NewAssumeRoleProvider(
 			sts.NewFromConfig(baseCfg),
 			authConfig.RoleARN,
 			func(aro *stscreds.AssumeRoleOptions) {
 				aro.RoleSessionName = sessionName
 				aro.Duration = duration
-				if authConfig.ExternalID != "" {
+				if authConfig.CloudResourceID != "" && authConfig.ExternalID != "" {
+					aro.ExternalID = aws.String(authConfig.CloudResourceID + "-" + authConfig.ExternalID)
+				} else if authConfig.ExternalID != "" {
 					aro.ExternalID = aws.String(authConfig.ExternalID)
-				}
-				if authConfig.CloudResourceID != "" {
-					aro.SourceIdentity = aws.String(authConfig.CloudResourceID)
 				}
 			},
 		)
@@ -247,9 +248,13 @@ func (v *AWSVerifier) Verify(ctx context.Context, permission Permission, provide
 	case "rds":
 		result = v.verifyRDS(ctx, cfg, operation)
 	default:
-		result = Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported AWS service: " + service,
+		if permission.Method == MethodPolicyAttachmentCheck {
+			result = v.verifyPolicyAttachment(ctx, cfg, permission.Action)
+		} else {
+			result = Result{
+				Status:       StatusSkipped,
+				ErrorMessage: "Unsupported AWS service: " + service,
+			}
 		}
 	}
 
@@ -777,6 +782,58 @@ func (v *AWSVerifier) verifyRDS(ctx context.Context, cfg aws.Config, operation s
 			Status:       StatusSkipped,
 			ErrorMessage: "Unsupported RDS operation: " + operation,
 		}
+	}
+}
+
+// verifyPolicyAttachment checks whether a specific AWS managed policy is
+// attached to the currently assumed role. It uses sts:GetCallerIdentity to
+// discover the role name, then iam:ListAttachedRolePolicies to look for the
+// target policy ARN.
+func (v *AWSVerifier) verifyPolicyAttachment(ctx context.Context, cfg aws.Config, policyARN string) Result {
+	stsClient := sts.NewFromConfig(cfg)
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return v.handleAWSError(err, "sts:GetCallerIdentity")
+	}
+
+	// ARN format: arn:aws:sts::ACCOUNT:assumed-role/ROLE_NAME/SESSION
+	arnStr := aws.ToString(identity.Arn)
+	parts := strings.Split(arnStr, "/")
+	if len(parts) < 2 {
+		return Result{
+			Status:       StatusError,
+			ErrorCode:    "InvalidARN",
+			ErrorMessage: "cannot extract role name from ARN: " + arnStr,
+			Endpoint:     "iam:ListAttachedRolePolicies",
+		}
+	}
+	roleName := parts[1]
+
+	iamClient := iam.NewFromConfig(cfg)
+	paginator := iam.NewListAttachedRolePoliciesPaginator(iamClient, &iam.ListAttachedRolePoliciesInput{
+		RoleName: aws.String(roleName),
+	})
+
+	for paginator.HasMorePages() {
+		page, pageErr := paginator.NextPage(ctx)
+		if pageErr != nil {
+			return v.handleAWSError(pageErr, "iam:ListAttachedRolePolicies")
+		}
+		for _, policy := range page.AttachedPolicies {
+			if aws.ToString(policy.PolicyArn) == policyARN {
+				return Result{
+					Status:   StatusGranted,
+					Endpoint: fmt.Sprintf("iam:ListAttachedRolePolicies (found %s on role %s)", policyARN, roleName),
+				}
+			}
+		}
+	}
+
+	return Result{
+		Status:       StatusDenied,
+		ErrorCode:    "PolicyNotAttached",
+		ErrorMessage: fmt.Sprintf("managed policy %s is not attached to role %s", policyARN, roleName),
+		Endpoint:     "iam:ListAttachedRolePolicies",
 	}
 }
 
