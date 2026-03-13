@@ -134,14 +134,6 @@ service:
       receivers: [forward]
       processors: [tail_sampling]
       exporters: [debug, elasticsearch/otel]
-    metrics:
-      receivers: [otlp]
-      processors: []
-      exporters: [debug, elasticsearch/otel]
-    logs:
-      receivers: [otlp]
-      processors: []
-      exporters: [debug, elasticapm, elasticsearch/otel]
     metrics/aggregated-otel-metrics:
       receivers: [elasticapm]
       processors: []
@@ -152,9 +144,9 @@ service:
 
 To horizontally scale collectors with tail-based sampling turned on, all traces should go through a load-balancing Collector in front of the downstream tail-sampling collectors. Set the `traceID` as the routing key in the load-balancing Collector so that all traces belonging to the same trace ID go to the same downstream tail-sampling Collector.
 
-::::{tab-set}
+:::::{tab-set}
 
-:::{tab-item} Load-balancing Collector
+::::{tab-item} Load-balancing Collector
 ```yaml
 receivers:
   otlp:
@@ -180,9 +172,9 @@ service:
       processors: []
       exporters: [loadbalancing]
 ```
-:::
+::::
 
-:::{tab-item} Downstream Collector
+::::{tab-item} Downstream Collector
 ```yaml
 receivers:
   otlp:
@@ -230,21 +222,13 @@ service:
       receivers: [forward]
       processors: [tail_sampling]
       exporters: [debug, elasticsearch/otel]
-    metrics:
-      receivers: [otlp]
-      processors: []
-      exporters: [debug, elasticsearch/otel]
-    logs:
-      receivers: [otlp]
-      processors: []
-      exporters: [debug, elasticapm, elasticsearch/otel]
     metrics/aggregated-otel-metrics:
       receivers: [elasticapm]
       processors: []
       exporters: [debug, elasticsearch/otel]
 ```
-:::
 ::::
+:::::
 
 ## Resources
 

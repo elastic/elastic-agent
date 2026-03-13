@@ -8,7 +8,7 @@ toc:
       - file: config/default-config-k8s.md
       - file: config/configure-logs-collection.md
       - file: config/configure-metrics-collection.md
-      - file: config/configure-traces-collection.md
+      - file: config/configure-tracing-collection.md
       - file: config/authentication-methods.md
       - file: config/configure-profiles-collection.md
       - file: config/monitor-internal-metrics.md
