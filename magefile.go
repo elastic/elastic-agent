@@ -4349,3 +4349,5 @@ func getMacOSMajorVersion() (int, error) {
 
 	return majorVer, nil
 }
+
+var _ = "this is a linting test"
