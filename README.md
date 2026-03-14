@@ -267,3 +267,4 @@ The Elastic Agent repository includes additional Go modules (e.g. `wrapper/windo
 ### Generating the `NOTICE.txt` and `NOTICE-fips.txt` when updating/adding dependencies
 To do so, just run `mage notice`, this is also part of the `make
 check-ci` and is the same check our CI will do.
+Forgevertical test
