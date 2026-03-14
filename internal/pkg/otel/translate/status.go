@@ -285,15 +285,17 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		return runtime.ComponentComponentState{}, err
 	}
 
-	// We either have one receiver and exporter, or none. Multiple receivers or exporters are a logic error.
-	// If there's no receiver or exporter, we simply don't set a status for it.
-	var receiverStatus, exporterStatus *status.AggregateStatus
-	if len(receiverStatuses) > 1 {
-		return runtime.ComponentComponentState{}, fmt.Errorf("expected at most one receiver for component %s, found %d", comp.ID, len(receiverStatuses))
-	} else if len(receiverStatuses) == 1 {
-		receiverStatus = slices.Collect(maps.Values(receiverStatuses))[0]
+	// Build a map from input ID to receiver status. Each receiver corresponds to one input,
+	// and its otel component ID encodes the input ID as compID/inputID.
+	receiverByInputID := make(map[string]*status.AggregateStatus)
+	receiverPrefix := OtelNamePrefix + comp.ID + "/"
+	for receiverOtelID, rs := range receiverStatuses {
+		if inputID, found := strings.CutPrefix(receiverOtelID.Name(), receiverPrefix); found {
+			receiverByInputID[inputID] = rs
+		}
 	}
 
+	var exporterStatus *status.AggregateStatus
 	if len(exporterStatuses) > 1 {
 		return runtime.ComponentComponentState{}, fmt.Errorf("expected at most one exporter for component %s, found %d", comp.ID, len(exporterStatuses))
 	} else if len(exporterStatuses) == 1 {
@@ -307,12 +309,12 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		}
 		switch unit.Type {
 		case client.UnitTypeInput:
-			if receiverStatus != nil {
-				compState.Units[unitKey] = getComponentUnitState(receiverStatus, unit, &comp)
+			if len(receiverByInputID) > 0 {
+				compState.Units[unitKey] = getComponentUnitState(nil, receiverByInputID, unit, &comp)
 			}
 		case client.UnitTypeOutput:
 			if exporterStatus != nil {
-				compState.Units[unitKey] = getComponentUnitState(exporterStatus, unit, &comp)
+				compState.Units[unitKey] = getComponentUnitState(exporterStatus, nil, unit, &comp)
 			}
 		}
 	}
@@ -322,6 +324,20 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		State:     compState,
 	}
 	return compStatus, nil
+}
+
+// getStreamStatusFromReceiver extracts a stream's status from a receiver's "inputs" attributes.
+func getStreamStatusFromReceiver(rs *status.AggregateStatus, streamID string) *serializablestatus.SerializableEvent {
+	attrs := rs.Attributes().AsRaw()
+	inputStatuses, ok := attrs["inputs"]
+	if !ok {
+		return nil
+	}
+	var inputStatusMap map[string]*serializablestatus.SerializableEvent
+	if err := mapstructure.Decode(inputStatuses, &inputStatusMap); err != nil {
+		return nil
+	}
+	return inputStatusMap[streamID]
 }
 
 // getComponentStartingState returns a ComponentComponentState with all units in the starting state,
@@ -348,7 +364,7 @@ func getComponentStartingState(comp component.Component) runtime.ComponentCompon
 		compState.Units[unitKey] = getComponentUnitState(&status.AggregateStatus{
 			Event:              componentstatus.NewEvent(componentstatus.StatusStarting),
 			ComponentStatusMap: map[string]*status.AggregateStatus{},
-		}, unit, &comp)
+		}, nil, unit, &comp)
 	}
 	return runtime.ComponentComponentState{
 		Component: comp,
@@ -387,57 +403,74 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.
 }
 
 // getComponentUnitState extracts component unit state from otel status.
-func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit component.Unit, comp *component.Component) runtime.ComponentUnitState {
-	topLevelState, topLevelMessage := StateWithMessage(otelUnitStatus)
-
+// For input units with streams, receiverByInputID maps each stream/input ID to its dedicated receiver status.
+// For output units or starting state, otelUnitStatus provides a single status and receiverByInputID is nil.
+func getComponentUnitState(otelUnitStatus *status.AggregateStatus, receiverByInputID map[string]*status.AggregateStatus, unit component.Unit, comp *component.Component) runtime.ComponentUnitState {
 	if unit.Config == nil || unit.Type == client.UnitTypeOutput {
+		topLevelState, topLevelMessage := StateWithMessage(otelUnitStatus)
 		return runtime.ComponentUnitState{
 			State:   topLevelState,
 			Message: topLevelMessage,
 		}
 	}
 
-	// inputStatusMap is the full map of input statuses for all units running inside the component
-	var inputStatusMap map[string]*serializablestatus.SerializableEvent
+	// unitStreamStatuses tracks per-stream statuses from receiver attributes (detailed status from beat)
+	unitStreamStatuses := make(map[string]*serializablestatus.SerializableEvent, len(unit.Config.Streams))
+	streamStatuses := make(map[string]map[string]string, len(unit.Config.Streams))
 
-	// unitStreamStatuses is the map of stream statuses relevant to the unit based on streams in the configuration
-	var unitStreamStatuses map[string]*serializablestatus.SerializableEvent
+	// worstReceiverState tracks the worst top-level receiver state for streams without per-stream attributes
+	var worstReceiverState client.UnitState
+	var worstReceiverMessage string
 
-	statusAttributes := otelUnitStatus.Attributes().AsRaw()
+	for _, stream := range unit.Config.Streams {
+		var rs *status.AggregateStatus
+		if receiverByInputID != nil {
+			// Each stream has its own dedicated receiver
+			rs = receiverByInputID[stream.Id]
+		}
 
-	if inputStatuses, ok := statusAttributes["inputs"]; ok {
-		err := mapstructure.Decode(inputStatuses, &inputStatusMap)
-		if err == nil {
-			// get the stream statuses relevant to the unit based on streams in the configuration
-			unitStreamStatuses = make(map[string]*serializablestatus.SerializableEvent, len(unit.Config.Streams))
-			for _, stream := range unit.Config.Streams {
-				if inputStatus, ok := inputStatusMap[stream.Id]; ok {
-					unitStreamStatuses[stream.Id] = inputStatus
+		if rs != nil {
+			// Extract the stream's status from its receiver's attributes
+			streamStatus := getStreamStatusFromReceiver(rs, stream.Id)
+			if streamStatus != nil {
+				unitStreamStatuses[stream.Id] = streamStatus
+				streamStatusEvent := streamStatusToStatusEvent(streamStatus)
+				isError := streamStatusEvent.Err() != nil
+				streamState, streamMsg := StateWithMessage(streamStatusEvent)
+				if !isError {
+					streamMsg = ""
+				}
+				streamStatuses[stream.Id] = map[string]string{
+					"error":  streamMsg,
+					"status": streamState.String(),
+				}
+			} else {
+				// No per-stream attributes, use the receiver's top-level status
+				topState, topMsg := StateWithMessage(rs)
+				if topState > worstReceiverState {
+					worstReceiverState = topState
+					worstReceiverMessage = topMsg
+				}
+				isError := rs.Err() != nil
+				if !isError {
+					topMsg = ""
+				}
+				streamStatuses[stream.Id] = map[string]string{
+					"error":  topMsg,
+					"status": topState.String(),
 				}
 			}
-		}
-	}
-
-	streamStatuses := make(map[string]map[string]string, len(unit.Config.Streams))
-	for _, stream := range unit.Config.Streams {
-		var streamState client.UnitState
-		var streamMsg string
-		var isError bool
-		if streamStatus, ok := unitStreamStatuses[stream.Id]; ok {
-			streamStatusEvent := streamStatusToStatusEvent(streamStatus)
-			isError = streamStatusEvent.Err() != nil
-			streamState, streamMsg = StateWithMessage(streamStatusEvent)
-		} else {
-			streamState, streamMsg = topLevelState, topLevelMessage
-			isError = otelUnitStatus.Err() != nil
-		}
-		// for streams, the message field is only for errors
-		if !isError {
-			streamMsg = ""
-		}
-		streamStatuses[stream.Id] = map[string]string{
-			"error":  streamMsg,
-			"status": streamState.String(),
+		} else if otelUnitStatus != nil {
+			// No per-stream receiver, fall back to the single unit status (starting state)
+			topState, topMsg := StateWithMessage(otelUnitStatus)
+			isError := otelUnitStatus.Err() != nil
+			if !isError {
+				topMsg = ""
+			}
+			streamStatuses[stream.Id] = map[string]string{
+				"error":  topMsg,
+				"status": topState.String(),
+			}
 		}
 	}
 
@@ -448,12 +481,38 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit componen
 		}
 	}
 
-	// get the unit status from input statuses
-	// this can happen for filestream, which is allowed to have a configuration without streams
-	unitInputId := comp.GetBeatInputIDForUnit(unit.ID)
-	unitStatus, ok := inputStatusMap[unitInputId]
-	if ok {
-		unitState, unitMessage := StateWithMessage(streamStatusToStatusEvent(unitStatus))
+	// Filestream without streams case: look up receiver by beat input ID
+	if len(unit.Config.Streams) == 0 && receiverByInputID != nil {
+		beatInputID := comp.GetBeatInputIDForUnit(unit.ID)
+		if beatInputID != "" {
+			if rs, ok := receiverByInputID[beatInputID]; ok {
+				streamStatus := getStreamStatusFromReceiver(rs, beatInputID)
+				if streamStatus != nil {
+					unitState, unitMessage := StateWithMessage(streamStatusToStatusEvent(streamStatus))
+					return runtime.ComponentUnitState{
+						State:   unitState,
+						Message: unitMessage,
+						Payload: payload,
+					}
+				}
+				topState, topMsg := StateWithMessage(rs)
+				return runtime.ComponentUnitState{
+					State:   topState,
+					Message: topMsg,
+					Payload: payload,
+				}
+			}
+		}
+	}
+
+	// Compute unit state from per-stream attribute statuses if available
+	if len(unitStreamStatuses) > 0 {
+		unitState, unitMessage := unitStateFromStreamStatuses(unitStreamStatuses)
+		// Also consider worst receiver top-level state for streams without attributes
+		if worstReceiverState > unitState {
+			unitState = worstReceiverState
+			unitMessage = worstReceiverMessage
+		}
 		return runtime.ComponentUnitState{
 			State:   unitState,
 			Message: unitMessage,
@@ -461,19 +520,26 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit componen
 		}
 	}
 
-	// if there's no singular unit status, we need to compute it from stream statuses, if they're present
-	if len(unitStreamStatuses) > 0 {
-		unitState, unitMessage := unitStateFromStreamStatuses(unitStreamStatuses)
+	// No per-stream attributes available; use worst receiver top-level state
+	if worstReceiverState > 0 {
 		return runtime.ComponentUnitState{
-			State:   unitState,
-			Message: unitMessage,
+			State:   worstReceiverState,
+			Message: worstReceiverMessage,
+			Payload: payload,
+		}
+	}
+
+	// Fall back to single unit status (starting state or no receivers)
+	if otelUnitStatus != nil {
+		topLevelState, topLevelMessage := StateWithMessage(otelUnitStatus)
+		return runtime.ComponentUnitState{
+			State:   topLevelState,
+			Message: topLevelMessage,
 			Payload: payload,
 		}
 	}
 
 	return runtime.ComponentUnitState{
-		State:   topLevelState,
-		Message: topLevelMessage,
 		Payload: payload,
 	}
 }
