@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent/internal/edot
 
-go 1.24.13
+go 1.25.8
 
 // use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260305175215-8ed67e48c418
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260312230139-e4a1f79971f4
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.33.3
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -384,7 +384,7 @@ require (
 	github.com/elastic/mito v1.24.1 // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.29.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.30.0 // indirect
-	github.com/elastic/sarama v1.19.1-0.20251224062803-313637a62841 // indirect
+	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.36.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.0 // indirect
@@ -439,7 +439,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/gomodule/redigo v1.9.3 // indirect
-	github.com/google/cel-go v0.26.0 // indirect
+	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0
@@ -491,7 +491,7 @@ require (
 	github.com/kamstrup/intmap v0.5.1 // indirect
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
-	github.com/klauspost/compress v1.18.3 // indirect
+	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
@@ -579,7 +579,7 @@ require (
 	github.com/openzipkin/zipkin-go v0.4.3 // indirect
 	github.com/outcaste-io/ristretto v0.2.3 // indirect
 	github.com/ovh/go-ovh v1.9.0 // indirect
-	github.com/pierrec/lz4/v4 v4.1.23 // indirect
+	github.com/pierrec/lz4/v4 v4.1.25 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
