@@ -1566,10 +1566,9 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			name:          "unsupported output type - kafka",
-			outputType:    "kafka",
-			outputCfg:     map[string]any{},
-			expectedError: "unsupported output type: kafka",
+			name:       "supported output type - kafka",
+			outputType: "kafka",
+			outputCfg:  map[string]any{},
 		},
 		{
 			name:       "unsupported configuration - indices field",
