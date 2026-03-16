@@ -20,7 +20,7 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 		return nil, fmt.Errorf("error reading kafka config: %w", err)
 	}
 
-	if err := checkUnsupportedKafkaConfig(config); err != nil {
+	if err := checkUnsupportedKafkaConfig(config, logger); err != nil {
 		return nil, err
 	}
 
@@ -88,7 +88,7 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 }
 
 // log warning for unsupported config
-func checkUnsupportedKafkaConfig(cfg *config.C) error {
+func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 
 	// topic field always exists here, otherwise Validate function above throws an error
 	str, err := cfg.String("topic", -1)
@@ -111,6 +111,12 @@ func checkUnsupportedKafkaConfig(cfg *config.C) error {
 		return fmt.Errorf("keep_alive is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("headers") {
 		return fmt.Errorf("headers is currently not supported: %w", errors.ErrUnsupported)
+	} else if cfg.HasField("timeout") {
+		return fmt.Errorf("timeout is currently not supported: %w", errors.ErrUnsupported)
+	} else if cfg.HasField("ssl") {
+		return fmt.Errorf("ssl parameters are currently not supported: %w", errors.ErrUnsupported)
+	} else if cfg.HasField("bullk_flush_frequency") {
+		logger.Warn("bullk_flush_frequency is deprecated")
 	}
 
 	return nil
