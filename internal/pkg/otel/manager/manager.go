@@ -79,9 +79,8 @@ type OTelManager struct {
 	// they should be reported as failed components to the elastic-agent
 	errCh chan error
 
-	// Agent info and monitoring config getter for otel config generation
-	agentInfo                  info.Agent
-	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter
+	// Agent info for otel config generation
+	agentInfo info.Agent
 
 	healthCheckExtID string
 	collectorCfg     *confmap.Conf
@@ -139,7 +138,6 @@ func NewOTelManager(
 	collectorLogger *logger.Logger,
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
-	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
 ) (*OTelManager, error) {
 	var exec collectorExecution
@@ -179,8 +177,7 @@ func NewOTelManager(
 	return &OTelManager{
 		managerLogger:              logger,
 		collectorLogger:            collectorLogger,
-		agentInfo:                  agentInfo,
-		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
+		agentInfo: agentInfo,
 		healthCheckExtID:           fmt.Sprintf("extension:healthcheckv2/%s", hcUUIDStr),
 		errCh:                      make(chan error, 1), // holds at most one error
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
@@ -301,7 +298,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.managerLogger)
+			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.managerLogger)
 			if err != nil {
 				// critical error, merging the configuration should always work
 				reportErr(ctx, m.errCh, err)
@@ -391,7 +388,6 @@ func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Con
 func buildMergedConfig(
 	cfgUpdate configUpdate,
 	agentInfo info.Agent,
-	monitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
@@ -401,7 +397,7 @@ func buildMergedConfig(
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, monitoringConfigGetter, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
@@ -426,6 +422,12 @@ func buildMergedConfig(
 				err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components)
 				if err != nil {
 					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
+				}
+				// Inject the beat telemetry pipeline that bridges beat internal
+				// metrics into logs via the beatmetrics connector.
+				err = injectBeatTelemetryPipeline(mergedOtelCfg)
+				if err != nil {
+					return nil, fmt.Errorf("merging beat telemetry pipeline config: %w", err)
 				}
 			}
 		}
@@ -612,6 +614,119 @@ func injectMonitoringReceiver(
 	}
 
 	return config.Merge(confmap.NewFromStringMap(collectorCfg))
+}
+
+// injectBeatTelemetryPipeline injects the beat internal telemetry pipeline into the
+// collector configuration. This pipeline collects metrics from the beat receivers via
+// the OTel SDK's internal telemetry, routes them through the beatmetrics connector to
+// convert them into logs, and sends them to the monitoring Elasticsearch exporter.
+//
+// The pipeline structure is:
+//
+//	service.telemetry.metrics.readers → periodic OTLP exporter (localhost:PORT)
+//	otlp receiver (localhost:PORT) → beatmetrics connector → ES monitoring exporter
+func injectBeatTelemetryPipeline(config *confmap.Conf) error {
+	// Find the monitoring exporter
+	exporterType := otelcomponent.MustNewType("elasticsearch")
+	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
+	monitoringExporterFound := false
+	if config.IsSet("exporters") {
+		for exporter := range config.Get("exporters").(map[string]any) {
+			if exporter == exporterID {
+				monitoringExporterFound = true
+			}
+		}
+	}
+	if !monitoringExporterFound {
+		// No monitoring exporter available, skip beat telemetry
+		return nil
+	}
+
+	// Find a free port for the OTLP loopback
+	ports, err := findRandomTCPPorts(1)
+	if err != nil {
+		return fmt.Errorf("failed to find random port for beat telemetry OTLP receiver: %w", err)
+	}
+	otlpPort := ports[0]
+	otlpEndpoint := fmt.Sprintf("localhost:%d", otlpPort)
+
+	// OTLP receiver for the beat telemetry loopback
+	otlpReceiverID := "otlp/" + translate.OtelNamePrefix + "beat-telemetry"
+	beatmetricsConnectorID := "beatmetrics/" + translate.OtelNamePrefix + "beat-telemetry"
+	metricsPipelineID := "metrics/" + translate.OtelNamePrefix + "beat-telemetry"
+	logsPipelineID := "logs/" + translate.OtelNamePrefix + "beat-telemetry"
+
+	collectorCfg := map[string]any{
+		"receivers": map[string]any{
+			otlpReceiverID: map[string]any{
+				"protocols": map[string]any{
+					"grpc": map[string]any{
+						"endpoint": otlpEndpoint,
+					},
+				},
+			},
+		},
+		"connectors": map[string]any{
+			beatmetricsConnectorID: map[string]any{},
+		},
+		"service": map[string]any{
+			"pipelines": map[string]any{
+				metricsPipelineID: map[string]any{
+					"receivers": []string{otlpReceiverID},
+					"exporters": []string{beatmetricsConnectorID},
+				},
+				logsPipelineID: map[string]any{
+					"receivers": []string{beatmetricsConnectorID},
+					"exporters": []string{exporterID},
+				},
+			},
+		},
+	}
+
+	if err := config.Merge(confmap.NewFromStringMap(collectorCfg)); err != nil {
+		return fmt.Errorf("failed to merge beat telemetry pipeline config: %w", err)
+	}
+
+	// Add the periodic OTLP reader to service.telemetry.metrics
+	return addBeatTelemetryReader(config, otlpEndpoint)
+}
+
+// addBeatTelemetryReader injects a periodic OTLP reader into the service telemetry
+// configuration that exports beat internal metrics every 30 seconds to the loopback
+// OTLP receiver.
+func addBeatTelemetryReader(conf *confmap.Conf, otlpEndpoint string) error {
+	metricReadersUntyped := conf.Get("service::telemetry::metrics::readers")
+	if metricReadersUntyped == nil {
+		metricReadersUntyped = []any{}
+	}
+	metricsReadersList, ok := metricReadersUntyped.([]any)
+	if !ok {
+		return fmt.Errorf("couldn't convert value of service::telemetry::metrics::readers to a list: %v", metricReadersUntyped)
+	}
+
+	metricsReader := map[string]any{
+		"periodic": map[string]any{
+			"interval": 30000,
+			"exporter": map[string]any{
+				"otlp": map[string]any{
+					"protocol": "grpc",
+					"endpoint": otlpEndpoint,
+					"insecure": true,
+				},
+			},
+		},
+	}
+	metricsReadersList = append(metricsReadersList, metricsReader)
+
+	// Ensure the telemetry metrics level is detailed so beat bridge metrics are collected
+	confMap := map[string]any{
+		"service::telemetry::metrics::readers": metricsReadersList,
+		"service::telemetry::metrics::level":   "detailed",
+	}
+	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
+		return fmt.Errorf("failed to merge beat telemetry reader config: %w", mergeErr)
+	}
+	return nil
 }
 
 func (m *OTelManager) applyMergedConfig(ctx context.Context,

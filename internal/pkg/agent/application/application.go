@@ -288,7 +288,6 @@ func New(
 		baseLogger,
 		agentInfo,
 		cfg.Settings.Collector,
-		monitor.ComponentMonitoringConfig,
 		otelmanager.CollectorStopTimeout,
 	)
 	if err != nil {

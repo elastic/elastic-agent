@@ -929,7 +929,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
-			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, nil, waitTimeForStop)
+			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop)
 			require.NoError(t, err, "could not create otel manager")
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
@@ -1025,7 +1025,6 @@ func TestOTelManager_Ports(t *testing.T) {
 				base,
 				&info.AgentInfo{},
 				&agentCollectorConfig,
-				nil,
 				waitTimeForStop,
 			)
 			require.NoError(t, err, "could not create otel manager")
@@ -1149,7 +1148,6 @@ func TestOTelManager_PortConflict(t *testing.T) {
 		base,
 		&info.AgentInfo{},
 		nil,
-		nil,
 		waitTimeForStop,
 	)
 	require.NoError(t, err, "could not create otel manager")
@@ -1231,11 +1229,6 @@ func toSerializableStatus(s *status.AggregateStatus) *serializableStatus {
 	return outputStruct
 }
 
-// Mock function for BeatMonitoringConfigGetter
-func mockBeatMonitoringConfigGetter(unitID, binary string) map[string]any {
-	return map[string]any{"test": "config"}
-}
-
 // Helper function to create test logger
 func newTestLogger() *logger.Logger {
 	l, _ := loggertest.New("test")
@@ -1245,9 +1238,8 @@ func newTestLogger() *logger.Logger {
 func TestOTelManager_buildMergedConfig(t *testing.T) {
 	// Common parameters used across all test cases
 	var (
-		commonAgentInfo                  = &info.AgentInfo{}
-		commonBeatMonitoringConfigGetter = mockBeatMonitoringConfigGetter
-		testComp                         = testComponent("test-component")
+		commonAgentInfo = &info.AgentInfo{}
+		testComp        = testComponent("test-component")
 		invalidLogpLevel                 = logp.DebugLevel - 1
 		testOtelConfigLevel              = logp.InfoLevel
 		configUpdateLevel                = logp.WarnLevel
@@ -1323,7 +1315,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				components:    tt.components,
 				agentLogLevel: configUpdateLevel,
 			}
-			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
+			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, logptest.NewTestingLogger(t, ""))
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)
@@ -1612,7 +1604,6 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	// Setup test logger and dependencies
 	testLogger, _ := loggertest.New("test")
 	agentInfo := &info.AgentInfo{}
-	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
 
 	execution := &mockExecution{
@@ -1621,18 +1612,17 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 
 	// Create manager with test dependencies
 	mgr := OTelManager{
-		managerLogger:              testLogger,
-		collectorLogger:            testLogger,
-		errCh:                      make(chan error, 1), // holds at most one error
-		updateCh:                   make(chan configUpdate, 1),
-		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
-		componentStateCh:           make(chan []runtime.ComponentComponentState, 5),
-		doneChan:                   make(chan struct{}),
-		recoveryTimer:              newRestarterNoop(),
-		execution:                  execution,
-		agentInfo:                  agentInfo,
-		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
-		collectorRunErr:            make(chan error),
+		managerLogger:     testLogger,
+		collectorLogger:   testLogger,
+		errCh:             make(chan error, 1), // holds at most one error
+		updateCh:          make(chan configUpdate, 1),
+		collectorStatusCh: make(chan *status.AggregateStatus, 1),
+		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
+		doneChan:          make(chan struct{}),
+		recoveryTimer:     newRestarterNoop(),
+		execution:         execution,
+		agentInfo:         agentInfo,
+		collectorRunErr:   make(chan error),
 	}
 
 	// Start manager in a goroutine
@@ -1887,7 +1877,6 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	// Setup test logger and dependencies
 	testLogger, _ := loggertest.New("test")
-	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
 
 	execution := &mockExecution{
@@ -1901,7 +1890,6 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		testLogger,
 		&info.AgentInfo{},
 		nil,
-		beatMonitoringConfigGetter,
 		time.Second,
 	)
 	require.NoError(t, err)
@@ -1986,7 +1974,6 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 	testLogger, _ := loggertest.New("test")
 	agentInfo := &info.AgentInfo{}
-	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
 
 	execution := &mockExecution{
@@ -2000,7 +1987,6 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		testLogger,
 		agentInfo,
 		nil,
-		beatMonitoringConfigGetter,
 		time.Second,
 	)
 	require.NoError(t, err)
