@@ -101,6 +101,7 @@ import (
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
+	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
 	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
@@ -254,6 +255,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			headersetterextension.NewFactory(),
 			beatsauthextension.NewFactory(),
 			elasticdiagnostics.NewFactory(),
+			elasticsearchstorage.NewFactory(),
 			awslogsencodingextension.NewFactory(),
 			opampextension.NewFactory(),
 		}
