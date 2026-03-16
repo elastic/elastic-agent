@@ -12,7 +12,7 @@ import (
 
 	"github.com/elastic/beats/v7/x-pack/otel/otelmap"
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	"github.com/elastic/elastic-agent/internal/edot/otel/internaltelemetry"
+	"github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
