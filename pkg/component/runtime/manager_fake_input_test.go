@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -2168,6 +2169,132 @@ LOOP:
 
 	err = <-errCh
 	require.NoError(t, err)
+}
+
+func (suite *FakeInputSuite) TestManager_NoZombieOnShutdownAfterMissedCheckins() {
+	t := suite.T()
+	if runtime.GOOS == "windows" {
+		t.Skip("zombie process detection not applicable on Windows")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ai := &info.AgentInfo{}
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig())
+	require.NoError(t, err)
+	errCh := make(chan error)
+	go func() {
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer waitCancel()
+	if err := waitForReady(waitCtx, m); err != nil {
+		require.NoError(t, err)
+	}
+
+	binaryPath := testBinary(t, "component")
+	comp := component.Component{
+		ID: "fake-default",
+		InputSpec: &component.InputRuntimeSpec{
+			InputType:  "fake",
+			BinaryName: "",
+			BinaryPath: binaryPath,
+			Spec: component.InputSpec{
+				Name: "fake",
+				Command: &component.CommandSpec{
+					Timeouts: component.CommandTimeoutSpec{
+						// very low checkin timeout so we can cause missed check-ins
+						Checkin: 100 * time.Millisecond,
+						Restart: 10 * time.Second,
+						Stop:    30 * time.Second,
+					},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "fake-input",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]interface{}{
+					"type":    "fake",
+					"state":   int(client.UnitStateHealthy),
+					"message": "Fake Healthy",
+				}),
+			},
+		},
+	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
+
+	subCtx, subCancel := context.WithCancel(context.Background())
+	defer subCancel()
+	pidCh := make(chan int, 1)
+	go func() {
+		sub := m.Subscribe(subCtx, "fake-default")
+		for {
+			select {
+			case <-subCtx.Done():
+				return
+			case state := <-sub.Ch():
+				t.Logf("component state changed: %+v", state)
+				if state.State == client.UnitStateFailed {
+					// Extract PID from the failure message
+					r := regexp.MustCompile(`pid '(\d+)'`)
+					rp := r.FindStringSubmatch(state.Message)
+					if len(rp) > 1 {
+						pid, err := strconv.Atoi(rp[1])
+						if err == nil {
+							select {
+							case pidCh <- pid:
+							default:
+							}
+						}
+					}
+				}
+			}
+		}
+	}()
+
+	defer drainErrChan(errCh)
+
+	m.Update(component.Model{Components: []component.Component{comp}})
+	err = <-m.errCh
+	require.NoError(t, err)
+
+	// Wait for the component to fail due to missed check-ins and capture PID
+	var killedPID int
+	endTimer := time.NewTimer(30 * time.Second)
+	defer endTimer.Stop()
+	select {
+	case <-endTimer.C:
+		t.Fatalf("timed out waiting for component to fail from missed check-ins")
+	case killedPID = <-pidCh:
+		t.Logf("component failed with pid %d", killedPID)
+	}
+
+	// Now cancel the context to shut down the manager, which triggers
+	// the cleanup path that should reap the child process.
+	subCancel()
+	cancel()
+
+	err = <-errCh
+	require.NoError(t, err)
+
+	// Give a short time for the process to be fully reaped
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify the process is not a zombie. On Linux, we can check /proc/<pid>/stat.
+	// On other Unix systems, we verify the process is no longer signalable.
+	assertProcessReaped(t, killedPID)
 }
 
 func (suite *FakeInputSuite) TestManager_InvalidAction() {

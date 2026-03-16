@@ -132,10 +132,30 @@ func (s *componentRuntimeState) runLoop() {
 		return nil
 	})
 
+	// Watch the manager's run context for shutdown. When the coordinator
+	// cancels the manager context, we stop the runner so that
+	// commandRuntime.Run() sees ctx.Done() and calls cleanupProcess()
+	// to kill and reap child processes, preventing zombies.
+	var managerDone <-chan struct{}
+	if s.manager.runCtx != nil {
+		managerDone = s.manager.runCtx.Done()
+	}
+
 	for {
 		select {
 		case <-runtimeRunner.Done():
 			// Exit from the watcher loop only when the runner is done
+			return
+		case <-managerDone:
+			// Manager context cancelled (coordinator shutdown). Stop the
+			// runner to trigger cleanup of child processes, then wait for
+			// it to finish and remove ourselves from the manager's map so
+			// shutdown() doesn't hang waiting for us.
+			runtimeRunner.Stop()
+			<-runtimeRunner.Done()
+			s.manager.currentMx.Lock()
+			delete(s.manager.current, s.id)
+			s.manager.currentMx.Unlock()
 			return
 		case componentState := <-s.runtime.Watch():
 			s.latestMx.Lock()

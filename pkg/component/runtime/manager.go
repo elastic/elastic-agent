@@ -108,6 +108,12 @@ type Manager struct {
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
 
+	// runCtx is the context from Run(). It is cancelled when the coordinator
+	// shuts down the manager. Component runtimes use this so their runner
+	// context is also cancelled on shutdown, allowing cleanup (e.g. killing
+	// child processes) even when the component has not reached Stopped.
+	runCtx context.Context
+
 	// Set when the RPC server is ready to receive requests, for use by tests.
 	serverReady chan struct{}
 
@@ -191,6 +197,8 @@ func NewManager(
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
+	m.runCtx = ctx
+
 	var (
 		listener net.Listener
 		err      error

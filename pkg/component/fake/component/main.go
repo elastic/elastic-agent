@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -21,14 +22,27 @@ import (
 )
 
 func main() {
-	err := run()
+	// The agent passes flags like "-E path.data=..." to component binaries.
+	// Use a custom FlagSet with ContinueOnError so unknown flags are silently
+	// ignored instead of causing the process to exit.
+	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	ignoreSIGTERM := fs.Bool("sigterm-ignore", false, "ignore SIGTERM signal for testing zombie process handling")
+	noPdeathsig := fs.Bool("clear-pdeathsig", false, "clear parent-death signal so process survives parent exit (Linux testing only)")
+	fs.SetOutput(io.Discard)
+	_ = fs.Parse(os.Args[1:])
+
+	if *noPdeathsig {
+		clearPdeathsig()
+	}
+
+	err := run(*ignoreSIGTERM)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func run(ignoreSIGTERM bool) error {
 	logger := zerolog.New(os.Stderr).Level(zerolog.TraceLevel).With().Timestamp().Logger()
 	ver := client.VersionInfo{
 		Name: comp.Fake,
@@ -43,7 +57,12 @@ func run() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	n := make(chan os.Signal, 1)
-	signal.Notify(n, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	if ignoreSIGTERM {
+		signal.Ignore(syscall.SIGTERM)
+		signal.Notify(n, syscall.SIGINT, syscall.SIGQUIT)
+	} else {
+		signal.Notify(n, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	}
 	defer func() {
 		signal.Stop(n)
 		cancel()
