@@ -15,6 +15,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -299,6 +300,10 @@ type Component struct {
 	Component *proto.Component `yaml:"component,omitempty"`
 
 	OutputStatusReporting *StatusReporting `yaml:"-"`
+
+	// LastConfiguredAt records when the component was last configured.
+	// It resets whenever a new configuration is applied.
+	LastConfiguredAt time.Time `yaml:"-"`
 }
 
 type StatusReporting struct {
@@ -638,6 +643,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
+					LastConfiguredAt:      time.Now(),
 				})
 			}
 		}
@@ -684,6 +690,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
+					LastConfiguredAt:      time.Now(),
 				})
 			}
 		}
