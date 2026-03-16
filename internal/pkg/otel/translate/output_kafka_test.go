@@ -42,7 +42,7 @@ max_message_bytes: 1000000`,
 			},
 			"producer": map[string]any{
 				"compression": "gzip",
-				"compression_param": map[string]any{
+				"compression_params": map[string]any{
 					"level": 4,
 				},
 				"max_message_bytes": 1000000,
@@ -57,6 +57,8 @@ max_message_bytes: 1000000`,
 				"batch": map[string]any{
 					"flush_timeout": "10s",
 					"max_size":      2048,
+					"min_size":      0,
+					"sizer":         "items",
 				},
 				"queue_size": 3200,
 			},
@@ -87,7 +89,7 @@ max_message_bytes: 1000000`,
 				},
 				"producer": map[string]any{
 					"compression": "gzip",
-					"compression_param": map[string]any{
+					"compression_params": map[string]any{
 						"level": 4,
 					},
 					"max_message_bytes": 1000000,
@@ -102,6 +104,8 @@ max_message_bytes: 1000000`,
 					"batch": map[string]any{
 						"flush_timeout": "10s",
 						"max_size":      2048,
+						"sizer":         "items",
+						"min_size":      0,
 					},
 					"queue_size": 3200,
 				},
