@@ -1061,8 +1061,6 @@ agent.monitoring:
   http:
     enabled: true
     port: 6790
-agent.internal.runtime.metricbeat:
-  http/metrics: otel
 `
 	index := ".ds-metrics-e2e-*"
 	var configBuffer bytes.Buffer
@@ -2141,8 +2139,6 @@ outputs:
     preset: "balanced"
     status_reporting:
       enabled: {{.StatusReportingEnabled}}
-agent.internal.runtime.metricbeat:
-  system/metrics: otel
 `
 
 	var configBuffer bytes.Buffer
@@ -2314,7 +2310,7 @@ agent.reload:
 	cfg = fmt.Sprintf(logConfig, esURL.String(), "info")
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
 
-	// wait for elastic agent to be healthy and OTel collector to start
+	// wait for elastic agent to be healthy and OTel collector to reload configuration
 	require.Eventually(t, func() bool {
 		err = fixture.IsHealthy(ctx)
 		if err != nil {

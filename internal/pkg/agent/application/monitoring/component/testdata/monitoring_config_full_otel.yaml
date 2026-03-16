@@ -32,7 +32,7 @@ inputs:
         when:
           regexp:
             message: (^Non-zero metrics in the last)|(^Collector internal telemetry
-              metrics updated)
+              metrics updated)|(^No non-zero metrics in the last)
     - drop_event:
         when:
           equals:
