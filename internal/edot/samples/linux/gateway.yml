@@ -1,12 +1,12 @@
 extensions:
   # Activate if API key authentication is needed
   # Read more: https://www.elastic.co/docs/reference/edot-collector/config/authentication-methods
-  #   apikeyauth:
-  #     endpoint: ${env:ELASTIC_ENDPOINT}
-  #     application_privileges:
-  #       - application: "apm"
-  #         privileges: ["config_agent:read"]
-  #         resources: ["*"]
+  # apikeyauth:
+  #   endpoint: ${env:ELASTIC_ENDPOINT}
+  #   application_privileges:
+  #     - application: "apm"
+  #       privileges: ["config_agent:read"]
+  #       resources: ["*"]
 
   # Activate if central configuration with bearer token auth is needed
   # bearertokenauth:
