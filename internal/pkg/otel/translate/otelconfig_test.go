@@ -1382,14 +1382,13 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			name: "unsupported output type - kafka",
+			name: "supported output type - kafka",
 			component: &component.Component{
 				ID:         "unsupported-output",
 				InputType:  "filestream",
-				OutputType: "kafka", // unsupported
+				OutputType: "kafka",
 				OutputName: "default",
 			},
-			expectedError: "unsupported output type: kafka",
 		},
 		{
 			name: "unsupported configuration",

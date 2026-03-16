@@ -24,6 +24,16 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 		return nil, err
 	}
 
+	maxMessageBytes := 100000
+	if kConfig.MaxMessageBytes != nil {
+		maxMessageBytes = *kConfig.MaxMessageBytes
+	}
+
+	requiredAcks := 1
+	if kConfig.RequiredACKs != nil {
+		requiredAcks = *kConfig.RequiredACKs
+	}
+
 	kafkaExporter := map[string]any{
 		"brokers":          kConfig.Hosts,
 		"client_id":        kConfig.ClientID,
@@ -32,16 +42,18 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 			"batch": map[string]any{
 				"max_size":      kConfig.BulkMaxSize,
 				"flush_timeout": getFlushTimeout(logger, config),
+				"min_size":      0, // 0 means immediately trigger a flush
+				"sizer":         "items",
 			},
 			"queue_size": getQueueSize(logger, config),
 		},
 		"producer": map[string]any{
 			"compression": kConfig.Compression,
-			"compression_param": map[string]any{
+			"compression_params": map[string]any{
 				"level": kConfig.CompressionLevel,
 			},
-			"max_message_bytes": *kConfig.MaxMessageBytes,
-			"required_acks":     *kConfig.RequiredACKs,
+			"max_message_bytes": maxMessageBytes,
+			"required_acks":     requiredAcks,
 		},
 		"retry_on_failure": map[string]any{
 			"initial_interval": kConfig.Backoff.Init,
@@ -71,6 +83,7 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 			},
 		}
 	}
+
 	return kafkaExporter, nil
 }
 
