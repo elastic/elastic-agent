@@ -26,9 +26,9 @@ extensions:
   #         endpoint: 0.0.0.0:4320
   #         auth:
   #           authenticator: apikeyauth
-  #         # tls:
-  #         #   cert_file: your/path/to/server.crt
-  #         #   key_file: your/path/to/server.key
+  #         tls:
+  #           cert_file: your/path/to/server.crt
+  #           key_file: your/path/to/server.key
 
 receivers:
   # Receives data from other Collectors in Agent mode
