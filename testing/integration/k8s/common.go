@@ -185,7 +185,7 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 		stdout.Reset()
 		stderr.Reset()
 		if err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr); err != nil {
-			&stderr.Write([]byte(err.Error()))
+			stderr.Write([]byte(err.Error()))
 			return err
 		}
 
