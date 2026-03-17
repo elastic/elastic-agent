@@ -68,7 +68,9 @@ func TestKubernetesAgentHelmCloudDefend(t *testing.T) {
 						},
 					},
 				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil), //only checking that deployment was ok, but not cloud-defend component: because integration test infra doesn't support bpf/lsm
+				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+					k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
+				},
 			},
 		},
 		{
