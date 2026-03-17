@@ -58,10 +58,10 @@ const (
 type VerificationMethod string
 
 const (
-	MethodAPICall              VerificationMethod = "api_call"
-	MethodDryRun               VerificationMethod = "dry_run"
-	MethodHTTPProbe            VerificationMethod = "http_probe"
-	MethodGraphQL              VerificationMethod = "graphql_query"
+	MethodAPICall               VerificationMethod = "api_call"
+	MethodDryRun                VerificationMethod = "dry_run"
+	MethodHTTPProbe             VerificationMethod = "http_probe"
+	MethodGraphQL               VerificationMethod = "graphql_query"
 	MethodPolicyAttachmentCheck VerificationMethod = "policy_attachment_check"
 )
 
