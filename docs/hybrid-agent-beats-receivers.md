@@ -126,6 +126,25 @@ outputs:
         include_source_on_error: false # Override the generated value of include_source_on_error.
 ```
 
+Overrides can also be used to adjust batching behavior in the Elasticsearch exporter. By default, batching uses an items sizer that limits only the number of events per batch. In rare cases, very large events may cause batches to become unbalanced, allowing the total request size to exceed Elasticsearch limits and resulting in 413 (Request Entity Too Large) errors.
+
+To avoid this, the batching strategy can be configured to use a bytes sizer so that batches are constrained by their total size:
+
+```yaml
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+    api_key: "example-key"
+    otel:
+      exporter:
+        sending_queue:
+          batch:
+            min_size: 1e+6 # 1MB
+            max_size: 5e+6 # 5MB
+            sizer: bytes
+```
+
 ## Hybrid Agent
 
 **Hybrid Agent** refers the capability of Elastic Agent to run OpenTelemetry collector pipelines specified directly in
