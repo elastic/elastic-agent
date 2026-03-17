@@ -1161,8 +1161,38 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	}
 
 	storedFleetHosts := storedConfig.Fleet.Client.GetHosts()
-	if len(storedFleetHosts) == 0 || !slices.Contains(storedFleetHosts, setupCfg.Fleet.URL) {
-		// The Fleet URL in the setup does not exist in the stored configuration, so enrollment is required.
+	if len(storedFleetHosts) == 0 {
+		// No stored Fleet hosts, enrollment is required.
+		return true, nil
+	}
+	// Parse the setup Fleet URL to extract the host for comparison.
+	// The stored configuration separates the protocol and host (remote.Config stores
+	// Protocol and Host/Hosts as separate fields), while setupCfg.Fleet.URL from the
+	// FLEET_URL environment variable is a full URL including the scheme.
+	// Compare the host portion against stored hosts, and the scheme against the stored protocol.
+	setupFleetURL, err := url.Parse(setupCfg.Fleet.URL)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse fleet URL %q: %w", setupCfg.Fleet.URL, err)
+	}
+	setupFleetHost := setupFleetURL.Host
+	if setupFleetHost == "" {
+		// url.Parse may put the value in Path if there's no scheme (e.g. "host1")
+		// or misinterpret "host:port" as scheme:opaque. Fall back to the raw URL
+		// for the host comparison, and skip the protocol check since there is no
+		// reliable scheme.
+		setupFleetHost = setupCfg.Fleet.URL
+	}
+	if !slices.Contains(storedFleetHosts, setupFleetHost) {
+		// The Fleet host in the setup does not exist in the stored configuration, so enrollment is required.
+		return true, nil
+	}
+	// Also check that the protocol matches when both are specified.
+	// Only check when url.Parse successfully extracted a Host, meaning the URL had a
+	// proper scheme (e.g. "https://host:port"). Without a proper scheme, url.Parse
+	// produces an unreliable Scheme value (e.g. "host1:8220" parses as Scheme="host1").
+	if setupFleetURL.Host != "" && setupFleetURL.Scheme != "" && storedConfig.Fleet.Client.Protocol != "" &&
+		setupFleetURL.Scheme != string(storedConfig.Fleet.Client.Protocol) {
+		// The Fleet protocol has changed, so enrollment is required.
 		return true, nil
 	}
 
