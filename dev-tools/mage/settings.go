@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/magefile/mage/sh"
 	"golang.org/x/text/cases"
@@ -75,7 +76,7 @@ func FuncMap(cfg *Settings) map[string]interface{} {
 		"beat_version":                   func() string { return cfg.BeatQualifiedVersion() },
 		"commit":                         func() (string, error) { return cfg.Build.CommitHash() },
 		"commit_short":                   func() (string, error) { return cfg.Build.CommitHashShort() },
-		"date":                           func() string { return cfg.BuildDate },
+		"date":                           func() string { return cfg.BuildDateString() },
 		"elastic_beats_dir":              func() string { return cfg.ElasticBeatsDir },
 		"go_version":                     func() string { return cfg.GoVersion() },
 		"repo":                           func() *ProjectRepoInfo { return cfg.RepoInfo },
@@ -650,7 +651,7 @@ type Settings struct {
 
 	// BuildDate is the timestamp when settings were loaded (build started).
 	// Initialized during LoadSettings().
-	BuildDate string
+	BuildDate time.Time
 }
 
 // DefaultSettings returns a new Settings instance with all default values.
@@ -682,6 +683,7 @@ func (s *Settings) setBuildDefaults() {
 	s.Build.GOOS = build.Default.GOOS
 	s.Build.GOARCH = build.Default.GOARCH
 	s.Build.MaxParallel = runtime.NumCPU()
+	s.BuildDate = time.Now().UTC()
 }
 
 // setBeatDefaults sets default values for BeatSettings.
@@ -1702,7 +1704,7 @@ func (s *Settings) TestTagsWithFIPS() []string {
 	tags := make([]string, len(s.Test.Tags))
 	copy(tags, s.Test.Tags)
 	if s.Build.FIPSBuild {
-		tags = append(tags, "requirefips", "ms_tls13kdf")
+		tags = append(tags, "requirefips")
 	}
 	return tags
 }
@@ -1735,6 +1737,11 @@ func (s *Settings) BeatVersion() string {
 		return s.Build.BeatVersion
 	}
 	return s.beatVersion
+}
+
+// BuildDateString returns a formatted build date.
+func (s *Settings) BuildDateString() string {
+	return s.BuildDate.Format(time.RFC3339)
 }
 
 // GetPlatforms returns the parsed platform list from PLATFORMS env var.
