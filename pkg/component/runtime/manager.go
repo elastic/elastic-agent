@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -112,7 +113,8 @@ type Manager struct {
 	// shuts down the manager. Component runtimes use this so their runner
 	// context is also cancelled on shutdown, allowing cleanup (e.g. killing
 	// child processes) even when the component has not reached Stopped.
-	runCtx context.Context
+	// Stored atomically so runLoop() goroutines can read it without a mutex.
+	runCtx atomic.Pointer[context.Context]
 
 	// Set when the RPC server is ready to receive requests, for use by tests.
 	serverReady chan struct{}
@@ -197,7 +199,7 @@ func NewManager(
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
-	m.runCtx = ctx
+	m.runCtx.Store(&ctx)
 
 	var (
 		listener net.Listener
@@ -208,7 +210,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	if m.isLocal {
 		listener, err = ipc.CreateListener(m.logger, m.listenAddr)
 	} else {
-		listener, err = net.Listen("tcp", m.listenAddr)
+		listener, err = (&net.ListenConfig{}).Listen(ctx, "tcp", m.listenAddr)
 	}
 
 	if err != nil {

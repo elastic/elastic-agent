@@ -2209,8 +2209,7 @@ func (suite *FakeInputSuite) TestManager_NoZombieOnShutdownAfterMissedCheckins()
 				Name: "fake",
 				Command: &component.CommandSpec{
 					Timeouts: component.CommandTimeoutSpec{
-						// very low checkin timeout so we can cause missed check-ins
-						Checkin: 100 * time.Millisecond,
+						Checkin: 1 * time.Second,
 						Restart: 10 * time.Second,
 						Stop:    30 * time.Second,
 					},
@@ -2235,6 +2234,10 @@ func (suite *FakeInputSuite) TestManager_NoZombieOnShutdownAfterMissedCheckins()
 		assert.NoError(t, comp.RemoveWorkDir(runPath))
 	})
 
+	// Subscribe and capture the PID once the component reports healthy.
+	// We must grab the PID from the healthy state because once the component
+	// is SIGKILLed for missed check-ins its entry is already reaped and
+	// checking that older PID would trivially pass.
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
 	pidCh := make(chan int, 1)
@@ -2246,8 +2249,7 @@ func (suite *FakeInputSuite) TestManager_NoZombieOnShutdownAfterMissedCheckins()
 				return
 			case state := <-sub.Ch():
 				t.Logf("component state changed: %+v", state)
-				if state.State == client.UnitStateFailed {
-					// Extract PID from the failure message
+				if state.State == client.UnitStateHealthy {
 					r := regexp.MustCompile(`pid '(\d+)'`)
 					rp := r.FindStringSubmatch(state.Message)
 					if len(rp) > 1 {
@@ -2270,31 +2272,32 @@ func (suite *FakeInputSuite) TestManager_NoZombieOnShutdownAfterMissedCheckins()
 	err = <-m.errCh
 	require.NoError(t, err)
 
-	// Wait for the component to fail due to missed check-ins and capture PID
-	var killedPID int
+	// Wait for the component to become healthy and capture its PID.
+	var runningPID int
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
 	select {
 	case <-endTimer.C:
-		t.Fatalf("timed out waiting for component to fail from missed check-ins")
-	case killedPID = <-pidCh:
-		t.Logf("component failed with pid %d", killedPID)
+		t.Fatalf("timed out waiting for component to become healthy")
+	case runningPID = <-pidCh:
+		t.Logf("component is healthy with pid %d, cancelling manager", runningPID)
 	}
 
-	// Now cancel the context to shut down the manager, which triggers
-	// the cleanup path that should reap the child process.
+	// Cancel the manager context while the component is running. This simulates
+	// a coordinator shutdown and exercises the ctx.Done() → cleanupProcess()
+	// path in commandRuntime.Run(), which must reap the child process so it
+	// does not become a zombie.
 	subCancel()
 	cancel()
 
 	err = <-errCh
 	require.NoError(t, err)
 
-	// Give a short time for the process to be fully reaped
+	// Give a short time for the process to be fully reaped.
 	time.Sleep(500 * time.Millisecond)
 
-	// Verify the process is not a zombie. On Linux, we can check /proc/<pid>/stat.
-	// On other Unix systems, we verify the process is no longer signalable.
-	assertProcessReaped(t, killedPID)
+	// Verify the process has been properly reaped (not a zombie).
+	assertProcessReaped(t, runningPID)
 }
 
 func (suite *FakeInputSuite) TestManager_InvalidAction() {

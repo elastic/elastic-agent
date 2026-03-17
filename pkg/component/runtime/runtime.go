@@ -137,8 +137,8 @@ func (s *componentRuntimeState) runLoop() {
 	// commandRuntime.Run() sees ctx.Done() and calls cleanupProcess()
 	// to kill and reap child processes, preventing zombies.
 	var managerDone <-chan struct{}
-	if s.manager.runCtx != nil {
-		managerDone = s.manager.runCtx.Done()
+	if p := s.manager.runCtx.Load(); p != nil {
+		managerDone = (*p).Done()
 	}
 
 	for {
