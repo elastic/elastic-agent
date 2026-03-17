@@ -151,12 +151,27 @@ func (s *componentRuntimeState) runLoop() {
 			// runner to trigger cleanup of child processes, then wait for
 			// it to finish and remove ourselves from the manager's map so
 			// shutdown() doesn't hang waiting for us.
+			//
+			// We must keep draining s.runtime.Watch() while waiting for
+			// Done(): commandRuntime.Run() calls sendObserved() which does a
+			// blocking send on c.ch (= s.runtime.Watch()). If Run() is
+			// mid-send when we stop selecting on Watch(), the send blocks
+			// forever and Run() never returns to its select to see
+			// ctx.Done() — a deadlock. Draining here unblocks any
+			// in-flight send so Run() can exit cleanly.
 			runtimeRunner.Stop()
-			<-runtimeRunner.Done()
-			s.manager.currentMx.Lock()
-			delete(s.manager.current, s.id)
-			s.manager.currentMx.Unlock()
-			return
+			done := runtimeRunner.Done()
+			for {
+				select {
+				case <-done:
+					s.manager.currentMx.Lock()
+					delete(s.manager.current, s.id)
+					s.manager.currentMx.Unlock()
+					return
+				case <-s.runtime.Watch():
+					// drain to unblock any in-flight sendObserved() call
+				}
+			}
 		case componentState := <-s.runtime.Watch():
 			s.latestMx.Lock()
 			s.latestState = componentState
