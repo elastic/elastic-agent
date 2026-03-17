@@ -152,11 +152,20 @@ func (s *componentRuntimeState) runLoop() {
 			// it to finish and remove ourselves from the manager's map so
 			// shutdown() doesn't hang waiting for us.
 			runtimeRunner.Stop()
-			<-runtimeRunner.Done()
-			s.manager.currentMx.Lock()
-			delete(s.manager.current, s.id)
-			s.manager.currentMx.Unlock()
-			return
+			// Drain s.runtime.Watch() while waiting for the runner to finish.
+			// This prevents deadlock when commandRuntime.Run is blocked sending
+			// to that channel at shutdown time.
+			for {
+				select {
+				case <-runtimeRunner.Done():
+					s.manager.currentMx.Lock()
+					delete(s.manager.current, s.id)
+					s.manager.currentMx.Unlock()
+					return
+				case <-s.runtime.Watch():
+					// Drain the watch channel to prevent blocking the runtime
+				}
+			}
 		case componentState := <-s.runtime.Watch():
 			s.latestMx.Lock()
 			s.latestState = componentState
