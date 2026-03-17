@@ -102,6 +102,7 @@ import (
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
 	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
 	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
@@ -149,8 +150,8 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
 			elasticmonitoringreceiver.NewFactory(),
-			fbreceiver.NewFactory(),
-			mbreceiver.NewFactory(),
+			fbreceiver.NewFactory(fbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
+			mbreceiver.NewFactory(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			jmxreceiver.NewFactory(), // deprecated, will be removed in 9.4.0
 
 			nopreceiver.NewFactory(),
