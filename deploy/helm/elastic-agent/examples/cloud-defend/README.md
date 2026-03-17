@@ -10,7 +10,7 @@ This example deploys the [cloud-defend](https://www.elastic.co/docs/current/inte
    helm dependency build ../../
    ```
 
-2. Elasticsearch connection. Current version of `cloud-defend` supports only Elasticsearch outpup with `ESPlainAuthAPI` or `ESPlainAuthBasic` output type.
+2. Elasticsearch connection. Current version of `cloud-defend` supports only Elasticsearch output with `ESPlainAuthAPI` or `ESPlainAuthBasic` output type.
 
 3. Node requirements. Cloud Defend requires a node with bpf/lsm enabled, and it should allow mounting of `/sys/kernel/debug`, `/boot`, `/sys/fs/bpf`, and `/sys/kernel/security` directories.
 
