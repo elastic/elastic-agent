@@ -10,38 +10,38 @@ metadata:
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: "2.16.0"
   name: kube-state-metrics
-  namespace: kube-system
+  namespace: default
 ---
 # Source: elastic-agent/templates/agent/service-account.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-pernode-elastic-agent
-  namespace: "kube-system"
+  name: agent-pernode-example
+  namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.4.0
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-pernode-elastic-agent
-  namespace: "kube-system"
+  name: agent-pernode-example
+  namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.4.0
 stringData:
 
   agent.yml: |-
-    id: agent-pernode-elastic-agent
+    id: agent-pernode-example
     outputs:
       default:
         api_key: api_key_example
@@ -58,7 +58,7 @@ stringData:
         use_output: default
     inputs:
       - data_stream:
-          namespace: kube-system
+          namespace: default
         id: cloud_defend/control-cloud_defend-6fc15307-6002-4cb7-8b1b-0ce899ca8b6e
         meta:
           package:
@@ -126,7 +126,7 @@ stringData:
         scope: node
       kubernetes_leaderelection:
         enabled: false
-        leader_lease: elastic-agent-pernode
+        leader_lease: example-pernode
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -138,7 +138,7 @@ metadata:
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: "2.16.0"
   name: kube-state-metrics
 rules:
@@ -287,11 +287,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: agent-perNode-elastic-agent-kube-system
+  name: agent-perNode-example-default
   labels:
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.4.0
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
@@ -373,7 +373,7 @@ metadata:
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: "2.16.0"
   name: kube-state-metrics
 roleRef:
@@ -383,25 +383,25 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: kube-state-metrics
-  namespace: kube-system
+  namespace: default
 ---
 # Source: elastic-agent/templates/agent/cluster-role-binding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: agent-perNode-elastic-agent-kube-system
+  name: agent-perNode-example-default
   labels:
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.4.0
 subjects:
   - kind: ServiceAccount
-    name: agent-pernode-elastic-agent
-    namespace: "kube-system"
+    name: agent-pernode-example
+    namespace: "default"
 roleRef:
   kind: ClusterRole
-  name: agent-perNode-elastic-agent-kube-system
+  name: agent-perNode-example-default
   apiGroup: rbac.authorization.k8s.io
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/service.yaml
@@ -409,14 +409,14 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kube-state-metrics
-  namespace: kube-system
+  namespace: default
   labels:    
     helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: "2.16.0"
   annotations:
     prometheus.io/scrape: 'true'
@@ -430,29 +430,29 @@ spec:
   
   selector:    
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
 ---
 # Source: elastic-agent/templates/agent/k8s/daemonset.yaml
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: agent-pernode-elastic-agent
-  namespace: "kube-system"
+  name: agent-pernode-example
+  namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.4.0
 spec:
   selector:
     matchLabels:
-      name: agent-pernode-elastic-agent
+      name: agent-pernode-example
   template:
     metadata:
       labels:
-        name: agent-pernode-elastic-agent
+        name: agent-pernode-example
       annotations:
-        checksum/config: 488c40828a1ae29d404b7f6cccb403cfbe1e826ce420ca37a40c3df1656a7c02
+        checksum/config: df68db656a339729f036c0a0e2e9a6fcf8c24cfaffd4a5377d6821d7f41e9344
     spec:
       automountServiceAccountToken: true
       containers:
@@ -515,7 +515,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
-      serviceAccountName: agent-pernode-elastic-agent
+      serviceAccountName: agent-pernode-example
       volumes:
       - hostPath:
           path: /proc
@@ -533,33 +533,33 @@ spec:
           path: /sys/kernel/security
         name: sys-kernel-security
       - hostPath:
-          path: /etc/elastic-agent/kube-system/agent-pernode-elastic-agent/state
+          path: /etc/elastic-agent/default/agent-pernode-example/state
           type: DirectoryOrCreate
         name: agent-data
       - name: config
         secret:
           defaultMode: 292
-          secretName: agent-pernode-elastic-agent
+          secretName: agent-pernode-example
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kube-state-metrics
-  namespace: kube-system
+  namespace: default
   labels:    
     helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: "2.16.0"
 spec:
   selector:
     matchLabels:      
       app.kubernetes.io/name: kube-state-metrics
-      app.kubernetes.io/instance: elastic-agent
+      app.kubernetes.io/instance: example
   replicas: 1
   strategy:
     type: RollingUpdate
@@ -572,7 +572,7 @@ spec:
         app.kubernetes.io/component: metrics
         app.kubernetes.io/part-of: kube-state-metrics
         app.kubernetes.io/name: kube-state-metrics
-        app.kubernetes.io/instance: elastic-agent
+        app.kubernetes.io/instance: example
         app.kubernetes.io/version: "2.16.0"
     spec:
       automountServiceAccountToken: true

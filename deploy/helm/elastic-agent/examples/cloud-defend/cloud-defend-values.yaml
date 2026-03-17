@@ -2,7 +2,6 @@ kubernetes:
   enabled: false
 cloudDefend:
   enabled: true
-  namespace: kube-system
   policy_id: "6fc15307-6002-4cb7-8b1b-0ce899ca8b6e"
 outputs:
   default:

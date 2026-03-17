@@ -22,17 +22,16 @@ helm install elastic-agent ../../ \
    --set outputs.default.type=ESPlainAuthAPI \
    --set outputs.default.url=<ELASTICSEARCH_URL> \
    --set outputs.default.api_key=<ELASTICSEARCH_API_KEY> \
-   -n kube-system
 ```
 
 ## Validate
 
 1. Verify the DaemonSet is running:
    ```console
-   kubectl get daemonset -n kube-system -l app.kubernetes.io/name=elastic-agent
+   kubectl get daemonset -l app.kubernetes.io/name=elastic-agent
    ```
 
 2. Check that agent pods are running on each node:
    ```console
-   kubectl get pods -n kube-system -l app.kubernetes.io/name=elastic-agent -o wide
+   kubectl get pods -l app.kubernetes.io/name=elastic-agent -o wide
    ```
