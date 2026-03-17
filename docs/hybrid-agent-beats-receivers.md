@@ -70,6 +70,73 @@ outputs:
     api_key: placeholder
 ```
 
+<<<<<<< HEAD
+=======
+With changes in https://github.com/elastic/elastic-agent/pull/12852, user can also control the runtime of the inputs based on output type.
+This can be done by setting `agent.internal.runtime.output.[output_type]` to `otel` or `process`. For example, below config would override all inputs used with elasticsearch output to use otel runtime
+
+```yaml
+agent:
+  internal:
+    runtime:
+      default: process
+      filebeat:
+        filestream: otel
+      metricbeat:
+        system/metrics: otel
+      output: # Override the runtime used based on the output type.
+        elasticsearch: otel # Force all inputs using the Elasticearch output to use the otel runtime 
+        logstash: process # Force all inputs using the Logstash output to use the process runtime
+        kafka: process # Force all inputs using the kafka output to use the process runtime
+```
+
+### Configuration Translation Overrides
+
+When an input is executed as a Beat receiver, it is injected into an OpenTelemetry collector pipeline that was
+generated based on the associated output. The `ssl`, `proxy*`, and other transport settings are added to a generated
+[beatsauth extension](https://github.com/elastic/beats/tree/da79b6ecce2fd9cc9403f8041aea10616ba93c57/x-pack/otel/extension/beatsauthextension)
+instance which allows the collector to use the Beat SSL settings and underlying HTTP transport to guarantee the behavior is the same as before.
+Similarly, when using the Elasticsearch output an [elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/elasticsearchexporter)
+instance is generated with a configuration equivalent to the previous Elasticsearch output in Beats using the `bodymap` mapping mode to
+continue to generate ECS documents.
+
+The changes in https://github.com/elastic/elastic-agent/pull/10992 added a way to override or extend the translated beatsauth extension and
+elasticsearch exporter parameters in case there is a problem or bug with the translation process. For example:
+
+```yaml
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+    api_key: "example-key"
+    otel:
+      extensions:
+        beatsauth:
+          timeout: "60s" # Override the connection timeout from the translated value.
+      exporter:
+        include_source_on_error: false # Override the generated value of include_source_on_error.
+```
+
+Overrides can also be used to adjust batching behavior in the Elasticsearch exporter. By default, batching uses an items sizer that limits only the number of events per batch. In rare cases, very large events may cause batches to become unbalanced, allowing the total request size to exceed Elasticsearch limits and resulting in 413 (Request Entity Too Large) errors.
+
+To avoid this, the batching strategy can be configured to use a bytes sizer so that batches are constrained by their total size:
+
+```yaml
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+    api_key: "example-key"
+    otel:
+      exporter:
+        sending_queue:
+          batch:
+            min_size: 1e+6 # 1MB
+            max_size: 5e+6 # 5MB
+            sizer: bytes
+```
+
+>>>>>>> 68ec2ed50 (docs: add otel batcher override example to hybrid agent docs (#13174))
 ## Hybrid Agent
 
 **Hybrid Agent** refers the capability of Elastic Agent to run OpenTelemetry collector pipelines specified directly in
