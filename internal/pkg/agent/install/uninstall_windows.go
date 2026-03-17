@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"golang.org/x/sys/windows"
@@ -45,21 +46,18 @@ func isRetryableError(err error) bool {
 // as long as it stays on the same volume). After the move we schedule the temp
 // file for deletion on the next reboot via MoveFileEx/MOVEFILE_DELAY_UNTIL_REBOOT.
 //
-// rootPath is the top-level directory being removed (e.g. C:\Program Files\Elastic\Agent).
-// The temp file is placed in the parent of rootPath so it is outside the tree
-// being deleted but on the same volume.
-func removeBlockingExe(blockingErr error, rootPath string) error {
+// tempDir is the directory where the temp file will be created. It must be on
+// the same volume as the blocked file (cross-volume rename won't work for
+// in-use files).
+func removeBlockingExe(blockingErr error, tempDir string) error {
 	path, _ := getPathFromError(blockingErr)
 	if path == "" {
 		return nil
 	}
 
-	// Place the temp file in the parent of rootPath so it's outside the tree
-	// being removed but on the same volume (cross-volume rename won't work).
-	tmpDir := filepath.Dir(rootPath)
-	tmp, err := os.CreateTemp(tmpDir, ".elastic-agent-rm-*.exe")
+	tmp, err := os.CreateTemp(tempDir, ".elastic-agent-rm-*.exe")
 	if err != nil {
-		return fmt.Errorf("failed to create temp file in %q: %w", tmpDir, err)
+		return fmt.Errorf("failed to create temp file in %q: %w", tempDir, err)
 	}
 	tmpPath := tmp.Name()
 	_ = tmp.Close()
@@ -82,6 +80,19 @@ func removeBlockingExe(blockingErr error, rootPath string) error {
 	}
 
 	return nil
+}
+
+// tempDirOnSameVolume returns os.TempDir() if it is on the same volume as
+// path, otherwise falls back to the parent of path. Rename/move of an in-use
+// file only works within the same volume.
+func tempDirOnSameVolume(path string) string {
+	sysTemp := os.TempDir()
+	pathVol := filepath.VolumeName(path)
+	tempVol := filepath.VolumeName(sysTemp)
+	if strings.EqualFold(pathVol, tempVol) {
+		return sysTemp
+	}
+	return filepath.Dir(path)
 }
 
 func getPathFromError(blockingErr error) (string, syscall.Errno) {

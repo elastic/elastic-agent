@@ -282,6 +282,7 @@ func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (b
 // seconds if it keeps getting that error.
 func RemovePath(path string) error {
 	const arbitraryTimeout = 60 * time.Second
+	tmpDir := tempDirOnSameVolume(path)
 	start := time.Now()
 	var lastErr error
 	for time.Since(start) <= arbitraryTimeout {
@@ -293,7 +294,7 @@ func RemovePath(path string) error {
 
 		if isBlockingOnExe(lastErr) {
 			// try to move the blocking exe out of the way and try again
-			_ = removeBlockingExe(lastErr, path)
+			_ = removeBlockingExe(lastErr, tmpDir)
 		}
 
 		time.Sleep(500 * time.Millisecond)

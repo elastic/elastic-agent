@@ -122,7 +122,7 @@ func TestRemoveAllSucceedsAfterRename(t *testing.T) {
 }
 
 // TestRemoveBlockingExeMovesOutsideTree verifies that removeBlockingExe places
-// the temp file in the parent of rootPath, not inside the tree being deleted.
+// the temp file in the specified temp directory, outside the tree being deleted.
 func TestRemoveBlockingExeMovesOutsideTree(t *testing.T) {
 	tmpDir := t.TempDir()
 	destDir := filepath.Join(tmpDir, "target")
@@ -130,28 +130,27 @@ func TestRemoveBlockingExeMovesOutsideTree(t *testing.T) {
 
 	_, exePath := startBlockingExe(t, destDir)
 
-	// Construct an error that matches what os.RemoveAll produces.
 	blockingErr := makeBlockingError(exePath)
 
-	err := removeBlockingExe(blockingErr, destDir)
+	err := removeBlockingExe(blockingErr, tmpDir)
 	require.NoError(t, err, "removeBlockingExe should succeed")
 
 	// The original path should be gone.
 	_, err = os.Stat(exePath)
 	assert.ErrorIs(t, err, fs.ErrNotExist, "original exe should no longer exist")
 
-	// A temp file should exist in the parent of destDir (i.e. tmpDir).
+	// The temp file should exist in tmpDir.
 	entries, err := os.ReadDir(tmpDir)
 	require.NoError(t, err)
 
-	var found bool
+	var found string
 	for _, e := range entries {
 		if strings.HasPrefix(e.Name(), ".elastic-agent-rm-") && strings.HasSuffix(e.Name(), ".exe") {
-			found = true
+			found = filepath.Join(tmpDir, e.Name())
 			break
 		}
 	}
-	assert.True(t, found, "temp file should exist in parent directory")
+	assert.NotEmpty(t, found, "temp file should exist in %s", tmpDir)
 }
 
 // TestRemoveBlockingExeCleansTempOnFailure verifies that if os.Rename fails
@@ -165,10 +164,10 @@ func TestRemoveBlockingExeCleansTempOnFailure(t *testing.T) {
 	fakePath := filepath.Join(destDir, "nonexistent.exe")
 	blockingErr := makeBlockingError(fakePath)
 
-	err := removeBlockingExe(blockingErr, destDir)
+	err := removeBlockingExe(blockingErr, tmpDir)
 	assert.Error(t, err, "removeBlockingExe should fail when source doesn't exist")
 
-	// No temp files should be left behind in the parent.
+	// No temp files should be left behind.
 	entries, err := os.ReadDir(tmpDir)
 	require.NoError(t, err)
 
