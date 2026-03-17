@@ -21,21 +21,20 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
-	"github.com/elastic/go-elasticsearch/v8"
-
 	"github.com/gofrs/uuid/v5"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 
 	"github.com/stretchr/testify/assert"
@@ -400,6 +399,50 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	zeroDifferingFields(&agentStatus)
 	zeroDifferingFields(&otelStatus)
 	assert.Equal(t, agentStatus, otelStatus, "expected agent status to be equal to otel status")
+
+	// Make sure we haven't transferred any logs that are supposed to be dropped
+	findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer findCancel()
+	rawQuery := map[string]any{
+		"query": map[string]any{
+			"bool": map[string]any{
+				"filter": []map[string]any{
+					{
+						"terms": map[string]any{
+							"data_stream.namespace": []string{processNamespace, receiverNamespace},
+						},
+					},
+				},
+				"must": []map[string]any{
+					{
+						"bool": map[string]any{
+							"should": []map[string]any{
+								{
+									"match_phrase": map[string]any{
+										"message": "Non-zero metrics in the last",
+									},
+								},
+								{
+									"match_phrase": map[string]any{
+										"message": "Collector internal telemetry metrics updated",
+									},
+								},
+								{
+									"match_phrase": map[string]any{
+										"message": "No non-zero metrics in the last",
+									},
+								},
+							},
+							"minimum_should_match": 1,
+						},
+					},
+				},
+			},
+		},
+	}
+	docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, "logs-*", info.ESClient)
+	require.NoError(t, err)
+	require.Equal(t, 0, docs.Hits.Total.Value)
 }
 
 // TestAgentMetricsInput is a test that compares documents ingested by
@@ -831,8 +874,6 @@ func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
 
 	config := fmt.Sprintf(`agent.logging.to_stderr: true
 agent.logging.to_files: false
-agent.internal.runtime.metricbeat:
-  system/metrics: otel
 inputs:
   - type: system/metrics
     id: unique-system-metrics-input
@@ -842,7 +883,6 @@ inputs:
   - type: system/metrics
     id: unique-system-metrics-input-2
     use_output: supported
-    _runtime_experimental: otel
     streams:
       - metricsets:
         - cpu
@@ -1388,7 +1428,6 @@ func genIgnoredFields(goos string) []string {
 
 // TestSensitiveLogsESExporter tests sensitive logs from ex-exporter are not sent to fleet
 func TestSensitiveLogsESExporter(t *testing.T) {
-
 	// The ES exporter logs the original document on indexing failure only if
 	// the "telemetry::log_failed_docs_input" setting is enabled and the log level is set to debug.
 	info := define.Require(t, define.Requirements{
@@ -1562,7 +1601,7 @@ agent.logging.stderr: true
 	findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer findCancel()
 
-	docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, "logs-elastic_agent*", map[string]interface{}{
+	docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, "logs-elastic_agent*", map[string]any{
 		"log.type": "event",
 	})
 
@@ -1713,7 +1752,6 @@ agent.logging.stderr: true
 	// assert that error.reason is not part of monitoring logs
 	inputField := monitoringDoc.Hits.Hits[0].Source["error.reason"]
 	assert.Nil(t, inputField)
-
 }
 
 // setStrictMapping takes es client and index name
@@ -1721,12 +1759,12 @@ agent.logging.stderr: true
 // Useful to reproduce mapping conflicts required for testing
 func setStrictMapping(client *elasticsearch.Client, index string) error {
 	// Define the body
-	body := map[string]interface{}{
+	body := map[string]any{
 		"index_patterns": []string{index + "*"},
-		"template": map[string]interface{}{
-			"mappings": map[string]interface{}{
+		"template": map[string]any{
+			"mappings": map[string]any{
 				"dynamic": "strict",
-				"properties": map[string]interface{}{
+				"properties": map[string]any{
 					"@timestamp": map[string]string{"type": "date"},
 					"message":    map[string]string{"type": "integer"}, // we set message type to integer to cause mapping conflict
 				},

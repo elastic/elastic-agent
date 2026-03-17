@@ -2,11 +2,9 @@
 navigation_title: Elastic {{product.apm}} connector
 description: The Elastic {{product.apm}} connector is an OpenTelemetry Collector component that generates pre-aggregated APM metrics from trace data.
 applies_to:
-  stack:
+  stack: ga
   serverless:
-    observability:
-  product:
-    edot_collector:
+    observability: ga
 products:
   - id: elastic-agent
   - id: observability

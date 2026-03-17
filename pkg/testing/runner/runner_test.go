@@ -27,8 +27,7 @@ func TestNewRunner_Clean(t *testing.T) {
 	settings, err := mage.LoadSettings()
 	require.NoError(t, err)
 
-	goVersion, err := mage.GoVersion(settings)
-	require.NoError(t, err)
+	goVersion := settings.GoVersion()
 
 	cfg := common.Config{
 		AgentVersion: "8.10.0",

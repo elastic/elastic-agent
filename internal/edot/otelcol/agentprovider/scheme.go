@@ -4,4 +4,4 @@
 
 package agentprovider
 
-const AgentConfigProviderSchemeName = "elasticagent"
+const StdinGobProviderSchemeName = "stdingob"

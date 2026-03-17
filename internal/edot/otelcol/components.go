@@ -16,8 +16,10 @@ import (
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
 	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
+	couchdbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver"
 	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
+	haproxyreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/haproxyreceiver"
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
 	iisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/iisreceiver"
@@ -28,18 +30,24 @@ import (
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
 	kafkametricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkametricsreceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
+	memcachedreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/memcachedreceiver"
+	mongodbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mongodbreceiver"
 	mysqlreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver"
 	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
+	oracledbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/oracledbreceiver"
 	postgresqlreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postgresqlreceiver"
 	prometheusremotewritereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver"
+	rabbitmqreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/rabbitmqreceiver"
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
 	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
 	snmpreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver"
 	sqlserverreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver"
 	statsdreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/statsdreceiver"
+	vcenterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/vcenterreceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver"
 	windowsperfcountersreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
+	zookeeperreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zookeeperreceiver"
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
@@ -93,6 +101,7 @@ import (
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
+	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
 	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
@@ -146,13 +155,21 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
+			couchdbreceiver.NewFactory(),
+			haproxyreceiver.NewFactory(),
 			iisreceiver.NewFactory(),
+			memcachedreceiver.NewFactory(),
+			mongodbreceiver.NewFactory(),
 			mysqlreceiver.NewFactory(),
+			oracledbreceiver.NewFactory(),
 			postgresqlreceiver.NewFactory(),
+			rabbitmqreceiver.NewFactory(),
 			snmpreceiver.NewFactory(),
 			kafkametricsreceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
 			statsdreceiver.NewFactory(),
+			vcenterreceiver.NewFactory(),
+			zookeeperreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
 			awss3receiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
@@ -238,6 +255,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			headersetterextension.NewFactory(),
 			beatsauthextension.NewFactory(),
 			elasticdiagnostics.NewFactory(),
+			elasticsearchstorage.NewFactory(),
 			awslogsencodingextension.NewFactory(),
 			opampextension.NewFactory(),
 		}
