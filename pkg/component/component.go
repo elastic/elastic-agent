@@ -50,7 +50,24 @@ type BeatRuntimeConfig struct {
 
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
+<<<<<<< HEAD
 		Default: string(DefaultRuntimeManager),
+=======
+		Default:       string(DefaultRuntimeManager),
+		DynamicInputs: string(ProcessRuntimeManager),
+		Metricbeat: BeatRuntimeConfig{
+			Default:   string(OtelRuntimeManager),
+			InputType: map[string]string{},
+		},
+		Filebeat: BeatRuntimeConfig{
+			// go-ucfg sets this while unpacking, having it in the default makes testing easier
+			InputType: make(map[string]string),
+		},
+		Output: map[string]string{
+			"logstash": string(ProcessRuntimeManager), // Force all inputs using the Logstash output to use the process runtime
+			"kafka":    string(ProcessRuntimeManager), // Force all inputs using the kafka output to use the process runtime
+		},
+>>>>>>> 068d67fcb ([beatreceivers] Add inital kafka translation logic (#13102))
 	}
 }
 
@@ -80,6 +97,19 @@ func (r *RuntimeConfig) Validate() error {
 			}
 		}
 	}
+<<<<<<< HEAD
+=======
+
+	allowedOutput := []string{"elasticsearch", "logstash", "kafka"}
+	for name, runtime := range r.Output {
+		if !slices.Contains(allowedOutput, name) {
+			return fmt.Errorf("%s output is not supported", name)
+		}
+		if err := validateRuntime(runtime, false); err != nil {
+			return err
+		}
+	}
+>>>>>>> 068d67fcb ([beatreceivers] Add inital kafka translation logic (#13102))
 	return nil
 }
 

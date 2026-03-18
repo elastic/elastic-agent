@@ -300,6 +300,7 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
+<<<<<<< HEAD
 	github.com/elastic/lunes v0.2.0 // indirect
 	github.com/elastic/mito v1.24.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.29.0 // indirect
@@ -313,6 +314,9 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.29.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.30.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20251224062803-313637a62841 // indirect
+=======
+	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 // indirect
+>>>>>>> 068d67fcb ([beatreceivers] Add inital kafka translation logic (#13102))
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.36.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.0 // indirect
@@ -633,7 +637,11 @@ require (
 	github.com/vultr/govultr/v2 v2.17.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
+<<<<<<< HEAD
 	github.com/xdg-go/scram v1.2.0 // indirect
+=======
+	github.com/xdg-go/scram v1.1.2 // indirect
+>>>>>>> 068d67fcb ([beatreceivers] Add inital kafka translation logic (#13102))
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect

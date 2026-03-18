@@ -1174,13 +1174,17 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			name: "unsupported output type - kafka",
+			name: "supported output type - kafka",
 			component: &component.Component{
 				ID:         "unsupported-output",
 				InputType:  "filestream",
+<<<<<<< HEAD
 				OutputType: "kafka", // unsupported
+=======
+				OutputType: "kafka",
+				OutputName: "default",
+>>>>>>> 068d67fcb ([beatreceivers] Add inital kafka translation logic (#13102))
 			},
-			expectedError: "unsupported output type: kafka",
 		},
 		{
 			name: "unsupported output type - logstash",
@@ -1405,10 +1409,9 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			name:          "unsupported output type - kafka",
-			outputType:    "kafka",
-			outputCfg:     map[string]any{},
-			expectedError: "unsupported output type: kafka",
+			name:       "supported output type - kafka",
+			outputType: "kafka",
+			outputCfg:  map[string]any{},
 		},
 		{
 			name:          "unsupported output type - logstash",
@@ -1557,10 +1560,13 @@ func TestUnitToExporterConfig(t *testing.T) {
 				Type: client.UnitTypeOutput,
 				Config: component.MustExpectedConfig(map[string]any{
 					"hosts": []any{"es:9200"},
-					"queue": map[string]any{"mem": map[string]any{"events": 100}},
+					"queue": map[string]any{"mem": map[string]any{"events": 100, "flush": map[string]any{
+						"timeout": "20s",
+					}}},
 				}),
 			},
 			exporterType: esExporterType,
+<<<<<<< HEAD
 			inputType:    "filestream",
 			expectedExportersCfg: map[string]any{
 				"elasticsearch/_agent-component/default": map[string]any{
@@ -1570,9 +1576,25 @@ func TestUnitToExporterConfig(t *testing.T) {
 					"auth": map[string]any{
 						"authenticator": "beatsauth/_agent-component/default",
 					},
+=======
+			outputName:   "default",
+			expectedExporterCfg: map[string]any{
+				"hosts": []interface{}{"es:9200"},
+				"queue": map[string]any{"mem": map[string]any{
+					"events": float64(100),
+					"flush": map[string]any{
+						"timeout": "20s",
+					},
+				}},
+				"translated": true,
+				"auth": map[string]any{
+					"authenticator": "beatsauth/_agent-component/default",
+>>>>>>> 068d67fcb ([beatreceivers] Add inital kafka translation logic (#13102))
 				},
 			},
-			expectedQueueSettings: map[string]any{"mem": map[string]any{"events": float64(100)}},
+			expectedQueueSettings: map[string]any{"mem": map[string]any{"events": float64(100), "flush": map[string]any{
+				"timeout": "20s",
+			}}},
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,

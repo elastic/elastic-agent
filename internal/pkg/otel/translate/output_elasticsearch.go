@@ -21,7 +21,6 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
-	"github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -140,7 +139,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
-				"flush_timeout": "10s",
+				"flush_timeout": getFlushTimeout(logger, output),
 				"max_size":      escfg.BulkMaxSize, // bulk_max_size
 				"min_size":      0,                 // 0 means immediately trigger a flush
 				"sizer":         "items",
@@ -225,6 +224,7 @@ func checkUnsupportedConfig(cfg *config.C) error {
 
 	return nil
 }
+<<<<<<< HEAD
 
 // Helper function to check if a struct is empty
 func isStructEmpty(s any) bool {
@@ -321,3 +321,5 @@ func cfgDecodeHookFunc() mapstructure.DecodeHookFunc {
 		}
 	}
 }
+=======
+>>>>>>> 068d67fcb ([beatreceivers] Add inital kafka translation logic (#13102))

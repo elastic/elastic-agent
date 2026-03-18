@@ -53,6 +53,7 @@ type (
 )
 
 var (
+<<<<<<< HEAD
 	OtelSupportedOutputTypes        = []string{"elasticsearch"}
 	OtelSupportedFilebeatInputTypes = []string{
 		"filestream",
@@ -64,6 +65,13 @@ var (
 	OtelSupportedInputTypes          = OtelSupportedFilebeatInputTypes
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
+=======
+	OtelSupportedOutputTypes         = []string{"elasticsearch", "logstash", "kafka"}
+	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
+		otelcomponent.MustNewType("elasticsearch"): ESToOTelConfig,
+		otelcomponent.MustNewType("logstash"):      LogstashToOTelConfig,
+		otelcomponent.MustNewType("kafka"):         KafkaToOTelConfig,
+>>>>>>> 068d67fcb ([beatreceivers] Add inital kafka translation logic (#13102))
 	}
 )
 
@@ -419,6 +427,13 @@ func OutputTypeToExporterType(outputType string) (otelcomponent.Type, error) {
 	switch outputType {
 	case "elasticsearch":
 		return otelcomponent.MustNewType("elasticsearch"), nil
+<<<<<<< HEAD
+=======
+	case "logstash":
+		return otelcomponent.MustNewType("logstash"), nil
+	case "kafka":
+		return otelcomponent.MustNewType("kafka"), nil
+>>>>>>> 068d67fcb ([beatreceivers] Add inital kafka translation logic (#13102))
 	default:
 		return otelcomponent.Type{}, fmt.Errorf("unknown otel exporter type for output type: %s", outputType)
 	}

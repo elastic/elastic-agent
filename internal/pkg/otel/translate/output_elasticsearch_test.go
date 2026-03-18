@@ -336,7 +336,7 @@ sending_queue:
 max_conns_per_host: 4
 sending_queue:
   batch:
-    flush_timeout: 10s
+    flush_timeout: 5s
     max_size: 1600
     min_size: 0
     sizer: items
@@ -378,7 +378,7 @@ user: elastic
 max_conns_per_host: 1
 sending_queue:
   batch:
-    flush_timeout: 10s
+    flush_timeout: 20s
     max_size: 1600
     min_size: 0
     sizer: items
@@ -398,7 +398,7 @@ compression_params:
 max_conns_per_host: 1
 sending_queue:
   batch:
-    flush_timeout: 10s
+    flush_timeout: 1s
     max_size: 50
     min_size: 0
     sizer: items

@@ -793,10 +793,14 @@ func TestMonitoringConfigOtelOutputSupport(t *testing.T) {
 				"hosts": []string{"localhost:9092"},
 			},
 			expectPrometheusMonitoring: false,
-			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
+			monitoringRuntimeManager:   monitoringcfg.OtelRuntimeManager,
 		},
 		{
+<<<<<<< HEAD
 			name: "logstash output - should NOT have prometheus monitoring",
+=======
+			name: "logstash output - should have prometheus monitoring",
+>>>>>>> 068d67fcb ([beatreceivers] Add inital kafka translation logic (#13102))
 			outputConfig: map[string]any{
 				"type":  "logstash",
 				"hosts": []string{"localhost:9092"},
