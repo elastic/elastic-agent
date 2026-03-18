@@ -11,13 +11,7 @@ entries:
         contents with only the feature flag.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12852
-        - https://github.com/elastic/elastic-agent/pull/13075
-        - https://github.com/elastic/elastic-agent/pull/12909
-        - https://github.com/elastic/elastic-agent/pull/13128
-        - https://github.com/elastic/elastic-agent/pull/13129
-        - https://github.com/elastic/elastic-agent/pull/13134
-        - https://github.com/elastic/elastic-agent/pull/13127
+        - https://github.com/elastic/elastic-agent/pull/12521
       issue:
         - https://github.com/elastic/elastic-agent/issues/7283
       impact: ""
@@ -31,15 +25,8 @@ entries:
       description: The permission fix was failing when the file was protected with permissions that do not allow reading its metadata.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12852
-        - https://github.com/elastic/elastic-agent/pull/13075
         - https://github.com/elastic/elastic-agent/pull/12909
-        - https://github.com/elastic/elastic-agent/pull/13128
-        - https://github.com/elastic/elastic-agent/pull/13129
-        - https://github.com/elastic/elastic-agent/pull/13134
-        - https://github.com/elastic/elastic-agent/pull/13127
       issue:
-        - https://github.com/elastic/elastic-agent/issues/12823
         - https://github.com/elastic/elastic-agent/issues/13059
       impact: ""
       action: ""
@@ -67,16 +54,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12852
-        - https://github.com/elastic/elastic-agent/pull/13075
-        - https://github.com/elastic/elastic-agent/pull/12909
-        - https://github.com/elastic/elastic-agent/pull/13128
-        - https://github.com/elastic/elastic-agent/pull/13129
-        - https://github.com/elastic/elastic-agent/pull/13134
-        - https://github.com/elastic/elastic-agent/pull/13127
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/12823
-        - https://github.com/elastic/elastic-agent/issues/13059
+        - https://github.com/elastic/elastic-agent/pull/12980
+      issue: []
       impact: ""
       action: ""
       timestamp: 1772205184
@@ -88,16 +67,9 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12852
-        - https://github.com/elastic/elastic-agent/pull/13075
-        - https://github.com/elastic/elastic-agent/pull/12909
-        - https://github.com/elastic/elastic-agent/pull/13128
-        - https://github.com/elastic/elastic-agent/pull/13129
-        - https://github.com/elastic/elastic-agent/pull/13134
-        - https://github.com/elastic/elastic-agent/pull/13127
+        - https://github.com/elastic/elastic-agent/pull/13022
       issue:
-        - https://github.com/elastic/elastic-agent/issues/12823
-        - https://github.com/elastic/elastic-agent/issues/13059
+        - https://github.com/elastic/elastic-agent/issues/13017
       impact: ""
       action: ""
       timestamp: 1772578978

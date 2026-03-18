@@ -22,7 +22,7 @@ The 8.19.13 release adds the following new and notable features.
 
 
 
-* Add support for encrypted config for standalone agents. https://github.com/elastic/elastic-agent/pull/12852[#12852] https://github.com/elastic/elastic-agent/pull/13075[#13075] https://github.com/elastic/elastic-agent/pull/12909[#12909] https://github.com/elastic/elastic-agent/pull/13128[#13128] https://github.com/elastic/elastic-agent/pull/13129[#13129] https://github.com/elastic/elastic-agent/pull/13134[#13134] https://github.com/elastic/elastic-agent/pull/13127[#13127] https://github.com/elastic/elastic-agent/issues/7283[#7283]
+* Add support for encrypted config for standalone agents. https://github.com/elastic/elastic-agent/pull/12521[#12521] https://github.com/elastic/elastic-agent/issues/7283[#7283]
 +
 Add a new agent.features.encrypted_config.enabled config attribute
 that enables the use of encrypted config when the agent is operating
@@ -52,7 +52,7 @@ contents with only the feature flag.
 
 
 
-* Prevent permission fix from failing when file is protected. https://github.com/elastic/elastic-agent/pull/12852[#12852] https://github.com/elastic/elastic-agent/pull/13075[#13075] https://github.com/elastic/elastic-agent/pull/12909[#12909] https://github.com/elastic/elastic-agent/pull/13128[#13128] https://github.com/elastic/elastic-agent/pull/13129[#13129] https://github.com/elastic/elastic-agent/pull/13134[#13134] https://github.com/elastic/elastic-agent/pull/13127[#13127] https://github.com/elastic/elastic-agent/issues/12823[#12823] https://github.com/elastic/elastic-agent/issues/13059[#13059]
-* Redact URL credentials in diagnostic outputs. https://github.com/elastic/elastic-agent/pull/12852[#12852] https://github.com/elastic/elastic-agent/pull/13075[#13075] https://github.com/elastic/elastic-agent/pull/12909[#12909] https://github.com/elastic/elastic-agent/pull/13128[#13128] https://github.com/elastic/elastic-agent/pull/13129[#13129] https://github.com/elastic/elastic-agent/pull/13134[#13134] https://github.com/elastic/elastic-agent/pull/13127[#13127] https://github.com/elastic/elastic-agent/issues/12823[#12823] https://github.com/elastic/elastic-agent/issues/13059[#13059]
+* Prevent permission fix from failing when file is protected. https://github.com/elastic/elastic-agent/pull/12909[#12909] https://github.com/elastic/elastic-agent/issues/13059[#13059]
+* Redact URL credentials in diagnostic outputs. https://github.com/elastic/elastic-agent/pull/13022[#13022] https://github.com/elastic/elastic-agent/issues/13017[#13017]
 
 // end 8.19.13 relnotes
