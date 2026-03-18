@@ -173,12 +173,14 @@ func (w *Writer) writeBlock(b []byte) error {
 	// Seal prepends a random nonce to the produced bytes, The encrypted text are all bytes after the nonce.
 	// However the agent crypto handlers were initially implemented with a different header structure that includes the length of each encrypted text block.
 	payload := encodedBytes[nonceLen:]
+	size := len(payload)
 
-	if len(payload) > math.MaxUint32 {
-		return fmt.Errorf("encrypted block size %d exceeds uint32 max", len(payload))
+	if size > math.MaxUint32 {
+		return fmt.Errorf("encrypted block size %d exceeds uint32 max", size)
 	}
+	sizeUint := uint32(size)
 	l := make([]byte, 4)
-	binary.LittleEndian.PutUint32(l, uint32(len(payload))) //nolint:gosec // ignoring unsafe type conversion, size checked above.
+	binary.LittleEndian.PutUint32(l, sizeUint)
 
 	w.writer.Write(iv) //nolint:errcheck // Ignore the error at this point.
 	w.writer.Write(l)  //nolint:errcheck // Ignore the error at this point.
