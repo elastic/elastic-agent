@@ -24,7 +24,6 @@ import (
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
 	iisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/iisreceiver"
 	jaegerreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver"
-	jmxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
 	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
@@ -101,6 +100,7 @@ import (
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
+	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
 	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
@@ -116,8 +116,8 @@ import (
 	profilingmetricsconnector "github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector"
 
 	// Telemetry
-	internaltelemetry "github.com/elastic/elastic-agent/internal/pkg/otel/internaltelemetry"
-	elasticmonitoringreceiver "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/elasticmonitoring"
+	internaltelemetry "github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
+	elasticmonitoringreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/elasticmonitoring"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
@@ -150,7 +150,6 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elasticmonitoringreceiver.NewFactory(),
 			fbreceiver.NewFactory(),
 			mbreceiver.NewFactory(),
-			jmxreceiver.NewFactory(), // deprecated, will be removed in 9.4.0
 
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
@@ -254,6 +253,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			headersetterextension.NewFactory(),
 			beatsauthextension.NewFactory(),
 			elasticdiagnostics.NewFactory(),
+			elasticsearchstorage.NewFactory(),
 			awslogsencodingextension.NewFactory(),
 			opampextension.NewFactory(),
 		}
