@@ -239,7 +239,7 @@ func checkUnsupportedConfig(cfg *config.C) error {
 	} else if value, err := cfg.Bool("allow_older_versions", -1); err == nil && !value {
 		return fmt.Errorf("allow_older_versions:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if value, err := cfg.Bool("loadbalance", -1); err == nil && !value {
-		return fmt.Errorf("ladbalance:false is currently not supported: %w", errors.ErrUnsupported)
+		return fmt.Errorf("loadbalance:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("non_indexable_policy") {
 		return fmt.Errorf("non_indexable_policy is currently not supported: %w", errors.ErrUnsupported)
 	} else if val, err := cfg.Int("max_retries", -1); err == nil && val < 0 {

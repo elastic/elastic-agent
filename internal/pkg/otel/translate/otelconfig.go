@@ -286,17 +286,13 @@ func getCollectorConfigForComponent(
 	}
 
 	// Build the pipeline processors list: the shared beat processor first (if enabled),
-	// then any other processors from processorConfig (e.g. Kafka transform), then per-output processors from config.
+	// then per-output processors from config. then any other processors from processorConfig (e.g. Kafka transform),
 	var pipelineProcessors []string
 	// If the default_processors feature flag is enabled, add a single shared
 	// beat processor definition that all pipelines reference.
 	if features.DefaultProcessors() {
 		pipelineProcessors = append(pipelineProcessors, GetProcessorID().String())
 	}
-	if len(processorConfig) != 0 {
-		pipelineProcessors = append(pipelineProcessors, maps.Keys(processorConfig)...)
-	}
-
 	// per output processor if any
 	processor, err := extractOtelProcessors(comp)
 	if err != nil {
@@ -304,6 +300,11 @@ func getCollectorConfigForComponent(
 	}
 
 	pipelineProcessors = append(pipelineProcessors, processor...)
+
+	if len(processorConfig) != 0 {
+		pipelineProcessors = append(pipelineProcessors, maps.Keys(processorConfig)...)
+	}
+
 	if len(pipelineProcessors) > 0 {
 		pipelineConfig["processors"] = pipelineProcessors
 	}

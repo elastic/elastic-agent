@@ -142,7 +142,7 @@ func setDynamicTopic(fs *fmtstr.EventFormatString, topic string) map[string]any 
 				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], log.body["%s"])`, fields[fieldIndex]))
 			} else {
 				// First placeholder: set topic =  literal + field
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat(["%s", log.body["%s"], ""))`, literalBefore, fields[fieldIndex]))
+				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat(["%s", log.body["%s"]], ""))`, literalBefore, fields[fieldIndex]))
 			}
 		} else {
 			// Subsequent placeholder: set topic =  topic + field
@@ -187,8 +187,8 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 		return fmt.Errorf("timeout is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("ssl") {
 		return fmt.Errorf("ssl parameters are currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("bullk_flush_frequency") {
-		logger.Warn("bullk_flush_frequency is deprecated")
+	} else if cfg.HasField("bulk_flush_frequency") {
+		logger.Warn("bulk_flush_frequency is deprecated")
 	}
 
 	return nil
