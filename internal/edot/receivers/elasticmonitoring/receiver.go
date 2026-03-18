@@ -105,9 +105,33 @@ func (mr *monitoringReceiver) updateMetrics() {
 		}
 		mr.sendExporterMetricsEvent(componentID, metrics)
 	}
+
+	// Send per-input metrics, one document per input, grouped by component
+	componentMetrics := collectComponentInputMetrics(resourceMetrics.ScopeMetrics)
+	for compID, inputs := range componentMetrics {
+		for _, inputMetrics := range inputs {
+			mr.sendInputMetricsEvent(compID, inputMetrics)
+		}
+	}
 }
 
 func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metrics exporterMetrics) {
+	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
+	addMetricsToEventFields(mr.logger, metrics, &beatEvent)
+	_, _ = beatEvent.Put("component.id", componentID)
+	mr.sendLogRecord(beatEvent, componentID)
+}
+
+func (mr *monitoringReceiver) sendInputMetricsEvent(componentID string, inputMetrics map[string]any) {
+	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
+	_, _ = beatEvent.Put("component.id", componentID)
+	for k, v := range inputMetrics {
+		_, _ = beatEvent.Put(k, v)
+	}
+	mr.sendLogRecord(beatEvent, componentID)
+}
+
+func (mr *monitoringReceiver) sendLogRecord(beatEvent mapstr.M, componentID string) {
 	pLogs := plog.NewLogs()
 	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
 	sourceLogs := resourceLogs.ScopeLogs().AppendEmpty()
@@ -115,11 +139,6 @@ func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metri
 	logRecord := logRecords.AppendEmpty()
 
 	sourceLogs.Scope().Attributes().PutStr("elastic.mapping.mode", "bodymap")
-
-	// Initialize to the configured event template
-	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
-	addMetricsToEventFields(mr.logger, metrics, &beatEvent)
-	_, _ = beatEvent.Put("component.id", componentID)
 
 	// Set timestamp
 	now := time.Now()
@@ -140,7 +159,6 @@ func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metri
 				logRecord.Attributes().PutStr("data_stream."+subField, vStr)
 			}
 		}
-
 	}
 
 	// Set log record body to computed fields
