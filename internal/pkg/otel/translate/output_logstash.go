@@ -19,22 +19,22 @@ type logstashOutputConfig struct {
 }
 
 // LogstashToOTelConfig converts a Beat config into logstash exporter config
-func LogstashToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error) {
+func LogstashToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, map[string]any, error) {
 	logstashConfig := logstashOutputConfig{
 		Config: logstash.DefaultConfig(),
 	}
 
 	// unpack and validate lsConfig
 	if err := output.Unpack(&logstashConfig); err != nil {
-		return nil, fmt.Errorf("failed unpacking config. %w", err)
+		return nil, nil, fmt.Errorf("failed unpacking config. %w", err)
 	}
 
 	// convert logstash config into a map
 	var finalMap map[string]any
 	lsConfig := config.MustNewConfigFrom(logstashConfig)
 	if err := lsConfig.Unpack(&finalMap); err != nil {
-		return nil, fmt.Errorf("error translating logstash config %w", err)
+		return nil, nil, fmt.Errorf("error translating logstash config %w", err)
 	}
 
-	return finalMap, nil
+	return finalMap, nil, nil
 }
