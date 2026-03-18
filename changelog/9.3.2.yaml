@@ -1,0 +1,187 @@
+version: 9.3.2
+entries:
+    - kind: feature
+      summary: Allow setting component runtime per output type
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12852
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1771494547
+      file:
+        name: 1771494547-add-output-runtime.yaml
+        checksum: 4c7cdac872949fb5ea42de60182c853e868dd43d
+    - kind: enhancement
+      summary: Default inputs using dynamic providers to the process runtime
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12854
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1771503155
+      file:
+        name: 1771503155-dynamic-inputs-process.yaml
+        checksum: 6eed4aaec3a96dc7418d97212f5c48e91b7314cb
+    - kind: feature
+      summary: Add OpAMP extension to EDOT Collector
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12857
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1771511114
+      file:
+        name: 1771511114-add-opamp-extension-to-edot-collector.yaml
+        checksum: d8d36331709c595dbd6a174701c69c093f654c20
+    - kind: bug-fix
+      summary: Use agent log level for the otel collector even if no inputs are defined
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12880
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1771614243
+      file:
+        name: 1771614243-log-level-pure-otel.yaml
+        checksum: 69962e1bee8b2827cb6b9a4393a5e7601eda6514
+    - kind: bug-fix
+      summary: Prevent permission fix from failing when file is protected
+      description: The permission fix was failing when the file was protected with permissions that do not allow reading its metadata.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12909
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1771854258
+      file:
+        name: 1771854258-do-not-fail-fix-permissions-when-file-is-protected.yaml
+        checksum: bfaee8b888292646425aa0decf0433e87e7b730b
+    - kind: enhancement
+      summary: Enrolling fleet-server uses internal port
+      description: |
+        The bootstraping process to enroll an agent into a local fleet-server instance
+        now uses the internal port (https://localhost:8221) instead of the URL flag.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12917
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1771868124
+      file:
+        name: 1771868124-Enrolling-fleet-server-uses-internal-port.yaml
+        checksum: ec2c1a78d8b4e0de92a1670d2ca6d4d167a7bb2b
+    - kind: unknown
+      summary: Handle multi-line otel collector errors correctly
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12980
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1772205184
+      file:
+        name: 1772205184-otel-collector-multiline-errors.yaml
+        checksum: ef30f2eda27de2b5b030b43fe4db5d66e56368d1
+    - kind: bug-fix
+      summary: Fix prometheus metrics endpoint in supervised EDOT collector
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13010
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1772535983
+      file:
+        name: 1772535983-edot-supervised-prometheus-metrics.yaml
+        checksum: 9b19b2d4c8b72a70435b893553f762c21d844f21
+    - kind: bug-fix
+      summary: Redact URL credentials in diagnostic outputs
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13022
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1772578978
+      file:
+        name: 1772578978-redact-url-credentials-in-diagnostic-outputs.yaml
+        checksum: 3a26629026b21dad3c0c8d73fe30fc0f60906a1b
+    - kind: bug-fix
+      summary: Move AutoOps sizer configuration to the batch level
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13093
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1773088413
+      file:
+        name: 1773088413-autoops-move-sizer.yaml
+        checksum: 78a776681a6cc91ae6d6c457a0e19a71c90f6beb
+    - kind: enhancement
+      summary: Rename AutoOps usage of deprecated "otlphttp" to "otlp_http"
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13094
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1773089893
+      file:
+        name: 1773089893-rename-autoops-otlphttp-to-otlp_http.yaml
+        checksum: 2574547c8c7c5710917af71a130b694b0c0166c0
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.145.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13103
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1773135698
+      file:
+        name: 1773135698-update-otel-components-to-v0.145.0.yaml
+        checksum: bec6be5a9448b1139cdddbc3c6fcbe2ade461cbd
+    - kind: bug-fix
+      summary: Fix an issue where some components could be missing from the status output
+      description: |
+        In some cases, a late update from an older component instance could overwrite a newer state.  This could cause components to be missing from the status output. With this fix, updates from older instances are ignored if a newer update has already been processed.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13119
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1773217838
+      file:
+        name: 1773217838-main.yaml
+        checksum: 9ff6f8a3221e3ae28562f165dbd9d4bad684d7d3
+    - kind: unknown
+      summary: Fix the elastic-agent build time as reported by the version command
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13140
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1773392178
+      file:
+        name: 1773392178-fix-agent-buildtime.yaml
+        checksum: 570441a6912ee2ad229ca16be43edd6d8a47bf76
