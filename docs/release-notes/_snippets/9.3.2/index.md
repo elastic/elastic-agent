@@ -13,7 +13,7 @@
   The bootstraping process to enroll an agent into a local fleet-server instance
   now uses the internal port (https://localhost:8221) instead of the URL flag.
   
-* Rename AutoOps usage of deprecated &#34;otlphttp&#34; to &#34;otlp_http&#34;. [#13094](https://github.com/elastic/elastic-agent/pull/13094) 
+* Rename AutoOps usage of deprecated `otlphttp` to `otlp_http`. [#13094](https://github.com/elastic/elastic-agent/pull/13094) 
 * Update OTel Collector components to v0.145.0. [#13103](https://github.com/elastic/elastic-agent/pull/13103) 
 
 
