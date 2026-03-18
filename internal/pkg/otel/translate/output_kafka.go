@@ -167,6 +167,7 @@ func setDynamicTopic(fs *fmtstr.EventFormatString, topic string) map[string]any 
 	}
 
 	return map[string]any{
+		// TODO: Use a more structured name for this processor
 		"transform": map[string]any{
 			"error_mode":     "ignore",
 			"log_statements": logStatements,
