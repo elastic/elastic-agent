@@ -5,8 +5,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13168
-        - https://github.com/elastic/elastic-agent/pull/13192
+        - https://github.com/elastic/elastic-agent/pull/12857
       issue: []
       impact: ""
       action: ""
@@ -19,8 +18,7 @@ entries:
       description: The permission fix was failing when the file was protected with permissions that do not allow reading its metadata.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13168
-        - https://github.com/elastic/elastic-agent/pull/13192
+        - https://github.com/elastic/elastic-agent/pull/12909
       issue: []
       impact: ""
       action: ""
@@ -48,8 +46,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13168
-        - https://github.com/elastic/elastic-agent/pull/13192
+        - https://github.com/elastic/elastic-agent/pull/12980
       issue: []
       impact: ""
       action: ""
@@ -62,8 +59,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13168
-        - https://github.com/elastic/elastic-agent/pull/13192
+        - https://github.com/elastic/elastic-agent/pull/13022
       issue: []
       impact: ""
       action: ""
@@ -76,9 +72,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13168
-        - https://github.com/elastic/elastic-agent/pull/13192
-      issue: []
+        - https://github.com/elastic/elastic-agent/pull/13093
       impact: ""
       action: ""
       timestamp: 1773088413
@@ -90,8 +84,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13168
-        - https://github.com/elastic/elastic-agent/pull/13192
+        - https://github.com/elastic/elastic-agent/pull/13109
       issue: []
       impact: ""
       action: ""
@@ -104,8 +97,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13168
-        - https://github.com/elastic/elastic-agent/pull/13192
+        - https://github.com/elastic/elastic-agent/pull/13140
       issue: []
       impact: ""
       action: ""
