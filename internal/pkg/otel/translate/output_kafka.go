@@ -139,18 +139,18 @@ func setDynamicTopic(fs *fmtstr.EventFormatString, topic string) map[string]any 
 		if len(logStatements) == 0 {
 			if literalBefore == "" {
 				// First placeholder: set topic = field
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], log.body["%s"])`, fields[fieldIndex]))
+				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], %s)`, getLogBody(fields[fieldIndex])))
 			} else {
 				// First placeholder: set topic =  literal + field
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat(["%s", log.body["%s"]], ""))`, literalBefore, fields[fieldIndex]))
+				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat(["%s", %s], ""))`, literalBefore, getLogBody(fields[fieldIndex])))
 			}
 		} else {
 			// Subsequent placeholder: set topic =  topic + field
 			if literalBefore == "" {
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["%s"]], ""))`, fields[fieldIndex]))
+				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], %s], ""))`, getLogBody(fields[fieldIndex])))
 			} else {
 				// Subsequent placeholder: set topic =  topic + literal + field
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["%s"]], "%s"))`, fields[fieldIndex], literalBefore))
+				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], %s], "%s"))`, getLogBody(fields[fieldIndex]), literalBefore))
 			}
 
 		}
@@ -172,6 +172,16 @@ func setDynamicTopic(fs *fmtstr.EventFormatString, topic string) map[string]any 
 			"log_statements": logStatements,
 		},
 	}
+}
+
+func getLogBody(field string) string {
+	query := strings.Split(field, ".")
+
+	logBody := []string{"log.body"}
+	for _, q := range query {
+		logBody = append(logBody, fmt.Sprintf(`["%s"]`, q))
+	}
+	return strings.Join(logBody, "")
 }
 
 // log warning for unsupported config

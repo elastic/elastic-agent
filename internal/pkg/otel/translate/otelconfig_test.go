@@ -920,9 +920,9 @@ func TestGetOtelConfig(t *testing.T) {
 					"transform": map[string]any{
 						"error_mode": "ignore",
 						"log_statements": []string{
-							`set(resource.attributes["topic"], log.body["data_stream.type"])`,
-							`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream.dataset"]], "-"))`,
-							`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream.namespace"]], "-"))`,
+							`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
+							`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["dataset"]], "-"))`,
+							`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-"))`,
 						},
 					},
 				},
