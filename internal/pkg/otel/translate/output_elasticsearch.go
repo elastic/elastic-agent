@@ -18,7 +18,6 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
-	"github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 )
@@ -122,7 +121,7 @@ func ESToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, erro
 
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
-				"flush_timeout": "10s",
+				"flush_timeout": getFlushTimeout(logger, output),
 				"max_size":      escfg.BulkMaxSize, // bulk_max_size
 				"min_size":      0,                 // 0 means immediately trigger a flush
 				"sizer":         "items",
@@ -248,13 +247,4 @@ func checkUnsupportedConfig(cfg *config.C) error {
 	}
 
 	return nil
-}
-
-func getQueueSize(logger *logp.Logger, output *config.C) int {
-	size, err := output.Int("queue.mem.events", -1)
-	if err != nil {
-		logger.Debugf("Failed to get queue size: %v", err)
-		return memqueue.DefaultEvents // return default queue.mem.events for sending_queue in case of an errr
-	}
-	return int(size)
 }
