@@ -15,7 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"slices"
+	"math"
 )
 
 // Option is the default options used to generate the encrypt and decrypt writer.
@@ -170,10 +170,15 @@ func (w *Writer) Write(b []byte) (int, error) {
 func (w *Writer) writeBlock(b []byte) error {
 	encodedBytes := w.gcm.Seal(nil, nil, b, nil)
 	iv := encodedBytes[:nonceLen]
+	// Seal prepends a random nonce to the produced bytes, The encrypted text are all bytes after the nonce.
+	// However the agent crypto handlers were initially implemented with a different header structure that includes the length of each encrypted text block.
 	payload := encodedBytes[nonceLen:]
 
+	if len(payload) > math.MaxUint32 {
+		return fmt.Errorf("encrypted block size %d exceeds uint32 max", len(payload))
+	}
 	l := make([]byte, 4)
-	binary.LittleEndian.PutUint32(l, uint32(len(payload))) //nolint:gosec // ignoring unsafe type conversion
+	binary.LittleEndian.PutUint32(l, uint32(len(payload))) //nolint:gosec // ignoring unsafe type conversion, size checked above.
 
 	w.writer.Write(iv) //nolint:errcheck // Ignore the error at this point.
 	w.writer.Write(l)  //nolint:errcheck // Ignore the error at this point.
@@ -311,14 +316,16 @@ func (r *Reader) consumeBlock() error {
 		return err
 	}
 
-	payload := make([]byte, l)
-	_, err = io.ReadAtLeast(r.reader, payload, l)
+	payload := make([]byte, l+nonceLen)
+	if n := copy(payload, iv); n != nonceLen {
+		return fmt.Errorf("expected to copy nonce of size %d, got %d", nonceLen, n)
+	}
+	_, err = io.ReadAtLeast(r.reader, payload[nonceLen:], l)
 	if err != nil {
 		r.err = fmt.Errorf("fail read the block of %d bytes: %w", l, err)
 	}
 
-	encodedBytes := slices.Concat(iv, payload)
-	decodedBytes, err := r.gcm.Open(nil, nil, encodedBytes, nil)
+	decodedBytes, err := r.gcm.Open(nil, nil, payload, nil)
 	if err != nil {
 		return fmt.Errorf("fail to decode bytes: %w", err)
 	}
