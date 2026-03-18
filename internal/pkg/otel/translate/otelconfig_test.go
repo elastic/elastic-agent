@@ -1382,14 +1382,13 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			name: "unsupported output type - kafka",
+			name: "supported output type - kafka",
 			component: &component.Component{
 				ID:         "unsupported-output",
 				InputType:  "filestream",
-				OutputType: "kafka", // unsupported
+				OutputType: "kafka",
 				OutputName: "default",
 			},
-			expectedError: "unsupported output type: kafka",
 		},
 		{
 			name: "unsupported configuration",
@@ -1567,10 +1566,9 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			name:          "unsupported output type - kafka",
-			outputType:    "kafka",
-			outputCfg:     map[string]any{},
-			expectedError: "unsupported output type: kafka",
+			name:       "supported output type - kafka",
+			outputType: "kafka",
+			outputCfg:  map[string]any{},
 		},
 		{
 			name:       "unsupported configuration - indices field",
@@ -1711,20 +1709,29 @@ func TestUnitToExporterConfig(t *testing.T) {
 				Type: client.UnitTypeOutput,
 				Config: component.MustExpectedConfig(map[string]any{
 					"hosts": []any{"es:9200"},
-					"queue": map[string]any{"mem": map[string]any{"events": 100}},
+					"queue": map[string]any{"mem": map[string]any{"events": 100, "flush": map[string]any{
+						"timeout": "20s",
+					}}},
 				}),
 			},
 			exporterType: esExporterType,
 			outputName:   "default",
 			expectedExporterCfg: map[string]any{
-				"hosts":      []interface{}{"es:9200"},
-				"queue":      map[string]any{"mem": map[string]any{"events": float64(100)}},
+				"hosts": []interface{}{"es:9200"},
+				"queue": map[string]any{"mem": map[string]any{
+					"events": float64(100),
+					"flush": map[string]any{
+						"timeout": "20s",
+					},
+				}},
 				"translated": true,
 				"auth": map[string]any{
 					"authenticator": "beatsauth/_agent-component/default",
 				},
 			},
-			expectedQueueSettings: map[string]any{"mem": map[string]any{"events": float64(100)}},
+			expectedQueueSettings: map[string]any{"mem": map[string]any{"events": float64(100), "flush": map[string]any{
+				"timeout": "20s",
+			}}},
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,

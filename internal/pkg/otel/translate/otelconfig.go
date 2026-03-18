@@ -53,10 +53,11 @@ type (
 )
 
 var (
-	OtelSupportedOutputTypes         = []string{"elasticsearch", "logstash"}
+	OtelSupportedOutputTypes         = []string{"elasticsearch", "logstash", "kafka"}
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): ESToOTelConfig,
 		otelcomponent.MustNewType("logstash"):      LogstashToOTelConfig,
+		otelcomponent.MustNewType("kafka"):         KafkaToOTelConfig,
 	}
 )
 
@@ -489,6 +490,8 @@ func OutputTypeToExporterType(outputType string) (otelcomponent.Type, error) {
 		return otelcomponent.MustNewType("elasticsearch"), nil
 	case "logstash":
 		return otelcomponent.MustNewType("logstash"), nil
+	case "kafka":
+		return otelcomponent.MustNewType("kafka"), nil
 	default:
 		return otelcomponent.Type{}, fmt.Errorf("unknown otel exporter type for output type: %s", outputType)
 	}
