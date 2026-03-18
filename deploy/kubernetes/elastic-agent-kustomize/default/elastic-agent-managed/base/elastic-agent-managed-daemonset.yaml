@@ -119,10 +119,18 @@ spec:
             - name: etc-mid
               mountPath: /etc/machine-id
               readOnly: true
-            - name: sys-kernel-debug
-              mountPath: /sys/kernel/debug
             - name: elastic-agent-state
               mountPath: /usr/share/elastic-agent/state
+            - name: sys-kernel-debug
+              mountPath: /sys/kernel/debug
+            - name: boot
+              mountPath: /boot
+              readOnly: true
+            - name: sys-fs-bpf
+              mountPath: /sys/fs/bpf
+            - name: sys-kernel-security
+              mountPath: /sys/kernel/security
+              readOnly: true
       volumes:
         - name: proc
           hostPath:
@@ -151,15 +159,26 @@ spec:
           hostPath:
             path: /etc/machine-id
             type: File
-        # Needed for 'Defend for containers' integration (cloud-defend) and Universal Profiling
-        # If you are not using one of these integrations, then these volumes and the corresponding
-        # mounts can be removed.
-        - name: sys-kernel-debug
-          hostPath:
-            path: /sys/kernel/debug
         # Mount /var/lib/elastic-agent-managed/kube-system/state to store elastic-agent state
         # Update 'kube-system' with the namespace of your agent installation
         - name: elastic-agent-state
           hostPath:
             path: /var/lib/elastic-agent-managed/kube-system/state
             type: DirectoryOrCreate
+        # Needed for 'Defend for containers' integration (cloud-defend) and Universal Profiling
+        # If you are not using one of these integrations, then these volumes and the corresponding
+        # mounts can be removed.
+        - name: sys-kernel-debug
+          hostPath:
+            path: /sys/kernel/debug
+        # The following three mounts are needed for 'Defend for containers' integration (cloud-defend)
+        # If you are not using cloud-defend, then these volumes and the corresponding mounts can be removed.
+        - name: boot
+          hostPath:
+            path: /boot
+        - name: sys-fs-bpf
+          hostPath:
+            path: /sys/fs/bpf
+        - name: sys-kernel-security
+          hostPath:
+            path: /sys/kernel/security

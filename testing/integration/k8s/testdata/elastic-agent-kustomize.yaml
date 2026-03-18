@@ -769,6 +769,14 @@ spec:
           readOnly: true
         - mountPath: /sys/kernel/debug
           name: sys-kernel-debug
+        - name: boot
+          mountPath: /boot
+          readOnly: true
+        - name: sys-fs-bpf
+          mountPath: /sys/fs/bpf
+        - name: sys-kernel-security
+          mountPath: /sys/kernel/security
+          readOnly: true
         - mountPath: /usr/share/elastic-agent/state
           name: elastic-agent-state
       dnsPolicy: ClusterFirstWithHostNet
@@ -802,9 +810,23 @@ spec:
       - hostPath:
           path: /var/lib
         name: var-lib
+      # Needed for 'Defend for containers' integration (cloud-defend) and Universal Profiling
+      # If you are not using one of these integrations, then these volumes and the corresponding
+      # mounts can be removed.
       - hostPath:
           path: /sys/kernel/debug
         name: sys-kernel-debug
+      # The following three mounts are needed for 'Defend for containers' integration (cloud-defend)
+      # If you are not using cloud-defend, then these volumes and the corresponding mounts can be removed.
+      - hostPath:
+          path: /boot
+        name: boot
+      - hostPath:
+          path: /sys/fs/bpf
+        name: sys-fs-bpf
+      - hostPath:
+          path: /sys/kernel/security
+        name: sys-kernel-security
       - hostPath:
           path: /var/lib/elastic-agent-standalone/kube-system/state
           type: DirectoryOrCreate
