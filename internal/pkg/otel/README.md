@@ -56,7 +56,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.143.0/exporter/debugexporter/README.md) | v0.143.0 |
+| [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.145.0/exporter/debugexporter/README.md) | v0.145.0 |
 | [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.145.0/exporter/elasticsearchexporter/README.md) | v0.145.0 |
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.145.0/exporter/fileexporter/README.md) | v0.145.0 |
 | [kafkaexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/kafkaexporter/v0.145.0/exporter/kafkaexporter/README.md) | v0.145.0 |
