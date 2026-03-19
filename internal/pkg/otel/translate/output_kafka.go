@@ -9,17 +9,18 @@ import (
 	"fmt"
 	"strings"
 
+	otelcomponent "go.opentelemetry.io/collector/component"
+
 	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
 	"github.com/elastic/beats/v7/libbeat/outputs/kafka"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
-	otelcomponent "go.opentelemetry.io/collector/component"
 )
 
 var TransformProcessorType = "transform"
 
-// KafkaToOTelConfig translate kafka output to OTel config
-// It returns config for kafka exporter, transform processor and error
+// KafkaToOTelConfig translates kafka output to OTel config
+// It returns kafka exporter, transform processor (if required) and error
 func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger) (map[string]any, map[string]any, error) {
 	kConfig, err := kafka.ReadConfig(config)
 	if err != nil {
