@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
@@ -32,6 +33,8 @@ func TestCheckin(t *testing.T) {
 	const requestDelay = time.Millisecond
 	ctx := context.Background()
 	agentInfo := &agentinfo{}
+	defaultCompressEnabled := configuration.DefaultFleetCheckin().GetCompressEnabled()
+	defaultCompressThreshold := configuration.DefaultFleetCheckin().GetCompressThresholdSize()
 
 	t.Run("Propagate any errors from the server", withServerWithAuthClient(
 		func(t *testing.T) *http.ServeMux {
@@ -50,7 +53,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
 
 			request := CheckinRequest{}
 
@@ -101,7 +104,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
 
 			request := CheckinRequest{}
 
@@ -162,7 +165,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
 
 			request := CheckinRequest{}
 
@@ -194,7 +197,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
 
 			request := CheckinRequest{}
 
@@ -228,7 +231,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
 
 			request := CheckinRequest{Metadata: testMetadata()}
 
@@ -262,7 +265,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
 
 			request := CheckinRequest{}
 
@@ -301,7 +304,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
 
 			request := CheckinRequest{}
 

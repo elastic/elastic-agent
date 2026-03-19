@@ -116,4 +116,3 @@ func TestFQDNCallbacks(t *testing.T) {
 	RemoveFQDNOnChangeCallback("cb2")
 	require.Len(t, current.fqdnCallbacks, 0)
 }
-

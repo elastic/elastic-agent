@@ -135,7 +135,7 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 
 	requestHeaders := http.Header{}
 	requestBody := bytes.NewBuffer(b)
-	if shouldCompressCheckinRequest(uint64(len(b)), e.compressEnabled, e.compressThresholdSize) {
+	if e.compressEnabled && (e.compressThresholdSize == 0 || uint64(len(b)) >= e.compressThresholdSize) {
 		requestBody, err = gzipEncodeCheckinRequestBody(b)
 		if err != nil {
 			return nil, 0, errors.New(err,
@@ -147,7 +147,7 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 
 	cp := fmt.Sprintf(checkingPath, e.info.AgentID())
 	sendStart := time.Now()
-	resp, err := e.client.Send(ctx, "POST", cp, nil, requestHeaders, requestBody)
+	resp, err := e.client.Send(ctx, http.MethodPost, cp, nil, requestHeaders, requestBody)
 	sendDuration := time.Since(sendStart)
 	if err != nil {
 		return nil, sendDuration, errors.New(err,
@@ -181,14 +181,6 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 	}
 
 	return checkinResponse, sendDuration, nil
-}
-
-func shouldCompressCheckinRequest(bodySize uint64, enabled bool, thresholdSize uint64) bool {
-	if !enabled {
-		return false
-	}
-
-	return thresholdSize == 0 || bodySize >= thresholdSize
 }
 
 func gzipEncodeCheckinRequestBody(body []byte) (*bytes.Buffer, error) {

@@ -194,7 +194,7 @@ func (f *Flags) setSource(c cfg) error {
 		return fmt.Errorf("could not convert feature flags configuration to JSON: %w", err)
 	}
 
-	var s map[string]any
+	var s map[string]interface{}
 	if err := json.Unmarshal(data, &s); err != nil {
 		return fmt.Errorf("could not convert feature flags JSON to mapstr: %w", err)
 	}
@@ -320,4 +320,3 @@ func DefaultProcessors() bool {
 func EncryptedConfig() bool {
 	return current.EncryptedConfig()
 }
-

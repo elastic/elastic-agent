@@ -11,6 +11,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
 
+const (
+	defaultCompressEnabled   = true
+	defaultCompressThreshold = uint64(1024)
+)
+
 // FleetAgentConfig is the internal configuration of the agent after the enrollment is done,
 // this configuration is not exposed in anyway in the elastic-agent.yml and is only internal configuration.
 type FleetAgentConfig struct {
@@ -69,8 +74,8 @@ type FleetCheckin struct {
 // DefaultFleetCheckin returns a FleetCheckin with default values.
 func DefaultFleetCheckin() *FleetCheckin {
 	return &FleetCheckin{
-		CompressEnabled:       true,
-		CompressThresholdSize: 1024,
+		CompressEnabled:       defaultCompressEnabled,
+		CompressThresholdSize: defaultCompressThreshold,
 	}
 }
 
