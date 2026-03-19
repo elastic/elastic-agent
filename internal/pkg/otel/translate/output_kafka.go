@@ -13,11 +13,14 @@ import (
 	"github.com/elastic/beats/v7/libbeat/outputs/kafka"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
+	otelcomponent "go.opentelemetry.io/collector/component"
 )
 
+var TransformProcessorType = "transform"
+
 // KafkaToOTelConfig translate kafka output to OTel config
-// It returns config for kafka exporter, tranform processor and error
-func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, map[string]any, error) {
+// It returns config for kafka exporter, transform processor and error
+func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger) (map[string]any, map[string]any, error) {
 	kConfig, err := kafka.ReadConfig(config)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error reading kafka config: %w", err)
@@ -97,7 +100,7 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, m
 
 	if !fmtstr.IsConst() {
 		kafkaExporter["topic_from_attribute"] = "topic"
-		processor := setDynamicTopic(kConfig.Topic)
+		processor := setDynamicTopic(kConfig.Topic, outputName)
 		// delete topic set under logs
 		delete(kafkaExporter, "logs")
 		return kafkaExporter, processor, nil
@@ -106,7 +109,7 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, m
 }
 
 // set dynamic topic returns a transform processor
-func setDynamicTopic(topic string) map[string]any {
+func setDynamicTopic(topic string, outputName string) map[string]any {
 	content := topic
 	logStatements := []string{}
 
@@ -164,8 +167,7 @@ func setDynamicTopic(topic string) map[string]any {
 	}
 
 	return map[string]any{
-		// TODO: Use a more structured name for this processor
-		"transform": map[string]any{
+		getTransformProcessorID(outputName).String(): map[string]any{
 			"error_mode":     "ignore",
 			"log_statements": logStatements,
 		},
@@ -220,6 +222,12 @@ func getLogBody(field string) string {
 		logBody = append(logBody, fmt.Sprintf(`["%s"]`, q))
 	}
 	return strings.Join(logBody, "")
+}
+
+// getTransformProcessorID returns the id for transform processor
+func getTransformProcessorID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(TransformProcessorType), extensionName)
 }
 
 // log warning for unsupported config

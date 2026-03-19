@@ -175,7 +175,7 @@ max_message_bytes: 1000000`,
 		t.Run(testc.name, func(t *testing.T) {
 			cfg, err := config.NewConfigFrom(testc.input)
 			require.NoError(t, err, "error creating kafka config")
-			gotMap, _, err := KafkaToOTelConfig(cfg, logp.NewNopLogger())
+			gotMap, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating kafka to kafka exporter")
 			require.Equal(t, testc.expectedMap, gotMap)
 		})
@@ -192,7 +192,7 @@ func TestSetDynamicTopic(t *testing.T) {
 			name:  "test where topic=field",
 			topic: `%{[data_stream.type]}`,
 			expectedTransformMap: map[string]any{
-				"transform": map[string]any{
+				"transform/_agent-component/default": map[string]any{
 					"error_mode": "ignore",
 					"log_statements": []string{
 						`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
@@ -203,7 +203,7 @@ func TestSetDynamicTopic(t *testing.T) {
 			name:  "test correct behavior when two keys are same",
 			topic: `%{[data_stream.type]}-%{[data_stream.type]}`,
 			expectedTransformMap: map[string]any{
-				"transform": map[string]any{
+				"transform/_agent-component/default": map[string]any{
 					"error_mode": "ignore",
 					"log_statements": []string{
 						`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
@@ -215,7 +215,7 @@ func TestSetDynamicTopic(t *testing.T) {
 			name:  "test where topic = topic + field",
 			topic: `%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}`,
 			expectedTransformMap: map[string]any{
-				"transform": map[string]any{
+				"transform/_agent-component/default": map[string]any{
 					"error_mode": "ignore",
 					"log_statements": []string{
 						`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
@@ -228,7 +228,7 @@ func TestSetDynamicTopic(t *testing.T) {
 			name:  "test where topic = literal + field ",
 			topic: `test-data-%{[data_stream.dataset]}-%{[data_stream.namespace]}`,
 			expectedTransformMap: map[string]any{
-				"transform": map[string]any{
+				"transform/_agent-component/default": map[string]any{
 					"error_mode": "ignore",
 					"log_statements": []string{
 						`set(resource.attributes["topic"], Concat(["test-data-", log.body["data_stream"]["dataset"]], ""))`,
@@ -240,7 +240,7 @@ func TestSetDynamicTopic(t *testing.T) {
 			name:  "test where topic =  topic + literal + field ",
 			topic: `%{[data_stream.dataset]}-test-data-%{[data_stream.namespace]}`,
 			expectedTransformMap: map[string]any{
-				"transform": map[string]any{
+				"transform/_agent-component/default": map[string]any{
 					"error_mode": "ignore",
 					"log_statements": []string{
 						`set(resource.attributes["topic"], log.body["data_stream"]["dataset"])`,
@@ -252,7 +252,7 @@ func TestSetDynamicTopic(t *testing.T) {
 			name:  "test where topic =  field + literal (i.e any content left is appended to final topic string) ",
 			topic: `%{[data_stream.dataset]}-test-data`,
 			expectedTransformMap: map[string]any{
-				"transform": map[string]any{
+				"transform/_agent-component/default": map[string]any{
 					"error_mode": "ignore",
 					"log_statements": []string{
 						`set(resource.attributes["topic"], log.body["data_stream"]["dataset"])`,
@@ -266,7 +266,7 @@ func TestSetDynamicTopic(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := fmtstr.CompileEvent(test.topic)
 			require.NoError(t, err)
-			require.Equal(t, test.expectedTransformMap, setDynamicTopic(test.topic))
+			require.Equal(t, test.expectedTransformMap, setDynamicTopic(test.topic, "default"))
 		})
 	}
 }

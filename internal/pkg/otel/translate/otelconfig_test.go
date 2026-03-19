@@ -874,10 +874,7 @@ func TestGetOtelConfig(t *testing.T) {
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
 				"exporters": map[string]any{
 					"kafka/_agent-component/default": map[string]any{
-						"brokers": []string{"127.0.0.1:9022"},
-						"logs": map[string]any{
-							"topic": "%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}",
-						},
+						"brokers":              []string{"127.0.0.1:9022"},
 						"topic_from_attribute": "topic",
 						"client_id":            "beats",
 						"metadata": map[string]any{
@@ -917,7 +914,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"beat/_agent-component": map[string]any{
 						"processors": defaultGlobalProcessors,
 					},
-					"transform": map[string]any{
+					"transform/_agent-component/default": map[string]any{
 						"error_mode": "ignore",
 						"log_statements": []string{
 							`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
@@ -933,7 +930,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"pipelines": map[string]any{
 						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
 							"exporters":  {"kafka/_agent-component/default"},
-							"processors": {"beat/_agent-component", "transform"},
+							"processors": {"beat/_agent-component", "transform/_agent-component/default"},
 							"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring"},
 						},
 					},
@@ -1779,7 +1776,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 	originalConfigTranslationFuncForExporter := configTranslationFuncForExporter
 	defer func() { configTranslationFuncForExporter = originalConfigTranslationFuncForExporter }()
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
-		esExporterType: func(c *config.C, l *logp.Logger) (map[string]any, map[string]any, error) {
+		esExporterType: func(c *config.C, _ string, l *logp.Logger) (map[string]any, map[string]any, error) {
 			if c.HasField("unsupported") {
 				return nil, nil, errors.New("unsupported config")
 			}

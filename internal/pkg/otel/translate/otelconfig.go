@@ -48,8 +48,10 @@ const (
 
 // BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
 type (
-	BeatMonitoringConfigGetter    func(unitID, binary string) map[string]any
-	exporterConfigTranslationFunc func(*config.C, *logp.Logger) (map[string]any, map[string]any, error)
+	BeatMonitoringConfigGetter func(unitID, binary string) map[string]any
+	// exporter translation logic takes output config, output name, logger
+	// and returns exporter config, processor config (if any) and error
+	exporterConfigTranslationFunc func(*config.C, string, *logp.Logger) (map[string]any, map[string]any, error)
 )
 
 var (
@@ -198,7 +200,7 @@ func VerifyOutputIsOtelSupported(outputType string, outputCfg map[string]any) er
 		return err
 	}
 
-	_, _, err = OutputConfigToExporterConfig(logp.NewNopLogger(), exporterType, outputCfgC)
+	_, _, err = OutputConfigToExporterConfig(logp.NewNopLogger(), exporterType, outputCfgC, "")
 	if errors.Is(err, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", outputType, err)
 	}
@@ -290,8 +292,6 @@ func getCollectorConfigForComponent(
 	// Build the pipeline processors list: the shared beat processor first (if enabled),
 	// then per-output processors from config. then any other processors from processorConfig (e.g. Kafka transform),
 	var pipelineProcessors []string
-	// If the default_processors feature flag is enabled, add a single shared
-	// beat processor definition that all pipelines reference.
 	if features.DefaultProcessors() {
 		pipelineProcessors = append(pipelineProcessors, GetProcessorID().String())
 	}
@@ -548,7 +548,7 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 	}
 
 	// Config translation function can mutate queue settings defined under output config
-	exporterConfig, processorConfig, err := OutputConfigToExporterConfig(logger, exporterType, outputCfgC)
+	exporterConfig, processorConfig, err := OutputConfigToExporterConfig(logger, exporterType, outputCfgC, outputName)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
 	}
@@ -669,14 +669,18 @@ func extractOtelProcessors(comp *component.Component) ([]string, error) {
 }
 
 // OutputConfigToExporterConfig translates the output configuration to an exporter configuration.
-// It can also return a processor configuration if required
-func OutputConfigToExporterConfig(logger *logp.Logger, exporterType otelcomponent.Type, outputConfig *config.C) (map[string]any, map[string]any, error) {
+// It can also return a processor configuration (if any)
+func OutputConfigToExporterConfig(logger *logp.Logger,
+	exporterType otelcomponent.Type,
+	outputConfig *config.C,
+	outputName string,
+) (map[string]any, map[string]any, error) {
 	configTranslationFunc, ok := configTranslationFuncForExporter[exporterType]
 	if !ok {
 		return nil, nil, fmt.Errorf("no config translation function for exporter type: %s", exporterType)
 	}
 
-	exporterConfig, processorConfig, err := configTranslationFunc(outputConfig, logger)
+	exporterConfig, processorConfig, err := configTranslationFunc(outputConfig, outputName, logger)
 	if err != nil {
 		return nil, nil, err
 	}

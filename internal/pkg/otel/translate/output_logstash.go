@@ -19,7 +19,7 @@ type logstashOutputConfig struct {
 }
 
 // LogstashToOTelConfig converts a Beat config into logstash exporter config
-func LogstashToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, map[string]any, error) {
+func LogstashToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string]any, map[string]any, error) {
 	logstashConfig := logstashOutputConfig{
 		Config: logstash.DefaultConfig(),
 	}

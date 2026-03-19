@@ -55,7 +55,7 @@ var defaultOptions = esToOTelOptions{
 
 // ESToOTelConfig converts a Beat config into OTel elasticsearch exporter config
 // Note: This method may override output queue settings defined by user.
-func ESToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, map[string]any, error) {
+func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string]any, map[string]any, error) {
 	escfg := defaultOptions
 
 	// check for unsupported config

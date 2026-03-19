@@ -108,7 +108,7 @@ ssl.curve_types: "P-256"
 			}
 
 			logger := logptest.NewTestingLogger(t, "test")
-			otelCfg, _, err := LogstashToOTelConfig(cfg, logger)
+			otelCfg, _, err := LogstashToOTelConfig(cfg, "", logger)
 			if err != nil {
 				t.Fatalf("error translating logstash output to logstash exporter config: %v", err)
 			}
