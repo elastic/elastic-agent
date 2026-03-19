@@ -133,11 +133,8 @@ required_acks: 1
 compression: gzip
 max_message_bytes: 1000000`,
 			expectedMap: map[string]any{
-				"brokers": []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
-				"logs": map[string]any{
-					"topic": "%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}",
-				},
-				"topic_from_attribute": "topic",
+				"brokers":              []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
+				"topic_from_attribute": "topic", // this field is an the addition
 				"client_id":            "beats",
 				"metadata": map[string]any{
 					"full":             false,
@@ -192,7 +189,7 @@ func TestSetDynamicTopic(t *testing.T) {
 		expectedTransformMap map[string]any
 	}{
 		{
-			name:  "single field configured",
+			name:  "test where topic=field",
 			topic: `%{[data_stream.type]}`,
 			expectedTransformMap: map[string]any{
 				"transform": map[string]any{
@@ -203,7 +200,7 @@ func TestSetDynamicTopic(t *testing.T) {
 				}},
 		},
 		{
-			name:  "multipe event fields configured",
+			name:  "test where topic = topic + field",
 			topic: `%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}`,
 			expectedTransformMap: map[string]any{
 				"transform": map[string]any{
@@ -215,7 +212,43 @@ func TestSetDynamicTopic(t *testing.T) {
 					},
 				}},
 		},
-	} // more test cases required
+		{
+			name:  "test where topic = literal + field ",
+			topic: `test-data-%{[data_stream.dataset]}-%{[data_stream.namespace]}`,
+			expectedTransformMap: map[string]any{
+				"transform": map[string]any{
+					"error_mode": "ignore",
+					"log_statements": []string{
+						`set(resource.attributes["topic"], Concat(["test-data-", log.body["data_stream"]["dataset"]], ""))`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-"))`,
+					},
+				}},
+		},
+		{
+			name:  "test where topic =  topic + literal + field ",
+			topic: `%{[data_stream.dataset]}-test-data-%{[data_stream.namespace]}`,
+			expectedTransformMap: map[string]any{
+				"transform": map[string]any{
+					"error_mode": "ignore",
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["dataset"])`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-test-data-"))`,
+					},
+				}},
+		},
+		{
+			name:  "test where topic =  field + literal (i.e any content left is appended to final topic string) ",
+			topic: `%{[data_stream.dataset]}-test-data`,
+			expectedTransformMap: map[string]any{
+				"transform": map[string]any{
+					"error_mode": "ignore",
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["dataset"])`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], "-test-data"], ""))`,
+					},
+				}},
+		},
+	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {

@@ -98,12 +98,14 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, m
 	if !fmtstr.IsConst() {
 		kafkaExporter["topic_from_attribute"] = "topic"
 		processor := setDynamicTopic(fmtstr, kConfig.Topic)
+		// delete topic set under logs
+		delete(kafkaExporter, "logs")
 		return kafkaExporter, processor, nil
 	}
 	return kafkaExporter, nil, nil
 }
 
-// TODO: Default value and special operation is not supported in this translation logic yet
+// TODO: Default value such as %{key:default} is not supported in this translation logic yet
 // set dynamic topic returns a transform processor
 func setDynamicTopic(fs *fmtstr.EventFormatString, topic string) map[string]any {
 	fields := fs.Fields()
