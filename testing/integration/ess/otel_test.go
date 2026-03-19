@@ -492,8 +492,6 @@ exporters:
         min_size: 2000
         max_size: 10000
         flush_timeout: 1s
-    mapping:
-      mode: none
 
 processors:
   resource/add-test-id:
@@ -501,6 +499,12 @@ processors:
     - key: test.id
       action: insert
       value: {{.TestId}}
+
+  transform/add-mapping-mode:
+    log_statements:
+    - context: scope
+      statements:
+      - set(attributes["elastic.mapping.mode"], "none")
 
 receivers:
   filelog:
@@ -516,6 +520,7 @@ service:
         - elasticsearch
       processors:
         - resource/add-test-id
+        - transform/add-mapping-mode
       receivers:
         - filelog
   telemetry:
