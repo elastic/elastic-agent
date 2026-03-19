@@ -30,6 +30,9 @@ Installed integrations:
 {{- if eq $.Values.system.enabled true }}
   - system [built-in chart integration]
 {{- end }}
+{{- if eq $.Values.cloudDefend.enabled true }}
+  - cloudDefend [built-in chart integration]
+{{- end }}
 {{- range $customInputName, $customInputVal := $.Values.extraIntegrations }}
   - {{$customInputName}} [user-defined integration]
 {{- end }}
