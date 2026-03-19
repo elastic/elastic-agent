@@ -22,19 +22,23 @@ processors:
       action: insert
       value: "${EA_POLICY_NAMESPACE}"
 
+  transform/add-mapping-mode:
+    log_statements:
+    - context: scope
+      statements:
+      - set(attributes["elastic.mapping.mode"], "none")
+
 exporters:
   elasticsearch:
     logs_index: "${EA_POLICY_NAMESPACE}"
     endpoint: "${ES_HOST}"
     api_key: "${ES_API_KEY_ENCODED}"
-    mapping:
-      mode: none
 
 service:
   pipelines:
     logs:
       receivers: [filebeatreceiver]
-      processors: [resource]
+      processors: [resource, transform/add-mapping-mode]
       exporters:
         - elasticsearch
   telemetry:
