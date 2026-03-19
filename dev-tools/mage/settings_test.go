@@ -307,7 +307,7 @@ func TestSettingsTestTagsWithFIPS(t *testing.T) {
 
 		tags := s.TestTagsWithFIPS()
 
-		assert.Equal(t, []string{"tag1", "requirefips", "ms_tls13kdf"}, tags)
+		assert.Equal(t, []string{"tag1", "requirefips"}, tags)
 	})
 
 	t.Run("does not modify original tags", func(t *testing.T) {
@@ -327,7 +327,7 @@ func TestSettingsTestTagsWithFIPS(t *testing.T) {
 
 		tags := s.TestTagsWithFIPS()
 
-		assert.Equal(t, []string{"requirefips", "ms_tls13kdf"}, tags)
+		assert.Equal(t, []string{"requirefips"}, tags)
 	})
 }
 
