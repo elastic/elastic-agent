@@ -283,7 +283,10 @@ func (b GolangCrossBuilder) Build() error {
 		args = append(args, "--ulimit", "nofile=262144:262144")
 	}
 
-	if runtime.GOOS != "windows" {
+	// In rootless Docker, container UID 0 maps to the host user's UID, so files
+	// created as root inside the container are already owned by the correct user
+	// on the host.
+	if runtime.GOOS != "windows" && !isRootlessDocker() {
 		args = append(args,
 			"--env", fmt.Sprintf("EXEC_UID=%d", uid),
 			"--env", fmt.Sprintf("EXEC_GID=%d", gid),
@@ -342,6 +345,16 @@ func (b GolangCrossBuilder) Build() error {
 	)
 
 	return dockerRun(args...)
+}
+
+// isRootlessDocker returns true when the Docker daemon is running in rootless
+// mode.
+func isRootlessDocker() bool {
+	out, err := sh.Output("docker", "info", "--format", "{{.SecurityOptions}}")
+	if err != nil {
+		return false
+	}
+	return strings.Contains(out, "rootless")
 }
 
 // DockerChown chowns files generated during build. EXEC_UID and EXEC_GID must

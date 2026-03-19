@@ -40,10 +40,13 @@ extraVolumeMounts:
   mountPath: /var/log
   readOnly: true
 {{- end }}
-{{- if and (eq $.Values.system.enabled true) (eq $.Values.system.metrics.enabled true) }}
+{{- $needsProc := or (and (eq $.Values.system.enabled true) (eq $.Values.system.metrics.enabled true)) (eq $.Values.cloudDefend.enabled true) }}
+{{- if $needsProc }}
 - name: proc
   mountPath: /hostfs/proc
   readOnly: true
+{{- end }}
+{{- if and (eq $.Values.system.enabled true) (eq $.Values.system.metrics.enabled true) }}
 - name: cgroup
   mountPath: /hostfs/sys/fs/cgroup
   readOnly: true
@@ -52,6 +55,18 @@ extraVolumeMounts:
   readOnly: true
 - name: etc-full
   mountPath: /hostfs/etc
+  readOnly: true
+{{- end }}
+{{- if eq $.Values.cloudDefend.enabled true }}
+- name: sys-kernel-debug
+  mountPath: /sys/kernel/debug
+- name: boot
+  mountPath: /boot
+  readOnly: true
+- name: sys-fs-bpf
+  mountPath: /sys/fs/bpf
+- name: sys-kernel-security
+  mountPath: /sys/kernel/security
   readOnly: true
 {{- end }}
 {{- end }}
@@ -68,10 +83,13 @@ extraVolumes:
   hostPath:
     path: /var/log
 {{- end }}
-{{- if and (eq $.Values.system.enabled true) (eq $.Values.system.metrics.enabled true) }}
+{{- $needsProc := or (and (eq $.Values.system.enabled true) (eq $.Values.system.metrics.enabled true)) (eq $.Values.cloudDefend.enabled true) }}
+{{- if $needsProc }}
 - name: proc
   hostPath:
     path: /proc
+{{- end }}
+{{- if and (eq $.Values.system.enabled true) (eq $.Values.system.metrics.enabled true) }}
 - name: cgroup
   hostPath:
     path: /sys/fs/cgroup
@@ -81,6 +99,20 @@ extraVolumes:
 - name: var-lib
   hostPath:
     path: /var/lib
+{{- end }}
+{{- if eq $.Values.cloudDefend.enabled true }}
+- name: sys-kernel-debug
+  hostPath:
+    path: /sys/kernel/debug
+- name: boot
+  hostPath:
+    path: /boot
+- name: sys-fs-bpf
+  hostPath:
+    path: /sys/fs/bpf
+- name: sys-kernel-security
+  hostPath:
+    path: /sys/kernel/security
 {{- end }}
 {{- end -}}
 
@@ -110,13 +142,27 @@ tolerations:
 
 {{- define "elasticagent.presets.pernode.securityContext.capabilities.add" -}}
 securityContext:
+{{- $cloudDefendEnabled := eq $.Values.cloudDefend.enabled true }}
 {{- if eq $.Values.agent.unprivileged true -}}
 {{- $k8sIntegrationRead := and (eq $.Values.kubernetes.enabled true) (has true (pluck "enabled" $.Values.kubernetes.containers.logs $.Values.kubernetes.containers.audit_logs) ) }}
 {{- $systemIntegrationRead := and (eq $.Values.system.enabled true) (has true (pluck "enabled" $.Values.system.syslog $.Values.system.authLogs $.Values.system.metrics) ) }}
-{{- if or $k8sIntegrationRead $systemIntegrationRead }}
+{{- if or $k8sIntegrationRead $systemIntegrationRead $cloudDefendEnabled }}
   capabilities:
     add:
       - DAC_READ_SEARCH
+{{- if $cloudDefendEnabled }}
+      - BPF
+      - PERFMON
+      - SYS_RESOURCE
+{{- end -}}
+{{- end -}}
+{{- else -}}
+{{- if $cloudDefendEnabled }}
+  capabilities:
+    add:
+      - BPF
+      - PERFMON
+      - SYS_RESOURCE
 {{- end -}}
 {{- end -}}
 {{- end -}}
