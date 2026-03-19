@@ -42,7 +42,7 @@ disable_background_package_managers() {
     return 0
   fi
   echo "Disabling background package managers to prevent RPM lock contention"
-  for unit in dnf-makecache.timer dnf-makecache.service packagekit.service; do
+  for unit in dnf-automatic.timer dnf-makecache.timer dnf-makecache.service packagekit.service; do
     sudo systemctl disable --now "$unit" 2>/dev/null || true
   done
 }

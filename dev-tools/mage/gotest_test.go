@@ -331,9 +331,7 @@ func TestGoTest_Helper_WithPanic(t *testing.T) {
 
 var wantTestWithPanic = `(?sm:
 === FAIL: dev-tools/mage TestGoTest_Helper_WithPanic.*
-panic: Kaputt. \[recovered\].*
-	panic: Kaputt.*
-)`
+panic: Kaputt. \[recovered, repanicked\].*)`
 
 func TestGoTest_Helper_WithWrongPanic(t *testing.T) {
 	if !gotestHelperMode {

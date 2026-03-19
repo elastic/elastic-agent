@@ -69,7 +69,7 @@ steps:
         # Note: The GODEBUG=fips140=only environment variable must be set in the command itself (as opposed to
         # in the env block) so that it is applied *only* to the 'go' command invoked by the script, and
         # not to any other Go code executed as part of the Buildkite agent itself.
-        command: 'GODEBUG="fips140=only" .buildkite/scripts/steps/unit-tests.sh'
+        command: 'GODEBUG="fips140=only,tlsmlkem=0" .buildkite/scripts/steps/unit-tests.sh'
         env:
           FIPS: "true"
         artifact_paths:
