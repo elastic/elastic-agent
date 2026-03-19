@@ -12,10 +12,6 @@ import (
 
 // Validate the options for encoding and decoding values.
 func (o *Option) Validate() error {
-	if o.IVLength < 12 {
-		return errors.New("IVLength must be at least 96 bits (12 bytes)")
-	}
-
 	if o.SaltLength < 16 {
 		return errors.New("SaltLength must be at least 128 bits (16 bytes)")
 	}
