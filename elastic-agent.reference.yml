@@ -91,6 +91,11 @@ inputs:
 
 # fleet:
 #   access_api_key: ""
+#   checkin:
+#     # compress_enabled enables gzip compression of checkin request bodies. Default: true.
+#     compress_enabled: true
+#     # compress_threshold_size is the minimum size (in bytes) of a checkin body that will be compressed. Default: 1024.
+#     compress_threshold_size: 1024
 #   kibana:
 #     # kibana minimal configuration
 #     hosts: ["localhost:5601"]
@@ -254,11 +259,6 @@ inputs:
 #  # ignored by Fleet managed agents, which always use encrypted config.
 #  encrypted_config:
 #    enabled: false
-#  # allow fleet-managed agents to compress checkin request bodies.
-#  checkin_compress:
-#    enabled: false
-#    # threshold_size is the min size (in bytes) for a compress body that must be compressed.
-#    threshold_size: 1024
 
 # Logging
 

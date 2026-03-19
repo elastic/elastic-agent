@@ -85,19 +85,21 @@ type rollbacksSource interface {
 }
 
 type FleetGateway struct {
-	log                *logger.Logger
-	client             client.Sender
-	scheduler          scheduler.Scheduler
-	settings           *fleetGatewaySettings
-	agentInfo          agentInfo
-	acker              acker.Acker
-	unauthCounter      int
-	checkinFailCounter int
-	stateStore         stateStore
-	stateFetcher       StateFetcher
-	errCh              chan error
-	actionCh           chan []fleetapi.Action
-	rollbackSource     rollbacksSource
+	log                   *logger.Logger
+	client                client.Sender
+	scheduler             scheduler.Scheduler
+	settings              *fleetGatewaySettings
+	agentInfo             agentInfo
+	acker                 acker.Acker
+	unauthCounter         int
+	checkinFailCounter    int
+	stateStore            stateStore
+	stateFetcher          StateFetcher
+	errCh                 chan error
+	actionCh              chan []fleetapi.Action
+	rollbackSource        rollbacksSource
+	compressEnabled       bool
+	compressThresholdSize uint64
 }
 
 // New creates a new fleet gateway
@@ -114,7 +116,7 @@ func New(
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
 	st.Backoff = getBackoffSettings(cfg)
-	return newFleetGatewayWithScheduler(
+	gw, err := newFleetGatewayWithScheduler(
 		log,
 		st,
 		agentInfo,
@@ -125,6 +127,12 @@ func New(
 		stateFetcher,
 		source,
 	)
+	if err != nil {
+		return nil, err
+	}
+	gw.compressEnabled = cfg.GetCompressEnabled()
+	gw.compressThresholdSize = cfg.GetCompressThresholdSize()
+	return gw, nil
 }
 
 func newFleetGatewayWithScheduler(
@@ -427,7 +435,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// checkin
-	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
+	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client, f.compressEnabled, f.compressThresholdSize)
 	req := &fleetapi.CheckinRequest{
 		AckToken:          ackToken,
 		Metadata:          ecsMeta,

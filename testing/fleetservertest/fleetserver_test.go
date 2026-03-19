@@ -162,7 +162,7 @@ func ExampleNewServer_checkin() {
 		WithAgentID(agentID))
 
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, true, 1024)
 
 	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err != nil {
@@ -200,7 +200,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 		WithAgentID(agentID))
 
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, true, 1024)
 
 	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err != nil {
@@ -460,7 +460,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 
 	// 1st call, nextAction() will return a POLICY_CHANGE.
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, true, 1024)
 	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing 3rd checkin: %v", err))
@@ -526,7 +526,7 @@ func ExampleNewServer_checkin_withDelay() {
 
 	// 1st - call actions have a delay.
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, true, 1024)
 
 	start := time.Now()
 	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
@@ -708,7 +708,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	// =========================================================================
 	// 4th - instantiate the fleetapi commands
 	cmdCheckin := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, true, 1024)
 	cmdAck := fleetapi.NewAckCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathAgentAcks(agentID)})
 

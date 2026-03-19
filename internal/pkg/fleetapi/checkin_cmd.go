@@ -18,7 +18,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 const checkingPath = "/api/fleet/agents/%s/checkin"
@@ -100,8 +99,10 @@ func (e *CheckinResponse) Validate() error {
 
 // CheckinCmd is a fleet API command.
 type CheckinCmd struct {
-	client client.Sender
-	info   AgentInfo
+	client                client.Sender
+	info                  AgentInfo
+	compressEnabled       bool
+	compressThresholdSize uint64
 }
 
 type AgentInfo interface {
@@ -109,10 +110,12 @@ type AgentInfo interface {
 }
 
 // NewCheckinCmd creates a new api command.
-func NewCheckinCmd(info AgentInfo, client client.Sender) *CheckinCmd {
+func NewCheckinCmd(info AgentInfo, client client.Sender, compressEnabled bool, compressThresholdSize uint64) *CheckinCmd {
 	return &CheckinCmd{
-		client: client,
-		info:   info,
+		client:                client,
+		info:                  info,
+		compressEnabled:       compressEnabled,
+		compressThresholdSize: compressThresholdSize,
 	}
 }
 
@@ -132,7 +135,7 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 
 	requestHeaders := http.Header{}
 	requestBody := bytes.NewBuffer(b)
-	if shouldCompressCheckinRequest(uint64(len(b))) {
+	if shouldCompressCheckinRequest(uint64(len(b)), e.compressEnabled, e.compressThresholdSize) {
 		requestBody, err = gzipEncodeCheckinRequestBody(b)
 		if err != nil {
 			return nil, 0, errors.New(err,
@@ -180,8 +183,7 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 	return checkinResponse, sendDuration, nil
 }
 
-func shouldCompressCheckinRequest(bodySize uint64) bool {
-	enabled, thresholdSize := features.CheckinCompress()
+func shouldCompressCheckinRequest(bodySize uint64, enabled bool, thresholdSize uint64) bool {
 	if !enabled {
 		return false
 	}

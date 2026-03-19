@@ -77,12 +77,6 @@ func TestCheckinCompress(t *testing.T) {
 			kibana.MonitoringEnabledLogs,
 			kibana.MonitoringEnabledMetrics,
 		},
-		AgentFeatures: []map[string]interface{}{
-			{
-				"name":    "checkin_compress",
-				"enabled": true,
-			},
-		},
 	}
 
 	installOpts := atesting.InstallOpts{
@@ -102,7 +96,7 @@ func TestCheckinCompress(t *testing.T) {
 		sawGzipCheckin.Load,
 		5*time.Minute,
 		5*time.Second,
-		"expected at least one gzip-compressed checkin request after enabling checkin_compress in Kibana policy",
+		"expected at least one gzip-compressed checkin request",
 	)
 }
 

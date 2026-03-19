@@ -19,10 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
-	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 type agentinfo struct{}
@@ -52,7 +50,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
 
 			request := CheckinRequest{}
 
@@ -103,7 +101,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
 
 			request := CheckinRequest{}
 
@@ -164,7 +162,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
 
 			request := CheckinRequest{}
 
@@ -196,7 +194,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
 
 			request := CheckinRequest{}
 
@@ -230,7 +228,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
 
 			request := CheckinRequest{Metadata: testMetadata()}
 
@@ -264,7 +262,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
 
 			request := CheckinRequest{}
 
@@ -303,7 +301,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, true, 1024)
 
 			request := CheckinRequest{}
 
@@ -357,14 +355,6 @@ func TestCheckinCompression(t *testing.T) {
 		wantCompressed:   false,
 	}}
 
-	// restore feature flag defaults after tests
-	t.Cleanup(func() {
-		defaultCfg, defaultErr := config.NewConfigFrom(`agent:
-  features:`)
-		require.NoError(t, defaultErr)
-		require.NoError(t, features.Apply(defaultCfg))
-	})
-
 	for _, tc := range testCases {
 		t.Run(tc.name, withServerWithAuthClient(
 			func(t *testing.T) *http.ServeMux {
@@ -393,32 +383,17 @@ func TestCheckinCompression(t *testing.T) {
 			},
 			withAPIKey,
 			func(t *testing.T, client client.Sender) {
-				applyCheckinCompressionFeatureFlag(t, tc.enabled, tc.thresholdSize)
-
-				cmd := NewCheckinCmd(agentInfo, client)
+				thresholdSize := uint64(0)
+				if tc.thresholdSize != nil {
+					thresholdSize = *tc.thresholdSize
+				}
+				cmd := NewCheckinCmd(agentInfo, client, tc.enabled, thresholdSize)
 				request := CheckinRequest{Message: strings.Repeat("a", tc.messageSizeBytes)}
 				_, _, err := cmd.Execute(t.Context(), &request)
 				require.NoError(t, err)
 			},
 		))
 	}
-}
-
-func applyCheckinCompressionFeatureFlag(t *testing.T, enabled bool, thresholdSize *uint64) {
-	t.Helper()
-
-	thresholdConfig := ""
-	if thresholdSize != nil {
-		thresholdConfig = fmt.Sprintf("\n      threshold_size: %d", *thresholdSize)
-	}
-
-	cfg, err := config.NewConfigFrom(fmt.Sprintf(`
-agent:
-  features:
-    checkin_compress:
-      enabled: %t%s`, enabled, thresholdConfig))
-	require.NoError(t, err)
-	require.NoError(t, features.Apply(cfg))
 }
 
 func readMaybeCompressedCheckinBody(r *http.Request) ([]byte, error) {

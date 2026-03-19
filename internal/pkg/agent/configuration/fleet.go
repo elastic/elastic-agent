@@ -54,14 +54,24 @@ func DefaultFleetAgentConfig() *FleetAgentConfig {
 		Enabled: false,
 		Client:  remote.DefaultClientConfig(),
 		Info:    &AgentInfo{},
-		Checkin: nil,
+		Checkin: DefaultFleetCheckin(),
 	}
 }
 
 type FleetCheckin struct {
-	Mode               string        `config:"mode" yaml:"mode,omitempty"` // `standard` or `on_state_change` (empty string is accepted as standard)
-	RequestBackoffInit time.Duration `config:"request_backoff_init" yaml:"request_backoff_init,omitempty"`
-	RequestBackoffMax  time.Duration `config:"request_backoff_max" yaml:"request_backoff_max,omitempty"`
+	Mode                  string        `config:"mode" yaml:"mode,omitempty"` // `standard` or `on_state_change` (empty string is accepted as standard)
+	RequestBackoffInit    time.Duration `config:"request_backoff_init" yaml:"request_backoff_init,omitempty"`
+	RequestBackoffMax     time.Duration `config:"request_backoff_max" yaml:"request_backoff_max,omitempty"`
+	CompressEnabled       bool          `config:"compress_enabled" yaml:"compress_enabled,omitempty"`
+	CompressThresholdSize uint64        `config:"compress_threshold_size" yaml:"compress_threshold_size,omitempty"`
+}
+
+// DefaultFleetCheckin returns a FleetCheckin with default values.
+func DefaultFleetCheckin() *FleetCheckin {
+	return &FleetCheckin{
+		CompressEnabled:       true,
+		CompressThresholdSize: 1024,
+	}
 }
 
 func (f *FleetCheckin) IsModeOnStateChanged() bool {
@@ -89,6 +99,20 @@ func (f *FleetCheckin) Validate() error {
 		return errors.New("checkin.request_backoff_max must be greater than or equal to checkin.request_backoff_init")
 	}
 	return nil
+}
+
+func (f *FleetCheckin) GetCompressEnabled() bool {
+	if f == nil {
+		return true
+	}
+	return f.CompressEnabled
+}
+
+func (f *FleetCheckin) GetCompressThresholdSize() uint64 {
+	if f == nil {
+		return 1024
+	}
+	return f.CompressThresholdSize
 }
 
 const (
