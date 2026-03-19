@@ -304,6 +304,7 @@ require (
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
+<<<<<<< HEAD
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.2.0 // indirect
 	github.com/elastic/mito v1.24.0 // indirect
@@ -320,6 +321,9 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.36.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.36.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.33.0 // indirect
+=======
+	github.com/elastic/gosigar v0.14.4 // indirect
+>>>>>>> be658e042 (build(deps): bump github.com/elastic/gosigar from 0.14.3 to 0.14.4 (#13211))
 	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.36.0 // indirect
