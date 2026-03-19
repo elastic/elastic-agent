@@ -89,11 +89,8 @@ Initialise input templates if we are not deploying as managed
  as they change the k8s configuration of presets e.g. necessary volume mounts, etc. */}}
 {{- include "elasticagent.kubernetes.init" $ -}}
 {{- include "elasticagent.system.init" $ -}}
-<<<<<<< HEAD
-=======
 {{- include "elasticagent.cloudDefend.init" $ -}}
 {{- include "elasticagent.autoops.init" $ -}}
->>>>>>> e55646045 (Add Cloud Defend Integration support to the helm chart (#13074))
 {{/* initialise inputs the custom integrations only if fleet is disabled */}}
 {{- if eq $.Values.agent.fleet.enabled false -}}
 {{- range $customInputName, $customInputVal := $.Values.extraIntegrations -}}
