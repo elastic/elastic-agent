@@ -108,14 +108,14 @@ func (f *FleetCheckin) Validate() error {
 
 func (f *FleetCheckin) GetCompressEnabled() bool {
 	if f == nil {
-		return true
+		return defaultCompressEnabled
 	}
 	return f.CompressEnabled
 }
 
 func (f *FleetCheckin) GetCompressThresholdSize() uint64 {
 	if f == nil {
-		return 1024
+		return defaultCompressThreshold
 	}
 	return f.CompressThresholdSize
 }
