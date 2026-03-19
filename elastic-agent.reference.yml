@@ -94,8 +94,8 @@ inputs:
 #   checkin:
 #     # compress_enabled enables gzip compression of checkin request bodies. Default: true.
 #     compress_enabled: true
-#     # compress_threshold_size is the minimum size (in bytes) of a checkin body that will be compressed. Default: 1024.
-#     compress_threshold_size: 1024
+#     # compress_threshold_size_bytes is the minimum size (in bytes) of a checkin body that will be compressed. Default: 1024.
+#     compress_threshold_size_bytes: 1024
 #   kibana:
 #     # kibana minimal configuration
 #     hosts: ["localhost:5601"]
