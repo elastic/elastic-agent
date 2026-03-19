@@ -97,7 +97,7 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, m
 
 	if !fmtstr.IsConst() {
 		kafkaExporter["topic_from_attribute"] = "topic"
-		processor := setDynamicTopic(fmtstr, kConfig.Topic)
+		processor := setDynamicTopic(kConfig.Topic)
 		// delete topic set under logs
 		delete(kafkaExporter, "logs")
 		return kafkaExporter, processor, nil
@@ -105,18 +105,12 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, m
 	return kafkaExporter, nil, nil
 }
 
-// TODO: Default value such as %{key:default} is not supported in this translation logic yet
 // set dynamic topic returns a transform processor
-func setDynamicTopic(fs *fmtstr.EventFormatString, topic string) map[string]any {
-	fields := fs.Fields()
-	if len(fields) < 1 {
-		return nil
-	}
-
+func setDynamicTopic(topic string) map[string]any {
 	content := topic
 	logStatements := []string{}
 
-	for fieldIndex := 0; fieldIndex < len(fields); {
+	for len(content) > 0 {
 		idxPercent := strings.Index(content, "%")
 		if idxPercent == -1 {
 			break
@@ -127,7 +121,7 @@ func setDynamicTopic(fs *fmtstr.EventFormatString, topic string) map[string]any 
 			continue
 		}
 		idxClose := strings.Index(content[idxPercent+2:], "}")
-		// Ideally this should never happen because we have identified len(fields) exists
+		// Found no closing bracket. Ideally this should never happen because CompileEvent() validates against such malforms
 		if idxClose == -1 {
 			break
 		}
@@ -135,33 +129,34 @@ func setDynamicTopic(fs *fmtstr.EventFormatString, topic string) map[string]any 
 		idxClose += idxPercent + 2 // position of '}' in content
 		literalBefore := content[:idxPercent]
 
+		// get field between %{...}
+		field := extractField(content[idxPercent+2 : idxClose])
+
 		// Advance past "%{...}"
 		content = content[idxClose+1:]
 
 		if len(logStatements) == 0 {
 			if literalBefore == "" {
 				// First placeholder: set topic = field
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], %s)`, getLogBody(fields[fieldIndex])))
+				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], %s)`, getLogBody(field)))
 			} else {
 				// First placeholder: set topic =  literal + field
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat(["%s", %s], ""))`, literalBefore, getLogBody(fields[fieldIndex])))
+				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat(["%s", %s], ""))`, literalBefore, getLogBody(field)))
 			}
 		} else {
 			// Subsequent placeholder: set topic =  topic + field
 			if literalBefore == "" {
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], %s], ""))`, getLogBody(fields[fieldIndex])))
+				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], %s], ""))`, getLogBody(field)))
 			} else {
 				// Subsequent placeholder: set topic =  topic + literal + field
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], %s], "%s"))`, getLogBody(fields[fieldIndex]), literalBefore))
+				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], %s], "%s"))`, getLogBody(field), literalBefore))
 			}
-
 		}
+	}
 
-		// check if any more content is left after all fields are indexed
-		if fieldIndex == (len(fields)-1) && len(content) != 0 {
-			logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], "%s"], ""))`, content))
-		}
-		fieldIndex++
+	// check if any more content is left after all fields are parsed
+	if len(content) != 0 {
+		logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], "%s"], ""))`, content))
 	}
 
 	if len(logStatements) == 0 {
@@ -175,6 +170,46 @@ func setDynamicTopic(fs *fmtstr.EventFormatString, topic string) map[string]any 
 			"log_statements": logStatements,
 		},
 	}
+}
+
+func extractField(field string) string {
+	switch field[0] {
+	case '[':
+		return parseEventPath(field)
+	case '+':
+		// TODO parse time stamp
+		return ""
+	}
+
+	return ""
+}
+
+// copied from https://github.com/elastic/beats/blob/main/libbeat/common/fmtstr/formatevents.go#L385-L410
+func parseEventPath(field string) string {
+	field = strings.Trim(field, " \n\r\t")
+	fields := []string{}
+
+	for len(field) > 0 {
+		if field[0] != '[' {
+			return ""
+		}
+
+		idx := strings.IndexByte(field, ']')
+		if idx < 0 {
+			return ""
+		}
+
+		path := field[1:idx]
+		if path == "" {
+			return ""
+		}
+
+		fields = append(fields, path)
+		field = field[idx+1:]
+	}
+
+	path := strings.Join(fields, ".")
+	return path
 }
 
 func getLogBody(field string) string {

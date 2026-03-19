@@ -200,6 +200,18 @@ func TestSetDynamicTopic(t *testing.T) {
 				}},
 		},
 		{
+			name:  "test correct behavior when two keys are same",
+			topic: `%{[data_stream.type]}-%{[data_stream.type]}`,
+			expectedTransformMap: map[string]any{
+				"transform": map[string]any{
+					"error_mode": "ignore",
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["type"]], "-"))`,
+					},
+				}},
+		},
+		{
 			name:  "test where topic = topic + field",
 			topic: `%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}`,
 			expectedTransformMap: map[string]any{
@@ -252,9 +264,9 @@ func TestSetDynamicTopic(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			fs, err := fmtstr.CompileEvent(test.topic)
+			_, err := fmtstr.CompileEvent(test.topic)
 			require.NoError(t, err)
-			require.Equal(t, test.expectedTransformMap, setDynamicTopic(fs, test.topic))
+			require.Equal(t, test.expectedTransformMap, setDynamicTopic(test.topic))
 		})
 	}
 }
