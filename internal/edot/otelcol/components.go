@@ -5,7 +5,6 @@
 package otelcol
 
 import (
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"go.opentelemetry.io/collector/connector"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/extension"
@@ -13,6 +12,8 @@ import (
 	"go.opentelemetry.io/collector/processor"
 	"go.opentelemetry.io/collector/receiver"
 	"go.opentelemetry.io/collector/service/telemetry/otelconftelemetry"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
