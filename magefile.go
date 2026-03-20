@@ -474,9 +474,9 @@ func (Check) All() {
 }
 
 // Lint downloads golangci-lint and runs the linter on current changes only.
-func (Check) Lint() error {
+func (Check) Lint(ctx context.Context) error {
 	mg.Deps(Prepare.InstallGolangciLint)
-	return devtools.Lint()
+	return devtools.Lint(ctx)
 }
 
 // LintAll downloads golangci-lint and runs the linter on the whole codebase.
