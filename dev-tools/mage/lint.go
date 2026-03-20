@@ -5,8 +5,6 @@
 package mage
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -17,44 +15,22 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/git"
 )
 
-// ParseToolVersions parses a .tool-versions file and returns a map of tool
-// names to their versions. See https://asdf-vm.com/manage/configuration.html#tool-versions.
-func ParseToolVersions(path string) (map[string]string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", path, err)
-	}
-	versions := make(map[string]string)
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) >= 2 {
-			versions[fields[0]] = fields[1]
-		}
-	}
-	return versions, scanner.Err()
-}
-
-// GolangciLintVersion reads the golangci-lint version from .tool-versions and
-// returns it prefixed with "v" (e.g. "v2.5.0").
+// GolangciLintVersion reads the golangci-lint version from
+// .golangci-lint-version and returns it prefixed with "v" (e.g. "v2.5.0").
 func GolangciLintVersion() (string, error) {
-	versions, err := ParseToolVersions(".tool-versions")
+	data, err := os.ReadFile(".golangci-lint-version")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("reading .golangci-lint-version: %w", err)
 	}
-	ver, ok := versions["golangci-lint"]
-	if !ok {
-		return "", fmt.Errorf("golangci-lint version not found in .tool-versions")
+	ver := strings.TrimSpace(string(data))
+	if ver == "" {
+		return "", fmt.Errorf(".golangci-lint-version is empty")
 	}
 	return "v" + ver, nil
 }
 
 // InstallGolangciLint ensures ./bin/golangci-lint is present and matches the
-// version specified in .tool-versions. It skips the download if the installed
+// version specified in .golangci-lint-version. It skips the download if the installed
 // binary is already the correct version.
 func InstallGolangciLint() error {
 	wantVer, err := GolangciLintVersion()
