@@ -387,8 +387,8 @@ func DiagnosticsExtensionSocket() string {
 	return diagnosticsExtensionSocket
 }
 
-func SetDiagnosticsExtensionSocket(socket string) {
-	diagnosticsExtensionSocket = SocketFromPath(runtime.GOOS, topPath, socket)
+func SetDiagnosticsExtensionSocket(path string) {
+	diagnosticsExtensionSocket = path
 }
 
 func pathSplit(path string) []string {

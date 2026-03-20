@@ -6,12 +6,9 @@ package cmd
 
 import (
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
 )
 
 func TestPrepareCollectorSettings(t *testing.T) {
@@ -31,14 +28,6 @@ func TestPrepareCollectorSettings(t *testing.T) {
 		require.NoError(t, err, "failed to prepare collector settings")
 		require.NotNil(t, settings, "settings should not be nil")
 		require.NotNil(t, settings.otelSettings.ConfigProviderSettings.ResolverSettings.URIs, "URIs should not be nil")
-		agentProviderURIFound := false
-		for _, uri := range settings.otelSettings.ConfigProviderSettings.ResolverSettings.URIs {
-			agentProviderURIFound = strings.Contains(uri, agentprovider.AgentConfigProviderSchemeName)
-			if agentProviderURIFound {
-				break
-			}
-		}
-		require.True(t, agentProviderURIFound, "agentprovider Scheme not found in the URIS of ConfigProviderSettings")
 		require.NotNil(t, settings.otelSettings.LoggingOptions, "loggingOptions should not be nil for supervised mode")
 	})
 

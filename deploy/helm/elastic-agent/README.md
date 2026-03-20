@@ -1,6 +1,6 @@
 # elastic-agent
 
-![Version: 9.1.0-beta](https://img.shields.io/badge/Version-9.1.0--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.1.0](https://img.shields.io/badge/AppVersion-9.1.0-informational?style=flat-square)
+![Version: 9.4.0-SNAPSHOT](https://img.shields.io/badge/Version-9.4.0--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.4.0](https://img.shields.io/badge/AppVersion-9.4.0-informational?style=flat-square)
 
 Elastic-Agent Helm Chart
 
@@ -175,6 +175,22 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | system.syslog.enabled | bool | `true` | enable syslog |
 | system.syslog.vars | object | `{}` | override default variables of syslog stream. Look in the [values.schema.json](values.schema.json) to see the available variables |
 | system.metrics.enabled | bool | `true` | enable metrics |
+
+### 4.1 - Cloud Defend integration
+
+The [cloud-defend](https://www.elastic.co/docs/current/integrations/cloud_defend) integration (Defend for Containers) enables BPF/LSM-based drift prevention and telemetry. It deploys as a DaemonSet (`perNode` preset) and requires `BPF`, `PERFMON`, and `SYS_RESOURCE` capabilities.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| cloudDefend.enabled | bool | `false` | enable Cloud Defend integration |
+| cloudDefend.policy_id | string | `""` | package policy ID used in cloud_defend input and stream IDs. If empty, a random UUID is generated via Helm `uuidv4` |
+| cloudDefend.revision | integer | `1` | package policy revision used in cloud_defend input |
+| cloudDefend.output | string | `"default"` | name of the output used in Cloud Defend integration. Note that this output needs to be defined in [outputs](#1-outputs) |
+| cloudDefend.namespace | string | `"default"` | output namespace |
+| cloudDefend.securityPolicy | object | `{process: {...}, file: {...}}` | security policy with process and file selectors/responses (standalone only). See [values.yaml](values.yaml) for the default policy |
+| cloudDefend.heartbeat.period | string | `"30m"` | heartbeat stream period |
+| cloudDefend.metrics.metricsets | list | `["cloud_defend"]` | metrics stream metricsets |
+| cloudDefend.metrics.period | string | `"24h"` | metrics stream period |
 
 ### 5 - User Extra Integrations
 | Key | Type | Default | Description |

@@ -18,6 +18,8 @@ const (
 	SystemSID = "S-1-5-32-544"
 	// EveryoneSID is the SID for Everyone.
 	EveryoneSID = "S-1-1-0"
+	// InteractiveSID is the SID for Interactive users.
+	InteractiveSID = "S-1-5-4"
 )
 
 // FileOwner is the ownership a file should have.

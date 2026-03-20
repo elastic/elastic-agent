@@ -22,14 +22,6 @@ func Test_Option_ValidateFIPS(t *testing.T) {
 		name   string
 		option *Option
 	}{{
-		name: "IVLength is low",
-		option: &Option{
-			IVLength:        10,
-			SaltLength:      20,
-			IterationsCount: 10000,
-			KeyLength:       20,
-		},
-	}, {
 		name: "SaltLength is low",
 		option: &Option{
 			IVLength:        20,

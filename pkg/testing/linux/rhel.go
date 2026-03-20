@@ -16,7 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 )
 
-// RhelRunner is a handler for running tests on SUSE Linux Enterpriser Server
+// RhelRunner is a handler for running tests on Red Hat Enterprise Linux and CentOS
 type RhelRunner struct{}
 
 // Prepare configures the host for running the test
@@ -27,6 +27,15 @@ func (RhelRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logger c
 	stdOut, errOut, err := sshClient.ExecWithRetry(dnfCtx, "sudo", []string{"dnf", "-y", "-v", "group", "install", "\"Development Tools\""}, 15*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to run 'dnf group install \"Development Tools\"': %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
+	}
+
+	// Disable background package managers to prevent RPM lock contention
+	// during tests. The dnf-makecache timer periodically refreshes package
+	// metadata and holds the RPM database lock while doing so, which causes
+	// "Resource temporarily unavailable" errors when tests run rpm commands.
+	logger.Logf("Disabling background package managers to prevent RPM lock contention")
+	for _, unit := range []string{"dnf-makecache.timer", "dnf-makecache.service", "packagekit.service"} {
+		_, _, _ = sshClient.Exec(ctx, "sudo", []string{"systemctl", "disable", "--now", unit}, nil)
 	}
 
 	// install golang

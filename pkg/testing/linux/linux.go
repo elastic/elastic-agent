@@ -81,7 +81,7 @@ func linuxCopy(ctx context.Context, sshClient ssh.SSHClient, logger common.Logge
 			err, stdout, stderr)
 	}
 
-	stdOut, errOut, err := sshClient.Exec(ctx, "unzip", []string{destRepoName, "-d", "agent"}, nil)
+	stdOut, errOut, err := sshClient.Exec(ctx, "unzip", []string{"-o", destRepoName, "-d", "agent"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to unzip %s to agent directory: %w (stdout: %s, stderr: %s)", destRepoName, err, stdOut, errOut)
 	}

@@ -4,7 +4,7 @@ description: Elastic-Agent Helm Chart
 kubeVersion: ">= 1.27.0-0"
 type: application
 appVersion: 9.4.0
-version: 9.4.0-beta
+version: 9.4.0-SNAPSHOT
 dependencies:
   - name: kube-state-metrics
     version: "6.1.0"

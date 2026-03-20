@@ -335,3 +335,32 @@ func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 		))
 	}
 }
+
+func TestRpmWithPrefix(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.RPM,
+		Stack: &define.Stack{},
+		OS: []define.OS{
+			{
+				Type:   define.Linux,
+				Distro: "rhel",
+			},
+		},
+		Local: false,
+		Sudo:  true,
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("rpm"))
+	require.NoError(t, err)
+
+	installOpts := atesting.InstallOpts{
+		BasePath:       "/opt/elastic-agent",
+		NonInteractive: true,
+		Force:          true,
+		InstallServers: false,
+	}
+	testRpmLogIngestFleetManagedWithCheck(ctx, t, agentFixture, info, installOpts, nil)
+}

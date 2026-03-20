@@ -1,0 +1,41 @@
+version: 8.19.12
+entries:
+    - kind: bug-fix
+      summary: Adds a missing dependency for Synthetics on wolfi docker image
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12453
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1769621019
+      file:
+        name: 1769621019-synthetics-add-playwright-dependency-on-wolfi.yaml
+        checksum: 2bfe5a207cb383c59b53cd8a304403fce8c8b0e7
+    - kind: bug-fix
+      summary: Ensure otel collector health check requests reuse the TCP connection
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12517
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1769802977
+      file:
+        name: 1769802977-fix-otel-healthcheck.yaml
+        checksum: a68e4673e42829bb088d56675373f0ceb497fd10
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.144.0/v1.50.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12735
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1770896223
+      file:
+        name: 1770896223-update-otel-to-01440.yaml
+        checksum: 98f58a388bf39a58b64da82ef8d37960fbcc3773

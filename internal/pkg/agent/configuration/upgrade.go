@@ -16,8 +16,7 @@ const (
 	// period during which an upgraded Agent can be asked to rollback to the previous
 	// Agent version on disk.
 	// this is temporarily set to 0 to disable the rollback window until manual rollback functionality is complete.
-	// defaultRollbackWindowDuration = 7 * 24 * time.Hour // 7 days
-	defaultRollbackWindowDuration = 0
+	defaultRollbackWindowDuration = 7 * 24 * time.Hour // 7 days
 
 	// defaultRollbackCleanupInterval represents the interval between runs to cleanup available rollbacks
 	defaultRollbackCleanupInterval = 10 * time.Minute

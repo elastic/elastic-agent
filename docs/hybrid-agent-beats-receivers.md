@@ -49,18 +49,24 @@ monitoring use cases.
 
 With the changes in https://github.com/elastic/elastic-agent/pull/11186 a new `agent.internal.runtime` section allows controlling
 the default runtime where `otel` indicates the input should run as a receiver. The default can be controlled on a per Beat and per
-input basis. For example to run the `filestream` and `system/metrics` inputs as Beat receivers:
+input basis.
+
+At the time of writing (January 2026), the logic for selecting the
+runtime prioritises the most specific setting, which might be hard
+coded. Therefore it is recommended to always set the desired runtime
+for the specific input. For example to run the `filestream` and
+`system/metrics` inputs as Beat receivers:
 
 ```yaml
 agent:
   internal:
     runtime:
-      default: process # Run all beats and inputs as sub-processes unless overridden below.
+      default: process # Run all beats and inputs as sub-processes unless overridden below or by harcoded defaults.
       filebeat:
-        default: process # Run all Filebeat inputs as sub-processe unless overidden individually.
+        default: process # Run all Filebeat inputs as sub-processe unless overidden individually or by harcoded defaults.
         filestream: otel # Run the Filebeat filestream input as a beat receiver.
       metricbeat:
-        default: process # Run all Metricbeat inputs as sub-processe unless overidden individually.
+        default: process # Run all Metricbeat inputs as sub-processe unless overidden individually or by harcoded defaults.
         system/metrics: otel # Run the Metricbeat system/metrics input as a beat receiver.
 inputs:
   - id: system-metrics-receiver
@@ -79,6 +85,24 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+```
+
+With changes in https://github.com/elastic/elastic-agent/pull/12852, user can also control the runtime of the inputs based on output type.
+This can be done by setting `agent.internal.runtime.output.[output_type]` to `otel` or `process`. For example, below config would override all inputs used with elasticsearch output to use otel runtime
+
+```yaml
+agent:
+  internal:
+    runtime:
+      default: process
+      filebeat:
+        filestream: otel
+      metricbeat:
+        system/metrics: otel
+      output: # Override the runtime used based on the output type.
+        elasticsearch: otel # Force all inputs using the Elasticearch output to use the otel runtime 
+        logstash: process # Force all inputs using the Logstash output to use the process runtime
+        kafka: process # Force all inputs using the kafka output to use the process runtime
 ```
 
 ### Configuration Translation Overrides
@@ -106,6 +130,25 @@ outputs:
           timeout: "60s" # Override the connection timeout from the translated value.
       exporter:
         include_source_on_error: false # Override the generated value of include_source_on_error.
+```
+
+Overrides can also be used to adjust batching behavior in the Elasticsearch exporter. By default, batching uses an items sizer that limits only the number of events per batch. In rare cases, very large events may cause batches to become unbalanced, allowing the total request size to exceed Elasticsearch limits and resulting in 413 (Request Entity Too Large) errors.
+
+To avoid this, the batching strategy can be configured to use a bytes sizer so that batches are constrained by their total size:
+
+```yaml
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+    api_key: "example-key"
+    otel:
+      exporter:
+        sending_queue:
+          batch:
+            min_size: 1e+6 # 1MB
+            max_size: 5e+6 # 5MB
+            sizer: bytes
 ```
 
 ## Hybrid Agent
@@ -214,8 +257,6 @@ exporters:
             - http://localhost:9200
         logs_dynamic_id:
             enabled: true
-        mapping:
-            mode: bodymap
 
         retry:
             enabled: true

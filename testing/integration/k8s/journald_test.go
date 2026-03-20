@@ -187,7 +187,7 @@ func TestKubernetesJournaldInputOtel(t *testing.T) {
 		kCtx,
 		steps,
 		namespace,
-		"Body.input.type",
+		"input.type",
 		"journald")
 }
 

@@ -18,6 +18,8 @@ import (
 	"go.opentelemetry.io/collector/extension"
 
 	"go.opentelemetry.io/collector/otelcol"
+
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
 )
 
 const buildDescription = "Elastic opentelemetry-collector distribution"
@@ -83,6 +85,7 @@ func NewSettings(version string, configPaths []string, opts ...SettingOpt) *otel
 		yamlprovider.NewFactory(),
 		httpprovider.NewFactory(),
 		httpsprovider.NewFactory(),
+		agentprovider.NewFactory(),
 	}
 	providerFactories = append(providerFactories, o.resolverConfigProviders...)
 	var converterFactories []confmap.ConverterFactory

@@ -4,9 +4,7 @@ description: The Prometheus remote write receiver is an OpenTelemetry Collector 
 applies_to:
   stack: ga 9.3
   serverless:
-    observability:
-  product:
-    edot_collector: ga 9.3
+    observability: ga
 products:
   - id: elastic-agent
   - id: observability

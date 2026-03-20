@@ -20,7 +20,7 @@ receivers:
         # Templates and License Details
         - module: autoops_es
           hosts: ${env:AUTOOPS_ES_URL}
-          period: 1d
+          period: 24h
           metricsets:
             - cat_template
             - component_template

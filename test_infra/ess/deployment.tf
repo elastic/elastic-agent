@@ -93,7 +93,7 @@ locals {
 
 # If we have defined a stack version, validate that this version exists on that region and return it.
 data "ec_stack" "latest" {
-  version_regex = split("-", var.stack_version)[0] # Remove -SNAPSHOT suffix in the stack filter.
+  version_regex = var.stack_version
   region        = local.ess_region
 }
 
@@ -123,7 +123,7 @@ resource "ec_deployment" "integration-testing" {
     zone_count                = 1
     config = {
       user_settings_json = jsonencode({
-        "xpack.fleet.enableExperimental"                          = ["agentTamperProtectionEnabled"]
+        "xpack.fleet.enableExperimental"                          = ["agentTamperProtectionEnabled", "enableAgentPrivilegeLevelChange"]
         "xpack.fleet.internal.registry.kibanaVersionCheckEnabled" = false
         "server.restrictInternalApis"                             = false
       })

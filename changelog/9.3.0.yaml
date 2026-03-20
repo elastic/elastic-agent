@@ -1,0 +1,538 @@
+version: 9.3.0
+entries:
+    - kind: feature
+      summary: Add support for downgrading a running Agent's privileges from Fleet.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10231
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1759318728
+      file:
+        name: 1759318728-support-for-privilege_level_change.yaml
+        checksum: 0b210d946ffb6bb3dcb0edb5154da676715ab8cc
+    - kind: feature
+      summary: Add awss3receiver to EDOT.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10515
+      issue:
+        - https://github.com/elastic/obs-integration-team/issues/604
+      impact: ""
+      action: ""
+      timestamp: 1760341895
+      file:
+        name: 1760341895-edot-add-awss3receiver.yaml
+        checksum: bf127645f0d12f626d51a9d2bd9e50c55e40636e
+    - kind: feature
+      summary: Add support for logstash output to elastic agent standalone helm chart.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10644
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760710876
+      file:
+        name: 1760710876-add-support-for-logstash-output-to-elastic-agent-standalone-helm-chart.yaml
+        checksum: 15fab0a8b8cc1bcc819efe977b68d635d9a94be1
+    - kind: feature
+      summary: Add awslogsencodingextension to EDOT.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11107
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1762782544
+      file:
+        name: 1762782544-edot-add-awslogsencodingextension.yaml
+        checksum: 4567bd63f0a8d715d18a21521fd80239bf24ea91
+    - kind: feature
+      summary: Add opex to elastic-agent helm chart, This change will add the Opex-CCM support to the offical elastic-agent helm chart deployment.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9363
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1762856188
+      file:
+        name: 1762856188-added-opex-to-elastic-agent-helm-chart.yaml
+        checksum: 68703d5ad2c1da273c161a567dab94dd45cba8b4
+    - kind: bug-fix
+      summary: Ensure the self-monitoring configuration accounts for the runtime components actually run in.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11300
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1763650536
+      file:
+        name: 1763650536-self-monitoring-runtime.yaml
+        checksum: 710e318433ce207e6651d5d55cdaa140b961dd35
+    - kind: other
+      summary: Promote Kafka receiver and exporter components to core / supported EDOT Collector components.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10988
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1763973037
+      file:
+        name: 1763973037-otel-kafka-components-to-core.yaml
+        checksum: 881c67fdf686409194b0f3aa1450423754dd3ebb
+    - kind: feature
+      summary: Add windowseventlogreceiver to EDOT
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11418
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764082001
+      file:
+        name: 1764082001-add-winperf.yaml
+        checksum: 0cf5a4ba0e0834b4fd63cc5637f3d3a34f430a0a
+    - kind: feature
+      summary: Enable cpu and disk hostmetrics scrapers for Darwin configurations.
+      description: ""
+      component: "elastic-agent"
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11423
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764087321
+      file:
+        name: 1764087321-enable_darwin_cpu_disk_scrapers.yaml
+        checksum: 97a8e7536d0275d4fbe7993c47e868354f42b4e1
+    - kind: bug-fix
+      summary: Report crashing otel process cleanly with proper status reporting.
+      description: ""
+      component: "elastic-agent"
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11448
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764175228
+      file:
+        name: 1764175228-report-crashing-otel-process-cleanly-with-proper-status-reporting.yaml
+        checksum: 62a746ba3ea8715cff49004b6d91667c0448294b
+    - kind: enhancement
+      summary: Restore cloud-defend to the basic and complete Docker images.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11795
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764188813
+      file:
+        name: 1764188813-add-cloud-defend-packaging.yaml
+        checksum: 9e61cf042d64625c6b1712f0cb6ad4b8d380bffb
+    - kind: feature
+      summary: Allow setting component runtime per input type.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11186
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764270813
+      file:
+        name: 1764270813-runtime-per-input-type.yaml
+        checksum: 11766aee53f12560f7dce5a62663eadc793106ef
+    - kind: bug-fix
+      summary: Fix kube-stack null template evaluation for Helm v4.
+      description: ""
+      component: "elastic-agent"
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11481
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764348725
+      file:
+        name: 1764348725-fix_templates_for_helm_4.yaml
+        checksum: b7f752f5de0d910907416ff4b7ac501f83e59ae9
+    - kind: bug-fix
+      summary: Add environment.yaml file to diagnostics.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11484
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/10966
+      impact: ""
+      action: ""
+      timestamp: 1764357992
+      file:
+        name: 1764357992-Add-environment.yml-file-to-diagnostics.yaml
+        checksum: 32d02808ffe0d86635f1fae1998146da5518e734
+    - kind: enhancement
+      summary: Make otel default runtime for system\metrics input.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11613
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764869946
+      file:
+        name: 1764869946-make-otel-default-runtime-for-system-metrics.yaml
+        checksum: 558bf634ad5bf0c6a61893402101edcb09316cfb
+    - kind: bug-fix
+      summary: Merge multiple agent keys when loading config.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11619
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3717
+      impact: ""
+      action: ""
+      timestamp: 1764873750
+      file:
+        name: 1764873750-Merge-multiple-agent-keys-when-loading-config.yaml
+        checksum: bd5fdb1aff142e76b888cafd9b3fe171fe7657a2
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.141.0.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11671
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1765186217
+      file:
+        name: 1765186217-update-otel-components-to-v0.141.0.yaml
+        checksum: 575b17e1411036b248791e8c6dc18a2b4e23c134
+    - kind: bug-fix
+      summary: Hide healthcheckv2 from status output.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11718
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1765377327
+      file:
+        name: 1765377327-hide-healthcheckv2-from-status-output.yaml
+        checksum: 9ab8a8e02d947e3e39163df15488b471f9db53ae
+    - kind: bug-fix
+      summary: Set path.home for beat receivers to components directory.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11726
+      issue:
+        - https://github.com/elastic/beats/issues/48010
+      impact: ""
+      action: ""
+      timestamp: 1765388410
+      file:
+        name: 1765388410-set-path.home-for-beat-receivers.yaml
+        checksum: 37a1e6233d9b62927c18967be5019fc09aee1dd2
+    - kind: enhancement
+      summary: Change default runtime for select metricbeat inputs.
+      description: |-
+        The following metricbeat inputs will use the otel runtime by default if the elasticsearch output is used:
+
+          - "activemq/metrics"
+          - "apache/metrics"
+          - "beat/metrics"
+          - "containerd/metrics"
+          - "docker/metrics"
+          - "elasticsearch/metrics"
+          - "etcd/metrics"
+          - "http/metrics"
+          - "jolokia/metrics"
+          - "kafka/metrics"
+          - "kibana/metrics"
+          - "linux/metrics"
+          - "logstash/metrics"
+          - "memcached/metrics"
+          - "mongodb/metrics"
+          - "mysql/metrics"
+          - "nats/metrics"
+          - "nginx/metrics"
+          - "rabbitmq/metrics"
+          - "sql/metrics"
+          - "stan/metrics"
+          - "statsd/metrics"
+          - "system/metrics"
+          - "vsphere/metrics"
+
+        This will result in a memory reduction since fewer agentbeat processes are started, because the otel runtime runs within the collector process.  If the policy is not compatible with the otel runtime, it will fall back to the process runtime.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11754
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1765559574
+      file:
+        name: 1765559574-change-default-runtime-for-select-metricbeat-inputs.yaml
+        checksum: a48604bd656e030830d0aeec93c57c0b69c32162
+    - kind: feature
+      summary: Rotated container logs can be ingested using the helm-chart by setting `kubernetes.containers.logs.rotated_logs=true`.
+      description: ""
+      component: helm-chart
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11783
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/11559
+      impact: ""
+      action: ""
+      timestamp: 1765570441
+      file:
+        name: 1765570441-helm-chart-container-logs-is-GA.yaml
+        checksum: e3c511a9ddfd60fff82737bbff46bd2345374fed
+    - kind: enhancement
+      summary: Improve input not supported error message to reference installation flavors.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11825
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1765833524
+      file:
+        name: 1765833524-improve-input-not-supported-error-message.yaml
+        checksum: a46c7d283b38448d3c5df4c1245281af2a8efd96
+    - kind: feature
+      summary: Improve metrics monitoring coverage for OTel-based ingestion.
+      description: Extend ingestion of OTel collector internal telemetry to give more detailed metrics, including support for both monitoring and non-monitoring components in the same collector.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11813
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1765835660
+      file:
+        name: 1765835660-otel-internal-telemetry.yaml
+        checksum: 2d5273fb789d2dd0982809337e69a2b6560b0373
+    - kind: bug-fix
+      summary: Fix signature verification using the upgrade command with the --source-uri flag for fleet-managed agents.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11826
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/11152
+      impact: ""
+      action: ""
+      timestamp: 1765835845
+      file:
+        name: 1765835845-Allow-use-of---source-uri-flag-when-upgrading-fleet-managed-agents.yaml
+        checksum: 018aa38560d8af20c1d1f45ab209e27ae45fdef4
+    - kind: enhancement
+      summary: Add service.instance.id to k8s attributes in helm charts
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11844
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1765893006
+      file:
+        name: 1765893006-add-service-instance-id-to-k8s-attributes.yaml
+        checksum: 4822c8c74123b84ca6067b4dd21610629e050d79
+    - kind: enhancement
+      summary: Reduce installation size for all versions of the Elastic Agent.
+      description: |
+        The Elastic Agent now ships with a single elastic-otel-collector binary that contains both the
+        OTEL collector, beats receivers, and beat modules. This reduces the size of the Elastic Agent roughly
+        ~200MB (amount depends on the platform). The elastic-agent.exe has also been greatly reduced from ~400M to ~75M.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11821
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1765922144
+      file:
+        name: 1765922144-reduce-installation-size.yaml
+        checksum: f04428db2634318744f84cb3435547829608905f
+    - kind: bug-fix
+      summary: handle curve_types to []curve_types conversion for elasticsearch config translation
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11892
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/11776
+      impact: ""
+      action: ""
+      timestamp: 1766011716
+      file:
+        name: 1766011716-handle-curve_types-to-[]curve_types-conversion-for-elasticsearch-config-translation.yaml
+        checksum: d3c5446a2f793ebcc1befa69d834fb7b74d01020
+    - kind: enhancement
+      summary: Add prometheusremotewrite receiver to EDOT.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11937
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1766130237
+      file:
+        name: 1766130237-prw-receiver.yaml
+        checksum: 886f7a8336d01106efe50a7ad32a8294703ea475
+    - kind: feature
+      summary: Allow manually initiating an upgrade rollback within a configurable window.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11955
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6881
+      impact: ""
+      action: ""
+      timestamp: 1766167270
+      file:
+        name: 1766167270-set-rollback-to-7d.yaml
+        checksum: f02b06a0d0e3bd381f50f90c09321b8b674156e6
+    - kind: bug-fix
+      summary: Avoid uninstall and reinstalling service components on policy changes or reassignments.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11740
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1766378849
+      file:
+        name: 1766378849-service-component-avoid-stop-start.yaml
+        checksum: c676decaf931526a9a602c55a532e337f514ac77
+    - kind: bug-fix
+      summary: Fix reloading agent.logging.level for standalone Elastic Agent.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11998
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1766556100
+      file:
+        name: 1766556100-reload-log-level.yaml
+        checksum: 76ff40da08baae2c8d6b4449d3864993bd63673a
+    - kind: bug-fix
+      summary: Fix FLEET_TOKEN_POLICY_NAME environment variable for the container command to handle cases where there are more than 20 agent policies available.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12073
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12069
+      impact: ""
+      action: ""
+      timestamp: 1767391687
+      file:
+        name: 1767391687-Container-entrypoint-searches-for-policy.yaml
+        checksum: 9d1344a8c23ff9c33be25a147fe43fe5058ebaa2
+    - kind: breaking-change
+      summary: Remove Elastic Agent global CLI flags from `otel` subcommand.
+      description: |
+        The `elastic-agent otel` subcommand no longer accepts global CLI flags that had no effect: `-c`, `--path.home`, `--path.home.unversioned`, `--path.config`, `--path.logs`, `--path.socket` and `--path.downloads`.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12187
+      issue: []
+      impact: Removal of these flags can result in otel subcommand failure, if they being are used. These flags had no effect on the otel subcommand behavior.
+      action: ""
+      timestamp: 1767937335
+      file:
+        name: 1767937335-remove-cli-flags-otel-subcommand.yaml
+        checksum: 671657eb1f8c542bc52e1023753a17e84fd9d881
+    - kind: bug-fix
+      summary: This updates the kube-stack otel gateway collector endpoint to be OTEL_K8S_POD_IP as the previous value was causing an undefined log warning.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12205
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1768216020
+      file:
+        name: 1768216020-use-correct-endpoint-for-gateway-collector.yaml
+        checksum: 124dba1a470d73dd72dd17bb56c4d7eae3cf1666
+    - kind: bug-fix
+      summary: Emit the correct error message when the app lock cannot be acquired.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12225
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1768299909
+      file:
+        name: 1768299909-fix-applock-error.yaml
+        checksum: d823958a6f6574021c89862f1f55c6d9a8344036
+    - kind: feature
+      summary: Add SNMP receiver to EDOT Collector.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12239
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1768379754
+      file:
+        name: 1768379754-add-snmp-receiver-to-edot-collector.yaml
+        checksum: c2298f66f5524dc9dc850b1246f9aa21c306af15
+    - kind: bug-fix
+      summary: Fix diagnostics socket path for read-only container filesystems
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12312
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/11572
+      impact: ""
+      action: ""
+      timestamp: 1768802548
+      file:
+        name: 1768802548-fix-diagnostics-extension-read-only.yaml
+        checksum: 77cf582677b25b0cc6d1f9e38eb2c035a8fafdcf
+    - kind: enhancement
+      summary: Replace elastic-agent/collector component name with elastic-otel-collector in self-monitoring.
+      description: Make self-monitoring metrics consistently use the name of the new elastic-otel-collector binary executing the EDOT collector and beats receivers.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12364
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1769021076
+      file:
+        name: 1769021076-replace-elastic-agent-collector-with-elastic-otel-collector-in-self-monitoring.yaml
+        checksum: 05d783f769867496b1e4b830870b25fe6eeb9d7a

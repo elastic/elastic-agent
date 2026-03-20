@@ -24,9 +24,10 @@ func TestNewRunner_Clean(t *testing.T) {
 	stateDir := filepath.Join(tmpdir, "state")
 	err := os.MkdirAll(stateDir, 0755)
 	require.NoError(t, err)
-
-	goVersion, err := mage.GoVersion()
+	settings, err := mage.LoadSettings()
 	require.NoError(t, err)
+
+	goVersion := settings.GoVersion()
 
 	cfg := common.Config{
 		AgentVersion: "8.10.0",
