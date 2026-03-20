@@ -53,16 +53,39 @@ func GolangciLintVersion() (string, error) {
 	return "v" + ver, nil
 }
 
-// InstallGolangciLint downloads and installs golangci-lint using the version
-// specified in .tool-versions.
+// InstallGolangciLint ensures ./bin/golangci-lint is present and matches the
+// version specified in .tool-versions. It skips the download if the installed
+// binary is already the correct version.
 func InstallGolangciLint() error {
-	ver, err := GolangciLintVersion()
+	wantVer, err := GolangciLintVersion()
 	if err != nil {
 		return err
 	}
-	fmt.Printf(">> install golangci-lint %s\n", ver)
+	if installedVer, err := golangciLintInstalledVersion(); err == nil && installedVer == wantVer {
+		fmt.Printf(">> golangci-lint %s already installed, skipping download\n", wantVer)
+		return nil
+	}
+	fmt.Printf(">> install golangci-lint %s\n", wantVer)
 	return sh.RunV("bash", "-c",
-		fmt.Sprintf("curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s %s", ver))
+		fmt.Sprintf("curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s %s", wantVer))
+}
+
+// golangciLintInstalledVersion returns the version of the locally installed
+// golangci-lint binary (e.g. "v2.5.0"), or an error if the binary is missing
+// or its output cannot be parsed.
+func golangciLintInstalledVersion() (string, error) {
+	out, err := sh.Output("./bin/golangci-lint", "version")
+	if err != nil {
+		return "", err
+	}
+	// Output format: "golangci-lint has version 2.5.0 built with ..."
+	fields := strings.Fields(out)
+	for i, f := range fields {
+		if f == "version" && i+1 < len(fields) {
+			return "v" + fields[i+1], nil
+		}
+	}
+	return "", fmt.Errorf("could not parse version from: %s", out)
 }
 
 // Lint runs golangci-lint on new issues only, comparing against the closest
