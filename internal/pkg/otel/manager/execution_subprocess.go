@@ -18,16 +18,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/ipc"
 	"go.opentelemetry.io/collector/component"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/ipc"
+
 	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v3"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 
