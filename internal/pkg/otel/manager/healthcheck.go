@@ -11,12 +11,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"time"
 
 	"go.opentelemetry.io/collector/confmap"
-
-	"github.com/elastic/beats/v7/libbeat/api/npipe"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
 
@@ -74,15 +71,9 @@ func AllComponentsStatuses(ctx context.Context, client http.Client) (*otelstatus
 
 // injectHealthCheckV2Extension injects the healthcheckv2 extension into the provided configuration.
 func injectHealthCheckV2Extension(conf *confmap.Conf, healthCheckExtensionID string, endpoint string) error {
-	var path string
-	endpointUrl, err := url.Parse(endpoint)
+	scheme, path, err := parseEndpoint(endpoint)
 	if err != nil {
 		return fmt.Errorf("error parsing url %s: %w", endpoint, err)
-	}
-	if endpointUrl.Scheme == "npipe" {
-		path = npipe.TransformString(endpoint)
-	} else {
-		path = endpointUrl.Path
 	}
 	err = conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
 		"extensions": map[string]interface{}{
@@ -95,7 +86,7 @@ func injectHealthCheckV2Extension(conf *confmap.Conf, healthCheckExtensionID str
 				},
 				"http": map[string]interface{}{
 					"endpoint":            path,
-					"transport":           endpointUrl.Scheme,
+					"transport":           scheme,
 					"keep_alives_enabled": true,
 					"status": map[string]interface{}{
 						"enabled":            healthCheckHealthStatusEnabled,
