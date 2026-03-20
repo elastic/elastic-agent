@@ -3539,6 +3539,17 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 	params.ExtraFlags = append(params.ExtraFlags, "-tags=agentbeat")
 	injectBuildVars(cfg, params.Vars)
 
+	// Workaround for https://github.com/golang/go/issues/75077: the Go PE linker assigns
+	// duplicate virtual addresses to DWARF sections in large binaries, causing Windows to
+	// reject the executable. nodwarf5 avoids this. Only needed for dev builds since
+	// production builds strip debug symbols via -s in DefaultGolangCrossBuildArgs.
+	if cfg.Build.DevBuild && cfg.Build.GOOS == "windows" {
+		if params.Env == nil {
+			params.Env = map[string]string{}
+		}
+		params.Env["GOEXPERIMENT"] = "nodwarf5"
+	}
+
 	// embedded packetbeat is only included in a non-FIPS build
 	if !cfg.Build.FIPSBuild {
 		// requires the NPCAP installer on Windows

@@ -23,6 +23,7 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 	"golang.org/x/exp/maps"
 
+	fbfeatures "github.com/elastic/beats/v7/filebeat/features"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
@@ -42,6 +43,7 @@ const (
 	outputOtelOverrideFieldName           = "otel"
 	outputOtelOverrideExporterFieldName   = "exporter"
 	outputOtelOverrideExtensionsFieldName = "extensions"
+	elasticsearchStateStoreExtensionName  = "elasticsearch_storage"
 )
 
 // BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
@@ -51,10 +53,11 @@ type (
 )
 
 var (
-	OtelSupportedOutputTypes         = []string{"elasticsearch", "logstash"}
+	OtelSupportedOutputTypes         = []string{"elasticsearch", "logstash", "kafka"}
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): ESToOTelConfig,
 		otelcomponent.MustNewType("logstash"):      LogstashToOTelConfig,
+		otelcomponent.MustNewType("kafka"):         KafkaToOTelConfig,
 	}
 )
 
@@ -390,6 +393,9 @@ func getReceiversConfigForComponent(
 		receiverConfig[beatName] = map[string]any{
 			"inputs": inputs,
 		}
+		if fbfeatures.IsElasticsearchStateStoreEnabled() {
+			receiverConfig["storage"] = elasticsearchStateStoreExtensionName
+		}
 	case "metricbeat":
 		receiverConfig[beatName] = map[string]any{
 			"modules": inputs,
@@ -484,6 +490,8 @@ func OutputTypeToExporterType(outputType string) (otelcomponent.Type, error) {
 		return otelcomponent.MustNewType("elasticsearch"), nil
 	case "logstash":
 		return otelcomponent.MustNewType("logstash"), nil
+	case "kafka":
+		return otelcomponent.MustNewType("kafka"), nil
 	default:
 		return otelcomponent.Type{}, fmt.Errorf("unknown otel exporter type for output type: %s", outputType)
 	}
@@ -570,7 +578,12 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 		exporterConfig["auth"] = map[string]any{
 			"authenticator": extensionID.String(),
 		}
-
+		if fbfeatures.IsElasticsearchStateStoreEnabled() {
+			// Add elasticsearch state store extension for agentless mode
+			// We paste the config as is, without any translation.
+			// The state store extension will pick up relevant settings from it and ignore the rest.
+			extensionCfg[elasticsearchStateStoreExtensionName] = unitConfigMap
+		}
 	}
 
 	return exporterConfig, queueSettings, extensionCfg, processors, nil

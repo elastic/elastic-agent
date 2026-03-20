@@ -34,7 +34,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	elasticmonitoringreceiver "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/elasticmonitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -46,6 +45,9 @@ const (
 	// CollectorStopTimeout is the duration to wait for the collector to stop. Note: this needs to be shorter
 	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
 	CollectorStopTimeout = 3 * time.Second
+
+	// elasticMonitoringReceiverName is the component type name for the elastic monitoring receiver.
+	elasticMonitoringReceiverName = "elasticmonitoringreceiver"
 )
 
 type collectorRecoveryTimer interface {
@@ -605,7 +607,7 @@ func injectMonitoringReceiver(
 		return fmt.Errorf("couldn't map exporter IDs to output names: %w", err)
 	}
 
-	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
+	receiverType := otelcomponent.MustNewType(elasticMonitoringReceiverName)
 	receiverName := "internal-telemetry-monitoring"
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
 	processorID := translate.GetProcessorID().String()
@@ -823,13 +825,11 @@ func (m *OTelManager) processComponentStates(componentStates []runtime.Component
 	for _, componentState := range componentStates {
 		componentIds[componentState.Component.ID] = true
 	}
-	for id := range m.currentComponentStates {
+	for id, comp := range m.currentComponentStates {
 		if _, ok := componentIds[id]; !ok {
 			// this component is not in the configuration anymore, emit a fake STOPPED state
 			componentStates = append(componentStates, runtime.ComponentComponentState{
-				Component: component.Component{
-					ID: id,
-				},
+				Component: comp.Component,
 				State: runtime.ComponentState{
 					State: client.UnitStateStopped,
 				},
