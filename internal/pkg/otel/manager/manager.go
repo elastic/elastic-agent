@@ -137,6 +137,7 @@ type OTelManager struct {
 }
 
 // NewOTelManager returns a OTelManager.
+// If execFactory is nil, the default subprocess execution is used.
 func NewOTelManager(
 	logger *logger.Logger,
 	collectorLogLevel logp.Level,
@@ -145,6 +146,7 @@ func NewOTelManager(
 	agentCollectorConfig *configuration.CollectorConfig,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
+	execFactory ExecutionFactory,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
@@ -182,9 +184,14 @@ func NewOTelManager(
 
 	executable := filepath.Join(paths.Components(), collectorBinaryName)
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-	exec, err = newSubprocessExecution(executable, healthCheckExtComponentID, collectorHealthCheckPort)
+	if execFactory == nil {
+		execFactory = func(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (collectorExecution, error) {
+			return newSubprocessExecution(collectorPath, healthCheckExtensionID, healthCheckPort)
+		}
+	}
+	exec, err = execFactory(executable, healthCheckExtComponentID, collectorHealthCheckPort)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
+		return nil, fmt.Errorf("failed to create execution: %w", err)
 	}
 
 	return &OTelManager{
