@@ -779,16 +779,9 @@ func PackageAgentCore(ctx context.Context) error {
 
 	cfg := devtools.SettingsFromContext(ctx)
 
-	// If Docker is selected but TarGz isn't, add TarGz since it's required for docker images
-	if cfg.IsPackageTypeSelected(devtools.Docker) && !cfg.IsPackageTypeSelected(devtools.TarGz) {
-		cfg = cfg.WithAddedPackageType(devtools.TarGz)
-		ctx = devtools.ContextWithSettings(ctx, cfg)
-	}
-
 	fmt.Println("--- Build elastic-agent-core")
-	mg.CtxDeps(ctx, Update, Otel.CrossBuild, CrossBuild, Build.WindowsArchiveRootBinary)
+	mg.CtxDeps(ctx, CrossBuild)
 
-	fmt.Println("--- Package elastic-agent-core")
 	devtools.UseElasticAgentCorePackaging(cfg)
 
 	// ran directly as we don't want mage to cache that it already called devtools.Package
