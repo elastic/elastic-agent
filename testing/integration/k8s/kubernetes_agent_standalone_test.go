@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -33,6 +34,7 @@ import (
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/cli"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -1241,6 +1243,90 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 		installAction.WaitForJobs = true
 		_, err = installAction.Run(helmChart, values)
 		require.NoError(t, err, "failed to install helm chart")
+	}
+}
+
+// k8sStepHelmTemplateApply mimics "helm template" followed by "kubectl apply":
+// it renders the chart to manifests (no Helm release metadata) and applies them directly.
+// Cleanup deletes the applied objects; there is no helm uninstall since no release exists.
+func k8sStepHelmTemplateApply(chartPath string, releaseName string, values map[string]any) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		settings := cli.New()
+		settings.SetNamespace(namespace)
+		actionConfig := &action.Configuration{}
+
+		helmChart, err := loader.Load(chartPath)
+		require.NoError(t, err, "failed to load helm chart")
+
+		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
+			func(format string, v ...interface{}) {})
+		require.NoError(t, err, "failed to init helm action config")
+
+		installAction := action.NewInstall(actionConfig)
+		installAction.Namespace = namespace
+		installAction.ReleaseName = releaseName
+		installAction.UseReleaseName = true
+		// DryRun to create the manifest without installing the chart
+		installAction.DryRun = true
+		installAction.Replace = true
+		installAction.ClientOnly = true
+		installAction.IncludeCRDs = true
+		installAction.DisableHooks = false
+
+		installAction.KubeVersion = &chartutil.KubeVersion{Version: "1.27.0"}
+
+		release, err := installAction.Run(helmChart, values)
+		require.NoError(t, err, "failed to render helm chart")
+
+		// Helm includes documents that are just "# Source: ..." comments; filter those out
+		// since they lack Kind and cause the k8s decoder to fail.
+		// filteredManifest := filterHelmManifestToK8sResources(release.Manifest)
+		// Reorder so Secrets and Jobs (e.g. cert) are applied before Deployments that
+		// depend on them; avoids FailedMount on the operator pod.
+		// filteredManifest = orderHelmManifestForApply(filteredManifest)
+
+		// Use kubectl apply -f to apply the manifest.
+		manifestFile, err := os.CreateTemp("", "helm-template-*.yaml")
+		require.NoError(t, err, "failed to create temp manifest file")
+		manifestPath := manifestFile.Name()
+		_, err = manifestFile.WriteString(release.Manifest)
+		require.NoError(t, err, "failed to write manifest")
+		for _, hook := range release.Hooks {
+			// Hooks are not included in the release.Manifest, so we need to add them manually
+			// to match `helm template` output.
+			_, err = manifestFile.WriteString("\n---\n")
+			require.NoError(t, err, "failed to write hook manifest")
+			_, err = manifestFile.WriteString(hook.Manifest)
+			require.NoError(t, err, "failed to write hook manifest")
+		}
+
+		manifestFile.Close()
+		t.Cleanup(func() { os.Remove(manifestPath) })
+
+		t.Cleanup(func() {
+			if t.Failed() {
+				k8sDumpPods(t, ctx, kCtx.client, t.Name(), namespace, kCtx.logsBasePath, kCtx.createdAt)
+				// Kubectl diagnostics when template+apply test fails
+				t.Logf("=== kubectl diagnostics for namespace %s ===", namespace)
+				for _, args := range [][]string{
+					{"get", "pods", "-n", namespace, "-o", "wide"},
+					{"get", "events", "-n", namespace, "--sort-by=.lastTimestamp"},
+					{"get", "secrets", "-n", namespace},
+				} {
+					cmd := exec.CommandContext(ctx, "kubectl", args...)
+					if out, err := cmd.CombinedOutput(); err == nil {
+						t.Logf("kubectl %s:\n%s", strings.Join(args, " "), string(out))
+					}
+				}
+			}
+			// kubectl delete -f to remove all applied resources
+			delCmd := exec.CommandContext(ctx, "kubectl", "delete", "-f", manifestPath, "--ignore-not-found", "--wait", "--timeout=120s")
+			_ = delCmd.Run()
+		})
+
+		applyCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", manifestPath)
+		applyOut, applyErr := applyCmd.CombinedOutput()
+		require.NoError(t, applyErr, "kubectl apply failed: %s", string(applyOut))
 	}
 }
 
