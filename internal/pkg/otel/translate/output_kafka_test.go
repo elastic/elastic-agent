@@ -182,7 +182,7 @@ max_message_bytes: 1000000`,
 	}
 }
 
-func TestSetDynamicTopic(t *testing.T) {
+func TestDynamicTopicSetter(t *testing.T) {
 	testCases := []struct {
 		name                 string
 		topic                string
@@ -266,7 +266,7 @@ func TestSetDynamicTopic(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := fmtstr.CompileEvent(test.topic)
 			require.NoError(t, err)
-			require.Equal(t, test.expectedTransformMap, setDynamicTopic(test.topic, "default"))
+			require.Equal(t, test.expectedTransformMap, dynamicTopicSetterProcessor(test.topic, "default"))
 		})
 	}
 }

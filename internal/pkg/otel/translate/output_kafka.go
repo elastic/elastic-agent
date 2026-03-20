@@ -17,7 +17,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
-var TransformProcessorType = "transform"
+const transformProcessorType = "transform"
 
 // KafkaToOTelConfig translates kafka output to OTel config
 // It returns kafka exporter, transform processor (if required) and error
@@ -101,7 +101,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 
 	if !fmtstr.IsConst() {
 		kafkaExporter["topic_from_attribute"] = "topic"
-		processor := setDynamicTopic(kConfig.Topic, outputName)
+		processor := dynamicTopicSetterProcessor(kConfig.Topic, outputName)
 		// delete topic set under logs
 		delete(kafkaExporter, "logs")
 		return kafkaExporter, processor, nil
@@ -109,8 +109,10 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 	return kafkaExporter, nil, nil
 }
 
-// set dynamic topic returns a transform processor
-func setDynamicTopic(topic string, outputName string) map[string]any {
+// dynamicTopicSetterProcessor parses topic field with dynamic values such as %{[data_stream.type]}
+// It translates this behavior onto a transform processor defined here
+// More about transform processor https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor
+func dynamicTopicSetterProcessor(topic string, outputName string) map[string]any {
 	content := topic
 	logStatements := []string{}
 
@@ -148,13 +150,8 @@ func setDynamicTopic(topic string, outputName string) map[string]any {
 				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat(["%s", %s], ""))`, literalBefore, getLogBody(field)))
 			}
 		} else {
-			// Subsequent placeholder: set topic =  topic + field
-			if literalBefore == "" {
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], %s], ""))`, getLogBody(field)))
-			} else {
-				// Subsequent placeholder: set topic =  topic + literal + field
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], %s], "%s"))`, getLogBody(field), literalBefore))
-			}
+			// Subsequent placeholder: set topic =  topic + literal + field
+			logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], %s], "%s"))`, getLogBody(field), literalBefore))
 		}
 	}
 
@@ -228,7 +225,7 @@ func getLogBody(field string) string {
 // getTransformProcessorID returns the id for transform processor
 func getTransformProcessorID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(TransformProcessorType), extensionName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(transformProcessorType), extensionName)
 }
 
 // log warning for unsupported config
