@@ -1449,10 +1449,10 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := &OTelManager{
-				managerLogger:          newTestLogger(),
-				components:             tt.components,
-				healthCheckExtID:       "extension:healthcheckv2/uuid",
-				currentComponentStates: make(map[string]runtime.ComponentComponentState),
+				managerLogger:             newTestLogger(),
+				components:                tt.components,
+				healthCheckExtComponentID: "healthcheckv2/uuid",
+				currentComponentStates:    make(map[string]runtime.ComponentComponentState),
 			}
 
 			componentStates, err := mgr.handleOtelStatusUpdate(tt.inputStatus)
@@ -1584,24 +1584,22 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		configUpdated:    configUpdated,
 	}
 
-	// Create manager with test dependencies
-	mgr := OTelManager{
-		managerLogger:              testLogger,
-		collectorLogger:            testLogger,
-		errCh:                      make(chan error, 1), // holds at most one error
-		updateCh:                   make(chan configUpdate, 1),
-		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
-		componentStateCh:           make(chan []runtime.ComponentComponentState, 5),
-		doneChan:                   make(chan struct{}),
-		recoveryTimer:              newRestarterNoop(),
-		execution:                  execution,
-		agentInfo:                  agentInfo,
-		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
-		collectorRunErr:            make(chan error),
-		healthCheckExtComponentID:  "healthcheckv2/test-e2e-uuid",
-		healthCheckExtID:           "extension:healthcheckv2/test-e2e-uuid",
-		collectorMetricsPort:       8888,
+	// Create manager with mock execution factory
+	mockFactory := func(string, string, int) (collectorExecution, error) {
+		return execution, nil
 	}
+	mgr, err := NewOTelManager(
+		testLogger,
+		logp.InfoLevel,
+		testLogger,
+		agentInfo,
+		nil,
+		beatMonitoringConfigGetter,
+		time.Second,
+		mockFactory,
+	)
+	require.NoError(t, err)
+	mgr.recoveryTimer = newRestarterNoop()
 
 	// Start manager in a goroutine
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
@@ -1793,22 +1791,12 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 		collectorStarted: collectorStarted,
 	}
 
-	mgr := OTelManager{
-		managerLogger:             testLogger,
-		collectorLogger:           testLogger,
-		errCh:                     make(chan error, 1),
-		updateCh:                  make(chan configUpdate, 1),
-		collectorStatusCh:         make(chan *status.AggregateStatus, 1),
-		componentStateCh:          make(chan []runtime.ComponentComponentState, 5),
-		doneChan:                  make(chan struct{}),
-		recoveryTimer:             newRestarterNoop(),
-		execution:                 execution,
-		agentInfo:                 &info.AgentInfo{},
-		collectorRunErr:           make(chan error),
-		stopTimeout:               time.Second,
-		healthCheckExtComponentID: "healthcheckv2/test-uuid",
-		collectorMetricsPort:      8888,
+	mockFactory := func(string, string, int) (collectorExecution, error) {
+		return execution, nil
 	}
+	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, nil, time.Second, mockFactory)
+	require.NoError(t, err)
+	mgr.recoveryTimer = newRestarterNoop()
 
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
@@ -1862,22 +1850,21 @@ func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
 	managerLogger, obs := loggertest.New("otel-manager")
 	collectorLogger, _ := loggertest.New("otel")
 
-	mgr := OTelManager{
-		managerLogger:             managerLogger,
-		collectorLogger:           collectorLogger,
-		errCh:                     make(chan error, 1),
-		updateCh:                  make(chan configUpdate, 1),
-		collectorStatusCh:         make(chan *status.AggregateStatus, 1),
-		componentStateCh:          make(chan []runtime.ComponentComponentState, 5),
-		doneChan:                  make(chan struct{}),
-		recoveryTimer:             newRestarterNoop(),
-		execution:                 &mockExecution{},
-		agentInfo:                 &info.AgentInfo{},
-		collectorRunErr:           make(chan error, 1),
-		stopTimeout:               time.Second,
-		healthCheckExtComponentID: "healthcheckv2/test-uuid",
-		collectorMetricsPort:      8888,
+	mockFactory := func(string, string, int) (collectorExecution, error) {
+		return &mockExecution{}, nil
 	}
+	mgr, err := NewOTelManager(
+		managerLogger,
+		logp.InfoLevel,
+		collectorLogger,
+		&info.AgentInfo{},
+		nil,
+		nil,
+		time.Second,
+		mockFactory,
+	)
+	require.NoError(t, err)
+	mgr.recoveryTimer = newRestarterNoop()
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()

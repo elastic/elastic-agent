@@ -85,7 +85,6 @@ type OTelManager struct {
 	agentInfo                  info.Agent
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter
 
-	healthCheckExtID          string
 	healthCheckExtComponentID string
 	collectorMetricsPort      int
 	collectorCfg              *confmap.Conf
@@ -199,7 +198,6 @@ func NewOTelManager(
 		collectorLogger:            collectorLogger,
 		agentInfo:                  agentInfo,
 		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
-		healthCheckExtID:           "extension:" + healthCheckExtComponentID,
 		healthCheckExtComponentID:  healthCheckExtComponentID,
 		collectorMetricsPort:       collectorMetricsPort,
 		errCh:                      make(chan error, 1), // holds at most one error
@@ -774,7 +772,7 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
-				case extensionKey == m.healthCheckExtID:
+				case extensionKey == "extension:"+m.healthCheckExtComponentID:
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}
