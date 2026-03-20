@@ -391,6 +391,22 @@ func countHealthCheckExtensionStatuses(status *status.AggregateStatus) uint {
 	return count
 }
 
+// newTestSubprocessExecution creates a subprocessExecution for testing with a random
+// health check extension ID. The health check port is resolved per-start (0 = random).
+func newTestSubprocessExecution(t *testing.T, collectorPath string) (*subprocessExecution, error) {
+	t.Helper()
+	hcUUID, err := uuid.NewV4()
+	if err != nil {
+		return nil, fmt.Errorf("cannot generate UUID: %w", err)
+	}
+	componentType, err := otelComponent.NewType(healthCheckExtensionName)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create component type: %w", err)
+	}
+	healthCheckExtID := otelComponent.NewIDWithName(componentType, hcUUID.String()).String()
+	return newSubprocessExecution(collectorPath, healthCheckExtID, 0)
+}
+
 func TestOTelManager_Run(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
@@ -410,11 +426,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name: "subprocess collector config updates",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
+				return newTestSubprocessExecution(t, testBinary)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -442,11 +454,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name: "subprocess collector stopped gracefully outside manager",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
+				return newTestSubprocessExecution(t, testBinary)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -475,11 +483,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name: "subprocess collector killed outside manager",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
+				return newTestSubprocessExecution(t, testBinary)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -522,11 +526,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name: "subprocess collector panics restarts",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
+				return newTestSubprocessExecution(t, testBinary)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -561,11 +561,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name: "subprocess collector panics reports fatal",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
+				return newTestSubprocessExecution(t, testBinary)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -601,11 +597,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name: "subprocess collector killed if delayed and manager is stopped",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				subprocessExec, err := newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
+				subprocessExec, err := newTestSubprocessExecution(t, testBinary)
 				if err != nil {
 					return nil, err
 				}
@@ -658,11 +650,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name: "subprocess collector gracefully exited if delayed a bit and manager is stopped",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				subprocessExec, err := newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
+				subprocessExec, err := newTestSubprocessExecution(t, testBinary)
 				if err != nil {
 					return nil, err
 				}
@@ -715,11 +703,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name: "subprocess user has healthcheck extension",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
+				return newTestSubprocessExecution(t, testBinary)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -740,7 +724,7 @@ func TestOTelManager_Run(t *testing.T) {
 				ports, err := findRandomTCPPorts(3)
 				require.NoError(t, err, "failed to find random tcp ports")
 				subprocessExec.collectorHealthCheckPort = ports[0]
-				subprocessExec.collectorMetricsPort = ports[1]
+				m.collectorMetricsPort = ports[1]
 				err = injectHealthCheckV2Extension(cfg, healthCheckExtensionID, ports[2])
 				require.NoError(t, err, "failed to inject user health extension")
 
@@ -754,11 +738,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name: "subprocess collector empty config",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
+				return newTestSubprocessExecution(t, testBinary)
 			},
 			restarter:           newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			skipListeningErrors: true,
@@ -805,11 +785,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name: "subprocess collector failed to start",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
+				return newTestSubprocessExecution(t, testBinary)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -876,6 +852,17 @@ func TestOTelManager_Run(t *testing.T) {
 			require.NoError(t, err, "failed to create execution mode")
 			testExecutionMode := &testExecution{exec: executionMode}
 			m.execution = testExecutionMode
+			// Extract subprocess fields to set on the manager
+			switch exec := executionMode.(type) {
+			case *subprocessExecution:
+				m.healthCheckExtComponentID = exec.healthCheckExtensionID
+				m.healthCheckExtID = "extension:" + exec.healthCheckExtensionID
+			case *testExecution:
+				if subExec, ok := exec.exec.(*subprocessExecution); ok {
+					m.healthCheckExtComponentID = subExec.healthCheckExtensionID
+					m.healthCheckExtID = "extension:" + subExec.healthCheckExtensionID
+				}
+			}
 
 			eListener := &EventListener{}
 			defer func() {
@@ -934,28 +921,20 @@ func TestOTelManager_Logging(t *testing.T) {
 	l, _ := loggertest.New("otel-manager")
 
 	for _, tc := range []struct {
-		name       string
-		execModeFn func(collectorRunErr chan error) (collectorExecution, error)
+		name string
 	}{
 		{
 			name: "subprocess execution",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
-			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			// the execution mode passed here is overridden below so it is irrelevant
 			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, nil, waitTimeForStop)
 			require.NoError(t, err, "could not create otel manager")
 
-			executionMode, err := tc.execModeFn(m.collectorRunErr)
+			// Use the manager's pre-resolved health check values for the execution
+			exec, err := newSubprocessExecution(testBinary, m.healthCheckExtComponentID, 0)
 			require.NoError(t, err, "failed to create execution mode")
-			testExecutionMode := &testExecution{exec: executionMode}
+			testExecutionMode := &testExecution{exec: exec}
 			m.execution = testExecutionMode
 
 			go func() {
@@ -1017,18 +996,10 @@ func TestOTelManager_Ports(t *testing.T) {
 
 	for _, tc := range []struct {
 		name               string
-		execModeFn         func(collectorRunErr chan error) (collectorExecution, error)
 		healthCheckEnabled bool
 	}{
 		{
-			name: "subprocess execution",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				return newSubprocessExecution(testBinary, hcUUID.String(), metricsPort, healthCheckPort)
-			},
+			name:               "subprocess execution",
 			healthCheckEnabled: true,
 		},
 	} {
@@ -1045,7 +1016,6 @@ func TestOTelManager_Ports(t *testing.T) {
 				}
 			})
 
-			// the execution mode passed here is overridden below so it is irrelevant
 			m, err := NewOTelManager(
 				l,
 				logp.InfoLevel,
@@ -1057,9 +1027,10 @@ func TestOTelManager_Ports(t *testing.T) {
 			)
 			require.NoError(t, err, "could not create otel manager")
 
-			executionMode, err := tc.execModeFn(m.collectorRunErr)
+			// Use the manager's health check component ID with the configured port for the execution
+			exec, err := newSubprocessExecution(testBinary, m.healthCheckExtComponentID, healthCheckPort)
 			require.NoError(t, err, "failed to create execution mode")
-			testExecutionMode := &testExecution{exec: executionMode}
+			testExecutionMode := &testExecution{exec: exec}
 			m.execution = testExecutionMode
 
 			go func() {
@@ -1180,7 +1151,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 		waitTimeForStop,
 	)
 	require.NoError(t, err, "could not create otel manager")
-	executionMode, err := newSubprocessExecution(testBinary, strings.TrimPrefix(m.healthCheckExtID, "extension:healthcheckv2/"), 0, 0)
+	executionMode, err := newSubprocessExecution(testBinary, m.healthCheckExtComponentID, 0)
 	require.NoError(t, err, "could not create subprocess execution mode")
 	m.execution = executionMode
 
@@ -1350,7 +1321,11 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				components:    tt.components,
 				agentLogLevel: configUpdateLevel,
 			}
-			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
+			mgr := &OTelManager{
+				healthCheckExtComponentID: "healthcheckv2/test-uuid",
+				collectorMetricsPort:      8888,
+			}
+			result, err := mgr.buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)
@@ -1659,6 +1634,9 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		agentInfo:                  agentInfo,
 		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
 		collectorRunErr:            make(chan error),
+		healthCheckExtComponentID:  "healthcheckv2/test-e2e-uuid",
+		healthCheckExtID:           "extension:healthcheckv2/test-e2e-uuid",
+		collectorMetricsPort:       8888,
 	}
 
 	// Start manager in a goroutine
@@ -1699,6 +1677,8 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
 		assert.NoError(t, maybeInjectLogLevel(expectedCfg, logpLevel))
+		assert.NoError(t, injectHealthCheckV2Extension(expectedCfg, mgr.healthCheckExtComponentID, 0))
+		assert.NoError(t, addCollectorMetricsReader(expectedCfg, mgr.collectorMetricsPort))
 		assert.Equal(t, expectedCfg, execution.cfg)
 
 	})
@@ -1850,18 +1830,20 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	}
 
 	mgr := OTelManager{
-		managerLogger:     testLogger,
-		collectorLogger:   testLogger,
-		errCh:             make(chan error, 1),
-		updateCh:          make(chan configUpdate, 1),
-		collectorStatusCh: make(chan *status.AggregateStatus, 1),
-		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
-		doneChan:          make(chan struct{}),
-		recoveryTimer:     newRestarterNoop(),
-		execution:         execution,
-		agentInfo:         &info.AgentInfo{},
-		collectorRunErr:   make(chan error),
-		stopTimeout:       time.Second,
+		managerLogger:             testLogger,
+		collectorLogger:           testLogger,
+		errCh:                     make(chan error, 1),
+		updateCh:                  make(chan configUpdate, 1),
+		collectorStatusCh:         make(chan *status.AggregateStatus, 1),
+		componentStateCh:          make(chan []runtime.ComponentComponentState, 5),
+		doneChan:                  make(chan struct{}),
+		recoveryTimer:             newRestarterNoop(),
+		execution:                 execution,
+		agentInfo:                 &info.AgentInfo{},
+		collectorRunErr:           make(chan error),
+		stopTimeout:               time.Second,
+		healthCheckExtComponentID: "healthcheckv2/test-uuid",
+		collectorMetricsPort:      8888,
 	}
 
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
@@ -1917,18 +1899,20 @@ func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
 	collectorLogger, _ := loggertest.New("otel")
 
 	mgr := OTelManager{
-		managerLogger:     managerLogger,
-		collectorLogger:   collectorLogger,
-		errCh:             make(chan error, 1),
-		updateCh:          make(chan configUpdate, 1),
-		collectorStatusCh: make(chan *status.AggregateStatus, 1),
-		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
-		doneChan:          make(chan struct{}),
-		recoveryTimer:     newRestarterNoop(),
-		execution:         &mockExecution{},
-		agentInfo:         &info.AgentInfo{},
-		collectorRunErr:   make(chan error, 1),
-		stopTimeout:       time.Second,
+		managerLogger:             managerLogger,
+		collectorLogger:           collectorLogger,
+		errCh:                     make(chan error, 1),
+		updateCh:                  make(chan configUpdate, 1),
+		collectorStatusCh:         make(chan *status.AggregateStatus, 1),
+		componentStateCh:          make(chan []runtime.ComponentComponentState, 5),
+		doneChan:                  make(chan struct{}),
+		recoveryTimer:             newRestarterNoop(),
+		execution:                 &mockExecution{},
+		agentInfo:                 &info.AgentInfo{},
+		collectorRunErr:           make(chan error, 1),
+		stopTimeout:               time.Second,
+		healthCheckExtComponentID: "healthcheckv2/test-uuid",
+		collectorMetricsPort:      8888,
 	}
 
 	ctx, cancel := context.WithCancel(t.Context())
