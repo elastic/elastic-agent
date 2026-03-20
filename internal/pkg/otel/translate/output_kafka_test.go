@@ -5,6 +5,7 @@
 package translate
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -187,6 +188,7 @@ func TestDynamicTopicSetter(t *testing.T) {
 		name                 string
 		topic                string
 		expectedTransformMap map[string]any
+		err                  error
 	}{
 		{
 			name:  "test where topic=field",
@@ -198,6 +200,7 @@ func TestDynamicTopicSetter(t *testing.T) {
 						`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
 					},
 				}},
+			err: nil,
 		},
 		{
 			name:  "test correct behavior when two keys are same",
@@ -210,6 +213,7 @@ func TestDynamicTopicSetter(t *testing.T) {
 						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["type"]], "-"))`,
 					},
 				}},
+			err: nil,
 		},
 		{
 			name:  "test where topic = topic + field",
@@ -223,6 +227,7 @@ func TestDynamicTopicSetter(t *testing.T) {
 						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-"))`,
 					},
 				}},
+			err: nil,
 		},
 		{
 			name:  "test where topic = literal + field ",
@@ -235,6 +240,7 @@ func TestDynamicTopicSetter(t *testing.T) {
 						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-"))`,
 					},
 				}},
+			err: nil,
 		},
 		{
 			name:  "test where topic =  topic + literal + field ",
@@ -247,6 +253,7 @@ func TestDynamicTopicSetter(t *testing.T) {
 						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-test-data-"))`,
 					},
 				}},
+			err: nil,
 		},
 		{
 			name:  "test where topic =  field + literal (i.e any content left is appended to final topic string) ",
@@ -259,12 +266,23 @@ func TestDynamicTopicSetter(t *testing.T) {
 						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], "-test-data"], ""))`,
 					},
 				}},
+			err: nil,
+		},
+		{
+			name:                 "return error if closing bracket not found",
+			topic:                `%{[data_stream.dataset]-no-closing-bracket`,
+			expectedTransformMap: nil,
+			err:                  fmt.Errorf("missing closing '}'"),
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := fmtstr.CompileEvent(test.topic)
+			if test.err != nil {
+				require.Error(t, err)
+				return
+			}
 			require.NoError(t, err)
 			require.Equal(t, test.expectedTransformMap, dynamicTopicSetterProcessor(test.topic, "default"))
 		})

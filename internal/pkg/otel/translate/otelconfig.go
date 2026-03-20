@@ -295,13 +295,14 @@ func getCollectorConfigForComponent(
 	if features.DefaultProcessors() {
 		pipelineProcessors = append(pipelineProcessors, GetProcessorID().String())
 	}
+
 	// per output processor if any
-	processor, err := extractOtelProcessors(comp)
+	processors, err := extractOtelProcessors(comp)
 	if err != nil {
 		return nil, fmt.Errorf("could not read per output processor: %w", err)
 	}
 
-	pipelineProcessors = append(pipelineProcessors, processor...)
+	pipelineProcessors = append(pipelineProcessors, processors...)
 
 	if len(processorConfig) != 0 {
 		pipelineProcessors = append(pipelineProcessors, maps.Keys(processorConfig)...)
@@ -523,13 +524,13 @@ func OutputTypeToExporterType(outputType string) (otelcomponent.Type, error) {
 // - exportersCfg: OTel exporter configuration
 // - queueSettings: the output's queue configuration
 // - extensionCfg: OTel extension configuration, or nil if not needed for the exporter
-// - processors: list of OTel processor IDs defined in the output, or nil if the output does not define any
+// - processorCfg: OTel processor configuration or nil if not needed for the exporter
 // - err: the error, if any
 func unitToExporterConfig(unit component.Unit, outputName string, exporterType otelcomponent.Type, logger *logp.Logger) (
 	exportersCfg map[string]any,
 	queueSettings map[string]any,
 	extensionCfg map[string]any,
-	processors map[string]any, err error) {
+	processorCfg map[string]any, err error) {
 	if unit.Type == client.UnitTypeInput {
 		return nil, nil, nil, nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
 	}

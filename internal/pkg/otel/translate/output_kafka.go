@@ -121,12 +121,15 @@ func dynamicTopicSetterProcessor(topic string, outputName string) map[string]any
 		if idxPercent == -1 {
 			break
 		}
-		// Require %{...}; find closing }
+
 		if len(content) <= idxPercent+1 || content[idxPercent+1] != '{' {
 			content = content[idxPercent+1:]
 			continue
 		}
+
+		// Require %{...}; find closing }
 		idxClose := strings.Index(content[idxPercent+2:], "}")
+
 		// Found no closing bracket. Ideally this should never happen because CompileEvent() validates against such malforms
 		if idxClose == -1 {
 			break
