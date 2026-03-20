@@ -73,6 +73,7 @@ import (
 
 	elasticapmprocessor "github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor"
 	elastictraceprocessor "github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
+	"github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
@@ -202,6 +203,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			memorylimiterprocessor.NewFactory(),
 			elasticapmprocessor.NewFactory(),
 			elastictraceprocessor.NewFactory(), // deprecated, will be removed in future
+			ratelimitprocessor.NewFactory(),
 			tailsamplingprocessor.NewFactory(),
 			logdedupprocessor.NewFactory(),
 			beatprocessor.NewFactory(),

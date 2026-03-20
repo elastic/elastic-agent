@@ -19,6 +19,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.36.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.36.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.36.0
+	github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.36.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.36.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.147.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.147.0

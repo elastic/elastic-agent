@@ -49,6 +49,7 @@ core_components:
   - elasticapmprocessor
   - k8sattributesprocessor
   - resourcedetectionprocessor
+  - ratelimitprocessor
   - resourceprocessor
   - transformprocessor
   - elastictraceprocessor
