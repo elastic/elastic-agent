@@ -236,6 +236,12 @@ func (Prepare) InstallGoLicenser() error {
 	return GoInstall(goLicenserRepo)
 }
 
+// InstallGolangciLint downloads and installs golangci-lint using the version
+// specified in .tool-versions.
+func (Prepare) InstallGolangciLint() error {
+	return devtools.InstallGolangciLint()
+}
+
 // All build all the things for the current projects.
 func (Build) All() {
 	mg.Deps(Build.Binary)
@@ -425,6 +431,18 @@ func (Build) TestBinaries() error {
 // All run all the code checks.
 func (Check) All() {
 	mg.SerialDeps(Check.License, Integration.Check)
+}
+
+// Lint downloads golangci-lint and runs the linter on current changes only.
+func (Check) Lint(ctx context.Context) error {
+	mg.Deps(Prepare.InstallGolangciLint)
+	return devtools.Lint(ctx)
+}
+
+// LintAll downloads golangci-lint and runs the linter on the whole codebase.
+func (Check) LintAll() error {
+	mg.Deps(Prepare.InstallGolangciLint)
+	return devtools.LintAll()
 }
 
 // License makes sure that all the Golang files have the appropriate license header.
