@@ -11,7 +11,7 @@
 kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: Add config options to enable checkin request compression
+summary: Add config option to enable checkin request compression
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.

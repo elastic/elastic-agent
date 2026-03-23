@@ -12,8 +12,15 @@ import (
 )
 
 const (
-	defaultCompressEnabled   = true
-	defaultCompressThreshold = uint64(1024)
+	// CheckinCompressionNone disables checkin request compression.
+	CheckinCompressionNone = "none"
+	// CheckinCompressionGzip enables gzip compression of checkin requests.
+	CheckinCompressionGzip = "gzip"
+
+	defaultCompression = CheckinCompressionGzip
+
+	fleetCheckinModeStandard       = "standard"
+	fleetCheckinModeOnStateChanged = "on_state_change"
 )
 
 // FleetAgentConfig is the internal configuration of the agent after the enrollment is done,
@@ -64,18 +71,18 @@ func DefaultFleetAgentConfig() *FleetAgentConfig {
 }
 
 type FleetCheckin struct {
-	Mode                       string        `config:"mode" yaml:"mode,omitempty"` // `standard` or `on_state_change` (empty string is accepted as standard)
-	RequestBackoffInit         time.Duration `config:"request_backoff_init" yaml:"request_backoff_init,omitempty"`
-	RequestBackoffMax          time.Duration `config:"request_backoff_max" yaml:"request_backoff_max,omitempty"`
-	CompressEnabled            bool          `config:"compress_enabled" yaml:"compress_enabled"`
-	CompressThresholdSizeBytes uint64        `config:"compress_threshold_size_bytes" yaml:"compress_threshold_size_bytes,omitempty"`
+	Mode               string        `config:"mode" yaml:"mode,omitempty"` // `standard` or `on_state_change` (empty string is accepted as standard)
+	RequestBackoffInit time.Duration `config:"request_backoff_init" yaml:"request_backoff_init,omitempty"`
+	RequestBackoffMax  time.Duration `config:"request_backoff_max" yaml:"request_backoff_max,omitempty"`
+	// Compression controls how checkin request bodies are encoded.
+	// Accepted values: "none" (no compression) or "gzip" (gzip compression).
+	Compression string `config:"compression" yaml:"compression,omitempty"`
 }
 
 // DefaultFleetCheckin returns a FleetCheckin with default values.
 func DefaultFleetCheckin() *FleetCheckin {
 	return &FleetCheckin{
-		CompressEnabled:            defaultCompressEnabled,
-		CompressThresholdSizeBytes: defaultCompressThreshold,
+		Compression: defaultCompression,
 	}
 }
 
@@ -103,24 +110,18 @@ func (f *FleetCheckin) Validate() error {
 	if f.RequestBackoffMax < f.RequestBackoffInit {
 		return errors.New("checkin.request_backoff_max must be greater than or equal to checkin.request_backoff_init")
 	}
+
+	if f.Compression != "" && f.Compression != CheckinCompressionNone && f.Compression != CheckinCompressionGzip {
+		return errors.New("checkin.compression must be either 'none' or 'gzip'")
+	}
+
 	return nil
 }
 
-func (f *FleetCheckin) GetCompressEnabled() bool {
-	if f == nil {
-		return defaultCompressEnabled
+// GetCompression returns the configured compression mode, defaulting to gzip.
+func (f *FleetCheckin) GetCompression() string {
+	if f == nil || f.Compression == "" {
+		return defaultCompression
 	}
-	return f.CompressEnabled
+	return f.Compression
 }
-
-func (f *FleetCheckin) GetCompressThresholdSize() uint64 {
-	if f == nil {
-		return defaultCompressThreshold
-	}
-	return f.CompressThresholdSizeBytes
-}
-
-const (
-	fleetCheckinModeStandard       = "standard"
-	fleetCheckinModeOnStateChanged = "on_state_change"
-)

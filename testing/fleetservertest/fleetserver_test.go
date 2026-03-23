@@ -164,7 +164,7 @@ func ExampleNewServer_checkin() {
 
 	defaultCheckinConfig := configuration.DefaultFleetCheckin()
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompressEnabled(), defaultCheckinConfig.GetCompressThresholdSize())
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 
 	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err != nil {
@@ -193,7 +193,7 @@ func ExampleNewServer_checkin_compress() {
 		WithAgentID(agentID))
 
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, true, 0) // true with 0 threshold always compresses
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, "gzip")
 
 	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err != nil {
@@ -232,7 +232,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 
 	defaultCheckinConfig := configuration.DefaultFleetCheckin()
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompressEnabled(), defaultCheckinConfig.GetCompressThresholdSize())
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 
 	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err != nil {
@@ -493,7 +493,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 	// 1st call, nextAction() will return a POLICY_CHANGE.
 	defaultCheckinConfig := configuration.DefaultFleetCheckin()
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompressEnabled(), defaultCheckinConfig.GetCompressThresholdSize())
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing 3rd checkin: %v", err))
@@ -560,7 +560,7 @@ func ExampleNewServer_checkin_withDelay() {
 	// 1st - call actions have a delay.
 	defaultCheckinConfig := configuration.DefaultFleetCheckin()
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompressEnabled(), defaultCheckinConfig.GetCompressThresholdSize())
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 
 	start := time.Now()
 	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
@@ -743,7 +743,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	// 4th - instantiate the fleetapi commands
 	defaultCheckinConfig := configuration.DefaultFleetCheckin()
 	cmdCheckin := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompressEnabled(), defaultCheckinConfig.GetCompressThresholdSize())
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 	cmdAck := fleetapi.NewAckCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathAgentAcks(agentID)})
 

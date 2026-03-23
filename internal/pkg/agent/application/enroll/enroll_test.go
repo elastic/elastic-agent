@@ -98,19 +98,17 @@ func TestLoadPersistentConfig_FleetCheckin(t *testing.T) {
 			expected: configuration.DefaultFleetCheckin(),
 		},
 		{
-			name: "compress_enabled false",
-			yaml: "fleet:\n  checkin:\n    compress_enabled: false\n",
+			name: "compression none",
+			yaml: "fleet:\n  checkin:\n    compression: none\n",
 			expected: &configuration.FleetCheckin{
-				CompressEnabled:            false,
-				CompressThresholdSizeBytes: 1024,
+				Compression: configuration.CheckinCompressionNone,
 			},
 		},
 		{
-			name: "compress_enabled true",
-			yaml: "fleet:\n  checkin:\n    compress_enabled: true\n",
+			name: "compression gzip",
+			yaml: "fleet:\n  checkin:\n    compression: gzip\n",
 			expected: &configuration.FleetCheckin{
-				CompressEnabled:            true,
-				CompressThresholdSizeBytes: 1024,
+				Compression: configuration.CheckinCompressionGzip,
 			},
 		},
 	}

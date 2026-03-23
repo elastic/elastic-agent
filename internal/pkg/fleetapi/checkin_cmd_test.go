@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -33,8 +32,7 @@ func TestCheckin(t *testing.T) {
 	const requestDelay = time.Millisecond
 	ctx := context.Background()
 	agentInfo := &agentinfo{}
-	defaultCompressEnabled := configuration.DefaultFleetCheckin().GetCompressEnabled()
-	defaultCompressThreshold := configuration.DefaultFleetCheckin().GetCompressThresholdSize()
+	defaultCompression := configuration.DefaultFleetCheckin().GetCompression()
 
 	t.Run("Propagate any errors from the server", withServerWithAuthClient(
 		func(t *testing.T) *http.ServeMux {
@@ -53,7 +51,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{}
 
@@ -104,7 +102,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{}
 
@@ -165,7 +163,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{}
 
@@ -197,7 +195,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{}
 
@@ -231,7 +229,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{Metadata: testMetadata()}
 
@@ -265,7 +263,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{}
 
@@ -304,7 +302,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client, defaultCompressEnabled, defaultCompressThreshold)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{}
 
@@ -327,35 +325,17 @@ func TestCheckinCompression(t *testing.T) {
 	agentInfo := &agentinfo{}
 
 	testCases := []struct {
-		name             string
-		enabled          bool
-		thresholdSize    *uint64
-		messageSizeBytes int
-		wantCompressed   bool
+		name           string
+		compression    string
+		wantCompressed bool
 	}{{
-		name:             "compression is enabled at a 1kb threshold_size - request body is at least 1kb",
-		enabled:          true,
-		thresholdSize:    uint64Ptr(1024),
-		messageSizeBytes: 2048,
-		wantCompressed:   true,
+		name:           "compression=gzip - request body is compressed",
+		compression:    "gzip",
+		wantCompressed: true,
 	}, {
-		name:             "compression is enabled at a 1kb threshold_size - request body is smaller than size limit",
-		enabled:          true,
-		thresholdSize:    uint64Ptr(1024),
-		messageSizeBytes: 128,
-		wantCompressed:   false,
-	}, {
-		name:             "compression is enabled with 0 threshold_size - request body is always compressed",
-		enabled:          true,
-		thresholdSize:    uint64Ptr(0),
-		messageSizeBytes: 128,
-		wantCompressed:   true,
-	}, {
-		name:             "compression is disabled - request body is not compressed",
-		enabled:          false,
-		thresholdSize:    uint64Ptr(0),
-		messageSizeBytes: 2048,
-		wantCompressed:   false,
+		name:           "compression=none - request body is not compressed",
+		compression:    "none",
+		wantCompressed: false,
 	}}
 
 	for _, tc := range testCases {
@@ -377,7 +357,6 @@ func TestCheckinCompression(t *testing.T) {
 
 					var checkinRequest CheckinRequest
 					require.NoError(t, json.Unmarshal(checkinPayload, &checkinRequest))
-					assert.Equal(t, strings.Repeat("a", tc.messageSizeBytes), checkinRequest.Message)
 
 					w.WriteHeader(http.StatusOK)
 					fmt.Fprint(w, resp)
@@ -386,13 +365,8 @@ func TestCheckinCompression(t *testing.T) {
 			},
 			withAPIKey,
 			func(t *testing.T, client client.Sender) {
-				thresholdSize := uint64(0)
-				if tc.thresholdSize != nil {
-					thresholdSize = *tc.thresholdSize
-				}
-				cmd := NewCheckinCmd(agentInfo, client, tc.enabled, thresholdSize)
-				request := CheckinRequest{Message: strings.Repeat("a", tc.messageSizeBytes)}
-				_, _, err := cmd.Execute(t.Context(), &request)
+				cmd := NewCheckinCmd(agentInfo, client, tc.compression)
+				_, _, err := cmd.Execute(t.Context(), &CheckinRequest{})
 				require.NoError(t, err)
 			},
 		))
@@ -411,8 +385,4 @@ func readMaybeCompressedCheckinBody(r *http.Request) ([]byte, error) {
 	defer gzipReader.Close()
 
 	return io.ReadAll(gzipReader)
-}
-
-func uint64Ptr(v uint64) *uint64 {
-	return &v
 }

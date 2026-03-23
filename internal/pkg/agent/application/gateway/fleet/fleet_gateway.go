@@ -98,8 +98,7 @@ type FleetGateway struct {
 	errCh                 chan error
 	actionCh              chan []fleetapi.Action
 	rollbackSource        rollbacksSource
-	compressEnabled       bool
-	compressThresholdSize uint64
+	compression string
 }
 
 // New creates a new fleet gateway
@@ -130,8 +129,7 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	gw.compressEnabled = cfg.GetCompressEnabled()
-	gw.compressThresholdSize = cfg.GetCompressThresholdSize()
+	gw.compression = cfg.GetCompression()
 	return gw, nil
 }
 
@@ -435,7 +433,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// checkin
-	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client, f.compressEnabled, f.compressThresholdSize)
+	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client, f.compression)
 	req := &fleetapi.CheckinRequest{
 		AckToken:          ackToken,
 		Metadata:          ecsMeta,

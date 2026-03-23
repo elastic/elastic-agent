@@ -99,10 +99,9 @@ func (e *CheckinResponse) Validate() error {
 
 // CheckinCmd is a fleet API command.
 type CheckinCmd struct {
-	client                client.Sender
-	info                  AgentInfo
-	compressEnabled       bool
-	compressThresholdSize uint64
+	client      client.Sender
+	info        AgentInfo
+	compression string // "gzip" or "none"
 }
 
 type AgentInfo interface {
@@ -110,12 +109,12 @@ type AgentInfo interface {
 }
 
 // NewCheckinCmd creates a new api command.
-func NewCheckinCmd(info AgentInfo, client client.Sender, compressEnabled bool, compressThresholdSize uint64) *CheckinCmd {
+// compression must be either "gzip" (compress request bodies) or "none" (no compression).
+func NewCheckinCmd(info AgentInfo, client client.Sender, compression string) *CheckinCmd {
 	return &CheckinCmd{
-		client:                client,
-		info:                  info,
-		compressEnabled:       compressEnabled,
-		compressThresholdSize: compressThresholdSize,
+		client:      client,
+		info:        info,
+		compression: compression,
 	}
 }
 
@@ -135,7 +134,7 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 
 	requestHeaders := http.Header{}
 	requestBody := bytes.NewBuffer(b)
-	if e.compressEnabled && (e.compressThresholdSize == 0 || uint64(len(b)) >= e.compressThresholdSize) {
+	if e.compression == "gzip" {
 		requestBody, err = gzipEncodeCheckinRequestBody(b)
 		if err != nil {
 			return nil, 0, errors.New(err,

@@ -108,14 +108,14 @@ func isAgentCheckinRequest(r *http.Request) bool {
 }
 
 // TestEnrollPreservesCheckinConfig verifies that a user-supplied
-// fleet.checkin.compress_enabled: false in elastic-agent.yml is not
-// overwritten with the default (true) during enrollment.
+// fleet.checkin.compression: none in elastic-agent.yml is not
+// overwritten with the default (gzip) during enrollment.
 //
 // The agent is installed with a pre-configured elastic-agent.yml that
 // disables checkin compression.  A MITM proxy records every checkin request.
 // After the agent connects to Fleet, we wait for at least one checkin and
 // then assert that none of them carried a Content-Encoding: gzip header,
-// confirming that compress_enabled: false survived enrollment.
+// confirming that compression: none survived enrollment.
 func TestEnrollPreservesCheckinConfig(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Fleet,
@@ -130,10 +130,10 @@ func TestEnrollPreservesCheckinConfig(t *testing.T) {
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	// Write elastic-agent.yml with compress_enabled: false before the agent is
+	// Write elastic-agent.yml with compression: none before the agent is
 	// installed.  LoadPersistentConfig reads this file during enrollment and
 	// the fix under test ensures that the setting is propagated to fleet.enc.
-	const agentYML = "fleet:\n  checkin:\n    compress_enabled: false\n"
+	const agentYML = "fleet:\n  checkin:\n    compression: none\n"
 	err = agentFixture.Configure(ctx, []byte(agentYML))
 	require.NoError(t, err, "writing pre-enrollment elastic-agent.yml")
 
@@ -194,7 +194,7 @@ func TestEnrollPreservesCheckinConfig(t *testing.T) {
 		"expected at least one checkin request through the proxy",
 	)
 	require.Equal(t, int32(0), gzipCheckins.Load(),
-		"checkin requests should not be gzip-compressed when compress_enabled is false")
+		"checkin requests should not be gzip-compressed when compression is none")
 
 	checkinCount := totalCheckins.Load()
 
@@ -213,5 +213,5 @@ func TestEnrollPreservesCheckinConfig(t *testing.T) {
 		"expected at least one checkin request through the proxy after restart",
 	)
 	require.Equal(t, int32(0), gzipCheckins.Load(),
-		"checkin requests should not be gzip-compressed when compress_enabled is false")
+		"checkin requests should not be gzip-compressed when compression is none")
 }
