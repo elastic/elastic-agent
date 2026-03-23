@@ -1147,8 +1147,46 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	}
 
 	storedFleetHosts := storedConfig.Fleet.Client.GetHosts()
-	if len(storedFleetHosts) == 0 || !slices.Contains(storedFleetHosts, setupCfg.Fleet.URL) {
+	if len(storedFleetHosts) == 0 {
+		// No stored Fleet hosts, enrollment is required.
+		return true, nil
+	}
+	// Parse the setup Fleet URL to extract the host portion for comparison.
+	// Stored hosts can be in one of two forms depending on when the config was last saved:
+	//  - Full URL "https://host:port" — after a fleet policy update (handler_action_policy_change
+	//    stores the full URLs sent by Fleet and clears the separate Protocol/Host fields).
+	//  - Host-only "host:port" — right after enrollment, before the first policy update
+	//    (remote.NewConfigFromURL stores Protocol and Host as separate fields).
+	// We must match against both forms so that neither case triggers a spurious re-enrollment.
+	setupFleetURL, err := url.Parse(setupCfg.Fleet.URL)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse fleet URL %q: %w", setupCfg.Fleet.URL, err)
+	}
+	setupFleetHost := setupFleetURL.Host
+	if setupFleetHost == "" {
+		// url.Parse may put the value in Path if there's no scheme (e.g. "host1")
+		// or misinterpret "host:port" as scheme:opaque. Fall back to the raw URL
+		// for the host comparison, and skip the protocol check since there is no
+		// reliable scheme.
+		setupFleetHost = setupCfg.Fleet.URL
+	}
+	// Check for a match against the full URL (post-policy-update form) or
+	// the host-only form (post-enrollment, pre-policy-update form).
+	// Track which form matched so we can decide whether to do the protocol check below.
+	matchedFullURL := slices.Contains(storedFleetHosts, setupCfg.Fleet.URL)
+	matchedHostOnly := slices.Contains(storedFleetHosts, setupFleetHost)
+	if !matchedFullURL && !matchedHostOnly {
 		// The Fleet URL in the setup does not exist in the stored configuration, so enrollment is required.
+		return true, nil
+	}
+	// When the stored config uses the pre-policy-update form (separate Protocol/Host
+	// fields, matched via setupFleetHost above), also verify the protocol hasn't changed.
+	// Skip this check when we matched via the full URL, because the scheme is already
+	// embedded in that URL and the stored Protocol field may hold a stale default value.
+	if !matchedFullURL && setupFleetURL.Host != "" && setupFleetURL.Scheme != "" &&
+		storedConfig.Fleet.Client.Protocol != "" &&
+		setupFleetURL.Scheme != string(storedConfig.Fleet.Client.Protocol) {
+		// The Fleet protocol has changed, so enrollment is required.
 		return true, nil
 	}
 
@@ -1198,6 +1236,12 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	fc, err := newFleetClient(log, storedConfig.Fleet.AccessAPIKey, storedConfig.Fleet.Client)
 	if err != nil {
 		return false, fmt.Errorf("failed to create fleet client: %w", err)
+	}
+
+	// The agent ID is stored under the top-level "agent.id" key (Settings.ID) in fleet.enc,
+	// not under "fleet.agent.id" (Fleet.Info.ID), which is always empty after enrollment.
+	if storedConfig.Settings != nil && storedConfig.Fleet.Info != nil && storedConfig.Fleet.Info.ID == "" {
+		storedConfig.Fleet.Info.ID = storedConfig.Settings.ID
 	}
 
 	// Perform an ACK request with **empty events** to verify the validity of the API token.
