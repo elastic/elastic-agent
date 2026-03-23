@@ -106,8 +106,8 @@ import (
 	profilingmetricsconnector "github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector"
 
 	// Telemetry
-	internaltelemetry "github.com/elastic/elastic-agent/internal/pkg/otel/internaltelemetry"
-	elasticmonitoringreceiver "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/elasticmonitoring"
+	internaltelemetry "github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
+	elasticmonitoringreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/elasticmonitoring"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
