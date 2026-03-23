@@ -242,6 +242,12 @@ func (Prepare) InstallGoLicenser() error {
 	return GoInstall(goLicenserRepo)
 }
 
+// InstallGolangciLint downloads and installs golangci-lint using the version
+// specified in .tool-versions.
+func (Prepare) InstallGolangciLint() error {
+	return devtools.InstallGolangciLint()
+}
+
 // All build all the things for the current projects.
 func (Build) All() {
 	mg.Deps(Build.Binary)
@@ -465,6 +471,18 @@ func buildTestBinaries(testBinaryPkgs []string) error {
 // All run all the code and docs checks.
 func (Check) All() {
 	mg.SerialDeps(Check.License, Integration.Check, Check.DocsFiles)
+}
+
+// Lint downloads golangci-lint and runs the linter on current changes only.
+func (Check) Lint(ctx context.Context) error {
+	mg.Deps(Prepare.InstallGolangciLint)
+	return devtools.Lint(ctx)
+}
+
+// LintAll downloads golangci-lint and runs the linter on the whole codebase.
+func (Check) LintAll() error {
+	mg.Deps(Prepare.InstallGolangciLint)
+	return devtools.LintAll()
 }
 
 // License makes sure that all the Golang files have the appropriate license header.
@@ -3538,6 +3556,17 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 	params.Package = "."
 	params.ExtraFlags = append(params.ExtraFlags, "-tags=agentbeat")
 	injectBuildVars(cfg, params.Vars)
+
+	// Workaround for https://github.com/golang/go/issues/75077: the Go PE linker assigns
+	// duplicate virtual addresses to DWARF sections in large binaries, causing Windows to
+	// reject the executable. nodwarf5 avoids this. Only needed for dev builds since
+	// production builds strip debug symbols via -s in DefaultGolangCrossBuildArgs.
+	if cfg.Build.DevBuild && cfg.Build.GOOS == "windows" {
+		if params.Env == nil {
+			params.Env = map[string]string{}
+		}
+		params.Env["GOEXPERIMENT"] = "nodwarf5"
+	}
 
 	// embedded packetbeat is only included in a non-FIPS build
 	if !cfg.Build.FIPSBuild {
