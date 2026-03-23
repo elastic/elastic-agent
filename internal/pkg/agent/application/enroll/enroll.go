@@ -186,7 +186,10 @@ func enroll(
 		if checkin, ok := checkinRaw.(*configuration.FleetCheckin); ok {
 			fleetConfig.Checkin = checkin
 		}
+		// Remove the key so CreateAgentConfig does not also write it as agent.fleet.checkin.
+		// Restore it on exit so that a retry still finds the user's configured value.
 		delete(persistentConfig, "fleet.checkin")
+		defer func() { persistentConfig["fleet.checkin"] = checkinRaw }()
 	}
 
 	agentConfig := CreateAgentConfig(resp.Item.ID, persistentConfig, options.FleetServer.Headers, options.Staging)
