@@ -218,8 +218,8 @@ func TestCheckin(t *testing.T) {
 
 				var req *Request
 
-				content, err := io.ReadAll(r.Body)
-				assert.NoError(t, err)
+				content, err := readMaybeCompressedCheckinBody(r)
+				require.NoError(t, err)
 				assert.NoError(t, json.Unmarshal(content, &req))
 				assert.Equal(t, "linux", req.Metadata.OS.Name)
 
@@ -252,8 +252,8 @@ func TestCheckin(t *testing.T) {
 
 				var req *Request
 
-				content, err := io.ReadAll(r.Body)
-				assert.NoError(t, err)
+				content, err := readMaybeCompressedCheckinBody(r)
+				require.NoError(t, err)
 				assert.NoError(t, json.Unmarshal(content, &req))
 				assert.Nil(t, req.Metadata)
 
@@ -286,8 +286,8 @@ func TestCheckin(t *testing.T) {
 
 				var req *Request
 
-				content, err := io.ReadAll(r.Body)
-				assert.NoError(t, err)
+				content, err := readMaybeCompressedCheckinBody(r)
+				require.NoError(t, err)
 				assert.NoError(t, json.Unmarshal(content, &req))
 				assert.Nil(t, req.Metadata)
 

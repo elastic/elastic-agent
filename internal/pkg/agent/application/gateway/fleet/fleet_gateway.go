@@ -85,20 +85,20 @@ type rollbacksSource interface {
 }
 
 type FleetGateway struct {
-	log                   *logger.Logger
-	client                client.Sender
-	scheduler             scheduler.Scheduler
-	settings              *fleetGatewaySettings
-	agentInfo             agentInfo
-	acker                 acker.Acker
-	unauthCounter         int
-	checkinFailCounter    int
-	stateStore            stateStore
-	stateFetcher          StateFetcher
-	errCh                 chan error
-	actionCh              chan []fleetapi.Action
-	rollbackSource        rollbacksSource
-	compression string
+	log                *logger.Logger
+	client             client.Sender
+	scheduler          scheduler.Scheduler
+	settings           *fleetGatewaySettings
+	agentInfo          agentInfo
+	acker              acker.Acker
+	unauthCounter      int
+	checkinFailCounter int
+	stateStore         stateStore
+	stateFetcher       StateFetcher
+	errCh              chan error
+	actionCh           chan []fleetapi.Action
+	rollbackSource     rollbacksSource
+	compression        string
 }
 
 // New creates a new fleet gateway
