@@ -67,7 +67,7 @@ type FleetCheckin struct {
 	Mode                       string        `config:"mode" yaml:"mode,omitempty"` // `standard` or `on_state_change` (empty string is accepted as standard)
 	RequestBackoffInit         time.Duration `config:"request_backoff_init" yaml:"request_backoff_init,omitempty"`
 	RequestBackoffMax          time.Duration `config:"request_backoff_max" yaml:"request_backoff_max,omitempty"`
-	CompressEnabled            bool          `config:"compress_enabled" yaml:"compress_enabled,omitempty"`
+	CompressEnabled            bool          `config:"compress_enabled" yaml:"compress_enabled"`
 	CompressThresholdSizeBytes uint64        `config:"compress_threshold_size_bytes" yaml:"compress_threshold_size_bytes,omitempty"`
 }
 

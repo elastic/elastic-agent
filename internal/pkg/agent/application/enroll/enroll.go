@@ -182,6 +182,13 @@ func enroll(
 		return err
 	}
 
+	if checkinRaw, ok := persistentConfig["fleet.checkin"]; ok {
+		if checkin, ok := checkinRaw.(*configuration.FleetCheckin); ok {
+			fleetConfig.Checkin = checkin
+		}
+		delete(persistentConfig, "fleet.checkin")
+	}
+
 	agentConfig := CreateAgentConfig(resp.Item.ID, persistentConfig, options.FleetServer.Headers, options.Staging)
 
 	localFleetServer := options.FleetServer.ConnStr != ""
@@ -415,8 +422,10 @@ func LoadPersistentConfig(pathConfigFile string) (map[string]interface{}, error)
 		Headers        map[string]string                      `json:"agent.headers,omitempty" yaml:"agent.headers,omitempty" config:"agent.headers,omitempty"`
 		LogLevel       string                                 `json:"agent.logging.level,omitempty" yaml:"agent.logging.level,omitempty" config:"agent.logging.level,omitempty"`
 		MonitoringHTTP *monitoringConfig.MonitoringHTTPConfig `json:"agent.monitoring.http,omitempty" yaml:"agent.monitoring.http,omitempty" config:"agent.monitoring.http,omitempty"`
+		FleetCheckin   *configuration.FleetCheckin            `json:"fleet.checkin,omitempty" yaml:"fleet.checkin,omitempty" config:"fleet.checkin,omitempty"`
 	}{
 		MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
+		FleetCheckin:   configuration.DefaultFleetCheckin(),
 	}
 
 	if err := rawConfig.UnpackTo(&pc); err != nil {
@@ -429,6 +438,9 @@ func LoadPersistentConfig(pathConfigFile string) (map[string]interface{}, error)
 
 	if pc.MonitoringHTTP != nil {
 		persistentMap["monitoring.http"] = pc.MonitoringHTTP
+	}
+	if pc.FleetCheckin != nil {
+		persistentMap["fleet.checkin"] = pc.FleetCheckin
 	}
 
 	return persistentMap, nil
