@@ -395,19 +395,24 @@ func RunPatchRelease(cfg *ReleaseConfig, dryRun bool) error {
 	// Step 1: Verify we're on the release branch
 	fmt.Println("Step 1: Verifying current branch...")
 	gitRepo, err := OpenRepo(".")
-	if err != nil {
-		return err
+	if !dryRun {
+		if err != nil {
+			return err
+		}
+		currentBranch, err := gitRepo.GetCurrentBranch()
+		if err != nil {
+			return err
+		}
+		if currentBranch != cfg.ReleaseBranch {
+			return fmt.Errorf("not on release branch %s (currently on %s). Run: git checkout %s",
+				cfg.ReleaseBranch, currentBranch, cfg.ReleaseBranch)
+		}
+		fmt.Printf("✓ On release branch: %s\n", currentBranch)
+		fmt.Println()
+	} else {
+		fmt.Println("✓ [DRY RUN] Would verify current branch")
+		fmt.Println()
 	}
-	currentBranch, err := gitRepo.GetCurrentBranch()
-	if err != nil {
-		return err
-	}
-	if currentBranch != cfg.ReleaseBranch {
-		return fmt.Errorf("not on release branch %s (currently on %s). Run: git checkout %s",
-			cfg.ReleaseBranch, currentBranch, cfg.ReleaseBranch)
-	}
-	fmt.Printf("✓ On release branch: %s\n", currentBranch)
-	fmt.Println()
 
 	// Step 2: Update version files
 	fmt.Println("Step 2: Updating version files...")
