@@ -235,6 +235,7 @@ const minManagerShutdownTimeout = 5 * time.Second
 // processManagerStopTimeout is the typical SIGTERM-to-SIGKILL window used by process
 // managers (systemd, Kubernetes, etc.). Component stop timeouts exceeding this may
 // be ineffective because the agent could be killed before components finish shutting down.
+// Set to 30s to be consistent with default Windows stop timeout.
 const processManagerStopTimeout = 30 * time.Second
 
 // managerShutdownTimeoutForComponents computes the manager shutdown timeout based on passed components.

@@ -150,8 +150,11 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 	for {
 		select {
 		case <-ctx.Done():
-			// Make sure the process terminates and does not stay as a zombie.
-			c.cleanupProcess()
+			if c.proc != nil {
+				_ = c.proc.Stop() // SIGTERM
+				// Make sure the process terminates and does not stay as a zombie.
+				c.waitOrKill()
+			}
 			return ctx.Err()
 		case as := <-c.actionCh:
 			c.actionState = as
@@ -465,17 +468,14 @@ func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 // (systemd, Kubernetes) forcibly kill the agent.
 const ShutdownBuffer = 5 * time.Second
 
-// cleanupProcess gracefully stops a running managed process and waits
-// for the startWatcher goroutine to reap it, preventing zombie processes
-// on context cancellation. It first sends SIGTERM and waits, if the
-// process takes too long to exit it  sends SIGKILL to force termination.
-// An unresponsive process should be killed and reaped within 30s.
-func (c *commandRuntime) cleanupProcess() {
-	if c.proc == nil {
-		return
-	}
+// killReapTime is timeout after a SIGKILL is sent to wait for the process to be reaped.
+const killReapTime = 3 * time.Second
 
-	stopTimeout := 30 * time.Second // default from CommandTimeoutSpec.InitDefaults
+// waitOrKill waits after a SIGTERM for the process to be stopped.
+// if process takes too long to exit it sends SIGKILL to force termination.
+// An unresponsive process should be killed and reaped within 30s.
+func (c *commandRuntime) waitOrKill() {
+	stopTimeout := 30 * time.Second
 	if cmdSpec := c.getCommandSpec(); cmdSpec != nil && cmdSpec.Timeouts.Stop > 0 {
 		stopTimeout = cmdSpec.Timeouts.Stop
 	}
@@ -485,9 +485,6 @@ func (c *commandRuntime) cleanupProcess() {
 	if graceTimeout <= 0 {
 		graceTimeout = 1 * time.Second
 	}
-
-	c.log.Debugf("gracefully stopping process %d on context cancellation.", c.proc.PID)
-	_ = c.proc.Stop() // SIGTERM
 
 	// Wait for the process to exit gracefully
 	stopTimer := time.NewTimer(graceTimeout)
@@ -503,9 +500,8 @@ func (c *commandRuntime) cleanupProcess() {
 	_ = c.proc.Kill() // SIGKILL
 
 	// Drain procCh so the startWatcher goroutine can complete and
-	// os.Process.Wait() reaps the child. Use a short timeout to avoid
-	// blocking forever if something goes wrong.
-	reapTimer := time.NewTimer(3 * time.Second)
+	// os.Process.Wait() reaps the child.
+	reapTimer := time.NewTimer(killReapTime)
 	defer reapTimer.Stop()
 	select {
 	case <-c.procCh:
