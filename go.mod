@@ -72,14 +72,8 @@ require (
 	golang.org/x/term v0.40.0
 	golang.org/x/text v0.34.0
 	golang.org/x/time v0.14.0
-<<<<<<< HEAD
 	golang.org/x/tools v0.42.0
-	google.golang.org/grpc v1.79.1
-=======
-	golang.org/x/tools v0.41.0
-	google.golang.org/api v0.257.0
 	google.golang.org/grpc v1.79.3
->>>>>>> bb0c75590 (Bump grpc and elastic-agent-client. (#13252))
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
