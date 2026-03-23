@@ -65,16 +65,6 @@ var caFilePath = func(t *testing.T) string {
 	return caFilePath
 }
 
-// type options struct {
-// 	Host                 string
-// 	CACertificate        string
-// 	ClientCert           string
-// 	ClientKey            string
-// 	CATrustedFingerPrint string
-// 	VerificationMode     string
-// 	ProxyURL             string
-// }
-
 // tests mutual TLS
 func TestMTLS(t *testing.T) {
 	// create server certificates
@@ -702,7 +692,7 @@ func getTranslatedConf(t *testing.T, input map[string]any) (map[string]any, map[
 		Config: agentComponent.MustExpectedConfig(input),
 	}
 
-	exporterCfg, _, beatsauthCfg, err := unitToExporterConfig(unit, "default", component.MustNewType("elasticsearch"), logp.NewNopLogger())
+	exporterCfg, _, beatsauthCfg, _, err := unitToExporterConfig(unit, "default", component.MustNewType("elasticsearch"), logp.NewNopLogger())
 	if err != nil {
 		t.Fatalf("could not convert given output config to OTel config:%v", err)
 

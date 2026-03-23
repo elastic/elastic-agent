@@ -53,27 +53,27 @@ type ConfigParams struct {
 
 // Config generates config files. Set DEV_OS and DEV_ARCH to change the target
 // host for the generated configs. Defaults to linux/amd64.
-func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error {
+func Config(cfg *Settings, types ConfigFileType, args ConfigFileParams, targetDir string) error {
 	// Short
 	if types.IsShort() {
-		file := filepath.Join(targetDir, BeatName+".yml")
-		if err := makeConfigTemplate(file, 0600, args, ShortConfigType); err != nil {
+		file := filepath.Join(targetDir, cfg.Beat.Name+".yml")
+		if err := makeConfigTemplate(cfg, file, 0600, args, ShortConfigType); err != nil {
 			return fmt.Errorf("failed making short config: %w", err)
 		}
 	}
 
 	// Reference
 	if types.IsReference() {
-		file := filepath.Join(targetDir, BeatName+".reference.yml")
-		if err := makeConfigTemplate(file, 0644, args, ReferenceConfigType); err != nil {
+		file := filepath.Join(targetDir, cfg.Beat.Name+".reference.yml")
+		if err := makeConfigTemplate(cfg, file, 0644, args, ReferenceConfigType); err != nil {
 			return fmt.Errorf("failed making reference config: %w", err)
 		}
 	}
 
 	// Docker
 	if types.IsDocker() {
-		file := filepath.Join(targetDir, BeatName+".docker.yml")
-		if err := makeConfigTemplate(file, 0600, args, DockerConfigType); err != nil {
+		file := filepath.Join(targetDir, cfg.Beat.Name+".docker.yml")
+		if err := makeConfigTemplate(cfg, file, 0600, args, DockerConfigType); err != nil {
 			return fmt.Errorf("failed making docker config: %w", err)
 		}
 	}
@@ -81,7 +81,7 @@ func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error
 	return nil
 }
 
-func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigFileParams, typ ConfigFileType) error {
+func makeConfigTemplate(cfg *Settings, destination string, mode os.FileMode, confParams ConfigFileParams, typ ConfigFileType) error {
 	// Determine what type to build and set some parameters.
 	var confFile ConfigParams
 	var tmplParams map[string]interface{}
@@ -107,9 +107,9 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 	// one of the libbeat templates in your project by adding a file with the
 	// same name to your _meta/config directory.
 	params := map[string]interface{}{
-		"GOOS":                           EnvOr("DEV_OS", "linux"),
-		"GOARCH":                         EnvOr("DEV_ARCH", "amd64"),
-		"BeatLicense":                    BeatLicense,
+		"GOOS":                           cfg.CrossBuild.DevOS,
+		"GOARCH":                         cfg.CrossBuild.DevArch,
+		"BeatLicense":                    cfg.Beat.License,
 		"Reference":                      false,
 		"Docker":                         false,
 		"ExcludeConsole":                 false,
@@ -124,7 +124,7 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 	}
 	params = joinMaps(params, confParams.ExtraVars, tmplParams)
 	tmpl := template.New("config").Option("missingkey=error")
-	funcs := joinMaps(FuncMap, template.FuncMap{
+	funcs := joinMaps(FuncMap(cfg), template.FuncMap{
 		"header":    header,
 		"subheader": subheader,
 		"indent":    indent,
@@ -165,7 +165,7 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 	}
 	defer out.Close()
 
-	if err = tmpl.Execute(out, EnvMap(params)); err != nil {
+	if err = tmpl.Execute(out, EnvMap(cfg, params)); err != nil {
 		return fmt.Errorf("failed building %v: %w", destination, err)
 	}
 

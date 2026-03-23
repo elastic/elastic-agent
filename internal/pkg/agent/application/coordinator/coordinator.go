@@ -1615,10 +1615,13 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
 	c.migrationProgressWg.Wait()
 
-	if c.otelMgr != nil {
-		c.otelCfg = cfg.OTel
+	// processConfigAgent will apply persisted config and set c.otelCfg before calling refreshComponentModel
+	err = c.processConfigAgent(ctx, cfg)
+	if err != nil {
+		return err
 	}
-	return c.processConfigAgent(ctx, cfg)
+
+	return nil
 }
 
 // Always called on the main Coordinator goroutine.
@@ -1643,6 +1646,12 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		if err := applyPersistedConfig(c.logger, cfg, paths.ConfigFile(), c.isContainerizedEnvironment, c.caps.AllowFleetOverride); err != nil {
 			return fmt.Errorf("could not apply persisted configuration: %w", err)
 		}
+	}
+
+	// Set c.otelCfg after persisted config has been applied but before refreshComponentModel
+	// so that the OTel manager receives the correct configuration
+	if c.otelMgr != nil {
+		c.otelCfg = cfg.OTel
 	}
 
 	// perform and verify ast translation

@@ -1643,6 +1643,9 @@
         "hostNetwork": {
           "type": "boolean"
         },
+        "hostPID": {
+          "type": "boolean"
+        },
         "shareProcessNamespace": {
           "type": "boolean"
         },
@@ -2232,15 +2235,13 @@
       ]
     },
     "Quantity": {
-      "properties": {
-        "Format": {
+      "oneOf": [
+        {
           "type": "string"
+        },
+        {
+          "type": "number"
         }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "Format"
       ]
     },
     "QuobyteVolumeSource": {
@@ -3507,6 +3508,9 @@
           "type": "array"
         },
         "hostNetwork": {
+          "type": "boolean"
+        },
+        "hostPID": {
           "type": "boolean"
         },
         "priorityClassName": {

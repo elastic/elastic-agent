@@ -36,6 +36,8 @@ service:
       receivers: [filebeatreceiver]
       exporters: [elasticsearch]
   telemetry:
+    metrics:
+      level: none
     logs:
       level: DEBUG
       encoding: json

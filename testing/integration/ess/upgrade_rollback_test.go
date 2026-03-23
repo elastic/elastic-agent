@@ -10,7 +10,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -74,9 +73,7 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-	esUrlStr := integration.StartMockES(t, 0, 0, 0, 0)
-	esUrl, err := url.Parse(esUrlStr)
-	require.NoError(t, err)
+	esUrl := integration.StartMockES(t, 0, 0, 0, 0)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()

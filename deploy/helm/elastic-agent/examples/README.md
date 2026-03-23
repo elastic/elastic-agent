@@ -14,6 +14,7 @@ Here is a collection of example configurations for the eck-integrations chart.
 - [Fleet - Managed Agent with KSM autosharding](fleet-managed-ksm-sharding/README.md)
 - [User created cluster role](user-cluster-role/README.md)
 - [User created service account](user-service-account/README.md)
+- [Cloud Defend - standalone](cloud-defend/README.md)
 
 Useful links:
 

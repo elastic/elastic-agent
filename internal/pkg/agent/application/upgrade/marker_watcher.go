@@ -20,6 +20,7 @@ import (
 type MarkerWatcher interface {
 	Watch() <-chan UpdateMarker
 	Run(ctx context.Context) error
+	Done() <-chan struct{}
 	SetUpgradeStarted()
 }
 
@@ -27,6 +28,7 @@ type MarkerFileWatcher struct {
 	markerFilePath string
 	logger         *logger.Logger
 	updateCh       chan UpdateMarker
+	doneCh         chan struct{}
 
 	upgradeStarted atomic.Bool
 	lastMarker     *UpdateMarker
@@ -39,6 +41,7 @@ func newMarkerFileWatcher(upgradeMarkerFilePath string, logger *logger.Logger) M
 		markerFilePath: upgradeMarkerFilePath,
 		logger:         logger,
 		updateCh:       make(chan UpdateMarker),
+		doneCh:         make(chan struct{}),
 	}
 }
 
@@ -48,6 +51,10 @@ func (mfw *MarkerFileWatcher) Watch() <-chan UpdateMarker {
 
 func (mfw *MarkerFileWatcher) SetUpgradeStarted() {
 	mfw.upgradeStarted.Store(true)
+}
+
+func (mfw *MarkerFileWatcher) Done() <-chan struct{} {
+	return mfw.doneCh
 }
 
 func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
@@ -70,6 +77,7 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 
 	// Handle watching
 	go func() {
+		defer close(mfw.doneCh)
 		defer watcher.Close()
 		for {
 			select {
@@ -100,7 +108,7 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 				case e.Op&(fsnotify.Create|fsnotify.Write) != 0:
 					// Upgrade marker file was created or updated; read its contents
 					// and send them over the update channel.
-					mfw.processMarker(version.GetAgentPackageVersion(), version.Commit())
+					mfw.processMarker(ctx, version.GetAgentPackageVersion(), version.Commit())
 				case e.Op&(fsnotify.Remove) != 0:
 					// Upgrade marker file was removed.
 					// - Upgrade could've been rolled back
@@ -109,11 +117,15 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 					// upgrade was successful
 					if mfw.lastMarker != nil && mfw.lastMarker.Details != nil && mfw.lastMarker.Details.State != details.StateRollback {
 						mfw.lastMarker.Details = nil
-						mfw.updateCh <- *mfw.lastMarker
+						select {
+						case mfw.updateCh <- *mfw.lastMarker:
+						case <-ctx.Done():
+							return
+						}
 					}
 				}
 			case <-doInitialRead:
-				mfw.processMarker(version.GetAgentPackageVersion(), version.Commit())
+				mfw.processMarker(ctx, version.GetAgentPackageVersion(), version.Commit())
 			}
 		}
 	}()
@@ -121,7 +133,7 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 	return nil
 }
 
-func (mfw *MarkerFileWatcher) processMarker(currentVersion string, commit string) {
+func (mfw *MarkerFileWatcher) processMarker(ctx context.Context, currentVersion string, commit string) {
 	marker, err := loadMarker(mfw.markerFilePath)
 	if err != nil {
 		mfw.logger.Error(err)
@@ -151,5 +163,8 @@ func (mfw *MarkerFileWatcher) processMarker(currentVersion string, commit string
 	}
 
 	mfw.lastMarker = marker
-	mfw.updateCh <- *marker
+	select {
+	case mfw.updateCh <- *marker:
+	case <-ctx.Done():
+	}
 }

@@ -400,7 +400,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 // The server will respond with the passed error probabilities. If they add
 // up to zero, all requests are a success.
 func createMockESOutput(t *testing.T, info *define.Info, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge uint) (string, string) {
-	mockesURL := integration.StartMockES(t, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge)
+	mockesURL := integration.StartMockES(t, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge).String()
 	createOutputBody := `
 {
   "id": "mock-es-%[1]s",
@@ -500,7 +500,7 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 			err = agentFixture.Prepare(ctx)
 			require.NoError(t, err)
 
-			mockesURL := integration.StartMockES(t, 0, 0, 0, 0)
+			mockesURL := integration.StartMockES(t, 0, 0, 0, 0).String()
 
 			// Create a local agent config file with monitoring enabled
 			agentConfig := createSimpleAgentMonitoringConfig(t, agentFixture.WorkDir(), mockesURL)
