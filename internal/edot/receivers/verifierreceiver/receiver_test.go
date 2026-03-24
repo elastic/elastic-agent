@@ -1133,3 +1133,92 @@ func TestStripPrerelease(t *testing.T) {
 		})
 	}
 }
+
+func TestReceiver_FleetManagedStyle(t *testing.T) {
+	config := &Config{
+		CloudConnectorID:   "cc-fleet-001",
+		CloudConnectorName: "Fleet Managed Connector",
+		Namespace:          "default",
+		AccountType:        "single_account",
+		VerificationID:     "verify-fleet-001",
+		VerificationType:   "scheduled",
+		Providers: ProvidersConfig{
+			AWS: AWSProviderConfig{
+				Credentials: AWSCredentials{
+					RoleARN:       "arn:aws:iam::123456789012:role/ElasticAgentRole",
+					ExternalID:    "elastic-test-external-id",
+					DefaultRegion: "us-east-1",
+				},
+			},
+		},
+		Policies: []PolicyConfig{
+			{
+				PolicyID:   "policy-fleet-001",
+				PolicyName: "Verifier-Policy-Fleet-Managed-Connector-abc12345",
+				Integrations: []IntegrationConfig{
+					{
+						PolicyTemplate: "cloudtrail",
+						PackageName:    "aws",
+						PackageTitle:   "AWS",
+						PackageVersion: "2.17.0",
+					},
+					{
+						PolicyTemplate: "guardduty",
+						PackageName:    "aws",
+						PackageTitle:   "AWS",
+						PackageVersion: "2.17.0",
+					},
+					{
+						PolicyTemplate: "securityhub",
+						PackageName:    "aws",
+						PackageTitle:   "AWS",
+						PackageVersion: "2.17.0",
+					},
+				},
+			},
+		},
+	}
+
+	consumer := &consumertest.LogsSink{}
+	rcvr := newVerifierReceiver(
+		receivertest.NewNopSettings(metadata.Type),
+		config,
+		consumer,
+	)
+
+	ctx := context.Background()
+	err := rcvr.Start(ctx, nil)
+	require.NoError(t, err)
+
+	<-rcvr.done
+
+	err = rcvr.Shutdown(ctx)
+	require.NoError(t, err)
+
+	logs := consumer.AllLogs()
+	require.NotEmpty(t, logs)
+
+	logRecords := logs[0].ResourceLogs().At(0).ScopeLogs().At(0).LogRecords()
+	assert.GreaterOrEqual(t, logRecords.Len(), 1)
+
+	policyTemplates := make(map[string]bool)
+	for i := 0; i < logRecords.Len(); i++ {
+		record := logRecords.At(i)
+
+		policyID, ok := record.Attributes().Get("policy.id")
+		require.True(t, ok)
+		assert.Equal(t, "policy-fleet-001", policyID.Str())
+
+		policyName, ok := record.Attributes().Get("policy.name")
+		require.True(t, ok)
+		assert.Contains(t, policyName.Str(), "Verifier-Policy-Fleet-Managed-Connector")
+
+		if tmpl, ok := record.Attributes().Get("policy_template"); ok {
+			policyTemplates[tmpl.Str()] = true
+		}
+	}
+
+	assert.True(t, policyTemplates["cloudtrail"], "expected cloudtrail policy_template")
+	assert.True(t, policyTemplates["guardduty"], "expected guardduty policy_template")
+	assert.True(t, policyTemplates["securityhub"], "expected securityhub policy_template")
+}

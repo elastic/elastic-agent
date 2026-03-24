@@ -8,13 +8,13 @@ receivers:
   verifier:
     cloud_connector_id: "cc-test-minimal"
     verification_id: "verify-minimal-001"
-    
+
     policies:
       - policy_id: "test-policy-local"
-        policy_name: "Minimal Test Policy"
+        policy_name: "Verifier-Policy-minimal"
         integrations:
-          - integration_type: "aws_cloudtrail"
-            integration_name: "Test CloudTrail"
+          - policy_template: "cloudtrail"
+            package_name: "aws"
 
 exporters:
   debug:
