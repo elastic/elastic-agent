@@ -1,0 +1,30 @@
+name: Validate docs generation structure
+
+on:
+  pull_request:
+    paths:
+      - 'internal/edot/**'
+      - 'docs/scripts/update-docs/**'
+      - '.github/workflows/validate-docs-structure.yml'
+
+jobs:
+  validate-structure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+      
+      - name: Install mage
+        uses: magefile/mage-action@a662bd8c29d8106879588cfff83b2faf6e6f59db # v4.0.0
+        with:
+          install-only: true
+      
+      - name: Validate expected files for docs generation
+        run: mage check:docsFiles
+
