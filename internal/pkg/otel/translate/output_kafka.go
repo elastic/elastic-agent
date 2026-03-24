@@ -176,6 +176,10 @@ func dynamicTopicSetterProcessor(topic string, outputName string) map[string]any
 }
 
 func extractField(field string) string {
+	if len(field) == 0 {
+		return ""
+	}
+
 	switch field[0] {
 	case '[':
 		return parseEventPath(field)

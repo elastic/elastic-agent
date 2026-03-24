@@ -305,7 +305,7 @@ func getCollectorConfigForComponent(
 	pipelineProcessors = append(pipelineProcessors, processors...)
 
 	if len(processorConfig) != 0 {
-		// Note: processorConfig should be applied in a determinsitic order.
+		// Note: processorConfig should be applied in a deterministic order.
 		// Since only a single processor is ever returned from the exporter config, we ignore the ordering
 
 		if len(processorConfig) > 1 { // Ideally this never happens but it guards any future changes
