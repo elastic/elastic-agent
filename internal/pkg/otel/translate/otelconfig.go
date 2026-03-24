@@ -307,6 +307,11 @@ func getCollectorConfigForComponent(
 	if len(processorConfig) != 0 {
 		// Note: processorConfig should be applied in a determinsitic order.
 		// Since only a single processor is ever returned from the exporter config, we ignore the ordering
+
+		if len(processorConfig) > 1 { // Ideally this never happens but it guards any future changes
+			return nil, fmt.Errorf("found more than one processor config")
+		}
+
 		pipelineProcessors = append(pipelineProcessors, maps.Keys(processorConfig)...)
 	}
 
@@ -474,12 +479,11 @@ func getExporterConfigForComponent(comp *component.Component, exporterType otelc
 	queueCfg map[string]any,
 	extensionCfg map[string]any,
 	processors map[string]any, err error) {
-	for _, unit := range comp.Units {
-		if unit.Type == client.UnitTypeOutput {
-			return unitToExporterConfig(unit, comp.OutputName, exporterType, logger)
-		}
+	outputUnit, ok := comp.OutputUnit()
+	if !ok {
+		return nil, nil, nil, nil, nil
 	}
-	return nil, nil, nil, nil, nil
+	return unitToExporterConfig(outputUnit, comp.OutputName, exporterType, logger)
 }
 
 // getSignalForComponent returns the otel signal for the given component. Currently, this is always logs, even for
@@ -643,32 +647,30 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 
 // extractOtelProcessors extracts the processor IDs from the output configuration.
 func extractOtelProcessors(comp *component.Component) ([]string, error) {
-	for _, unit := range comp.Units {
-		if unit.Type == client.UnitTypeOutput {
-			// translate the configuration
-			unitConfigMap := unit.Config.GetSource().AsMap() // this is what beats do in libbeat/management/generate.go
-			outputConfig, err := config.NewConfigFrom(unitConfigMap)
-			if err != nil {
-				return nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", comp.OutputName, unit.ID, err)
-			}
-
-			if !outputConfig.HasField("processors") {
-				return nil, nil
-			}
-
-			processorIdsC, err := outputConfig.Child("processors", -1)
-			if err != nil {
-				return nil, err
-			}
-
-			var processorIds []string
-			if err := processorIdsC.Unpack(&processorIds); err != nil {
-				return nil, err
-			}
-			return processorIds, nil
-		}
+	outputUnit, ok := comp.OutputUnit()
+	if !ok {
+		return nil, nil
 	}
-	return nil, nil
+	unitConfigMap := outputUnit.Config.GetSource().AsMap() // this is what beats do in libbeat/management/generate.go
+	outputConfig, err := config.NewConfigFrom(unitConfigMap)
+	if err != nil {
+		return nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", comp.OutputName, outputUnit.ID, err)
+	}
+
+	if !outputConfig.HasField("processors") {
+		return nil, nil
+	}
+
+	processorIdsC, err := outputConfig.Child("processors", -1)
+	if err != nil {
+		return nil, err
+	}
+
+	var processorIds []string
+	if err := processorIdsC.Unpack(&processorIds); err != nil {
+		return nil, err
+	}
+	return processorIds, nil
 }
 
 // OutputConfigToExporterConfig translates the output configuration to an exporter configuration.
