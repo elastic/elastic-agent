@@ -124,7 +124,7 @@ func TestEnrollPreservesCheckinConfig(t *testing.T) {
 		Sudo:  true,
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -165,7 +165,7 @@ func TestEnrollPreservesCheckinConfig(t *testing.T) {
 
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-policy-enroll-checkin-config-%s", uuid.Must(uuid.NewV4()).String()),
-		Namespace:   "default",
+		Namespace:   info.Namespace,
 		Description: "test policy for enroll checkin config preservation",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
@@ -201,10 +201,13 @@ func TestEnrollPreservesCheckinConfig(t *testing.T) {
 	// restart the agent so it needs to reload config.
 	err = agentFixture.ExecRestart(ctx)
 	require.NoError(t, err)
-	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
 
 	// Wait until at least one checkin request has been observed through the
-	// proxy, then assert that none of them used gzip encoding.
+	// proxy after the restart, then assert that none of them used gzip encoding.
+	// We do not use check.ConnectedToFleet here: after restart the agent already
+	// has the current policy so Fleet holds the checkin as a long-poll for several
+	// minutes before responding, causing FleetState to stay STARTING far longer
+	// than our timeout on Windows.
 	require.Eventually(
 		t,
 		func() bool { return totalCheckins.Load() > checkinCount },
