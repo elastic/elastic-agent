@@ -29,7 +29,10 @@ case "$1" in
       echo "found symlink $prefix_symlink, unlink"
       unlink "$prefix_symlink"
     fi
-    if test -L /lib/systemd/system/elastic-agent.service || test -f /lib/systemd/system/elastic-agent.service; then
+    if test -L /lib/systemd/system/elastic-agent.service; then
+        echo "Found elastic-agent.service link, unlink"
+        unlink /lib/systemd/system/elastic-agent.service
+    elif [[ ${PREFIX} != "" ]] && test -f /lib/systemd/system/elastic-agent.service; then
         echo "Found /lib/systemd/system/elastic-agent.service, removing"
         rm -f /lib/systemd/system/elastic-agent.service
     fi
