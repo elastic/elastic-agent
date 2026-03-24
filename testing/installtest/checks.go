@@ -42,6 +42,7 @@ type CheckOpts struct {
 	Namespace  string
 	Username   string
 	Group      string
+	Version    string
 }
 
 func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts *CheckOpts) error {
@@ -75,6 +76,10 @@ func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts
 
 	// Specific checks depending on the platform.
 	return checkPlatform(ctx, f, topPath, opts)
+}
+
+func CheckUninstallSuccess(opts *CheckOpts) error {
+	return checkUninstallPlatform(opts)
 }
 
 func exeOnWindows(filename string) string {

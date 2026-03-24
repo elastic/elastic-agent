@@ -1152,6 +1152,9 @@ type IntegrationTestSettings struct {
 	// BuildAgent indicates whether to build the agent before tests (from BUILD_AGENT env var)
 	BuildAgent bool
 
+	// UpgradeVersions overrides the upgrade test versions (from TEST_UPGRADE_VERSIONS env var, comma-separated)
+	UpgradeVersions string
+
 	// GoTestFlags contains additional flags for go test (from GOTEST_FLAGS env var)
 	GoTestFlags string
 
@@ -1533,6 +1536,9 @@ func (s *Settings) loadIntegrationTestSettingsFromEnv() error {
 	}
 	if v := os.Getenv("AGENT_KEEP_INSTALLED"); v != "" {
 		s.IntegrationTest.KeepInstalled = v
+	}
+	if v := os.Getenv("TEST_UPGRADE_VERSIONS"); v != "" {
+		s.IntegrationTest.UpgradeVersions = v
 	}
 	if os.Getenv("BUILD_AGENT") == "true" {
 		s.IntegrationTest.BuildAgent = true

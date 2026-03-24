@@ -14,7 +14,9 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
@@ -110,7 +112,43 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 			return fmt.Errorf("DACL has more than allowed ACE for %s (privileged): %v", topPath, sids)
 		}
 	}
+
+	if opts.Version != "" {
+		displayVersion, err := getRegistryDisplayVersion(opts.Namespace)
+		if err != nil {
+			return fmt.Errorf("uninstall registry entry missing for %s: %w", topPath, err)
+		}
+		if displayVersion != opts.Version {
+			return fmt.Errorf("uninstall registry DisplayVersion mismatch for %s: got %q, want %q", topPath, displayVersion, opts.Version)
+		}
+	}
+
 	return nil
+}
+
+func checkUninstallPlatform(opts *CheckOpts) error {
+	v, err := getRegistryDisplayVersion(opts.Namespace)
+	if err != nil {
+		// key doesn't exist, as expected
+		return nil
+	}
+	svc := paths.ServiceNameForNamespace(opts.Namespace)
+	return fmt.Errorf("uninstall registry entry for %q still present with DisplayVersion %q", svc, v)
+}
+
+func getRegistryDisplayVersion(namespace string) (string, error) {
+	keyPath := install.UninstallKeyPath + `\` + paths.ServiceNameForNamespace(namespace)
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
+	if err != nil {
+		return "", err
+	}
+	defer k.Close()
+
+	v, _, err := k.GetStringValue("DisplayVersion")
+	if err != nil {
+		return "", err
+	}
+	return v, nil
 }
 
 func hasSID(sids []*windows.SID, m *windows.SID) bool {

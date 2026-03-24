@@ -100,6 +100,10 @@ func init() {
 }
 
 func getAgentVersions() (*AgentVersions, error) {
+	if v := os.Getenv("TEST_UPGRADE_VERSIONS"); v != "" {
+		return &AgentVersions{TestVersions: strings.Split(v, ",")}, nil
+	}
+
 	var (
 		filePath string
 		dir      string

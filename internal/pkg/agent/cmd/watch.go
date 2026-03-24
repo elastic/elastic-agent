@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -27,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -259,6 +261,21 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			upgradeDetails.Fail(err)
 		}
 		return err
+	}
+
+	// This runs in the watcher (new binary) rather than in the upgrader (old binary)
+	// so it works even when upgrading from a version that didn't write an
+	// uninstall registry entry.
+	if err := install.UpsertUninstallEntry(topDir, marker.Version); err != nil {
+		// Unprivileged upgrades from versions that didn't write an uninstall
+		// registry entry lack the registry key ACL, so the watcher cannot write
+		// to HKLM. This is expected and can be fixed by running
+		// 'elastic-agent unprivileged -f' which sets the correct ACL.
+		if errors.Is(err, os.ErrPermission) || strings.Contains(err.Error(), "Access is denied") {
+			log.Infof("insufficient permissions to update uninstall registry entry, can be fixed by running 'elastic-agent unprivileged -f'")
+		} else {
+			log.Warnf("failed to update uninstall registry entry: %v", err)
+		}
 	}
 
 	// watch succeeded - upgrade was successful!
