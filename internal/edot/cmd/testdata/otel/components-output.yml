@@ -89,11 +89,6 @@ processors:
       logs: Alpha
       metrics: Alpha
       traces: Alpha
-  - name: ratelimit
-    stability:
-      logs: Development
-      metrics: Development
-      traces: Development
   - name: filter
     stability:
       logs: Alpha
