@@ -61,9 +61,9 @@ func changeUser(topPath string, ownership utils.FileOwner, username string, grou
 		return fmt.Errorf("failed to update config from %v: %w", curCfg, err)
 	}
 
-	err = serviceConfigure(ownership)
+	err = configureServicePermissions(ownership)
 	if err != nil {
-		return fmt.Errorf("failed to configure service (%s) from %v: %w", paths.ServiceName(), curCfg, err)
+		return fmt.Errorf("failed to configure service permissions (%s) from %v: %w", paths.ServiceName(), curCfg, err)
 	}
 
 	return nil

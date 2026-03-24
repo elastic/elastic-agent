@@ -142,6 +142,12 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		pt.Describe("Successfully uninstalled service")
 	}
 
+	// platform-specific post-uninstall tasks
+	err = postUninstall()
+	if err != nil {
+		return fmt.Errorf("failed to perform post-uninstall tasks: %w", err)
+	}
+
 	// remove, if present on platform
 	if paths.ShellWrapperPath() != "" {
 		err = os.Remove(paths.ShellWrapperPath())

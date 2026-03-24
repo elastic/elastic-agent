@@ -453,7 +453,7 @@ func PerformUpgrade(
 
 	// validate again that the installation is correct, upgrade should not have changed installation validation
 	if InstallChecksAllowed(!installOpts.Privileged, startVersion, endVersion) {
-		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
+		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged, Version: endVersionInfo.Binary.String()})
 		if err != nil {
 			return fmt.Errorf("post-upgrade installation checks failed: %w", err)
 		}

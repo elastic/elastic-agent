@@ -160,11 +160,12 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	checks := &installtest.CheckOpts{Privileged: opts.Privileged}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 	})
 	t.Run("check components set",
 		testComponentsPresence(ctx, fixture,
@@ -194,6 +195,10 @@ func TestInstallWithBasePath(t *testing.T) {
 		require.Error(t, err, "uninstall should have failed")
 		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 	}
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	})
 }
 
 func TestInstallServersWithBasePath(t *testing.T) {
@@ -255,7 +260,8 @@ func TestInstallServersWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	checks := &installtest.CheckOpts{Privileged: opts.Privileged}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 
@@ -286,6 +292,10 @@ func TestInstallServersWithBasePath(t *testing.T) {
 		require.Error(t, err, "uninstall should have failed")
 		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 	}
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	})
 }
 
 func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
@@ -321,11 +331,16 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in default base path
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	checks := &installtest.CheckOpts{Privileged: opts.Privileged}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, checks))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, checks))
+	})
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
 	})
 }
 
@@ -372,10 +387,15 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	checks := &installtest.CheckOpts{Privileged: opts.Privileged}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
+	})
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
 	})
 }
 
@@ -443,6 +463,10 @@ func TestInstallSecondAgentInDevelopmentNamespace(t *testing.T) {
 		require.Error(t, err, "uninstall should have failed")
 		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 	}
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	})
 }
 
 func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T, fixture *atesting.Fixture, customUsername, customGroup string) {
@@ -486,6 +510,10 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 		require.Error(t, err, "uninstall should have failed")
 		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 	}
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	})
 }
 
 func testComponentsPresence(ctx context.Context, fixture *atesting.Fixture, requiredComponents []componentPresenceDefinition, unwantedComponents []componentPresenceDefinition) func(*testing.T) {
@@ -553,12 +581,18 @@ func testSecondAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, b
 			topPath = filepath.Join(basePath, "Elastic", paths.InstallDirNameForNamespace(installOpts.Namespace))
 		}
 
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{
+		checks := &installtest.CheckOpts{
 			Privileged: installOpts.Privileged,
 			Namespace:  installOpts.Namespace,
 			Username:   installOpts.Username,
 			Group:      installOpts.Group,
-		}))
+		}
+
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
+
+		devFixture.PostUninstallHook(func(t *testing.T) {
+			require.NoError(t, installtest.CheckUninstallSuccess(checks))
+		})
 	}
 }
 

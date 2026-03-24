@@ -23,6 +23,10 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
+func checkUninstallPlatform(_ *CheckOpts) error {
+	return nil
+}
+
 func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opts *CheckOpts) error {
 	if !opts.Privileged {
 		// Check that the elastic-agent user/group exist.

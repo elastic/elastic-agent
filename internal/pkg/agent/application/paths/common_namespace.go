@@ -88,11 +88,14 @@ func InstallPath(basePath string) string {
 
 // ServiceName returns the service name accounting for any namespace.
 func ServiceName() string {
-	namespace := InstallNamespace()
+	return ServiceNameForNamespace(InstallNamespace())
+}
+
+// ServiceNameForNamespace returns the service name for a given namespace.
+func ServiceNameForNamespace(namespace string) string {
 	if namespace == "" {
 		return serviceName
 	}
-
 	return fmt.Sprintf(serviceNameNamespaceFmt, namespace)
 }
 

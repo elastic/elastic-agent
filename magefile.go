@@ -47,7 +47,6 @@ import (
 	xpacketbeat "github.com/elastic/beats/v7/x-pack/packetbeat/scripts/mage"
 
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
-	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
@@ -121,7 +120,7 @@ var (
 		"demo":  Demo.Enroll,
 	}
 
-	errNoManifest         = errors.New(fmt.Sprintf("missing %q environment variable", mage.ManifestUrlEnvVar))
+	errNoManifest         = errors.New(fmt.Sprintf("missing %q environment variable", devtools.ManifestUrlEnvVar))
 	errNoAgentDropPath    = errors.New("missing AGENT_DROP_PATH environment variable")
 	errAtLeastOnePlatform = errors.New("elastic-agent package is expected to build at least one platform package")
 
@@ -599,7 +598,7 @@ func Package(ctx context.Context) error {
 	mg.CtxDeps(ctx, PackageAgentCore)
 
 	// switch to the main package target
-	pkgSpec, err := mage.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
+	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return err
 	}
@@ -627,14 +626,14 @@ func Package(ctx context.Context) error {
 func DownloadManifest(ctx context.Context) error {
 	// Load elastic-agent packaging specs to correctly load component dependencies
 	cfg := devtools.SettingsFromContext(ctx)
-	pkgSpec, err := mage.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
+	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return err
 	}
 	return downloadManifest(ctx, cfg, pkgSpec)
 }
 
-func downloadManifest(ctx context.Context, cfg *mage.Settings, pkgSpecs []mage.OSPackageArgs, filters ...packaging.ComponentFilter) error {
+func downloadManifest(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs, filters ...packaging.ComponentFilter) error {
 	fmt.Println("--- Downloading manifest")
 	start := time.Now()
 	defer func() { fmt.Println("Downloading manifest took", time.Since(start)) }()
@@ -859,7 +858,7 @@ func PackageAgentCore(ctx context.Context) error {
 	mg.CtxDeps(ctx, Update, Otel.Prepare, Otel.CrossBuild, CrossBuild, Build.WindowsArchiveRootBinary)
 
 	fmt.Println("--- Package elastic-agent-core")
-	coreSpec, err := mage.LoadElasticAgentCorePackageSpec(cfg.ElasticBeatsDir)
+	coreSpec, err := devtools.LoadElasticAgentCorePackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return err
 	}
@@ -1087,7 +1086,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	// docker does not exists for this commit, build it
 	if !strings.Contains(dockerImageOut, tag) {
 		// produce docker package
-		pkgSpec, err := mage.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
+		pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 		if err != nil {
 			return err
 		}
@@ -1141,7 +1140,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, cfg *mage.Settings, pkgSpecs []mage.OSPackageArgs, dependenciesVersion string, manifestResponse *manifest.Build) error {
+func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs, dependenciesVersion string, manifestResponse *manifest.Build) error {
 	fmt.Println("--- Package elastic-agent")
 
 	if dependenciesVersion == "" {
@@ -1487,7 +1486,7 @@ func PackageUsingDRA(ctx context.Context) error {
 	}
 
 	// final package build
-	pkgSpec, err := mage.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
+	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return err
 	}
@@ -1655,7 +1654,7 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 	return downloadedArtifacts, errGrp.Wait()
 }
 
-func extractAgentCoreForPackage(ctx context.Context, cfg *mage.Settings, manifestResponse *manifest.Build, version string) error {
+func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, manifestResponse *manifest.Build, version string) error {
 	components, err := packaging.Components()
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
@@ -2326,6 +2325,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch upgradable versions: %w", err)
 	}
+
 	versionFileData := upgradetest.AgentVersions{
 		TestVersions: versions,
 	}
@@ -2354,7 +2354,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 
 // UpdatePackageVersion update the file that contains the latest available snapshot version
 func (Integration) UpdatePackageVersion(ctx context.Context) error {
-	cfg := mage.SettingsFromContext(ctx)
+	cfg := devtools.SettingsFromContext(ctx)
 	currentReleaseBranch, err := git.GetCurrentReleaseBranch(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to identify the current release branch: %w", err)
@@ -2807,7 +2807,7 @@ func (Integration) DeployDebugTools() error {
 
 // PrepareOnRemote shouldn't be called locally (called on remote host to prepare it for testing)
 func (Integration) PrepareOnRemote() {
-	mg.Deps(mage.InstallGoTestTools)
+	mg.Deps(devtools.InstallGoTestTools)
 }
 
 // TestBeatServerless runs beats-oriented serverless tests
@@ -2898,7 +2898,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 		}
 		extraFlags = append(extraFlags, "-test.shuffle", "on",
 			"-test.timeout", goIntegTestTimeout.String(), "-test.run", "^("+strings.Join(packageTests, "|")+")$")
-		params := mage.GoTestArgs{
+		params := devtools.GoTestArgs{
 			LogName:         testName,
 			OutputFile:      fileName + ".out",
 			JUnitReportFile: fileName + ".xml",
@@ -3168,6 +3168,7 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 
 	extraEnv["TEST_LONG_RUNNING"] = cfg.IntegrationTest.LongRunning
 	extraEnv["LONG_TEST_RUNTIME"] = cfg.IntegrationTest.LongTestRuntime
+	extraEnv["TEST_UPGRADE_VERSIONS"] = cfg.IntegrationTest.UpgradeVersions
 
 	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
 	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
@@ -4203,7 +4204,7 @@ func (h Helm) handleDependencies(update bool) error {
 	}
 
 	for _, subChartArchive := range subChartArchives {
-		err := mage.Extract(subChartArchive, subChartDir)
+		err := devtools.Extract(subChartArchive, subChartDir)
 		if err != nil {
 			return fmt.Errorf("failed to extract %q: %w", subChartArchive, err)
 		}

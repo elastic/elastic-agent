@@ -13,6 +13,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -89,6 +90,22 @@ func SwitchExecutingMode(topPath string, pt ProgressDescriber, username string, 
 
 	// **end critical section**
 	// service is now re-created and started
+
+	// Ensure the uninstall registry entry exists and has the correct ACL.
+	// The entry may not exist when switching modes after upgrading from an old version.
+	pt.Describe("Ensuring uninstall registry entry")
+	err = UpsertUninstallEntry(topPath, release.VersionWithSnapshot())
+	if err != nil {
+		pt.Describe("Failed to create uninstall registry entry")
+		return err
+	}
+
+	pt.Describe("Configuring registry permissions")
+	err = configureRegistryPermissions(ownership)
+	if err != nil {
+		pt.Describe("Failed to configure registry permissions")
+		return err
+	}
 
 	return nil
 }
