@@ -96,7 +96,7 @@ message UpgradeRequest {
   // this version field.
   string version = 1;
 
-  // (Optional) Use a different source URI then configured.
+  // (Optional) Use a different source URI than configured.
   //
   // If provided the upgrade process will use the provided sourceURI instead of the configured
   // sourceURI in the configuration.
@@ -121,7 +121,7 @@ message UpgradeRequest {
   bool rollback = 6;
 }
 
-// A upgrade response message.
+// An upgrade response message.
 message UpgradeResponse {
   // Response status.
   ActionStatus status = 1;
@@ -389,7 +389,7 @@ service ElasticAgentControl {
   // Fetches the currently running version of the Elastic Agent.
   rpc Version(Empty) returns (VersionResponse);
 
-  // Fetches the currently states of the Elastic Agent.
+  // Fetches the current states of the Elastic Agent.
   rpc State(Empty) returns (StateResponse);
 
   // Streams the current state of the Elastic Agent to the client.
@@ -421,6 +421,6 @@ service ElasticAgentControl {
   // returned and nothing occurring.
   rpc Configure(ConfigureRequest) returns (Empty);
 
-  // AvailableRollbacks returns any existing agent installs than can be used as target for a manual rollback operation
+  // AvailableRollbacks returns any existing agent installs that can be used as a target for a manual rollback operation
   rpc AvailableRollbacks(Empty) returns (AvailableRollbacksResponse);
 }
