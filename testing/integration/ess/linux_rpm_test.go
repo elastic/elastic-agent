@@ -285,6 +285,15 @@ func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 	out, err := exec.CommandContext(ctx, "sudo", cmdArgs...).CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	require.NoError(t, err, string(out))
 
+	// Inform endFixture of the install prefix so FindRunDir resolves the
+	// correct data directory (e.g. /opt/elastic-agent/var/lib/elastic-agent).
+	if prefix != "" {
+		endFixture.SetInstallBasePath(prefix)
+		// RPM scriptlets do not restart the service for prefix installs; do it explicitly.
+		out, err = exec.CommandContext(ctx, "sudo", "systemctl", "restart", "elastic-agent").CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+
 	newRunDir, err := atesting.FindRunDir(endFixture)
 	require.NoError(t, err, "failed at getting run dir")
 	require.NotEqual(t, runDir, newRunDir, "the run dirs from upgrade should not match")
