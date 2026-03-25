@@ -77,11 +77,16 @@ if [[ ${PREFIX} != "" ]]; then
 
     # RPM --prefix relocates all package files under the new prefix, including the service file.
     # Copy (not symlink) to /lib/systemd/system/ so systemd can find it at boot before the prefix mount is available.
-    # On upgrade from an older version, /lib/systemd/system/ may already hold a symlink; unlink it first so cp
-    # creates a real file rather than following the symlink and overwriting the prefix copy.
+    # On upgrade from an older version, /lib/systemd/system/ and /etc/systemd/system/ may already hold symlinks
+    # pointing into the prefix mount; unlink them so cp creates a real file and systemctl enable recreates the
+    # /etc/systemd/system/ link pointing at the new /lib/systemd/system/ copy instead of the prefix path.
     if test -L /lib/systemd/system/elastic-agent.service; then
         echo "removing legacy symlink /lib/systemd/system/elastic-agent.service"
         unlink /lib/systemd/system/elastic-agent.service
+    fi
+    if test -L /etc/systemd/system/elastic-agent.service; then
+        echo "removing legacy symlink /etc/systemd/system/elastic-agent.service"
+        unlink /etc/systemd/system/elastic-agent.service
     fi
     if test -f ${PREFIX}/lib/systemd/system/elastic-agent.service; then
         echo "copy ${PREFIX}/lib/systemd/system/elastic-agent.service to /lib/systemd/system/elastic-agent.service"

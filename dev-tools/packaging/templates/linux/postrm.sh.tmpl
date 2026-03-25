@@ -36,6 +36,10 @@ case "$1" in
         echo "Found /lib/systemd/system/elastic-agent.service, removing"
         rm -f /lib/systemd/system/elastic-agent.service
     fi
+    if test -L /etc/systemd/system/elastic-agent.service; then
+        echo "Found /etc/systemd/system/elastic-agent.service link, unlink"
+        unlink /etc/systemd/system/elastic-agent.service
+    fi
     ;;
   *)
     ;;
