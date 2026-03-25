@@ -7,6 +7,7 @@
 package install
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -25,8 +26,6 @@ const (
 	elasticPublisher = "Elastic"
 	elasticAgentURL  = "https://www.elastic.co/elastic-agent"
 )
-
-func stringPtr(s string) *string { return &s }
 
 func agentUninstallKeyPath() string {
 	return UninstallKeyPath + `\` + paths.ServiceName()
@@ -86,13 +85,12 @@ func UpsertUninstallEntry(topPath, displayVersion string) error {
 	return nil
 }
 
-
 // removeUninstallEntry deletes the Elastic Agent entry from
 // the Windows "Add or Remove Programs" list.
 func removeUninstallEntry() error {
 	keyPath := agentUninstallKeyPath()
 	err := registry.DeleteKey(registry.LOCAL_MACHINE, keyPath)
-	if err == registry.ErrNotExist {
+	if errors.Is(err, registry.ErrNotExist) {
 		return nil
 	}
 	if err != nil {
