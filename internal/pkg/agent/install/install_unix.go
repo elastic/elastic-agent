@@ -46,9 +46,3 @@ func configureRegistryPermissions(_ utils.FileOwner) error {
 func UpsertUninstallEntry(_, _ string) error {
 	return nil
 }
-
-
-// removeUninstallEntry is a no-op on non-Windows platforms.
-func removeUninstallEntry() error {
-	return nil
-}

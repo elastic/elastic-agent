@@ -8,6 +8,7 @@ package installtest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"syscall"
@@ -128,9 +129,12 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 
 func checkUninstallPlatform(opts *CheckOpts) error {
 	v, err := getRegistryDisplayVersion(opts.Namespace)
-	if err != nil {
+	if errors.Is(err, registry.ErrNotExist) {
 		// key doesn't exist, as expected
 		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("checking uninstall registry entry: %w", err)
 	}
 	svc := paths.ServiceNameForNamespace(opts.Namespace)
 	return fmt.Errorf("uninstall registry entry for %q still present with DisplayVersion %q", svc, v)
