@@ -351,7 +351,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		if err != nil {
 			return err
 		}
-		enroll := exec.Command(executable, cmdArgs...)
+		enroll := exec.CommandContext(context.Background(), executable, cmdArgs...)
 		enroll.Stdout = streams.Out
 		enroll.Stderr = streams.Err
 		err = enroll.Start()
