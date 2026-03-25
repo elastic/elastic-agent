@@ -599,7 +599,7 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 		ManagedMode:  runtime.ProtoAgentMode(info),
 		Unprivileged: info.Unprivileged(),
 	}
-	inputs, err := management.CreateInputsFromStreams(unit.Config, defaultDataStreamType, agentInfo)
+	inputs, err := management.CreateInputsFromStreamsForReceiver(unit.Config, defaultDataStreamType, agentInfo)
 	if err != nil {
 		return nil, err
 	}
