@@ -784,7 +784,7 @@ func TestFromSerializableEvent(t *testing.T) {
 			}
 
 			if tt.checkAttrs {
-				attrs := event.Attributes()
+				attrs := EventAttributes(event)
 				assert.Equal(t, 3, attrs.Len())
 				val, ok := attrs.Get("key1")
 				require.True(t, ok)
@@ -945,8 +945,8 @@ func TestAggregateStatusHelper(t *testing.T) {
 		assert.Nil(t, result.Err())
 		assert.NotNil(t, result.ComponentStatusMap)
 		assert.Empty(t, result.ComponentStatusMap)
-		assert.NotNil(t, result.Attributes())
-		assert.Empty(t, result.Attributes().AsRaw())
+		assert.NotNil(t, result.Event)
+		assert.Empty(t, EventAttributes(result.Event).AsRaw())
 	})
 
 	t.Run("creates status with error", func(t *testing.T) {

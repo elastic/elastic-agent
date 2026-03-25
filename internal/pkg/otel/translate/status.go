@@ -403,7 +403,7 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit componen
 	// unitStreamStatuses is the map of stream statuses relevant to the unit based on streams in the configuration
 	var unitStreamStatuses map[string]*serializablestatus.SerializableEvent
 
-	statusAttributes := otelUnitStatus.Attributes().AsRaw()
+	statusAttributes := serializablestatus.EventAttributes(otelUnitStatus.Event).AsRaw()
 
 	if inputStatuses, ok := statusAttributes["inputs"]; ok {
 		err := mapstructure.Decode(inputStatuses, &inputStatusMap)

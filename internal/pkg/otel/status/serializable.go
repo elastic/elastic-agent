@@ -56,6 +56,20 @@ func (e *healthCheckEvent) Timestamp() time.Time           { return e.timestamp 
 func (e *healthCheckEvent) Err() error                     { return e.err }
 func (e *healthCheckEvent) Attributes() pcommon.Map        { return e.attributes }
 
+// EventAttributes returns the pcommon.Map attributes for a status.Event.
+// pkg/status.Event interface does not include Attributes(), but both
+// *componentstatus.Event (live collector events) and *healthCheckEvent
+// (deserialized events) carry attributes. Use duck-typing to extract them.
+func EventAttributes(e status.Event) pcommon.Map {
+	type attributer interface {
+		Attributes() pcommon.Map
+	}
+	if a, ok := e.(attributer); ok {
+		return a.Attributes()
+	}
+	return pcommon.NewMap()
+}
+
 // FromSerializableStatus reconstructs an AggregateStatus from serializableStatus.
 func FromSerializableStatus(ss *SerializableStatus) (*status.AggregateStatus, error) {
 	ev, err := FromSerializableEvent(ss.SerializableEvent)
@@ -139,7 +153,7 @@ func CompareStatuses(s1, s2 *status.AggregateStatus) bool {
 		}
 	}
 
-	if !s1.Attributes().Equal(s2.Attributes()) {
+	if !EventAttributes(s1.Event).Equal(EventAttributes(s2.Event)) {
 		return false
 	}
 
