@@ -5,12 +5,15 @@
 package translate
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/url"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
+	"go.opentelemetry.io/collector/config/configtls"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
 	"github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
@@ -19,6 +22,20 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
+
+var tlsVersions = map[uint16]string{
+	tls.VersionTLS10: "1.0",
+	tls.VersionTLS11: "1.1",
+	tls.VersionTLS12: "1.2",
+	tls.VersionTLS13: "1.3",
+}
+
+var otelCurveType = map[tls.CurveID]string{
+	tls.CurveP256: "P256",
+	tls.CurveP384: "P384",
+	tls.CurveP521: "P521",
+	tls.X25519:    "X25519",
+}
 
 // Helper function to conditionally add fields to the map
 func setIfNotNil(m map[string]any, key string, value any) {
@@ -122,4 +139,119 @@ func getFlushTimeout(logger *logp.Logger, output *config.C) string {
 		return "10s" // return default queue.mem.flush.timeout for sending_queue in case of an errr
 	}
 	return timeout
+}
+
+// TLSCommonToOTel converts a tlscommon.Config into the OTel configtls.ClientConfig
+// ca_trusted_fingerprint, ca_sha_256 and verification mode are not handled by this method
+func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any, error) {
+	logger = logger.Named("tls-to-otel")
+	otelTLSConfig := map[string]any{}
+
+	if tlsConfig == nil {
+		return nil, nil
+	}
+
+	if !tlsConfig.IsEnabled() {
+		return map[string]any{
+			"insecure": true,
+		}, nil
+	}
+
+	// validate the beats config before proceeding
+	if err := tlsConfig.Validate(); err != nil {
+		return nil, err
+	}
+
+	// handle verification_mode:none
+	// Handle all other cases, including VerifyFull, VerifyCertificate, or VerifyStrict by beatsauth extension
+	if tlsConfig.VerificationMode == tlscommon.VerifyNone {
+		otelTLSConfig["insecure_skip_verify"] = true
+	}
+
+	// unpacks -> ssl.certificate_authorities
+	// The OTel exporter accepts either single CA file or CA string. However,
+	// Beats support any combination and number of files and certificates
+	// as string, so we read them all and assemble one PEM string with
+	// all CA certificates
+	var caCerts []string
+	for _, ca := range tlsConfig.CAs {
+		d, err := tlscommon.ReadPEMFile(logger, ca, "")
+		if err != nil {
+			logger.Errorf("Failed reading CA: %+v", err)
+			return nil, err
+		}
+		caCerts = append(caCerts, string(d))
+	}
+
+	var (
+		certKeyPem string
+		certPem    string
+	)
+
+	if tlsConfig.Certificate.Key != "" {
+		// unpacks ->  ssl.key
+		certKeyBytes, err := tlscommon.ReadPEMFile(logger, tlsConfig.Certificate.Key, tlsConfig.Certificate.Passphrase)
+		if err != nil {
+			return nil, fmt.Errorf("failed reading key file: %w", err)
+		}
+		certKeyPem = string(certKeyBytes)
+
+		// unpacks ->  ssl.certificate
+		certBytes, err := tlscommon.ReadPEMFile(logger, tlsConfig.Certificate.Certificate, "")
+		if err != nil {
+			logger.Errorf("Failed reading cert file: %+v", err)
+			return nil, fmt.Errorf("failed reading cert file: %w", err)
+		}
+		certPem = string(certBytes)
+	}
+
+	tlsCfg, err := tlscommon.LoadTLSConfig(tlsConfig, logger)
+	if err != nil {
+		return nil, fmt.Errorf("cannot load SSL configuration: %w", err)
+	}
+	goTLSConfig := tlsCfg.ToConfig()
+
+	// convert beats' cipher suits to OTel compatible format
+	ciphersuites := []string{}
+	for _, cs := range goTLSConfig.CipherSuites {
+		ciphersuites = append(ciphersuites, tls.CipherSuiteName(cs))
+	}
+
+	// convert beat curve ID to OTel compatible curve preference
+	curve_preferences := []string{}
+	for _, cp := range goTLSConfig.CurvePreferences {
+		curve_preferences = append(curve_preferences, otelCurveType[cp])
+	}
+
+	setIfNotNil(otelTLSConfig, "ca_pem", strings.Join(caCerts, "")) // ssl.certificate_authorities
+	setIfNotNil(otelTLSConfig, "cert_pem", certPem)                 // ssl.certificate
+	setIfNotNil(otelTLSConfig, "key_pem", certKeyPem)               // ssl.key
+	setIfNotNil(otelTLSConfig, "cipher_suites", ciphersuites)       // ssl.cipher_suites
+	setIfNotNil(otelTLSConfig, "curve_preferences", curve_preferences)
+
+	otelTLSConfig["min_version"] = tlsVersions[goTLSConfig.MinVersion]
+	otelTLSConfig["max_version"] = tlsVersions[goTLSConfig.MaxVersion]
+
+	if err := typeSafetyCheck(otelTLSConfig); err != nil {
+		return nil, err
+	}
+	return otelTLSConfig, nil
+}
+
+// For type safety check
+func typeSafetyCheck(value map[string]any) error {
+	// the returned valued should match `clienttls.Config` type.
+	// it throws an error if non existing key names  are set
+	var result configtls.ClientConfig
+	d, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Squash:      true,
+		Result:      &result,
+		ErrorUnused: true,
+	})
+
+	err := d.Decode(value)
+	if err != nil {
+		return err
+	}
+	return err
 }

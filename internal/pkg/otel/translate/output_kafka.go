@@ -93,6 +93,13 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		}
 	}
 
+	tlsCfg, err := TLSToOTel(kConfig.TLS, logger)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error translating tls config :%w", err)
+	}
+
+	setIfNotNil(kafkaExporter, "tls", tlsCfg)
+
 	// compiles topic and validates against any malformed strings
 	fmtstr, err := fmtstr.CompileEvent(kConfig.Topic)
 	if err != nil {
@@ -246,8 +253,6 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 		return fmt.Errorf("headers is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("timeout") {
 		return fmt.Errorf("timeout is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("ssl") {
-		return fmt.Errorf("ssl parameters are currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("bulk_flush_frequency") {
 		logger.Warn("bulk_flush_frequency is deprecated")
 	}
