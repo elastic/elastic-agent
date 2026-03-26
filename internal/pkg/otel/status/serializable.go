@@ -139,7 +139,7 @@ func CompareStatuses(s1, s2 *status.AggregateStatus) bool {
 		}
 	}
 
-	if !s1.Event.Attributes().Equal(s2.Event.Attributes()) {
+	if !s1.Attributes().Equal(s2.Attributes()) {
 		return false
 	}
 
