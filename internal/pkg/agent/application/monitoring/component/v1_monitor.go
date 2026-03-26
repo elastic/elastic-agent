@@ -1236,7 +1236,7 @@ func dropEventsFromProcessMonitoringProcessor() map[string]any {
 // dropEventsFromOTelMonitoringProcessor returns a processor which drops all events from monitoring-specific
 // OTel collector components
 func dropEventsFromOTelMonitoringProcessor() map[string]any {
-	otelMonitoringPattern := ".*/" + translate.OtelNamePrefix + "monitoring$"
+	otelMonitoringPattern := ".*/_agent-component/monitoring$"
 	return map[string]interface{}{
 		"drop_event": map[string]interface{}{
 			"when": map[string]interface{}{
