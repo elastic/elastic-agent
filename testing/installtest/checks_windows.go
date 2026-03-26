@@ -114,13 +114,17 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		}
 	}
 
+	// Verify the registry DisplayVersion. If the entry doesn't exist,
+	// only fail for privileged installs, unprivileged upgrades from old
+	// versions may not have the entry yet.
 	if opts.Version != "" {
 		displayVersion, err := getRegistryDisplayVersion(opts.Namespace)
-		if err != nil {
+		if err == nil {
+			if displayVersion != opts.Version {
+				return fmt.Errorf("uninstall registry DisplayVersion mismatch for %s: got %q, want %q", topPath, displayVersion, opts.Version)
+			}
+		} else if opts.Privileged {
 			return fmt.Errorf("uninstall registry entry missing for %s: %w", topPath, err)
-		}
-		if displayVersion != opts.Version {
-			return fmt.Errorf("uninstall registry DisplayVersion mismatch for %s: got %q, want %q", topPath, displayVersion, opts.Version)
 		}
 	}
 
