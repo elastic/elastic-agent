@@ -107,6 +107,15 @@ func SwitchExecutingMode(topPath string, pt ProgressDescriber, username string, 
 		return err
 	}
 
+	// The MSI ProductCode GUID is version-specific and stale after upgrade,
+	// so we use our own stable key and remove the MSI one to avoid duplicates.
+	pt.Describe("Removing MSI uninstall registry entry")
+	err = RemoveMSIUninstallEntries()
+	if err != nil {
+		pt.Describe("Failed to remove MSI uninstall registry entry")
+		return err
+	}
+
 	return nil
 }
 

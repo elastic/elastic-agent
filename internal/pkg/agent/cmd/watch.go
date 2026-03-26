@@ -276,6 +276,12 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		} else {
 			log.Warnf("failed to update uninstall registry entry: %v", err)
 		}
+	} else {
+		// The MSI ProductCode GUID is version-specific and stale after upgrade,
+		// so we use our own stable key and remove the MSI one to avoid duplicates.
+		if err := install.RemoveMSIUninstallEntries(); err != nil {
+			log.Warnf("failed to remove MSI uninstall registry entry: %v", err)
+		}
 	}
 
 	// watch succeeded - upgrade was successful!

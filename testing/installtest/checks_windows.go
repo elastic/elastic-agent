@@ -145,7 +145,7 @@ func checkUninstallPlatform(opts *CheckOpts) error {
 }
 
 func getRegistryDisplayVersion(namespace string) (string, error) {
-	keyPath := install.UninstallKeyPath + `\` + paths.ServiceNameForNamespace(namespace)
+	keyPath := install.AgentUninstallKeyPathForNamespace(namespace)
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
 	if err != nil {
 		return "", err

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"golang.org/x/sys/windows"
@@ -28,7 +29,13 @@ const (
 )
 
 func agentUninstallKeyPath() string {
-	return UninstallKeyPath + `\` + paths.ServiceName()
+	return AgentUninstallKeyPathForNamespace(paths.InstallNamespace())
+}
+
+// AgentUninstallKeyPathForNamespace returns the full registry key path for the
+// agent's Add/Remove Programs entry for the given namespace.
+func AgentUninstallKeyPathForNamespace(namespace string) string {
+	return UninstallKeyPath + `\` + paths.ServiceNameForNamespace(namespace)
 }
 
 // UpsertUninstallEntry creates or updates the entry under
@@ -83,6 +90,56 @@ func UpsertUninstallEntry(topPath, displayVersion string) error {
 	}
 
 	return nil
+}
+
+// RemoveMSIUninstallEntries removes Add/Remove Programs entries created by the
+// MSI installer to avoid duplicates.
+// See: https://github.com/elastic/elastic-stack-installers
+func RemoveMSIUninstallEntries() error {
+	guids := findMSIProductCodes()
+	for _, guid := range guids {
+		if err := registry.DeleteKey(registry.LOCAL_MACHINE, UninstallKeyPath+`\`+guid); err != nil {
+			return fmt.Errorf("deleting MSI uninstall registry key %q: %w", guid, err)
+		}
+	}
+	return nil
+}
+
+// findMSIProductCodes searches the Uninstall registry for MSI entries.
+func findMSIProductCodes() []string {
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, UninstallKeyPath, registry.ENUMERATE_SUB_KEYS)
+	if err != nil {
+		return nil
+	}
+	defer k.Close()
+
+	var guids []string
+	for {
+		names, err := k.ReadSubKeyNames(100)
+		for _, name := range names {
+			// The Elastic Agent MSI ProductCode varies per version but
+			// it always starts with "{E550A894-5C44-5BEF-9967-".
+			// See: https://github.com/elastic/elastic-stack-installers/blob/main/src/shared/Uuid5.cs
+			if !strings.HasPrefix(strings.ToUpper(name), "{E550A894-5C44-5BEF-9967-") {
+				continue
+			}
+			subKey, subErr := registry.OpenKey(registry.LOCAL_MACHINE, UninstallKeyPath+`\`+name, registry.QUERY_VALUE)
+			if subErr != nil {
+				continue
+			}
+			displayName, _, _ := subKey.GetStringValue("DisplayName")
+			winInstaller, _, _ := subKey.GetIntegerValue("WindowsInstaller")
+			subKey.Close()
+
+			if strings.HasPrefix(displayName, "Elastic Agent") && winInstaller == 1 {
+				guids = append(guids, name)
+			}
+		}
+		if err != nil {
+			break
+		}
+	}
+	return guids
 }
 
 // removeUninstallEntry deletes the Elastic Agent entry from
