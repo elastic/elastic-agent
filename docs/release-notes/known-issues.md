@@ -23,6 +23,22 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} Windows Add/Remove Programs entry not created after unprivileged upgrade from pre-9.4.0
+**Applies to: {{agent}} 9.4.0+**
+
+Starting in 9.4.0, {{agent}} registers an entry in the Windows Add/Remove Programs list during installation. When upgrading from a version before 9.4.0 in **unprivileged** mode, the upgrade watcher does not have permission to create the registry entry because the required ACL was never set by the older version.
+
+**Workaround**
+
+Run the following command to create the registry entry and set the correct permissions for future upgrades:
+
+```
+elastic-agent unprivileged -f
+```
+
+This is only needed once after the first upgrade from a pre-9.4.0 version. Subsequent upgrades will update the entry automatically.
+:::
+
 :::{dropdown} Elastic Agent 9.3.x fails to start on MacOS when OSQuery Manager integration is used
 **Applies to: {{agent}} 9.3.0, 9.3.1**
 
