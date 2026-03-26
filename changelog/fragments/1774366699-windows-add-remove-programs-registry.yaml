@@ -23,7 +23,10 @@ description: |
   (Uninstall registry key) during installation. This makes the agent visible
   in the Windows Settings > Apps list and Control Panel, and the entry is
   removed on uninstall. The registry entry includes version, publisher, install
-  location, and estimated size information, and is updated on upgrade.
+  location, and uninstall command, and is updated on upgrade.
+
+  For systems originally installed via MSI, the new entry replaces the
+  MSI-generated one during the first upgrade to this version.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
