@@ -78,13 +78,7 @@ func NewAWSVerifierFactory() VerifierFactory {
 //
 // Default credentials mode (testing): uses the default AWS credential chain.
 func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthConfig) (*AWSVerifier, error) {
-	transport, _ := http.DefaultTransport.(*http.Transport)
-	if transport == nil {
-		transport = &http.Transport{}
-	}
-	httpClient := &http.Client{
-		Transport: transport.Clone(),
-	}
+	httpClient := newHTTPClient()
 
 	baseCfg, err := config.LoadDefaultConfig(ctx,
 		config.WithHTTPClient(httpClient),

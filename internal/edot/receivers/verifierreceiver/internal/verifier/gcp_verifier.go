@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 type GCPVerifier struct {
 	logger              *zap.Logger
 	opts                []option.ClientOption
+	httpClient          *http.Client
 	configured          bool
 	authConfig          GCPAuthConfig
 	projectID           string
@@ -60,16 +62,20 @@ func NewGCPVerifierFactory() VerifierFactory {
 //
 // Default credentials mode (testing): Application Default Credentials.
 func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthConfig) (*GCPVerifier, error) {
+	httpClient := newHTTPClient()
 	var opts []option.ClientOption
 
 	switch {
 	case authConfig.IsCloudConnector():
 		// AWS-mediated WIF flow matching Cloudbeat:
-		// 1. Assume Elastic global AWS role using the OIDC JWT
-		// 2. Supply AWS credentials to GCP STS for WIF token exchange
+		// 1. Assume Elastic global AWS role using the OIDC JWT (via FIPS HTTP client)
+		// 2. Supply AWS credentials to GCP STS for WIF token exchange (via FIPS HTTP client)
 		// 3. Impersonate the target GCP service account
 		sessionName := authConfig.CloudResourceID + "-" + authConfig.CloudConnectorID
-		stsClient := sts.New(sts.Options{Region: "us-east-1"})
+		stsClient := sts.New(sts.Options{
+			Region:     "us-east-1",
+			HTTPClient: httpClient,
+		})
 		webIdentityProvider := stscreds.NewWebIdentityRoleProvider(
 			stsClient,
 			authConfig.GlobalRoleARN,
@@ -99,12 +105,19 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 			)
 		}
 
-		tokenSource, err := externalaccount.NewTokenSource(ctx, extCfg)
+		// Inject the FIPS HTTP client into the OAuth2 token-source context so
+		// that GCP STS token exchange uses FIPS-compliant TLS.
+		ctxWithClient := context.WithValue(ctx, oauth2.HTTPClient, httpClient)
+		tokenSource, err := externalaccount.NewTokenSource(ctxWithClient, extCfg)
 		if err != nil {
 			logger.Warn("Failed to create GCP external account token source", zap.Error(err))
+			httpClient.CloseIdleConnections()
 			return &GCPVerifier{logger: logger, configured: false}, nil
 		}
-		opts = append(opts, option.WithTokenSource(tokenSource))
+		opts = append(opts,
+			option.WithTokenSource(tokenSource),
+			option.WithHTTPClient(httpClient),
+		)
 		logger.Info("GCP cloud connector AWS-mediated WIF credential configured",
 			zap.String("audience", authConfig.WorkloadIdentityProvider),
 			zap.String("global_role", authConfig.GlobalRoleARN),
@@ -113,20 +126,27 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 
 	case authConfig.UseDefaultCredentials:
 		logger.Info("Configuring GCP default credentials (testing)")
-		creds, err := google.FindDefaultCredentials(ctx,
+		// Inject the FIPS HTTP client so credential discovery uses FIPS-compliant TLS.
+		ctxWithClient := context.WithValue(ctx, oauth2.HTTPClient, httpClient)
+		creds, err := google.FindDefaultCredentials(ctxWithClient,
 			"https://www.googleapis.com/auth/cloud-platform.read-only",
 		)
 		if err != nil {
 			logger.Warn("Failed to find GCP default credentials", zap.Error(err))
+			httpClient.CloseIdleConnections()
 			return &GCPVerifier{logger: logger, configured: false}, nil
 		}
-		opts = append(opts, option.WithCredentials(creds))
+		opts = append(opts,
+			option.WithCredentials(creds),
+			option.WithHTTPClient(httpClient),
+		)
 		if authConfig.ProjectID == "" && creds.ProjectID != "" {
 			authConfig.ProjectID = creds.ProjectID
 		}
 
 	default:
 		logger.Warn("GCP credentials not fully configured")
+		httpClient.CloseIdleConnections()
 		return &GCPVerifier{logger: logger, configured: false}, nil
 	}
 
@@ -137,6 +157,7 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 	return &GCPVerifier{
 		logger:              logger,
 		opts:                opts,
+		httpClient:          httpClient,
 		configured:          true,
 		authConfig:          authConfig,
 		projectID:           authConfig.ProjectID,
@@ -149,6 +170,9 @@ func (v *GCPVerifier) ProviderType() ProviderType {
 }
 
 func (v *GCPVerifier) Close() error {
+	if v.httpClient != nil {
+		v.httpClient.CloseIdleConnections()
+	}
 	return nil
 }
 
