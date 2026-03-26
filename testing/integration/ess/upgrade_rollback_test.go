@@ -30,6 +30,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/integration"
@@ -322,6 +323,155 @@ func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
 	}
 }
 
+// TestWindowsFleetManagedManualRollback is a Windows-specific regression test for
+// https://github.com/elastic/elastic-agent/issues/12910.
+// After a manual rollback the rolled-back agent may receive the same rollback
+// action again (replayed) because its ackToken predates the rollback action.
+// This test verifies that the agent handles the replayed action gracefully and
+// does not get stuck in "Upgrading" or "Upgrade failed" state.
+// See https://github.com/elastic/elastic-agent/issues/12910
+func TestFleetManagedReplayedRollback(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Fleet,
+		Local: false,
+		Sudo:  true,
+		Stack: &define.Stack{},
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	// Use the current build as the starting version and downgrade to
+	// previous minor, so the commit hashes differ and PerformManagedUpgrade
+	// doesn't skip. After upgrade we rollback to the starting version.
+	fromFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	upgradeToVersion, err := upgradetest.PreviousMinor()
+	require.NoError(t, err)
+	toFixture, err := atesting.NewFixture(
+		t,
+		upgradeToVersion.String(),
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+	)
+	require.NoError(t, err)
+
+	startVersionInfo, err := fromFixture.ExecVersion(ctx)
+	require.NoError(t, err, "failed to get start agent build version info")
+
+	policyUUID := uuid.Must(uuid.NewV4()).String()
+	policy := kibana.AgentPolicy{
+		Name:        fmt.Sprintf("%s-policy-%s", t.Name(), policyUUID),
+		Namespace:   "default",
+		Description: fmt.Sprintf("Fleet replayed rollback test %s (%s)", t.Name(), policyUUID),
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+
+	kibClient := info.KibanaClient
+
+	// waitFleetOnline polls Fleet until the agent reports "online" status.
+	waitFleetOnline := func(agentID, msg string) {
+		t.Helper()
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			status, sErr := fleettools.GetAgentStatus(ctx, kibClient, agentID)
+			if assert.NoError(ct, sErr) {
+				assert.Equal(ct, "online", status, msg)
+			}
+		}, 2*time.Minute, 10*time.Second)
+	}
+
+	// 1. Perform managed upgrade (from -> to)
+	var errSkipGrace = errors.New("skip grace period")
+	err = PerformManagedUpgrade(ctx, t, info, fromFixture, toFixture, policy, false,
+		upgradetest.WithPostUpgradeHook(func() error { return errSkipGrace }),
+		upgradetest.WithDisableHashCheck(true),
+		upgradetest.WithCustomWatcherConfig(fastWatcherCfgWithRollbackWindow),
+	)
+	require.ErrorIs(t, err, errSkipGrace, "managed upgrade failed with unexpected error")
+
+	agentID, err := fromFixture.AgentID(ctx)
+	require.NoError(t, err, "failed to get agent ID")
+	t.Logf("Agent ID: %s", agentID)
+
+	// 2. Request manual rollback via control protocol
+	elasticAgentClient := fromFixture.Client()
+	err = elasticAgentClient.Connect(ctx)
+	require.NoError(t, err, "error connecting to installed elastic agent")
+	defer elasticAgentClient.Disconnect()
+
+	t.Logf("Requesting manual rollback to version %s", fromFixture.Version())
+	retVal, err := elasticAgentClient.Upgrade(ctx, fromFixture.Version(), true, "", false, false)
+	if err != nil {
+		// The rollback triggers an agent restart which may sever the RPC
+		// connection before the response arrives.
+		t.Logf("rollback request returned error (may be expected due to agent restart): %v", err)
+	} else {
+		t.Logf("rollback output: %s", retVal)
+	}
+
+	// Need to reconnect after rollback since the agent restarted
+	elasticAgentClient.Disconnect()
+
+	// 3. Wait for agent to be healthy at original version.
+	// Use a longer timeout (4 min) because the rollback involves watcher
+	// takedown, symlink switch, and a full agent restart.
+	err = upgradetest.WaitHealthyAndVersion(ctx, fromFixture, startVersionInfo.Binary, 4*time.Minute, 10*time.Second, t)
+	require.NoError(t, err, "agent should be healthy at original version after rollback")
+
+	// 4. Verify Fleet/Kibana reflects the rollback: agent should be online
+	// and at the rolled-back version with no failed upgrade details.
+	t.Log("Verifying agent status in Fleet after rollback...")
+	waitFleetOnline(agentID, "agent should be online in Fleet after rollback")
+
+	// Poll for Fleet to reflect the rolled-back version; the checkin that
+	// reports the new version may lag behind the agent's local health check.
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		fleetVersion, vErr := fleettools.GetAgentVersion(ctx, kibClient, agentID)
+		if assert.NoError(ct, vErr, "failed to get agent version from Fleet") {
+			assert.Equal(ct, startVersionInfo.Binary.Version, fleetVersion,
+				"Fleet should report the rolled-back agent version")
+		}
+	}, 2*time.Minute, 10*time.Second)
+
+	agentData, err := kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+	require.NoError(t, err, "failed to get agent from Fleet API")
+	if agentData.UpgradeDetails != nil {
+		assert.NotEqual(t, "UPG_FAILED", agentData.UpgradeDetails.State,
+			"Fleet must not show agent in UPG_FAILED state after rollback")
+	}
+
+	// 5. Reconnect and simulate replayed rollback action (the core of the bug from issue #12910)
+	elasticAgentClient = fromFixture.Client()
+	err = elasticAgentClient.Connect(ctx)
+	require.NoError(t, err, "error reconnecting to agent after rollback")
+	defer elasticAgentClient.Disconnect()
+
+	t.Logf("Sending replayed rollback to version %s (simulating Fleet re-send)", fromFixture.Version())
+	retVal, err = elasticAgentClient.Upgrade(ctx, fromFixture.Version(), true, "", false, false)
+	require.NoError(t, err, "replayed rollback should not error")
+	t.Logf("replayed rollback output: %s", retVal)
+
+	// 6. Verify agent stays healthy and is not stuck in Upgrading/Failed state
+	err = upgradetest.WaitHealthyAndVersion(ctx, fromFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	require.NoError(t, err, "agent should stay healthy after replayed rollback")
+
+	// 7. Verify Fleet/Kibana still shows the agent correctly after replayed rollback
+	t.Log("Verifying agent status in Fleet after replayed rollback...")
+	waitFleetOnline(agentID, "agent should be online in Fleet after replayed rollback")
+
+	agentData, err = kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+	require.NoError(t, err, "failed to get agent from Fleet API after replayed rollback")
+	if agentData.UpgradeDetails != nil {
+		assert.NotEqual(t, "UPG_FAILED", agentData.UpgradeDetails.State,
+			"Fleet must not show agent in UPG_FAILED state after replayed rollback")
+	}
+	assert.NotEqual(t, "updating", agentData.Status,
+		"Fleet must not show agent as updating after replayed rollback")
+}
+
 type rollbackTriggerFunc func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture)
 
 // TestStandaloneUpgradeManualRollback tests the scenario where, after upgrading to a new version
@@ -416,6 +566,68 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 		})
 	}
 
+}
+
+// TestStandaloneUpgradeReplayedRollback is a regression test for
+// https://github.com/elastic/elastic-agent/issues/12910.
+// After a successful manual rollback, the rolled-back agent may receive the same
+// rollback action again because its ackToken predates the rollback action.
+// This test verifies that the agent handles the replayed action gracefully and
+// does not get stuck in "Upgrading" or "Upgrade failed" state.
+func TestStandaloneUpgradeReplayedRollback(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Upgrade,
+		Local: false,
+		Sudo:  true,
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t, time.Now())
+
+	err := fromFixture.Configure(ctx, []byte(fastWatcherCfgWithRollbackWindow))
+	require.NoError(t, err, "error configuring starting fixture")
+
+	// Step 1: Upgrade and rollback using the standard helper.
+	// The trigger just sends the rollback; the helper waits for it to complete.
+	standaloneRollbackTest(
+		ctx, t, fromFixture, toFixture, fastWatcherCfgWithRollbackWindow,
+		fmt.Sprintf(details.ReasonManualRollbackPattern, fromFixture.Version()),
+		func(ctx context.Context, t *testing.T, c client.Client, startFixture, endFixture *atesting.Fixture) {
+			assertListRollbacks(ctx, t, startFixture, time.Now().Add(10*time.Minute))
+			t.Logf("sending rollback: version=%s rollback=%v", startFixture.Version(), true)
+			retVal, err := c.Upgrade(ctx, startFixture.Version(), true, "", false, false)
+			require.NoError(t, err, "rollback should succeed")
+			t.Logf("rollback output: %s", retVal)
+		},
+	)
+
+	// Step 2: After standaloneRollbackTest returns, agent is healthy at fromFixture version.
+	// Now send a replayed rollback (same version as current) and verify it's handled gracefully.
+	startVersionInfo, err := fromFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+
+	replayClient := fromFixture.Client()
+	err = replayClient.Connect(ctx)
+	require.NoError(t, err, "error connecting to agent after first rollback")
+	defer replayClient.Disconnect()
+
+	t.Logf("Sending replayed rollback to version %s (simulating Fleet re-send)", fromFixture.Version())
+	retVal, err := replayClient.Upgrade(ctx, fromFixture.Version(), true, "", false, false)
+	require.NoError(t, err, "replayed rollback should not error")
+	t.Logf("replayed rollback output: %s", retVal)
+
+	// Verify agent stays healthy and is not stuck in failed state
+	err = upgradetest.WaitHealthyAndVersion(ctx, fromFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	require.NoError(t, err, "agent should remain healthy after replayed rollback")
+
+	state, err := replayClient.State(ctx)
+	require.NoError(t, err, "error getting agent state")
+	if state.UpgradeDetails != nil {
+		assert.NotEqual(t, string(details.StateFailed), state.UpgradeDetails.State,
+			"agent must not be in failed upgrade state after replayed rollback")
+	}
 }
 
 func assertListRollbacks(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, expectedValidUntil time.Time) {

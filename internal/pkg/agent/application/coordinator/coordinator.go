@@ -837,6 +837,28 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		return err
 	}
 
+	// Detect replayed rollback actions: if this is a rollback request and the
+	// agent is already running the target version, the rollback was already
+	// performed. Ack the action and return without processing.
+	// This can happen when the rolled-back agent starts with an ackToken from
+	// before the rollback action was received and Fleet Server re-sends it.
+	if uOpts.rollback && release.VersionWithSnapshot() == version {
+		actionID := ""
+		if action != nil {
+			actionID = action.ActionID
+		}
+		c.logger.Infow(
+			"Received a rollback action targeting the current version, "+
+				"likely a replayed action; acking without processing",
+			"action_id", actionID,
+			"version", version,
+		)
+		if action != nil {
+			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
+		}
+		return nil
+	}
+
 	// override the overall state to upgrading until the re-execution is complete
 	c.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
 
@@ -879,22 +901,6 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
 			// Set upgrade state to completed so update no longer shows in-progress.
 			det.SetState(details.StateCompleted)
-			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
-		}
-
-		if errors.Is(err, upgrade.ErrNoRollbacksAvailable) && action != nil && release.VersionWithSnapshot() == action.Data.Version {
-			// when manually rolling back the action store is not copied back, so it's likely that the rolled back agent
-			// will receive (again) the rollback action because it's using an ackToken from before the rollback action
-			// was received by the "upgraded" elastic-agent.
-			// This block here is to avoid setting an error state because the rollback requested no longer exist after
-			// having performed the rollback once.
-			// A better test would be to compare actionIDs but there's no way to persist the actionID of the rollback action
-			// from the upgraded agent to the rolled back agent (upgrade details is reset when the upgrade marker is deleted)
-			c.logger.Infow(
-				"Received a rollback action with the same version as current and no rollbacks available, ignoring the likely replayed action",
-				"action_id", action.ID())
-			c.ClearOverrideState()
-			det.SetState(details.StateRollback)
 			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
 		}
 
