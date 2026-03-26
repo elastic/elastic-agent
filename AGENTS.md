@@ -167,6 +167,14 @@ Principles and repo-specific process: [CONTRIBUTING.md](./CONTRIBUTING.md).
 - **Before opening a PR (minimum):** **`mage test:unit`** and linting (**`mage check:lint`** or **`make lint`**) should pass. Also run **`mage check:all`** when your change should satisfy license + integration metadata + docs layout checks. For CI parity, use **`make check-ci`** (see [Makefile](./Makefile); note **`check-ci` does not run golangci-lint**, which CI runs in GitHub Actions) and **`make check`** when you want the linter plus the same **`check-ci`** steps.
 - **Integration / E2E:** When changes affect multi-component or Elasticsearch-backed behavior, run the relevant integration or E2E targets described in the magefile and [docs/test-framework-dev-guide.md](./docs/test-framework-dev-guide.md).
 
+## PR Preferences
+
+Always use the [pull request template](.github/PULL_REQUEST_TEMPLATE.md) when creating a pull request.
+Always asign the author to the pull request.
+
+Unless instructed otherwise, always add the `Team:Elastic-Agent-Control-Plane` label to the pull request.
+Unless instructed otherwise, always add the `backport-active-all` label to the pull request when fixing a bug.
+
 ## Further documentation
 
 - [README.md](./README.md) — setup, packaging, dependency hygiene
