@@ -32,11 +32,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
 
       - name: Install mage
-<<<<<<< HEAD
-        uses: magefile/mage-action@v3
-=======
         uses: magefile/mage-action@a662bd8c29d8106879588cfff83b2faf6e6f59db # v4.0.0
->>>>>>> 335682cb3 (build(deps): bump magefile/mage-action from 3.1.0 to 4.0.0 (#13260))
         with:
           version: v1.13.0
           install-only: true
