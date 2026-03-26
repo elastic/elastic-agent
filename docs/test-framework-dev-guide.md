@@ -15,7 +15,6 @@ provides a high level overview of the testing framework.
 #### Go version
 Go version should be at least the same than the one in [.go-version](https://github.com/elastic/elastic-agent/blob/main/.go-version) file at the root of this repository.
 
-
 #### GCloud CLI
 The integration testing framework spins up resources in GCP.  To achieve this, it needs the
 [GCloud CLI](https://cloud.google.com/sdk/gcloud) to be installed on the system where the tests are initiated from.
@@ -42,7 +41,6 @@ found.
 ESS (production) API Key to create on <https://cloud.elastic.co/account/keys>
 Warning: if you never created a deployment on it, you won't have permission to get this key, so you will need to create one first.
 
-
 #### Setup Serverless deployment
 
 This process is now automated and runs daily, utilizing the existing `oblt-cli` framework. Serverless deployments are created each day and automatically destroyed every three days.
@@ -52,7 +50,6 @@ The automation is configured in the `serverless-project.yml` file located in the
 If necessary, you can create a new serverless deployment manually; the previous deployments will be destroyed automatically, but not immediately. To do so, you need to run the GitHub action called [serverless-project.yml](https://github.com/elastic/elastic-agent/actions/workflows/serverless-project.yml).
 
 Credentials for these deployments are securely stored in Google and can only be accessed by Buildkite pipelines. The access control is set using [OpenID Connect in Google Cloud Platform](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform). And that's managed by the Robots team.
-
 
 ## Running tests
 
@@ -77,7 +74,7 @@ Go to https://docker-auth.elastic.co/ and authenticate with Okta to receive your
 
 ### Packaging
 Before you can run any test, you first need to package the Elastic
-Agent version you want to test. For that you'll need to run
+Agent version you want to test. For that you'll need to run `mage package`, for example:
 
 ```
 DEV=true SNAPSHOT=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
@@ -147,6 +144,11 @@ share similar leavers as the packaging process.
        in Docker. This needs to be set if running Kubernetes integration
        tests.
 
+An example for running a single test, including packaging the artifacts for it is:
+```
+EXTERNAL=true DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" SNAPSHOT=true mage package # create elastic-agent SNAPSHOT package using external sources for components
+SNAPSHOT=true INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME # Run TEST_NAME on a multipass VM
+```
 
 ### TL;DR: Packaging and running tests
 **Package the Elastic Agent**

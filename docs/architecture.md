@@ -1,7 +1,18 @@
 # Elastic Agent V2 Architecture
 
+## Runtime modes
+
+The Elastic-agent has two supported runtime deployment modes:
+- Standalone: policy from local YAML on the host.
+- Managed: policy delivered from Fleet Server on checkin as a POLICY_CHANGE action; the agent enrolls and receives configuration remotely.
+
 ## Overview
 The Elastic Agent V2 architecture was introduced in the 8.6 version of the Elastic Agent. It was a large internal change of how the Elastic Agent was designed and how it operated. The change was performed to allow better status reporting of each running input, improved the specification definition, and allowed for better parallel change actions.
+
+### protoc
+
+The proto definition for the V2 protocol is defined in [control_v2.proto](../control_v2.proto), the generated go files are located in [pkg/control/v2/cproto](../pkg/control/v2/cproto).
+
 ## Component Model
 The entire logic of the Elastic Agent V2 architecture works with what is called the Component Model. The Elastic Agent uses policy to generate a Component Model and then that Component Model is used to ensure a consistency between the currently observed state and the expected state (which is the Component Model).
 ### Component
@@ -11,13 +22,25 @@ A unit to Elastic Agent is a unique block of configuration that is passed to a c
 
 ## Policy Stages
 The policy of the Elastic Agent passes through different stages of rendering to result in the final configuration that gets sent to the runtime manager. Each stage mutates the configuration in its own way to make the required configuration for the components/units.
-### AST Processing
+
+**Policy Flow**:
+  ```
+  YAML Policy → AST → Variable Substitution → Apply Conditions → Component Model → Runtime convergence
+  ```
+
+  1. Policy is parsed into an AST [internal/pkg/agent/transpiler/](../internal/pkg/agent/transpiler/)
+  2. Composable providers inject dynamic variables [internal/pkg/composable/](../internal/pkg/composable/)
+  3. Conditions are evaluated; inputs/outputs match component specs in [specs/](../specs/)
+  4. The runtime manager converges running processes to the desired state.
+
+### 1 AST Processing
 The first stage of the process is to convert the YAML policy into an internal abstract syntax tree (AST) representation of the policy. The AST is used for the next two stages of the processing.
-### Variable Substitution
+### 2 Composable Providers & Variable Substitution
 After conversion of the policy into the AST the resulting AST is used to process the variables provided by the provider system inside the Elastic Agent. This substitutes any variables with values given by the providers or uses default variable values if the provider does not provide a value for the variable reference.
-### Apply Conditions
+### 3 Apply Conditions
 The next stage of the policy's journey is to apply conditions. Applying conditions can result in parts of the policy being removed. This is used by many integrations to change the behavior based on variables that come from provides. (e.g. removing the winlog input on non-Windows hosts for the system integration).
-### Compute Model
+Additonal documentation for the specs files can be found in [component-specs.md](compoonent-specs.md).
+### 4 Compute Model
 The final stage of the policy’s journey is to compute the components and units model that represents the expected state of the running Elastic Agent environment. Using the input specifications that each component defines in the Elastic Agent component directory, the Elastic Agent computes a model. That model can be different based on the platform that the Elastic Agent is running on because of specification settings defined in a component’s specification.
 
 <center><img src="./images/compute_model.png" alt="Compute Model Diagram"></center>

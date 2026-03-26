@@ -70,6 +70,7 @@ High-level areas:
 | `testing/` | Testing utiliteis including integration test definitions |
 | `docs/` | Architecture and developer guides |
 | `changelog/` | Changelog fragments for releases |
+| `build/` | Produced build and testing artifacts |
 
 Entry flow: `main.go` → `cmd.NewCommand()` → Cobra command tree → `application.New()` initializes platform specs, config managers, and the coordinator.
 
@@ -81,32 +82,12 @@ The **`beats/`** directory is a **git submodule** (see `.gitmodules`: `elastic/b
 
 ## Deployment architecture
 
-- **Runtime modes**
-  - **Standalone**: policy from local YAML on the host.
-  - **Managed**: policy delivered from **Fleet Server**; the agent enrolls and receives configuration remotely.
+Refer to [architecture.md](./docs/architecture.md).
 
-- **Component model**
-  The agent supervises child processes (**components**): Filebeat, Metricbeat, Endpoint Security, Fleet Server, etc. Each component has **units** — **input units** collect data, **output units** send data (for example to Elasticsearch). Components talk to the agent over **gRPC** using the protocol under `pkg/control/v2/cproto/` (generated from `control_v2.proto`).
+## Packaging and delivery
 
-- **Policy flow**
-
-  ```
-  YAML Policy → AST → Variable Substitution → Apply Conditions → Component Model → Runtime convergence
-  ```
-
-  1. Policy is parsed into an AST (`internal/pkg/agent/transpiler/`).
-  2. Composable providers inject dynamic variables (`internal/pkg/composable/`).
-  3. Conditions are evaluated; inputs/outputs match component specs in `specs/`.
-  4. The runtime manager converges running processes to the desired state.
-
-- **Coordinator** (`internal/pkg/agent/application/coordinator/`) wires **ConfigManager** (policy delivery), **VarsManager** (composable variables), and **RuntimeManager** (`pkg/component/runtime/`). It also handles agent-level actions (upgrade, unenroll, diagnostics).
-
-- **RuntimeManager** (`pkg/component/runtime/manager.go`): **CommandRuntime** runs components as subprocesses; **ServiceRuntime** integrates with OS services (for example Endpoint). Components can be reconfigured or restarted without restarting the agent.
-
-- **Packaging and delivery**
-  Build artifacts (for example tar, deb, rpm, Docker images) are produced via mage packaging targets; see `magefile.go` for environment variables such as `EXTERNAL`, `SNAPSHOT`, `PLATFORMS`, `PACKAGES`, `DEV`, `DOCKER_VARIANTS`. Kubernetes-oriented deployment material lives under `deploy/helm/`.
-
-Further reading: [docs/architecture.md](./docs/architecture.md), [docs/component-specs.md](./docs/component-specs.md), [docs/test-framework-dev-guide.md](./docs/test-framework-dev-guide.md), [docs/local-k8s-testing.md](./docs/local-k8s-testing.md).
+Build artifacts (for example tar, deb, rpm, Docker images) are produced via mage packaging targets; see `magefile.go` for environment variables such as `EXTERNAL`, `SNAPSHOT`, `PLATFORMS`, `PACKAGES`, `DEV`, `DOCKER_VARIANTS`. Kubernetes-oriented deployment material lives under `deploy/helm/`.
+Produced artifacts will be placed in the `build` directory.
 
 ## Testing
 
@@ -118,22 +99,11 @@ go test -run TestName ./path/to/pkg -v   # Single test / package
 
 Treat **`mage test:unit` passing** as the minimum bar before considering a change complete. If you add or change integration/E2E behavior, run the relevant mage integration targets and consult the testing docs.
 
+Testing artifacts, including outputs and results will be placed in the `build/` directory.
+
 ### Integration Tests
 
-Integration tests are driven from mage as well; they require a `define.Require` declaration, and only tests with `Local: true` run in the local integration harness. See [docs/test-framework-dev-guide.md](./docs/test-framework-dev-guide.md).
-
-Before integration tests are ran, new agent packages must be produced with the `mage package` command.
-Environment variables may be used with the `package` target to specify a specific artifact that should be tested.
-
-A single integration test can be ran with the `mage integration:single $TEST_NAME` target.
-
-If [multipass](https://canonical.com/multipass) is installed in the local environment, it can be used to run integration tests using the env var `INSTANCE_PROVIDER="multipass"`.
-
-For example, the steps needed to run a single test on a multipass amd64 VM are:
-```
-EXTERNAL=true DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" SNAPSHOT=true mage package # create elastic-agent SNAPSHOT package using external sources for components
-SNAPSHOT=true INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME # Run TEST_NAME on a multipass VM
-```
+See [docs/test-framework-dev-guide.md](./docs/test-framework-dev-guide.md).
 
 ## Dependencies (not exhaustive)
 
