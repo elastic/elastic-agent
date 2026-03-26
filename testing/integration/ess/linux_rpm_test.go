@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/snapshots"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/integration"
@@ -200,12 +201,12 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		}
 
 		t.Run(fmt.Sprintf("Upgrade RPM from %s - %q", tc.upgradeFromVersion.String(), tc.name), func(t *testing.T) {
-			testRpmUpgrade(t, tc.upgradeFromVersion, info, tc.installingServers, tc.expectingServers)
+			testRpmUpgrade(t, tc.upgradeFromVersion, info, tc.installingServers, tc.expectingServers, "")
 		})
 	}
 }
 
-func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info *define.Info, installingServers bool, expectingServers bool) {
+func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info *define.Info, installingServers bool, expectingServers bool, prefix string) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
@@ -244,6 +245,7 @@ func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 	}
 
 	installOpts := atesting.InstallOpts{
+		BasePath:       prefix,
 		NonInteractive: true,
 		Force:          true,
 		InstallServers: installingServers,
@@ -275,8 +277,22 @@ func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 	// 3. Upgrade rpm to the build version
 	srcPackage, err := endFixture.SrcPackage(ctx)
 	require.NoError(t, err)
-	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	cmdArgs := []string{"rpm", "-U", "-v"}
+	if prefix != "" {
+		cmdArgs = append(cmdArgs, "--prefix", prefix)
+	}
+	cmdArgs = append(cmdArgs, srcPackage)
+	out, err := exec.CommandContext(ctx, "sudo", cmdArgs...).CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	require.NoError(t, err, string(out))
+
+	// Inform endFixture of the install prefix so FindRunDir resolves the
+	// correct data directory (e.g. /opt/elastic-agent/var/lib/elastic-agent).
+	if prefix != "" {
+		endFixture.SetInstallBasePath(prefix)
+		// RPM scriptlets do not restart the service for prefix installs; do it explicitly.
+		out, err = exec.CommandContext(ctx, "sudo", "systemctl", "restart", "elastic-agent").CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
 
 	newRunDir, err := atesting.FindRunDir(endFixture)
 	require.NoError(t, err, "failed at getting run dir")
@@ -363,4 +379,104 @@ func TestRpmWithPrefix(t *testing.T) {
 		InstallServers: false,
 	}
 	testRpmLogIngestFleetManagedWithCheck(ctx, t, agentFixture, info, installOpts, nil)
+
+	t.Run("upgrade to latest snapshot", func(t *testing.T) {
+		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+		defer cancel()
+
+		currentVersion, err := version.ParseVersion(define.Version())
+		require.NoError(t, err)
+		branch := fmt.Sprintf("%d.%d", currentVersion.Major(), currentVersion.Minor())
+
+		snapshotClient := snapshots.NewSnapshotsClient()
+		latestSnapshots, err := snapshotClient.FindLatestSnapshots(ctx, []string{branch})
+		require.NoError(t, err)
+		if len(latestSnapshots) == 0 {
+			t.Skipf("no snapshot found for branch %s, skipping upgrade test", branch)
+		}
+
+		snapshotFixture, err := atesting.NewFixture(
+			t,
+			latestSnapshots[0].String(),
+			atesting.WithFetcher(atesting.ArtifactFetcher()),
+			atesting.WithPackageFormat("rpm"),
+		)
+		require.NoError(t, err)
+
+		snapshotPackage, err := snapshotFixture.SrcPackage(ctx)
+		require.NoError(t, err)
+
+		const migrationMarkerFile = "migration_marker.file"
+		runDir, err := atesting.FindRunDir(agentFixture)
+		require.NoError(t, err, "failed at getting run dir")
+
+		out, err := exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", "--prefix", "/opt/elastic-agent", snapshotPackage).CombinedOutput()
+		require.NoError(t, err, string(out))
+
+		// Verify upgrade succeeds - similar to testRpmUpgrade
+		newRunDir, err := atesting.FindRunDir(snapshotFixture)
+		require.NoError(t, err, "failed at getting run dir")
+		require.NotEqual(t, runDir, newRunDir, "the run dirs from upgrade should not match")
+		newRunMigrationMarker := filepath.Join(newRunDir, migrationMarkerFile)
+		require.FileExistsf(t, newRunMigrationMarker, "%q is missing", newRunMigrationMarker)
+
+		status, err := agentFixture.ExecStatus(ctx)
+		require.NoError(t, err)
+		agentID := status.Info.ID
+
+		noSnapshotVersion := strings.TrimSuffix(snapshotFixture.Version(), "-SNAPSHOT")
+		require.Eventually(t, func() bool {
+			t.Log("Getting Agent version...")
+			newVersion, err := fleettools.GetAgentVersion(ctx, info.KibanaClient, agentID)
+			if err != nil {
+				t.Logf("error getting agent version: %v", err)
+				return false
+			}
+			if noSnapshotVersion == newVersion {
+				return true
+			}
+			t.Logf("Got Agent version %s != %s", newVersion, noSnapshotVersion)
+			return false
+		}, 5*time.Minute, time.Second)
+
+		t.Run("check components set", testComponentsPresence(ctx, snapshotFixture,
+			[]componentPresenceDefinition{
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			},
+		))
+	})
+}
+
+// TestRpmWithPrefix upgrade tests upgrading from 9.3.1 -> local build
+func TestRpmWithPrefixUpgrade(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.RPM,
+		Stack: &define.Stack{},
+		OS: []define.OS{
+			{
+				Type:   define.Linux,
+				Distro: "rhel",
+			},
+		},
+		Local: false,
+		Sudo:  true,
+	})
+	currentVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+	fromVersion := version.NewParsedSemVer(9, 3, 1, "", "") // earliest patch of the 9.3.x release that has --prefix support
+
+	// sanity check
+	if !fromVersion.Less(*currentVersion) {
+		t.Skipf("unexpected upgrade sequence, %s is not less then %s", fromVersion.String(), currentVersion.String())
+	}
+	testRpmUpgrade(t, fromVersion, info, false, false, "/opt/elastic-agent")
 }

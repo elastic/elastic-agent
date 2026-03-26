@@ -212,9 +212,18 @@ func TestMonitoringLogsAreShipped(
 			"add_cloud_metadata: received error for provider azure: failed with http status code 404",
 			"add_cloud_metadata: received error for provider openstack: failed with http status code 404",
 			"add_cloud_metadata: received error for provider gcp: failed with http status code 404",
+<<<<<<< HEAD
 			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
 			"failed to invoke rollback watcher: failed to start Upgrade Watcher",             // on debian this happens probably need to fix.
 			"falling back to IMDSv1: operation error ec2imds: getToken",                      // okay for the cloud metadata to not work
+=======
+			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled",               // can happen on restart
+			"failed to invoke rollback watcher: starting watcher process: failed to start Upgrade Watcher", // on debian/rpm package installs the binary symlink at Top() doesn't exist
+			"falling back to IMDSv1: operation error ec2imds: getToken",                                    // okay for the cloud metadata to not work
+			"bulk indexer flush error",          // can happen on restart (caused by context canceled)
+			"Exporting failed. Dropping data.",  // can happen on restart (caused by context canceled)
+			"Exporting failed. Rejecting data.", // can happen on restart (caused by context canceled)
+>>>>>>> 8d1bcc62b (Add upgrade rpm --prefix integration tests (#13275))
 		})
 	})
 	t.Logf("error logs: Got %d documents", len(docs.Hits.Hits))
