@@ -8,12 +8,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appservice/armappservice"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
@@ -28,10 +30,12 @@ import (
 
 // AzureVerifier implements permission verification for Azure.
 type AzureVerifier struct {
-	logger     *zap.Logger
-	credential azcore.TokenCredential
-	configured bool
-	authConfig AzureAuthConfig
+	logger        *zap.Logger
+	credential    azcore.TokenCredential
+	httpClient    *http.Client // TLS 1.3 — used for Entra ID (login.microsoftonline.com)
+	armHTTPClient *http.Client // TLS 1.2 — used for ARM (management.azure.com, TLS 1.3 unconfirmed)
+	configured    bool
+	authConfig    AzureAuthConfig
 
 	cachedSubscriptionID string
 	subscriptionOnce     sync.Once
@@ -59,6 +63,17 @@ func NewAzureVerifierFactory() VerifierFactory {
 //
 // Default credentials mode (testing): DefaultAzureCredential (az login).
 func NewAzureVerifier(ctx context.Context, logger *zap.Logger, authConfig AzureAuthConfig) (*AzureVerifier, error) {
+	// TLS 1.3 for Entra ID (login.microsoftonline.com — confirmed TLS 1.3 support).
+	httpClient := newHTTPClient()
+	// TLS 1.2 for ARM (management.azure.com — TLS 1.3 not yet officially confirmed).
+	armHTTPClient := newTLS12HTTPClient()
+	clientOpts := azcore.ClientOptions{Transport: httpClient}
+
+	closeAll := func() {
+		httpClient.CloseIdleConnections()
+		armHTTPClient.CloseIdleConnections()
+	}
+
 	var cred azcore.TokenCredential
 	var err error
 
@@ -80,33 +95,48 @@ func NewAzureVerifier(ctx context.Context, logger *zap.Logger, authConfig AzureA
 			authConfig.TenantID,
 			authConfig.ClientID,
 			getAssertion,
-			nil,
+			&azidentity.ClientAssertionCredentialOptions{ClientOptions: clientOpts},
 		)
 		if err != nil {
 			logger.Warn("Failed to create Azure client assertion credential", zap.Error(err))
+			closeAll()
 			return &AzureVerifier{logger: logger, configured: false}, nil
 		}
 		logger.Info("Azure cloud connector credential configured (ClientAssertion)")
 
 	case authConfig.UseDefaultCredentials:
-		cred, err = azidentity.NewDefaultAzureCredential(nil)
+		cred, err = azidentity.NewDefaultAzureCredential(
+			&azidentity.DefaultAzureCredentialOptions{ClientOptions: clientOpts},
+		)
 		if err != nil {
 			logger.Warn("Failed to create Azure default credential", zap.Error(err))
+			closeAll()
 			return &AzureVerifier{logger: logger, configured: false}, nil
 		}
 		logger.Info("Azure default credential configured (testing, uses az login / env vars)")
 
 	default:
 		logger.Warn("Azure credentials not fully configured")
+		closeAll()
 		return &AzureVerifier{logger: logger, configured: false}, nil
 	}
 
 	return &AzureVerifier{
-		logger:     logger,
-		credential: cred,
-		configured: true,
-		authConfig: authConfig,
+		logger:        logger,
+		credential:    cred,
+		httpClient:    httpClient,
+		armHTTPClient: armHTTPClient,
+		configured:    true,
+		authConfig:    authConfig,
 	}, nil
+}
+
+// armClientOptions returns [*arm.ClientOptions] that routes all ARM API calls
+// through the TLS 1.2 HTTP client (management.azure.com, TLS 1.3 unconfirmed).
+func (v *AzureVerifier) armClientOptions() *arm.ClientOptions {
+	return &arm.ClientOptions{
+		ClientOptions: azcore.ClientOptions{Transport: v.armHTTPClient},
+	}
 }
 
 func (v *AzureVerifier) ProviderType() ProviderType {
@@ -114,6 +144,12 @@ func (v *AzureVerifier) ProviderType() ProviderType {
 }
 
 func (v *AzureVerifier) Close() error {
+	if v.httpClient != nil {
+		v.httpClient.CloseIdleConnections()
+	}
+	if v.armHTTPClient != nil {
+		v.armHTTPClient.CloseIdleConnections()
+	}
 	return nil
 }
 
@@ -122,7 +158,7 @@ func (v *AzureVerifier) Close() error {
 // cached after the first successful call.
 func (v *AzureVerifier) discoverSubscriptionID(ctx context.Context) (string, error) {
 	v.subscriptionOnce.Do(func() {
-		client, err := armsubscriptions.NewClient(v.credential, nil)
+		client, err := armsubscriptions.NewClient(v.credential, v.armClientOptions())
 		if err != nil {
 			v.subscriptionErr = fmt.Errorf("creating subscriptions client: %w", err)
 			return
@@ -221,7 +257,7 @@ func extractAzureService(action string) string {
 func (v *AzureVerifier) verifyResources(ctx context.Context, subscriptionID, action string) Result {
 	switch {
 	case strings.Contains(action, "subscriptions/resources/read"):
-		client, err := armresources.NewClient(subscriptionID, v.credential, nil)
+		client, err := armresources.NewClient(subscriptionID, v.credential, v.armClientOptions())
 		if err != nil {
 			return v.handleAzureError(err, action)
 		}
@@ -231,7 +267,7 @@ func (v *AzureVerifier) verifyResources(ctx context.Context, subscriptionID, act
 		return v.handleAzureError(err, action)
 
 	case strings.Contains(action, "subscriptions/read"):
-		client, err := armsubscriptions.NewClient(v.credential, nil)
+		client, err := armsubscriptions.NewClient(v.credential, v.armClientOptions())
 		if err != nil {
 			return v.handleAzureError(err, action)
 		}
@@ -250,7 +286,7 @@ func (v *AzureVerifier) verifyResources(ctx context.Context, subscriptionID, act
 func (v *AzureVerifier) verifyCompute(ctx context.Context, subscriptionID, action string) Result {
 	switch {
 	case strings.Contains(action, "virtualMachines/read"):
-		client, err := armcompute.NewVirtualMachinesClient(subscriptionID, v.credential, nil)
+		client, err := armcompute.NewVirtualMachinesClient(subscriptionID, v.credential, v.armClientOptions())
 		if err != nil {
 			return v.handleAzureError(err, action)
 		}
@@ -269,7 +305,7 @@ func (v *AzureVerifier) verifyCompute(ctx context.Context, subscriptionID, actio
 func (v *AzureVerifier) verifyStorage(ctx context.Context, subscriptionID, action string) Result {
 	switch {
 	case strings.Contains(action, "storageAccounts/read"):
-		client, err := armstorage.NewAccountsClient(subscriptionID, v.credential, nil)
+		client, err := armstorage.NewAccountsClient(subscriptionID, v.credential, v.armClientOptions())
 		if err != nil {
 			return v.handleAzureError(err, action)
 		}
@@ -280,7 +316,7 @@ func (v *AzureVerifier) verifyStorage(ctx context.Context, subscriptionID, actio
 	case strings.Contains(action, "blobServices/containers/read"):
 		// Listing blob containers requires a storage account name. Fall back to
 		// listing storage accounts as a proxy check.
-		client, err := armstorage.NewAccountsClient(subscriptionID, v.credential, nil)
+		client, err := armstorage.NewAccountsClient(subscriptionID, v.credential, v.armClientOptions())
 		if err != nil {
 			return v.handleAzureError(err, action)
 		}
@@ -305,7 +341,7 @@ func (v *AzureVerifier) verifyStorage(ctx context.Context, subscriptionID, actio
 func (v *AzureVerifier) verifyInsights(ctx context.Context, subscriptionID, action string) Result {
 	switch {
 	case strings.Contains(action, "eventtypes/values/Read"):
-		client, err := armmonitor.NewActivityLogsClient(subscriptionID, v.credential, nil)
+		client, err := armmonitor.NewActivityLogsClient(subscriptionID, v.credential, v.armClientOptions())
 		if err != nil {
 			return v.handleAzureError(err, action)
 		}
@@ -326,7 +362,7 @@ func (v *AzureVerifier) verifyInsights(ctx context.Context, subscriptionID, acti
 func (v *AzureVerifier) verifyWeb(ctx context.Context, subscriptionID, action string) Result {
 	switch {
 	case strings.Contains(action, "sites/config/Read") || strings.Contains(action, "sites/read") || strings.Contains(action, "sites/*/read"):
-		client, err := armappservice.NewWebAppsClient(subscriptionID, v.credential, nil)
+		client, err := armappservice.NewWebAppsClient(subscriptionID, v.credential, v.armClientOptions())
 		if err != nil {
 			return v.handleAzureError(err, action)
 		}
@@ -345,7 +381,7 @@ func (v *AzureVerifier) verifyWeb(ctx context.Context, subscriptionID, action st
 func (v *AzureVerifier) verifyNetwork(ctx context.Context, subscriptionID, action string) Result {
 	switch {
 	case strings.Contains(action, "networkSecurityGroups/read"):
-		client, err := armnetwork.NewSecurityGroupsClient(subscriptionID, v.credential, nil)
+		client, err := armnetwork.NewSecurityGroupsClient(subscriptionID, v.credential, v.armClientOptions())
 		if err != nil {
 			return v.handleAzureError(err, action)
 		}
@@ -378,7 +414,7 @@ func (v *AzureVerifier) verifyPolicyAttachment(ctx context.Context, subscription
 
 	expectedRoleDefSuffix := "/providers/Microsoft.Authorization/roleDefinitions/" + roleGUID
 
-	client, err := armauthorization.NewRoleAssignmentsClient(subscriptionID, v.credential, nil)
+	client, err := armauthorization.NewRoleAssignmentsClient(subscriptionID, v.credential, v.armClientOptions())
 	if err != nil {
 		return v.handleAzureError(err, "armauthorization:NewRoleAssignmentsClient")
 	}
