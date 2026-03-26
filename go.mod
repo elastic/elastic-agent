@@ -4,6 +4,10 @@ go 1.25.8
 
 replace github.com/elastic/beats/v7 => ./beats
 
+// Use upstream commit post PR#43744 which adds Attributes() to the pkg/status Event interface.
+// Pin to the stable release once v0.149.0 is available.
+replace github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status => github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.148.1-0.20260322150300-d35591a04576
+
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
 	github.com/Microsoft/go-winio v0.6.2
@@ -60,13 +64,13 @@ require (
 	go.elastic.co/apm/v2 v2.7.2
 	go.elastic.co/ecszap v1.0.3
 	go.elastic.co/go-licence-detector v0.7.0
-	go.opentelemetry.io/collector/component/componentstatus v0.148.0
+	go.opentelemetry.io/collector/component/componentstatus v0.148.1-0.20260320051400-372cc483b303
 	go.opentelemetry.io/collector/component/componenttest v0.148.0
 	go.opentelemetry.io/collector/confmap/xconfmap v0.148.0
 	go.opentelemetry.io/collector/exporter/exportertest v0.148.0
 	go.opentelemetry.io/collector/extension/extensiontest v0.148.0
-	go.opentelemetry.io/collector/pdata v1.54.0
-	go.opentelemetry.io/collector/pipeline v1.54.0
+	go.opentelemetry.io/collector/pdata v1.54.1-0.20260320051400-372cc483b303
+	go.opentelemetry.io/collector/pipeline v1.54.1-0.20260320051400-372cc483b303
 	go.opentelemetry.io/otel/sdk/metric v1.42.0
 	go.uber.org/zap v1.27.1
 	go.yaml.in/yaml/v3 v3.0.4
@@ -101,12 +105,12 @@ require (
 
 require (
 	github.com/distribution/reference v0.6.0 // indirect
-	go.opentelemetry.io/collector/component v1.54.0
+	go.opentelemetry.io/collector/component v1.54.1-0.20260320051400-372cc483b303
 	go.opentelemetry.io/collector/confmap v1.54.0
 	go.opentelemetry.io/collector/connector v0.148.0 // indirect
 	go.opentelemetry.io/collector/exporter v1.54.0
 	go.opentelemetry.io/collector/extension v1.54.0
-	go.opentelemetry.io/collector/featuregate v1.54.0 // indirect
+	go.opentelemetry.io/collector/featuregate v1.54.1-0.20260320051400-372cc483b303 // indirect
 	go.opentelemetry.io/collector/otelcol v0.148.0
 	go.opentelemetry.io/collector/processor v1.54.0 // indirect
 	go.opentelemetry.io/collector/receiver v1.54.0 // indirect
