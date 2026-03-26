@@ -37,7 +37,7 @@ func agentUninstallKeyPath() string {
 // standard metadata (version, install date, publisher, uninstall command).
 func UpsertUninstallEntry(topPath, displayVersion string) error {
 	keyPath := agentUninstallKeyPath()
-	k, _, err := registry.CreateKey(registry.LOCAL_MACHINE, keyPath, registry.ALL_ACCESS)
+	k, _, err := registry.CreateKey(registry.LOCAL_MACHINE, keyPath, registry.CREATE_SUB_KEY|registry.SET_VALUE)
 	if err != nil {
 		return fmt.Errorf("creating uninstall registry key %q: %w", keyPath, err)
 	}
