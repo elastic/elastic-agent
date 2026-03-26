@@ -157,7 +157,7 @@ steps:
           - "build/diagnostics/*"
           - "coverage-*.out"
         agents:
-          provider: orka
+          provider: orka3
           imagePrefix: generic-base-15-arm-002
         retry:
           automatic:
@@ -175,7 +175,7 @@ steps:
           - "build/diagnostics/*"
           - "coverage-*.out"
         agents:
-          provider: orka
+          provider: orka3
           imagePrefix: generic-13-ventura-x64
         retry:
           automatic:
