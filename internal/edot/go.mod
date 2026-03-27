@@ -4,8 +4,6 @@ go 1.25.8
 
 replace github.com/elastic/elastic-agent => ../../
 
-replace github.com/elastic/beats/v7 => ../../beats
-
 // Use upstream commit post PR#43744 which adds include_attributes to internal/healthcheck
 // and Attributes() to the pkg/status Event interface.
 // internal/common is pinned to v0.148.0 to resolve the unreachable pseudo-version that

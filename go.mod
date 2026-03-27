@@ -2,8 +2,6 @@ module github.com/elastic/elastic-agent
 
 go 1.25.8
 
-replace github.com/elastic/beats/v7 => ./beats
-
 // Use upstream commit post PR#43744 which adds Attributes() to the pkg/status Event interface.
 // internal/common is pinned to v0.148.0 to resolve the unreachable pseudo-version that
 // internal/healthcheck@d35591a04576 references in its go.mod.
