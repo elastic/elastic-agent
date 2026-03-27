@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver/internal/verifier"
 )
@@ -208,8 +209,6 @@ type GCPProviderConfig struct {
 
 // GCPCredentials contains the GCP credentials.
 type GCPCredentials struct {
-	ProjectID string `mapstructure:"project_id"`
-
 	// Identity Federation WIF fields
 	// WorkloadIdentityProvider is the full resource name of the GCP WIF provider
 	// used as the audience for STS token exchange.
@@ -217,10 +216,60 @@ type GCPCredentials struct {
 	WorkloadIdentityProvider string `mapstructure:"workload_identity_provider"`
 
 	// ServiceAccountEmail is the GCP service account to impersonate via WIF.
+	// The project ID is derived from this email when set
+	// (e.g. "sa@my-project.iam.gserviceaccount.com" → project "my-project").
 	ServiceAccountEmail string `mapstructure:"service_account_email"`
 
 	// UseDefaultCredentials uses Application Default Credentials (for testing).
 	UseDefaultCredentials bool `mapstructure:"use_default_credentials"`
+}
+
+// projectID derives the GCP project identifier from the configured fields.
+// It first tries to extract a human-readable project ID from the service account
+// email (format: "name@PROJECT_ID.iam.gserviceaccount.com"). If that fails, it falls back to extracting the numeric project number
+// from the WorkloadIdentityProvider resource name.  Both forms are accepted by
+// all GCP APIs.
+func (cfg *GCPCredentials) projectID() string {
+	if id := gcpProjectIDFromServiceAccountEmail(cfg.ServiceAccountEmail); id != "" {
+		return id
+	}
+	return gcpProjectNumberFromAudience(cfg.WorkloadIdentityProvider)
+}
+
+// gcpProjectIDFromServiceAccountEmail extracts the GCP project ID from a
+// service account email of the form "name@PROJECT_ID.iam.gserviceaccount.com".
+// Returns an empty string when the email is empty or does not match the pattern.
+func gcpProjectIDFromServiceAccountEmail(email string) string {
+	at := strings.LastIndex(email, "@")
+	if at < 0 {
+		return ""
+	}
+	const suffix = ".iam.gserviceaccount.com"
+	domain := email[at+1:]
+	if !strings.HasSuffix(domain, suffix) {
+		return ""
+	}
+	return strings.TrimSuffix(domain, suffix)
+}
+
+// gcpProjectNumberFromAudience extracts the numeric GCP project number from a
+// Workload Identity Federation audience of the form:
+//
+//	//iam.googleapis.com/projects/PROJECT_NUMBER/locations/...
+//
+// Returns an empty string when the audience is empty or does not match the
+// expected prefix. Note: this returns a project *number*, not a project ID
+// (name); both are accepted by GCP APIs.
+func gcpProjectNumberFromAudience(audience string) string {
+	const prefix = "//iam.googleapis.com/projects/"
+	if !strings.HasPrefix(audience, prefix) {
+		return ""
+	}
+	rest := audience[len(prefix):]
+	if i := strings.Index(rest, "/"); i >= 0 {
+		return rest[:i]
+	}
+	return rest
 }
 
 // Validate validates the GCP credentials.
@@ -234,7 +283,8 @@ func (cfg *GCPCredentials) IsConfigured() bool {
 }
 
 // ToAuthConfig converts the config to a verifier.GCPAuthConfig, merging in
-// the shared identity federation OIDC configuration.
+// the shared identity federation OIDC configuration. The project ID is derived
+// from the service account email or, as a fallback, from the WIF audience.
 func (cfg *GCPCredentials) ToAuthConfig(cc IdentityFederationConfig, identityFederationID string) verifier.GCPAuthConfig {
 	return verifier.GCPAuthConfig{
 		IDTokenFile:              cc.IDTokenFile,
@@ -243,7 +293,7 @@ func (cfg *GCPCredentials) ToAuthConfig(cc IdentityFederationConfig, identityFed
 		GlobalRoleARN:            cc.GlobalRoleARN,
 		CloudResourceID:          cc.CloudResourceID,
 		IdentityFederationID:     identityFederationID,
-		ProjectID:                cfg.ProjectID,
+		ProjectID:                cfg.projectID(),
 		UseDefaultCredentials:    cfg.UseDefaultCredentials,
 	}
 }

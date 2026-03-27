@@ -54,11 +54,18 @@ receivers:
       #     client_id: "your-client-id"
       #     client_secret: "your-client-secret"
       
-      # GCP Authentication (future)
+      # GCP Authentication — choose one mode:
+      #
+      # Production (Identity Federation / WIF):
       # gcp:
       #   credentials:
-      #     project_id: "your-project-id"
-      #     use_default_credentials: true
+      #     workload_identity_provider: "//iam.googleapis.com/projects/PROJECT_NUMBER/..."
+      #     service_account_email: "sa@PROJECT_ID.iam.gserviceaccount.com"
+      #
+      # Testing (Application Default Credentials):
+      # gcp:
+      #   credentials:
+      #     use_default_credentials: true  # project from GOOGLE_CLOUD_PROJECT or GCE metadata
       
       # Okta Authentication (future)
       # okta:
@@ -133,12 +140,23 @@ receivers:
 
 #### GCP (`providers.gcp.credentials`)
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `project_id` | `string` | No | GCP project ID |
-| `service_account_key` | `string` | No | Service account JSON key |
-| `use_default_credentials` | `bool` | No | Use application default credentials |
-| `impersonate_service_account` | `string` | No | Service account to impersonate |
+Two mutually exclusive authentication modes are supported.
+
+**Identity Federation (production)** — requires `workload_identity_provider`. The GCP project
+identifier is derived automatically: from `service_account_email` when set (extracts
+`PROJECT_ID` from `name@PROJECT_ID.iam.gserviceaccount.com`), otherwise from the project
+number embedded in the WIF audience (`//iam.googleapis.com/projects/PROJECT_NUMBER/...`).
+
+**Application Default Credentials (testing only)** — requires only `use_default_credentials:
+true`. The project identifier is resolved at runtime from `google.FindDefaultCredentials`:
+the `GOOGLE_CLOUD_PROJECT` (or `GCLOUD_PROJECT`) environment variable, the ADC JSON file's
+`quota_project_id`, or the GCE/GKE metadata server. No WIF fields are needed or used.
+
+| Option | Type | Mode | Description |
+|--------|------|------|-------------|
+| `workload_identity_provider` | `string` | Identity Federation | Full WIF provider resource name; project number derived from this |
+| `service_account_email` | `string` | Identity Federation | GCP service account to impersonate via WIF; project ID derived from this when set |
+| `use_default_credentials` | `bool` | Testing | Use ADC (`gcloud auth application-default login`); project from `GOOGLE_CLOUD_PROJECT` env var or GCE metadata |
 
 #### Okta (`providers.okta.credentials`) - Future
 

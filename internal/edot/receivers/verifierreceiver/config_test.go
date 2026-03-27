@@ -402,3 +402,125 @@ func TestIntegrationConfig_IntegrationType(t *testing.T) {
 		})
 	}
 }
+
+func TestGCPProjectIDFromServiceAccountEmail(t *testing.T) {
+	tests := []struct {
+		name  string
+		email string
+		want  string
+	}{
+		{
+			name:  "standard service account email",
+			email: "my-sa@my-project-id.iam.gserviceaccount.com",
+			want:  "my-project-id",
+		},
+		{
+			name:  "hyphenated project ID",
+			email: "verifier@elastic-cloud-prod.iam.gserviceaccount.com",
+			want:  "elastic-cloud-prod",
+		},
+		{
+			name:  "non-service-account email returns empty",
+			email: "user@example.com",
+			want:  "",
+		},
+		{
+			name:  "empty email returns empty",
+			email: "",
+			want:  "",
+		},
+		{
+			name:  "no at-sign returns empty",
+			email: "noatsign",
+			want:  "",
+		},
+		{
+			name:  "wrong domain suffix returns empty",
+			email: "sa@project.iam.googleapis.com",
+			want:  "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, gcpProjectIDFromServiceAccountEmail(tt.email))
+		})
+	}
+}
+
+func TestGCPProjectNumberFromAudience(t *testing.T) {
+	tests := []struct {
+		name     string
+		audience string
+		want     string
+	}{
+		{
+			name:     "full WIF provider resource name",
+			audience: "//iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/pool/providers/provider",
+			want:     "123456789",
+		},
+		{
+			name:     "bare project prefix",
+			audience: "//iam.googleapis.com/projects/987",
+			want:     "987",
+		},
+		{
+			name:     "wrong prefix returns empty",
+			audience: "//iam.googleapis.com/organizations/123",
+			want:     "",
+		},
+		{
+			name:     "empty string returns empty",
+			audience: "",
+			want:     "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, gcpProjectNumberFromAudience(tt.audience))
+		})
+	}
+}
+
+func TestGCPCredentials_ProjectID(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  GCPCredentials
+		want string
+	}{
+		{
+			name: "derived from service account email (preferred)",
+			cfg: GCPCredentials{
+				ServiceAccountEmail:      "sa@my-project.iam.gserviceaccount.com",
+				WorkloadIdentityProvider: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/p",
+			},
+			want: "my-project",
+		},
+		{
+			name: "fallback to WIF audience when no service account email",
+			cfg: GCPCredentials{
+				WorkloadIdentityProvider: "//iam.googleapis.com/projects/987654321/locations/global/workloadIdentityPools/pool/providers/p",
+			},
+			want: "987654321",
+		},
+		{
+			name: "non-service-account email falls back to WIF",
+			cfg: GCPCredentials{
+				ServiceAccountEmail:      "user@example.com",
+				WorkloadIdentityProvider: "//iam.googleapis.com/projects/555/locations/global/workloadIdentityPools/pool/providers/p",
+			},
+			want: "555",
+		},
+		{
+			name: "use_default_credentials with no WIF returns empty (ADC provides project)",
+			cfg: GCPCredentials{
+				UseDefaultCredentials: true,
+			},
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.cfg.projectID())
+		})
+	}
+}

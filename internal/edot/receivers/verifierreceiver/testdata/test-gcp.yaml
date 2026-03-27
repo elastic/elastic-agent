@@ -1,10 +1,14 @@
-# GCP verifier test using application default credentials
+# GCP verifier test using application default credentials (ADC).
 #
 # Prerequisites:
 #   gcloud auth application-default login
 #
-# Run with:
-#   GCP_PROJECT_ID=your-project-id ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-gcp.yaml
+# The GCP project is resolved at runtime from Application Default Credentials.
+# Set the GOOGLE_CLOUD_PROJECT environment variable (or GCLOUD_PROJECT) if the
+# project is not already configured in your ADC file or GCE/GKE metadata:
+#
+#   export GOOGLE_CLOUD_PROJECT=your-project-id
+#   ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-gcp.yaml
 
 receivers:
   verifier:
@@ -19,7 +23,6 @@ receivers:
       gcp:
         credentials:
           use_default_credentials: true
-          project_id: "${GCP_PROJECT_ID}"
 
     policies:
       - policy_id: "policy-gcp-security"
@@ -29,32 +32,22 @@ receivers:
             package_name: "gcp"
             package_policy_id: "pp-audit-001"
             package_title: "GCP"
-            config:
-              project_id: "${GCP_PROJECT_ID}"
           - policy_template: "cspm"
             package_name: "gcp"
             package_policy_id: "pp-cspm-001"
             package_title: "GCP"
-            config:
-              project_id: "${GCP_PROJECT_ID}"
           - policy_template: "asset_inventory"
             package_name: "gcp"
             package_policy_id: "pp-asset-001"
             package_title: "GCP"
-            config:
-              project_id: "${GCP_PROJECT_ID}"
           - policy_template: "storage"
             package_name: "gcp"
             package_policy_id: "pp-storage-001"
             package_title: "GCP"
-            config:
-              project_id: "${GCP_PROJECT_ID}"
           - policy_template: "pubsub"
             package_name: "gcp"
             package_policy_id: "pp-pubsub-001"
             package_title: "GCP"
-            config:
-              project_id: "${GCP_PROJECT_ID}"
 
 exporters:
   debug:

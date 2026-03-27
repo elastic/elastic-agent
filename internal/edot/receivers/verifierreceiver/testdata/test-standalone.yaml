@@ -40,11 +40,20 @@ receivers:
       #     use_default_credentials: true
       #     subscription_id: "your-subscription-id"
       
-      # GCP - use_default_credentials or identity federation (workload_identity_provider + env vars)
+      # GCP — two mutually exclusive modes:
+      #
+      # Testing (Application Default Credentials):
+      #   Project is resolved from GOOGLE_CLOUD_PROJECT env var or GCE/GKE metadata.
       # gcp:
       #   credentials:
       #     use_default_credentials: true
-      #     project_id: "your-project-id"
+      #
+      # Production (Identity Federation / WIF):
+      #   Project is derived from service_account_email (preferred) or workload_identity_provider.
+      # gcp:
+      #   credentials:
+      #     workload_identity_provider: "//iam.googleapis.com/projects/PROJECT_NUMBER/..."
+      #     service_account_email: "sa@PROJECT_ID.iam.gserviceaccount.com"
       
       # Okta Authentication (future)
       # okta:
