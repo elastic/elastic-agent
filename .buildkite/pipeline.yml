@@ -158,7 +158,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: orka3
-          imagePrefix: generic-base-15-arm-002
+          imagePrefix: generic-15-sequoia-arm
         retry:
           automatic:
             limit: 1
