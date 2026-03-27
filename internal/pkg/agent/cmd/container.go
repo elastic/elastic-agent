@@ -85,16 +85,16 @@ The following actions are possible and grouped based on the actions.
 
   FLEET_ENROLL - set to 1 for enrollment into Fleet Server. If not set, Elastic Agent is run in standalone mode.
   FLEET_URL - URL of the Fleet Server to enroll into
-  FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLED and FLEET_ENROLL is set. Then the token is fetched from Kibana.
-  FLEET_ENROLL_TIMEOUT - The timeout duration for the enroll commnd. Defaults to 10m. A negative value disables the timeout.
+  FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLE and FLEET_ENROLL is set. Then the token is fetched from Kibana.
+  FLEET_ENROLL_TIMEOUT - The timeout duration for the enroll command. Defaults to 10m. A negative value disables the timeout.
   FLEET_CA - path to certificate authority to use with communicate with Fleet Server [$KIBANA_CA]
   FLEET_INSECURE - communicate with Fleet with either insecure HTTP or unverified HTTPS
   ELASTIC_AGENT_CERT - path to certificate to use for connecting to fleet-server.
   ELASTIC_AGENT_CERT_KEY - path to private key use for connecting to fleet-server.
 
-  The following vars are need in the scenario that Elastic Agent should automatically fetch its own token.
+  The following vars are needed in the scenario that Elastic Agent should automatically fetch its own token.
 
-  KIBANA_FLEET_HOST - Kibana host to enable create enrollment token on [$KIBANA_HOST]
+  KIBANA_FLEET_HOST - Kibana host to create an enrollment token on [$KIBANA_HOST]
   FLEET_TOKEN_NAME - token name to use for fetching token from Kibana. This requires Kibana configs to be set.
   FLEET_TOKEN_POLICY_NAME - token policy name to use for fetching token from Kibana. This requires Kibana configs to be set.
 
@@ -130,8 +130,8 @@ The following actions are possible and grouped based on the actions.
   should not setup Fleet.
 
   KIBANA_FLEET_HOST - Kibana host accessible from Fleet Server. [$KIBANA_HOST]
-  KIBANA_FLEET_USERNAME - Kibana username to service token [$KIBANA_USERNAME]
-  KIBANA_FLEET_PASSWORD - Kibana password to service token [$KIBANA_PASSWORD]
+  KIBANA_FLEET_USERNAME - Kibana username for service token [$KIBANA_USERNAME]
+  KIBANA_FLEET_PASSWORD - Kibana password for service token [$KIBANA_PASSWORD]
   KIBANA_FLEET_CA - path to certificate authority to use with communicate with Kibana [$KIBANA_CA]
   KIBANA_REQUEST_RETRY_SLEEP - sleep duration taken when agent performs a request to Kibana [default 1s]
   KIBANA_REQUEST_RETRY_COUNT - number of retries agent performs when executing a request to Kibana [default 30]
@@ -350,7 +350,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		if err != nil {
 			return err
 		}
-		enroll := exec.Command(executable, cmdArgs...)
+		enroll := exec.CommandContext(context.Background(), executable, cmdArgs...)
 		enroll.Stdout = streams.Out
 		enroll.Stderr = streams.Err
 		err = enroll.Start()
