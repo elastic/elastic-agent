@@ -98,8 +98,12 @@ For local testing with GCP Application Default Credentials:
 # Authenticate first
 gcloud auth application-default login
 
-# Run the test (replace with your project ID)
-GCP_PROJECT_ID=your-project-id ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-gcp.yaml
+# The GCP project is resolved automatically from Application Default Credentials.
+# Set GOOGLE_CLOUD_PROJECT if it is not already configured in your ADC file or
+# if you are not running on GCE/GKE where the metadata server provides the project.
+export GOOGLE_CLOUD_PROJECT=your-project-id
+
+./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-gcp.yaml
 ```
 
 This verifies Audit Logs, CSPM, Asset Inventory, Storage, and Pub/Sub permissions.
@@ -142,7 +146,6 @@ receivers:
       gcp:
         credentials:
           use_default_credentials: true
-          project_id: "${GCP_PROJECT_ID}"
     
     policies:
       - policy_id: "multi-cloud-policy"
