@@ -2,6 +2,11 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
+// These tests exist because the ratelimit processor is currently in Development
+// stability. They verify that our intended use case works and protect against
+// breakage from upstream changes. They can be removed once the processor
+// reaches Beta stability.
+
 package otelcol
 
 import (
