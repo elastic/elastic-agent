@@ -281,11 +281,9 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 	t.Log("Check if config files have been redacted.")
 	extractionDir := t.TempDir()
 	extractZipArchive(t, diagZip, extractionDir)
-	fileNames := []string{
+	configFileNames := []string{
 		"pre-config.yaml",
 		"computed-config.yaml",
-		"components-expected.yaml",
-		"components-actual.yaml",
 	}
 
 	var checkRedacted func(any) error
@@ -310,7 +308,7 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		return nil
 	}
 
-	for _, fileName := range fileNames {
+	for _, fileName := range configFileNames {
 		path := filepath.Join(extractionDir, fileName)
 		stat, err := os.Stat(path)
 		require.NoErrorf(t, err, "stat file %q failed", path)
@@ -325,6 +323,58 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 
 		err = checkRedacted(yObj)
 		require.NoError(t, err, "file %q has non-redacted values", path)
+	}
+
+	// Verify that Unit.Config is stripped from components diagnostic files
+	// to prevent secret leakage via structpb fields.
+	t.Log("Check that components files have been redacted and do not contain unit config.")
+	componentFileNames := []string{
+		"components-expected.yaml",
+		"components-actual.yaml",
+	}
+
+	checkComponentRedacted := func(root map[string]any) error {
+		comps, ok := root["components"].([]any)
+		if !ok {
+			return nil
+		}
+		for _, comp := range comps {
+			compMap, ok := comp.(map[string]any)
+			if !ok {
+				continue
+			}
+			units, ok := compMap["units"].([]any)
+			if !ok {
+				continue
+			}
+			for _, unit := range units {
+				unitMap, ok := unit.(map[string]any)
+				if !ok {
+					continue
+				}
+				if _, hasConfig := unitMap["config"]; hasConfig {
+					return fmt.Errorf("found 'config' key in unit, expected it to be stripped")
+				}
+			}
+		}
+		return nil
+	}
+
+	for _, fileName := range componentFileNames {
+		path := filepath.Join(extractionDir, fileName)
+		f, err := os.Open(path)
+		require.NoErrorf(t, err, "open file %q failed", path)
+		defer f.Close()
+
+		var yObj map[string]any
+		err = yaml.NewDecoder(f).Decode(&yObj)
+		require.NoError(t, err)
+
+		err = checkRedacted(yObj)
+		require.NoError(t, err, "file %q has non-redacted values", path)
+
+		err = checkComponentRedacted(yObj)
+		require.NoError(t, err, "file %q has unit config that should be stripped", path)
 	}
 }
 
