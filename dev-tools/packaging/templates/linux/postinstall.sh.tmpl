@@ -45,8 +45,57 @@ fi
 
 # create symlink to the new agent
 mkdir -p "$symlink_dir"
+<<<<<<< HEAD
 echo "create symlink "$symlink" to "$new_agent_dir/elastic-agent""
 ln -s "$new_agent_dir/elastic-agent" "$symlink"
+=======
+
+if [[ ${PREFIX} != "" ]]; then
+    # create symlink to the new agent
+    echo "create symlink \"${prefix_symlink}\" to \"${new_agent_dir}/elastic-agent\""
+    ln -s "$new_agent_dir/elastic-agent" "$prefix_symlink"
+
+    if test -f ${PREFIX}/lib/systemd/system/elastic-agent.service; then
+        echo "Prefix: ${PREFIX} detected, editing service file"
+        # Replace old paths in service file with new ones, use # as delimiter
+        sed -i "s#/etc/elastic-agent/elastic-agent.yml#${PREFIX}/etc/elastic-agent/elastic-agent.yml#g" ${PREFIX}/lib/systemd/system/elastic-agent.service
+        sed -i "s#/usr/bin/elastic-agent#${PREFIX}/usr/bin/elastic-agent#g" ${PREFIX}/lib/systemd/system/elastic-agent.service
+    fi
+
+    if test -f ${PREFIX}/usr/bin/elastic-agent; then
+        echo "editing elastic-agent wrapper"
+        # Replace paths in wrapper script
+        sed -i "s#/usr/share/elastic-agent/bin/elastic-agent#${PREFIX}/usr/share/elastic-agent/bin/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+        sed -i "s#/var/lib/elastic-agent#${PREFIX}/var/lib/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+        sed -i "s#/etc/elastic-agent#${PREFIX}/etc/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+        sed -i "s#/var/log/elastic-agent#${PREFIX}/var/log/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+    fi
+
+    # RPM --prefix relocates all package files under the new prefix, including the service file.
+    # Copy (not symlink) to /lib/systemd/system/ so systemd can find it at boot before the prefix mount is available.
+    # On upgrade from an older version, /lib/systemd/system/ and /etc/systemd/system/ may already hold symlinks
+    # pointing into the prefix mount; unlink them so cp creates a real file and systemctl enable recreates the
+    # /etc/systemd/system/ link pointing at the new /lib/systemd/system/ copy instead of the prefix path.
+    if test -L /lib/systemd/system/elastic-agent.service; then
+        echo "removing legacy symlink /lib/systemd/system/elastic-agent.service"
+        unlink /lib/systemd/system/elastic-agent.service
+    fi
+    if test -L /etc/systemd/system/elastic-agent.service; then
+        echo "removing legacy symlink /etc/systemd/system/elastic-agent.service"
+        unlink /etc/systemd/system/elastic-agent.service
+    fi
+    if test -f ${PREFIX}/lib/systemd/system/elastic-agent.service; then
+        echo "copy ${PREFIX}/lib/systemd/system/elastic-agent.service to /lib/systemd/system/elastic-agent.service"
+        cp ${PREFIX}/lib/systemd/system/elastic-agent.service /lib/systemd/system/elastic-agent.service
+    fi
+else
+    # create symlink to the new agent
+    echo "create symlink \"${default_symlink}\" to \"${new_agent_dir}/elastic-agent\""
+    ln -s "$new_agent_dir/elastic-agent" "$default_symlink"
+fi
+
+$new_agent_dir/elastic-agent apply-flavor
+>>>>>>> 3714606be (Fix RPM prefix installation to copy service file instead of symlink. (#13284))
 
 # reload systemctl and then restart service
 echo "systemd enable/restart elastic-agent"
