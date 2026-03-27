@@ -8,8 +8,8 @@
 
 receivers:
   verifier:
-    cloud_connector_id: "cc-test-gcp"
-    cloud_connector_name: "GCP Test"
+    identity_federation_id: "cc-test-gcp"
+    identity_federation_name: "GCP Test"
     namespace: "default"
     account_type: "single_account"
     verification_id: "verify-gcp-001"

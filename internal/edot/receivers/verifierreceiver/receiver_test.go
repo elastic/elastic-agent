@@ -20,11 +20,11 @@ import (
 
 func TestReceiver_StartShutdown(t *testing.T) {
 	config := &Config{
-		CloudConnectorID:   "cc-12345",
-		CloudConnectorName: "Test Connector",
-		Namespace:          "production",
-		VerificationID:     "verify-test-001",
-		VerificationType:   "on_demand",
+		IdentityFederationID:   "cc-12345",
+		IdentityFederationName: "Test Connector",
+		Namespace:              "production",
+		VerificationID:         "verify-test-001",
+		VerificationType:       "on_demand",
 		Providers: ProvidersConfig{
 			AWS: AWSProviderConfig{
 				Credentials: AWSCredentials{
@@ -88,13 +88,13 @@ func TestReceiver_StartShutdown(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "permission-verifier", serviceName.Str())
 
-	cloudConnectorID, ok := attrs.Get("cloud_connector.id")
+	federationID, ok := attrs.Get("identity_federation.id")
 	require.True(t, ok)
-	assert.Equal(t, "cc-12345", cloudConnectorID.Str())
+	assert.Equal(t, "cc-12345", federationID.Str())
 
-	cloudConnectorNamespace, ok := attrs.Get("cloud_connector.namespace")
+	federationNamespace, ok := attrs.Get("identity_federation.namespace")
 	require.True(t, ok)
-	assert.Equal(t, "production", cloudConnectorNamespace.Str())
+	assert.Equal(t, "production", federationNamespace.Str())
 
 	dsType, ok := attrs.Get("data_stream.type")
 	require.True(t, ok)
@@ -152,8 +152,8 @@ func TestReceiver_StartShutdown(t *testing.T) {
 
 func TestReceiver_WithoutAWSCredentials(t *testing.T) {
 	config := &Config{
-		CloudConnectorID: "cc-12345",
-		VerificationID:   "verify-test-002",
+		IdentityFederationID: "cc-12345",
+		VerificationID:       "verify-test-002",
 		// No provider credentials configured
 		Policies: []PolicyConfig{
 			{
@@ -192,7 +192,7 @@ func TestReceiver_WithoutAWSCredentials(t *testing.T) {
 
 	// Verify default namespace when not configured
 	resourceAttrs := logs[0].ResourceLogs().At(0).Resource().Attributes()
-	nsAttr, ok := resourceAttrs.Get("cloud_connector.namespace")
+	nsAttr, ok := resourceAttrs.Get("identity_federation.namespace")
 	require.True(t, ok)
 	assert.Equal(t, "default", nsAttr.Str())
 
@@ -216,8 +216,8 @@ func TestReceiver_WithoutAWSCredentials(t *testing.T) {
 
 func TestReceiver_UnsupportedIntegration(t *testing.T) {
 	config := &Config{
-		CloudConnectorID: "cc-12345",
-		VerificationID:   "verify-test-003",
+		IdentityFederationID: "cc-12345",
+		VerificationID:       "verify-test-003",
 		Policies: []PolicyConfig{
 			{
 				PolicyID: "policy-1",
@@ -266,8 +266,8 @@ func TestReceiver_UnsupportedIntegration(t *testing.T) {
 
 func TestReceiver_MultipleIntegrations(t *testing.T) {
 	config := &Config{
-		CloudConnectorID: "cc-12345",
-		VerificationID:   "verify-test-004",
+		IdentityFederationID: "cc-12345",
+		VerificationID:       "verify-test-004",
 		Providers: ProvidersConfig{
 			AWS: AWSProviderConfig{
 				Credentials: AWSCredentials{
@@ -342,12 +342,12 @@ func TestReceiver_MultipleIntegrations(t *testing.T) {
 
 func TestReceiver_AzureIntegrations(t *testing.T) {
 	config := &Config{
-		CloudConnectorID:   "cc-azure-001",
-		CloudConnectorName: "Azure Connector",
-		Namespace:          "staging",
-		AccountType:        "single_account",
-		VerificationID:     "verify-azure-001",
-		VerificationType:   "on_demand",
+		IdentityFederationID:   "cc-azure-001",
+		IdentityFederationName: "Azure Connector",
+		Namespace:              "staging",
+		AccountType:            "single_account",
+		VerificationID:         "verify-azure-001",
+		VerificationType:       "on_demand",
 		Providers: ProvidersConfig{
 			Azure: AzureProviderConfig{
 				Credentials: AzureCredentials{
@@ -401,11 +401,11 @@ func TestReceiver_AzureIntegrations(t *testing.T) {
 
 	// Verify resource-level attributes
 	attrs := resourceLog.Resource().Attributes()
-	ccID, ok := attrs.Get("cloud_connector.id")
+	ccID, ok := attrs.Get("identity_federation.id")
 	require.True(t, ok)
 	assert.Equal(t, "cc-azure-001", ccID.Str())
 
-	ns, ok := attrs.Get("cloud_connector.namespace")
+	ns, ok := attrs.Get("identity_federation.namespace")
 	require.True(t, ok)
 	assert.Equal(t, "staging", ns.Str())
 
@@ -451,12 +451,12 @@ func TestReceiver_AzureIntegrations(t *testing.T) {
 
 func TestReceiver_GCPIntegrations(t *testing.T) {
 	config := &Config{
-		CloudConnectorID:   "cc-gcp-001",
-		CloudConnectorName: "GCP Connector",
-		Namespace:          "production",
-		AccountType:        "single_account",
-		VerificationID:     "verify-gcp-001",
-		VerificationType:   "scheduled",
+		IdentityFederationID:   "cc-gcp-001",
+		IdentityFederationName: "GCP Connector",
+		Namespace:              "production",
+		AccountType:            "single_account",
+		VerificationID:         "verify-gcp-001",
+		VerificationType:       "scheduled",
 		Providers: ProvidersConfig{
 			GCP: GCPProviderConfig{
 				Credentials: GCPCredentials{
@@ -516,7 +516,7 @@ func TestReceiver_GCPIntegrations(t *testing.T) {
 
 	// Verify namespace propagation
 	attrs := resourceLog.Resource().Attributes()
-	ns, ok := attrs.Get("cloud_connector.namespace")
+	ns, ok := attrs.Get("identity_federation.namespace")
 	require.True(t, ok)
 	assert.Equal(t, "production", ns.Str())
 
@@ -552,12 +552,12 @@ func TestReceiver_GCPIntegrations(t *testing.T) {
 
 func TestReceiver_MultiProviderIntegrations(t *testing.T) {
 	config := &Config{
-		CloudConnectorID:   "cc-multi-001",
-		CloudConnectorName: "Multi-Cloud Connector",
-		Namespace:          "default",
-		AccountType:        "organization",
-		VerificationID:     "verify-multi-001",
-		VerificationType:   "on_demand",
+		IdentityFederationID:   "cc-multi-001",
+		IdentityFederationName: "Multi-Identity Federation",
+		Namespace:              "default",
+		AccountType:            "organization",
+		VerificationID:         "verify-multi-001",
+		VerificationType:       "on_demand",
 		Providers: ProvidersConfig{
 			AWS: AWSProviderConfig{
 				Credentials: AWSCredentials{
@@ -696,7 +696,7 @@ func TestReceiver_MultiProviderIntegrations(t *testing.T) {
 
 	// Verify resource-level attributes
 	resourceAttrs := logs[0].ResourceLogs().At(0).Resource().Attributes()
-	ns, ok := resourceAttrs.Get("cloud_connector.namespace")
+	ns, ok := resourceAttrs.Get("identity_federation.namespace")
 	require.True(t, ok)
 	assert.Equal(t, "default", ns.Str())
 
@@ -1136,12 +1136,12 @@ func TestStripPrerelease(t *testing.T) {
 
 func TestReceiver_FleetManagedStyle(t *testing.T) {
 	config := &Config{
-		CloudConnectorID:   "cc-fleet-001",
-		CloudConnectorName: "Fleet Managed Connector",
-		Namespace:          "default",
-		AccountType:        "single_account",
-		VerificationID:     "verify-fleet-001",
-		VerificationType:   "scheduled",
+		IdentityFederationID:   "cc-fleet-001",
+		IdentityFederationName: "Fleet Managed Connector",
+		Namespace:              "default",
+		AccountType:            "single_account",
+		VerificationID:         "verify-fleet-001",
+		VerificationType:       "scheduled",
 		Providers: ProvidersConfig{
 			AWS: AWSProviderConfig{
 				Credentials: AWSCredentials{

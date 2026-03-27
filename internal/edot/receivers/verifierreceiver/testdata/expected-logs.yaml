@@ -4,10 +4,10 @@
 resourceLogs:
   - resource:
       attributes:
-        - key: cloud_connector.id
+        - key: identity_federation.id
           value:
             stringValue: cc-12345
-        - key: cloud_connector.name
+        - key: identity_federation.name
           value:
             stringValue: Production Connector
         - key: verification.id

@@ -5,17 +5,17 @@
 #   make genelasticcol
 #   ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-standalone.yaml
 #
-# For AWS Cloud Connector authentication:
+# For AWS Identity Federation authentication:
 #   1. Set the role_arn to the IAM role ARN in the target AWS account
-#   2. Set the external_id to the value from Cloud Connector setup
+#   2. Set the external_id to the value from Identity Federation setup
 #
 # Without provider credentials, the receiver will still run but report "error" status
 # with "VerifierNotInitialized" for permissions requiring those providers.
 
 receivers:
   verifier:
-    cloud_connector_id: "cc-test-12345"
-    cloud_connector_name: "Local Test Connector"
+    identity_federation_id: "cc-test-12345"
+    identity_federation_name: "Local Test Connector"
     namespace: "default"
     account_type: "single_account"
     verification_id: "verify-local-001"
@@ -23,10 +23,10 @@ receivers:
     
     # Provider Credentials
     # Each CSP supports two auth modes:
-    #   1. Cloud connector (production) - OIDC JWT-based federated credentials
+    #   1. Identity federation (production) - OIDC JWT-based federated credentials
     #   2. Default credentials (testing) - use_default_credentials: true
     providers:
-      # AWS - use_default_credentials or cloud connector (role_arn + env vars)
+      # AWS - use_default_credentials or identity federation (role_arn + env vars)
       aws:
         credentials:
           # use_default_credentials: true
@@ -34,13 +34,13 @@ receivers:
           # external_id: "your-external-id-from-elastic"
           default_region: "us-east-1"
       
-      # Azure - use_default_credentials or cloud connector (tenant_id + client_id + env vars)
+      # Azure - use_default_credentials or identity federation (tenant_id + client_id + env vars)
       # azure:
       #   credentials:
       #     use_default_credentials: true
       #     subscription_id: "your-subscription-id"
       
-      # GCP - use_default_credentials or cloud connector (workload_identity_provider + env vars)
+      # GCP - use_default_credentials or identity federation (workload_identity_provider + env vars)
       # gcp:
       #   credentials:
       #     use_default_credentials: true

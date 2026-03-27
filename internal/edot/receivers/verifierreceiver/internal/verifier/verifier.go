@@ -104,7 +104,7 @@ type AuthConfig interface {
 
 // AWSAuthConfig contains AWS authentication configuration.
 //
-// Cloud Connector flow (production):
+// Identity Federation flow (production):
 //
 //	JWT token file → WebIdentity(GlobalRoleARN) → AssumeRole(RoleARN, ExternalID)
 //
@@ -112,12 +112,12 @@ type AuthConfig interface {
 //
 //	Uses the default credential chain (env vars, AWS_PROFILE, instance metadata).
 type AWSAuthConfig struct {
-	// Cloud Connector OIDC fields
+	// Identity Federation OIDC fields
 	IDTokenFile     string // Path to the OIDC JWT token file
 	GlobalRoleARN   string // Elastic global IAM role to assume via WebIdentity
 	CloudResourceID string // Resource ID used as SourceIdentity
 
-	// Customer's AWS account (used in cloud connector flow)
+	// Customer's AWS account (used in identity federation flow)
 	RoleARN    string
 	ExternalID string
 
@@ -131,18 +131,18 @@ type AWSAuthConfig struct {
 
 func (c AWSAuthConfig) ProviderType() ProviderType { return ProviderAWS }
 
-// IsCloudConnector returns true when configured for the cloud connector OIDC flow.
-func (c AWSAuthConfig) IsCloudConnector() bool {
+// IsIdentityFederation returns true when configured for the identity federation OIDC flow.
+func (c AWSAuthConfig) IsIdentityFederation() bool {
 	return c.IDTokenFile != "" && c.GlobalRoleARN != "" && c.RoleARN != ""
 }
 
 func (c AWSAuthConfig) IsConfigured() bool {
-	return c.IsCloudConnector() || c.UseDefaultCredentials
+	return c.IsIdentityFederation() || c.UseDefaultCredentials
 }
 
 // AzureAuthConfig contains Azure authentication configuration.
 //
-// Cloud Connector flow (production):
+// Identity Federation flow (production):
 //
 //	JWT token file → ClientAssertionCredential(TenantID, ClientID) → Azure Token
 //
@@ -151,7 +151,7 @@ func (c AWSAuthConfig) IsConfigured() bool {
 //	DefaultAzureCredential chains env vars, workload identity, managed identity,
 //	Azure CLI (az login), and azd CLI.
 type AzureAuthConfig struct {
-	// Cloud Connector OIDC field
+	// Identity Federation OIDC field
 	IDTokenFile string // Path to the OIDC JWT token file
 
 	TenantID string
@@ -163,18 +163,18 @@ type AzureAuthConfig struct {
 
 func (c AzureAuthConfig) ProviderType() ProviderType { return ProviderAzure }
 
-// IsCloudConnector returns true when configured for the cloud connector OIDC flow.
-func (c AzureAuthConfig) IsCloudConnector() bool {
+// IsIdentityFederation returns true when configured for the identity federation OIDC flow.
+func (c AzureAuthConfig) IsIdentityFederation() bool {
 	return c.IDTokenFile != "" && c.TenantID != "" && c.ClientID != ""
 }
 
 func (c AzureAuthConfig) IsConfigured() bool {
-	return c.IsCloudConnector() || c.UseDefaultCredentials
+	return c.IsIdentityFederation() || c.UseDefaultCredentials
 }
 
 // GCPAuthConfig contains GCP authentication configuration.
 //
-// Cloud Connector flow (production) — AWS-mediated WIF matching Cloudbeat:
+// Identity Federation flow (production) — AWS-mediated WIF matching Cloudbeat:
 //
 //	JWT → AssumeRoleWithWebIdentity(GlobalRoleARN) → AWS creds →
 //	GCP STS(WorkloadIdentityProvider) → Service Account Impersonation
@@ -183,15 +183,15 @@ func (c AzureAuthConfig) IsConfigured() bool {
 //
 //	Application Default Credentials (gcloud auth application-default login).
 type GCPAuthConfig struct {
-	// Cloud Connector OIDC fields
+	// Identity Federation OIDC fields
 	IDTokenFile              string // Path to the OIDC JWT token file
 	WorkloadIdentityProvider string // Full resource name of the GCP WIF provider (audience)
 	ServiceAccountEmail      string // GCP service account to impersonate via WIF
 
-	// AWS-mediated WIF fields (populated from CloudConnectorConfig)
-	GlobalRoleARN    string // Elastic global AWS IAM role for the intermediate hop
-	CloudResourceID  string // Resource ID used in AWS session naming
-	CloudConnectorID string // Cloud connector identifier for session naming
+	// AWS-mediated WIF fields (populated from IdentityFederationConfig)
+	GlobalRoleARN        string // Elastic global AWS IAM role for the intermediate hop
+	CloudResourceID      string // Resource ID used in AWS session naming
+	IdentityFederationID string // Identity federation identifier for session naming
 
 	ProjectID string
 
@@ -201,14 +201,14 @@ type GCPAuthConfig struct {
 
 func (c GCPAuthConfig) ProviderType() ProviderType { return ProviderGCP }
 
-// IsCloudConnector returns true when configured for the cloud connector
+// IsIdentityFederation returns true when configured for the identity federation
 // AWS-mediated WIF flow (requires JWT, GCP WIF audience, and AWS global role).
-func (c GCPAuthConfig) IsCloudConnector() bool {
+func (c GCPAuthConfig) IsIdentityFederation() bool {
 	return c.IDTokenFile != "" && c.WorkloadIdentityProvider != "" && c.GlobalRoleARN != ""
 }
 
 func (c GCPAuthConfig) IsConfigured() bool {
-	return c.IsCloudConnector() || c.UseDefaultCredentials
+	return c.IsIdentityFederation() || c.UseDefaultCredentials
 }
 
 // OktaAuthConfig contains Okta authentication configuration.

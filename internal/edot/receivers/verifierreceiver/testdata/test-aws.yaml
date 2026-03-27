@@ -8,8 +8,8 @@
 
 receivers:
   verifier:
-    cloud_connector_id: "cc-test-aws"
-    cloud_connector_name: "AWS Test"
+    identity_federation_id: "cc-test-aws"
+    identity_federation_name: "AWS Test"
     namespace: "default"
     account_type: "single_account"
     verification_id: "verify-aws-001"

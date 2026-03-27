@@ -48,11 +48,11 @@ func isFIPSOnly() bool {
 // cipher suites. It must mirror the list in newTLS12HTTPClient exactly.
 var fipsApprovedTLS12Ciphers = map[uint16]bool{
 	tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:   true,
-	tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:  true,
+	tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256: true,
 	tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384:   true,
-	tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:  true,
-	tls.TLS_RSA_WITH_AES_128_GCM_SHA256:          true,
-	tls.TLS_RSA_WITH_AES_256_GCM_SHA384:          true,
+	tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384: true,
+	tls.TLS_RSA_WITH_AES_128_GCM_SHA256:         true,
+	tls.TLS_RSA_WITH_AES_256_GCM_SHA384:         true,
 }
 
 // generateECDSACert creates a self-signed ECDSA P-256/SHA-256 certificate and
@@ -149,7 +149,7 @@ func extractTransport(t *testing.T, client *http.Client) *http.Transport {
 }
 
 // writeFakeTokenFile writes a placeholder JWT to a temp file and returns its path.
-// Used for cloud-connector code paths that need a token file to exist.
+// Used for identity-federation code paths that need a token file to exist.
 func writeFakeTokenFile(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "id_token")
@@ -332,7 +332,7 @@ func TestAWSVerifier_UsesTLS13Client(t *testing.T) {
 
 // TestAzureVerifier_UsesTLS13ForCredentials verifies that NewAzureVerifier
 // configures its Entra ID credential client (login.microsoftonline.com) with
-// TLS 1.3.  Uses the cloud-connector path with a fake token file because
+// TLS 1.3.  Uses the identity-federation path with a fake token file because
 // NewClientAssertionCredential does not make network calls during construction.
 func TestAzureVerifier_UsesTLS13ForCredentials(t *testing.T) {
 	v, err := NewAzureVerifier(context.Background(), zap.NewNop(), AzureAuthConfig{
@@ -399,7 +399,7 @@ func TestAzureVerifier_CredentialsAndARMClientsAreIndependent(t *testing.T) {
 }
 
 // TestGCPVerifier_UsesTLS13Client verifies that NewGCPVerifier configures its
-// HTTP client with TLS 1.3 as the minimum version.  Uses the cloud-connector
+// HTTP client with TLS 1.3 as the minimum version.  Uses the identity-federation
 // path; externalaccount.NewTokenSource does not make network calls during
 // construction.
 func TestGCPVerifier_UsesTLS13Client(t *testing.T) {

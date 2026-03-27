@@ -17,13 +17,13 @@ import (
 // Fleet API provides the policy/integration context; the receiver determines what
 // permissions each integration needs and how to verify them.
 type Config struct {
-	// CloudConnectorID identifies the Cloud Connector being verified.
-	CloudConnectorID string `mapstructure:"cloud_connector_id"`
+	// IdentityFederationID identifies the Identity Federation being verified.
+	IdentityFederationID string `mapstructure:"identity_federation_id"`
 
-	// CloudConnectorName is the human-readable name of the Cloud Connector.
-	CloudConnectorName string `mapstructure:"cloud_connector_name"`
+	// IdentityFederationName is the human-readable name of the Identity Federation.
+	IdentityFederationName string `mapstructure:"identity_federation_name"`
 
-	// Namespace is the Kibana Space that the Cloud Connector belongs to.
+	// Namespace is the Kibana Space that the Identity Federation belongs to.
 	// Used as a resource attribute and for data stream routing.
 	// Defaults to "default" when not set.
 	Namespace string `mapstructure:"namespace"`
@@ -49,8 +49,8 @@ type Config struct {
 
 // ProvidersConfig contains authentication configuration for all supported providers.
 type ProvidersConfig struct {
-	// CloudConnector contains shared OIDC authentication used by the cloud connector flow.
-	CloudConnector CloudConnectorConfig `mapstructure:"cloud_connector"`
+	// IdentityFederation contains shared OIDC authentication used by the identity federation flow.
+	IdentityFederation IdentityFederationConfig `mapstructure:"identity_federation"`
 
 	AWS   AWSProviderConfig   `mapstructure:"aws"`
 	Azure AzureProviderConfig `mapstructure:"azure"`
@@ -58,10 +58,10 @@ type ProvidersConfig struct {
 	Okta  OktaProviderConfig  `mapstructure:"okta"`
 }
 
-// CloudConnectorConfig contains shared OIDC fields for the cloud connector
+// IdentityFederationConfig contains shared OIDC fields for the identity federation
 // authentication flow. These are typically injected as environment variables
 // by the agentless controller.
-type CloudConnectorConfig struct {
+type IdentityFederationConfig struct {
 	// IDTokenFile is the path to the OIDC JWT token file.
 	// Env fallback: CLOUD_CONNECTORS_ID_TOKEN_FILE
 	IDTokenFile string `mapstructure:"id_token_file"`
@@ -77,7 +77,7 @@ type CloudConnectorConfig struct {
 
 // LoadFromEnv populates empty fields from well-known environment variables
 // set by the agentless controller.
-func (cfg *CloudConnectorConfig) LoadFromEnv() {
+func (cfg *IdentityFederationConfig) LoadFromEnv() {
 	if cfg.IDTokenFile == "" {
 		cfg.IDTokenFile = os.Getenv("CLOUD_CONNECTORS_ID_TOKEN_FILE")
 	}
@@ -89,18 +89,18 @@ func (cfg *CloudConnectorConfig) LoadFromEnv() {
 	}
 }
 
-// IsConfigured returns true if the cloud connector OIDC token file is available.
-func (cfg *CloudConnectorConfig) IsConfigured() bool {
+// IsConfigured returns true if the identity federation OIDC token file is available.
+func (cfg *IdentityFederationConfig) IsConfigured() bool {
 	return cfg.IDTokenFile != ""
 }
 
 // AWSProviderConfig contains AWS authentication configuration.
 type AWSProviderConfig struct {
-	// Credentials contains the Cloud Connector authentication credentials.
+	// Credentials contains the Identity Federation authentication credentials.
 	Credentials AWSCredentials `mapstructure:"credentials"`
 }
 
-// AWSCredentials contains the AWS credentials for Cloud Connector mode.
+// AWSCredentials contains the AWS credentials for Identity Federation mode.
 type AWSCredentials struct {
 	// RoleARN is the ARN of the IAM role to assume in the customer's AWS account.
 	RoleARN string `mapstructure:"role_arn"`
@@ -121,25 +121,25 @@ func (cfg *AWSCredentials) Validate() error {
 		return nil
 	}
 	if cfg.RoleARN == "" && cfg.ExternalID == "" {
-		return nil // Not configured; cloud connector config may supply the rest
+		return nil // Not configured; identity federation config may supply the rest
 	}
 	if cfg.RoleARN == "" {
 		return errors.New("role_arn must be specified when external_id is set")
 	}
-	// external_id is optional in cloud connector mode (only required for direct mode)
+	// external_id is optional in identity federation mode (only required for direct mode)
 	return nil
 }
 
 // IsConfigured returns true if AWS credentials are configured (with or without
-// cloud connector config -- the cloud connector fields are checked separately
+// identity federation config -- the identity federation fields are checked separately
 // during verifier initialization).
 func (cfg *AWSCredentials) IsConfigured() bool {
 	return cfg.RoleARN != "" || cfg.UseDefaultCredentials
 }
 
 // ToAuthConfig converts the config to a verifier.AWSAuthConfig, merging in
-// the shared cloud connector OIDC configuration.
-func (cfg *AWSCredentials) ToAuthConfig(cc CloudConnectorConfig) verifier.AWSAuthConfig {
+// the shared identity federation OIDC configuration.
+func (cfg *AWSCredentials) ToAuthConfig(cc IdentityFederationConfig) verifier.AWSAuthConfig {
 	return verifier.AWSAuthConfig{
 		IDTokenFile:           cc.IDTokenFile,
 		GlobalRoleARN:         cc.GlobalRoleARN,
@@ -173,7 +173,7 @@ func (cfg *AzureCredentials) Validate() error {
 		return nil
 	}
 	if cfg.TenantID == "" && cfg.ClientID == "" {
-		return nil // Not configured; cloud connector may provide the JWT
+		return nil // Not configured; identity federation may provide the JWT
 	}
 	if cfg.TenantID == "" {
 		return errors.New("tenant_id must be specified")
@@ -190,8 +190,8 @@ func (cfg *AzureCredentials) IsConfigured() bool {
 }
 
 // ToAuthConfig converts the config to a verifier.AzureAuthConfig, merging in
-// the shared cloud connector OIDC configuration.
-func (cfg *AzureCredentials) ToAuthConfig(cc CloudConnectorConfig) verifier.AzureAuthConfig {
+// the shared identity federation OIDC configuration.
+func (cfg *AzureCredentials) ToAuthConfig(cc IdentityFederationConfig) verifier.AzureAuthConfig {
 	return verifier.AzureAuthConfig{
 		IDTokenFile:           cc.IDTokenFile,
 		TenantID:              cfg.TenantID,
@@ -210,7 +210,7 @@ type GCPProviderConfig struct {
 type GCPCredentials struct {
 	ProjectID string `mapstructure:"project_id"`
 
-	// Cloud Connector WIF fields
+	// Identity Federation WIF fields
 	// WorkloadIdentityProvider is the full resource name of the GCP WIF provider
 	// used as the audience for STS token exchange.
 	// Example: //iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider
@@ -234,15 +234,15 @@ func (cfg *GCPCredentials) IsConfigured() bool {
 }
 
 // ToAuthConfig converts the config to a verifier.GCPAuthConfig, merging in
-// the shared cloud connector OIDC configuration.
-func (cfg *GCPCredentials) ToAuthConfig(cc CloudConnectorConfig, cloudConnectorID string) verifier.GCPAuthConfig {
+// the shared identity federation OIDC configuration.
+func (cfg *GCPCredentials) ToAuthConfig(cc IdentityFederationConfig, identityFederationID string) verifier.GCPAuthConfig {
 	return verifier.GCPAuthConfig{
 		IDTokenFile:              cc.IDTokenFile,
 		WorkloadIdentityProvider: cfg.WorkloadIdentityProvider,
 		ServiceAccountEmail:      cfg.ServiceAccountEmail,
 		GlobalRoleARN:            cc.GlobalRoleARN,
 		CloudResourceID:          cc.CloudResourceID,
-		CloudConnectorID:         cloudConnectorID,
+		IdentityFederationID:     identityFederationID,
 		ProjectID:                cfg.ProjectID,
 		UseDefaultCredentials:    cfg.UseDefaultCredentials,
 	}
@@ -349,8 +349,8 @@ func (cfg *IntegrationConfig) IntegrationType() string {
 
 // Validate validates the configuration.
 func (cfg *Config) Validate() error {
-	if cfg.CloudConnectorID == "" {
-		return errors.New("cloud_connector_id must be specified")
+	if cfg.IdentityFederationID == "" {
+		return errors.New("identity_federation_id must be specified")
 	}
 	if cfg.VerificationID == "" {
 		return errors.New("verification_id must be specified")

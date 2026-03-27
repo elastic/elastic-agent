@@ -6,7 +6,7 @@
 
 receivers:
   verifier:
-    cloud_connector_id: "cc-test-minimal"
+    identity_federation_id: "cc-test-minimal"
     verification_id: "verify-minimal-001"
 
     policies:

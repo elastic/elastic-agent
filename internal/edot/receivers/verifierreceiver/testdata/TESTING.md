@@ -39,7 +39,7 @@ Quick smoke test without provider credentials - will show "VerifierNotInitialize
 
 Expected output includes:
 ```
-info    Starting verifier receiver    {"cloud_connector_id": "cc-test-minimal", ...}
+info    Starting verifier receiver    {"identity_federation_id": "cc-test-minimal", ...}
 debug   AWS credentials not configured
 debug   Azure credentials not configured
 debug   GCP credentials not configured
@@ -49,7 +49,7 @@ warn    No verifiers initialized - permission verification will be limited
 LogsExporter {"logs": {"resourceLogs":[{...}]}}
 ```
 
-## 4. Run Standalone Test with AWS Cloud Connector Auth
+## 4. Run Standalone Test with AWS Identity Federation Auth
 
 Edit `testdata/test-standalone.yaml` and uncomment/set your AWS credentials:
 
@@ -70,8 +70,8 @@ Then run:
 
 Expected output with valid credentials:
 ```
-info    Starting verifier receiver    {"cloud_connector_id": "cc-test-12345", ...}
-info    Initializing AWS verifier with Cloud Connector authentication
+info    Starting verifier receiver    {"identity_federation_id": "cc-test-12345", ...}
+info    Initializing AWS verifier with Identity Federation authentication
 info    AWS verifier initialized successfully
 info    Verifiers initialized    {"providers": ["aws"]}
 ...
@@ -125,7 +125,7 @@ Configure multiple providers in a single receiver:
 ```yaml
 receivers:
   verifier:
-    cloud_connector_id: "cc-multi-provider"
+    identity_federation_id: "cc-multi-provider"
     verification_id: "verify-multi-001"
     
     providers:
@@ -180,7 +180,7 @@ mage build
 # otel.yml
 receivers:
   verifier:
-    cloud_connector_id: "cc-agent-test"
+    identity_federation_id: "cc-agent-test"
     verification_id: "verify-agent-001"
     
     providers:
@@ -245,7 +245,7 @@ Create a config that exports to Elasticsearch:
 ```yaml
 receivers:
   verifier:
-    cloud_connector_id: "cc-e2e-test"
+    identity_federation_id: "cc-e2e-test"
     verification_id: "verify-e2e-001"
     
     providers:

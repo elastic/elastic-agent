@@ -76,7 +76,7 @@ func newVerifierReceiver(
 // Start begins the permission verification process.
 func (r *verifierReceiver) Start(ctx context.Context, _ component.Host) error {
 	r.logger.Info("Starting verifier receiver",
-		zap.String("cloud_connector_id", r.config.CloudConnectorID),
+		zap.String("identity_federation_id", r.config.IdentityFederationID),
 		zap.String("namespace", r.config.Namespace),
 		zap.String("verification_id", r.config.VerificationID),
 		zap.Int("policy_count", len(r.config.Policies)),
@@ -102,25 +102,25 @@ func (r *verifierReceiver) Start(ctx context.Context, _ component.Host) error {
 
 // initializeVerifiers initializes verifiers for all configured providers.
 func (r *verifierReceiver) initializeVerifiers(ctx context.Context) {
-	// Populate cloud connector fields from environment variables when not
+	// Populate identity federation fields from environment variables when not
 	// already set in the config. The agentless controller injects these as
-	// pod env vars (CLOUD_CONNECTORS_ID_TOKEN_FILE, etc.).
-	r.config.Providers.CloudConnector.LoadFromEnv()
-	cc := r.config.Providers.CloudConnector
+	// pod env vars (IDENTITY_FEDERATION_ID_TOKEN_FILE, etc.).
+	r.config.Providers.IdentityFederation.LoadFromEnv()
+	idf := r.config.Providers.IdentityFederation
 
-	if cc.IsConfigured() {
-		r.logger.Info("Cloud connector OIDC configuration detected",
-			zap.String("id_token_file", cc.IDTokenFile),
-			zap.Bool("has_global_role", cc.GlobalRoleARN != ""),
-			zap.Bool("has_resource_id", cc.CloudResourceID != ""),
+	if idf.IsConfigured() {
+		r.logger.Info("Identity federation OIDC configuration detected",
+			zap.String("id_token_file", idf.IDTokenFile),
+			zap.Bool("has_global_role", idf.GlobalRoleARN != ""),
+			zap.Bool("has_resource_id", idf.CloudResourceID != ""),
 		)
 	}
 
 	// Initialize AWS verifier if configured
 	if r.config.Providers.AWS.Credentials.IsConfigured() {
-		authCfg := r.config.Providers.AWS.Credentials.ToAuthConfig(cc)
-		if authCfg.IsCloudConnector() {
-			r.logger.Info("Initializing AWS verifier with cloud connector OIDC flow",
+		authCfg := r.config.Providers.AWS.Credentials.ToAuthConfig(idf)
+		if authCfg.IsIdentityFederation() {
+			r.logger.Info("Initializing AWS verifier with identity federation OIDC flow",
 				zap.String("role_arn", authCfg.RoleARN),
 			)
 		} else {
@@ -138,9 +138,9 @@ func (r *verifierReceiver) initializeVerifiers(ctx context.Context) {
 
 	// Initialize Azure verifier if configured
 	if r.config.Providers.Azure.Credentials.IsConfigured() {
-		authCfg := r.config.Providers.Azure.Credentials.ToAuthConfig(cc)
-		if authCfg.IsCloudConnector() {
-			r.logger.Info("Initializing Azure verifier with cloud connector OIDC flow",
+		authCfg := r.config.Providers.Azure.Credentials.ToAuthConfig(idf)
+		if authCfg.IsIdentityFederation() {
+			r.logger.Info("Initializing Azure verifier with identity federation OIDC flow",
 				zap.String("tenant_id", authCfg.TenantID),
 			)
 		} else {
@@ -158,9 +158,9 @@ func (r *verifierReceiver) initializeVerifiers(ctx context.Context) {
 
 	// Initialize GCP verifier if configured
 	if r.config.Providers.GCP.Credentials.IsConfigured() {
-		authCfg := r.config.Providers.GCP.Credentials.ToAuthConfig(cc, r.config.CloudConnectorID)
-		if authCfg.IsCloudConnector() {
-			r.logger.Info("Initializing GCP verifier with cloud connector WIF flow",
+		authCfg := r.config.Providers.GCP.Credentials.ToAuthConfig(idf, r.config.IdentityFederationID)
+		if authCfg.IsIdentityFederation() {
+			r.logger.Info("Initializing GCP verifier with identity federation WIF flow",
 				zap.String("project_id", authCfg.ProjectID),
 			)
 		} else {
@@ -243,7 +243,7 @@ func (r *verifierReceiver) runVerification(ctx context.Context) {
 // OTEL log records with structured results.
 func (r *verifierReceiver) verifyPermissions(ctx context.Context) error {
 	r.logger.Info("Starting permission verification",
-		zap.String("cloud_connector_id", r.config.CloudConnectorID),
+		zap.String("identity_federation_id", r.config.IdentityFederationID),
 		zap.String("verification_id", r.config.VerificationID),
 		zap.Int("policy_count", len(r.config.Policies)),
 	)
@@ -257,15 +257,15 @@ func (r *verifierReceiver) verifyPermissions(ctx context.Context) error {
 
 	// Set resource attributes per RFC specification
 	resource := resourceLogs.Resource()
-	resource.Attributes().PutStr("cloud_connector.id", r.config.CloudConnectorID)
-	if r.config.CloudConnectorName != "" {
-		resource.Attributes().PutStr("cloud_connector.name", r.config.CloudConnectorName)
+	resource.Attributes().PutStr("identity_federation.id", r.config.IdentityFederationID)
+	if r.config.IdentityFederationName != "" {
+		resource.Attributes().PutStr("identity_federation.name", r.config.IdentityFederationName)
 	}
 	namespace := r.config.Namespace
 	if namespace == "" {
 		namespace = "default"
 	}
-	resource.Attributes().PutStr("cloud_connector.namespace", namespace)
+	resource.Attributes().PutStr("identity_federation.namespace", namespace)
 
 	// Data stream routing attributes for the Elasticsearch exporter.
 	// Native OTel inputs must set these explicitly for dynamic index routing.
