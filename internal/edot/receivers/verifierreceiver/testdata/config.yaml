@@ -4,11 +4,11 @@
 receivers:
   # Default verifier configuration
   verifier:
-    cloud_connector_id: "cc-12345"
-    cloud_connector_name: "Production Connector"
+    identity_federation_id: "cc-12345"
+    identity_federation_name: "Production Connector"
     verification_id: "verify-abc123"
     verification_type: "scheduled"
-    # AWS Authentication - Cloud Connector STS AssumeRole
+    # AWS Authentication - Identity Federation STS AssumeRole
     providers:
       aws:
         credentials:
@@ -45,8 +45,8 @@ receivers:
 
   # Named verifier instance for single integration testing
   verifier/single-integration:
-    cloud_connector_id: "cc-single"
-    cloud_connector_name: "Single Integration Test Connector"
+    identity_federation_id: "cc-single"
+    identity_federation_name: "Single Integration Test Connector"
     verification_id: "verify-single-001"
     verification_type: "on_demand"
     providers:
@@ -68,8 +68,8 @@ receivers:
 
   # Named verifier instance for Security Hub testing
   verifier/security-hub:
-    cloud_connector_id: "cc-securityhub"
-    cloud_connector_name: "Security Hub Connector"
+    identity_federation_id: "cc-securityhub"
+    identity_federation_name: "Security Hub Connector"
     verification_id: "verify-sechub-001"
     verification_type: "on_demand"
     providers:

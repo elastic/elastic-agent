@@ -3,15 +3,15 @@
 # when used as a Fleet integration.
 #
 # Variables are substituted by Fleet/Elastic Agent when the policy is applied:
-# - ${var:cloud_connector_id} - Unique identifier for the Cloud Connector
+# - ${var:identity_federation_id} - Unique identifier for the Identity Federation
 # - ${var:verification_id} - Unique verification session ID
 # - ${var:providers.aws.credentials.*} - AWS credentials for verification
 # - ${var:policies} - List of policies with integrations to verify
 
 receivers:
   verifier:
-    cloud_connector_id: ${var:cloud_connector_id}
-    cloud_connector_name: ${var:cloud_connector_name}
+    identity_federation_id: ${var:identity_federation_id}
+    identity_federation_name: ${var:identity_federation_name}
     verification_id: ${var:verification_id}
     verification_type: ${var:verification_type}
     providers:

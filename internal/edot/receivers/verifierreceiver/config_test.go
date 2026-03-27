@@ -22,11 +22,11 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "valid config with AWS credentials",
 			config: Config{
-				CloudConnectorID:   "cc-12345",
-				CloudConnectorName: "Production Connector",
-				VerificationID:     "verify-abc123",
-				VerificationType:   "on_demand",
-				AccountType:        "single_account",
+				IdentityFederationID:   "cc-12345",
+				IdentityFederationName: "Production Connector",
+				VerificationID:         "verify-abc123",
+				VerificationType:       "on_demand",
+				AccountType:            "single_account",
 				Providers: ProvidersConfig{
 					AWS: AWSProviderConfig{
 						Credentials: AWSCredentials{
@@ -56,8 +56,8 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "valid config with package version",
 			config: Config{
-				CloudConnectorID: "cc-12345",
-				VerificationID:   "verify-abc123",
+				IdentityFederationID: "cc-12345",
+				VerificationID:       "verify-abc123",
 				Policies: []PolicyConfig{
 					{
 						PolicyID: "policy-1",
@@ -76,8 +76,8 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "valid config without AWS credentials (non-AWS integrations)",
 			config: Config{
-				CloudConnectorID: "cc-12345",
-				VerificationID:   "verify-abc123",
+				IdentityFederationID: "cc-12345",
+				VerificationID:       "verify-abc123",
 				Policies: []PolicyConfig{
 					{
 						PolicyID: "policy-1",
@@ -92,8 +92,8 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "valid config with AWS integration but no credentials (credentials optional at config level)",
 			config: Config{
-				CloudConnectorID: "cc-12345",
-				VerificationID:   "verify-abc123",
+				IdentityFederationID: "cc-12345",
+				VerificationID:       "verify-abc123",
 				Policies: []PolicyConfig{
 					{
 						PolicyID: "policy-1",
@@ -106,7 +106,7 @@ func TestConfig_Validate(t *testing.T) {
 			wantErr: "",
 		},
 		{
-			name: "invalid config - missing cloud_connector_id",
+			name: "invalid config - missing identity_federation_id",
 			config: Config{
 				VerificationID: "verify-abc123",
 				Policies: []PolicyConfig{
@@ -118,12 +118,12 @@ func TestConfig_Validate(t *testing.T) {
 					},
 				},
 			},
-			wantErr: "cloud_connector_id must be specified",
+			wantErr: "identity_federation_id must be specified",
 		},
 		{
 			name: "invalid config - missing verification_id",
 			config: Config{
-				CloudConnectorID: "cc-12345",
+				IdentityFederationID: "cc-12345",
 				Policies: []PolicyConfig{
 					{
 						PolicyID: "policy-1",
@@ -138,17 +138,17 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "invalid config - no policies",
 			config: Config{
-				CloudConnectorID: "cc-12345",
-				VerificationID:   "verify-abc123",
-				Policies:         []PolicyConfig{},
+				IdentityFederationID: "cc-12345",
+				VerificationID:       "verify-abc123",
+				Policies:             []PolicyConfig{},
 			},
 			wantErr: "at least one policy must be specified",
 		},
 		{
 			name: "invalid config - policy without policy_id",
 			config: Config{
-				CloudConnectorID: "cc-12345",
-				VerificationID:   "verify-abc123",
+				IdentityFederationID: "cc-12345",
+				VerificationID:       "verify-abc123",
 				Policies: []PolicyConfig{
 					{
 						Integrations: []IntegrationConfig{
@@ -162,8 +162,8 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "invalid config - policy without integrations",
 			config: Config{
-				CloudConnectorID: "cc-12345",
-				VerificationID:   "verify-abc123",
+				IdentityFederationID: "cc-12345",
+				VerificationID:       "verify-abc123",
 				Policies: []PolicyConfig{
 					{
 						PolicyID:     "policy-1",
@@ -176,8 +176,8 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "invalid config - integration without policy_template",
 			config: Config{
-				CloudConnectorID: "cc-12345",
-				VerificationID:   "verify-abc123",
+				IdentityFederationID: "cc-12345",
+				VerificationID:       "verify-abc123",
 				Policies: []PolicyConfig{
 					{
 						PolicyID: "policy-1",
@@ -192,8 +192,8 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "invalid config - integration without package_name",
 			config: Config{
-				CloudConnectorID: "cc-12345",
-				VerificationID:   "verify-abc123",
+				IdentityFederationID: "cc-12345",
+				VerificationID:       "verify-abc123",
 				Policies: []PolicyConfig{
 					{
 						PolicyID: "policy-1",
@@ -255,7 +255,7 @@ func TestAWSCredentials_Validate(t *testing.T) {
 			wantErr: "",
 		},
 		{
-			name: "valid - role_arn without external_id (cloud connector provides global role)",
+			name: "valid - role_arn without external_id (identity federation provides global role)",
 			credentials: AWSCredentials{
 				RoleARN: "arn:aws:iam::123456789012:role/ElasticAgentRole",
 			},
@@ -297,14 +297,14 @@ func TestAWSCredentials_IsConfigured(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "role_arn only (cloud connector will supply OIDC chain)",
+			name: "role_arn only (identity federation will supply OIDC chain)",
 			credentials: AWSCredentials{
 				RoleARN: "arn:aws:iam::123456789012:role/ElasticAgentRole",
 			},
 			want: true,
 		},
 		{
-			name: "role_arn with external_id (cloud connector mode)",
+			name: "role_arn with external_id (identity federation mode)",
 			credentials: AWSCredentials{
 				RoleARN:    "arn:aws:iam::123456789012:role/ElasticAgentRole",
 				ExternalID: "test-external-id",

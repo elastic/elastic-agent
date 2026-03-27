@@ -30,7 +30,7 @@
 // # Configuration
 //
 // The receiver is configured with:
-//   - Cloud Connector identification (ID, name)
+//   - Identity Federation identification (ID, name)
 //   - Verification session (ID, type)
 //   - Provider credentials (AWS, Azure, GCP, Okta)
 //   - Policies containing integrations to verify, each with an optional
@@ -40,7 +40,7 @@
 //
 //	receivers:
 //	  verifier:
-//	    cloud_connector_id: "cc-12345"
+//	    identity_federation_id: "cc-12345"
 //	    verification_id: "verify-001"
 //	    providers:
 //	      aws:
@@ -56,5 +56,5 @@
 // # Output
 //
 // The receiver emits OTEL logs with structured attributes following the
-// RFC specification for Cloud Connector Permission Verification.
+// RFC specification for Identity Federation Permission Verification.
 package verifierreceiver // import "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"

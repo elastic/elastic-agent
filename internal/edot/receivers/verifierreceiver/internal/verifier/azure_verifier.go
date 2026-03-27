@@ -57,7 +57,7 @@ func NewAzureVerifierFactory() VerifierFactory {
 
 // NewAzureVerifier creates a new Azure verifier.
 //
-// Cloud connector mode (IDTokenFile set):
+// Identity federation mode (IDTokenFile set):
 //
 //	JWT → ClientAssertionCredential(TenantID, ClientID) → Azure Token
 //
@@ -78,8 +78,8 @@ func NewAzureVerifier(ctx context.Context, logger *zap.Logger, authConfig AzureA
 	var err error
 
 	switch {
-	case authConfig.IsCloudConnector():
-		// Cloud connector OIDC flow: use the JWT as a federated client assertion.
+	case authConfig.IsIdentityFederation():
+		// Identity federation OIDC flow: use the JWT as a federated client assertion.
 		// The callback re-reads the file on each invocation so refreshed tokens
 		// are picked up automatically.
 		idTokenFile := authConfig.IDTokenFile
@@ -102,7 +102,7 @@ func NewAzureVerifier(ctx context.Context, logger *zap.Logger, authConfig AzureA
 			closeAll()
 			return &AzureVerifier{logger: logger, configured: false}, nil
 		}
-		logger.Info("Azure cloud connector credential configured (ClientAssertion)")
+		logger.Info("Azure identity federation credential configured (ClientAssertion)")
 
 	case authConfig.UseDefaultCredentials:
 		cred, err = azidentity.NewDefaultAzureCredential(

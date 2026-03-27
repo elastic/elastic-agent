@@ -55,7 +55,7 @@ func NewGCPVerifierFactory() VerifierFactory {
 
 // NewGCPVerifier creates a new GCP verifier.
 //
-// Cloud connector mode (IDTokenFile + WorkloadIdentityProvider + GlobalRoleARN set):
+// Identity federation mode (IDTokenFile + WorkloadIdentityProvider + GlobalRoleARN set):
 //
 //	JWT → AWS AssumeRoleWithWebIdentity(GlobalRoleARN) → AWS creds →
 //	GCP STS(WorkloadIdentityProvider) → Service Account Impersonation
@@ -66,12 +66,12 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 	var opts []option.ClientOption
 
 	switch {
-	case authConfig.IsCloudConnector():
+	case authConfig.IsIdentityFederation():
 		// AWS-mediated WIF flow matching Cloudbeat:
 		// 1. Assume Elastic global AWS role using the OIDC JWT (via FIPS HTTP client)
 		// 2. Supply AWS credentials to GCP STS for WIF token exchange (via FIPS HTTP client)
 		// 3. Impersonate the target GCP service account
-		sessionName := authConfig.CloudResourceID + "-" + authConfig.CloudConnectorID
+		sessionName := authConfig.CloudResourceID + "-" + authConfig.IdentityFederationID
 		stsClient := sts.New(sts.Options{
 			Region:     "us-east-1",
 			HTTPClient: httpClient,
@@ -118,7 +118,7 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 			option.WithTokenSource(tokenSource),
 			option.WithHTTPClient(httpClient),
 		)
-		logger.Info("GCP cloud connector AWS-mediated WIF credential configured",
+		logger.Info("GCP identity federation AWS-mediated WIF credential configured",
 			zap.String("audience", authConfig.WorkloadIdentityProvider),
 			zap.String("global_role", authConfig.GlobalRoleARN),
 			zap.Bool("has_service_account_impersonation", authConfig.ServiceAccountEmail != ""),

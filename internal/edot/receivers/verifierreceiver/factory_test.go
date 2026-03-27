@@ -41,7 +41,7 @@ func TestCreateLogsReceiver(t *testing.T) {
 	cfg := factory.CreateDefaultConfig().(*Config)
 
 	// Set up required configuration per RFC structure
-	cfg.CloudConnectorID = "cc-test-001"
+	cfg.IdentityFederationID = "cc-test-001"
 	cfg.VerificationID = "verify-test-001"
 	cfg.Policies = []PolicyConfig{
 		{

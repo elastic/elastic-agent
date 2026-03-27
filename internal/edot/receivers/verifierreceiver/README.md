@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Verifier Receiver is a custom EDOT (Elastic Distribution of OpenTelemetry) collector component that verifies permissions for cloud connector based integrations and reports results as OTEL logs to Elasticsearch.
+The Verifier Receiver is a custom EDOT (Elastic Distribution of OpenTelemetry) collector component that verifies permissions for identity federation based integrations and reports results as OTEL logs to Elasticsearch.
 
 ## Features
 
@@ -11,7 +11,7 @@ The Verifier Receiver is a custom EDOT (Elastic Distribution of OpenTelemetry) c
 - **Active Verification**: Makes actual API calls to verify permissions (granted/denied)
 - **On-demand verification**: Proactively check all permissions for attached integrations
 - **Structured reporting**: Output OTEL logs with full policy/integration context to Elasticsearch
-- **Policy-aware**: Results are grouped by Cloud Connector, policy, and integration for clear remediation
+- **Policy-aware**: Results are grouped by Identity Federation, policy, and integration for clear remediation
 - **Verification Methods**: Supports `api_call` (minimal API calls) and `dry_run` (EC2-style DryRun parameter)
 
 ## Supported Providers
@@ -25,14 +25,14 @@ The Verifier Receiver is a custom EDOT (Elastic Distribution of OpenTelemetry) c
 
 ## Configuration
 
-The receiver configuration follows the RFC structure for Cloud Connector Permission Verification:
+The receiver configuration follows the RFC structure for Identity Federation Permission Verification:
 
 ```yaml
 receivers:
   verifier:
-    # Cloud Connector identification
-    cloud_connector_id: "cc-12345"
-    cloud_connector_name: "Production Connector"
+    # Identity Federation identification
+    identity_federation_id: "cc-12345"
+    identity_federation_name: "Production Connector"
     
     # Verification session
     verification_id: "verify-abc123"
@@ -40,7 +40,7 @@ receivers:
     
     # Provider credentials
     providers:
-      # AWS Authentication - Cloud Connector STS AssumeRole
+      # AWS Authentication - Identity Federation STS AssumeRole
       aws:
         credentials:
           role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
@@ -101,8 +101,8 @@ receivers:
 
 | Option | Type | Required | Default | Description |
 |--------|------|----------|---------|-------------|
-| `cloud_connector_id` | `string` | Yes | - | Unique identifier for the Cloud Connector |
-| `cloud_connector_name` | `string` | No | - | Human-readable name of the Cloud Connector |
+| `identity_federation_id` | `string` | Yes | - | Unique identifier for the Identity Federation |
+| `identity_federation_name` | `string` | No | - | Human-readable name of the Identity Federation |
 | `verification_id` | `string` | Yes | - | Unique identifier for this verification session |
 | `verification_type` | `string` | No | `on_demand` | Type of verification (`on_demand` or `scheduled`) |
 | `providers` | `ProvidersConfig` | No | - | Provider credentials for AWS, Azure, GCP, Okta |
@@ -119,7 +119,7 @@ receivers:
 | `default_region` | `string` | No | `us-east-1` | Default AWS region for API calls |
 | `use_default_credentials` | `bool` | No | `false` | Use AWS SDK default credential chain (for testing) |
 
-*Required when using Cloud Connector authentication. Not required if `use_default_credentials` is `true`.
+*Required when using Identity Federation authentication. Not required if `use_default_credentials` is `true`.
 
 #### Azure (`providers.azure.credentials`)
 
@@ -215,8 +215,8 @@ The receiver emits OTEL logs following the RFC structure. Each log record repres
 
 | Attribute | Description |
 |-----------|-------------|
-| `cloud_connector.id` | Cloud Connector identifier |
-| `cloud_connector.name` | Cloud Connector name |
+| `identity_federation.id` | Identity Federation identifier |
+| `identity_federation.name` | Identity Federation name |
 | `verification.id` | Verification session ID |
 | `verification.timestamp` | When verification started |
 | `verification.type` | `on_demand` or `scheduled` |
@@ -309,7 +309,7 @@ The receiver uses a registry-based architecture for extensibility:
 
 Each CSP supports two authentication modes:
 
-1. **Cloud Connector** (production) - OIDC JWT-based federated credential exchange
+1. **Identity Federation** (production) - OIDC JWT-based federated credential exchange
 2. **Default Credentials** (testing) - uses the platform's default credential chain
 
 ### AWS
@@ -337,7 +337,7 @@ AZURE_SUBSCRIPTION_ID=your-subscription-id ./_build/elastic-collector-components
 ```yaml
 receivers:
   verifier:
-    cloud_connector_id: "${CLOUD_CONNECTOR_ID}"
+    identity_federation_id: "${IDENTITY_FEDERATION_ID}"
     verification_id: "${VERIFICATION_ID}"
     
     providers:

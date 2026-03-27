@@ -8,8 +8,8 @@
 
 receivers:
   verifier:
-    cloud_connector_id: "cc-test-azure"
-    cloud_connector_name: "Azure Test"
+    identity_federation_id: "cc-test-azure"
+    identity_federation_name: "Azure Test"
     namespace: "default"
     account_type: "single_account"
     verification_id: "verify-azure-001"

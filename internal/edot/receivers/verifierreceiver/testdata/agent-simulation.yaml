@@ -6,9 +6,9 @@
 
 receivers:
   verifier:
-    # Cloud Connector Identification (would come from Fleet)
-    cloud_connector_id: "cc-agent-simulation-001"
-    cloud_connector_name: "Agent Simulation Test"
+    # Identity Federation Identification (would come from Fleet)
+    identity_federation_id: "cc-agent-simulation-001"
+    identity_federation_name: "Agent Simulation Test"
     
     # Verification Session (would be generated per run)
     verification_id: "verify-sim-001"

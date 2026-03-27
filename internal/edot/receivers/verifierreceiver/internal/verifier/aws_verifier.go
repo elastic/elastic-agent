@@ -39,7 +39,7 @@ import (
 const (
 	defaultSessionName        = "verifier-receiver"
 	defaultAssumeRoleDuration = 15 * time.Minute
-	// Used by the cloud connector WebIdentity step. The global role session
+	// Used by the identity federation WebIdentity step. The global role session
 	// is short-lived because it is only an intermediate step before assuming
 	// the customer's role.
 	defaultIntermediateDuration = 20 * time.Minute
@@ -72,7 +72,7 @@ func NewAWSVerifierFactory() VerifierFactory {
 
 // NewAWSVerifier creates a new AWS verifier.
 //
-// Cloud connector mode (IDTokenFile + GlobalRoleARN set):
+// Identity federation mode (IDTokenFile + GlobalRoleARN set):
 //
 //	JWT → WebIdentity(GlobalRoleARN) → AssumeRole(customer RoleARN, ExternalID)
 //
@@ -107,8 +107,8 @@ func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthC
 	}
 
 	switch {
-	case authConfig.IsCloudConnector():
-		// Cloud connector OIDC flow: two-step credential chain.
+	case authConfig.IsIdentityFederation():
+		// Identity federation OIDC flow: two-step credential chain.
 		// Step 1: Assume Elastic Global Role using the OIDC JWT token.
 		webIdentityProvider := stscreds.NewWebIdentityRoleProvider(
 			sts.NewFromConfig(baseCfg),
@@ -137,7 +137,7 @@ func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthC
 		)
 		baseCfg.Credentials = aws.NewCredentialsCache(assumeRoleProvider)
 
-		logger.Info("AWS cloud connector credential chain configured",
+		logger.Info("AWS identity federation credential chain configured",
 			zap.String("global_role", authConfig.GlobalRoleARN),
 			zap.String("customer_role", authConfig.RoleARN),
 		)
