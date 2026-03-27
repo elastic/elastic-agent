@@ -142,3 +142,9 @@ service:
 
 	require.Empty(t, cmp.Diff(expected, ev), "metrics do not match expected values")
 }
+
+// TestOtelcolCIProbe always fails on purpose: run `go test -C internal/edot ./otelcol/...` locally.
+// If CI runs internal/edot tests, this will surface there; delete this test once coverage is confirmed.
+func TestOtelcolCIProbe(t *testing.T) {
+	t.Fatal("otelcol CI probe: deliberate failure (remove TestOtelcolCIProbe after verifying whether CI runs this package)")
+}
