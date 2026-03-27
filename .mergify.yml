@@ -1,348 +1,331 @@
 commands_restrictions:
-  backport:
-    conditions:
-      - or:
-        - sender-permission>=write
-        - sender=github-actions[bot]
-queue_rules:
-  - name: default
-    merge_method: squash
-    conditions:
-      - check-success=buildkite/elastic-agent
-      - check-success=CLA
-defaults:
-  actions:
     backport:
-      title: "[{{ destination_branch }}] (backport #{{ number }}) {{ title }}"
-      assignees:
-        - "{{ author }}"
-      labels:
-        - "backport"
+        conditions:
+            - or:
+                - sender-permission>=write
+                - sender=github-actions[bot]
+defaults:
+    actions:
+        backport:
+            assignees:
+                - '{{ author }}'
+            labels:
+                - backport
+            title: '[{{ destination_branch }}] (backport #{{ number }}) {{ title }}'
 pull_request_rules:
-  - name: automatic approval for updatecli pull requests with changes in .buildkite
-    conditions:
-      - author=github-actions[bot]
-      - check-success=buildkite/elastic-agent
-      - or:
-        - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
-      - head~=^updatecli_.*
-    actions:
-      review:
-        type: APPROVE
-        message: Automatically approving mergify
-  - name: automatic squash and merge with success checks and the files matching the regex .buildkite is modified.
-    conditions:
-      - author=github-actions[bot]
-      - check-success=buildkite/elastic-agent
-      - or:
-        - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
-      - head~=^updatecli_.*
-      - "#approved-reviews-by>=1"
-    actions:
-      queue:
-        name: default
-  - name: self-assign PRs
-    conditions:
-      - -merged
-      - -closed
-      - "#assignee=0"
-    actions:
-      assign:
-        add_users:
-          - "{{ author }}"
-  - name: forward-port patches to main branch
-    conditions:
-      - merged
-      - label=forwardport-main
-    actions:
-      backport:
-        branches:
-          - "main"
-  - name: ask to resolve conflict
-    conditions:
-      - -merged
-      - -closed
-      - conflict
-    actions:
+    - actions:
+        review:
+            message: Automatically approving mergify
+            type: APPROVE
+      conditions:
+        - author=github-actions[bot]
+        - check-success=buildkite/elastic-agent
+        - or:
+            - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+        - head~=^updatecli_.*
+      name: automatic approval for updatecli pull requests with changes in .buildkite
+    - actions:
+        queue:
+            name: default
+      conditions:
+        - author=github-actions[bot]
+        - check-success=buildkite/elastic-agent
+        - or:
+            - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+        - head~=^updatecli_.*
+        - '#approved-reviews-by>=1'
+      name: automatic squash and merge with success checks and the files matching the regex .buildkite is modified.
+    - actions:
+        assign:
+            add_users:
+                - '{{ author }}'
+      conditions:
+        - -merged
+        - -closed
+        - '#assignee=0'
+      name: self-assign PRs
+    - actions:
+        backport:
+            branches:
+                - main
+      conditions:
+        - merged
+        - label=forwardport-main
+      name: forward-port patches to main branch
+    - actions:
         comment:
-          message: |
-            This pull request is now in conflicts. Could you fix it? 🙏
-            To fixup this pull request, you can check out it locally. See documentation: https://help.github.com/articles/checking-out-pull-requests-locally/
-            ```
-            git fetch upstream
-            git checkout -b {{head}} upstream/{{head}}
-            git merge upstream/{{base}}
-            git push upstream {{head}}
-            ```
-  - name: close automated pull requests with bump updates if any conflict
-    conditions:
-      - -merged
-      - -closed
-      - conflict
-      - label=automation
-    actions:
-      close:
-        message: |
-          This pull request has been automatically closed by Mergify.
-          There are some other up-to-date pull requests.
-  - name: delete upstream branch after merging changes on .go-version or it's closed
-    conditions:
-      - or:
-        - merged
-        - closed
-      - and:
-        - head~=^updatecli.*
-        - files~=^\.go-version$
-    actions:
-      delete_head_branch:
-  - name: automatic approval for mergify pull requests with changes in bump-rules
-    conditions:
-      - author=mergify[bot]
-      - check-success=buildkite/elastic-agent
-      - files~=^\.mergify\.yml$
-      - head~=^add-backport-next.*
-    actions:
-      review:
-        type: APPROVE
-        message: Automatically approving mergify
-  - name: automatic squash and merge with success checks and the files matching the regex ^.mergify.yml is modified.
-    conditions:
-      - check-success=buildkite/elastic-agent
-      - files~=^\.mergify\.yml$
-      - head~=^add-backport-next.*
-      - "#approved-reviews-by>=1"
-    actions:
-      queue:
-        name: default
-  - name: delete upstream branch for mergify backports
-    conditions:
-      - or:
-        - merged
-        - closed
-      - and:
-        - head~=^mergify/bp/.*
-    actions:
-      delete_head_branch:
-  - name: delete upstream branch with changes on ^.mergify.yml that has been merged or closed
-    conditions:
-      - or:
-        - merged
-        - closed
-      - and:
-        - head~=^add-backport-next.*
+            message: "This pull request is now in conflicts. Could you fix it? \U0001F64F\nTo fixup this pull request, you can check out it locally. See documentation: https://help.github.com/articles/checking-out-pull-requests-locally/\n```\ngit fetch upstream\ngit checkout -b {{head}} upstream/{{head}}\ngit merge upstream/{{base}}\ngit push upstream {{head}}\n```\n"
+      conditions:
+        - -merged
+        - -closed
+        - conflict
+      name: ask to resolve conflict
+    - actions:
+        close:
+            message: |
+                This pull request has been automatically closed by Mergify.
+                There are some other up-to-date pull requests.
+      conditions:
+        - -merged
+        - -closed
+        - conflict
+        - label=automation
+      name: close automated pull requests with bump updates if any conflict
+    - actions:
+        delete_head_branch: null
+      conditions:
+        - or:
+            - merged
+            - closed
+        - and:
+            - head~=^updatecli.*
+            - files~=^\.go-version$
+      name: delete upstream branch after merging changes on .go-version or it's closed
+    - actions:
+        review:
+            message: Automatically approving mergify
+            type: APPROVE
+      conditions:
+        - author=mergify[bot]
+        - check-success=buildkite/elastic-agent
         - files~=^\.mergify\.yml$
-    actions:
-      delete_head_branch:
-  - name: notify the backport has not been merged yet
-    conditions:
-      - -merged
-      - -closed
-      - author=mergify[bot]
-      - "#check-success>0"
-      - schedule=Mon-Mon 06:00-10:00[Europe/Paris]
-      - "#assignee>=1"
-    actions:
-      comment:
-        message: |
-          This pull request has not been merged yet. Could you please review and merge it @{{ assignee | join(', @') }}? 🙏
-  - name: notify the backport policy
-    conditions:
-      - -label~=^backport
-      - base=main
-      - -merged
-      - -closed
-    actions:
-      comment:
-        message: |
-          This pull request does not have a backport label. Could you fix it @{{author}}? 🙏
-          To fixup this pull request, you need to add the backport labels for the needed
-          branches, such as:
-          * `backport-./d./d` is the label that automatically backports to the `8./d` branch. `/d` is the digit
-          * `backport-active-all` is the label that automatically backports to all active branches.
-          * `backport-active-8` is the label that automatically backports to all active minor branches for the 8 major.
-          * `backport-active-9` is the label that automatically backports to all active minor branches for the 9 major.
-
-  - name: backport patches to 7.17 branch
-    conditions:
-      - merged
-      - label~=^(backport-v7.17.0|backport-7.17)$
-    actions:
-      backport:
-        branches:
-          - "7.17"
-  - name: backport patches to 8.2 branch
-    conditions:
-      - merged
-      - label=backport-v8.2.0
-    actions:
-      backport:
-        branches:
-          - "8.2"
-  - name: backport patches to 8.3 branch
-    conditions:
-      - merged
-      - label=backport-v8.3.0
-    actions:
-      backport:
-        branches:
-          - "8.3"
-  - name: backport patches to 8.4 branch
-    conditions:
-      - merged
-      - label=backport-v8.4.0
-    actions:
-      backport:
-        branches:
-          - "8.4"
-  - name: backport patches to 8.5 branch
-    conditions:
-      - merged
-      - label=backport-v8.5.0
-    actions:
-      backport:
-        branches:
-          - "8.5"
-  - name: backport patches to 8.6 branch
-    conditions:
-      - merged
-      - label=backport-v8.6.0
-    actions:
-      backport:
-        branches:
-          - "8.6"
-  - name: backport patches to 8.7 branch
-    conditions:
-      - merged
-      - label=backport-v8.7.0
-    actions:
-      backport:
-        branches:
-          - "8.7"
-  - name: backport patches to 8.8 branch
-    conditions:
-      - merged
-      - label=backport-v8.8.0
-    actions:
-      backport:
-        branches:
-          - "8.8"
-  - name: backport patches to 8.9 branch
-    conditions:
-      - merged
-      - label=backport-v8.9.0
-    actions:
-      backport:
-        branches:
-          - "8.9"
-  - name: backport patches to 8.10 branch
-    conditions:
-      - merged
-      - label=backport-v8.10.0
-    actions:
-      backport:
-        branches:
-          - "8.10"
-  - name: backport patches to 8.11 branch
-    conditions:
-      - merged
-      - label=backport-v8.11.0
-    actions:
-      backport:
-        branches:
-          - "8.11"
-  - name: backport patches to 8.12 branch
-    conditions:
-      - merged
-      - label=backport-v8.12.0
-    actions:
-      backport:
-        branches:
-          - "8.12"
-  - name: backport patches to 8.13 branch
-    conditions:
-      - merged
-      - label=backport-v8.13.0
-    actions:
-      backport:
-        branches:
-          - "8.13"
-  - name: backport patches to 8.14 branch
-    conditions:
-      - merged
-      - label=backport-v8.14.0
-    actions:
-      backport:
-        branches:
-          - "8.14"
-  - name: backport patches to 8.15 branch
-    conditions:
-      - merged
-      - label~=^(backport-v8.15.0|backport-8.15)$
-    actions:
-      backport:
-        branches:
-          - "8.15"
-  - name: backport patches to 8.16 branch
-    conditions:
-      - merged
-      - label~=^(backport-v8.16.0|backport-8.16)$
-    actions:
-      backport:
-        branches:
-          - "8.16"
-  - name: backport patches to 8.17 branch
-    conditions:
-      - merged
-      - label=backport-8.17
-    actions:
-      backport:
-        branches:
-          - "8.17"
-  - name: backport patches to 8.18 branch
-    conditions:
-      - merged
-      - label=backport-8.18
-    actions:
-      backport:
-        branches:
-          - "8.18"
-  - name: backport patches to 8.19 branch
-    conditions:
-      - merged
-      - label=backport-8.19
-    actions:
-      backport:
-        branches:
-          - "8.19"
-  - name: backport patches to 9.0 branch
-    conditions:
-      - merged
-      - label=backport-9.0
-    actions:
-      backport:
-        branches:
-          - "9.0"
-  - name: backport patches to 9.1 branch
-    conditions:
-      - merged
-      - label=backport-9.1
-    actions:
-      backport:
-        branches:
-          - "9.1"
-  - name: backport patches to 9.2 branch
-    conditions:
-      - merged
-      - label=backport-9.2
-    actions:
-      backport:
-        branches:
-          - "9.2"
-  - name: backport patches to 9.3 branch
-    conditions:
-      - merged
-      - label=backport-9.3
-    actions:
-      backport:
-        branches:
-          - "9.3"
+        - head~=^add-backport-next.*
+      name: automatic approval for mergify pull requests with changes in bump-rules
+    - actions:
+        queue:
+            name: default
+      conditions:
+        - check-success=buildkite/elastic-agent
+        - files~=^\.mergify\.yml$
+        - head~=^add-backport-next.*
+        - '#approved-reviews-by>=1'
+      name: automatic squash and merge with success checks and the files matching the regex ^.mergify.yml is modified.
+    - actions:
+        delete_head_branch: null
+      conditions:
+        - or:
+            - merged
+            - closed
+        - and:
+            - head~=^mergify/bp/.*
+      name: delete upstream branch for mergify backports
+    - actions:
+        delete_head_branch: null
+      conditions:
+        - or:
+            - merged
+            - closed
+        - and:
+            - head~=^add-backport-next.*
+            - files~=^\.mergify\.yml$
+      name: delete upstream branch with changes on ^.mergify.yml that has been merged or closed
+    - actions:
+        comment:
+            message: "This pull request has not been merged yet. Could you please review and merge it @{{ assignee | join(', @') }}? \U0001F64F\n"
+      conditions:
+        - -merged
+        - -closed
+        - author=mergify[bot]
+        - '#check-success>0'
+        - schedule=Mon-Mon 06:00-10:00[Europe/Paris]
+        - '#assignee>=1'
+      name: notify the backport has not been merged yet
+    - actions:
+        comment:
+            message: "This pull request does not have a backport label. Could you fix it @{{author}}? \U0001F64F\nTo fixup this pull request, you need to add the backport labels for the needed\nbranches, such as:\n* `backport-./d./d` is the label that automatically backports to the `8./d` branch. `/d` is the digit\n* `backport-active-all` is the label that automatically backports to all active branches.\n* `backport-active-8` is the label that automatically backports to all active minor branches for the 8 major.\n* `backport-active-9` is the label that automatically backports to all active minor branches for the 9 major.\n"
+      conditions:
+        - -label~=^backport
+        - base=main
+        - -merged
+        - -closed
+      name: notify the backport policy
+    - actions:
+        backport:
+            branches:
+                - "7.17"
+      conditions:
+        - merged
+        - label~=^(backport-v7.17.0|backport-7.17)$
+      name: backport patches to 7.17 branch
+    - actions:
+        backport:
+            branches:
+                - "8.2"
+      conditions:
+        - merged
+        - label=backport-v8.2.0
+      name: backport patches to 8.2 branch
+    - actions:
+        backport:
+            branches:
+                - "8.3"
+      conditions:
+        - merged
+        - label=backport-v8.3.0
+      name: backport patches to 8.3 branch
+    - actions:
+        backport:
+            branches:
+                - "8.4"
+      conditions:
+        - merged
+        - label=backport-v8.4.0
+      name: backport patches to 8.4 branch
+    - actions:
+        backport:
+            branches:
+                - "8.5"
+      conditions:
+        - merged
+        - label=backport-v8.5.0
+      name: backport patches to 8.5 branch
+    - actions:
+        backport:
+            branches:
+                - "8.6"
+      conditions:
+        - merged
+        - label=backport-v8.6.0
+      name: backport patches to 8.6 branch
+    - actions:
+        backport:
+            branches:
+                - "8.7"
+      conditions:
+        - merged
+        - label=backport-v8.7.0
+      name: backport patches to 8.7 branch
+    - actions:
+        backport:
+            branches:
+                - "8.8"
+      conditions:
+        - merged
+        - label=backport-v8.8.0
+      name: backport patches to 8.8 branch
+    - actions:
+        backport:
+            branches:
+                - "8.9"
+      conditions:
+        - merged
+        - label=backport-v8.9.0
+      name: backport patches to 8.9 branch
+    - actions:
+        backport:
+            branches:
+                - "8.10"
+      conditions:
+        - merged
+        - label=backport-v8.10.0
+      name: backport patches to 8.10 branch
+    - actions:
+        backport:
+            branches:
+                - "8.11"
+      conditions:
+        - merged
+        - label=backport-v8.11.0
+      name: backport patches to 8.11 branch
+    - actions:
+        backport:
+            branches:
+                - "8.12"
+      conditions:
+        - merged
+        - label=backport-v8.12.0
+      name: backport patches to 8.12 branch
+    - actions:
+        backport:
+            branches:
+                - "8.13"
+      conditions:
+        - merged
+        - label=backport-v8.13.0
+      name: backport patches to 8.13 branch
+    - actions:
+        backport:
+            branches:
+                - "8.14"
+      conditions:
+        - merged
+        - label=backport-v8.14.0
+      name: backport patches to 8.14 branch
+    - actions:
+        backport:
+            branches:
+                - "8.15"
+      conditions:
+        - merged
+        - label~=^(backport-v8.15.0|backport-8.15)$
+      name: backport patches to 8.15 branch
+    - actions:
+        backport:
+            branches:
+                - "8.16"
+      conditions:
+        - merged
+        - label~=^(backport-v8.16.0|backport-8.16)$
+      name: backport patches to 8.16 branch
+    - actions:
+        backport:
+            branches:
+                - "8.17"
+      conditions:
+        - merged
+        - label=backport-8.17
+      name: backport patches to 8.17 branch
+    - actions:
+        backport:
+            branches:
+                - "8.18"
+      conditions:
+        - merged
+        - label=backport-8.18
+      name: backport patches to 8.18 branch
+    - actions:
+        backport:
+            branches:
+                - "8.19"
+      conditions:
+        - merged
+        - label=backport-8.19
+      name: backport patches to 8.19 branch
+    - actions:
+        backport:
+            branches:
+                - "9.0"
+      conditions:
+        - merged
+        - label=backport-9.0
+      name: backport patches to 9.0 branch
+    - actions:
+        backport:
+            branches:
+                - "9.1"
+      conditions:
+        - merged
+        - label=backport-9.1
+      name: backport patches to 9.1 branch
+    - actions:
+        backport:
+            branches:
+                - "9.2"
+      conditions:
+        - merged
+        - label=backport-9.2
+      name: backport patches to 9.2 branch
+    - actions:
+        backport:
+            branches:
+                - "9.3"
+      conditions:
+        - merged
+        - label=backport-9.3
+      name: backport patches to 9.3 branch
+queue_rules:
+    - conditions:
+        - check-success=buildkite/elastic-agent
+        - check-success=CLA
+      merge_method: squash
+      name: default

@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
+	"github.com/elastic/elastic-agent/dev-tools/mage/release"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	filecopy "github.com/otiai10/copy"
@@ -178,6 +179,9 @@ type Otel mg.Namespace
 
 // Devmachine namespace contains tasks related to remote development machines.
 type Devmachine mg.Namespace
+
+// Release namespace contains tasks for release automation.
+type Release mg.Namespace
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
@@ -4377,4 +4381,76 @@ func getMacOSMajorVersion() (int, error) {
 	}
 
 	return majorVer, nil
+}
+
+// UpdateVersion updates the version in version/version.go
+func (Release) UpdateVersion(version string) error {
+	return release.UpdateVersion(version)
+}
+
+// UpdateDocs updates version references in documentation and K8s manifests
+func (Release) UpdateDocs(version string) error {
+	return release.UpdateDocs(version)
+}
+
+// UpdateMergify adds a new backport rule to .mergify.yml
+func (Release) UpdateMergify(version string) error {
+	return release.UpdateMergify(version)
+}
+
+// PrepareMajorMinor prepares files for a major/minor release using env vars
+func (Release) PrepareMajorMinor() error {
+	cfg, err := release.LoadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	return release.PrepareMajorMinorRelease(cfg)
+}
+
+// CreateBranch creates a release branch with all changes committed
+func (Release) CreateBranch() error {
+	cfg, err := release.LoadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	return release.CreateReleaseBranch(cfg, ".")
+}
+
+// CreatePR creates a pull request for the release (requires GITHUB_TOKEN)
+func (Release) CreatePR() error {
+	cfg, err := release.LoadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+
+	ghClient, err := release.NewGitHubClientFromEnv()
+	if err != nil {
+		return err
+	}
+
+	return release.CreateReleasePR(cfg, ghClient)
+}
+
+// RunMajorMinor orchestrates the complete major/minor release workflow
+// Set DRY_RUN=true to preview changes without pushing
+func (Release) RunMajorMinor() error {
+	cfg, err := release.LoadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+
+	dryRun := os.Getenv("DRY_RUN") == "true"
+	return release.RunMajorMinorRelease(cfg, dryRun)
+}
+
+// RunPatch orchestrates the complete patch release workflow
+// Set DRY_RUN=true to preview changes without pushing
+func (Release) RunPatch() error {
+	cfg, err := release.LoadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+
+	dryRun := os.Getenv("DRY_RUN") == "true"
+	return release.RunPatchRelease(cfg, dryRun)
 }
