@@ -803,4 +803,5 @@ replace (
 	// They should be removed after the above PR is merged and we upgrade to the respective otel contrib release.
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck => github.com/elastic/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20260128133812-7296485a6185
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status => github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260128133812-7296485a6185
+	go.opentelemetry.io/collector/config/confignet => github.com/swiatekm/opentelemetry-collector/config/confignet v0.0.0-20260306162146-5c6e44867617
 )

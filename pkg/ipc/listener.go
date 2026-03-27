@@ -33,7 +33,7 @@ func CreateListener(log *logger.Logger, address string) (net.Listener, error) {
 	}
 	dir := filepath.Dir(path)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err = os.MkdirAll(dir, 0775)
+		err = os.MkdirAll(dir, 0770)
 		if err != nil {
 			return nil, err
 		}

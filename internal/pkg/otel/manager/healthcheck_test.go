@@ -7,11 +7,8 @@ package manager
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"net"
 	"net/http"
-	"net/http/httptest"
-	"strconv"
+	"net/url"
 	"testing"
 	"time"
 
@@ -43,7 +40,7 @@ func TestAllComponentsStatuses(t *testing.T) {
 			},
 		}
 
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		client, cleanup := startTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, "GET", r.Method)
 			assert.Equal(t, healthCheckHealthStatusPath, r.URL.Path)
 			assert.True(t, r.URL.Query().Has("verbose"), "verbose query parameter should be present")
@@ -53,10 +50,9 @@ func TestAllComponentsStatuses(t *testing.T) {
 			err := json.NewEncoder(w).Encode(serStatus)
 			require.NoError(t, err)
 		}))
-		defer server.Close()
+		defer cleanup()
 
-		port := extractPort(t, server.URL)
-		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
+		result, err := AllComponentsStatuses(context.Background(), *client)
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -75,15 +71,14 @@ func TestAllComponentsStatuses(t *testing.T) {
 			},
 		}
 
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		client, cleanup := startTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			err := json.NewEncoder(w).Encode(serStatus)
 			require.NoError(t, err)
 		}))
-		defer server.Close()
+		defer cleanup()
 
-		port := extractPort(t, server.URL)
-		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
+		result, err := AllComponentsStatuses(context.Background(), *client)
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -93,8 +88,9 @@ func TestAllComponentsStatuses(t *testing.T) {
 	})
 
 	t.Run("connection refused error", func(t *testing.T) {
-		// Use a port that's unlikely to be in use
-		result, err := AllComponentsStatuses(context.Background(), http.Client{}, 59999)
+		client := nonExistentClient(t)
+
+		result, err := AllComponentsStatuses(context.Background(), *client)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get status")
@@ -102,14 +98,13 @@ func TestAllComponentsStatuses(t *testing.T) {
 	})
 
 	t.Run("invalid JSON response", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		client, cleanup := startTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte("not valid json"))
 		}))
-		defer server.Close()
+		defer cleanup()
 
-		port := extractPort(t, server.URL)
-		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
+		result, err := AllComponentsStatuses(context.Background(), *client)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to unmarshal serializable status")
@@ -117,18 +112,17 @@ func TestAllComponentsStatuses(t *testing.T) {
 	})
 
 	t.Run("context cancelled", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		client, cleanup := startTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			// Delay response to allow context cancellation
 			time.Sleep(100 * time.Millisecond)
 			w.WriteHeader(http.StatusOK)
 		}))
-		defer server.Close()
+		defer cleanup()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
 
-		port := extractPort(t, server.URL)
-		result, err := AllComponentsStatuses(ctx, *server.Client(), port)
+		result, err := AllComponentsStatuses(ctx, *client)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get status")
@@ -136,15 +130,14 @@ func TestAllComponentsStatuses(t *testing.T) {
 	})
 
 	t.Run("empty response body", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		client, cleanup := startTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			// Empty body
 		}))
-		defer server.Close()
+		defer cleanup()
 
-		port := extractPort(t, server.URL)
-		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
+		result, err := AllComponentsStatuses(context.Background(), *client)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to unmarshal serializable status")
@@ -187,15 +180,14 @@ func TestAllComponentsStatuses(t *testing.T) {
 			},
 		}
 
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		client, cleanup := startTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			err := json.NewEncoder(w).Encode(serStatus)
 			require.NoError(t, err)
 		}))
-		defer server.Close()
+		defer cleanup()
 
-		port := extractPort(t, server.URL)
-		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
+		result, err := AllComponentsStatuses(context.Background(), *client)
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -214,24 +206,14 @@ func TestAllComponentsStatuses(t *testing.T) {
 	})
 }
 
-// extractPort extracts the port number from a URL string like "http://127.0.0.1:12345"
-func extractPort(t *testing.T, url string) int {
-	t.Helper()
-	_, portStr, err := net.SplitHostPort(url[len("http://"):])
-	require.NoError(t, err)
-	port, err := strconv.Atoi(portStr)
-	require.NoError(t, err)
-	return port
-}
-
 func TestInjectHealthCheckV2Extension(t *testing.T) {
 	const testExtensionID = "healthcheckv2/test"
-	const testPort = 12345
+	const testEndpoint = "unix:///tmp/test.sock"
 
 	t.Run("injects extension config into empty config", func(t *testing.T) {
 		conf := confmap.New()
 
-		err := injectHealthCheckV2Extension(conf, testExtensionID, testPort)
+		err := injectHealthCheckV2Extension(conf, testExtensionID, testEndpoint)
 
 		require.NoError(t, err)
 
@@ -241,10 +223,15 @@ func TestInjectHealthCheckV2Extension(t *testing.T) {
 		extHealthCheck, err := extConf.Sub(testExtensionID)
 		require.NoError(t, err)
 
+		testUrl, err := url.Parse(testEndpoint)
+		require.NoError(t, err)
 		assert.Equal(t, true, extHealthCheck.Get("use_v2"))
-		assert.Equal(t, fmt.Sprintf("localhost:%d", testPort), extHealthCheck.Get("http::endpoint"))
+		assert.Equal(t, testUrl.Path, extHealthCheck.Get("http::endpoint"))
+		assert.Equal(t, "unix", extHealthCheck.Get("http::transport"))
+		assert.Equal(t, true, extHealthCheck.Get("http::keep_alives_enabled"))
 		assert.Equal(t, healthCheckHealthStatusPath, extHealthCheck.Get("http::status::path"))
 		assert.Equal(t, healthCheckHealthStatusEnabled, extHealthCheck.Get("http::status::enabled"))
+		assert.Equal(t, true, extHealthCheck.Get("http::status::include_attributes"))
 		assert.Equal(t, healthCheckHealthConfigPath, extHealthCheck.Get("http::config::path"))
 		assert.Equal(t, healthCheckHealthConfigEnabled, extHealthCheck.Get("http::config::enabled"))
 		assert.Equal(t, healthCheckIncludePermanentErrors, extHealthCheck.Get("component_health::include_permanent_errors"))
@@ -255,7 +242,7 @@ func TestInjectHealthCheckV2Extension(t *testing.T) {
 	t.Run("no service defined creates service with extension", func(t *testing.T) {
 		conf := confmap.New()
 
-		err := injectHealthCheckV2Extension(conf, testExtensionID, testPort)
+		err := injectHealthCheckV2Extension(conf, testExtensionID, testEndpoint)
 
 		require.NoError(t, err)
 
@@ -284,7 +271,7 @@ func TestInjectHealthCheckV2Extension(t *testing.T) {
 			},
 		})
 
-		err := injectHealthCheckV2Extension(conf, testExtensionID, testPort)
+		err := injectHealthCheckV2Extension(conf, testExtensionID, testEndpoint)
 
 		require.NoError(t, err)
 
@@ -312,7 +299,7 @@ func TestInjectHealthCheckV2Extension(t *testing.T) {
 			},
 		})
 
-		err := injectHealthCheckV2Extension(conf, testExtensionID, testPort)
+		err := injectHealthCheckV2Extension(conf, testExtensionID, testEndpoint)
 
 		require.NoError(t, err)
 
@@ -342,7 +329,7 @@ func TestInjectHealthCheckV2Extension(t *testing.T) {
 			},
 		})
 
-		err := injectHealthCheckV2Extension(conf, testExtensionID, testPort)
+		err := injectHealthCheckV2Extension(conf, testExtensionID, testEndpoint)
 
 		require.NoError(t, err)
 
@@ -368,7 +355,7 @@ func TestInjectHealthCheckV2Extension(t *testing.T) {
 			},
 		})
 
-		err := injectHealthCheckV2Extension(conf, testExtensionID, testPort)
+		err := injectHealthCheckV2Extension(conf, testExtensionID, testEndpoint)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "merge into service::extensions failed")
@@ -392,7 +379,7 @@ func TestInjectHealthCheckV2Extension(t *testing.T) {
 			},
 		})
 
-		err := injectHealthCheckV2Extension(conf, testExtensionID, testPort)
+		err := injectHealthCheckV2Extension(conf, testExtensionID, testEndpoint)
 
 		require.NoError(t, err)
 

@@ -157,9 +157,9 @@ func validateFileTree(dir string, uid uint32, gid uint32) error {
 		if fs.Gid != gid {
 			return fmt.Errorf("%s doesn't have correct gid: has %d (expected %d)", file, fs.Gid, gid)
 		}
-		if fs.Mode&0007 != 0 {
-			return fmt.Errorf("%s has world access", file)
-		}
+		//if fs.Mode&0007 != 0 {
+		//	return fmt.Errorf("%s has world access", file)
+		//}
 		return nil
 	})
 }

@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,12 +27,13 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -724,9 +724,6 @@ func TestOTelManager_Run(t *testing.T) {
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 
-				subprocessExec, ok := exec.exec.(*subprocessExecution)
-				require.True(t, ok, "execution mode isn't subprocess")
-
 				cfg := confmap.NewFromStringMap(testConfig)
 
 				nsUUID, err := uuid.NewV4()
@@ -737,11 +734,8 @@ func TestOTelManager_Run(t *testing.T) {
 
 				healthCheckExtensionID := otelComponent.NewIDWithName(componentType, nsUUID.String()).String()
 
-				ports, err := findRandomTCPPorts(3)
-				require.NoError(t, err, "failed to find random tcp ports")
-				subprocessExec.collectorHealthCheckPort = ports[0]
-				subprocessExec.collectorMetricsPort = ports[1]
-				err = injectHealthCheckV2Extension(cfg, healthCheckExtensionID, ports[2])
+				healthCheckExtensionSocket := paths.HealthcheckExtensionSocket("someid")
+				err = injectHealthCheckV2Extension(cfg, healthCheckExtensionID, healthCheckExtensionSocket)
 				require.NoError(t, err, "failed to inject user health extension")
 
 				updateTime := time.Now()
@@ -992,236 +986,6 @@ func TestOTelManager_Logging(t *testing.T) {
 			}, time.Second*10, time.Second)
 		})
 	}
-}
-
-func TestOTelManager_Ports(t *testing.T) {
-	ports, err := findRandomTCPPorts(2)
-	require.NoError(t, err)
-	healthCheckPort, metricsPort := ports[0], ports[1]
-	agentCollectorConfig := configuration.CollectorConfig{
-		HealthCheckConfig: configuration.CollectorHealthCheckConfig{
-			Endpoint: fmt.Sprintf("http://localhost:%d", healthCheckPort),
-		},
-		TelemetryConfig: configuration.CollectorTelemetryConfig{
-			Endpoint: fmt.Sprintf("http://localhost:%d", metricsPort),
-		},
-	}
-
-	wd, erWd := os.Getwd()
-	require.NoError(t, erWd, "cannot get working directory")
-
-	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
-	require.FileExists(t, testBinary, "testing binary not found")
-
-	const waitTimeForStop = 30 * time.Second
-
-	for _, tc := range []struct {
-		name               string
-		execModeFn         func(collectorRunErr chan error) (collectorExecution, error)
-		healthCheckEnabled bool
-	}{
-		{
-			name: "subprocess execution",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				hcUUID, err := uuid.NewV4()
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate UUID: %w", err)
-				}
-				return newSubprocessExecution(testBinary, hcUUID.String(), metricsPort, healthCheckPort)
-			},
-			healthCheckEnabled: true,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			base, obs := loggertest.New("otel")
-			l, _ := loggertest.New("otel-manager")
-			ctx := t.Context()
-
-			t.Cleanup(func() {
-				if t.Failed() {
-					for _, log := range obs.All() {
-						t.Logf("%+v", log)
-					}
-				}
-			})
-
-			// the execution mode passed here is overridden below so it is irrelevant
-			m, err := NewOTelManager(
-				l,
-				logp.InfoLevel,
-				base,
-				&info.AgentInfo{},
-				&agentCollectorConfig,
-				nil,
-				waitTimeForStop,
-			)
-			require.NoError(t, err, "could not create otel manager")
-
-			executionMode, err := tc.execModeFn(m.collectorRunErr)
-			require.NoError(t, err, "failed to create execution mode")
-			testExecutionMode := &testExecution{exec: executionMode}
-			m.execution = testExecutionMode
-
-			go func() {
-				err := m.Run(ctx)
-				assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
-			}()
-
-			go func() {
-				for {
-					select {
-					case colErr := <-m.Errors():
-						require.NoError(t, colErr, "otel manager should not return errors")
-					case <-m.WatchComponents(): // ensure we receive component updates
-					case <-ctx.Done():
-						return
-					}
-				}
-			}()
-
-			cfg := confmap.NewFromStringMap(testConfig)
-			cfg.Delete("service::telemetry::metrics::level") // change this to default
-			m.Update(cfg, nil, logp.InfoLevel, nil)
-
-			// wait until status reflects the config update
-			require.EventuallyWithT(t, func(collect *assert.CollectT) {
-				select {
-				case collectorStatus := <-m.WatchCollector():
-					require.NotNil(collect, collectorStatus, "collector status should not be nil")
-					assert.Equal(collect, componentstatus.StatusOK, collectorStatus.Status())
-					assert.NotEmpty(collect, collectorStatus.ComponentStatusMap)
-				case <-ctx.Done():
-					require.NoError(collect, ctx.Err())
-				}
-			}, time.Second*10, time.Second)
-
-			// the collector should expose its status and metrics on the set ports
-			healthCheckUrl := fmt.Sprintf("http://localhost:%d%s", healthCheckPort, healthCheckHealthStatusPath)
-			metricsUrl := fmt.Sprintf("http://localhost:%d/metrics", metricsPort)
-			urlsToCheck := []string{metricsUrl}
-			if tc.healthCheckEnabled {
-				urlsToCheck = append(urlsToCheck, healthCheckUrl)
-			}
-			for _, url := range urlsToCheck {
-				assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-					req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-					assert.NoError(collect, err)
-					resp, err := http.DefaultClient.Do(req)
-					require.NoError(collect, err)
-					defer func() {
-						_ = resp.Body.Close()
-					}()
-					assert.Equal(collect, http.StatusOK, resp.StatusCode)
-				}, time.Second*10, time.Second)
-			}
-		})
-	}
-}
-
-// TestOTelManager_PortConflict test verifies that the collector restarts and tries new ports if it encounters a port
-// conflict.
-func TestOTelManager_PortConflict(t *testing.T) {
-	// switch the net.Listen implementation with one that returns test listeners that ignore the Close call the first
-	// two times
-	var timesCalled int
-	var mx sync.Mutex
-	netListen = func(network string, address string) (net.Listener, error) {
-		mx.Lock()
-		defer mx.Unlock()
-		lc := &net.ListenConfig{}
-		l, err := lc.Listen(t.Context(), network, address)
-		if err != nil {
-			return nil, err
-		}
-		if timesCalled < 1 {
-			// only actually close the listener after test completion, freeing the port
-			t.Cleanup(func() {
-				assert.NoError(t, l.Close())
-			})
-			// this listener won't free the port even after Close is called, leading to port binding conflicts later
-			// in the test
-			l = &fakeCloseListener{inner: l}
-		}
-		timesCalled++
-		return l, err
-	}
-	t.Cleanup(func() {
-		netListen = net.Listen
-	})
-
-	wd, erWd := os.Getwd()
-	require.NoError(t, erWd, "cannot get working directory")
-
-	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
-	require.FileExists(t, testBinary, "testing binary not found")
-
-	const waitTimeForStop = 30 * time.Second
-
-	base, obs := loggertest.New("base")
-	l := base.Named("otel-manager")
-	ctx := t.Context()
-
-	t.Cleanup(func() {
-		if t.Failed() {
-			for _, log := range obs.All() {
-				t.Logf("%+v", log)
-			}
-		}
-	})
-
-	// the execution mode passed here is overridden below so it is irrelevant
-	m, err := NewOTelManager(
-		l,
-		logp.InfoLevel,
-		base,
-		&info.AgentInfo{},
-		nil,
-		nil,
-		waitTimeForStop,
-	)
-	require.NoError(t, err, "could not create otel manager")
-	executionMode, err := newSubprocessExecution(testBinary, strings.TrimPrefix(m.healthCheckExtID, "extension:healthcheckv2/"), 0, 0)
-	require.NoError(t, err, "could not create subprocess execution mode")
-	m.execution = executionMode
-
-	go func() {
-		err := m.Run(ctx)
-		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
-	}()
-
-	go func() {
-		for {
-			select {
-			case <-m.Errors():
-			case <-m.WatchComponents(): // ensure we receive component updates
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	cfg := confmap.NewFromStringMap(testConfig)
-	cfg.Delete("service::telemetry::metrics::level") // change this to default
-
-	// no retries, collector is not running
-	assert.Equal(t, uint32(0), m.recoveryRetries.Load())
-
-	m.Update(cfg, nil, logp.InfoLevel, nil)
-
-	// wait until status reflects the config update
-	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		select {
-		case collectorStatus := <-m.WatchCollector():
-			require.NotNil(collect, collectorStatus, "collector status should not be nil")
-			assert.Equal(collect, componentstatus.StatusOK, collectorStatus.Status())
-			assert.NotEmpty(collect, collectorStatus.ComponentStatusMap)
-		case <-ctx.Done():
-			require.NoError(collect, ctx.Err())
-		}
-	}, time.Second*10, time.Second)
-
-	// collector must have retried exactly once
-	assert.Equal(t, uint32(1), m.recoveryRetries.Load())
 }
 
 // statusToYaml converts the status.AggregateStatus to a YAML string representation.

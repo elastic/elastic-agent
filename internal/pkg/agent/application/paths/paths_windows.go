@@ -31,7 +31,8 @@ const (
 	shellWrapperPath = ""
 
 	// ShellWrapper is the wrapper that is installed.
-	ShellWrapperFmt = "" // no wrapper on Windows
+	ShellWrapperFmt                        = "" // no wrapper on Windows
+	HealthcheckExtensionSocketNameTemplate = "npipe///:edot-healthcheck-extension-%s"
 )
 
 // ShellWrapperPathForNamespace is a helper to work around not being able to use fmt.Sprintf
