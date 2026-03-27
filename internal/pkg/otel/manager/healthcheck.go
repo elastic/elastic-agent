@@ -67,7 +67,11 @@ func AllComponentsStatuses(ctx context.Context, client http.Client, httpHealthCh
 		return nil, fmt.Errorf("failed to unmarshal serializable status: %w", err)
 	}
 
-	return status.FromSerializableStatus(serStatus), nil
+	aggStatus, err := status.FromSerializableStatus(serStatus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reconstruct status: %w", err)
+	}
+	return aggStatus, nil
 }
 
 // injectHealthCheckV2Extension injects the healthcheckv2 extension into the provided configuration.

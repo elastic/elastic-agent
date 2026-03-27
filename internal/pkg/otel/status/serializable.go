@@ -6,10 +6,12 @@ package status
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 )
 
 // SerializableStatus is exported for json.Unmarshal
@@ -21,10 +23,11 @@ type SerializableStatus struct {
 
 // SerializableEvent is exported for json.Unmarshal
 type SerializableEvent struct {
-	Healthy      bool      `json:"healthy"`
-	StatusString string    `json:"status"`
-	Error        string    `json:"error,omitempty"`
-	Timestamp    time.Time `json:"status_time"`
+	Healthy      bool           `json:"healthy"`
+	StatusString string         `json:"status"`
+	Error        string         `json:"error,omitempty"`
+	Timestamp    time.Time      `json:"status_time"`
+	Attributes   map[string]any `json:"attributes,omitempty"`
 }
 
 // stringToStatusMap is a map from string representation of status to componentstatus.Status.
@@ -41,18 +44,23 @@ var stringToStatusMap = map[string]componentstatus.Status{
 
 // healthCheckEvent implements status.Event interface for health check events.
 type healthCheckEvent struct {
-	status    componentstatus.Status
-	timestamp time.Time
-	err       error
+	status     componentstatus.Status
+	timestamp  time.Time
+	err        error
+	attributes pcommon.Map
 }
 
 func (e *healthCheckEvent) Status() componentstatus.Status { return e.status }
 func (e *healthCheckEvent) Timestamp() time.Time           { return e.timestamp }
 func (e *healthCheckEvent) Err() error                     { return e.err }
+func (e *healthCheckEvent) Attributes() pcommon.Map        { return e.attributes }
 
 // FromSerializableStatus reconstructs an AggregateStatus from serializableStatus.
-func FromSerializableStatus(ss *SerializableStatus) *status.AggregateStatus {
-	ev := FromSerializableEvent(ss.SerializableEvent)
+func FromSerializableStatus(ss *SerializableStatus) (*status.AggregateStatus, error) {
+	ev, err := FromSerializableEvent(ss.SerializableEvent)
+	if err != nil {
+		return nil, err
+	}
 
 	as := &status.AggregateStatus{
 		Event:              ev,
@@ -60,21 +68,24 @@ func FromSerializableStatus(ss *SerializableStatus) *status.AggregateStatus {
 	}
 
 	for k, cs := range ss.ComponentStatuses {
-		as.ComponentStatusMap[k] = FromSerializableStatus(cs)
+		as.ComponentStatusMap[k], err = FromSerializableStatus(cs)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return as
+	return as, nil
 }
 
 // FromSerializableEvent reconstructs a status.Event from SerializableEvent.
-func FromSerializableEvent(se *SerializableEvent) status.Event {
+func FromSerializableEvent(se *SerializableEvent) (status.Event, error) {
 	if se == nil {
-		return nil
+		return nil, nil
 	}
 
-	var err error
+	var evErr error
 	if se.Error != "" {
-		err = errors.New(se.Error)
+		evErr = errors.New(se.Error)
 	}
 
 	statusVal, ok := stringToStatusMap[se.StatusString]
@@ -82,11 +93,19 @@ func FromSerializableEvent(se *SerializableEvent) status.Event {
 		statusVal = componentstatus.StatusNone
 	}
 
-	return &healthCheckEvent{
-		status:    statusVal,
-		timestamp: se.Timestamp,
-		err:       err,
+	attrs := pcommon.NewMap()
+	if len(se.Attributes) > 0 {
+		if err := attrs.FromRaw(se.Attributes); err != nil {
+			return nil, fmt.Errorf("error parsing event attributes: %w", err)
+		}
 	}
+
+	return &healthCheckEvent{
+		status:     statusVal,
+		timestamp:  se.Timestamp,
+		err:        evErr,
+		attributes: attrs,
+	}, nil
 }
 
 // CompareStatuses checks if two AggregateStatuses are equal, excluding timestamp.
@@ -142,9 +161,10 @@ func CompareStatuses(s1, s2 *status.AggregateStatus) bool {
 func AggregateStatus(sts componentstatus.Status, err error) *status.AggregateStatus {
 	return &status.AggregateStatus{
 		Event: &healthCheckEvent{
-			status:    sts,
-			timestamp: time.Now(),
-			err:       err,
+			status:     sts,
+			timestamp:  time.Now(),
+			err:        err,
+			attributes: pcommon.NewMap(),
 		},
 		ComponentStatusMap: make(map[string]*status.AggregateStatus),
 	}
