@@ -1,0 +1,137 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+
+# The lines below are called `modelines`. See `:help modeline`
+# Feel free to remove those if you don't want/need to use them.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+
+builds:
+  - id: elastic-agent-build
+    binary: 'data/elastic-agent-{{ slice .ShortCommit 0 6 }}/elastic-agent'
+    flags:
+      - -buildvcs=false
+    goos:
+      - linux
+      - windows
+      # - darwin
+    goarch:
+      - amd64
+      # - arm64
+    ignore:
+      - goarch: arm64
+        goos: windows
+    env:
+      - CGO_ENABLED=1
+      # complex, templated envs:
+      - >-
+        {{- if eq .Os "darwin" }}
+          {{- if eq .Arch "amd64"}}CC=o64-clang{{- end }}
+          {{- if eq .Arch "arm64"}}CC=oa64-clang{{- end }}
+        {{- end }}
+        {{- if eq .Os "windows" }}
+          {{- if eq .Arch "amd64" }}CC=x86_64-w64-mingw32-gcc{{- end }}
+        {{- end }}
+        {{- if eq .Os "linux" }}
+          {{- if eq .Arch "amd64" }}CC=gcc{{- end }}
+          {{- if eq .Arch "arm64" }}CC=aarch64-linux-gnu-gcc{{- end }}
+        {{- end }}
+      - >-
+        {{- if eq .Os "darwin" }}
+          {{- if eq .Arch "amd64"}}CXX=o64-clang++{{- end }}
+          {{- if eq .Arch "arm64"}}CXX=oa64-clang++{{- end }}
+        {{- end }}
+        {{- if eq .Os "windows" }}
+          {{- if eq .Arch "amd64" }}CXX=x86_64-w64-mingw32-g++{{- end }}
+        {{- end }}
+        {{- if eq .Os "linux" }}
+          {{- if eq .Arch "amd64" }}CXX=g++{{- end }}
+          {{- if eq .Arch "arm64" }}CXX=aarch64-linux-gnu-g++{{- end }}
+        {{- end }}
+# FIXME Prebuilt is a pro-only feature
+#  - id: elastic-agent-prebuilt
+#    builder: prebuilt
+#    goos:
+#      - linux
+#      - windows
+#      # - darwin
+#    goarch:
+#      - amd64
+#      # - arm64
+#    ignore:
+#      - goarch: arm64
+#        goos: windows
+#    prebuilt:
+#      # Path must be the template path to the binaries.
+#      # GoReleaser removes the `dist` directory before running, so you will likely
+#      # want to put the binaries elsewhere.
+#      # This field is required when using the `prebuilt` builder.
+#      path: output/{{ .Os }}/{{ .Arch }}/elastic-agent
+#
+#      # Use 'binary' to set the final name of your binary.
+#      # This is the name that will be used in archives et al.
+#      binary: data/elastic-agent-{{ .ShortCommit }}/elastic-agent
+archives:
+  - formats:
+    - tar.gz
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    wrap_in_directory: true
+    # use zip for windows archives
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+#      - src: commit.txt
+#        dst: .build_hash.txt
+#      - src: commit.txt
+#        dst: .elastic-agent.active.commit
+      - src: dev-tools/licenses/ELASTIC-LICENSE-2.0.txt
+        dst: "LICENSE.txt"
+      - src: "NOTICE.txt"
+      - src: dev-tools/packaging/files/linux/otelcol.sh
+        dst: "data/elastic-agent-{{ slice .ShortCommit 0 6 }}/otelcol"
+      - src: dev-tools/packaging/files/linux/otelcol.sh
+        dst: "otelcol"
+      - src: elastic-agent.reference.yml
+      - dst: elastic-agent.yml
+      - src: otel.yml
+        dst: otel.yml
+      - src: 'internal/pkg/otel/samples/linux/*'
+        dst: otel_samples
+    templated_files:
+      - src: "dev-tools/packaging/templates/common/README.md.tmpl"
+        dst: README.md
+    # Before and after hooks for each archive.
+    # Skipped if archive format is binary.
+    # If multiple formats are set, hooks will be executed for each format.
+    # Extra template fields available: `.Format`.
+    # This feature is only available in GoReleaser Pro.
+    hooks:
+      before:
+        - cmd: "{{.Env.GOPATH}}/bin/mage -v goreleaser:collectComponents"
+          env:
+            - "SNAPSHOT={{.IsSnapshot}}"
+            - "EXTERNAL=true"
+            - "PACKAGES={{.ArtifactExt}}"
+#            - "PLATFORMS={{ .Os }}/{{ .Arch }}"
+            - "PLATFORMS=linux/amd64,windows/amd64"
+release:
+  footer: >-
+
+    ---
+
+    Released by [GoReleaser](https://github.com/goreleaser/goreleaser).

@@ -1,0 +1,34 @@
+ARG GO_VERSION=1.24.1
+ARG BASE_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-main-debian11
+ARG GORELEASER_VERSION="latest"
+
+# Use 'ghcr.io/goreleaser/goreleaser' and 'goreleaser' to default to open-source goreleaser
+ARG GORELEASER_DOCKER_IMAGE="ghcr.io/goreleaser/goreleaser-pro"
+
+FROM ${GORELEASER_DOCKER_IMAGE}:${GORELEASER_VERSION} AS goreleaser
+
+FROM ${BASE_IMAGE}
+ARG GORELEASER_BINARY
+
+# Install some basic dependencies
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y -q \
+    software-properties-common \
+    curl \
+    gnupg2 \
+    openssh-client \
+ && apt -y autoremove \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN go install github.com/magefile/mage@v1.15.0
+
+COPY --from=goreleaser /usr/bin/goreleaser /usr/bin/goreleaser
+
+WORKDIR /src
+
+# Configure workdir to be safe for git operations
+RUN git config --global --add safe.directory /src
+
+ENTRYPOINT ["/usr/bin/goreleaser"]
+
