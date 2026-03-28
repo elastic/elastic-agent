@@ -1,10 +1,14 @@
-# Azure verifier test using default credentials (az login)
+# Azure verifier test using default credentials (az login).
 #
 # Prerequisites:
 #   az login
 #
+# The Azure subscription is discovered automatically at runtime by listing the
+# subscriptions visible to the authenticated principal — no subscription ID is
+# needed in the config.
+#
 # Run with:
-#   AZURE_SUBSCRIPTION_ID=your-subscription-id ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-azure.yaml
+#   ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-azure.yaml
 
 receivers:
   verifier:
@@ -19,7 +23,6 @@ receivers:
       azure:
         credentials:
           use_default_credentials: true
-          subscription_id: "${AZURE_SUBSCRIPTION_ID}"
 
     policies:
       - policy_id: "policy-azure-security"

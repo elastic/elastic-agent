@@ -82,10 +82,22 @@ Permission check: aws/cloudtrail:GetEventSelectors - granted
 
 ## 5. Test with AWS Default Credentials
 
-For local testing with an AWS profile, use the test-aws.yaml config:
+For local testing, use the test-aws.yaml config with any source from the standard AWS SDK
+credential chain (tried in order):
+
+1. Environment variables: `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (+ optional `AWS_SESSION_TOKEN`)
+2. Named profile: set `AWS_PROFILE` to select a profile from `~/.aws/credentials`
+3. ECS container credentials (when running in ECS)
+4. EC2/EKS instance metadata (IMDSv2)
 
 ```bash
-AWS_PROFILE=your-profile ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-aws.yaml
+# Option 1 — environment variables
+AWS_ACCESS_KEY_ID=AKIAxxx AWS_SECRET_ACCESS_KEY=yyy \
+  ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-aws.yaml
+
+# Option 2 — named profile
+AWS_PROFILE=your-profile \
+  ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-aws.yaml
 ```
 
 This verifies CloudTrail, CSPM, and Asset Inventory permissions using the default AWS credential chain.
@@ -110,14 +122,23 @@ This verifies Audit Logs, CSPM, Asset Inventory, Storage, and Pub/Sub permission
 
 ## 7. Test with Azure Default Credentials
 
-For local testing with Azure CLI credentials:
+For local testing, use the test-azure.yaml config with any source from the
+`DefaultAzureCredential` chain (tried in order):
+
+1. Environment variables: `AZURE_CLIENT_ID` + `AZURE_CLIENT_SECRET` + `AZURE_TENANT_ID`
+2. Workload identity (when running in AKS with workload identity enabled)
+3. Managed identity (when running on an Azure VM/App Service)
+4. Azure CLI: `az login`
+5. Azure Developer CLI: `azd auth login`
+
+The Azure subscription is discovered automatically at runtime by listing the subscriptions
+visible to the authenticated principal — no subscription ID needs to be set.
 
 ```bash
-# Authenticate first
+# Authenticate first (if not using env vars or managed identity)
 az login
 
-# Run the test (replace with your subscription ID)
-AZURE_SUBSCRIPTION_ID=your-subscription-id ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-azure.yaml
+./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-azure.yaml
 ```
 
 This verifies Activity Logs, CSPM, Asset Inventory, and Blob Storage permissions.
@@ -141,7 +162,7 @@ receivers:
       azure:
         credentials:
           use_default_credentials: true
-          subscription_id: "${AZURE_SUBSCRIPTION_ID}"
+          # Subscription is discovered automatically — no subscription_id needed
       
       gcp:
         credentials:
