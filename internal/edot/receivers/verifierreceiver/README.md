@@ -119,24 +119,41 @@ receivers:
 
 #### AWS (`providers.aws.credentials`)
 
-| Option | Type | Required | Default | Description |
-|--------|------|----------|---------|-------------|
-| `role_arn` | `string` | Yes* | - | ARN of the IAM role to assume |
-| `external_id` | `string` | Yes* | - | External ID for confused deputy protection |
-| `default_region` | `string` | No | `us-east-1` | Default AWS region for API calls |
-| `use_default_credentials` | `bool` | No | `false` | Use AWS SDK default credential chain (for testing) |
+Two mutually exclusive authentication modes are supported.
 
-*Required when using Identity Federation authentication. Not required if `use_default_credentials` is `true`.
+**Identity Federation (production)**: JWT → `WebIdentityRoleProvider(GlobalRoleARN)` →
+`AssumeRole(RoleARN, ExternalID)`. The AWS account is implicit in `role_arn`.
+
+**Default credentials (testing)**: Uses the standard AWS SDK credential chain in order:
+environment variables (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`),
+`~/.aws/credentials` profile (optionally selected via `AWS_PROFILE`), container credential
+provider (ECS), and EC2/EKS instance metadata service (IMDSv2).
+
+| Option | Type | Mode | Description |
+|--------|------|------|-------------|
+| `role_arn` | `string` | Identity Federation | ARN of the IAM role to assume in the customer account |
+| `external_id` | `string` | Identity Federation | External ID for confused deputy protection |
+| `default_region` | `string` | Both | Default AWS region for API calls (default: `us-east-1`) |
+| `use_default_credentials` | `bool` | Testing | Use AWS SDK default credential chain |
 
 #### Azure (`providers.azure.credentials`)
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `tenant_id` | `string` | Yes* | Azure AD tenant ID |
-| `client_id` | `string` | Yes* | Azure AD application client ID |
-| `client_secret` | `string` | Yes* | Azure AD application secret |
-| `subscription_id` | `string` | No | Azure subscription ID |
-| `use_managed_identity` | `bool` | No | Use Azure Managed Identity |
+Two mutually exclusive authentication modes are supported.
+
+**Identity Federation (production)**: JWT → `ClientAssertionCredential(TenantID, ClientID)` →
+Azure access token. The Azure subscription is discovered automatically at runtime by listing
+the subscriptions visible to the authenticated principal — no subscription ID is needed in config.
+
+**Default credentials (testing)**: `DefaultAzureCredential` chains the following sources in
+order: environment variables (`AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` / `AZURE_TENANT_ID`),
+workload identity, managed identity, Azure CLI (`az login`), and Azure Developer CLI (`azd`).
+The subscription is also discovered automatically at runtime.
+
+| Option | Type | Mode | Description |
+|--------|------|------|-------------|
+| `tenant_id` | `string` | Identity Federation | Azure AD tenant ID |
+| `client_id` | `string` | Identity Federation | Azure AD application client ID |
+| `use_default_credentials` | `bool` | Testing | Use `DefaultAzureCredential` (`az login` / env vars / managed identity) |
 
 #### GCP (`providers.gcp.credentials`)
 
