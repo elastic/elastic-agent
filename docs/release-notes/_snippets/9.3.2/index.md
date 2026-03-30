@@ -15,9 +15,9 @@
   
 * Rename AutoOps usage of deprecated `otlphttp` to `otlp_http`. [#13094](https://github.com/elastic/elastic-agent/pull/13094) 
 * Update OTel Collector components to v0.145.0. [#13103](https://github.com/elastic/elastic-agent/pull/13103) 
-* Add Windows ARM64 platform support. [#9751](https://github.com/elastic/elastic-agent/pull/9751) [#11673](https://github.com/elastic/elastic-agent/pull/11673)
+* Add Windows ARM64 platform support in technical preview. [#9751](https://github.com/elastic/elastic-agent/pull/9751) [#11673](https://github.com/elastic/elastic-agent/pull/11673)
 
-  Elastic Agent for Windows on ARM64 is now available for download. The ARM64 package includes all Elastic Agent components, including Elastic Defend.
+  Elastic Agent for Windows on ARM64 is now available in technical preview. The ARM64 package includes all Elastic Agent components, including Elastic Defend.
 
 ### Fixes [elastic-agent-9.3.2-fixes]
 
