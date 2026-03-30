@@ -281,9 +281,11 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 	t.Log("Check if config files have been redacted.")
 	extractionDir := t.TempDir()
 	extractZipArchive(t, diagZip, extractionDir)
-	configFileNames := []string{
+	fileNames := []string{
 		"pre-config.yaml",
 		"computed-config.yaml",
+		"components-expected.yaml",
+		"components-actual.yaml",
 	}
 
 	var checkRedacted func(any) error
@@ -306,31 +308,6 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 			// ignore other types
 		}
 		return nil
-	}
-
-	for _, fileName := range configFileNames {
-		path := filepath.Join(extractionDir, fileName)
-		stat, err := os.Stat(path)
-		require.NoErrorf(t, err, "stat file %q failed", path)
-		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
-		f, err := os.Open(path)
-		require.NoErrorf(t, err, "open file %q failed", path)
-		defer f.Close()
-
-		var yObj map[string]any
-		err = yaml.NewDecoder(f).Decode(&yObj)
-		require.NoError(t, err)
-
-		err = checkRedacted(yObj)
-		require.NoError(t, err, "file %q has non-redacted values", path)
-	}
-
-	// Verify that Unit.Config is stripped from components diagnostic files
-	// to prevent secret leakage via structpb fields.
-	t.Log("Check that components files have been redacted and do not contain unit config.")
-	componentFileNames := []string{
-		"components-expected.yaml",
-		"components-actual.yaml",
 	}
 
 	checkConfigStripped := func(root map[string]any) error {
@@ -360,8 +337,11 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		return nil
 	}
 
-	for _, fileName := range componentFileNames {
+	for _, fileName := range fileNames {
 		path := filepath.Join(extractionDir, fileName)
+		stat, err := os.Stat(path)
+		require.NoErrorf(t, err, "stat file %q failed", path)
+		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
 		f, err := os.Open(path)
 		require.NoErrorf(t, err, "open file %q failed", path)
 		defer f.Close()
@@ -370,11 +350,15 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		err = yaml.NewDecoder(f).Decode(&yObj)
 		require.NoError(t, err)
 
+		t.Logf("checking redaction for file %q", fileName)
 		err = checkRedacted(yObj)
 		require.NoError(t, err, "file %q has non-redacted values", path)
 
-		err = checkConfigStripped(yObj)
-		require.NoError(t, err, "file %q has unit config that should be stripped", path)
+		if strings.HasPrefix(fileName, "components-") {
+			t.Logf("checking unit config is stripped from file %q", fileName)
+			err = checkConfigStripped(yObj)
+			require.NoError(t, err, "file %q has unit config that should be stripped", path)
+		}
 	}
 }
 
