@@ -6,25 +6,16 @@
 
 package install
 
-import (
-	"os"
-	"path/filepath"
-)
+import "os"
 
 func isBlockingOnExe(_ error) bool {
 	return false
 }
 
-func removeBlockingExe(_ error, _ string) error {
-	return nil
-}
+func scheduleDeleteOnReboot(_ error, _ string) {}
 
 func isRetryableError(_ error) bool {
 	return false
-}
-
-func tempDirOnSameVolume(path string) string {
-	return filepath.Dir(path)
 }
 
 // killNoneChildProcess provides a way of killing a process that is not started as a child of this process.

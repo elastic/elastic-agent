@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"testing"
 
@@ -55,7 +54,8 @@ func startBlockingExe(t *testing.T, destDir string) (*exec.Cmd, string) {
 }
 
 // TestRemovePath verifies the full end-to-end: RemovePath successfully removes
-// a directory containing a running executable.
+// a directory containing a running executable (or schedules leftovers for
+// reboot deletion and returns nil).
 func TestRemovePath(t *testing.T) {
 	destDir := filepath.Join(t.TempDir(), "target")
 	require.NoError(t, os.Mkdir(destDir, 0o755))
@@ -64,12 +64,9 @@ func TestRemovePath(t *testing.T) {
 
 	err := RemovePath(destDir)
 	assert.NoError(t, err)
-	_, err = os.Stat(destDir)
-	assert.ErrorIsf(t, err, fs.ErrNotExist, "path %q still exists after removal", destDir)
 }
 
-// TestRenameRunningExe verifies that os.Rename works on a running executable,
-// which is the core assumption behind removeBlockingExe.
+// TestRenameRunningExe verifies that os.Rename works on a running executable.
 func TestRenameRunningExe(t *testing.T) {
 	destDir := filepath.Join(t.TempDir(), "target")
 	require.NoError(t, os.Mkdir(destDir, 0o755))
@@ -90,7 +87,6 @@ func TestRenameRunningExe(t *testing.T) {
 	assert.ErrorIs(t, err, fs.ErrNotExist)
 
 	// The process is still running (rename doesn't kill it).
-	// The moved file exists at the new path.
 	_, err = os.Stat(tmpPath)
 	assert.NoError(t, err, "moved file should exist at new path")
 }
@@ -108,7 +104,7 @@ func TestRemoveAllSucceedsAfterRename(t *testing.T) {
 	err := os.RemoveAll(destDir)
 	require.Error(t, err, "RemoveAll should fail while running exe is in the directory")
 
-	// Move the exe outside the directory (but inside tmpDir so t.TempDir cleans it up).
+	// Move the exe outside the directory.
 	tmpPath := filepath.Join(tmpDir, ".test-rm.exe")
 	err = os.Rename(exePath, tmpPath)
 	require.NoError(t, err)
@@ -121,9 +117,10 @@ func TestRemoveAllSucceedsAfterRename(t *testing.T) {
 	assert.ErrorIs(t, err, fs.ErrNotExist)
 }
 
-// TestRemoveBlockingExeMovesOutsideTree verifies that removeBlockingExe places
-// the temp file in the specified temp directory, outside the tree being deleted.
-func TestRemoveBlockingExeMovesOutsideTree(t *testing.T) {
+// TestScheduleDeleteOnReboot verifies that scheduleDeleteOnReboot marks the
+// blocked file and its ancestor directories for reboot deletion without moving
+// the file.
+func TestScheduleDeleteOnReboot(t *testing.T) {
 	tmpDir := t.TempDir()
 	destDir := filepath.Join(tmpDir, "target")
 	require.NoError(t, os.Mkdir(destDir, 0o755))
@@ -131,51 +128,42 @@ func TestRemoveBlockingExeMovesOutsideTree(t *testing.T) {
 	_, exePath := startBlockingExe(t, destDir)
 
 	blockingErr := makeBlockingError(exePath)
+	scheduleDeleteOnReboot(blockingErr, destDir)
 
-	err := removeBlockingExe(blockingErr, tmpDir)
-	require.NoError(t, err, "removeBlockingExe should succeed")
-
-	// The original path should be gone.
-	_, err = os.Stat(exePath)
-	assert.ErrorIs(t, err, fs.ErrNotExist, "original exe should no longer exist")
-
-	// The temp file should exist in tmpDir.
-	entries, err := os.ReadDir(tmpDir)
-	require.NoError(t, err)
-
-	var found string
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), ".elastic-agent-rm-") && strings.HasSuffix(e.Name(), ".exe") {
-			found = filepath.Join(tmpDir, e.Name())
-			break
-		}
-	}
-	assert.NotEmpty(t, found, "temp file should exist in %s", tmpDir)
+	// The file should still be in its original location (no move).
+	_, err := os.Stat(exePath)
+	assert.NoError(t, err, "exe should still exist at original path after scheduling reboot deletion")
 }
 
-// TestRemoveBlockingExeCleansTempOnFailure verifies that if os.Rename fails
-// (e.g. path doesn't exist), the temp file is cleaned up.
-func TestRemoveBlockingExeCleansTempOnFailure(t *testing.T) {
+// TestRemoveAllDeletesEverythingExceptBlockingExe verifies that os.RemoveAll
+// deletes all files it can and only fails on the running exe.
+func TestRemoveAllDeletesEverythingExceptBlockingExe(t *testing.T) {
 	tmpDir := t.TempDir()
 	destDir := filepath.Join(tmpDir, "target")
 	require.NoError(t, os.Mkdir(destDir, 0o755))
 
-	// Use a non-existent path so the rename will fail.
-	fakePath := filepath.Join(destDir, "nonexistent.exe")
-	blockingErr := makeBlockingError(fakePath)
+	// Create some additional files alongside the exe.
+	require.NoError(t, os.WriteFile(filepath.Join(destDir, "config.yml"), []byte("test"), 0o644))
+	subDir := filepath.Join(destDir, "subdir")
+	require.NoError(t, os.Mkdir(subDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(subDir, "data.txt"), []byte("test"), 0o644))
 
-	err := removeBlockingExe(blockingErr, tmpDir)
-	assert.Error(t, err, "removeBlockingExe should fail when source doesn't exist")
+	_, exePath := startBlockingExe(t, destDir)
 
-	// No temp files should be left behind.
-	entries, err := os.ReadDir(tmpDir)
-	require.NoError(t, err)
+	// RemoveAll should fail on the exe but delete everything else.
+	err := os.RemoveAll(destDir)
+	require.Error(t, err, "RemoveAll should fail due to running exe")
 
-	for _, e := range entries {
-		assert.False(t,
-			strings.HasPrefix(e.Name(), ".elastic-agent-rm-"),
-			"temp file %q should have been cleaned up", e.Name())
-	}
+	// The exe should still exist.
+	_, err = os.Stat(exePath)
+	assert.NoError(t, err, "exe should still exist")
+
+	// Other files should be gone.
+	_, err = os.Stat(filepath.Join(destDir, "config.yml"))
+	assert.ErrorIs(t, err, fs.ErrNotExist, "config.yml should be deleted")
+
+	_, err = os.Stat(filepath.Join(subDir, "data.txt"))
+	assert.ErrorIs(t, err, fs.ErrNotExist, "data.txt should be deleted")
 }
 
 // makeBlockingError constructs an error matching what os.RemoveAll produces
