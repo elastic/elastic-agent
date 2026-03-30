@@ -197,12 +197,12 @@ func isNodeReady(node *kubernetes.Node) bool {
 func generateNodeData(node *kubernetes.Node, kubeMetaGen metadata.MetaGen) *nodeData {
 	host := getAddress(node)
 
-	// If a node doesn't have an IP then dont monitor it
+	// If a node doesn't have an IP, then don't monitor it
 	if host == "" {
 		return nil
 	}
 
-	// If the node is not in ready state then dont monitor it
+	// If the node is not in a ready state, then don't monitor it
 	if !isNodeReady(node) {
 		return nil
 	}

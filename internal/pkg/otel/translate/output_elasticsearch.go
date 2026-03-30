@@ -18,7 +18,6 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
-	"github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 )
@@ -56,13 +55,13 @@ var defaultOptions = esToOTelOptions{
 
 // ESToOTelConfig converts a Beat config into OTel elasticsearch exporter config
 // Note: This method may override output queue settings defined by user.
-func ESToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error) {
+func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string]any, map[string]any, error) {
 	escfg := defaultOptions
 
 	// check for unsupported config
 	err := checkUnsupportedConfig(output)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// apply preset here
@@ -73,7 +72,7 @@ func ESToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, erro
 		// were overridden
 		overriddenFields, presetConfig, err := elasticsearch.ApplyPreset(preset, output)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		logger.Infof("Applying performance preset '%v': %v",
 			preset, config.DebugString(presetConfig, false))
@@ -84,7 +83,7 @@ func ESToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, erro
 	unpackedMap := make(map[string]any)
 	// unpack and validate ES config
 	if err := output.Unpack(&unpackedMap); err != nil {
-		return nil, fmt.Errorf("failed unpacking config. %w", err)
+		return nil, nil, fmt.Errorf("failed unpacking config. %w", err)
 	}
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -94,21 +93,21 @@ func ESToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, erro
 		DecodeHook:      cfgDecodeHookFunc(),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed creating decoder. %w", err)
+		return nil, nil, fmt.Errorf("failed creating decoder. %w", err)
 	}
 
 	err = decoder.Decode(&unpackedMap)
 	if err != nil {
-		return nil, fmt.Errorf("failed decoding config. %w", err)
+		return nil, nil, fmt.Errorf("failed decoding config. %w", err)
 	}
 
 	if err := escfg.Validate(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	hosts, err := getURL(escfg, output)
 	if err != nil {
-		return nil, fmt.Errorf("error creating hosts:%w", err)
+		return nil, nil, fmt.Errorf("error creating hosts:%w", err)
 	}
 	otelYAMLCfg := map[string]any{
 		"endpoints": hosts, // hosts, protocol, path, port
@@ -122,7 +121,7 @@ func ESToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, erro
 
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
-				"flush_timeout": "10s",
+				"flush_timeout": getFlushTimeout(logger, output),
 				"max_size":      escfg.BulkMaxSize, // bulk_max_size
 				"min_size":      0,                 // 0 means immediately trigger a flush
 				"sizer":         "items",
@@ -164,7 +163,7 @@ func ESToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, erro
 	// proxy_url, proxy_headers, proxy_disable are handled by beatsauthextension https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/beatsauthextension
 	// caller of this method should take care of integrating the extension
 
-	return otelYAMLCfg, nil
+	return otelYAMLCfg, nil, nil
 }
 
 // getTotalNumWorkers returns the number of hosts that beats would
@@ -240,7 +239,7 @@ func checkUnsupportedConfig(cfg *config.C) error {
 	} else if value, err := cfg.Bool("allow_older_versions", -1); err == nil && !value {
 		return fmt.Errorf("allow_older_versions:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if value, err := cfg.Bool("loadbalance", -1); err == nil && !value {
-		return fmt.Errorf("ladbalance:false is currently not supported: %w", errors.ErrUnsupported)
+		return fmt.Errorf("loadbalance:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("non_indexable_policy") {
 		return fmt.Errorf("non_indexable_policy is currently not supported: %w", errors.ErrUnsupported)
 	} else if val, err := cfg.Int("max_retries", -1); err == nil && val < 0 {
@@ -248,13 +247,4 @@ func checkUnsupportedConfig(cfg *config.C) error {
 	}
 
 	return nil
-}
-
-func getQueueSize(logger *logp.Logger, output *config.C) int {
-	size, err := output.Int("queue.mem.events", -1)
-	if err != nil {
-		logger.Debugf("Failed to get queue size: %v", err)
-		return memqueue.DefaultEvents // return default queue.mem.events for sending_queue in case of an errr
-	}
-	return int(size)
 }

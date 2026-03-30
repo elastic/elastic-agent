@@ -64,6 +64,7 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 		},
 		Output: map[string]string{
 			"logstash": string(ProcessRuntimeManager), // Force all inputs using the Logstash output to use the process runtime
+			"kafka":    string(ProcessRuntimeManager), // Force all inputs using the kafka output to use the process runtime
 		},
 	}
 }
@@ -96,7 +97,7 @@ func (r *RuntimeConfig) Validate() error {
 		}
 	}
 
-	allowedOutput := []string{"elasticsearch", "logstash"}
+	allowedOutput := []string{"elasticsearch", "logstash", "kafka"}
 	for name, runtime := range r.Output {
 		if !slices.Contains(allowedOutput, name) {
 			return fmt.Errorf("%s output is not supported", name)
@@ -374,6 +375,17 @@ func (c *Component) BeatName() string {
 		return c.InputSpec.BeatName()
 	}
 	return ""
+}
+
+// OutputUnit returns the first output unit among c.Units, if any.
+// Agent-built components normally have at most one output unit; if several are present, the first is returned.
+func (c *Component) OutputUnit() (Unit, bool) {
+	for _, u := range c.Units {
+		if u.Type == client.UnitTypeOutput {
+			return u, true
+		}
+	}
+	return Unit{}, false
 }
 
 // GetBeatInputIDForUnit returns the ID of the corresponding input or module in the beat configuration for the unit.

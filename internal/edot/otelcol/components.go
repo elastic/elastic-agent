@@ -13,6 +13,8 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 	"go.opentelemetry.io/collector/service/telemetry/otelconftelemetry"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
 	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
@@ -24,7 +26,6 @@ import (
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
 	iisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/iisreceiver"
 	jaegerreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver"
-	jmxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
 	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
@@ -72,6 +73,7 @@ import (
 
 	elasticapmprocessor "github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor"
 	elastictraceprocessor "github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
+	"github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
@@ -149,9 +151,8 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
 			elasticmonitoringreceiver.NewFactory(),
-			fbreceiver.NewFactory(),
-			mbreceiver.NewFactory(),
-			jmxreceiver.NewFactory(), // deprecated, will be removed in 9.4.0
+			fbreceiver.NewFactoryWithSettings(fbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
+			mbreceiver.NewFactoryWithSettings(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
@@ -202,6 +203,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			memorylimiterprocessor.NewFactory(),
 			elasticapmprocessor.NewFactory(),
 			elastictraceprocessor.NewFactory(), // deprecated, will be removed in future
+			ratelimitprocessor.NewFactory(),
 			tailsamplingprocessor.NewFactory(),
 			logdedupprocessor.NewFactory(),
 			beatprocessor.NewFactory(),
