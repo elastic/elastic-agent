@@ -6,6 +6,7 @@ package install
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -228,4 +229,31 @@ func TestSetupInstallPath(t *testing.T) {
 	require.NoError(t, err)
 	markerFilePath := filepath.Join(tmpdir, paths.MarkerFileName)
 	require.FileExists(t, markerFilePath)
+}
+
+func TestSetupInstallPathCleansUpPreviousInstall(t *testing.T) {
+	tmpdir := t.TempDir()
+	topPath := filepath.Join(tmpdir, "Elastic", "Agent")
+
+	// Simulate leftover files from a previous installation.
+	require.NoError(t, os.MkdirAll(filepath.Join(topPath, "data", "elastic-agent-old"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(topPath, "data", "elastic-agent-old", "elastic-agent.exe"), []byte("old binary"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(topPath, "some-config.yml"), []byte("old config"), 0o644))
+
+	ownership, err := utils.CurrentFileOwner()
+	require.NoError(t, err)
+
+	err = setupInstallPath(topPath, ownership)
+	require.NoError(t, err)
+
+	// The install marker should exist (fresh install).
+	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
+	require.FileExists(t, markerFilePath)
+
+	// Leftover files from the previous installation should be gone.
+	_, err = os.Stat(filepath.Join(topPath, "data"))
+	assert.ErrorIs(t, err, fs.ErrNotExist, "leftover data directory should be removed")
+
+	_, err = os.Stat(filepath.Join(topPath, "some-config.yml"))
+	assert.ErrorIs(t, err, fs.ErrNotExist, "leftover config file should be removed")
 }

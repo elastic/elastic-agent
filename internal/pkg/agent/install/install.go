@@ -209,6 +209,14 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt Pr
 
 // setup the basic topPath, and the .installed file
 func setupInstallPath(topPath string, ownership utils.FileOwner) error {
+	// Clean up any remnants from a previous installation. On Windows,
+	// uninstall may leave behind the running executable (scheduled for
+	// deletion on reboot via MoveFileEx). By the time a new install runs
+	// the old process is gone, so these files can now be deleted normally.
+	if err := os.RemoveAll(topPath); err != nil {
+		return errors.New(err, fmt.Sprintf("failed to clean up previous installation at (%s)", topPath), errors.M("directory", topPath))
+	}
+
 	// ensure parent directory exists
 	err := os.MkdirAll(filepath.Dir(topPath), 0755)
 	if err != nil {
