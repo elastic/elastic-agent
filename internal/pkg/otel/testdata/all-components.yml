@@ -49,6 +49,7 @@ processors:
     limit_mib: 4000
     spike_limit_mib: 800
   elasticapm:
+  ratelimit:
   tail_sampling:
   logdedup:
   beat:
