@@ -128,7 +128,7 @@ These components are included in EDOT Collector version 9.3.2.
 - Using the Sarama client (i.e. opting out of the `exporter.kafkaexporter.UseFranzGo` feature gate is not supported)
 - Partitioning configuration (i.e. `partition_*` options).
 
-[^2]: Deprecated in 9.3.1. JMX Scraper is recommened to run as a standalone Java program. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
+[^2]: Deprecated in 9.3.1. JMX Scraper is recommended to run as a standalone Java program. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
 
 [^3]: The following features and configuration options are **NOT** officially supported in the EDOT Collector with the Kafka receiver:
 - Encoding options other than `otlp_proto` or `otlp_json`
