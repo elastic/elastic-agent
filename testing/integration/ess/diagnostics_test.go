@@ -333,7 +333,7 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		"components-actual.yaml",
 	}
 
-	checkComponentRedacted := func(root map[string]any) error {
+	checkConfigStripped := func(root map[string]any) error {
 		comps, ok := root["components"].([]any)
 		if !ok {
 			return nil
@@ -373,7 +373,7 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		err = checkRedacted(yObj)
 		require.NoError(t, err, "file %q has non-redacted values", path)
 
-		err = checkComponentRedacted(yObj)
+		err = checkConfigStripped(yObj)
 		require.NoError(t, err, "file %q has unit config that should be stripped", path)
 	}
 }
