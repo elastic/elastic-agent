@@ -57,3 +57,20 @@ func IsZombie(pid int) bool {
 	}
 	return s[idx+2] == 'Z'
 }
+
+// IsReaped returns true if the process with the given PID has fully exited
+// and is not a zombie. On Unix, os.FindProcess always succeeds (it just wraps
+// the PID without checking the process table), so we use Signal(0) for the
+// actual liveness check, then check /proc for zombie state.
+func IsReaped(pid int) bool {
+	proc, err := os.FindProcess(pid)
+	if err != nil || proc == nil {
+		return true // can't find -> treat as reaped
+	}
+	if proc.Signal(syscall.Signal(0)) != nil {
+		return true // can't signal -> fully reaped
+	}
+	// Signal(0) succeeds for both alive and zombie processes on Linux.
+	// Either way the process is not reaped.
+	return false
+}

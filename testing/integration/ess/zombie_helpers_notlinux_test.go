@@ -8,10 +8,6 @@ package ess
 
 import "testing"
 
-func assertProcessGone(t *testing.T, pid int) {
-	t.Helper()
-}
-
 func cleanupProcess(t *testing.T, pid int) {
 	t.Helper()
 }

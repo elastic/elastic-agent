@@ -27,6 +27,7 @@ import (
 
 	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -2294,10 +2295,7 @@ func (suite *FakeInputSuite) TestManager_NoZombieOnShutdownAfterMissedCheckins()
 	require.NoError(t, err)
 
 	// Give a short time for the process to be fully reaped.
-	time.Sleep(500 * time.Millisecond)
-
-	// Verify the process has been properly reaped (not a zombie).
-	assertProcessReaped(t, runningPID)
+	require.Eventually(t, func() bool { return process.IsReaped(runningPID) }, process.KillReapTime, 100*time.Millisecond, "Process may still be running as a zombie")
 }
 
 func (suite *FakeInputSuite) TestManager_InvalidAction() {

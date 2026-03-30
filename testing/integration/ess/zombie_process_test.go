@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -114,5 +115,5 @@ func TestNoZombieOnAgentShutdown(t *testing.T) {
 	// Give a brief moment for any pending process cleanup.
 	time.Sleep(500 * time.Millisecond)
 
-	assertProcessGone(t, componentPID)
+	require.Truef(process.IsReaped(componentPID), "Process %d has not been reaped", componentPID)
 }

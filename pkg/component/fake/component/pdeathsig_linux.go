@@ -8,9 +8,9 @@ package main
 
 import "golang.org/x/sys/unix"
 
-// clearPdeathsig clears the parent-death signal so this process survives its
-// parent exiting. Used in tests to verify the agent actively kills components
-// during shutdown rather than relying on Pdeathsig.
+// clearPdeathsig clears the parent-death signal (Pdeathsig) so this process
+// survives its parent exiting. Used in tests to verify the agent actively
+// kills components during shutdown rather than relying on Pdeathsig.
 func clearPdeathsig() {
 	_ = unix.Prctl(unix.PR_SET_PDEATHSIG, 0, 0, 0, 0)
 }

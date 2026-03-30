@@ -232,17 +232,11 @@ type VarsManager interface {
 // minManagerShutdownTimeout is the minimum timeout used when no components are running.
 const minManagerShutdownTimeout = 5 * time.Second
 
-// processManagerStopTimeout is the typical SIGTERM-to-SIGKILL window used by process
-// managers (systemd, Kubernetes, etc.). Component stop timeouts exceeding this may
-// be ineffective because the agent could be killed before components finish shutting down.
-// Set to 30s to be consistent with default Windows stop timeout.
-const processManagerStopTimeout = 30 * time.Second
-
 // managerShutdownTimeoutForComponents computes the manager shutdown timeout based on passed components.
 // It returns the maximum stop timeout across all command components plus a buffer,
-// capped at processManagerStopTimeout so the agent exits before external process
+// capped at runtime.ProcessStopTimeout so the agent exits before external process
 // managers (systemd, Kubernetes, etc.) forcibly kill it.
-// Emits a warning log if a component's stop timeout exceeds processManagerStopTimeout.
+// Emits a warning log if a component's stop timeout exceeds runtime.ProcessStopTimeout.
 func managerShutdownTimeoutForComponents(log *logger.Logger, components []component.Component) time.Duration {
 	var maxTimeout time.Duration
 	for _, comp := range components {
@@ -250,10 +244,10 @@ func managerShutdownTimeoutForComponents(log *logger.Logger, components []compon
 			continue
 		}
 		stopTimeout := comp.InputSpec.Spec.Command.Timeouts.Stop
-		if stopTimeout > processManagerStopTimeout && log != nil {
+		if stopTimeout > runtime.ProcessStopTimeout && log != nil {
 			log.Warnf("component %s has stop timeout %s which exceeds the typical process manager limit of %s; "+
 				"the agent may be terminated before the component fully shuts down",
-				comp.ID, stopTimeout, processManagerStopTimeout)
+				comp.ID, stopTimeout, runtime.ProcessStopTimeout)
 		}
 		if stopTimeout > maxTimeout {
 			maxTimeout = stopTimeout
@@ -263,8 +257,8 @@ func managerShutdownTimeoutForComponents(log *logger.Logger, components []compon
 		return minManagerShutdownTimeout
 	}
 	timeout := maxTimeout + runtime.ShutdownBuffer
-	if timeout > processManagerStopTimeout {
-		return processManagerStopTimeout
+	if timeout > runtime.ProcessStopTimeout {
+		return runtime.ProcessStopTimeout
 	}
 	return timeout
 }

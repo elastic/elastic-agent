@@ -54,3 +54,7 @@ func isWindowsProcessExited(pid int) bool {
 
 	return ec != exitCodeStillActive
 }
+
+func IsReaped(pid int) bool {
+	return isWindowsProcessExited(pid)
+}

@@ -1901,7 +1901,7 @@ func TestManagerShutdownTimeoutForComponents(t *testing.T) {
 
 	t.Run("command component with default 30s stop timeout is capped", func(t *testing.T) {
 		got := managerShutdownTimeoutForComponents(nil, []component.Component{makeCommandComponent(30 * time.Second)})
-		assert.Equal(t, processManagerStopTimeout, got, "30s + 5s buffer = 35s, capped at 30s")
+		assert.Equal(t, runtime.ProcessStopTimeout, got, "30s + 5s buffer = 35s, capped at 30s")
 	})
 
 	t.Run("mix of command and service components uses command max", func(t *testing.T) {

@@ -49,6 +49,25 @@ func (m actionMode) String() string {
 	return ""
 }
 
+const (
+	// ShutdownBuffer is the time reserved for SIGKILL delivery, process reaping,
+	// and coordinator shutdown overhead. The SIGTERM grace period is reduced by
+	// this amount so the entire cleanup completes before external process managers
+	// (systemd, Kubernetes) forcibly kill the agent.
+	ShutdownBuffer = 5 * time.Second
+
+	// ProcessStopTimeout is the maximum time to wait for a component to stop
+	// before escalating to SIGKILL. ShutdownBuffer time is removed from stop
+	// time so the process may be killed and reaped within this value. Value
+	// was chosen to reflect external process manager defaults (systemd: 90s,
+	// k8s: 30s, windows: 30s).
+	ProcessStopTimeout = 30 * time.Second
+
+	// minGraceTimeout is the minimum SIGTERM grace period when the configured
+	// stop timeout minus ShutdownBuffer would be zero or negative.
+	minGraceTimeout = 1 * time.Second
+)
+
 type MonitoringManager interface {
 	// EnrichArgs enriches arguments provided to application, in
 	// order to enable monitoring of a component.Component identified
@@ -462,28 +481,12 @@ func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 	}()
 }
 
-// ShutdownBuffer is the time reserved for SIGKILL delivery, process reaping,
-// and coordinator shutdown overhead. The SIGTERM grace period is reduced by
-// this amount so the entire cleanup completes before external process managers
-// (systemd, Kubernetes) forcibly kill the agent.
-const ShutdownBuffer = 5 * time.Second
-
-// processStopTimeout is the maximum time to wait for a component to stop
-// before escalating to SIGKILL. Chosen to complete before external process
-// managers (systemd default: 90s, Kubernetes default: 30s) forcibly kill
-// the agent.
-const processStopTimeout = 30 * time.Second
-
-// minGraceTimeout is the minimum SIGTERM grace period when the configured
-// stop timeout minus ShutdownBuffer would be zero or negative.
-const minGraceTimeout = 1 * time.Second
-
 // waitOrKill waits for the process to exit after SIGTERM.
 // If the process does not exit within the grace period, it sends SIGKILL
 // to force termination. An unresponsive process should be killed and
-// reaped within processStopTimeout.
+// reaped within ProcessStopTimeout.
 func (c *commandRuntime) waitOrKill() {
-	stopTimeout := processStopTimeout
+	stopTimeout := ProcessStopTimeout
 	if cmdSpec := c.getCommandSpec(); cmdSpec != nil && cmdSpec.Timeouts.Stop > 0 {
 		stopTimeout = cmdSpec.Timeouts.Stop
 	}

@@ -28,3 +28,14 @@ func externalProcess(proc *os.Process) {
 		}
 	}
 }
+
+// IsReaped returns true if the process with the given PID has fully exited.
+// On Unix, os.FindProcess always succeeds (it just wraps the PID without
+// checking the process table), so we use Signal(0) for the actual check.
+func IsReaped(pid int) bool {
+	proc, err := os.FindProcess(pid)
+	if err != nil || proc == nil {
+		return true // can't find -> treat as reaped
+	}
+	return proc.Signal(syscall.Signal(0)) != nil
+}
