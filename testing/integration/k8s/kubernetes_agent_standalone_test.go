@@ -1247,8 +1247,7 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 }
 
 // k8sStepHelmTemplateApply mimics "helm template" followed by "kubectl apply":
-// it renders the chart to manifests (no Helm release metadata) and applies them directly.
-// Cleanup deletes the applied objects; there is no helm uninstall since no release exists.
+// it renders the chart to manifests and applies them directly.
 func k8sStepHelmTemplateApply(chartPath string, releaseName string, values map[string]any) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		settings := cli.New()
@@ -1278,13 +1277,6 @@ func k8sStepHelmTemplateApply(chartPath string, releaseName string, values map[s
 		release, err := installAction.Run(helmChart, values)
 		require.NoError(t, err, "failed to render helm chart")
 
-		// Helm includes documents that are just "# Source: ..." comments; filter those out
-		// since they lack Kind and cause the k8s decoder to fail.
-		// filteredManifest := filterHelmManifestToK8sResources(release.Manifest)
-		// Reorder so Secrets and Jobs (e.g. cert) are applied before Deployments that
-		// depend on them; avoids FailedMount on the operator pod.
-		// filteredManifest = orderHelmManifestForApply(filteredManifest)
-
 		// Use kubectl apply -f to apply the manifest.
 		manifestFile, err := os.CreateTemp("", "helm-template-*.yaml")
 		require.NoError(t, err, "failed to create temp manifest file")
@@ -1306,18 +1298,6 @@ func k8sStepHelmTemplateApply(chartPath string, releaseName string, values map[s
 		t.Cleanup(func() {
 			if t.Failed() {
 				k8sDumpPods(t, ctx, kCtx.client, t.Name(), namespace, kCtx.logsBasePath, kCtx.createdAt)
-				// Kubectl diagnostics when template+apply test fails
-				t.Logf("=== kubectl diagnostics for namespace %s ===", namespace)
-				for _, args := range [][]string{
-					{"get", "pods", "-n", namespace, "-o", "wide"},
-					{"get", "events", "-n", namespace, "--sort-by=.lastTimestamp"},
-					{"get", "secrets", "-n", namespace},
-				} {
-					cmd := exec.CommandContext(ctx, "kubectl", args...)
-					if out, err := cmd.CombinedOutput(); err == nil {
-						t.Logf("kubectl %s:\n%s", strings.Join(args, " "), string(out))
-					}
-				}
 			}
 			// kubectl delete -f to remove all applied resources
 			delCmd := exec.CommandContext(ctx, "kubectl", "delete", "-f", manifestPath, "--ignore-not-found", "--wait", "--timeout=120s")
