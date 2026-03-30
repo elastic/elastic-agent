@@ -9,19 +9,16 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: bug-fix
+kind: enhancement
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Fix an issue where some components could be missing from the status output
+summary: update otel to v1.54.0/v0.148.0
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: >
-  In some cases, a late update from an older component instance could overwrite a newer state. 
-  This could cause components to be missing from the status output.
-  With this fix, updates from older instances are ignored if a newer update has already been processed.
+# description:
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:

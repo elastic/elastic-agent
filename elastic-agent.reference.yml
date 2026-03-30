@@ -91,6 +91,9 @@ inputs:
 
 # fleet:
 #   access_api_key: ""
+#   checkin:
+#     # compression sets the compression algorithm for checkin requests one of ["gzip", "none"] (default: "gzip").
+#     compression: gzip
 #   kibana:
 #     # kibana minimal configuration
 #     hosts: ["localhost:5601"]
