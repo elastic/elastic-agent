@@ -557,6 +557,8 @@ github.com/elastic/opentelemetry-collector-components/processor/elastictraceproc
 github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.36.0/go.mod h1:1fk3Ep2+JVVn/ouVBRo2GNJ9LK0EDyLaRWh21rstnbI=
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.36.0 h1:j4VdbbNED7AyDWBqljFERuePvFn+M2gJy8RCA2GOKxE=
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.36.0/go.mod h1:If0vFEicCSQ/OpZPyRdLtrD7ir2y31A/0C0lgDdv59E=
+github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.36.0 h1:ZFY/5h1oACW626xnZyA5Q/xS+JGL9TToidVRG5nzd7Q=
+github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.36.0/go.mod h1:d+f/D67mQaXK6neermpiciyLys6VtohAKe5Y0yu3/yg=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.36.0 h1:NNt/FdqZMpGzQhgxTuuU5Br8YF4yaLMsPjGNJJG42+U=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.36.0/go.mod h1:x2A/bMl+CfzRYPxJ/lKorpXTR8JKjxsdQwEDjDnu630=
 github.com/elastic/opentelemetry-lib v0.33.0 h1:AZWMT0enMUXnkD0P8ieidDnaYtWZr9yQt6TO01BKhNI=
