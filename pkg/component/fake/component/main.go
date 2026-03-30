@@ -32,6 +32,9 @@ func main() {
 	_ = fs.Parse(os.Args[1:])
 
 	if *noPdeathsig {
+		// Clear the Pdeathsig (SIGKILL on parent death) set by cmd_linux.go:33.
+		// Without this, the kernel auto-kills the child when the agent exits,
+		// preventing us from testing the agent's active cleanup path.
 		clearPdeathsig()
 	}
 
@@ -58,6 +61,10 @@ func run(ignoreSIGTERM bool) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	n := make(chan os.Signal, 1)
 	if ignoreSIGTERM {
+		// Ignore SIGTERM so the agent's graceful stop (SIGTERM) has no effect,
+		// forcing it to escalate to SIGKILL. This tests the SIGKILL + reap path.
+		// Note: this is independent of clearPdeathsig above — Pdeathsig handles
+		// automatic parent-death signals, while this handles explicit stop signals.
 		signal.Ignore(syscall.SIGTERM)
 		signal.Notify(n, syscall.SIGINT, syscall.SIGQUIT)
 	} else {

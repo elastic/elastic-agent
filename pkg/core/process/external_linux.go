@@ -21,8 +21,9 @@ func externalProcess(proc *os.Process) {
 		return
 	}
 
-	for {
-		<-time.After(1 * time.Second)
+	ticker := time.NewTicker(externalPollInterval)
+	defer ticker.Stop()
+	for range ticker.C {
 		if proc.Signal(syscall.Signal(0)) != nil {
 			// failed to contact process, return
 			return
@@ -30,20 +31,20 @@ func externalProcess(proc *os.Process) {
 		// On Linux, Signal(0) succeeds for zombie processes because
 		// they still have a PID entry in the process table.
 		// Check /proc/<pid>/stat to detect zombie state.
-		if isZombie(proc.Pid) {
+		if IsZombie(proc.Pid) {
 			return
 		}
 	}
 }
 
-// isZombie checks if the process with the given PID is in zombie state
+// IsZombie checks if the process with the given PID is in zombie state
 // by reading /proc/<pid>/stat. The format is:
 //
 //	<pid> (<comm>) <state> ...
 //
 // where <state> is a single character. 'Z' indicates zombie state.
 // We use LastIndex for ") " to handle process names containing parentheses.
-func isZombie(pid int) bool {
+func IsZombie(pid int) bool {
 	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
 	if err != nil {
 		// Can't read proc entry (process may have been fully reaped)

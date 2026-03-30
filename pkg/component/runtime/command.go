@@ -468,14 +468,22 @@ func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 // (systemd, Kubernetes) forcibly kill the agent.
 const ShutdownBuffer = 5 * time.Second
 
-// killReapTime is timeout after a SIGKILL is sent to wait for the process to be reaped.
-const killReapTime = 3 * time.Second
+// processStopTimeout is the maximum time to wait for a component to stop
+// before escalating to SIGKILL. Chosen to complete before external process
+// managers (systemd default: 90s, Kubernetes default: 30s) forcibly kill
+// the agent.
+const processStopTimeout = 30 * time.Second
 
-// waitOrKill waits after a SIGTERM for the process to be stopped.
-// if process takes too long to exit it sends SIGKILL to force termination.
-// An unresponsive process should be killed and reaped within 30s.
+// minGraceTimeout is the minimum SIGTERM grace period when the configured
+// stop timeout minus ShutdownBuffer would be zero or negative.
+const minGraceTimeout = 1 * time.Second
+
+// waitOrKill waits for the process to exit after SIGTERM.
+// If the process does not exit within the grace period, it sends SIGKILL
+// to force termination. An unresponsive process should be killed and
+// reaped within processStopTimeout.
 func (c *commandRuntime) waitOrKill() {
-	stopTimeout := 30 * time.Second
+	stopTimeout := processStopTimeout
 	if cmdSpec := c.getCommandSpec(); cmdSpec != nil && cmdSpec.Timeouts.Stop > 0 {
 		stopTimeout = cmdSpec.Timeouts.Stop
 	}
@@ -483,7 +491,7 @@ func (c *commandRuntime) waitOrKill() {
 	// Remove some time as a buffer for SIGKILL + overhead if unresponsive
 	graceTimeout := stopTimeout - ShutdownBuffer
 	if graceTimeout <= 0 {
-		graceTimeout = 1 * time.Second
+		graceTimeout = minGraceTimeout
 	}
 
 	// Wait for the process to exit gracefully
@@ -501,7 +509,7 @@ func (c *commandRuntime) waitOrKill() {
 
 	// Drain procCh so the startWatcher goroutine can complete and
 	// os.Process.Wait() reaps the child.
-	reapTimer := time.NewTimer(killReapTime)
+	reapTimer := time.NewTimer(process.KillReapTime)
 	defer reapTimer.Stop()
 	select {
 	case <-c.procCh:
