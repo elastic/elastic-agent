@@ -84,7 +84,127 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 		}
 	}
 
+<<<<<<< Updated upstream
 	return kafkaExporter, nil
+=======
+	// compiles topic and validates against any malformed strings
+	fmtstr, err := fmtstr.CompileEvent(kConfig.Topic)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not parse topic: %w", err)
+	}
+
+	if !fmtstr.IsConst() {
+		kafkaExporter["topic_from_attribute"] = "topic"
+		processor, err := dynamicTopicSetterProcessor(kConfig.Topic, outputName)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error translating kafka topic: %w", err)
+		}
+		// delete topic set under logs
+		delete(kafkaExporter, "logs")
+		return kafkaExporter, processor, nil
+	}
+	return kafkaExporter, nil, nil
+}
+
+// dynamicTopicSetterProcessor parses topic field with dynamic values such as %{[data_stream.type]}
+// It translates this behavior onto a transform processor defined here
+// More about transform processor https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor
+func dynamicTopicSetterProcessor(topic string, outputName string) (map[string]any, error) {
+	logStatements := []string{}
+
+	lexer := fmtstr.MakeLexer(topic)
+	defer lexer.Finish()
+
+	tokens, err := fmtstr.ParseRawTokens(lexer)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing token:%w", err)
+	}
+
+	pendingLiteral := ""
+	fieldExpr := func(v fmtstr.VariableToken) string {
+		return getLogBody(extractField(string(v)))
+	}
+
+	for _, tok := range tokens {
+		switch t := tok.(type) {
+		case string:
+			pendingLiteral += t
+		case fmtstr.VariableToken:
+			f := fieldExpr(t)
+			if len(logStatements) == 0 {
+				if pendingLiteral != "" {
+					// First placeholder: set topic = literal + field
+					logStatements = append(logStatements, fmt.Sprintf(
+						`set(resource.attributes["topic"], Concat(["%s", %s], ""))`,
+						pendingLiteral, f))
+				} else {
+					// First placeholder: set topic = field
+					logStatements = append(logStatements, fmt.Sprintf(
+						`set(resource.attributes["topic"], %s)`, f))
+				}
+			} else {
+				// Subsequent placeholder: set topic = topic + literal + field
+				logStatements = append(logStatements, fmt.Sprintf(
+					`set(resource.attributes["topic"], Concat([resource.attributes["topic"], %s], "%s"))`,
+					f, pendingLiteral))
+			}
+			pendingLiteral = ""
+		default:
+			return nil, fmt.Errorf("unexpected token type %T in kafka topic format", tok)
+		}
+	}
+
+	// check if any more content is left after all fields are parsed
+	if len(logStatements) > 0 && pendingLiteral != "" {
+		logStatements = append(logStatements, fmt.Sprintf(
+			`set(resource.attributes["topic"], Concat([resource.attributes["topic"], "%s"], ""))`,
+			pendingLiteral))
+	}
+
+	if len(logStatements) == 0 {
+		return nil, fmt.Errorf("there are no statements")
+	}
+
+	return map[string]any{
+		getTransformProcessorID(outputName).String(): map[string]any{
+			"error_mode":     "ignore",
+			"log_statements": logStatements,
+		},
+	}, nil
+}
+
+func extractField(field string) string {
+	if len(field) == 0 {
+		return ""
+	}
+
+	switch field[0] {
+	case '[':
+		data, _ := fmtstr.ParseEventPath(field)
+		return data
+	case '+':
+		// TODO parse time stamp
+		return ""
+	}
+
+	return ""
+}
+
+func getLogBody(field string) string {
+	query := strings.Split(field, ".")
+
+	logBody := []string{"log.body"}
+	for _, q := range query {
+		logBody = append(logBody, fmt.Sprintf(`["%s"]`, q))
+	}
+	return strings.Join(logBody, "")
+}
+
+// getTransformProcessorID returns the id for transform processor
+func getTransformProcessorID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(transformProcessorType), extensionName)
+>>>>>>> Stashed changes
 }
 
 // log warning for unsupported config

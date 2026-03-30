@@ -131,3 +131,114 @@ max_message_bytes: 1000000`,
 		})
 	}
 }
+<<<<<<< Updated upstream
+=======
+
+func TestDynamicTopicSetter(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		topic                string
+		expectedTransformMap map[string]any
+		err                  error
+	}{
+		{
+			name:  "test where topic=field",
+			topic: `%{[data_stream.type]}`,
+			expectedTransformMap: map[string]any{
+				"transform/_agent-component/default": map[string]any{
+					"error_mode": "ignore",
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
+					},
+				}},
+			err: nil,
+		},
+		{
+			name:  "test correct behavior when two keys are same",
+			topic: `%{[data_stream.type]}-%{[data_stream.type]}`,
+			expectedTransformMap: map[string]any{
+				"transform/_agent-component/default": map[string]any{
+					"error_mode": "ignore",
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["type"]], "-"))`,
+					},
+				}},
+			err: nil,
+		},
+		{
+			name:  "test where topic = topic + field",
+			topic: `%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}`,
+			expectedTransformMap: map[string]any{
+				"transform/_agent-component/default": map[string]any{
+					"error_mode": "ignore",
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["dataset"]], "-"))`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-"))`,
+					},
+				}},
+			err: nil,
+		},
+		{
+			name:  "test where topic = literal + field ",
+			topic: `test-data-%{[data_stream.dataset]}-%{[data_stream.namespace]}`,
+			expectedTransformMap: map[string]any{
+				"transform/_agent-component/default": map[string]any{
+					"error_mode": "ignore",
+					"log_statements": []string{
+						`set(resource.attributes["topic"], Concat(["test-data-", log.body["data_stream"]["dataset"]], ""))`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-"))`,
+					},
+				}},
+			err: nil,
+		},
+		{
+			name:  "test where topic =  topic + literal + field ",
+			topic: `%{[data_stream.dataset]}-test-data-%{[data_stream.namespace]}`,
+			expectedTransformMap: map[string]any{
+				"transform/_agent-component/default": map[string]any{
+					"error_mode": "ignore",
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["dataset"])`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-test-data-"))`,
+					},
+				}},
+			err: nil,
+		},
+		{
+			name:  "test where topic =  field + literal (i.e any content left is appended to final topic string) ",
+			topic: `%{[data_stream.dataset]}-test-data`,
+			expectedTransformMap: map[string]any{
+				"transform/_agent-component/default": map[string]any{
+					"error_mode": "ignore",
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["dataset"])`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], "-test-data"], ""))`,
+					},
+				}},
+			err: nil,
+		},
+		{
+			name:                 "return error if closing bracket not found",
+			topic:                `%{[data_stream.dataset]-no-closing-bracket`,
+			expectedTransformMap: nil,
+			err:                  fmt.Errorf("missing closing '}'"),
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := fmtstr.CompileEvent(test.topic)
+			if test.err != nil {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			processor, err := dynamicTopicSetterProcessor(test.topic, "default")
+			require.NoError(t, err)
+			require.Equal(t, test.expectedTransformMap, processor)
+		})
+	}
+}
+>>>>>>> Stashed changes
