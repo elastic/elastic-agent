@@ -5,6 +5,7 @@
 package translate
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -286,6 +287,51 @@ func TestDynamicTopicSetter(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, test.expectedTransformMap, dynamicTopicSetterProcessor(test.topic, "default"))
+		})
+	}
+}
+
+func TestUnsupportedParams(t *testing.T) {
+	testCases := []struct {
+		name  string
+		input string
+	}{
+		{
+			"ca_trusted_fingerprint is set",
+			`
+hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
+topic: static-topic
+ssl:
+  ca_trusted_fingerprint:  fingerprint
+`,
+		},
+		{
+			"ca_sha_256 is set",
+			`
+hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
+topic: static-topic
+ssl:
+  ca_sha_256:  sha256
+`,
+		},
+		{
+			"partition is set",
+			`
+hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
+topic: static-topic
+partition: 
+  round_robin: 
+    group_events: 1
+`,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			cfg, err := config.NewConfigFrom(test.input)
+			require.NoError(t, err)
+			_, _, err = KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
+			require.ErrorIs(t, err, errors.ErrUnsupported)
 		})
 	}
 }

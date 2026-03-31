@@ -24,7 +24,6 @@ import (
 )
 
 var tlsVersions = map[uint16]string{
-	tls.VersionTLS10: "1.0",
 	tls.VersionTLS11: "1.1",
 	tls.VersionTLS12: "1.2",
 	tls.VersionTLS13: "1.3",
@@ -142,7 +141,7 @@ func getFlushTimeout(logger *logp.Logger, output *config.C) string {
 }
 
 // TLSCommonToOTel converts a tlscommon.Config into the OTel configtls.ClientConfig
-// ca_trusted_fingerprint, ca_sha_256 and verification mode are not handled by this method
+// ca_trusted_fingerprint, ca_sha_256 and verification_mode: strict/certificate are not handled by this method
 func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any, error) {
 	logger = logger.Named("tls-to-otel")
 	otelTLSConfig := map[string]any{}
@@ -162,8 +161,7 @@ func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any
 		return nil, err
 	}
 
-	// handle verification_mode:none
-	// Handle all other cases, including VerifyFull, VerifyCertificate, or VerifyStrict by beatsauth extension
+	// handles verification_mode: none and full
 	if tlsConfig.VerificationMode == tlscommon.VerifyNone {
 		otelTLSConfig["insecure_skip_verify"] = true
 	}

@@ -255,6 +255,12 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 		return fmt.Errorf("timeout is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("bulk_flush_frequency") {
 		logger.Warn("bulk_flush_frequency is deprecated")
+	} else if value, err := cfg.Child("ssl", -1); err == nil {
+		if value.HasField("ca_trusted_fingerprint") {
+			return fmt.Errorf("ca_trusted_fingerprint is currently not supported: %w", errors.ErrUnsupported)
+		} else if value.HasField("ca_sha_256") {
+			return fmt.Errorf("ca_sha_256 is currently not supported: %w", errors.ErrUnsupported)
+		}
 	}
 
 	return nil

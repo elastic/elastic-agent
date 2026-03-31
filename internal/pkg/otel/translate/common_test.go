@@ -97,3 +97,29 @@ ssl:
 	require.Equal(t, expectedMap, got)
 
 }
+
+func TestTLSVersion(t *testing.T) {
+	input := `
+ssl:
+  supported_protocol: 
+  - TLSv1.1
+  - TLSv1.2
+  - TLSv1.3
+`
+
+	inputCfg := config.MustNewConfigFrom(input)
+	sslCfg, err := inputCfg.Child("ssl", -1)
+	require.NoError(t, err)
+	tlsCfg := &tlscommon.Config{}
+	err = sslCfg.Unpack(tlsCfg)
+	require.NoError(t, err)
+
+	got, err := TLSToOTel(tlsCfg, logptest.NewTestingLogger(t, ""))
+	require.NoError(t, err)
+	expectedMap := map[string]any{
+		"min_version": "1.1",
+		"max_version": "1.3",
+	}
+	require.Equal(t, expectedMap, got)
+
+}
