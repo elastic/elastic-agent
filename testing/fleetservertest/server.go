@@ -5,6 +5,7 @@
 package fleetservertest
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -248,7 +249,21 @@ func (h *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
 	acceptEncodingParam := r.Header.Get("Accept-Encoding")
 	checkinRequestParam := CheckinRequest{}
 
-	d := json.NewDecoder(r.Body)
+	var bodyReader io.Reader = r.Body
+	if r.Header.Get("Content-Encoding") == "gzip" {
+		gr, err := gzip.NewReader(r.Body)
+		if err != nil {
+			respondAsJSON(http.StatusBadRequest, HTTPError{
+				StatusCode: http.StatusBadRequest,
+				Message:    fmt.Sprintf("cannot uncompress checkin request: %v", err),
+			}, w)
+			return
+		}
+		defer gr.Close()
+		bodyReader = gr
+	}
+
+	d := json.NewDecoder(bodyReader)
 	if err := d.Decode(&checkinRequestParam); err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
