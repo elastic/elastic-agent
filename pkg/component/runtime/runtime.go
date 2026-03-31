@@ -159,6 +159,8 @@ func (s *componentRuntimeState) runLoop(ctx context.Context) {
 				select {
 				case <-done:
 					s.manager.currentMx.Lock()
+					// Deletion is required for deadlock avoidance, see:
+					// https://github.com/elastic/elastic-agent/pull/2729
 					delete(s.manager.current, s.id)
 					s.manager.currentMx.Unlock()
 					return

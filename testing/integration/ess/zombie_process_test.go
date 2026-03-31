@@ -9,9 +9,9 @@ package ess
 import (
 	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
-	"syscall"
 	"testing"
 	"time"
 
@@ -111,7 +111,9 @@ func TestNoZombieOnAgentShutdown(t *testing.T) {
 	if !reaped {
 		// The component is still running - the test will fail, however we should try to clean up.
 		t.Logf("Process %d survived agent shutdown! Attempting SIGKILL...", componentPID)
-		_ = syscall.Kill(componentPID, syscall.SIGKILL)
+		proc, err := os.FindProcess(componentPID)
+		require.NoError(t, err, "process not found")
+		_ = proc.Kill()
 		assert.Eventually(t, func() bool { return process.IsReaped(componentPID) }, process.KillReapTime, 100*time.Millisecond, "Process may still be running as a zombie after explicit kill")
 	}
 }
