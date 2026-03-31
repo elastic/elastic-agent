@@ -213,13 +213,13 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	// We use gotestsum to drive the tests and produce a junit report.
 	// The tool runs `go test -json` in order to produce a structured log which makes it easier
 	// to parse the actual test output.
-	// Of OutputFile is given the original JSON file will be written as well.
+	// If OutputFile is given, the original JSON file will be written as well.
 	//
 	// The runner needs to set CLI flags for gotestsum and for "go test". We track the different
-	// CLI flags in the gotestsumArgs and testArgs variables, such that we can finally produce command like:
+	// CLI flags in the gotestsumArgs and testArgs variables, such that we can finally produce a command like:
 	//   $ gotestsum <gotestsum args> -- <go test args>
 	//
-	// The additional arguments given via GoTestArgs are applied to `go test` only. Callers can not
+	// The additional arguments given via GoTestArgs are applied to `go test` only. Callers cannot
 	// modify any of the gotestsum arguments.
 
 	gotestsumArgs := []string{"--no-color", "--junitfile-hide-skipped-tests"}

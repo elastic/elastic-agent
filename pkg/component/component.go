@@ -377,6 +377,17 @@ func (c *Component) BeatName() string {
 	return ""
 }
 
+// OutputUnit returns the first output unit among c.Units, if any.
+// Agent-built components normally have at most one output unit; if several are present, the first is returned.
+func (c *Component) OutputUnit() (Unit, bool) {
+	for _, u := range c.Units {
+		if u.Type == client.UnitTypeOutput {
+			return u, true
+		}
+	}
+	return Unit{}, false
+}
+
 // GetBeatInputIDForUnit returns the ID of the corresponding input or module in the beat configuration for the unit.
 // If the unit doesn't run in a beat or isn't an input in the first place, it returns an empty string.
 // This function is only needed for the special case where an agent input that runs in a beat process doesn't specify

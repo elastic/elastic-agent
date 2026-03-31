@@ -8,11 +8,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -82,4 +84,47 @@ func TestRetryEnroll_BreaksOnContextCanceled(t *testing.T) {
 	err := retryEnroll(cancelErr, 5, l, enrollFn, "http://localhost", fb)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Equal(t, called, 0)
+}
+
+func TestLoadPersistentConfig_FleetCheckin(t *testing.T) {
+	tests := []struct {
+		name     string
+		yaml     string
+		expected *configuration.FleetCheckin
+	}{
+		{
+			name:     "no fleet.checkin uses default",
+			yaml:     "",
+			expected: configuration.DefaultFleetCheckin(),
+		},
+		{
+			name: "compression none",
+			yaml: "fleet:\n  checkin:\n    compression: none\n",
+			expected: &configuration.FleetCheckin{
+				Compression: configuration.CheckinCompressionNone,
+			},
+		},
+		{
+			name: "compression gzip",
+			yaml: "fleet:\n  checkin:\n    compression: gzip\n",
+			expected: &configuration.FleetCheckin{
+				Compression: configuration.CheckinCompressionGzip,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpFile, err := os.CreateTemp(t.TempDir(), "elastic-agent-*.yml")
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(tmpFile.Name(), []byte(tc.yaml), 0o600))
+			tmpFile.Close()
+
+			result, err := LoadPersistentConfig(tmpFile.Name())
+			require.NoError(t, err)
+
+			require.Contains(t, result, "fleet.checkin")
+			require.Equal(t, tc.expected, result["fleet.checkin"])
+		})
+	}
 }
