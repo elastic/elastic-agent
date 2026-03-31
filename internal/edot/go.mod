@@ -425,7 +425,7 @@ require (
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.4 // indirect
 	github.com/elastic/lunes v0.2.0 // indirect
-	github.com/elastic/mito v1.24.1 // indirect
+	github.com/elastic/mito v1.25.1 // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.36.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.33.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 // indirect
@@ -483,7 +483,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/gomodule/redigo v1.9.3 // indirect
-	github.com/google/cel-go v0.26.1 // indirect
+	github.com/google/cel-go v0.27.0 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0
@@ -652,7 +652,6 @@ require (
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/stackitcloud/stackit-sdk-go/core v0.21.1 // indirect
-	github.com/stoewer/go-strcase v1.3.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -793,7 +792,7 @@ require (
 	google.golang.org/api v0.270.0
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260319201613-d00831a3d3e7 // indirect
 	google.golang.org/grpc v1.79.3
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
