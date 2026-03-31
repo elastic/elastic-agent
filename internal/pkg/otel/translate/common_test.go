@@ -7,10 +7,11 @@ package translate
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/stretchr/testify/require"
 )
 
 func TestTLSCommonToOTel(t *testing.T) {
