@@ -154,7 +154,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 		// Catches config issues (e.g. missing/invalid debug exporter per #12878) that would
 		// cause collector pods to crash at startup.
 		{
-			name: "mOTel logs only helm template apply kube-stack on cluster",
+			name: "mOTel with helm template apply kube-stack on cluster",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
 				k8sStepHelmTemplateApplyWithValueOptions(KubeStackChartPath, "kube-stack-otel",

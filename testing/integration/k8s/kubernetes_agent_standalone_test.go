@@ -1277,7 +1277,6 @@ func k8sStepHelmTemplateApply(chartPath string, releaseName string, values map[s
 		release, err := installAction.Run(helmChart, values)
 		require.NoError(t, err, "failed to render helm chart")
 
-		// Use kubectl apply -f to apply the manifest.
 		manifestFile, err := os.CreateTemp("", "helm-template-*.yaml")
 		require.NoError(t, err, "failed to create temp manifest file")
 		manifestPath := manifestFile.Name()
@@ -1303,7 +1302,7 @@ func k8sStepHelmTemplateApply(chartPath string, releaseName string, values map[s
 			delCmd := exec.CommandContext(ctx, "kubectl", "delete", "-f", manifestPath, "--ignore-not-found", "--wait", "--timeout=120s")
 			_ = delCmd.Run()
 		})
-
+		// Use kubectl apply -f to apply the manifest.
 		applyCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", manifestPath)
 		applyOut, applyErr := applyCmd.CombinedOutput()
 		require.NoError(t, applyErr, "kubectl apply failed: %s", string(applyOut))
