@@ -441,7 +441,10 @@ func TestRpmWithPrefix(t *testing.T) {
 		runDir, err := atesting.FindRunDir(agentFixture)
 		require.NoError(t, err, "failed at getting run dir")
 
-		out, err := exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", "--prefix", "/opt/elastic-agent", snapshotPackage).CombinedOutput()
+		// --force is needed because the latest snapshot version may match the
+		// locally built version (same patch), causing RPM to reject the upgrade
+		// with "already installed" errors.
+		out, err := exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", "--force", "--prefix", "/opt/elastic-agent", snapshotPackage).CombinedOutput()
 		require.NoError(t, err, string(out))
 
 		t.Run("service file is not a symlink into prefix after upgrade", func(t *testing.T) {
