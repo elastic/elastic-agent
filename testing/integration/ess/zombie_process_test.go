@@ -11,9 +11,11 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"syscall"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -62,14 +64,6 @@ func TestNoZombieOnAgentShutdown(t *testing.T) {
 
 	pidRe := regexp.MustCompile(`pid '(\d+)'`)
 	var componentPID int
-
-	// Component clears Pdeathcsig, we need to ensure it does not survive the test.
-	t.Cleanup(func() {
-		if componentPID > 0 {
-			cleanupProcess(t, componentPID)
-		}
-	})
-
 	// Run the agent: wait for the component to become healthy, record its
 	// PID, then let the fixture shut the agent down (all states exhausted →
 	// fixture calls f.proc.Stop → SIGTERM to agent → agent shutdown
@@ -113,5 +107,11 @@ func TestNoZombieOnAgentShutdown(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait up until reap timeout for process to be reaped
-	require.Eventually(t, func() bool { return process.IsReaped(componentPID) }, process.KillReapTime, 100*time.Millisecond, "Process may still be running as a zombie")
+	reaped := assert.Eventually(t, func() bool { return process.IsReaped(componentPID) }, process.KillReapTime, 100*time.Millisecond, "Process may still be running as a zombie after agent shutdown")
+	if !reaped {
+		// The component is still running - the test will fail, however we should try to clean up.
+		t.Logf("Process %d survived agent shutdown! Attempting SIGKILL...", componentPID)
+		_ = syscall.Kill(componentPID, syscall.SIGKILL)
+		assert.Eventually(t, func() bool { return process.IsReaped(componentPID) }, process.KillReapTime, 100*time.Millisecond, "Process may still be running as a zombie after explicit kill")
+	}
 }
