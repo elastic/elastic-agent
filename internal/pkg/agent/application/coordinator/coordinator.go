@@ -1412,11 +1412,18 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 func stripComponentUnitsConfig(comps []component.Component) []component.Component {
 	result := make([]component.Component, len(comps))
 	copy(result, comps)
-	for i := range result {
-		units := make([]component.Unit, len(result[i].Units))
-		copy(units, result[i].Units)
-		for j := range units {
-			units[j].Config = nil
+	for i, comp := range comps {
+		units := make([]component.Unit, len(comp.Units))
+		// Explicitly copy only the fields we want rather than copying the
+		// whole struct and zeroing Config, avoiding unnecessary GC pressure
+		// when there are many units.
+		for j, u := range comp.Units {
+			units[j] = component.Unit{
+				ID:       u.ID,
+				Type:     u.Type,
+				LogLevel: u.LogLevel,
+				Err:      u.Err,
+			}
 		}
 		result[i].Units = units
 	}

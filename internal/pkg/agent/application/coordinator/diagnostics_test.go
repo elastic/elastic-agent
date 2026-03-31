@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -518,6 +519,14 @@ func TestDiagnosticStripComponentUnitsConfig(t *testing.T) {
 			},
 		},
 	}
+
+	t.Run("all unit fields except Config are copied", func(t *testing.T) {
+		// If this count changes, update stripComponentUnitsConfig to handle the
+		// new field (or explicitly exclude it), then update this constant.
+		const expectedUnitFields = 5 // ID, Type, LogLevel, Config, Err
+		require.Equal(t, expectedUnitFields, reflect.TypeOf(component.Unit{}).NumField(),
+			"component.Unit field count changed: update stripComponentUnitsConfig and this test")
+	})
 
 	t.Run("components-expected does not leak secrets from unit config", func(t *testing.T) {
 		coord := &Coordinator{componentModel: componentsModel}
