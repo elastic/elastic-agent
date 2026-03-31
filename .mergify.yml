@@ -2,8 +2,8 @@ commands_restrictions:
   backport:
     conditions:
       - or:
-        - sender-permission>=write
-        - sender=github-actions[bot]
+          - sender-permission>=write
+          - sender=github-actions[bot]
 queue_rules:
   - name: default
     merge_method: squash
@@ -24,7 +24,7 @@ pull_request_rules:
       - author=github-actions[bot]
       - check-success=buildkite/elastic-agent
       - or:
-        - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+          - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
       - head~=^updatecli_.*
     actions:
       review:
@@ -35,7 +35,7 @@ pull_request_rules:
       - author=github-actions[bot]
       - check-success=buildkite/elastic-agent
       - or:
-        - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+          - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
       - head~=^updatecli_.*
       - "#approved-reviews-by>=1"
     actions:
@@ -64,16 +64,16 @@ pull_request_rules:
       - -closed
       - conflict
     actions:
-        comment:
-          message: |
-            This pull request is now in conflicts. Could you fix it? 🙏
-            To fixup this pull request, you can check out it locally. See documentation: https://help.github.com/articles/checking-out-pull-requests-locally/
-            ```
-            git fetch upstream
-            git checkout -b {{head}} upstream/{{head}}
-            git merge upstream/{{base}}
-            git push upstream {{head}}
-            ```
+      comment:
+        message: |
+          This pull request is now in conflicts. Could you fix it? 🙏
+          To fixup this pull request, you can check out it locally. See documentation: https://help.github.com/articles/checking-out-pull-requests-locally/
+          ```
+          git fetch upstream
+          git checkout -b {{head}} upstream/{{head}}
+          git merge upstream/{{base}}
+          git push upstream {{head}}
+          ```
   - name: close automated pull requests with bump updates if any conflict
     conditions:
       - -merged
@@ -85,16 +85,6 @@ pull_request_rules:
         message: |
           This pull request has been automatically closed by Mergify.
           There are some other up-to-date pull requests.
-  - name: delete upstream branch after merging changes on .go-version or it's closed
-    conditions:
-      - or:
-        - merged
-        - closed
-      - and:
-        - head~=^updatecli.*
-        - files~=^\.go-version$
-    actions:
-      delete_head_branch:
   - name: automatic approval for mergify pull requests with changes in bump-rules
     conditions:
       - author=mergify[bot]
@@ -114,25 +104,6 @@ pull_request_rules:
     actions:
       queue:
         name: default
-  - name: delete upstream branch for mergify backports
-    conditions:
-      - or:
-        - merged
-        - closed
-      - and:
-        - head~=^mergify/bp/.*
-    actions:
-      delete_head_branch:
-  - name: delete upstream branch with changes on ^.mergify.yml that has been merged or closed
-    conditions:
-      - or:
-        - merged
-        - closed
-      - and:
-        - head~=^add-backport-next.*
-        - files~=^\.mergify\.yml$
-    actions:
-      delete_head_branch:
   - name: notify the backport has not been merged yet
     conditions:
       - -merged
