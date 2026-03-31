@@ -112,8 +112,6 @@ func TestNoZombieOnAgentShutdown(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Give a brief moment for any pending process cleanup.
-	time.Sleep(500 * time.Millisecond)
-
-	require.Truef(process.IsReaped(componentPID), "Process %d has not been reaped", componentPID)
+	// Wait up until reap timeout for process to be reaped
+	require.Eventually(t, func() bool { return process.IsReaped(componentPID) }, process.KillReapTime, 100*time.Millisecond, "Process may still be running as a zombie")
 }
