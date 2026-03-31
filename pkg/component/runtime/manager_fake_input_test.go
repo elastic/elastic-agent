@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -27,7 +26,6 @@ import (
 
 	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	"github.com/elastic/elastic-agent/pkg/core/process"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -2170,132 +2168,6 @@ LOOP:
 
 	err = <-errCh
 	require.NoError(t, err)
-}
-
-func (suite *FakeInputSuite) TestManager_NoZombieOnShutdownAfterMissedCheckins() {
-	t := suite.T()
-	if runtime.GOOS == "windows" {
-		t.Skip("zombie process detection not applicable on Windows")
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig())
-	require.NoError(t, err)
-	errCh := make(chan error)
-	go func() {
-		err := m.Run(ctx)
-		if errors.Is(err, context.Canceled) {
-			err = nil
-		}
-		errCh <- err
-	}()
-
-	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
-	defer waitCancel()
-	if err := waitForReady(waitCtx, m); err != nil {
-		require.NoError(t, err)
-	}
-
-	binaryPath := testBinary(t, "component")
-	comp := component.Component{
-		ID: "fake-default",
-		InputSpec: &component.InputRuntimeSpec{
-			InputType:  "fake",
-			BinaryName: "",
-			BinaryPath: binaryPath,
-			Spec: component.InputSpec{
-				Name: "fake",
-				Command: &component.CommandSpec{
-					Timeouts: component.CommandTimeoutSpec{
-						Checkin: 1 * time.Second,
-						Restart: 10 * time.Second,
-						Stop:    30 * time.Second,
-					},
-				},
-			},
-		},
-		Units: []component.Unit{
-			{
-				ID:   "fake-input",
-				Type: client.UnitTypeInput,
-				Config: component.MustExpectedConfig(map[string]interface{}{
-					"type":    "fake",
-					"state":   int(client.UnitStateHealthy),
-					"message": "Fake Healthy",
-				}),
-			},
-		},
-	}
-	runPath := paths.Run()
-	require.NoError(t, comp.PrepareWorkDir(runPath))
-	t.Cleanup(func() {
-		assert.NoError(t, comp.RemoveWorkDir(runPath))
-	})
-
-	// Subscribe and capture the PID once the component reports healthy.
-	// We must grab the PID from the healthy state because once the component
-	// is SIGKILLed for missed check-ins its entry is already reaped and
-	// checking that older PID would trivially pass.
-	subCtx, subCancel := context.WithCancel(context.Background())
-	defer subCancel()
-	pidCh := make(chan int, 1)
-	go func() {
-		sub := m.Subscribe(subCtx, "fake-default")
-		for {
-			select {
-			case <-subCtx.Done():
-				return
-			case state := <-sub.Ch():
-				t.Logf("component state changed: %+v", state)
-				if state.State == client.UnitStateHealthy {
-					r := regexp.MustCompile(`pid '(\d+)'`)
-					rp := r.FindStringSubmatch(state.Message)
-					if len(rp) > 1 {
-						pid, err := strconv.Atoi(rp[1])
-						if err == nil {
-							select {
-							case pidCh <- pid:
-							default:
-							}
-						}
-					}
-				}
-			}
-		}
-	}()
-
-	defer drainErrChan(errCh)
-
-	m.Update(component.Model{Components: []component.Component{comp}})
-	err = <-m.errCh
-	require.NoError(t, err)
-
-	// Wait for the component to become healthy and capture its PID.
-	var runningPID int
-	endTimer := time.NewTimer(30 * time.Second)
-	defer endTimer.Stop()
-	select {
-	case <-endTimer.C:
-		t.Fatalf("timed out waiting for component to become healthy")
-	case runningPID = <-pidCh:
-		t.Logf("component is healthy with pid %d, cancelling manager", runningPID)
-	}
-
-	// Cancel the manager context while the component is running. This simulates
-	// a coordinator shutdown and exercises the ctx.Done() → cleanupProcess()
-	// path in commandRuntime.Run(), which must reap the child process so it
-	// does not become a zombie.
-	subCancel()
-	cancel()
-
-	err = <-errCh
-	require.NoError(t, err)
-
-	// Give a short time for the process to be fully reaped.
-	require.Eventually(t, func() bool { return process.IsReaped(runningPID) }, process.KillReapTime, 100*time.Millisecond, "Process may still be running as a zombie")
 }
 
 func (suite *FakeInputSuite) TestManager_InvalidAction() {

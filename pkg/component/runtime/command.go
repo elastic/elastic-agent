@@ -54,7 +54,7 @@ const (
 	// and coordinator shutdown overhead. The SIGTERM grace period is reduced by
 	// this amount so the entire cleanup completes before external process managers
 	// (systemd, Kubernetes) forcibly kill the agent.
-	ShutdownBuffer = 5 * time.Second
+	ShutdownBuffer = process.KillReapTime + 2*time.Second
 
 	// ProcessStopTimeout is the maximum time to wait for a component to stop
 	// before escalating to SIGKILL. ShutdownBuffer time is removed from stop
