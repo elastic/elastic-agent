@@ -103,6 +103,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.148.0/processor/k8sattributesprocessor/README.md) | v0.148.0 |
 | [logdedupprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/logdedupprocessor/v0.148.0/processor/logdedupprocessor/README.md) | v0.148.0 |
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.148.0/processor/memorylimiterprocessor/README.md) | v0.148.0 |
+| [ratelimitprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/ratelimitprocessor/v0.36.0/processor/ratelimitprocessor/README.md) | v0.36.0 |
 | [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.148.0/processor/resourcedetectionprocessor/README.md) | v0.148.0 |
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.148.0/processor/resourceprocessor/README.md) | v0.148.0 |
 | [tailsamplingprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/tailsamplingprocessor/v0.148.0/processor/tailsamplingprocessor/README.md) | v0.148.0 |
@@ -133,7 +134,6 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.36.0/connector/elasticapmconnector/README.md) | v0.36.0 |
 | [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/blob/connector/forwardconnector/v0.148.0/connector/forwardconnector/README.md) | v0.148.0 |
-| [otlpjsonconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/otlpjsonconnector/v0.148.0/connector/otlpjsonconnector/README.md) | v0.148.0 |
 | [profilingmetricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/profilingmetricsconnector/v0.36.0/connector/profilingmetricsconnector/README.md) | v0.36.0 |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.148.0/connector/routingconnector/README.md) | v0.148.0 |
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.148.0/connector/spanmetricsconnector/README.md) | v0.148.0 |

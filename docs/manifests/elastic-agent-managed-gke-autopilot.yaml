@@ -72,7 +72,7 @@ spec:
             runAsUser: 0
           resources:
             limits:
-              #cpu: 200m # Keep this commented. We dont set the cpu limit to avoid scheduling problems of agent in autopilot scenarios
+              #cpu: 200m # Keep this commented. We don't set the CPU limit to avoid agent scheduling problems in Autopilot scenarios
               memory: 1Gi
               ephemeral-storage: "500Mi"
           volumeMounts:

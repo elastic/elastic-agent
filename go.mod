@@ -4,6 +4,10 @@ go 1.25.8
 
 replace github.com/elastic/beats/v7 => ./beats
 
+// Use upstream commit post PR#43744 which adds Attributes() to the pkg/status Event interface.
+// Pin to the stable release once v0.149.0 is available.
+replace github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status => github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.148.1-0.20260322150300-d35591a04576
+
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
 	github.com/Microsoft/go-winio v0.6.2
@@ -16,13 +20,13 @@ require (
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260319123650-eff088939b9a
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260330180950-f558378e74b1
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.2
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
 	github.com/elastic/elastic-agent-libs v0.33.3
 	github.com/elastic/elastic-agent-system-metrics v0.14.3
-	github.com/elastic/elastic-transport-go/v8 v8.9.0
+	github.com/elastic/elastic-transport-go/v8 v8.10.0
 	github.com/elastic/go-elasticsearch/v8 v8.19.3
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.4
@@ -60,13 +64,13 @@ require (
 	go.elastic.co/apm/v2 v2.7.2
 	go.elastic.co/ecszap v1.0.3
 	go.elastic.co/go-licence-detector v0.7.0
-	go.opentelemetry.io/collector/component/componentstatus v0.148.0
+	go.opentelemetry.io/collector/component/componentstatus v0.148.1-0.20260320051400-372cc483b303
 	go.opentelemetry.io/collector/component/componenttest v0.148.0
 	go.opentelemetry.io/collector/confmap/xconfmap v0.148.0
 	go.opentelemetry.io/collector/exporter/exportertest v0.148.0
 	go.opentelemetry.io/collector/extension/extensiontest v0.148.0
-	go.opentelemetry.io/collector/pdata v1.54.0
-	go.opentelemetry.io/collector/pipeline v1.54.0
+	go.opentelemetry.io/collector/pdata v1.54.1-0.20260320051400-372cc483b303
+	go.opentelemetry.io/collector/pipeline v1.54.1-0.20260320051400-372cc483b303
 	go.opentelemetry.io/otel/sdk/metric v1.42.0
 	go.uber.org/zap v1.27.1
 	go.yaml.in/yaml/v3 v3.0.4
@@ -101,12 +105,12 @@ require (
 
 require (
 	github.com/distribution/reference v0.6.0 // indirect
-	go.opentelemetry.io/collector/component v1.54.0
+	go.opentelemetry.io/collector/component v1.54.1-0.20260320051400-372cc483b303
 	go.opentelemetry.io/collector/confmap v1.54.0
 	go.opentelemetry.io/collector/connector v0.148.0 // indirect
 	go.opentelemetry.io/collector/exporter v1.54.0
 	go.opentelemetry.io/collector/extension v1.54.0
-	go.opentelemetry.io/collector/featuregate v1.54.0 // indirect
+	go.opentelemetry.io/collector/featuregate v1.54.1-0.20260320051400-372cc483b303 // indirect
 	go.opentelemetry.io/collector/otelcol v0.148.0
 	go.opentelemetry.io/collector/processor v1.54.0 // indirect
 	go.opentelemetry.io/collector/receiver v1.54.0 // indirect
@@ -354,7 +358,7 @@ require (
 	golang.org/x/telemetry v0.0.0-20260209163413-e7419c687ee4 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260319201613-d00831a3d3e7 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/apiextensions-apiserver v0.34.2 // indirect
@@ -395,13 +399,5 @@ replace (
 	github.com/google/gopacket => github.com/elastic/gopacket v1.1.20-0.20241002174017-e8c5fda595e6
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
 )
-
-// Needed to prevent https://github.com/open-telemetry/opentelemetry-go/issues/7039
-replace go.opentelemetry.io/otel/exporters/prometheus => go.opentelemetry.io/otel/exporters/prometheus v0.58.0
-
-// The replaces below refer to the following branch: https://github.com/elastic/opentelemetry-collector-contrib/tree/v0144-healthcheck-patched
-// They contain an additional patch created from the content of https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/43744
-// They should be removed after the above PR is merged and we upgrade to the respective otel contrib release.
-replace github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status => github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260128133812-7296485a6185
 
 tool golang.org/x/tools/cmd/deadcode
