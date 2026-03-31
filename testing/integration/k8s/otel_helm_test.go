@@ -172,7 +172,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 					},
 				),
 				k8sStepCheckRunningPods("app.kubernetes.io/name=opentelemetry-operator", 1, "manager"),
-				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 2, "otc-container"),
+				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
 			},
 		},
 	}
