@@ -561,6 +561,19 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 	return result
 }
 
+func monitoringInputEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent) map[string]any {
+	tmpl := monitoringEventTemplate(monitoring, agentInfo)
+	tmpl["data_stream"] = map[string]any{
+		"dataset":   "elastic_agent.filebeat_input",
+		"namespace": tmpl["data_stream"].(map[string]any)["namespace"],
+		"type":      "metrics",
+	}
+	tmpl["event"] = map[string]any{
+		"dataset": "elastic_agent.filebeat_input",
+	}
+	return tmpl
+}
+
 // exporterIDToOutputNameLookup compiles the mapping from raw collector
 // exporter IDs to the policy output names that generated them, so internal
 // telemetry monitoring can associate metrics with the user-defined name.
@@ -619,9 +632,10 @@ func injectMonitoringReceiver(
 	collectorCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
-				"event_template": monitoringEventTemplate(monitoring, agentInfo),
-				"interval":       monitoring.MetricsPeriod,
-				"exporter_names": outputNameLookup,
+				"event_template":       monitoringEventTemplate(monitoring, agentInfo),
+				"input_event_template": monitoringInputEventTemplate(monitoring, agentInfo),
+				"interval":             monitoring.MetricsPeriod,
+				"exporter_names":       outputNameLookup,
 			},
 		},
 		"service": map[string]any{

@@ -24,6 +24,14 @@ type Config struct {
 		Fields map[string]interface{} `mapstructure:",remain"`
 	} `mapstructure:"event_template"`
 
+	// InputEventTemplate provides the static fields for per-input events.
+	// If unset, per-input events are emitted without base fields (no datastream
+	// routing). When set, data_stream.* should be configured to route input
+	// events to the correct datastream (e.g. elastic_agent.filebeat_input).
+	InputEventTemplate struct {
+		Fields map[string]interface{} `mapstructure:",remain"`
+	} `mapstructure:"input_event_template"`
+
 	Interval time.Duration `mapstructure:"interval"`
 
 	// A map from OTel exporter IDs to the component name that should be used

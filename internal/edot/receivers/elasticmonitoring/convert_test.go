@@ -183,9 +183,10 @@ func TestCollectComponentInputMetrics_Basic(t *testing.T) {
 	}
 	result := collectComponentInputMetrics([]metricdata.ScopeMetrics{sm})
 	require.Len(t, result, 1)
-	comp, ok := result["filebeat-default"]
+	compData, ok := result["filebeat-default"]
 	require.True(t, ok)
-	entry, ok := comp["logs_my-input"]
+	assert.Equal(t, "filebeat", compData.beatType)
+	entry, ok := compData.inputs["logs.my-input"]
 	require.True(t, ok)
 	assert.Equal(t, "logs.my-input", entry["id"])
 	assert.Equal(t, int64(42), entry["beat.input.events.published"])
@@ -203,12 +204,12 @@ func TestCollectComponentInputMetrics_WithInputType(t *testing.T) {
 	}
 	result := collectComponentInputMetrics([]metricdata.ScopeMetrics{sm})
 	require.Len(t, result, 1)
-	comp := result["filebeat-default"]
-	entry := comp["my-input"]
+	compData := result["filebeat-default"]
+	entry := compData.inputs["my-input"]
 	assert.Equal(t, "log", entry["input"])
 }
 
-func TestCollectComponentInputMetrics_DotSanitization(t *testing.T) {
+func TestCollectComponentInputMetrics_DotInInputID(t *testing.T) {
 	sm := metricdata.ScopeMetrics{
 		Scope: receiverScope("filebeatreceiver/_agent-component/filebeat-default"),
 		Metrics: []metricdata.Metrics{
@@ -219,12 +220,10 @@ func TestCollectComponentInputMetrics_DotSanitization(t *testing.T) {
 	}
 	result := collectComponentInputMetrics([]metricdata.ScopeMetrics{sm})
 	require.Len(t, result, 1)
-	comp := result["filebeat-default"]
-	_, hasUnderscore := comp["logs_my-input"]
-	assert.True(t, hasUnderscore, "sanitized key should use underscores")
-	_, hasDot := comp["logs.my-input"]
-	assert.False(t, hasDot, "original dot-key should not be present")
-	assert.Equal(t, "logs.my-input", comp["logs_my-input"]["id"])
+	inputs := result["filebeat-default"].inputs
+	entry, ok := inputs["logs.my-input"]
+	require.True(t, ok, "input ID with dots should be used as-is")
+	assert.Equal(t, "logs.my-input", entry["id"])
 }
 
 func TestCollectComponentInputMetrics_NoInputID(t *testing.T) {
@@ -235,9 +234,9 @@ func TestCollectComponentInputMetrics_NoInputID(t *testing.T) {
 		},
 	}
 	result := collectComponentInputMetrics([]metricdata.ScopeMetrics{sm})
-	// Component is created but dataset should be empty (no input_id on data points)
-	if comp, ok := result["filebeat-default"]; ok {
-		assert.Empty(t, comp)
+	// Component is created but inputs should be empty (no input_id on data points)
+	if compData, ok := result["filebeat-default"]; ok {
+		assert.Empty(t, compData.inputs)
 	}
 }
 
@@ -255,12 +254,12 @@ func TestCollectComponentInputMetrics_MultipleInputsSameComponent(t *testing.T) 
 	}
 	result := collectComponentInputMetrics([]metricdata.ScopeMetrics{sm})
 	require.Len(t, result, 1)
-	comp := result["filebeat-default"]
-	require.Len(t, comp, 2)
-	assert.Equal(t, "input-a", comp["input-a"]["id"])
-	assert.Equal(t, "input-b", comp["input-b"]["id"])
-	assert.Equal(t, int64(7), comp["input-a"]["beat.input.events.published"])
-	assert.Equal(t, int64(3), comp["input-b"]["beat.input.events.published"])
+	inputs := result["filebeat-default"].inputs
+	require.Len(t, inputs, 2)
+	assert.Equal(t, "input-a", inputs["input-a"]["id"])
+	assert.Equal(t, "input-b", inputs["input-b"]["id"])
+	assert.Equal(t, int64(7), inputs["input-a"]["beat.input.events.published"])
+	assert.Equal(t, int64(3), inputs["input-b"]["beat.input.events.published"])
 }
 
 func TestCollectComponentInputMetrics_AcrossScopes(t *testing.T) {
@@ -282,8 +281,7 @@ func TestCollectComponentInputMetrics_AcrossScopes(t *testing.T) {
 	}
 	result := collectComponentInputMetrics([]metricdata.ScopeMetrics{sm1, sm2})
 	require.Len(t, result, 1)
-	comp := result["filebeat-default"]
-	entry := comp["shared-input"]
+	entry := result["filebeat-default"].inputs["shared-input"]
 	assert.Equal(t, int64(11), entry["metric.one"])
 	assert.Equal(t, int64(22), entry["metric.two"])
 }
@@ -307,13 +305,137 @@ func TestCollectComponentInputMetrics_DifferentComponents(t *testing.T) {
 	}
 	result := collectComponentInputMetrics([]metricdata.ScopeMetrics{sm1, sm2})
 	require.Len(t, result, 2)
-	fbComp := result["filebeat-default"]
-	require.Len(t, fbComp, 1)
-	assert.Equal(t, int64(10), fbComp["input-fb"]["beat.input.events.published"])
 
-	mbComp := result["metricbeat-default"]
-	require.Len(t, mbComp, 1)
-	assert.Equal(t, int64(20), mbComp["input-mb"]["beat.input.events.published"])
+	fbData := result["filebeat-default"]
+	assert.Equal(t, "filebeat", fbData.beatType)
+	require.Len(t, fbData.inputs, 1)
+	assert.Equal(t, int64(10), fbData.inputs["input-fb"]["beat.input.events.published"])
+
+	mbData := result["metricbeat-default"]
+	assert.Equal(t, "metricbeat", mbData.beatType)
+	require.Len(t, mbData.inputs, 1)
+	assert.Equal(t, int64(20), mbData.inputs["input-mb"]["beat.input.events.published"])
+}
+
+func TestBeatTypeFromOtelID(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"filebeatreceiver/_agent-component/filebeat-default", "filebeat"},
+		{"metricbeatreceiver/_agent-component/metricbeat-default", "metricbeat"},
+		{"elasticsearch/_agent-component/monitoring", "elasticsearch"},
+		{"filebeatreceiver/no-agent-component", "filebeat"},
+		{"filebeatreceiver", "filebeat"},
+		{"somecomponent", "somecomponent"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.expected, beatTypeFromOtelID(tt.input))
+		})
+	}
+}
+
+func registryBridgeScope(receiverID string) instrumentation.Scope {
+	return instrumentation.Scope{
+		Name: registryBridgeScopeName,
+		// RegistryBridge sets no scope attributes; receiver identity is on data points.
+	}
+}
+
+func gaugeMetricWithReceiverAttr[N int64 | float64](name string, value N, receiverID string) metricdata.Metrics {
+	return gaugeMetricWithAttrs(name, value, attribute.String(registryBridgeReceiverKey, receiverID))
+}
+
+func TestCollectReceiverPipelineMetrics_Basic(t *testing.T) {
+	const receiverID = "filebeatreceiver/_agent-component/filebeat-default"
+	sm := metricdata.ScopeMetrics{
+		Scope: registryBridgeScope(receiverID),
+		Metrics: []metricdata.Metrics{
+			gaugeMetricWithReceiverAttr("pipeline.clients", int64(3), receiverID),
+			sumMetricWithAttrs("pipeline.events.published", int64(42),
+				attribute.String(registryBridgeReceiverKey, receiverID),
+			),
+		},
+	}
+	result := collectReceiverMetrics([]metricdata.ScopeMetrics{sm})
+	require.Len(t, result, 1)
+	fields, ok := result["filebeat-default"]
+	require.True(t, ok)
+	assert.Equal(t, int64(3), fields["beat.stats.filebeat.pipeline.clients"])
+	assert.Equal(t, int64(42), fields["beat.stats.filebeat.pipeline.events.published"])
+}
+
+func TestCollectReceiverPipelineMetrics_FloatGauge(t *testing.T) {
+	const receiverID = "filebeatreceiver/_agent-component/filebeat-default"
+	sm := metricdata.ScopeMetrics{
+		Scope: registryBridgeScope(receiverID),
+		Metrics: []metricdata.Metrics{
+			gaugeMetricWithReceiverAttr("pipeline.queue.filled.pct", float64(0.42), receiverID),
+		},
+	}
+	result := collectReceiverMetrics([]metricdata.ScopeMetrics{sm})
+	require.Len(t, result, 1)
+	fields := result["filebeat-default"]
+	assert.Equal(t, float64(0.42), fields["beat.stats.filebeat.pipeline.queue.filled.pct"])
+}
+
+func TestCollectReceiverMetrics_AllMetricsCollected(t *testing.T) {
+	const receiverID = "filebeatreceiver/_agent-component/filebeat-default"
+	sm := metricdata.ScopeMetrics{
+		Scope: registryBridgeScope(receiverID),
+		Metrics: []metricdata.Metrics{
+			gaugeMetricWithReceiverAttr("output.events.active", int64(5), receiverID),
+			gaugeMetricWithReceiverAttr("harvester.running", int64(3), receiverID),
+			gaugeMetricWithReceiverAttr("pipeline.clients", int64(2), receiverID),
+		},
+	}
+	result := collectReceiverMetrics([]metricdata.ScopeMetrics{sm})
+	require.Len(t, result, 1)
+	fields := result["filebeat-default"]
+	assert.Equal(t, int64(2), fields["beat.stats.filebeat.pipeline.clients"])
+	assert.Equal(t, int64(5), fields["beat.stats.filebeat.output.events.active"])
+	assert.Equal(t, int64(3), fields["beat.stats.filebeat.harvester.running"])
+}
+
+func TestCollectReceiverPipelineMetrics_WrongScopeSkipped(t *testing.T) {
+	// A scope from the OTel collector (not RegistryBridge) should be ignored.
+	sm := metricdata.ScopeMetrics{
+		Scope: esExporterScope("elasticsearch/_agent-component/monitoring"),
+		Metrics: []metricdata.Metrics{
+			gaugeMetric("pipeline.clients", int64(1)),
+		},
+	}
+	result := collectReceiverMetrics([]metricdata.ScopeMetrics{sm})
+	assert.Empty(t, result)
+}
+
+func TestCollectReceiverPipelineMetrics_NoReceiverAttr(t *testing.T) {
+	// Data points without a "receiver" attribute should be skipped.
+	sm := metricdata.ScopeMetrics{
+		Scope: registryBridgeScope(""),
+		Metrics: []metricdata.Metrics{
+			gaugeMetric("pipeline.clients", int64(1)),
+		},
+	}
+	result := collectReceiverMetrics([]metricdata.ScopeMetrics{sm})
+	assert.Empty(t, result)
+}
+
+func TestCollectReceiverPipelineMetrics_MultipleReceivers(t *testing.T) {
+	const fbReceiverID = "filebeatreceiver/_agent-component/filebeat-default"
+	const mbReceiverID = "metricbeatreceiver/_agent-component/metricbeat-default"
+	sm := metricdata.ScopeMetrics{
+		Scope: registryBridgeScope(""),
+		Metrics: []metricdata.Metrics{
+			gaugeMetricWithReceiverAttr("pipeline.clients", int64(2), fbReceiverID),
+			gaugeMetricWithReceiverAttr("pipeline.clients", int64(5), mbReceiverID),
+		},
+	}
+	result := collectReceiverMetrics([]metricdata.ScopeMetrics{sm})
+	require.Len(t, result, 2)
+	assert.Equal(t, int64(2), result["filebeat-default"]["beat.stats.filebeat.pipeline.clients"])
+	assert.Equal(t, int64(5), result["metricbeat-default"]["beat.stats.metricbeat.pipeline.clients"])
 }
 
 func TestAgentComponentID(t *testing.T) {
