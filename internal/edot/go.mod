@@ -33,7 +33,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/route53 v1.62.5
 	github.com/aws/aws-sdk-go-v2/service/securityhub v1.68.3
 	github.com/aws/aws-sdk-go-v2/service/wafv2 v1.71.3
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260327084845-7d7d034db35b
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260330180950-f558378e74b1
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.33.3
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
