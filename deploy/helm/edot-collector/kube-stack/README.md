@@ -1,44 +1,28 @@
 ## Kube-stack Helm Chart
 
-**More detailed documentation can be found [here](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md).**
+More detailed Kubernetes operator documentation is available [here](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md).
 
-The [kube-stack Helm Chart](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-kube-stack#readme) is used to manage the installation of the OpenTelemetry operator (including its CRDs) and to configure a suite of EDOT collectors, which instrument various Kubernetes components to enable comprehensive observability and monitoring.
+This directory contains the default `values.yaml` used to deploy the OpenTelemetry `kube-stack` chart with Elastic Distribution of OpenTelemetry (EDOT) collectors. The deployment installs the OpenTelemetry Operator and configures three collector roles:
 
-The chart is installed with a provided default [`values.yaml`](./values.yaml) file that can be customized when needed.
+- `daemon`: a DaemonSet that runs on every node to collect host metrics, kubelet metrics, pod logs, and receive OTLP traffic from instrumented workloads
+- `cluster`: a Deployment that collects cluster-wide Kubernetes events and cluster metrics
+- `gateway`: a Deployment that receives OTLP data from the other collectors, applies Elastic-specific processing, and exports data to Elasticsearch
 
-### DaemonSet collectors
+The included [`values.yaml`](./values.yaml) has been tested with `opentelemetry-kube-stack` chart version `0.3.3`.
 
-The OpenTelemetry components deployed within the DaemonSet EDOT collectors are responsible for observing specific signals from each node. To ensure complete data collection, these components must be deployed on every node in the cluster. Failing to do so will result in partial and potentially incomplete data.
+### Default data flow
 
-The DaemonSet collectors handle the following data:
+The default configuration in this directory enables the following telemetry paths:
 
-- Host Metrics: Collects host metrics specific to each node, utilizing the [hostmetrics receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/hostmetricsreceiver/README.md)
-- Kubernetes Metrics: Captures metrics related to the Kubernetes infrastructure on each node, utlilizing [kubeletstats](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/kubeletstatsreceiver/README.md) receiver
-- Logs: Utilizes [File Log Receiver receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver#readme) to gather logs from all Pods running on the respective node.
-- OTLP Traces: Utilizes [OTLP Receiver]( https://github.com/open-telemetry/opentelemetry-collector/blob/main/receiver/otlpreceiver#readme) which configures both HTTP and GRPC endpoints on the node to receive OTLP trace data.
-
-### Deployment collectors
-
-#### Cluster
-
-The OpenTelemetry components deployed within a Deployment collector focus on gathering data at the cluster level rather than at individual nodes.  A Deployment instance of the collector operates as a standalone (unlike DaemonSet collector instances, which are deployed on every node)
-
-The Cluster Deployment collector handles the following data:
-
-- Kubernetes Events: Monitors and collects events occurring across the entire Kubernetes cluster, utilizing [Kubernetes Events Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8seventsreceiver#readme).
-- Cluster Metrics: Captures metrics that provide insights into the overall health and performance of the Kubernetes cluster, utilizing [Kubernetes Cluster Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sclusterreceiver#readme).
-
-#### Gateway
-
-The OpenTelemetry components deployed within the `Gateway` Deployment collectors focus on processing and exporting OTLP data to Elasticsearch. Processing components:
-
-- [Elastic APM processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor): The processor enriches traces with elastic specific requirements. It uses opentelemetry-lib to perform the actual enrichments.
-- DEPRECATED: [Elastic Infra Metrics processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor): The Elastic Infra Metrics Processor is used to bridge the gap between OTEL and Elastic Infra Metrics. This processor is deprecated and will be removed in 9.2.0.
-- [Elastic APM connector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector): The Elastic APM connector produces aggregated Elastic APM-specific metrics from all telemetry signals.
+- Node-level logs from the `filelog` receiver are sent from the `daemon` collector to the `gateway`
+- Host and Kubernetes node metrics from `hostmetrics` and `kubeletstats` are sent from the `daemon` collector to the `gateway`
+- Cluster metrics and Kubernetes events are collected by the `cluster` collector and forwarded to the `gateway`
+- Application OTLP traffic is received by the `daemon` collector on ports `4317` and `4318`, then forwarded to the `gateway`
+- The `gateway` collector exports telemetry to Elasticsearch by using credentials from the `elastic-secret-otel` Kubernetes secret
 
 ### Auto-instrumentation
 
-The Helm Chart is configured to enable zero-code instrumentation using the [Operator's Instrumentation resource](https://github.com/open-telemetry/opentelemetry-operator/?tab=readme-ov-file#opentelemetry-auto-instrumentation-injection) for the following programming languages:
+The chart enables zero-code instrumentation through the Operator `Instrumentation` resource for these languages:
 
 - Go
 - Java
@@ -46,31 +30,113 @@ The Helm Chart is configured to enable zero-code instrumentation using the [Oper
 - Python
 - .NET
 
+By default, the Operator `Instrumentation` resource exports telemetry to the in-cluster daemon collector service:
+
+- `http://opentelemetry-kube-stack-daemon-collector.opentelemetry-operator-system.svc.cluster.local:4318`
+
+### Prerequisites
+
+- A Kubernetes cluster with permissions to install CRDs
+- `kubectl` configured for the target cluster
+- Helm 3
+- An Elasticsearch endpoint and API key
+
+### EKS-only IAM configuration
+
+If you deploy this chart on Amazon EKS and want AWS metadata enrichment to work correctly, configure IAM permissions before installing the chart.
+
+These AWS-specific steps are not required for GKE or other Kubernetes environments.
+
+1. Create an IAM policy in AWS IAM with the following document:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeTags",
+        "tag:GetResources"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+Name the policy `EKSElasticAgentPolicy`.
+
+2. Create an IAM role for the service account:
+
+```bash
+eksctl create iamserviceaccount \
+  --name elastic-agent \
+  --namespace elastic-agent \
+  --cluster your-cluster-name \
+  --attach-policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy \
+  --attach-policy-arn arn:aws:iam::YOUR_AWS_ACCOUNT_ID:policy/EKSElasticAgentPolicy \
+  --approve \
+  --override-existing-serviceaccounts
+```
+
+Replace:
+
+- `your-cluster-name` with your EKS cluster name
+- `YOUR_AWS_ACCOUNT_ID` with your AWS account ID
 
 ### Installation
 
-1. Create the `opentelemetry-operator-system` Kubernetes namespace:
-```
-$ kubectl create namespace opentelemetry-operator-system
+1. Create the namespace used by the OpenTelemetry Operator:
+
+```bash
+kubectl create namespace opentelemetry-operator-system
 ```
 
-2. Create a secret in Kubernetes with the following command.
-   ```
-   kubectl create -n opentelemetry-operator-system secret generic elastic-secret-otel \
-     --from-literal=elastic_endpoint='YOUR_ELASTICSEARCH_ENDPOINT' \
-     --from-literal=elastic_api_key='YOUR_ELASTICSEARCH_API_KEY'
-   ```
-   Don't forget to replace
-   - `YOUR_ELASTICSEARCH_ENDPOINT`: your Elasticsearch endpoint (*with* `https://` prefix example: `https://1234567.us-west2.gcp.elastic-cloud.com:443`).
-   - `YOUR_ELASTICSEARCH_API_KEY`: your Elasticsearch API Key
+2. Create the secret consumed by the `gateway` collector:
 
-3. Execute the following commands to deploy the Helm Chart.
-
+```bash
+kubectl create secret generic elastic-secret-otel \
+  -n opentelemetry-operator-system \
+  --from-literal=elastic_endpoint='YOUR_ELASTICSEARCH_ENDPOINT' \
+  --from-literal=elastic_api_key='YOUR_ELASTICSEARCH_API_KEY'
 ```
-$ helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
-$ helm repo update
-$ helm upgrade --install --namespace opentelemetry-operator-system opentelemetry-kube-stack open-telemetry/opentelemetry-kube-stack --values ./values.yaml --version 0.3.3
 
-> [!NOTE]
-> Refer to the [compatibility matrix](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md#compatibility-matrix) for a complete list of available manifests and associated helm chart versions.
+Replace:
+
+- `YOUR_ELASTICSEARCH_ENDPOINT` with your Elasticsearch endpoint, including the `https://` prefix, for example `https://1234567.us-west2.gcp.elastic-cloud.com:443`
+- `YOUR_ELASTICSEARCH_API_KEY` with an Elasticsearch API key that can ingest observability data
+
+3. Install the upstream chart by using the values file from this directory:
+
+```bash
+helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+helm repo update
+helm upgrade --install opentelemetry-kube-stack open-telemetry/opentelemetry-kube-stack \
+  --namespace opentelemetry-operator-system \
+  --create-namespace \
+  --values ./values.yaml \
+  --version 0.3.3
 ```
+
+Note: refer to the [compatibility matrix](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md#compatibility-matrix) for the supported manifest and chart combinations.
+
+### Verify the installation
+
+After installation, confirm that the Operator and collectors are running:
+
+```bash
+kubectl get pods -n opentelemetry-operator-system
+kubectl get opentelemetrycollectors -n opentelemetry-operator-system
+kubectl get instrumentation -n opentelemetry-operator-system
+```
+
+You should see collector resources for `daemon`, `cluster`, and `gateway`, plus the `elastic-instrumentation` resource when auto-instrumentation is enabled.
+
+### Common customizations
+
+- Set `clusterName` in [`values.yaml`](./values.yaml) if your Kubernetes provider does not automatically populate `k8s.cluster.name`
+- Disable `instrumentation.enabled` if you do not want Operator-managed auto-instrumentation
+- Adjust the `gateway` resource requests and limits for larger clusters or higher ingest volume
+- Update collector pipelines in [`values.yaml`](./values.yaml) if you need additional receivers, processors, or exporters
