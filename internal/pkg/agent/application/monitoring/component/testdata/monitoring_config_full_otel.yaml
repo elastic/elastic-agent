@@ -32,6 +32,10 @@ inputs:
     - drop_event:
         when:
           regexp:
+            otelcol.component.id: .*/_agent-component/monitoring$
+    - drop_event:
+        when:
+          regexp:
             message: ^Non-zero metrics in the last
     - drop_event:
         when:
