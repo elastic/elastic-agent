@@ -155,7 +155,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 
 	// remove existing directory
 	pt.Describe("Removing install directory")
-	err = RemovePath(topPath)
+	err = RemovePath(log, topPath)
 	if err != nil {
 		pt.Describe("Failed to remove install directory")
 		return aerrors.New(
@@ -280,29 +280,35 @@ func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (b
 // On Windows it is possible that a removal can spuriously error due
 // to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
 // seconds if it keeps getting that error.
-func RemovePath(path string) error {
+func RemovePath(log *logp.Logger, path string) error {
 	const arbitraryTimeout = 60 * time.Second
 	start := time.Now()
 	var lastErr error
+	attempt := 0
 	for time.Since(start) <= arbitraryTimeout {
+		attempt++
 		lastErr = os.RemoveAll(path)
 
 		if lastErr == nil || !isRetryableError(lastErr) {
 			return lastErr
 		}
 
+		log.Debugf("RemovePath attempt %d failed after %s: %v", attempt, time.Since(start).Truncate(time.Millisecond), lastErr)
+
 		if isBlockingOnExe(lastErr) {
-			// Schedule the blocking exe and its ancestor directories for
-			// deletion on reboot. os.RemoveAll already deleted everything
-			// it could; only the exe and its parent dirs remain.
-			scheduleDeleteOnReboot(lastErr, path)
-			// One more RemoveAll to clean up directories that may now be
-			// empty after the previous pass.
-			if err := os.RemoveAll(path); err == nil {
-				return nil
+			// Rename the blocked exe in place (recognizable prefix) and
+			// schedule it for deletion on reboot. os.RemoveAll already
+			// deleted everything it could; only the exe and its ancestor
+			// dirs remain.
+			if err := scheduleDeleteOnReboot(log, lastErr, path); err != nil {
+				log.Errorf("Failed to schedule blocked file for removal: %v. You may need to manually delete %q.", err, path)
+				return fmt.Errorf("failed to handle blocked executable in %q: %w", path, err)
 			}
-			// The exe and its ancestor dirs are still present but scheduled
-			// for reboot deletion. Consider this a success.
+			// Try RemoveAll again — the original exe path is now free
+			// after the rename, so more of the tree may be removable.
+			if err := os.RemoveAll(path); err != nil {
+				log.Warnf("Some files in %q could not be removed and are scheduled for deletion on reboot or next install.", path)
+			}
 			return nil
 		}
 
@@ -312,9 +318,9 @@ func RemovePath(path string) error {
 	return fmt.Errorf("timed out while removing %q. Last error: %w", path, lastErr)
 }
 
-func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
+func RemoveBut(log *logp.Logger, path string, bestEffort bool, exceptions ...string) error {
 	if len(exceptions) == 0 {
-		return RemovePath(path)
+		return RemovePath(log, path)
 	}
 
 	files, err := os.ReadDir(path)
@@ -327,7 +333,7 @@ func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
 			continue
 		}
 
-		err = RemovePath(filepath.Join(path, f.Name()))
+		err = RemovePath(log, filepath.Join(path, f.Name()))
 		if !bestEffort && err != nil {
 			return fmt.Errorf("error removing path %s: %w", f.Name(), err)
 		}

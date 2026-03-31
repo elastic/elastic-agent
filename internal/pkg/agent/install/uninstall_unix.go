@@ -6,13 +6,19 @@
 
 package install
 
-import "os"
+import (
+	"os"
+
+	"github.com/elastic/elastic-agent-libs/logp"
+)
 
 func isBlockingOnExe(_ error) bool {
 	return false
 }
 
-func scheduleDeleteOnReboot(_ error, _ string) {}
+func scheduleDeleteOnReboot(_ *logp.Logger, _ error, _ string) error { return nil }
+
+func cleanupLeftoverRenames(_ string) error { return nil }
 
 func isRetryableError(_ error) bool {
 	return false

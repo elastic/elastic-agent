@@ -64,7 +64,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt Pr
 		}
 	}
 
-	err = setupInstallPath(topPath, ownership)
+	err = setupInstallPath(log, topPath, ownership)
 	if err != nil {
 		return utils.FileOwner{}, fmt.Errorf("error setting up install path: %w", err)
 	}
@@ -208,13 +208,14 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt Pr
 }
 
 // setup the basic topPath, and the .installed file
-func setupInstallPath(topPath string, ownership utils.FileOwner) error {
-	// Clean up any remnants from a previous installation. On Windows,
-	// uninstall may leave behind the running executable (scheduled for
-	// deletion on reboot via MoveFileEx). By the time a new install runs
-	// the old process is gone, so these files can now be deleted normally.
-	if err := os.RemoveAll(topPath); err != nil {
-		return errors.New(err, fmt.Sprintf("failed to clean up previous installation at (%s)", topPath), errors.M("directory", topPath))
+func setupInstallPath(log *logp.Logger, topPath string, ownership utils.FileOwner) error {
+	// Clean up renamed executables left behind by a previous uninstall. On
+	// Windows, uninstall renames the running executable (with a recognizable
+	// prefix) and schedules it for deletion on reboot. If the system was not
+	// rebooted before reinstalling, these files are still present but no
+	// longer locked, so we can delete them now.
+	if err := cleanupLeftoverRenames(topPath); err != nil {
+		log.Warnf("Failed to clean up leftover files from a previous installation in %q: %v. You may need to delete them manually.", topPath, err)
 	}
 
 	// ensure parent directory exists

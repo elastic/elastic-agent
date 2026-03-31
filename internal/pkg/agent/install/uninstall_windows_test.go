@@ -11,12 +11,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 
 	cp "github.com/otiai10/copy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 // startBlockingExe copies the testblocking binary into destDir and starts it.
@@ -62,7 +65,7 @@ func TestRemovePath(t *testing.T) {
 
 	startBlockingExe(t, destDir)
 
-	err := RemovePath(destDir)
+	err := RemovePath(logp.L(), destDir)
 	assert.NoError(t, err)
 }
 
@@ -117,9 +120,9 @@ func TestRemoveAllSucceedsAfterRename(t *testing.T) {
 	assert.ErrorIs(t, err, fs.ErrNotExist)
 }
 
-// TestScheduleDeleteOnReboot verifies that scheduleDeleteOnReboot marks the
-// blocked file and its ancestor directories for reboot deletion without moving
-// the file.
+// TestScheduleDeleteOnReboot verifies that scheduleDeleteOnReboot renames the
+// blocked executable in place with the leftover prefix and keeps it in the
+// same directory.
 func TestScheduleDeleteOnReboot(t *testing.T) {
 	tmpDir := t.TempDir()
 	destDir := filepath.Join(tmpDir, "target")
@@ -128,11 +131,25 @@ func TestScheduleDeleteOnReboot(t *testing.T) {
 	_, exePath := startBlockingExe(t, destDir)
 
 	blockingErr := makeBlockingError(exePath)
-	scheduleDeleteOnReboot(blockingErr, destDir)
+	err := scheduleDeleteOnReboot(logp.L(), blockingErr, destDir)
+	require.NoError(t, err)
 
-	// The file should still be in its original location (no move).
-	_, err := os.Stat(exePath)
-	assert.NoError(t, err, "exe should still exist at original path after scheduling reboot deletion")
+	// The original path should be gone (renamed).
+	_, err = os.Stat(exePath)
+	assert.ErrorIs(t, err, fs.ErrNotExist, "original exe path should no longer exist")
+
+	// A file with the leftover prefix should exist in the same directory.
+	entries, err := os.ReadDir(destDir)
+	require.NoError(t, err)
+
+	var found bool
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), leftoverPrefix) {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "renamed file with prefix %q should exist in %s", leftoverPrefix, destDir)
 }
 
 // TestRemoveAllDeletesEverythingExceptBlockingExe verifies that os.RemoveAll

@@ -8,12 +8,22 @@ package install
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 )
+
+// leftoverPrefix is used to rename blocked executables during uninstall.
+// Files with this prefix are cleaned up on the next install.
+const leftoverPrefix = ".elastic-agent-leftover"
 
 func isBlockingOnExe(err error) bool {
 	if err == nil {
@@ -37,17 +47,35 @@ func isRetryableError(err error) bool {
 	return errno == syscall.ERROR_ACCESS_DENIED || errno == windows.ERROR_SHARING_VIOLATION
 }
 
-// scheduleDeleteOnReboot marks the blocked file for deletion on the next
-// reboot using MoveFileEx/MOVEFILE_DELAY_UNTIL_REBOOT. The file is not moved
-// or renamed, which avoids triggering EDR software. The ancestor directories
-// are left in place.
-func scheduleDeleteOnReboot(blockingErr error, _ string) {
+// scheduleDeleteOnReboot renames the blocked executable in place (same
+// directory, recognizable prefix) and schedules it for deletion on the next
+// reboot via MoveFileEx/MOVEFILE_DELAY_UNTIL_REBOOT. Renaming in-place avoids
+// triggering EDR software. On the next install, any leftover files matching
+// the prefix are cleaned up by cleanupLeftoverRenames.
+func scheduleDeleteOnReboot(log *logp.Logger, blockingErr error, _ string) error {
 	blockedPath, _ := getPathFromError(blockingErr)
 	if blockedPath == "" {
-		return
+		return nil
 	}
 
-	_ = markDeleteOnReboot(blockedPath)
+	dir := filepath.Dir(blockedPath)
+	ext := filepath.Ext(blockedPath)
+	renamed := filepath.Join(dir, fmt.Sprintf("%s-%d%s", leftoverPrefix, time.Now().UnixNano(), ext))
+
+	if err := os.Rename(blockedPath, renamed); err != nil {
+		return fmt.Errorf("failed to rename %q to %q: %w", blockedPath, renamed, err)
+	}
+	log.Infof("Renamed blocked executable %q to %q", blockedPath, renamed)
+
+	if err := markDeleteOnReboot(renamed); err != nil {
+		log.Warnf("Failed to schedule %q for deletion on reboot: %v. The file will be cleaned up on next install.", renamed, err)
+		// Not fatal — the file is already renamed out of the way and will
+		// be cleaned up by cleanupLeftoverRenames on next install.
+	} else {
+		log.Infof("Scheduled %q for deletion on reboot", renamed)
+	}
+
+	return nil
 }
 
 // markDeleteOnReboot schedules a file or directory for deletion on the next
@@ -59,6 +87,25 @@ func markDeleteOnReboot(path string) error {
 		return err
 	}
 	return windows.MoveFileEx(p, nil, windows.MOVEFILE_DELAY_UNTIL_REBOOT)
+}
+
+// cleanupLeftoverRenames walks topPath and removes any files left behind by
+// a previous uninstall's scheduleDeleteOnReboot (files matching leftoverPrefix).
+// By the time a new install runs, the old process is gone and these files can
+// be deleted normally.
+func cleanupLeftoverRenames(topPath string) error {
+	return filepath.WalkDir(topPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // best-effort: skip inaccessible entries
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if strings.HasPrefix(d.Name(), leftoverPrefix) {
+			_ = os.Remove(path)
+		}
+		return nil
+	})
 }
 
 func getPathFromError(blockingErr error) (string, syscall.Errno) {
