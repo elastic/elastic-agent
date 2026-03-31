@@ -184,7 +184,7 @@ func generateServiceData(
 	namespaceAnnotations mapstr.M) *serviceData {
 	host := service.Spec.ClusterIP
 
-	// If a service doesn't have an IP then dont monitor it
+	// If a service doesn't have an IP, then don't monitor it
 	if host == "" {
 		return nil
 	}

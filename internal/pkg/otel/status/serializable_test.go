@@ -945,8 +945,8 @@ func TestAggregateStatusHelper(t *testing.T) {
 		assert.Nil(t, result.Err())
 		assert.NotNil(t, result.ComponentStatusMap)
 		assert.Empty(t, result.ComponentStatusMap)
-		assert.NotNil(t, result.Attributes())
-		assert.Empty(t, result.Attributes().AsRaw())
+		assert.NotNil(t, result.Event)
+		assert.Empty(t, result.Event.Attributes().AsRaw())
 	})
 
 	t.Run("creates status with error", func(t *testing.T) {

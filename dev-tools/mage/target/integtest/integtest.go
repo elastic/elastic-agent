@@ -27,7 +27,7 @@ func RegisterGoTestDeps(deps ...interface{}) {
 	goTestDeps = append(goTestDeps, deps...)
 }
 
-// WhitelistEnvVar whitelists an environment variable to enabled it to be
+// WhitelistEnvVar whitelists an environment variable to enable it to be
 // passed into the clean integration test environment (Docker).
 func WhitelistEnvVar(key ...string) {
 	whitelistedEnvVars = append(whitelistedEnvVars, key...)

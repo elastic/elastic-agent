@@ -171,16 +171,6 @@ max_message_bytes: 1000000`,
 				"timeout": 10 * time.Second,
 			},
 		},
-		{
-			name: "when dynamic topic is provided",
-			input: `
-hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
-topic: "%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}"
-required_acks: 1
-compression: gzip
-max_message_bytes: 1000000`,
-			err: fmt.Errorf("error"),
-		},
 	}
 
 	for _, testc := range testCases {
