@@ -1037,20 +1037,6 @@ func dockerCommitHash(cfg *devtools.Settings) string {
 	return ""
 }
 
-func getVersion() string {
-	version, found := os.LookupEnv("BEAT_VERSION")
-	if !found {
-		version = bversion.GetDefaultVersion()
-	}
-	if !strings.Contains(version, "SNAPSHOT") {
-		if _, ok := os.LookupEnv(snapshotEnv); ok {
-			version += "-SNAPSHOT"
-		}
-	}
-
-	return version
-}
-
 func runAgent(ctx context.Context, env map[string]string) error {
 	// Configure for linux/amd64 only to improve build time
 	cfg := devtools.SettingsFromContext(ctx).WithPlatforms("+all linux/amd64")
