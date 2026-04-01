@@ -81,10 +81,7 @@ type OTelManager struct {
 	// they should be reported as failed components to the elastic-agent
 	errCh chan error
 
-	// Agent info and monitoring config getter for otel config generation
-	agentInfo                  info.Agent
-	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter
-
+	agentInfo        info.Agent
 	healthCheckExtID string
 	collectorCfg     *confmap.Conf
 	components       []component.Component
@@ -141,7 +138,6 @@ func NewOTelManager(
 	collectorLogger *logger.Logger,
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
-	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
 ) (*OTelManager, error) {
 	var exec collectorExecution
@@ -179,13 +175,12 @@ func NewOTelManager(
 	}
 
 	return &OTelManager{
-		managerLogger:              logger,
-		collectorLogger:            collectorLogger,
-		agentInfo:                  agentInfo,
-		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
-		healthCheckExtID:           fmt.Sprintf("extension:healthcheckv2/%s", hcUUIDStr),
-		errCh:                      make(chan error, 1), // holds at most one error
-		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
+		managerLogger:     logger,
+		collectorLogger:   collectorLogger,
+		agentInfo:         agentInfo,
+		healthCheckExtID:  fmt.Sprintf("extension:healthcheckv2/%s", hcUUIDStr),
+		errCh:             make(chan error, 1), // holds at most one error
+		collectorStatusCh: make(chan *status.AggregateStatus, 1),
 		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
 		// any possible case of deadlock, 5 is used just to give a small buffer.
 		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
@@ -287,7 +282,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.managerLogger)
+			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.managerLogger)
 			if err != nil {
 				// critical error, merging the configuration should always work
 				reportErr(ctx, m.errCh, err)
@@ -422,7 +417,6 @@ func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Con
 func buildMergedConfig(
 	cfgUpdate configUpdate,
 	agentInfo info.Agent,
-	monitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
@@ -432,7 +426,7 @@ func buildMergedConfig(
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, monitoringConfigGetter, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}

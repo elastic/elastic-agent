@@ -14,7 +14,6 @@ import (
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/monitoringhelpers"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -46,9 +45,7 @@ const (
 	elasticsearchStateStoreExtensionName  = "elasticsearch_storage"
 )
 
-// BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
 type (
-	BeatMonitoringConfigGetter func(unitID, binary string) map[string]any
 	// exporter translation logic takes output config, output name, logger
 	// and returns exporter config, processor config (if any) and error
 	exporterConfigTranslationFunc func(*config.C, string, *logp.Logger) (map[string]any, map[string]any, error)
@@ -69,7 +66,6 @@ var (
 func GetOtelConfig(
 	model *component.Model,
 	info info.Agent,
-	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	components := getSupportedComponents(logger, model)
@@ -80,7 +76,7 @@ func GetOtelConfig(
 	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
 	for _, comp := range components {
-		componentConfig, compErr := getCollectorConfigForComponent(comp, info, beatMonitoringConfigGetter, logger)
+		componentConfig, compErr := getCollectorConfigForComponent(comp, info, logger)
 		if compErr != nil {
 			return nil, compErr
 		}
@@ -174,9 +170,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 
 	// check if the actual configuration is supported. We need to actually generate the config and look for
 	// the right kind of error
-	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, func(unitID, binary string) map[string]any {
-		return nil
-	}, logp.NewNopLogger())
+	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, logp.NewNopLogger())
 	if errors.Is(compErr, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
 	}
@@ -263,7 +257,6 @@ func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
 func getCollectorConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
-	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	exporterType, err := OutputTypeToExporterType(comp.OutputType)
@@ -275,7 +268,7 @@ func getCollectorConfigForComponent(
 	if err != nil {
 		return nil, err
 	}
-	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig, beatMonitoringConfigGetter)
+	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +353,6 @@ func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
 	outputQueueConfig map[string]any,
-	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 ) (map[string]any, error) {
 	receiverType, err := getReceiverTypeForComponent(comp)
 	if err != nil {
@@ -431,26 +423,8 @@ func getReceiversConfigForComponent(
 		receiverConfig["queue"] = outputQueueConfig
 	}
 
-	// add monitoring config if necessary
-	// we enable the basic monitoring endpoint by default, because we want to use it for diagnostics even if
-	// agent self-monitoring is disabled
-	var monitoringConfig map[string]any
-	if beatMonitoringConfigGetter != nil {
-		monitoringConfig = beatMonitoringConfigGetter(comp.ID, beatName)
-	}
-
-	if monitoringConfig == nil {
-		endpoint := monitoringhelpers.BeatsMonitoringEndpoint(comp.ID)
-		monitoringConfig = map[string]any{
-			"http": map[string]any{
-				"enabled": true,
-				"host":    endpoint,
-			},
-		}
-	}
 	// indicate that beat receivers are managed by the elastic-agent
 	receiverConfig["management.otel.enabled"] = true
-	koanfmaps.Merge(monitoringConfig, receiverConfig)
 
 	return map[string]any{
 		receiverId.String(): receiverConfig,

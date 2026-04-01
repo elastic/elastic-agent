@@ -664,28 +664,31 @@ func (b *BeatsMonitor) getHttpStreams(
 		endpoints := []any{PrefixedEndpoint(monitoringhelpers.BeatsMonitoringEndpoint(compInfo.ID))}
 		name := sanitizeName(binaryName)
 
-		// Do not create http streams if runtime-manager is otel and binary is of beat type
-		if compInfo.RuntimeManager != component.OtelRuntimeManager || !strings.HasSuffix(binaryName, "beat") {
-			httpStream := map[string]any{
-				idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
-				"data_stream": map[string]any{
-					"type":      "metrics",
-					"dataset":   dataset,
-					"namespace": monitoringNamespace,
-				},
-				"metricsets": []any{"json"},
-				"hosts":      endpoints,
-				"path":       "/stats",
-				"namespace":  "agent",
-				"period":     metricsCollectionIntervalString,
-				"index":      indexName,
-				"processors": processorsForHttpStream(binaryName, compInfo.ID, dataset, b.agentInfo, compInfo.RuntimeManager),
-			}
-			if failureThreshold != nil {
-				httpStream[failureThresholdKey] = *failureThreshold
-			}
-			httpStreams = append(httpStreams, httpStream)
+		// OTel-managed components don't expose the HTTP stats endpoint, so skip all
+		// HTTP scraping streams for them. Their metrics flow through the elasticmonitoring
+		// receiver via OTel internal telemetry instead.
+		if compInfo.RuntimeManager == component.OtelRuntimeManager {
+			continue
 		}
+		httpStream := map[string]any{
+			idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
+			"data_stream": map[string]any{
+				"type":      "metrics",
+				"dataset":   dataset,
+				"namespace": monitoringNamespace,
+			},
+			"metricsets": []any{"json"},
+			"hosts":      endpoints,
+			"path":       "/stats",
+			"namespace":  "agent",
+			"period":     metricsCollectionIntervalString,
+			"index":      indexName,
+			"processors": processorsForHttpStream(binaryName, compInfo.ID, dataset, b.agentInfo, compInfo.RuntimeManager),
+		}
+		if failureThreshold != nil {
+			httpStream[failureThresholdKey] = *failureThreshold
+		}
+		httpStreams = append(httpStreams, httpStream)
 		// specifically for filebeat, we include input metrics
 		if strings.EqualFold(name, "filebeat") {
 			fbDataStreamName := "filebeat_input"
@@ -728,6 +731,13 @@ func (b *BeatsMonitor) getBeatsStreams(
 	for _, compInfo := range componentInfos {
 		binaryName := compInfo.BinaryName
 		if !isSupportedBeatsBinary(binaryName) {
+			continue
+		}
+
+		// OTel-managed components don't expose the HTTP stats endpoint (http.enabled is not
+		// set), so skip generating beat.stats scraping streams for them. Their metrics are
+		// instead collected via the elasticmonitoring receiver through OTel internal telemetry.
+		if compInfo.RuntimeManager == component.OtelRuntimeManager {
 			continue
 		}
 
