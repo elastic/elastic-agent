@@ -38,11 +38,12 @@ func NamespaceTopPath(namespace string) string {
 }
 
 type CheckOpts struct {
-	Privileged bool
-	Namespace  string
-	Username   string
-	Group      string
-	Version    string
+	Privileged    bool
+	Namespace     string
+	Username      string
+	Group         string
+	StartVersion  string
+	TargetVersion string
 }
 
 func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts *CheckOpts) error {

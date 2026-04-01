@@ -60,7 +60,7 @@ func postInstall(topPath string, ownership utils.FileOwner) error {
 	if err := UpsertUninstallEntry(topPath, release.VersionWithSnapshot()); err != nil {
 		return err
 	}
-	if err := configureRegistryPermissions(ownership); err != nil {
+	if err := ConfigureRegistryPermissions(ownership); err != nil {
 		return err
 	}
 

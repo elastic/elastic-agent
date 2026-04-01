@@ -37,7 +37,7 @@ func configureServicePermissions(_ utils.FileOwner) error {
 	return nil
 }
 
-func configureRegistryPermissions(_ utils.FileOwner) error {
+func ConfigureRegistryPermissions(_ utils.FileOwner) error {
 	// do nothing on unix
 	return nil
 }
@@ -49,10 +49,5 @@ func UpsertUninstallEntry(_, _ string) error {
 
 // RemoveUninstallEntry is a no-op on non-Windows platforms.
 func RemoveUninstallEntry() error {
-	return nil
-}
-
-// RemoveMSIUninstallEntries is a no-op on non-Windows platforms.
-func RemoveMSIUninstallEntries() error {
 	return nil
 }

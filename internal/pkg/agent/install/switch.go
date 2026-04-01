@@ -13,7 +13,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -91,29 +90,11 @@ func SwitchExecutingMode(topPath string, pt ProgressDescriber, username string, 
 	// **end critical section**
 	// service is now re-created and started
 
-	// Ensure the uninstall registry entry exists and has the correct ACL.
-	// The entry may not exist when switching modes after upgrading from an old version.
-	pt.Describe("Ensuring uninstall registry entry")
-	err = UpsertUninstallEntry(topPath, release.VersionWithSnapshot())
-	if err != nil {
-		pt.Describe("Failed to create uninstall registry entry")
-		return err
-	}
-
+	// update the registry ACL so the new service user can update the entry on future upgrades
 	pt.Describe("Configuring registry permissions")
-	err = configureRegistryPermissions(ownership)
+	err = ConfigureRegistryPermissions(ownership)
 	if err != nil {
-		pt.Describe("Failed to configure registry permissions")
-		return err
-	}
-
-	// The MSI ProductCode GUID is version-specific and stale after upgrade,
-	// so we use our own stable key and remove the MSI one to avoid duplicates.
-	pt.Describe("Removing MSI uninstall registry entry")
-	err = RemoveMSIUninstallEntries()
-	if err != nil {
-		pt.Describe("Failed to remove MSI uninstall registry entry")
-		return err
+		pt.Describe(fmt.Sprintf("Failed to configure registry permissions: %s", err.Error()))
 	}
 
 	return nil

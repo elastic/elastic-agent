@@ -156,10 +156,10 @@ func RemoveUninstallEntry() error {
 	return nil
 }
 
-// configureRegistryPermissions sets the security descriptor for the uninstall registry key
+// ConfigureRegistryPermissions sets the security descriptor for the uninstall registry key
 //
 // gives user the ability to update the registry entry, needed when installed with --unprivileged.
-func configureRegistryPermissions(ownership utils.FileOwner) error {
+func ConfigureRegistryPermissions(ownership utils.FileOwner) error {
 	keyPath := agentUninstallKeyPath()
 	// https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/sddl-for-device-objects
 	sddl := "D:(A;;GA;;;SY)" + // SDDL_LOCAL_SYSTEM -> SDDL_GENERIC_ALL
