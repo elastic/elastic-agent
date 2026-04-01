@@ -491,14 +491,14 @@ func TestGCPCredentials_ProjectID(t *testing.T) {
 			name: "derived from service account email (preferred)",
 			cfg: GCPCredentials{
 				ServiceAccountEmail:      "sa@my-project.iam.gserviceaccount.com",
-				WorkloadIdentityProvider: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/p",
+				Audience: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/p",
 			},
 			want: "my-project",
 		},
 		{
 			name: "fallback to WIF audience when no service account email",
 			cfg: GCPCredentials{
-				WorkloadIdentityProvider: "//iam.googleapis.com/projects/987654321/locations/global/workloadIdentityPools/pool/providers/p",
+				Audience: "//iam.googleapis.com/projects/987654321/locations/global/workloadIdentityPools/pool/providers/p",
 			},
 			want: "987654321",
 		},
@@ -506,7 +506,7 @@ func TestGCPCredentials_ProjectID(t *testing.T) {
 			name: "non-service-account email falls back to WIF",
 			cfg: GCPCredentials{
 				ServiceAccountEmail:      "user@example.com",
-				WorkloadIdentityProvider: "//iam.googleapis.com/projects/555/locations/global/workloadIdentityPools/pool/providers/p",
+				Audience: "//iam.googleapis.com/projects/555/locations/global/workloadIdentityPools/pool/providers/p",
 			},
 			want: "555",
 		},
