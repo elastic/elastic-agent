@@ -147,6 +147,12 @@ require (
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
+<<<<<<< HEAD
+=======
+	github.com/elastic/go-docappender/v2 v2.14.0 // indirect
+	github.com/elastic/go-freelru v0.16.0 // indirect
+	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
+>>>>>>> a3cd4a3e1 (build(deps): bump github.com/elastic/go-docappender/v2 from 2.13.0 to 2.14.0 (#13399))
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
