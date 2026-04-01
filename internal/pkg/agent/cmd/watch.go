@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -255,33 +254,24 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			// that agent was rolled back and the reason
 			removeMarker = false
 		}
-		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, WithRemoveMarker(removeMarker))
+
+		// remove the registry entry when rolling back to pre-9.4 agents that don't manage it,
+		// for >= 9.4 the old agent's handleUpgrade() will update it on restart
+		revertRegistryHook := func(ctx context.Context, log *logger.Logger, topDirPath string) error {
+			if versionParseErr == nil && previousVersion.Less(*semver.NewParsedSemVer(9, 4, 0, "SNAPSHOT", "")) {
+				if err := install.RemoveUninstallEntry(); err != nil {
+					log.Warnf("failed to remove uninstall registry entry during rollback: %v", err)
+				}
+			}
+			return nil
+		}
+
+		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, WithRemoveMarker(removeMarker), WithPreRestartHook(revertRegistryHook))
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)
 		}
 		return err
-	}
-
-	// This runs in the watcher (new binary) rather than in the upgrader (old binary)
-	// so it works even when upgrading from a version that didn't write an
-	// uninstall registry entry.
-	if err := install.UpsertUninstallEntry(topDir, marker.Version); err != nil {
-		// Unprivileged upgrades from versions that didn't write an uninstall
-		// registry entry lack the registry key ACL, so the watcher cannot write
-		// to HKLM. This is expected and can be fixed by running
-		// 'elastic-agent unprivileged -f' which sets the correct ACL.
-		if errors.Is(err, os.ErrPermission) || strings.Contains(err.Error(), "Access is denied") {
-			log.Infof("insufficient permissions to update uninstall registry entry, can be fixed by running 'elastic-agent unprivileged -f'")
-		} else {
-			log.Warnf("failed to update uninstall registry entry: %v", err)
-		}
-	} else {
-		// The MSI ProductCode GUID is version-specific and stale after upgrade,
-		// so we use our own stable key and remove the MSI one to avoid duplicates.
-		if err := install.RemoveMSIUninstallEntries(); err != nil {
-			log.Warnf("failed to remove MSI uninstall registry entry: %v", err)
-		}
 	}
 
 	// watch succeeded - upgrade was successful!

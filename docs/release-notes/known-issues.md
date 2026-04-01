@@ -26,7 +26,7 @@ Known issues are significant defects or limitations that may impact your impleme
 :::{dropdown} Windows Add/Remove Programs entry not created after unprivileged upgrade from pre-9.4.0
 **Applies to: {{agent}} 9.4.0+**
 
-Starting in 9.4.0, {{agent}} registers an entry in the Windows Add/Remove Programs list during installation. When upgrading from a version before 9.4.0 in **unprivileged** mode, the upgrade watcher does not have permission to create the registry entry because the required ACL was never set by the older version.
+Starting in 9.4.0, {{agent}} registers an entry in the Windows Add/Remove Programs list during installation. When upgrading from a version before 9.4.0 in **unprivileged** mode, the new agent does not have permission to create the registry entry because the required ACL was never set by the older version.
 
 **Workaround**
 
