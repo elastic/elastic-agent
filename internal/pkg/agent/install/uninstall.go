@@ -145,7 +145,9 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	// platform-specific post-uninstall tasks
 	err = postUninstall()
 	if err != nil {
-		return fmt.Errorf("failed to perform post-uninstall tasks: %w", err)
+		pt.Describe(fmt.Sprintf("Failed to perform post-uninstall tasks: %s", err))
+	} else {
+		pt.Describe("Successfully performed post-uninstall tasks")
 	}
 
 	// remove, if present on platform
