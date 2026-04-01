@@ -93,7 +93,7 @@ type componentRuntimeState struct {
 	actions   map[string]func(*proto.ActionResponse)
 }
 
-func newComponentRuntimeState(ctx context.Context, m *Manager, logger *logger.Logger, monitor MonitoringManager, comp component.Component, isLocal bool) (*componentRuntimeState, error) {
+func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor MonitoringManager, comp component.Component, isLocal bool) (*componentRuntimeState, error) {
 	comm, err := newRuntimeComm(logger, m.getListenAddr(), m.ca, m.agentInfo, m.grpcConfig.MaxMsgSize)
 	if err != nil {
 		return nil, err
@@ -119,12 +119,12 @@ func newComponentRuntimeState(ctx context.Context, m *Manager, logger *logger.Lo
 	state.currComp.Store(&comp)
 
 	// Start the goroutine that spawns and monitors the component runtime.
-	go state.runLoop(ctx)
+	go state.runLoop()
 
 	return state, nil
 }
 
-func (s *componentRuntimeState) runLoop(ctx context.Context) {
+func (s *componentRuntimeState) runLoop() {
 	// start the go-routine that operates the runtime for the component
 	runtimeRunner := runner.Start(context.Background(), func(ctx context.Context) error {
 		defer s.comm.destroy()
@@ -132,44 +132,11 @@ func (s *componentRuntimeState) runLoop(ctx context.Context) {
 		return nil
 	})
 
-	// Watch for the runner to finish or the manager context to be cancelled.
-	// The runner uses context.Background() and must be explicitly stopped
-	// via runtimeRunner.Stop(), which triggers commandRuntime.Run() to see
-	// ctx.Done() and call waitOrKill() to kill and reap child processes.
 	for {
 		select {
 		case <-runtimeRunner.Done():
 			// Exit from the watcher loop only when the runner is done
 			return
-		case <-ctx.Done():
-			// Manager context cancelled (coordinator shutdown).
-			// Stop the runner, drain s.runtime.Watch() and remove ourselves
-			// from the manager's map so shutdown() doesn't hang waiting for us.
-			//
-			// We must keep draining s.runtime.Watch() while waiting for
-			// Done(): commandRuntime.Run() calls sendObserved() which does a
-			// blocking send on c.ch (= s.runtime.Watch()). If Run() is
-			// mid-send when we stop selecting on Watch(), the send blocks
-			// forever and Run() never returns to its select to see
-			// ctx.Done() — a deadlock. Draining here unblocks any
-			// in-flight send so Run() can exit cleanly.
-			runtimeRunner.Stop()
-			done := runtimeRunner.Done()
-			for {
-				select {
-				case <-done:
-					s.manager.currentMx.Lock()
-					// Deletion is required for deadlock avoidance, see:
-					// https://github.com/elastic/elastic-agent/pull/2729
-					delete(s.manager.current, s.id)
-					s.manager.currentMx.Unlock()
-					return
-				case <-s.runtime.Watch():
-					// Discard state: we're shutting down and have already called
-					// runtimeRunner.Stop(). We only drain Watch() to unblock any
-					// in-flight sendObserved() call so Run() can exit cleanly.
-				}
-			}
 		case componentState := <-s.runtime.Watch():
 			s.latestMx.Lock()
 			s.latestState = componentState

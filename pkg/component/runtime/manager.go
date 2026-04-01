@@ -292,7 +292,7 @@ LOOP:
 			go func(model component.Model) {
 				// Run the update with tearDown set to true since this is coming
 				// from a user-initiated policy update
-				err := m.update(ctx, model, true)
+				err := m.update(model, true)
 
 				// When update is done, send its result back to the coordinator,
 				// unless we're shutting down.
@@ -748,7 +748,7 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 // It is only called by the main runtime manager goroutine in Manager.Run.
 //
 // This returns as soon as possible, work is performed in the background.
-func (m *Manager) update(ctx context.Context, model component.Model, teardown bool) error {
+func (m *Manager) update(model component.Model, teardown bool) error {
 	touched := make(map[string]bool)
 	newComponents := make([]component.Component, 0, len(model.Components))
 	for _, comp := range model.Components {
@@ -802,7 +802,7 @@ func (m *Manager) update(ctx context.Context, model component.Model, teardown bo
 	for _, comp := range newComponents {
 		// new component; create its runtime
 		logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
-		state, err := newComponentRuntimeState(ctx, m, logger, m.monitor, comp, m.isLocal)
+		state, err := newComponentRuntimeState(m, logger, m.monitor, comp, m.isLocal)
 		if err != nil {
 			return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
 		}
@@ -864,10 +864,8 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) error {
 // Called from Manager's Run goroutine.
 func (m *Manager) shutdown() {
 	// don't tear down as this is just a shutdown, so components most likely will come back
-	// on next start of the manager.
-	// Pass context.Background() since shutdown removes all components
-	// and update() will not create new runtimes that need the manager ctx.
-	_ = m.update(context.Background(), component.Model{Components: []component.Component{}}, false)
+	// on next start of the manager
+	_ = m.update(component.Model{Components: []component.Component{}}, false)
 
 	// wait until all components are removed
 	for {

@@ -169,11 +169,6 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 	for {
 		select {
 		case <-ctx.Done():
-			if c.proc != nil {
-				_ = c.proc.Stop() // SIGTERM
-				// Make sure the process terminates and does not stay as a zombie.
-				c.waitOrKill()
-			}
 			return ctx.Err()
 		case as := <-c.actionCh:
 			c.actionState = as
@@ -438,25 +433,23 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 
 	// cleanup reserved resources related to monitoring
 	defer c.monitor.Cleanup(c.current.ID) //nolint:errcheck // this is ok
-	cmdSpec := c.getCommandSpec()
-	go func(info *process.Info, timeout time.Duration) {
-		t := time.NewTimer(timeout)
-		defer t.Stop()
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			// kill no matter what (might already be stopped)
-			c.log.Debugf("timeout waiting for pid %d, killing it", c.proc.PID)
-			_ = info.Kill()
-		}
-	}(c.proc, cmdSpec.Timeouts.Stop)
 
 	c.log.Debugf("gracefully stopping pid %d", c.proc.PID)
+	_ = c.proc.Stop() // SIGTERM
 
-	if stopErr := c.proc.Stop(); stopErr != nil {
-		return fmt.Errorf("failed to stop process %s: %w", c.proc.Cmd.String(), stopErr)
+	// Block until the process is reaped. This guarantees no zombie is left
+	// behind, whether this is a normal policy-driven stop or a shutdown.
+	// While blocked, Run()'s select loop is paused in the actionStop case,
+	// so waitOrKill() is the sole reader of procCh — no deadlock.
+	ps := c.waitOrKill()
+
+	pid := c.proc.PID
+	c.proc = nil
+	exitCode := -1
+	if ps != nil {
+		exitCode = ps.ExitCode()
 	}
+	c.forceCompState(client.UnitStateStopped, fmt.Sprintf("Stopped: pid '%d' exited with code '%d'", pid, exitCode))
 	return nil
 }
 
@@ -485,7 +478,8 @@ func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 // If the process does not exit within the grace period, it sends SIGKILL
 // to force termination. An unresponsive process should be killed and
 // reaped within ProcessStopTimeout.
-func (c *commandRuntime) waitOrKill() {
+// Returns the process state from procCh, or nil if the reap timed out.
+func (c *commandRuntime) waitOrKill() *os.ProcessState {
 	stopTimeout := ProcessStopTimeout
 	if cmdSpec := c.getCommandSpec(); cmdSpec != nil && cmdSpec.Timeouts.Stop > 0 {
 		stopTimeout = cmdSpec.Timeouts.Stop
@@ -501,9 +495,9 @@ func (c *commandRuntime) waitOrKill() {
 	stopTimer := time.NewTimer(graceTimeout)
 	defer stopTimer.Stop()
 	select {
-	case <-c.procCh:
+	case ps := <-c.procCh:
 		c.log.Debugf("process %d reaped successfully during cleanup", c.proc.PID)
-		return
+		return ps.state
 	case <-stopTimer.C:
 		c.log.Warnf("process %d did not stop after %s, killing it", c.proc.PID, graceTimeout)
 	}
@@ -515,10 +509,12 @@ func (c *commandRuntime) waitOrKill() {
 	reapTimer := time.NewTimer(process.KillReapTime)
 	defer reapTimer.Stop()
 	select {
-	case <-c.procCh:
+	case ps := <-c.procCh:
 		c.log.Debugf("process %d reaped successfully after SIGKILL", c.proc.PID)
+		return ps.state
 	case <-reapTimer.C:
 		c.log.Errorf("timed out waiting for process %d to be reaped after SIGKILL", c.proc.PID)
+		return nil
 	}
 }
 
