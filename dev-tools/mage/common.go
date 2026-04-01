@@ -13,7 +13,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/sha512"
-	"debug/elf"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -27,7 +26,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,14 +33,11 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/magefile/mage/target"
 )
 
 const (
 	inlineTemplate      = "inline"
-	xpackDirName        = "x-pack"
 	windowsBinarySuffix = ".exe"
 )
 
@@ -779,83 +774,6 @@ func GetSHA512Hash(file string) (string, error) {
 	return computedHash, nil
 }
 
-// Mage executes mage targets in the specified directory.
-func Mage(ctx context.Context, dir string, targets ...string) error {
-	c := exec.CommandContext(ctx, "mage", targets...)
-	c.Dir = dir
-	if mg.Verbose() {
-		c.Env = append(os.Environ(), "MAGEFILE_VERBOSE=1")
-	}
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	c.Stdin = os.Stdin
-	log.Println("exec:", strings.Join(c.Args, " "))
-	err := c.Run()
-	return err
-}
-
-// IsUpToDate returns true if dst exists and is older based on modtime than all the sources.
-func IsUpToDate(dst string, sources ...string) bool {
-	if len(sources) == 0 {
-		panic("No sources passed to IsUpToDate")
-	}
-
-	var files []string
-	for _, s := range sources {
-		err := filepath.WalkDir(s, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				if os.IsNotExist(err) {
-					return nil
-				}
-				return err
-			}
-
-			if d.Type().IsRegular() {
-				files = append(files, path)
-			}
-
-			return nil
-		})
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	execute, err := target.Path(dst, files...)
-	return err == nil && !execute
-}
-
-// OSSBeatDir returns the OSS beat directory. You can pass paths and they will
-// be joined and appended to the OSS beat dir.
-func OSSBeatDir(cfg *Settings, path ...string) string {
-	ossDir := CWD()
-
-	// Check if we need to correct ossDir because it's in x-pack.
-	if parentDir := filepath.Base(filepath.Dir(ossDir)); parentDir == xpackDirName {
-		// If the OSS version of the beat exists.
-		tmp := filepath.Join(ossDir, "../..", cfg.Beat.Name)
-		if _, err := os.Stat(tmp); !os.IsNotExist(err) {
-			ossDir = tmp
-		}
-	}
-
-	return filepath.Join(append([]string{ossDir}, path...)...)
-}
-
-// XPackBeatDir returns the X-Pack beat directory. You can pass paths and they
-// will be joined and appended to the X-Pack beat dir.
-func XPackBeatDir(cfg *Settings, path ...string) string {
-	// Check if we have an X-Pack only beats
-	cur := CWD()
-
-	if parentDir := filepath.Base(filepath.Dir(cur)); parentDir == xpackDirName {
-		tmp := filepath.Join(filepath.Dir(cur), cfg.Beat.Name)
-		return filepath.Join(append([]string{tmp}, path...)...)
-	}
-
-	return OSSBeatDir(cfg, append([]string{XPackDir, cfg.Beat.Name}, path...)...)
-}
-
 // createDir creates the parent directory for the given file.
 // Deprecated: Use CreateDir.
 func createDir(file string) string {
@@ -901,93 +819,4 @@ func ParseVersion(version string) (int, int, int, error) {
 	minor, _ := strconv.Atoi(data["minor"])
 	patch, _ := strconv.Atoi(data["patch"])
 	return major, minor, patch, nil
-}
-
-// ListMatchingEnvVars returns all the environment variables names that begin
-// with prefix.
-func ListMatchingEnvVars(prefixes ...string) []string {
-	var vars []string
-	for _, v := range os.Environ() {
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(v, prefix) {
-				eqIdx := strings.Index(v, "=")
-				if eqIdx != -1 {
-					vars = append(vars, v[:eqIdx])
-				}
-				break
-			}
-		}
-	}
-	return vars
-}
-
-// IntegrationTestEnvVars returns the names of environment variables needed to configure
-// connections to integration test environments.
-func IntegrationTestEnvVars() []string {
-	// Environment variables that can be configured with paths to files
-	// with authentication information.
-	vars := []string{
-		"AWS_SHARED_CREDENTIAL_FILE",
-		"AZURE_AUTH_LOCATION",
-		"GOOGLE_APPLICATION_CREDENTIALS",
-	}
-	// Environment variables with authentication information.
-	prefixes := []string{
-		"AWS_",
-		"AZURE_",
-		"GCP_",
-
-		// Accepted by terraform, but not by many clients, including Beats
-		"GOOGLE_",
-		"GCLOUD_",
-	}
-	for _, prefix := range prefixes {
-		vars = append(vars, ListMatchingEnvVars(prefix)...)
-	}
-	return vars
-}
-
-// ReadGLIBCRequirement returns the required glibc version for a dynamically
-// linked ELF binary. The target machine must have a version equal to or
-// greater than (newer) the returned value.
-func ReadGLIBCRequirement(elfFile string) (*SemanticVersion, error) {
-	e, err := elf.Open(elfFile)
-	if err != nil {
-		return nil, err
-	}
-
-	symbols, err := e.DynamicSymbols()
-	if err != nil {
-		return nil, err
-	}
-
-	versionSet := map[SemanticVersion]struct{}{}
-	for _, sym := range symbols {
-		if strings.HasPrefix(sym.Version, "GLIBC_") {
-			semver, err := NewSemanticVersion(strings.TrimPrefix(sym.Version, "GLIBC_"))
-			if err != nil {
-				continue
-			}
-
-			versionSet[*semver] = struct{}{}
-		}
-	}
-
-	if len(versionSet) == 0 {
-		return nil, fmt.Errorf("no GLIBC symbols found in binary (is this a static binary?)")
-	}
-
-	versions := make([]SemanticVersion, 0, len(versionSet))
-	for ver := range versionSet {
-		versions = append(versions, ver)
-	}
-
-	sort.Slice(versions, func(i, j int) bool {
-		a := versions[i]
-		b := versions[j]
-		return a.LessThan(&b)
-	})
-
-	max := versions[len(versions)-1]
-	return &max, nil
 }

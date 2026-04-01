@@ -81,10 +81,11 @@ type OTelManager struct {
 	// they should be reported as failed components to the elastic-agent
 	errCh chan error
 
-	agentInfo        info.Agent
-	healthCheckExtID string
-	collectorCfg     *confmap.Conf
-	components       []component.Component
+	agentInfo                 info.Agent
+	healthCheckExtComponentID string
+	collectorMetricsPort      int
+	collectorCfg              *confmap.Conf
+	components                []component.Component
 
 	// The current configuration that the OTel collector is using. In the case that
 	// the mergedCollectorCfg is nil then the collector is not running.
@@ -132,6 +133,7 @@ type OTelManager struct {
 }
 
 // NewOTelManager returns a OTelManager.
+// If execFactory is nil, the default subprocess execution is used.
 func NewOTelManager(
 	logger *logger.Logger,
 	collectorLogLevel logp.Level,
@@ -139,6 +141,7 @@ func NewOTelManager(
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
 	stopTimeout time.Duration,
+	execFactory ExecutionFactory,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
@@ -150,8 +153,9 @@ func NewOTelManager(
 	}
 	hcUUIDStr := hcUUID.String()
 
-	// determine the otel collector ports
-	collectorMetricsPort, collectorHealthCheckPort := 0, 0
+	// determine the otel collector metrics port
+	collectorMetricsPort := 0
+	collectorHealthCheckPort := 0
 	if agentCollectorConfig != nil {
 		if agentCollectorConfig.HealthCheckConfig.Endpoint != "" {
 			collectorHealthCheckPort, err = agentCollectorConfig.HealthCheckConfig.Port()
@@ -167,20 +171,32 @@ func NewOTelManager(
 		}
 	}
 
+	componentType, err := otelcomponent.NewType(healthCheckExtensionName)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create component type: %w", err)
+	}
+	healthCheckExtComponentID := otelcomponent.NewIDWithName(componentType, hcUUIDStr).String()
+
 	executable := filepath.Join(paths.Components(), collectorBinaryName)
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-	exec, err = newSubprocessExecution(executable, hcUUIDStr, collectorMetricsPort, collectorHealthCheckPort)
+	if execFactory == nil {
+		execFactory = func(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (collectorExecution, error) {
+			return newSubprocessExecution(collectorPath, healthCheckExtensionID, healthCheckPort)
+		}
+	}
+	exec, err = execFactory(executable, healthCheckExtComponentID, collectorHealthCheckPort)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
+		return nil, fmt.Errorf("failed to create execution: %w", err)
 	}
 
 	return &OTelManager{
-		managerLogger:     logger,
-		collectorLogger:   collectorLogger,
-		agentInfo:         agentInfo,
-		healthCheckExtID:  fmt.Sprintf("extension:healthcheckv2/%s", hcUUIDStr),
-		errCh:             make(chan error, 1), // holds at most one error
-		collectorStatusCh: make(chan *status.AggregateStatus, 1),
+		managerLogger:             logger,
+		collectorLogger:           collectorLogger,
+		agentInfo:                 agentInfo,
+		healthCheckExtComponentID: healthCheckExtComponentID,
+		collectorMetricsPort:      collectorMetricsPort,
+		errCh:                     make(chan error, 1), // holds at most one error
+		collectorStatusCh:         make(chan *status.AggregateStatus, 1),
 		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
 		// any possible case of deadlock, 5 is used just to give a small buffer.
 		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
@@ -282,7 +298,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.managerLogger)
+			mergedCfg, err := m.buildMergedConfig(cfgUpdate, m.agentInfo, m.managerLogger)
 			if err != nil {
 				// critical error, merging the configuration should always work
 				reportErr(ctx, m.errCh, err)
@@ -414,7 +430,7 @@ func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Con
 }
 
 // buildMergedConfig combines collector configuration with component-derived configuration.
-func buildMergedConfig(
+func (m *OTelManager) buildMergedConfig(
 	cfgUpdate configUpdate,
 	agentInfo info.Agent,
 	logger *logp.Logger,
@@ -471,6 +487,17 @@ func buildMergedConfig(
 	// if the otel log level is unset, use the agent log level
 	if err := maybeInjectLogLevel(mergedOtelCfg, cfgUpdate.agentLogLevel); err != nil {
 		return nil, err
+	}
+
+	// Inject health check extension with port 0 as a placeholder. The actual port is resolved
+	// per-start by the execution layer and passed to the collector via a CLI flag, where a
+	// confmap converter overrides the placeholder with the real port.
+	if err := injectHealthCheckV2Extension(mergedOtelCfg, m.healthCheckExtComponentID, 0); err != nil {
+		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
+	}
+
+	if err := addCollectorMetricsReader(mergedOtelCfg, m.collectorMetricsPort); err != nil {
+		return nil, fmt.Errorf("failed to add collector metrics reader: %w", err)
 	}
 
 	return mergedOtelCfg, nil
@@ -753,7 +780,7 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
-				case extensionKey == m.healthCheckExtID:
+				case extensionKey == "extension:"+m.healthCheckExtComponentID:
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}

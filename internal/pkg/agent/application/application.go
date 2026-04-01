@@ -289,6 +289,7 @@ func New(
 		agentInfo,
 		cfg.Settings.Collector,
 		otelmanager.CollectorStopTimeout,
+		nil,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)

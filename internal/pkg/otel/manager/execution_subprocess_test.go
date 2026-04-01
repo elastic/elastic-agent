@@ -89,7 +89,7 @@ func TestLastMessage(t *testing.T) {
 	}
 }
 
-func newTestProcHandle(t *testing.T, doneCh chan struct{}, reportErrFn func(error), modifier ConfigModifier) *procHandle {
+func newTestProcHandle(t *testing.T, doneCh chan struct{}, reportErrFn func(error)) *procHandle {
 	t.Helper()
 	log, err := logger.New("test", false)
 	require.NoError(t, err)
@@ -99,7 +99,6 @@ func newTestProcHandle(t *testing.T, doneCh chan struct{}, reportErrFn func(erro
 		logp.InfoLevel,
 		doneCh,
 		reportErrFn,
-		modifier,
 	)
 }
 
@@ -107,7 +106,7 @@ func TestProcHandle_LogLevel(t *testing.T) {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
-	h := newTestProcHandle(t, doneCh, func(error) {}, nil)
+	h := newTestProcHandle(t, doneCh, func(error) {})
 	assert.Equal(t, logp.InfoLevel, h.LogLevel())
 }
 
@@ -115,7 +114,7 @@ func TestProcHandle_UpdateConfigYamlBytes_LatestWins(t *testing.T) {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
-	h := newTestProcHandle(t, doneCh, func(error) {}, nil)
+	h := newTestProcHandle(t, doneCh, func(error) {})
 
 	// Send two configs rapidly; only the latest should remain.
 	h.updateConfigYamlBytes([]byte("first"))
@@ -137,7 +136,7 @@ func TestProcHandle_WriteToPipe(t *testing.T) {
 	pipeReader, pipeWriter := io.Pipe()
 
 	var reportedErr error
-	h := newTestProcHandle(t, doneCh, func(err error) { reportedErr = err }, nil)
+	h := newTestProcHandle(t, doneCh, func(err error) { reportedErr = err })
 	h.wg.Add(1)
 
 	go func() {
@@ -167,7 +166,7 @@ func TestProcHandle_WriteToPipe_SuppressesClosedPipeError(t *testing.T) {
 	_, pipeWriter := io.Pipe()
 
 	errCh := make(chan error, 1)
-	h := newTestProcHandle(t, doneCh, func(err error) { errCh <- err }, nil)
+	h := newTestProcHandle(t, doneCh, func(err error) { errCh <- err })
 	h.wg.Add(1)
 
 	// Close the write end before writing — io.ErrClosedPipe should be suppressed.
@@ -195,25 +194,15 @@ func TestProcHandle_UpdateConfig(t *testing.T) {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
-	modifierCalled := false
-	modifier := func(cfg *confmap.Conf) error {
-		modifierCalled = true
-		return cfg.Merge(confmap.NewFromStringMap(map[string]any{
-			"injected": "value",
-		}))
-	}
-
-	h := newTestProcHandle(t, doneCh, func(error) {}, modifier)
+	h := newTestProcHandle(t, doneCh, func(error) {})
 
 	cfg := confmap.NewFromStringMap(map[string]any{
 		"receivers": map[string]any{"nop": nil},
 	})
 	err := h.UpdateConfig(cfg)
 	require.NoError(t, err)
-	assert.True(t, modifierCalled)
 
 	got := <-h.configCh
-	assert.Contains(t, string(got), "injected: value")
 	assert.Contains(t, string(got), "receivers")
 }
 
@@ -221,7 +210,7 @@ func TestProcHandle_UpdateConfig_NilConfig(t *testing.T) {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
-	h := newTestProcHandle(t, doneCh, func(error) {}, nil)
+	h := newTestProcHandle(t, doneCh, func(error) {})
 
 	err := h.UpdateConfig(nil)
 	require.Error(t, err)
@@ -230,35 +219,14 @@ func TestProcHandle_UpdateConfig_NilConfig(t *testing.T) {
 
 func TestPrepareAndSerializeConfig(t *testing.T) {
 	t.Run("nil config", func(t *testing.T) {
-		_, err := prepareAndSerializeConfig(nil, nil)
+		_, err := prepareAndSerializeConfig(nil)
 		assert.Error(t, err)
 	})
 
-	t.Run("no modifier", func(t *testing.T) {
+	t.Run("serializes to yaml", func(t *testing.T) {
 		cfg := confmap.NewFromStringMap(map[string]any{"key": "value"})
-		yamlBytes, err := prepareAndSerializeConfig(cfg, nil)
+		yamlBytes, err := prepareAndSerializeConfig(cfg)
 		require.NoError(t, err)
 		assert.Contains(t, string(yamlBytes), "key: value")
-	})
-
-	t.Run("with modifier", func(t *testing.T) {
-		cfg := confmap.NewFromStringMap(map[string]any{"key": "value"})
-		modifier := func(c *confmap.Conf) error {
-			return c.Merge(confmap.NewFromStringMap(map[string]any{"extra": "data"}))
-		}
-		yamlBytes, err := prepareAndSerializeConfig(cfg, modifier)
-		require.NoError(t, err)
-		assert.Contains(t, string(yamlBytes), "key: value")
-		assert.Contains(t, string(yamlBytes), "extra: data")
-	})
-
-	t.Run("modifier error", func(t *testing.T) {
-		cfg := confmap.NewFromStringMap(map[string]any{"key": "value"})
-		modifier := func(c *confmap.Conf) error {
-			return fmt.Errorf("modifier failed")
-		}
-		_, err := prepareAndSerializeConfig(cfg, modifier)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "modifier failed")
 	})
 }
