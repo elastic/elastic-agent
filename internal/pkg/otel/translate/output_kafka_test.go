@@ -23,7 +23,6 @@ func TestKafkaTranslationLogic(t *testing.T) {
 		name        string
 		input       string
 		expectedMap map[string]any
-		err         error
 	}{{
 		name: "basic kafka translation logic",
 		input: `

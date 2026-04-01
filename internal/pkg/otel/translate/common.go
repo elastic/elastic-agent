@@ -162,8 +162,12 @@ func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any
 	}
 
 	// handles verification_mode: none and full
-	if tlsConfig.VerificationMode == tlscommon.VerifyNone {
+	switch tlsConfig.VerificationMode {
+	case tlscommon.VerifyNone:
 		otelTLSConfig["insecure_skip_verify"] = true
+	case tlscommon.VerifyStrict, tlscommon.VerifyCertificate:
+		logger.Warn("verification mode strict/certificate is not supported. Falling back to verification_mode:full")
+	default:
 	}
 
 	// unpacks -> ssl.certificate_authorities
@@ -225,7 +229,7 @@ func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any
 	setIfNotNil(otelTLSConfig, "cert_pem", certPem)                 // ssl.certificate
 	setIfNotNil(otelTLSConfig, "key_pem", certKeyPem)               // ssl.key
 	setIfNotNil(otelTLSConfig, "cipher_suites", ciphersuites)       // ssl.cipher_suites
-	setIfNotNil(otelTLSConfig, "curve_preferences", curve_preferences)
+	setIfNotNil(otelTLSConfig, "curve_preferences", curvePreferences)
 
 	otelTLSConfig["min_version"] = tlsVersions[goTLSConfig.MinVersion]
 	otelTLSConfig["max_version"] = tlsVersions[goTLSConfig.MaxVersion]
