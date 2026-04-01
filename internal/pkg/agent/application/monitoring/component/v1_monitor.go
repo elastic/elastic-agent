@@ -474,11 +474,14 @@ func (b *BeatsMonitor) injectMetricsInput(
 ) error {
 	monitoringNamespace := b.monitoringNamespace()
 
-	beatsStreams := b.getBeatsStreams(componentInfos)
+	beatsStreams, hasOtelManagedBeats := b.getBeatsStreams(componentInfos)
 	httpStreams := b.getHttpStreams(componentInfos)
 
 	inputs := []any{}
-	if len(beatsStreams) > 0 {
+	// Skip beat/metrics-monitoring only when beats exist but are all OTel-managed.
+	// If no beats exist at all, still create beat/metrics-monitoring (with empty streams);
+	// removing it would break tests that expect exactly 3 monitoring components.
+	if len(beatsStreams) > 0 || !hasOtelManagedBeats {
 		inputs = append(inputs, map[string]any{
 			idKey:        fmt.Sprintf("%s-beats", monitoringMetricsUnitID),
 			"name":       fmt.Sprintf("%s-beats", monitoringMetricsUnitID),
@@ -725,11 +728,17 @@ func (b *BeatsMonitor) getHttpStreams(
 
 // getBeatsStreams returns stream definitions for beats inputs.
 // Note: The return type must be []any due to protobuf serialization quirks.
+// getBeatsStreams returns the beat/metrics stream configs for process-managed beats,
+// plus a bool indicating whether any beats were skipped due to OTel management.
+// The bool is used by the caller to decide whether to omit beat/metrics-monitoring entirely
+// (only when hasOtelManagedBeats is true and streams are empty — metricbeatreceiver cannot
+// start with zero streams; no such restriction applies when there are simply no beats).
 func (b *BeatsMonitor) getBeatsStreams(
 	componentInfos []componentInfo,
-) []any {
+) ([]any, bool) {
 	monitoringNamespace := b.monitoringNamespace()
 	beatsStreams := make([]any, 0, len(componentInfos))
+	hasOtelManagedBeats := false
 
 	for _, compInfo := range componentInfos {
 		binaryName := compInfo.BinaryName
@@ -741,6 +750,7 @@ func (b *BeatsMonitor) getBeatsStreams(
 		// set), so skip generating beat.stats scraping streams for them. Their metrics are
 		// instead collected via the elasticmonitoring receiver through OTel internal telemetry.
 		if compInfo.RuntimeManager == component.OtelRuntimeManager {
+			hasOtelManagedBeats = true
 			continue
 		}
 
@@ -770,7 +780,7 @@ func (b *BeatsMonitor) getBeatsStreams(
 		beatsStreams = append(beatsStreams, beatsStream)
 	}
 
-	return beatsStreams
+	return beatsStreams, hasOtelManagedBeats
 }
 
 // getServiceComponentProcessMetricInputs returns input definitions for collecting process metrics of components
