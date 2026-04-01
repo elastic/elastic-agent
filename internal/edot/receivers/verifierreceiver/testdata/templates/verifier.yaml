@@ -20,7 +20,6 @@ receivers:
         credentials:
           role_arn: ${var:providers.aws.credentials.role_arn}
           external_id: ${var:providers.aws.credentials.external_id}
-          default_region: ${var:providers.aws.credentials.default_region}
     policies: ${var:policies}
 
 processors:

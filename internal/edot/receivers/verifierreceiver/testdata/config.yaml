@@ -14,7 +14,6 @@ receivers:
         credentials:
           role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
           external_id: "elastic-external-id-12345"
-          default_region: "us-east-1"
     policies:
       - policy_id: "verifier-policy"
         policy_name: "Verifier-Policy-Production-Connector-abc12345"
@@ -54,7 +53,6 @@ receivers:
         credentials:
           role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
           external_id: "elastic-external-id-single"
-          default_region: "us-east-1"
     policies:
       - policy_id: "verifier-policy"
         policy_name: "Verifier-Policy-Single-abc12345"
@@ -77,7 +75,6 @@ receivers:
         credentials:
           role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
           external_id: "elastic-external-id-sechub"
-          default_region: "us-east-1"
     policies:
       - policy_id: "verifier-policy"
         policy_name: "Verifier-Policy-SecurityHub-abc12345"

@@ -45,7 +45,6 @@ receivers:
         credentials:
           role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
           external_id: "elastic-external-id-from-setup"
-          default_region: "us-east-1"
 
       # Azure Authentication
       # azure:
@@ -163,7 +162,6 @@ provider (ECS), and EC2/EKS instance metadata service (IMDSv2).
 |--------|------|------|-------------|
 | `role_arn` | `string` | Identity Federation | ARN of the IAM role to assume in the customer account |
 | `external_id` | `string` | Identity Federation | External ID for confused deputy protection |
-| `default_region` | `string` | Both | Default AWS region for API calls (default: `us-east-1`) |
 | `use_default_credentials` | `bool` | Testing | Use AWS SDK default credential chain |
 
 #### Azure (`providers.azure.credentials`)
@@ -428,7 +426,6 @@ receivers:
         credentials:
           role_arn: "${AWS_ROLE_ARN}"
           external_id: "${AWS_EXTERNAL_ID}"
-          default_region: "us-east-1"
 
     policies:
       - policy_id: "policy-1"
