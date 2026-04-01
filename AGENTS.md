@@ -168,7 +168,7 @@ Principles and repo-specific process: [CONTRIBUTING.md](./CONTRIBUTING.md).
 ## PR Preferences
 
 Always use the [pull request template](.github/PULL_REQUEST_TEMPLATE.md) when creating a pull request.
-Always asign the author to the pull request.
+Always assign the author to the pull request.
 
 Unless instructed otherwise, always add the `Team:Elastic-Agent-Control-Plane` label to the pull request.
 Unless instructed otherwise, always add the `backport-active-all` label to the pull request when fixing a bug.
