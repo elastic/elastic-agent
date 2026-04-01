@@ -1330,19 +1330,19 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                       string
-		component                  *component.Component
-		outputQueueConfig          map[string]any
-		expectedError              string
-		expectedReceiverType       string
-		expectedBeatName           string
+		name                 string
+		component            *component.Component
+		outputQueueConfig    map[string]any
+		expectedError        string
+		expectedReceiverType string
+		expectedBeatName     string
 	}{
 		{
-			name:                       "filebeat component with default monitoring",
-			component:                  filebeatComponent,
-			outputQueueConfig:          nil,
-			expectedReceiverType:       "filebeatreceiver",
-			expectedBeatName:           "filebeat",
+			name:                 "filebeat component with default monitoring",
+			component:            filebeatComponent,
+			outputQueueConfig:    nil,
+			expectedReceiverType: "filebeatreceiver",
+			expectedBeatName:     "filebeat",
 		},
 		{
 			name:      "metricbeat component with custom monitoring and queue config",
@@ -1351,8 +1351,8 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				"type": "memory",
 				"size": 1000,
 			},
-			expectedReceiverType:       "metricbeatreceiver",
-			expectedBeatName:           "metricbeat",
+			expectedReceiverType: "metricbeatreceiver",
+			expectedBeatName:     "metricbeat",
 		},
 		{
 			name: "component with no input units",
@@ -1378,9 +1378,9 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 					},
 				},
 			},
-			outputQueueConfig:          nil,
-			expectedReceiverType:       "filebeatreceiver",
-			expectedBeatName:           "filebeat",
+			outputQueueConfig:    nil,
+			expectedReceiverType: "filebeatreceiver",
+			expectedBeatName:     "filebeat",
 		},
 		{
 			name: "unsupported component type",
@@ -1388,8 +1388,8 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				ID:        "unsupported-test-id",
 				InputType: "unsupported",
 			},
-			outputQueueConfig:          nil,
-			expectedError:              "unknown otel receiver type for input type: unsupported",
+			outputQueueConfig: nil,
+			expectedError:     "unknown otel receiver type for input type: unsupported",
 		},
 	}
 

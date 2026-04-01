@@ -477,8 +477,9 @@ func (b *BeatsMonitor) injectMetricsInput(
 	beatsStreams := b.getBeatsStreams(componentInfos)
 	httpStreams := b.getHttpStreams(componentInfos)
 
-	inputs := []any{
-		map[string]any{
+	inputs := []any{}
+	if len(beatsStreams) > 0 {
+		inputs = append(inputs, map[string]any{
 			idKey:        fmt.Sprintf("%s-beats", monitoringMetricsUnitID),
 			"name":       fmt.Sprintf("%s-beats", monitoringMetricsUnitID),
 			"type":       "beat/metrics",
@@ -488,8 +489,10 @@ func (b *BeatsMonitor) injectMetricsInput(
 			},
 			"streams":               beatsStreams,
 			"_runtime_experimental": string(monitoringRuntime),
-		},
-		map[string]any{
+		})
+	}
+	if len(httpStreams) > 0 {
+		inputs = append(inputs, map[string]any{
 			idKey:        fmt.Sprintf("%s-agent", monitoringMetricsUnitID),
 			"name":       fmt.Sprintf("%s-agent", monitoringMetricsUnitID),
 			"type":       "http/metrics",
@@ -499,7 +502,7 @@ func (b *BeatsMonitor) injectMetricsInput(
 			},
 			"streams":               httpStreams,
 			"_runtime_experimental": string(monitoringRuntime),
-		},
+		})
 	}
 
 	// add system/process metrics for services that can't be monitored via json/beats metrics
