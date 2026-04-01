@@ -5,4 +5,4 @@ summary: Synthetics complete image supports mounting custom CA certificates for 
 component: elastic-agent
 
 # PR URL; optional; the PR number that added the changeset.
-pr: https://github.com/elastic/elastic-agent/pull/13368
+pr: https://github.com/elastic/elastic-agent/pull/13371
