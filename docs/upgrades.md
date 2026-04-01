@@ -163,7 +163,7 @@ set.
 To create the entry and set the correct ACL after upgrading, run:
 
 ```
-elastic-agent unprivileged -f
+elastic-agent windows registry update
 ```
 
 This creates the registry key, writes the current version and configures the

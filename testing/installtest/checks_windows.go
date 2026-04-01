@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 const ACCESS_ALLOWED_ACE_TYPE = 0
@@ -114,17 +115,27 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		}
 	}
 
-	// Verify the registry DisplayVersion. If the entry doesn't exist,
-	// only fail for privileged installs, unprivileged upgrades from old
-	// versions may not have the entry yet.
-	if opts.Version != "" {
+	if opts.TargetVersion != "" {
 		displayVersion, err := getRegistryDisplayVersion(opts.Namespace)
-		if err == nil {
-			if displayVersion != opts.Version {
-				return fmt.Errorf("uninstall registry DisplayVersion mismatch for %s: got %q, want %q", topPath, displayVersion, opts.Version)
+		if err != nil {
+			if opts.Privileged {
+				return fmt.Errorf("uninstall registry entry missing for %s: %w", topPath, err)
 			}
-		} else if opts.Privileged {
-			return fmt.Errorf("uninstall registry entry missing for %s: %w", topPath, err)
+			// pre-9.4.0 versions never configured the registry ACL, so the new agent couldn't create the entry
+			// run 'windows registry update' to fix this
+			startVersion, parseErr := version.ParseVersion(opts.StartVersion)
+			if parseErr == nil && startVersion.Less(*version.NewParsedSemVer(9, 4, 0, "SNAPSHOT", "")) {
+				if _, execErr := f.Exec(ctx, []string{"windows", "registry", "update"}); execErr != nil {
+					return fmt.Errorf("failed to run 'windows registry update': %w", execErr)
+				}
+				displayVersion, err = getRegistryDisplayVersion(opts.Namespace)
+				if err != nil {
+					return fmt.Errorf("uninstall registry entry still missing after 'windows registry update' for %s: %w", topPath, err)
+				}
+			}
+		}
+		if err == nil && displayVersion != opts.TargetVersion {
+			return fmt.Errorf("uninstall registry DisplayVersion mismatch for %s: got %q, want %q", topPath, displayVersion, opts.TargetVersion)
 		}
 	}
 

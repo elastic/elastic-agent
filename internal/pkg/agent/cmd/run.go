@@ -829,17 +829,11 @@ func handleUpgrade(log *logger.Logger) (*upgrade.UpdateMarker, error) {
 	if err := install.UpsertUninstallEntry(paths.Top(), release.VersionWithSnapshot()); err != nil {
 		// Unprivileged upgrades from versions that predate the registry ACL change
 		// lack write access to HKLM. This is expected and can be resolved by
-		// running 'elastic-agent unprivileged -f'.
+		// running 'elastic-agent windows registry update'.
 		if goerrors.Is(err, os.ErrPermission) || strings.Contains(err.Error(), "Access is denied") {
-			log.Infof("insufficient permissions to update uninstall registry entry, can be fixed by running 'elastic-agent unprivileged -f'")
+			log.Infof("insufficient permissions to update uninstall registry entry, can be fixed by running 'elastic-agent windows registry update'")
 		} else {
 			log.Warnf("failed to update uninstall registry entry: %v", err)
-		}
-	} else {
-		// The MSI ProductCode GUID is version-specific and stale after upgrade,
-		// so we use our own stable key and remove the MSI one to avoid duplicates.
-		if err := install.RemoveMSIUninstallEntries(); err != nil {
-			log.Warnf("failed to remove MSI uninstall registry entries: %v", err)
 		}
 	}
 
