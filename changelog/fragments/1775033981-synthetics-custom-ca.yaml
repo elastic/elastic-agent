@@ -1,0 +1,8 @@
+kind: enhancement
+
+summary: Synthetics complete image supports mounting custom CA certificates for private PKI
+
+component: elastic-agent
+
+# PR URL; optional; the PR number that added the changeset.
+pr: https://github.com/elastic/elastic-agent/pull/13368
