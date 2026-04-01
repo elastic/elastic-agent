@@ -26,7 +26,7 @@ func TestConfig_Validate(t *testing.T) {
 				IdentityFederationName: "Production Connector",
 				VerificationID:         "verify-abc123",
 				VerificationType:       "on_demand",
-				AccountType:            "single_account",
+				AccountType:            "single-account",
 				Providers: ProvidersConfig{
 					AWS: AWSProviderConfig{
 						Credentials: AWSCredentials{

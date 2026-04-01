@@ -317,7 +317,7 @@ func TestReceiver_AzureIntegrations(t *testing.T) {
 	config := &Config{
 		IdentityFederationID:   "cc-azure-001",
 		IdentityFederationName: "Azure Connector",
-		AccountType:            "single_account",
+		AccountType:            "single-account",
 		VerificationID:         "verify-azure-001",
 		VerificationType:       "on_demand",
 		Providers: ProvidersConfig{
@@ -398,7 +398,7 @@ func TestReceiver_AzureIntegrations(t *testing.T) {
 		// account_type should be set from top-level config
 		accType, ok := record.Attributes().Get("account_type")
 		require.True(t, ok)
-		assert.Equal(t, "single_account", accType.Str())
+		assert.Equal(t, "single-account", accType.Str())
 
 		// verification.verified_at should be present
 		_, ok = record.Attributes().Get("verification.verified_at")
@@ -417,7 +417,7 @@ func TestReceiver_GCPIntegrations(t *testing.T) {
 	config := &Config{
 		IdentityFederationID:   "cc-gcp-001",
 		IdentityFederationName: "GCP Connector",
-		AccountType:            "single_account",
+		AccountType:            "single-account",
 		VerificationID:         "verify-gcp-001",
 		VerificationType:       "scheduled",
 		Providers: ProvidersConfig{
@@ -511,7 +511,7 @@ func TestReceiver_MultiProviderIntegrations(t *testing.T) {
 	config := &Config{
 		IdentityFederationID:   "cc-multi-001",
 		IdentityFederationName: "Multi-Identity Federation",
-		AccountType:            "organization",
+		AccountType:            "organization-account",
 		VerificationID:         "verify-multi-001",
 		VerificationType:       "on_demand",
 		Providers: ProvidersConfig{
@@ -619,10 +619,10 @@ func TestReceiver_MultiProviderIntegrations(t *testing.T) {
 			packageNames[pkg.Str()] = true
 		}
 
-		// All records should have account_type = organization
+		// All records should have account_type = organization-account
 		accType, ok := record.Attributes().Get("account_type")
 		require.True(t, ok)
-		assert.Equal(t, "organization", accType.Str())
+		assert.Equal(t, "organization-account", accType.Str())
 
 		// All records should have verification.verified_at
 		_, ok = record.Attributes().Get("verification.verified_at")
@@ -1084,7 +1084,7 @@ func TestReceiver_FleetManagedStyle(t *testing.T) {
 	config := &Config{
 		IdentityFederationID:   "cc-fleet-001",
 		IdentityFederationName: "Fleet Managed Connector",
-		AccountType:            "single_account",
+		AccountType:            "single-account",
 		VerificationID:         "verify-fleet-001",
 		VerificationType:       "scheduled",
 		Providers: ProvidersConfig{

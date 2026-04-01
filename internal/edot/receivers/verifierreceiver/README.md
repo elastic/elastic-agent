@@ -137,7 +137,7 @@ service:
 |--------|------|----------|---------|-------------|
 | `identity_federation_id` | `string` | Yes | - | Unique identifier for the Identity Federation |
 | `identity_federation_name` | `string` | No | - | Human-readable name of the Identity Federation |
-| `account_type` | `string` | No | - | Account scope: `single_account` or `organization` |
+| `account_type` | `string` | No | - | Account scope: `single-account` or `organization-account` |
 | `verification_id` | `string` | Yes | - | Unique identifier for this verification session |
 | `verification_type` | `string` | No | `on_demand` | Type of verification (`on_demand` or `scheduled`) |
 | `providers` | `ProvidersConfig` | No | - | Provider credentials for AWS, Azure, GCP, Okta |
@@ -320,7 +320,7 @@ The receiver sets identity federation and verification attributes. Data stream r
 | `package.title` | Human-readable integration title |
 | `package.version` | Integration package version (e.g., `2.17.0`) or `unspecified` |
 | `package_policy.id` | Package policy instance identifier |
-| `account_type` | Account scope (`single_account` or `organization`) |
+| `account_type` | Account scope (`single-account` or `organization-account`) |
 | `provider.type` | Provider type (`aws`, `azure`, `gcp`, `okta`) |
 | `provider.account` | Account identifier (if available) |
 | `provider.region` | Region (if available) |
