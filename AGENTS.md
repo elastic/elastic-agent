@@ -122,13 +122,15 @@ The repo contains **multiple Go modules**; use **`mage tidy`** to keep `go.mod` 
 
 ## Style and code quality
 
-- Follow **Go best practices** and match the style of the surrounding code (naming, structure, error handling, comments).
-- Use **`any`** instead of empty `interface{}`.
-- Run **`goimports`** on changed Go files; ensure **`go vet`** passes on affected packages.
-- Format Go with **`go fmt`** (and **`mage fmt`** when touching `.go` / `.py` as appropriate).
-- Keep changes minimal and scoped: avoid unrelated refactors or drive-by edits.
+### Lint Commands
 
-## Rules enforced by tooling
+```bash
+mage fmt             # formats source code (.go and .py) and adds license headers.
+mage format:all      # format automatically all the codes.
+mage format:license  # applies the right license header.
+```
+
+### Rules enforced by tooling
 
 CI and local checks enforce the following (details in [.golangci.yml](./.golangci.yml), [magefile.go](./magefile.go), and the Makefile):
 
@@ -155,16 +157,12 @@ Principles and repo-specific process: [CONTRIBUTING.md](./CONTRIBUTING.md).
 - **Keep changes focused**; avoid unrelated refactors or scope creep.
 - **Update docs and tests** when behavior, configuration, or operator-facing workflow changes.
 - **Make non-obvious intent clear** through naming, structure, or brief “why” comments when needed.
+- **Formatting:** All go files must be formatted with `go fmt` and the `goimports` tool, the `mage fmt` target can be used for this.
 - **Do not modify `beats/`** for routine Elastic Agent work (submodule boundary).
 - **Changelog:** For notable changes, add a fragment using **[elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool)**. Typical usage: `elastic-agent-changelog-tool new "$TITLE"` (see the tool’s [usage docs](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/usage.md)). PRs may use the **`skip-changelog`** label when appropriate; see `changelog/` for examples.
-- **`go.mod` / NOTICE:** If you change **`go.mod`** or add/update Go dependencies, regenerate **`NOTICE.txt`** and **`NOTICE-fips.txt`**:
-
-  ```bash
-  mage notice
-  ```
-
-  Commit the updated files. This is part of **`make check-ci`**. Use **`mage tidy`** so all modules in the repo stay in sync.
+- **`go.mod` / NOTICE:** If you change **`go.mod`** or add/update Go dependencies, regenerate **`NOTICE.txt`** and **`NOTICE-fips.txt`** with `mage notice`
 - **Before opening a PR (minimum):** **`mage test:unit`** and linting (**`mage check:lint`** or **`make lint`**) should pass. Also run **`mage check:all`** when your change should satisfy license + integration metadata + docs layout checks. For CI parity, use **`make check-ci`** (see [Makefile](./Makefile); note **`check-ci` does not run golangci-lint**, which CI runs in GitHub Actions) and **`make check`** when you want the linter plus the same **`check-ci`** steps.
+  Commit the updated files. This is part of **`make check-ci`**. Use **`mage tidy`** so all modules in the repo stay in sync.
 - **Integration / E2E:** When changes affect multi-component or Elasticsearch-backed behavior, run the relevant integration or E2E targets described in the magefile and [docs/test-framework-dev-guide.md](./docs/test-framework-dev-guide.md).
 
 ## PR Preferences
