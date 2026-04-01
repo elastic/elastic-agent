@@ -6,15 +6,6 @@ umask 0007
 
 set -eo pipefail
 
-# OpenShift runs containers with arbitrary UIDs in GID 0 (root group).
-# Some tools (npm, node) require a valid passwd entry for the running user.
-# If the current UID has no passwd entry, add one.
-if ! whoami &>/dev/null; then
-  if [ -w /etc/passwd ]; then
-    echo "elastic-agent:x:$(id -u):$(id -g):elastic-agent:{{ $beatHome }}:/bin/bash" >> /etc/passwd || true
-  fi
-fi
-
 # Beats performs strict file-ownership checks (OwnerHasExclusiveWritePerms):
 # config/module YAML files must be owned by the running EUID or root. When
 # running under an arbitrary UID (e.g. OpenShift), any file owned by the

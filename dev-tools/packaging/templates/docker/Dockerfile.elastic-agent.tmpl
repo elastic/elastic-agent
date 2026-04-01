@@ -213,11 +213,6 @@ RUN echo \
     {{ $beatHome }}/.cache \
     | xargs -IDIR sh -c 'mkdir -p DIR && chmod 0775 DIR && chown root:root DIR'
 
-# Support arbitrary user ids for OpenShift
-# Ensure /etc/passwd is group-writable so the entrypoint can add a passwd entry for arbitrary UIDs
-# REF: https://docs.okd.io/latest/openshift_images/create-images.html
-RUN chmod g+w /etc/passwd
-
 # Setup synthetics env vars
 ENV ELASTIC_SYNTHETICS_CAPABLE=true
 ENV ELASTIC_AGENT_COMPLETE=true
@@ -295,11 +290,6 @@ RUN for iter in {1..10}; do \
         exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
     done; \
     (exit $exit_code)
-
-# Support arbitrary user ids for OpenShift
-# Ensure /etc/passwd is group-writable so the entrypoint can add a passwd entry for arbitrary UIDs
-# REF: https://docs.okd.io/latest/openshift_images/create-images.html
-RUN chmod g+w /etc/passwd
 
 # Setup synthetics env vars
 ENV ELASTIC_SYNTHETICS_CAPABLE=true
