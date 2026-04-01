@@ -14,7 +14,6 @@ receivers:
   verifier:
     identity_federation_id: "cc-test-azure"
     identity_federation_name: "Azure Test"
-    namespace: "default"
     account_type: "single_account"
     verification_id: "verify-azure-001"
     verification_type: "on_demand"
@@ -45,6 +44,22 @@ receivers:
             package_policy_id: "pp-blob-001"
             package_title: "Azure"
 
+processors:
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
+
 exporters:
   debug:
     verbosity: detailed
@@ -56,4 +71,5 @@ service:
   pipelines:
     logs:
       receivers: [verifier]
+      processors: [resource/verifier]
       exporters: [debug]

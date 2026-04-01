@@ -16,6 +16,22 @@ receivers:
           - policy_template: "cloudtrail"
             package_name: "aws"
 
+processors:
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
+
 exporters:
   debug:
     verbosity: detailed
@@ -24,4 +40,5 @@ service:
   pipelines:
     logs:
       receivers: [verifier]
+      processors: [resource/verifier]
       exporters: [debug]

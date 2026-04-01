@@ -24,11 +24,6 @@ type Config struct {
 	// IdentityFederationName is the human-readable name of the Identity Federation.
 	IdentityFederationName string `mapstructure:"identity_federation_name"`
 
-	// Namespace is the Kibana Space that the Identity Federation belongs to.
-	// Used as a resource attribute and for data stream routing.
-	// Defaults to "default" when not set.
-	Namespace string `mapstructure:"namespace"`
-
 	// AccountType indicates whether the target is a single account or an
 	// organization (management) account. Affects which permissions are verified.
 	// Valid values: "single_account", "organization".

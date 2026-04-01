@@ -16,7 +16,6 @@ receivers:
   verifier:
     identity_federation_id: "cc-test-12345"
     identity_federation_name: "Local Test Connector"
-    namespace: "default"
     account_type: "single_account"
     verification_id: "verify-local-001"
     verification_type: "on_demand"
@@ -117,6 +116,22 @@ receivers:
               account_id: "123456789012"
               region: "us-west-2"
 
+processors:
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
+
 exporters:
   debug:
     verbosity: detailed
@@ -125,4 +140,5 @@ service:
   pipelines:
     logs:
       receivers: [verifier]
+      processors: [resource/verifier]
       exporters: [debug]

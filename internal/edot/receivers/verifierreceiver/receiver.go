@@ -77,7 +77,6 @@ func newVerifierReceiver(
 func (r *verifierReceiver) Start(ctx context.Context, _ component.Host) error {
 	r.logger.Info("Starting verifier receiver",
 		zap.String("identity_federation_id", r.config.IdentityFederationID),
-		zap.String("namespace", r.config.Namespace),
 		zap.String("verification_id", r.config.VerificationID),
 		zap.Int("policy_count", len(r.config.Policies)),
 	)
@@ -261,17 +260,6 @@ func (r *verifierReceiver) verifyPermissions(ctx context.Context) error {
 	if r.config.IdentityFederationName != "" {
 		resource.Attributes().PutStr("identity_federation.name", r.config.IdentityFederationName)
 	}
-	namespace := r.config.Namespace
-	if namespace == "" {
-		namespace = "default"
-	}
-	resource.Attributes().PutStr("identity_federation.namespace", namespace)
-
-	// Data stream routing attributes for the Elasticsearch exporter.
-	// Native OTel inputs must set these explicitly for dynamic index routing.
-	resource.Attributes().PutStr("data_stream.type", "logs")
-	resource.Attributes().PutStr("data_stream.dataset", "verifier_otel.verification")
-	resource.Attributes().PutStr("data_stream.namespace", namespace)
 
 	resource.Attributes().PutStr("verification.id", r.config.VerificationID)
 	resource.Attributes().PutStr("verification.timestamp", verificationTimestamp)

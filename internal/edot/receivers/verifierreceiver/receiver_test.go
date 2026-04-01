@@ -22,7 +22,6 @@ func TestReceiver_StartShutdown(t *testing.T) {
 	config := &Config{
 		IdentityFederationID:   "cc-12345",
 		IdentityFederationName: "Test Connector",
-		Namespace:              "production",
 		VerificationID:         "verify-test-001",
 		VerificationType:       "on_demand",
 		Providers: ProvidersConfig{
@@ -91,22 +90,6 @@ func TestReceiver_StartShutdown(t *testing.T) {
 	federationID, ok := attrs.Get("identity_federation.id")
 	require.True(t, ok)
 	assert.Equal(t, "cc-12345", federationID.Str())
-
-	federationNamespace, ok := attrs.Get("identity_federation.namespace")
-	require.True(t, ok)
-	assert.Equal(t, "production", federationNamespace.Str())
-
-	dsType, ok := attrs.Get("data_stream.type")
-	require.True(t, ok)
-	assert.Equal(t, "logs", dsType.Str())
-
-	dsDataset, ok := attrs.Get("data_stream.dataset")
-	require.True(t, ok)
-	assert.Equal(t, "verifier_otel.verification", dsDataset.Str())
-
-	dsNamespace, ok := attrs.Get("data_stream.namespace")
-	require.True(t, ok)
-	assert.Equal(t, "production", dsNamespace.Str())
 
 	verificationID, ok := attrs.Get("verification.id")
 	require.True(t, ok)
@@ -189,16 +172,6 @@ func TestReceiver_WithoutAWSCredentials(t *testing.T) {
 	// Should still emit logs but with error status
 	logs := consumer.AllLogs()
 	require.NotEmpty(t, logs)
-
-	// Verify default namespace when not configured
-	resourceAttrs := logs[0].ResourceLogs().At(0).Resource().Attributes()
-	nsAttr, ok := resourceAttrs.Get("identity_federation.namespace")
-	require.True(t, ok)
-	assert.Equal(t, "default", nsAttr.Str())
-
-	dsNsAttr, ok := resourceAttrs.Get("data_stream.namespace")
-	require.True(t, ok)
-	assert.Equal(t, "default", dsNsAttr.Str())
 
 	logRecords := logs[0].ResourceLogs().At(0).ScopeLogs().At(0).LogRecords()
 	assert.GreaterOrEqual(t, logRecords.Len(), 1)
@@ -344,7 +317,6 @@ func TestReceiver_AzureIntegrations(t *testing.T) {
 	config := &Config{
 		IdentityFederationID:   "cc-azure-001",
 		IdentityFederationName: "Azure Connector",
-		Namespace:              "staging",
 		AccountType:            "single_account",
 		VerificationID:         "verify-azure-001",
 		VerificationType:       "on_demand",
@@ -405,14 +377,6 @@ func TestReceiver_AzureIntegrations(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "cc-azure-001", ccID.Str())
 
-	ns, ok := attrs.Get("identity_federation.namespace")
-	require.True(t, ok)
-	assert.Equal(t, "staging", ns.Str())
-
-	dsNs, ok := attrs.Get("data_stream.namespace")
-	require.True(t, ok)
-	assert.Equal(t, "staging", dsNs.Str())
-
 	// Verify log records contain Azure integrations
 	logRecords := resourceLog.ScopeLogs().At(0).LogRecords()
 	assert.GreaterOrEqual(t, logRecords.Len(), 1)
@@ -453,7 +417,6 @@ func TestReceiver_GCPIntegrations(t *testing.T) {
 	config := &Config{
 		IdentityFederationID:   "cc-gcp-001",
 		IdentityFederationName: "GCP Connector",
-		Namespace:              "production",
 		AccountType:            "single_account",
 		VerificationID:         "verify-gcp-001",
 		VerificationType:       "scheduled",
@@ -513,13 +476,8 @@ func TestReceiver_GCPIntegrations(t *testing.T) {
 
 	resourceLog := logs[0].ResourceLogs().At(0)
 
-	// Verify namespace propagation
-	attrs := resourceLog.Resource().Attributes()
-	ns, ok := attrs.Get("identity_federation.namespace")
-	require.True(t, ok)
-	assert.Equal(t, "production", ns.Str())
-
 	// Verify verification type
+	attrs := resourceLog.Resource().Attributes()
 	vType, ok := attrs.Get("verification.type")
 	require.True(t, ok)
 	assert.Equal(t, "scheduled", vType.Str())
@@ -553,7 +511,6 @@ func TestReceiver_MultiProviderIntegrations(t *testing.T) {
 	config := &Config{
 		IdentityFederationID:   "cc-multi-001",
 		IdentityFederationName: "Multi-Identity Federation",
-		Namespace:              "default",
 		AccountType:            "organization",
 		VerificationID:         "verify-multi-001",
 		VerificationType:       "on_demand",
@@ -692,15 +649,6 @@ func TestReceiver_MultiProviderIntegrations(t *testing.T) {
 	assert.True(t, policyIDs["policy-azure"])
 	assert.True(t, policyIDs["policy-gcp"])
 
-	// Verify resource-level attributes
-	resourceAttrs := logs[0].ResourceLogs().At(0).Resource().Attributes()
-	ns, ok := resourceAttrs.Get("identity_federation.namespace")
-	require.True(t, ok)
-	assert.Equal(t, "default", ns.Str())
-
-	dsNs, ok := resourceAttrs.Get("data_stream.namespace")
-	require.True(t, ok)
-	assert.Equal(t, "default", dsNs.Str())
 }
 
 func TestPermissionRegistry(t *testing.T) {
@@ -1136,7 +1084,6 @@ func TestReceiver_FleetManagedStyle(t *testing.T) {
 	config := &Config{
 		IdentityFederationID:   "cc-fleet-001",
 		IdentityFederationName: "Fleet Managed Connector",
-		Namespace:              "default",
 		AccountType:            "single_account",
 		VerificationID:         "verify-fleet-001",
 		VerificationType:       "scheduled",
