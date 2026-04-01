@@ -319,7 +319,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		var statusErr error
 		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 3)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 2)
 	}, 1*time.Minute, 1*time.Second)
 
 	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
@@ -1972,7 +1972,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	healthCheck(ctx,
 		"Everything is ready. Begin running and processing data.",
 		component.OtelRuntimeManager,
-		3,
+		2,
 		otelTimestamp)
 
 	// restart 3 times, checks path definition is stable
@@ -1987,7 +1987,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		healthCheck(ctx,
 			"Everything is ready. Begin running and processing data.",
 			component.OtelRuntimeManager,
-			3,
+			2,
 			restartTimestamp)
 	}
 
