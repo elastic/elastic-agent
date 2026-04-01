@@ -102,7 +102,7 @@ ssl:
 func TestTLSVersion(t *testing.T) {
 	input := `
 ssl:
-  supported_protocol: 
+  supported_protocols: 
   - TLSv1.1
   - TLSv1.2
   - TLSv1.3
