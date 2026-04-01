@@ -295,7 +295,16 @@ func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *at
 		t.Logf("agent status returned an error: %v", err)
 	}
 
+	pidInStatusMessageRegex := regexp.MustCompile(`[\d]+`)
 	for _, comp := range status.Components {
+		pidStr := pidInStatusMessageRegex.FindString(comp.Message)
+		if pidStr == "" {
+			// OTel receivers run inside the agent process rather than as
+			// standalone beat processes, so they don't expose a /stats unix
+			// socket endpoint. Skip them.
+			continue
+		}
+
 		unitId := comp.ID
 		socketPath := utils.SocketURLWithFallback(unitId, paths.TempDir())
 		handlesReg := tools.NewSlope(comp.Name)
