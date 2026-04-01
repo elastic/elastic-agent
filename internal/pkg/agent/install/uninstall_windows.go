@@ -166,7 +166,7 @@ type fileDispositionInfo struct {
 
 // postUninstall performs post-uninstall tasks for Windows systems.
 func postUninstall() error {
-	return removeUninstallEntry()
+	return RemoveUninstallEntry()
 }
 
 // killNoneChildProcess provides a way of killing a process that is not started as a child of this process.

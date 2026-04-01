@@ -142,9 +142,9 @@ func findMSIProductCodes() []string {
 	return guids
 }
 
-// removeUninstallEntry deletes the Elastic Agent entry from
+// RemoveUninstallEntry deletes the Elastic Agent entry from
 // the Windows "Add or Remove Programs" list.
-func removeUninstallEntry() error {
+func RemoveUninstallEntry() error {
 	keyPath := agentUninstallKeyPath()
 	err := registry.DeleteKey(registry.LOCAL_MACHINE, keyPath)
 	if errors.Is(err, registry.ErrNotExist) {

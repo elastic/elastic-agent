@@ -166,13 +166,11 @@ func runElasticAgentCritical(
 	fleetInitTimeout time.Duration,
 	modifiers ...component.PlatformModifier,
 ) error {
-	var errs []error
-
-	// early handleUpgrade, but don't error yet
-	initialUpdateMarker, err := handleUpgrade()
-	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to handle upgrade: %w", err))
-	}
+	var (
+		errs                []error
+		err                 error
+		initialUpdateMarker *upgrade.UpdateMarker
+	)
 
 	// single run, but don't error yet
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
@@ -226,6 +224,12 @@ func runElasticAgentCritical(
 	defer baseLogger.Sync() //nolint:errcheck // flushing buffered logs is best effort.
 
 	l := baseLogger.With("log.source", agentName)
+
+	// handleUpgrade, but don't error yet
+	initialUpdateMarker, err = handleUpgrade(l)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to handle upgrade: %w", err))
+	}
 
 	// at this point the logger is working, so any errors that we hit can now be logged and returned
 	if len(errs) > 0 {
@@ -802,7 +806,7 @@ func setupMetrics(
 // handleUpgrade checks if agent is being run as part of an
 // ongoing upgrade operation, i.e. being re-exec'd and performs
 // any upgrade-specific work, if needed.
-func handleUpgrade() (*upgrade.UpdateMarker, error) {
+func handleUpgrade(log *logger.Logger) (*upgrade.UpdateMarker, error) {
 	upgradeMarker, err := upgrade.LoadMarker(paths.Data())
 	if err != nil {
 		return nil, fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
@@ -819,6 +823,24 @@ func handleUpgrade() (*upgrade.UpdateMarker, error) {
 
 	if err := upgrade.EnsureServiceConfigUpToDate(); err != nil {
 		return nil, err
+	}
+
+	// Update the Add/Remove Programs registry entry with the running version.
+	if err := install.UpsertUninstallEntry(paths.Top(), release.VersionWithSnapshot()); err != nil {
+		// Unprivileged upgrades from versions that predate the registry ACL change
+		// lack write access to HKLM. This is expected and can be resolved by
+		// running 'elastic-agent unprivileged -f'.
+		if goerrors.Is(err, os.ErrPermission) || strings.Contains(err.Error(), "Access is denied") {
+			log.Infof("insufficient permissions to update uninstall registry entry, can be fixed by running 'elastic-agent unprivileged -f'")
+		} else {
+			log.Warnf("failed to update uninstall registry entry: %v", err)
+		}
+	} else {
+		// The MSI ProductCode GUID is version-specific and stale after upgrade,
+		// so we use our own stable key and remove the MSI one to avoid duplicates.
+		if err := install.RemoveMSIUninstallEntries(); err != nil {
+			log.Warnf("failed to remove MSI uninstall registry entries: %v", err)
+		}
 	}
 
 	return upgradeMarker, nil
