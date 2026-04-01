@@ -290,6 +290,7 @@ func New(
 		cfg.Settings.Collector,
 		monitor.ComponentMonitoringConfig,
 		otelmanager.CollectorStopTimeout,
+		nil,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
