@@ -48,12 +48,11 @@ const (
 
 // AWSVerifier implements permission verification for AWS.
 type AWSVerifier struct {
-	logger        *zap.Logger
-	baseConfig    aws.Config
-	configured    bool
-	authConfig    AWSAuthConfig
-	defaultRegion string
-	httpClient    *http.Client
+	logger     *zap.Logger
+	baseConfig aws.Config
+	configured bool
+	authConfig AWSAuthConfig
+	httpClient *http.Client
 }
 
 // Ensure AWSVerifier implements Verifier interface.
@@ -95,10 +94,6 @@ func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthC
 			logger:     logger,
 			configured: false,
 		}, nil
-	}
-
-	if authConfig.DefaultRegion != "" {
-		baseCfg.Region = authConfig.DefaultRegion
 	}
 
 	sessionName := authConfig.SessionName
@@ -188,12 +183,11 @@ func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthC
 	}
 
 	return &AWSVerifier{
-		logger:        logger,
-		baseConfig:    baseCfg,
-		configured:    true,
-		authConfig:    authConfig,
-		defaultRegion: authConfig.DefaultRegion,
-		httpClient:    httpClient,
+		logger:     logger,
+		baseConfig: baseCfg,
+		configured: true,
+		authConfig: authConfig,
+		httpClient: httpClient,
 	}, nil
 }
 

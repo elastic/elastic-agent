@@ -29,8 +29,7 @@ func TestReceiver_StartShutdown(t *testing.T) {
 				Credentials: AWSCredentials{
 					RoleARN:       "arn:aws:iam::123456789012:role/ElasticAgentRole",
 					ExternalID:    "elastic-test-external-id",
-					DefaultRegion: "us-east-1",
-				},
+					},
 			},
 		},
 		Policies: []PolicyConfig{
@@ -246,8 +245,7 @@ func TestReceiver_MultipleIntegrations(t *testing.T) {
 				Credentials: AWSCredentials{
 					RoleARN:       "arn:aws:iam::123456789012:role/ElasticAgentRole",
 					ExternalID:    "elastic-test-external-id",
-					DefaultRegion: "us-east-1",
-				},
+					},
 			},
 		},
 		Policies: []PolicyConfig{
@@ -519,8 +517,7 @@ func TestReceiver_MultiProviderIntegrations(t *testing.T) {
 				Credentials: AWSCredentials{
 					RoleARN:       "arn:aws:iam::123456789012:role/ElasticAgentRole",
 					ExternalID:    "elastic-test-external-id",
-					DefaultRegion: "us-east-1",
-				},
+					},
 			},
 			Azure: AzureProviderConfig{
 				Credentials: AzureCredentials{
@@ -1092,8 +1089,7 @@ func TestReceiver_FleetManagedStyle(t *testing.T) {
 				Credentials: AWSCredentials{
 					RoleARN:       "arn:aws:iam::123456789012:role/ElasticAgentRole",
 					ExternalID:    "elastic-test-external-id",
-					DefaultRegion: "us-east-1",
-				},
+					},
 			},
 		},
 		Policies: []PolicyConfig{

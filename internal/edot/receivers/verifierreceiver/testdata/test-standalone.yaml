@@ -32,20 +32,17 @@ receivers:
       # aws:
       #   credentials:
       #     use_default_credentials: true
-      #     default_region: "us-east-1"
       #
       # Production (Identity Federation):
       # aws:
       #   credentials:
       #     role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
       #     external_id: "your-external-id-from-elastic"
-      #     default_region: "us-east-1"
       aws:
         credentials:
           # use_default_credentials: true
           # role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
           # external_id: "your-external-id-from-elastic"
-          default_region: "us-east-1"
 
       # Azure — choose one mode:
       #

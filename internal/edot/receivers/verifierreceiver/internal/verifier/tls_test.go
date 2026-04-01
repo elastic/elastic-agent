@@ -319,7 +319,6 @@ func TestNewTLS12HTTPClient_RejectsNonFIPSCipherSuite(t *testing.T) {
 func TestAWSVerifier_UsesTLS13Client(t *testing.T) {
 	v, err := NewAWSVerifier(context.Background(), zap.NewNop(), AWSAuthConfig{
 		UseDefaultCredentials: true,
-		DefaultRegion:         "us-east-1",
 	})
 	require.NoError(t, err)
 	require.True(t, v.configured)

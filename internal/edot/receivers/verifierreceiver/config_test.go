@@ -30,9 +30,8 @@ func TestConfig_Validate(t *testing.T) {
 				Providers: ProvidersConfig{
 					AWS: AWSProviderConfig{
 						Credentials: AWSCredentials{
-							RoleARN:       "arn:aws:iam::123456789012:role/ElasticAgentRole",
-							ExternalID:    "elastic-external-id-12345",
-							DefaultRegion: "us-east-1",
+							RoleARN:    "arn:aws:iam::123456789012:role/ElasticAgentRole",
+							ExternalID: "elastic-external-id-12345",
 						},
 					},
 				},
@@ -229,9 +228,8 @@ func TestAWSCredentials_Validate(t *testing.T) {
 		{
 			name: "valid - fully configured",
 			credentials: AWSCredentials{
-				RoleARN:       "arn:aws:iam::123456789012:role/ElasticAgentRole",
-				ExternalID:    "test-external-id",
-				DefaultRegion: "us-east-1",
+				RoleARN:    "arn:aws:iam::123456789012:role/ElasticAgentRole",
+				ExternalID: "test-external-id",
 			},
 			wantErr: "",
 		},
@@ -239,13 +237,6 @@ func TestAWSCredentials_Validate(t *testing.T) {
 			name:        "valid - empty (not configured)",
 			credentials: AWSCredentials{},
 			wantErr:     "",
-		},
-		{
-			name: "valid - only default_region (considered empty)",
-			credentials: AWSCredentials{
-				DefaultRegion: "us-east-1",
-			},
-			wantErr: "",
 		},
 		{
 			name: "valid - use_default_credentials",

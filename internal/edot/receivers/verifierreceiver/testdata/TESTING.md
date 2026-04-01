@@ -59,7 +59,6 @@ providers:
     credentials:
       role_arn: "arn:aws:iam::YOUR_ACCOUNT:role/YOUR_ROLE"
       external_id: "your-external-id"
-      default_region: "us-east-1"
 ```
 
 Then run:
@@ -157,7 +156,6 @@ receivers:
       aws:
         credentials:
           use_default_credentials: true
-          default_region: "us-east-1"
 
       azure:
         credentials:
@@ -239,7 +237,6 @@ receivers:
         credentials:
           role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
           external_id: "your-external-id"
-          default_region: "us-east-1"
 
     policies:
       - policy_id: "agent-test-policy"
@@ -321,7 +318,6 @@ receivers:
         credentials:
           role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
           external_id: "your-external-id"
-          default_region: "us-east-1"
 
     policies:
       - policy_id: "e2e-test-policy"

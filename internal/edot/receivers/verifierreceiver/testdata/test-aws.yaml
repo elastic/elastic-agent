@@ -18,7 +18,6 @@ receivers:
       aws:
         credentials:
           use_default_credentials: true
-          default_region: "us-east-1"
 
     policies:
       - policy_id: "policy-aws-security"

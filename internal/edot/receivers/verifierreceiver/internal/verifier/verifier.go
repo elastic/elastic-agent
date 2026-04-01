@@ -128,7 +128,6 @@ type AWSAuthConfig struct {
 
 	SessionName        string
 	AssumeRoleDuration time.Duration
-	DefaultRegion      string
 
 	// UseDefaultCredentials uses the default AWS credential chain (for testing).
 	UseDefaultCredentials bool

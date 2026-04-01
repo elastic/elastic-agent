@@ -20,7 +20,6 @@ receivers:
         credentials:
           # Using default credentials (AWS_PROFILE) for testing
           use_default_credentials: true
-          default_region: "us-east-1"
     
     # Policies and Integrations (would come from Fleet policy)
     policies:

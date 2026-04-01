@@ -104,9 +104,6 @@ type AWSCredentials struct {
 	// ExternalID is used to prevent confused deputy attacks.
 	ExternalID string `mapstructure:"external_id"`
 
-	// DefaultRegion is the default AWS region to use for API calls.
-	DefaultRegion string `mapstructure:"default_region"`
-
 	// UseDefaultCredentials enables using default AWS credentials (for testing).
 	UseDefaultCredentials bool `mapstructure:"use_default_credentials"`
 }
@@ -142,7 +139,6 @@ func (cfg *AWSCredentials) ToAuthConfig(cc IdentityFederationConfig) verifier.AW
 		CloudResourceID:       cc.CloudResourceID,
 		RoleARN:               cfg.RoleARN,
 		ExternalID:            cfg.ExternalID,
-		DefaultRegion:         cfg.DefaultRegion,
 		UseDefaultCredentials: cfg.UseDefaultCredentials,
 	}
 }
