@@ -506,12 +506,58 @@ func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
 }
 
 func checkCompleteDocker(t *testing.T, file string) {
-	p, _, err := readDocker(t, file, false)
+	p, info, err := readDocker(t, file, false)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 	}
 
 	checkSyntheticsDeps(t, "usr", p)
+	checkCompleteDockerCA(t, p, info)
+}
+
+// checkCompleteDockerCA verifies that the elastic-agent-complete image is set up
+// to support custom CA certificate mounting (PR #13368).
+//
+// Three things are asserted:
+//  1. The well-known mount-point directory usr/share/elastic-agent/certs/ca exists.
+//  2. NODE_EXTRA_CA_CERTS is pre-configured in the image env to point at the bundle.
+//  3. certutil (from nss-tools / libnss-tools) is present so the entrypoint can
+//     populate the per-user NSS database that headless Chromium reads.
+func checkCompleteDockerCA(t *testing.T, p *packageFile, info *dockerInfo) {
+	const (
+		caDir            = "usr/share/elastic-agent/certs/ca"
+		nodeExtraCAKey   = "NODE_EXTRA_CA_CERTS"
+		nodeExtraCAValue = "/usr/share/elastic-agent/certs/ca/ca-bundle.crt"
+	)
+
+	t.Run("custom CA mount point exists", func(t *testing.T) {
+		for _, entry := range p.Contents {
+			// Directory entries may appear with or without a trailing slash.
+			if strings.TrimRight(entry.File, "/") == caDir {
+				return
+			}
+		}
+		t.Errorf("directory %q not found in image; custom CA mount point was not created", caDir)
+	})
+
+	t.Run("NODE_EXTRA_CA_CERTS env var set", func(t *testing.T) {
+		want := nodeExtraCAKey + "=" + nodeExtraCAValue
+		for _, env := range info.Config.Env {
+			if env == want {
+				return
+			}
+		}
+		t.Errorf("image env does not contain %q; Node.js will not trust mounted CAs", want)
+	})
+
+	t.Run("certutil binary present", func(t *testing.T) {
+		for _, entry := range p.Contents {
+			if strings.HasSuffix(entry.File, "/certutil") {
+				return
+			}
+		}
+		t.Error("certutil binary not found in image; nss-tools / libnss-tools must be installed for NSS DB support")
+	})
 }
 
 // Verify that the main configuration file is installed with a 0600 file mode.
@@ -1121,6 +1167,7 @@ func readDocker(t *testing.T, dockerFile string, filterWorkingDir bool) (*packag
 		Size: imgSize,
 	}
 	info.Config.Entrypoint = configFile.Config.Entrypoint
+	info.Config.Env = configFile.Config.Env
 	info.Config.Labels = configFile.Config.Labels
 	info.Config.User = configFile.Config.User
 	info.Config.WorkingDir = configFile.Config.WorkingDir
@@ -1183,6 +1230,7 @@ func readDocker(t *testing.T, dockerFile string, filterWorkingDir bool) (*packag
 type dockerInfo struct {
 	Config struct {
 		Entrypoint []string
+		Env        []string
 		Labels     map[string]string
 		User       string
 		WorkingDir string
