@@ -152,22 +152,22 @@ receivers:
   verifier:
     identity_federation_id: "cc-multi-provider"
     verification_id: "verify-multi-001"
-    
+
     providers:
       aws:
         credentials:
           use_default_credentials: true
           default_region: "us-east-1"
-      
+
       azure:
         credentials:
           use_default_credentials: true
           # Subscription is discovered automatically — no subscription_id needed
-      
+
       gcp:
         credentials:
           use_default_credentials: true
-    
+
     policies:
       - policy_id: "multi-cloud-policy"
         policy_name: "Multi-Cloud Monitoring"
@@ -182,6 +182,33 @@ receivers:
           - policy_template: "audit"
             package_name: "gcp"
             package_title: "GCP"
+
+processors:
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    logs:
+      receivers: [verifier]
+      processors: [resource/verifier]
+      exporters: [debug]
 ```
 
 ## 9. Test with Elastic Agent
@@ -206,14 +233,14 @@ receivers:
   verifier:
     identity_federation_id: "cc-agent-test"
     verification_id: "verify-agent-001"
-    
+
     providers:
       aws:
         credentials:
           role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
           external_id: "your-external-id"
           default_region: "us-east-1"
-    
+
     policies:
       - policy_id: "agent-test-policy"
         policy_name: "Agent Test Policy"
@@ -221,6 +248,22 @@ receivers:
           - policy_template: "cloudtrail"
             package_name: "aws"
             package_title: "AWS"
+
+processors:
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
 
 exporters:
   debug:
@@ -230,6 +273,7 @@ service:
   pipelines:
     logs:
       receivers: [verifier]
+      processors: [resource/verifier]
       exporters: [debug]
 ```
 
@@ -271,14 +315,14 @@ receivers:
   verifier:
     identity_federation_id: "cc-e2e-test"
     verification_id: "verify-e2e-001"
-    
+
     providers:
       aws:
         credentials:
           role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
           external_id: "your-external-id"
           default_region: "us-east-1"
-    
+
     policies:
       - policy_id: "e2e-test-policy"
         policy_name: "E2E Test Policy"
@@ -288,24 +332,37 @@ receivers:
             package_title: "AWS"
 
 processors:
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
   batch:
 
 exporters:
-  elasticsearch:
+  elasticsearch/otel:
     endpoints: ["http://localhost:9200"]
-    logs_index: "logs-verifier_otel.verification-default"
     mapping:
-      mode: ecs
+      mode: otel
 
 service:
   pipelines:
     logs:
       receivers: [verifier]
-      processors: [batch]
-      exporters: [elasticsearch]
+      processors: [resource/verifier, batch]
+      exporters: [elasticsearch/otel]
 ```
 
-Then query Elasticsearch:
+Then query Elasticsearch (the index name reflects the namespace set in the `resource/verifier` processor):
 
 ```bash
 curl -X GET "localhost:9200/logs-verifier_otel.verification-default/_search?pretty" -H 'Content-Type: application/json' -d'

@@ -56,16 +56,32 @@ receivers:
             config:
               region: "us-east-1"
 
-exporters:
-  # Debug exporter shows detailed output in console
-  debug:
-    verbosity: detailed
-
 processors:
+  # Set data stream routing attributes and identity federation namespace at the
+  # pipeline level. Namespace comes from the Fleet policy (Kibana Space).
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
   # Batch processor for efficiency (like production)
   batch:
     timeout: 5s
     send_batch_size: 100
+
+exporters:
+  # Debug exporter shows detailed output in console
+  debug:
+    verbosity: detailed
 
 service:
   telemetry:
@@ -74,5 +90,5 @@ service:
   pipelines:
     logs:
       receivers: [verifier]
-      processors: [batch]
+      processors: [resource/verifier, batch]
       exporters: [debug]

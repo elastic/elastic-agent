@@ -90,6 +90,22 @@ receivers:
               account_id: "123456789012"
               region: "us-east-1"
 
+processors:
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
+
 exporters:
   debug:
     verbosity: detailed
@@ -98,10 +114,13 @@ service:
   pipelines:
     logs:
       receivers: [verifier]
+      processors: [resource/verifier]
       exporters: [debug]
     logs/single:
       receivers: [verifier/single-integration]
+      processors: [resource/verifier]
       exporters: [debug]
     logs/security:
       receivers: [verifier/security-hub]
+      processors: [resource/verifier]
       exporters: [debug]

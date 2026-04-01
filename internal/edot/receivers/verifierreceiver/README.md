@@ -33,11 +33,11 @@ receivers:
     # Identity Federation identification
     identity_federation_id: "cc-12345"
     identity_federation_name: "Production Connector"
-    
+
     # Verification session
     verification_id: "verify-abc123"
     verification_type: "on_demand"  # or "scheduled"
-    
+
     # Provider credentials
     providers:
       # AWS Authentication - Identity Federation STS AssumeRole
@@ -46,14 +46,13 @@ receivers:
           role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
           external_id: "elastic-external-id-from-setup"
           default_region: "us-east-1"
-      
-      # Azure Authentication (future)
+
+      # Azure Authentication
       # azure:
       #   credentials:
       #     tenant_id: "your-tenant-id"
       #     client_id: "your-client-id"
-      #     client_secret: "your-client-secret"
-      
+
       # GCP Authentication — choose one mode:
       #
       # Production (Identity Federation / WIF):
@@ -66,42 +65,70 @@ receivers:
       # gcp:
       #   credentials:
       #     use_default_credentials: true  # project from GOOGLE_CLOUD_PROJECT or GCE metadata
-      
+
       # Okta Authentication (future)
       # okta:
       #   credentials:
       #     domain: "dev-123456.okta.com"
       #     api_token: "your-api-token"
-    
+
     # Policy context from Fleet API (no permissions specified!)
     policies:
       - policy_id: "policy-1"
         policy_name: "AWS Security Monitoring"
         integrations:
-          - integration_id: "int-cloudtrail-001"
-            integration_type: "aws_cloudtrail"
-            integration_name: "AWS CloudTrail"
-            integration_version: "2.17.0"  # Version-aware permissions
+          - policy_template: "cloudtrail"
+            package_name: "aws"
+            package_policy_id: "pp-cloudtrail-001"
+            package_title: "AWS"
+            package_version: "2.17.0"  # Version-aware permissions
             config:
               account_id: "123456789012"
               region: "us-east-1"
-          - integration_id: "int-guardduty-001"
-            integration_type: "aws_guardduty"
-            integration_name: "AWS GuardDuty"
-            integration_version: "1.5.0"
+          - policy_template: "guardduty"
+            package_name: "aws"
+            package_policy_id: "pp-guardduty-001"
+            package_title: "AWS"
+            package_version: "1.5.0"
             config:
               account_id: "123456789012"
               region: "us-east-1"
-      
+
       - policy_id: "policy-2"
         policy_name: "AWS Infrastructure"
         integrations:
-          - integration_id: "int-ec2-001"
-            integration_type: "aws_ec2"
-            integration_name: "AWS EC2 Metrics"
-            # No integration_version - uses latest permission set
+          - policy_template: "ec2"
+            package_name: "aws"
+            package_title: "AWS"
+            # No package_version - uses latest permission set
             config:
               account_id: "123456789012"
+
+processors:
+  # Data stream routing and identity federation namespace are configured at the
+  # pipeline level via a resource processor. The namespace value comes from the
+  # Fleet policy (Kibana Space) and is substituted by Fleet when the policy is applied.
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"  # replaced by ${var:namespace} in Fleet-managed deployments
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"  # replaced by ${var:namespace} in Fleet-managed deployments
+
+service:
+  pipelines:
+    logs/verifier:
+      receivers: [verifier]
+      processors: [resource/verifier]
+      exporters: [...]
 ```
 
 ### Configuration Options
@@ -110,10 +137,13 @@ receivers:
 |--------|------|----------|---------|-------------|
 | `identity_federation_id` | `string` | Yes | - | Unique identifier for the Identity Federation |
 | `identity_federation_name` | `string` | No | - | Human-readable name of the Identity Federation |
+| `account_type` | `string` | No | - | Account scope: `single_account` or `organization` |
 | `verification_id` | `string` | Yes | - | Unique identifier for this verification session |
 | `verification_type` | `string` | No | `on_demand` | Type of verification (`on_demand` or `scheduled`) |
 | `providers` | `ProvidersConfig` | No | - | Provider credentials for AWS, Azure, GCP, Okta |
 | `policies` | `[]PolicyConfig` | Yes | - | List of policies to verify |
+
+> **Namespace and data stream routing** are not receiver config fields. They are configured at the OTel pipeline level via a `resource/verifier` processor (see example above). When deployed via Fleet, the namespace is substituted from the Kibana Space (`${var:namespace}`), matching the pattern used by all other EDOT integrations.
 
 ### Provider Credentials
 
@@ -196,11 +226,12 @@ the `GOOGLE_CLOUD_PROJECT` (or `GCLOUD_PROJECT`) environment variable, the ADC J
 
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
-| `integration_id` | `string` | No | Unique identifier for the integration instance |
-| `integration_type` | `string` | Yes | Package/integration type (e.g., `aws_cloudtrail`) |
-| `integration_name` | `string` | No | Human-readable name of the integration |
-| `integration_version` | `string` | No | Semantic version of the integration package (e.g., `2.17.0`). Different versions may require different permissions. When empty, the latest registered permission set is used. |
-| `config` | `map[string]interface{}` | No | Provider-specific configuration |
+| `policy_template` | `string` | Yes | Policy template name from the integration package (e.g., `cloudtrail`, `activitylogs`). Combined with `package_name` to form the registry lookup key. |
+| `package_name` | `string` | Yes | Integration package name (e.g., `aws`, `azure`, `gcp`, `okta`) |
+| `package_policy_id` | `string` | No | Unique identifier for the package policy instance |
+| `package_title` | `string` | No | Human-readable title of the integration package (e.g., `AWS`) |
+| `package_version` | `string` | No | Semantic version of the integration package (e.g., `2.17.0`). Different versions may require different permissions. When empty, the latest registered permission set is used. |
+| `config` | `map[string]interface{}` | No | Provider-specific configuration (e.g., `region`, `account_id`, `project_id`) |
 
 ## Supported Integration Types
 
@@ -248,22 +279,35 @@ The receiver emits OTEL logs following the RFC structure. Each log record repres
 
 ### Resource Attributes
 
+The receiver sets identity federation and verification attributes. Data stream routing attributes (`data_stream.*`) and `identity_federation.namespace` are set by the `resource/verifier` pipeline processor so that the namespace flows from the Fleet policy (Kibana Space), not from the receiver config.
+
+**Set by the receiver:**
+
 | Attribute | Description |
 |-----------|-------------|
 | `identity_federation.id` | Identity Federation identifier |
-| `identity_federation.name` | Identity Federation name |
+| `identity_federation.name` | Identity Federation name (when configured) |
 | `verification.id` | Verification session ID |
-| `verification.timestamp` | When verification started |
+| `verification.timestamp` | When verification started (RFC 3339) |
 | `verification.type` | `on_demand` or `scheduled` |
 | `service.name` | Always `permission-verifier` |
 | `service.version` | Receiver version |
+
+**Set by the `resource/verifier` processor:**
+
+| Attribute | Description |
+|-----------|-------------|
+| `identity_federation.namespace` | Kibana Space the Identity Federation belongs to |
+| `data_stream.type` | Always `logs` |
+| `data_stream.dataset` | Always `verifier_otel.verification` |
+| `data_stream.namespace` | Kibana Space namespace; routes data to `logs-verifier_otel.verification-{namespace}` |
 
 ### Scope
 
 | Attribute | Value |
 |-----------|-------|
 | `name` | `elastic.permission_verification` |
-| `version` | `0.0.0` |
+| `version` | `1.0.0` |
 
 ### Log Record Attributes
 
@@ -271,13 +315,16 @@ The receiver emits OTEL logs following the RFC structure. Each log record repres
 |-----------|-------------|
 | `policy.id` | Policy identifier |
 | `policy.name` | Policy name |
-| `integration.id` | Integration instance identifier |
-| `integration.name` | Integration name |
-| `integration.type` | Integration type (e.g., `aws_cloudtrail`) |
-| `integration.version` | Integration package version (e.g., `2.17.0`) or `unspecified` |
+| `policy_template` | Policy template name from the integration package (e.g., `cloudtrail`) |
+| `package.name` | Integration package name (e.g., `aws`) |
+| `package.title` | Human-readable integration title |
+| `package.version` | Integration package version (e.g., `2.17.0`) or `unspecified` |
+| `package_policy.id` | Package policy instance identifier |
+| `account_type` | Account scope (`single_account` or `organization`) |
 | `provider.type` | Provider type (`aws`, `azure`, `gcp`, `okta`) |
 | `provider.account` | Account identifier (if available) |
 | `provider.region` | Region (if available) |
+| `provider.project_id` | GCP project identifier (if available) |
 | `permission.action` | Permission being checked (e.g., `cloudtrail:LookupEvents`) |
 | `permission.category` | Category (`data_access`, `management`) |
 | `permission.status` | Result (`granted`, `denied`, `error`, `skipped`) |
@@ -287,6 +334,7 @@ The receiver emits OTEL logs following the RFC structure. Each log record repres
 | `verification.method` | Method used (`api_call`, `dry_run`, `http_probe`) |
 | `verification.endpoint` | API endpoint called for verification |
 | `verification.duration_ms` | Time taken for verification in milliseconds |
+| `verification.verified_at` | Timestamp of the individual permission check (RFC 3339) |
 
 ## Version-Aware Permissions
 
@@ -295,8 +343,8 @@ The permission registry supports versioned permission sets per integration type.
 ### How It Works
 
 - Each integration type is registered with one or more semver constraints (e.g., `>=2.0.0`, `>=1.0.0,<2.0.0`)
-- When `integration_version` is provided, the registry matches it against the constraints and returns the appropriate permission set
-- When `integration_version` is omitted, the latest (first registered) permission set is used
+- When `package_version` is provided, the registry matches it against the constraints and returns the appropriate permission set
+- When `package_version` is omitted, the latest (first registered) permission set is used
 - If the version does not match any constraint, a warning log with `permission.error_code: UnsupportedVersion` is emitted
 
 ### Example: AWS CloudTrail Version Differences
@@ -374,36 +422,56 @@ receivers:
   verifier:
     identity_federation_id: "${IDENTITY_FEDERATION_ID}"
     verification_id: "${VERIFICATION_ID}"
-    
+
     providers:
       aws:
         credentials:
           role_arn: "${AWS_ROLE_ARN}"
           external_id: "${AWS_EXTERNAL_ID}"
           default_region: "us-east-1"
-    
+
     policies:
       - policy_id: "policy-1"
         policy_name: "AWS Security Monitoring"
         integrations:
-          - integration_id: "int-cloudtrail-001"
-            integration_type: "aws_cloudtrail"
-            integration_name: "AWS CloudTrail"
-            integration_version: "2.17.0"
+          - policy_template: "cloudtrail"
+            package_name: "aws"
+            package_title: "AWS"
+            package_version: "2.17.0"
             config:
               region: "us-east-1"
 
+processors:
+  # Namespace flows from the Fleet policy (Kibana Space) to data stream routing.
+  # In Fleet-managed deployments, ${var:namespace} is substituted automatically.
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "${NAMESPACE}"
+      - action: insert
+        key: identity_federation.namespace
+        value: "${NAMESPACE}"
+
 exporters:
-  elasticsearch:
+  elasticsearch/otel:
     endpoints: ["${ES_ENDPOINT}"]
     api_key: "${ES_API_KEY}"
-    logs_index: "logs-verifier_otel.verification-default"
+    mapping:
+      mode: otel
 
 service:
   pipelines:
-    logs:
+    logs/verifier:
       receivers: [verifier]
-      exporters: [elasticsearch]
+      processors: [resource/verifier]
+      exporters: [elasticsearch/otel]
 ```
 
 ## Development Status
