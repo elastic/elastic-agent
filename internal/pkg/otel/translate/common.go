@@ -216,9 +216,9 @@ func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any
 	}
 
 	// convert beat curve ID to OTel compatible curve preference
-	curve_preferences := []string{}
+	curvePreferences := []string{}
 	for _, cp := range goTLSConfig.CurvePreferences {
-		curve_preferences = append(curve_preferences, otelCurveType[cp])
+		curvePreferences = append(curvePreferences, otelCurveType[cp])
 	}
 
 	setIfNotNil(otelTLSConfig, "ca_pem", strings.Join(caCerts, "")) // ssl.certificate_authorities
