@@ -1354,17 +1354,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfco
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.148.0/go.mod h1:PEAF/QjwzpFQDEaDRfT+bjbM0/A7bkqmJVVAzGY9o/c=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.148.0 h1:WuhsKq33Tm4Y3VIvZZ64iaaL0YReGwhXEOygEDDqstk=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.148.0/go.mod h1:6cadZ4Qk1KABCXAWuk5roaOQXJJdhmvDqwNoSzGF480=
-<<<<<<< HEAD
-github.com/open-telemetry/sig-profiling/tools/profcheck v0.0.0-20260227083359-da7d53b22766 h1:VJGqh1AeYpc9tBVVtxL6OwQM2VNq49Uee4fdqOUhKfQ=
-github.com/open-telemetry/sig-profiling/tools/profcheck v0.0.0-20260227083359-da7d53b22766/go.mod h1:KRO+Rec0+KycN1CrIP/6Pu0xOraPhbahCbL36i8FkfM=
-=======
-github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zookeeperreceiver v0.148.0 h1:mBrhSGk/tx6HjOtEB5V/ckPsT2mXm9SSMJ58M3Lyw6s=
-github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zookeeperreceiver v0.148.0/go.mod h1:BkkCiye1qD4lurWw0VfGv6qY2wMy1maEtfu/gStU0KQ=
-github.com/open-telemetry/opentelemetry-collector-contrib/scraper/zookeeperscraper v0.148.0 h1:ZbEWRUAQkuhSUqHxxtU9iheoeOPnR66HnfbQEZ5ulZQ=
-github.com/open-telemetry/opentelemetry-collector-contrib/scraper/zookeeperscraper v0.148.0/go.mod h1:wrszyjAsf03/GAEL4jv3f+e5OKRr4QCZDHi5xSaMP+Y=
 github.com/open-telemetry/sig-profiling/tools/profcheck v0.0.0-20260303084341-52f633d434c9 h1:3NStK3r8FVhXbU0qkVz/DpPQlaoLLgLHJOAMKyDX4WM=
 github.com/open-telemetry/sig-profiling/tools/profcheck v0.0.0-20260303084341-52f633d434c9/go.mod h1:KRO+Rec0+KycN1CrIP/6Pu0xOraPhbahCbL36i8FkfM=
->>>>>>> 5ee8196af (EDOT: Update ebpf-profiler to v0.0.202613 (#13388))
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
@@ -2175,13 +2166,8 @@ google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 h1:VQZ/yAbAtjkHgH8
 google.golang.org/genproto v0.0.0-20260128011058-8636f8732409/go.mod h1:rxKD3IEILWEu3P44seeNOAwZN4SaoKaQ/2eTg4mM6EM=
 google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171 h1:tu/dtnW1o3wfaxCOjSLn5IRX4YDcJrtlpzYkhHhGaC4=
 google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171/go.mod h1:M5krXqk4GhBKvB596udGL3UyjL4I1+cTbK0orROM9ng=
-<<<<<<< HEAD
-google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 h1:ggcbiqK8WWh6l1dnltU4BgWGIGo+EVYxCaAPih/zQXQ=
-google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171/go.mod h1:4Hqkh8ycfw05ld/3BWL7rJOSfebL2Q+DVDeRgYgxUU8=
-=======
 google.golang.org/genproto/googleapis/rpc v0.0.0-20260330182312-d5a96adf58d8 h1:OHkuo1i98/05rzpm9NBbfEtpJH/k3abEgZUKaAuCI7Y=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20260330182312-d5a96adf58d8/go.mod h1:4Hqkh8ycfw05ld/3BWL7rJOSfebL2Q+DVDeRgYgxUU8=
->>>>>>> 5ee8196af (EDOT: Update ebpf-profiler to v0.0.202613 (#13388))
 google.golang.org/grpc v1.19.0/go.mod h1:mqu4LbDTu4XGKhr4mRzUsmM4RtVoemTSY81AxZiDr8c=
 google.golang.org/grpc v1.23.0/go.mod h1:Y5yQAOtifL1yxbo5wqy6BxZv8vAUGQwXBOALyacEbxg=
 google.golang.org/grpc v1.25.1/go.mod h1:c3i+UQWmh7LiEpx4sFZnkU36qjEYZ0imhYfXVyQciAY=
