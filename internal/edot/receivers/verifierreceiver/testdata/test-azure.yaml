@@ -14,7 +14,7 @@ receivers:
   verifier:
     identity_federation_id: "cc-test-azure"
     identity_federation_name: "Azure Test"
-    account_type: "single_account"
+    account_type: "single-account"
     verification_id: "verify-azure-001"
     verification_type: "on_demand"
 

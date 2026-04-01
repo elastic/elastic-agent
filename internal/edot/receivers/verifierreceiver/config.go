@@ -26,7 +26,7 @@ type Config struct {
 
 	// AccountType indicates whether the target is a single account or an
 	// organization (management) account. Affects which permissions are verified.
-	// Valid values: "single_account", "organization".
+	// Valid values: "single-account", "organization-account".
 	AccountType string `mapstructure:"account_type"`
 
 	// VerificationID is a unique identifier for this verification session.

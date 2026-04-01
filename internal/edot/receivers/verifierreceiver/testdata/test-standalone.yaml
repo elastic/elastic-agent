@@ -16,7 +16,7 @@ receivers:
   verifier:
     identity_federation_id: "cc-test-12345"
     identity_federation_name: "Local Test Connector"
-    account_type: "single_account"
+    account_type: "single-account"
     verification_id: "verify-local-001"
     verification_type: "on_demand"
     

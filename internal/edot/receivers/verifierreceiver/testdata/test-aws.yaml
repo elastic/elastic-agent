@@ -10,7 +10,7 @@ receivers:
   verifier:
     identity_federation_id: "cc-test-aws"
     identity_federation_name: "AWS Test"
-    account_type: "single_account"
+    account_type: "single-account"
     verification_id: "verify-aws-001"
     verification_type: "on_demand"
 
