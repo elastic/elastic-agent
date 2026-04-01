@@ -86,6 +86,8 @@ receivers:
     username: test
     password: test
   docker_stats:
+  azure_event_hub:
+    connection: Endpoint=sb://namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=superSecret1234=;EntityPath=hubName
   awss3:
     starttime: "2024-01-01 01:00"
     endtime: "2024-01-02"
@@ -196,6 +198,7 @@ service:
         - nop
         - elasticapmintake
         - elasticmonitoringreceiver
+        - azure_event_hub
 
     logs/forward_receive:
       receivers:
@@ -245,6 +248,7 @@ service:
         - oracledb
         - vcenter
         - zookeeper
+        - azure_event_hub
 
     metrics/aggregated:
       receivers:
@@ -277,3 +281,4 @@ service:
         - jaeger
         - zipkin
         - elasticapmintake
+        - azure_event_hub
