@@ -104,7 +104,11 @@ type AuthConfig interface {
 
 // AWSAuthConfig contains AWS authentication configuration.
 //
-// Identity Federation flow (production):
+// Identity Federation IRSA flow (when AWS_WEB_IDENTITY_TOKEN_FILE is set):
+//
+//	IRSA (implicit via LoadDefaultConfig) → AssumeRole(GlobalRoleARN) → AssumeRole(RoleARN, ExternalID)
+//
+// Identity Federation OIDC flow (when IDTokenFile is set):
 //
 //	JWT token file → WebIdentity(GlobalRoleARN) → AssumeRole(RoleARN, ExternalID)
 //
@@ -112,9 +116,10 @@ type AuthConfig interface {
 //
 //	Uses the default credential chain (env vars, AWS_PROFILE, instance metadata).
 type AWSAuthConfig struct {
-	// Identity Federation OIDC fields
-	IDTokenFile     string // Path to the OIDC JWT token file
-	GlobalRoleARN   string // Elastic global IAM role to assume via WebIdentity
+	// Identity Federation fields — IDTokenFile is used for the OIDC flow; IRSA is
+	// detected at runtime from AWS_WEB_IDENTITY_TOKEN_FILE.
+	IDTokenFile     string // Path to the OIDC JWT token file (CLOUD_CONNECTORS_ID_TOKEN_FILE)
+	GlobalRoleARN   string // Elastic global IAM role to assume
 	CloudResourceID string // Resource ID used as SourceIdentity
 
 	// Customer's AWS account (used in identity federation flow)
@@ -131,9 +136,11 @@ type AWSAuthConfig struct {
 
 func (c AWSAuthConfig) ProviderType() ProviderType { return ProviderAWS }
 
-// IsIdentityFederation returns true when configured for the identity federation OIDC flow.
+// IsIdentityFederation returns true when configured for identity federation
+// (either IRSA or OIDC). Both flows require GlobalRoleARN and RoleARN; the
+// actual auth method is detected at runtime from environment variables.
 func (c AWSAuthConfig) IsIdentityFederation() bool {
-	return c.IDTokenFile != "" && c.GlobalRoleARN != "" && c.RoleARN != ""
+	return c.GlobalRoleARN != "" && c.RoleARN != ""
 }
 
 func (c AWSAuthConfig) IsConfigured() bool {
