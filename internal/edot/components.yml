@@ -55,6 +55,7 @@ core_components:
 
 # Connectors
   - elasticapmconnector
+  - otlpjsonconnector
   - routingconnector
 
 # Extensions
