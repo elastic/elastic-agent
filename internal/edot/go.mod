@@ -304,11 +304,7 @@ require (
 	github.com/elastic/elastic-agent-system-metrics v0.14.3 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.10.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
-<<<<<<< HEAD
-	github.com/elastic/go-docappender/v2 v2.12.1 // indirect
-=======
 	github.com/elastic/go-docappender/v2 v2.14.0 // indirect
->>>>>>> a3cd4a3e1 (build(deps): bump github.com/elastic/go-docappender/v2 from 2.13.0 to 2.14.0 (#13399))
 	github.com/elastic/go-elasticsearch/v8 v8.19.3 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
