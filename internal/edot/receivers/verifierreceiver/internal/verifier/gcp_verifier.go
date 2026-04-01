@@ -55,10 +55,10 @@ func NewGCPVerifierFactory() VerifierFactory {
 
 // NewGCPVerifier creates a new GCP verifier.
 //
-// Identity federation mode (IDTokenFile + WorkloadIdentityProvider + GlobalRoleARN set):
+// Identity federation mode (IDTokenFile + Audience + GlobalRoleARN set):
 //
 //	JWT → AWS AssumeRoleWithWebIdentity(GlobalRoleARN) → AWS creds →
-//	GCP STS(WorkloadIdentityProvider) → Service Account Impersonation
+//	GCP STS(Audience) → Service Account Impersonation
 //
 // Default credentials mode (testing): Application Default Credentials.
 func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthConfig) (*GCPVerifier, error) {
@@ -92,7 +92,7 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 		}
 
 		extCfg := externalaccount.Config{
-			Audience:                       authConfig.WorkloadIdentityProvider,
+			Audience:                       authConfig.Audience,
 			SubjectTokenType:               "urn:ietf:params:aws:token-type:aws4_request",
 			TokenURL:                       "https://sts.googleapis.com/v1/token",
 			Scopes:                         []string{"https://www.googleapis.com/auth/cloud-platform"},
@@ -119,7 +119,7 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 			option.WithHTTPClient(httpClient),
 		)
 		logger.Info("GCP identity federation AWS-mediated WIF credential configured",
-			zap.String("audience", authConfig.WorkloadIdentityProvider),
+			zap.String("audience", authConfig.Audience),
 			zap.String("global_role", authConfig.GlobalRoleARN),
 			zap.Bool("has_service_account_impersonation", authConfig.ServiceAccountEmail != ""),
 		)

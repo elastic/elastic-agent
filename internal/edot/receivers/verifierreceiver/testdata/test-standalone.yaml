@@ -72,10 +72,10 @@ receivers:
       #     use_default_credentials: true
       #
       # Production (Identity Federation / WIF):
-      #   Project is derived from service_account_email (preferred) or workload_identity_provider.
+      #   Project is derived from service_account_email (preferred) or audience.
       # gcp:
       #   credentials:
-      #     workload_identity_provider: "//iam.googleapis.com/projects/PROJECT_NUMBER/..."
+      #     audience: "//iam.googleapis.com/projects/PROJECT_NUMBER/..."
       #     service_account_email: "sa@PROJECT_ID.iam.gserviceaccount.com"
       
       # Okta Authentication (future)

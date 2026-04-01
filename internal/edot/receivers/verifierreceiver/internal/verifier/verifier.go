@@ -184,7 +184,7 @@ func (c AzureAuthConfig) IsConfigured() bool {
 // Identity Federation flow (production) — AWS-mediated WIF matching Cloudbeat:
 //
 //	JWT → AssumeRoleWithWebIdentity(GlobalRoleARN) → AWS creds →
-//	GCP STS(WorkloadIdentityProvider) → Service Account Impersonation
+//	GCP STS(Audience) → Service Account Impersonation
 //
 // Default credentials flow (testing):
 //
@@ -192,7 +192,7 @@ func (c AzureAuthConfig) IsConfigured() bool {
 type GCPAuthConfig struct {
 	// Identity Federation OIDC fields
 	IDTokenFile              string // Path to the OIDC JWT token file
-	WorkloadIdentityProvider string // Full resource name of the GCP WIF provider (audience)
+	Audience string // Full resource name of the GCP WIF provider used as the STS exchange audience
 	ServiceAccountEmail      string // GCP service account to impersonate via WIF
 
 	// AWS-mediated WIF fields (populated from IdentityFederationConfig)
@@ -211,7 +211,7 @@ func (c GCPAuthConfig) ProviderType() ProviderType { return ProviderGCP }
 // IsIdentityFederation returns true when configured for the identity federation
 // AWS-mediated WIF flow (requires JWT, GCP WIF audience, and AWS global role).
 func (c GCPAuthConfig) IsIdentityFederation() bool {
-	return c.IDTokenFile != "" && c.WorkloadIdentityProvider != "" && c.GlobalRoleARN != ""
+	return c.IDTokenFile != "" && c.Audience != "" && c.GlobalRoleARN != ""
 }
 
 func (c GCPAuthConfig) IsConfigured() bool {

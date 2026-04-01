@@ -205,10 +205,10 @@ type GCPProviderConfig struct {
 // GCPCredentials contains the GCP credentials.
 type GCPCredentials struct {
 	// Identity Federation WIF fields
-	// WorkloadIdentityProvider is the full resource name of the GCP WIF provider
-	// used as the audience for STS token exchange.
+	// Audience is the full resource name of the GCP WIF provider used as the
+	// STS token exchange audience.
 	// Example: //iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider
-	WorkloadIdentityProvider string `mapstructure:"workload_identity_provider"`
+	Audience string `mapstructure:"audience"`
 
 	// ServiceAccountEmail is the GCP service account to impersonate via WIF.
 	// The project ID is derived from this email when set
@@ -222,13 +222,12 @@ type GCPCredentials struct {
 // projectID derives the GCP project identifier from the configured fields.
 // It first tries to extract a human-readable project ID from the service account
 // email (format: "name@PROJECT_ID.iam.gserviceaccount.com"). If that fails, it falls back to extracting the numeric project number
-// from the WorkloadIdentityProvider resource name.  Both forms are accepted by
-// all GCP APIs.
+// from the audience resource name.  Both forms are accepted by all GCP APIs.
 func (cfg *GCPCredentials) projectID() string {
 	if id := gcpProjectIDFromServiceAccountEmail(cfg.ServiceAccountEmail); id != "" {
 		return id
 	}
-	return gcpProjectNumberFromAudience(cfg.WorkloadIdentityProvider)
+	return gcpProjectNumberFromAudience(cfg.Audience)
 }
 
 // gcpProjectIDFromServiceAccountEmail extracts the GCP project ID from a
@@ -274,7 +273,7 @@ func (cfg *GCPCredentials) Validate() error {
 
 // IsConfigured returns true if GCP credentials are configured.
 func (cfg *GCPCredentials) IsConfigured() bool {
-	return cfg.WorkloadIdentityProvider != "" || cfg.UseDefaultCredentials
+	return cfg.Audience != "" || cfg.UseDefaultCredentials
 }
 
 // ToAuthConfig converts the config to a verifier.GCPAuthConfig, merging in
@@ -282,14 +281,14 @@ func (cfg *GCPCredentials) IsConfigured() bool {
 // from the service account email or, as a fallback, from the WIF audience.
 func (cfg *GCPCredentials) ToAuthConfig(cc IdentityFederationConfig, identityFederationID string) verifier.GCPAuthConfig {
 	return verifier.GCPAuthConfig{
-		IDTokenFile:              cc.IDTokenFile,
-		WorkloadIdentityProvider: cfg.WorkloadIdentityProvider,
-		ServiceAccountEmail:      cfg.ServiceAccountEmail,
-		GlobalRoleARN:            cc.GlobalRoleARN,
-		CloudResourceID:          cc.CloudResourceID,
-		IdentityFederationID:     identityFederationID,
-		ProjectID:                cfg.projectID(),
-		UseDefaultCredentials:    cfg.UseDefaultCredentials,
+		IDTokenFile:           cc.IDTokenFile,
+		Audience:              cfg.Audience,
+		ServiceAccountEmail:   cfg.ServiceAccountEmail,
+		GlobalRoleARN:         cc.GlobalRoleARN,
+		CloudResourceID:       cc.CloudResourceID,
+		IdentityFederationID:  identityFederationID,
+		ProjectID:             cfg.projectID(),
+		UseDefaultCredentials: cfg.UseDefaultCredentials,
 	}
 }
 

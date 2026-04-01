@@ -58,7 +58,7 @@ receivers:
       # Production (Identity Federation / WIF):
       # gcp:
       #   credentials:
-      #     workload_identity_provider: "//iam.googleapis.com/projects/PROJECT_NUMBER/..."
+      #     audience: "//iam.googleapis.com/projects/PROJECT_NUMBER/..."
       #     service_account_email: "sa@PROJECT_ID.iam.gserviceaccount.com"
       #
       # Testing (Application Default Credentials):
@@ -189,10 +189,10 @@ The subscription is also discovered automatically at runtime.
 
 Two mutually exclusive authentication modes are supported.
 
-**Identity Federation (production)** — requires `workload_identity_provider`. The GCP project
+**Identity Federation (production)** — requires `audience`. The GCP project
 identifier is derived automatically: from `service_account_email` when set (extracts
 `PROJECT_ID` from `name@PROJECT_ID.iam.gserviceaccount.com`), otherwise from the project
-number embedded in the WIF audience (`//iam.googleapis.com/projects/PROJECT_NUMBER/...`).
+number embedded in the audience (`//iam.googleapis.com/projects/PROJECT_NUMBER/...`).
 
 **Application Default Credentials (testing only)** — requires only `use_default_credentials:
 true`. The project identifier is resolved at runtime from `google.FindDefaultCredentials`:
@@ -201,7 +201,7 @@ the `GOOGLE_CLOUD_PROJECT` (or `GCLOUD_PROJECT`) environment variable, the ADC J
 
 | Option | Type | Mode | Description |
 |--------|------|------|-------------|
-| `workload_identity_provider` | `string` | Identity Federation | Full WIF provider resource name; project number derived from this |
+| `audience` | `string` | Identity Federation | Full WIF provider resource name used as the STS exchange audience; project number derived from this |
 | `service_account_email` | `string` | Identity Federation | GCP service account to impersonate via WIF; project ID derived from this when set |
 | `use_default_credentials` | `bool` | Testing | Use ADC (`gcloud auth application-default login`); project from `GOOGLE_CLOUD_PROJECT` env var or GCE metadata |
 

@@ -423,7 +423,7 @@ func TestReceiver_GCPIntegrations(t *testing.T) {
 		Providers: ProvidersConfig{
 			GCP: GCPProviderConfig{
 				Credentials: GCPCredentials{
-					WorkloadIdentityProvider: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider",
+					Audience: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider",
 					ServiceAccountEmail:      "verifier@my-gcp-project-123.iam.gserviceaccount.com",
 				},
 			},
@@ -530,7 +530,7 @@ func TestReceiver_MultiProviderIntegrations(t *testing.T) {
 			},
 			GCP: GCPProviderConfig{
 				Credentials: GCPCredentials{
-					WorkloadIdentityProvider: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider",
+					Audience: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider",
 				},
 			},
 		},
