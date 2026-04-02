@@ -110,6 +110,7 @@ import (
 	"github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension"
 
 	// Connectors
+	otlpjsonconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector"
 	routingconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector"
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
@@ -232,6 +233,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		factories.Connectors, err = otelcol.MakeFactoryMap[connector.Factory](
+			otlpjsonconnector.NewFactory(),
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
 			elasticapmconnector.NewFactory(),
