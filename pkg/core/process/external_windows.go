@@ -26,8 +26,9 @@ func externalProcess(proc *os.Process) {
 		return
 	}
 
-	for {
-		<-time.After(1 * time.Second)
+	ticker := time.NewTicker(externalPollInterval)
+	defer ticker.Stop()
+	for range ticker.C {
 		if isWindowsProcessExited(proc.Pid) {
 			return
 		}
@@ -52,4 +53,8 @@ func isWindowsProcessExited(pid int) bool {
 	}
 
 	return ec != exitCodeStillActive
+}
+
+func IsReaped(pid int) bool {
+	return isWindowsProcessExited(pid)
 }
