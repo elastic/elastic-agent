@@ -200,7 +200,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	if m.isLocal {
 		listener, err = ipc.CreateListener(m.logger, m.listenAddr)
 	} else {
-		listener, err = net.Listen("tcp", m.listenAddr)
+		listener, err = (&net.ListenConfig{}).Listen(ctx, "tcp", m.listenAddr)
 	}
 
 	if err != nil {

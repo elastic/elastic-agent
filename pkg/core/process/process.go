@@ -10,7 +10,14 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"time"
 )
+
+// KillReapTime is the timeout after a SIGKILL is sent to wait for the process to be reaped.
+const KillReapTime = 3 * time.Second
+
+// externalPollInterval is the interval time when checking if an external process has exited.
+const externalPollInterval = time.Second
 
 // Info groups information about fresh new process
 type Info struct {
