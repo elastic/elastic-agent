@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -114,7 +115,8 @@ func LogIngestionFleetManaged(t *testing.T, info *define.Info) {
 // It registers a cleanup function to close the server when the test finishes.
 // The server will respond with the passed error probabilities. If they add
 // up to zero, all requests are a success.
-func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge uint) string {
+func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge uint) *url.URL {
+	t.Helper()
 	uid := uuid.Must(uuid.NewV4())
 	clusterUUID := uuid.Must(uuid.NewV4()).String()
 
@@ -130,7 +132,10 @@ func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)
 
-	return s.URL
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+
+	return u
 }
 
 // StartMockESDeterministic starts a MockES on a random port using httptest.NewServer
@@ -236,9 +241,9 @@ func TestMonitoringLogsAreShipped(
 			"add_cloud_metadata: received error for provider azure: failed with http status code 404",
 			"add_cloud_metadata: received error for provider openstack: failed with http status code 404",
 			"add_cloud_metadata: received error for provider gcp: failed with http status code 404",
-			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
-			"failed to invoke rollback watcher: failed to start Upgrade Watcher",             // on debian this happens probably need to fix.
-			"falling back to IMDSv1: operation error ec2imds: getToken",                      // okay for the cloud metadata to not work
+			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled",               // can happen on restart
+			"failed to invoke rollback watcher: starting watcher process: failed to start Upgrade Watcher", // on debian/rpm package installs the binary symlink at Top() doesn't exist
+			"falling back to IMDSv1: operation error ec2imds: getToken",                                    // okay for the cloud metadata to not work
 			"bulk indexer flush error",          // can happen on restart (caused by context canceled)
 			"Exporting failed. Dropping data.",  // can happen on restart (caused by context canceled)
 			"Exporting failed. Rejecting data.", // can happen on restart (caused by context canceled)

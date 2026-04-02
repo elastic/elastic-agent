@@ -91,6 +91,9 @@ inputs:
 
 # fleet:
 #   access_api_key: ""
+#   checkin:
+#     # compression sets the compression algorithm for checkin requests one of ["gzip", "none"] (default: "gzip").
+#     compression: gzip
 #   kibana:
 #     # kibana minimal configuration
 #     hosts: ["localhost:5601"]
@@ -249,6 +252,10 @@ inputs:
 # This section enables or disables feature flags supported by Agent and its components.
 #agent.features:
 #  fqdn:
+#    enabled: false
+#  # allow stand-alone agents to use encrypted config.
+#  # ignored by Fleet managed agents, which always use encrypted config.
+#  encrypted_config:
 #    enabled: false
 
 # Logging

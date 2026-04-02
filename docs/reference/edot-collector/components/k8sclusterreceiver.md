@@ -2,11 +2,9 @@
 navigation_title: Kubernetes cluster receiver
 description: The Kubernetes cluster receiver is an OpenTelemetry Collector component that collects Kubernetes cluster-level metrics and entity events for Elastic Observability through the EDOT Collector.
 applies_to:
-  stack:
+  stack: ga
   serverless:
-    observability:
-  product:
-    edot_collector:
+    observability: ga
 products:
   - id: cloud-serverless
   - id: observability

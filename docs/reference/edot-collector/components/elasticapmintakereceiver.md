@@ -4,9 +4,7 @@ description: The Elastic APM intake receiver is an OpenTelemetry Collector compo
 applies_to:
   stack: ga 9.2
   serverless:
-    observability:
-  product:
-    edot_collector: ga 9.2
+    observability: ga
 products:
   - id: cloud-serverless
   - id: observability

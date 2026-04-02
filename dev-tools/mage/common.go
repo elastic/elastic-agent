@@ -13,7 +13,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/sha512"
-	"debug/elf"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -27,7 +26,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,26 +33,23 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/magefile/mage/target"
 )
 
 const (
 	inlineTemplate      = "inline"
-	xpackDirName        = "x-pack"
 	windowsBinarySuffix = ".exe"
 )
 
 // Expand expands the given Go text/template string.
-func Expand(in string, args ...map[string]interface{}) (string, error) {
-	return expandTemplate(inlineTemplate, in, FuncMap, EnvMap(args...))
+func Expand(cfg *Settings, in string, args ...map[string]interface{}) (string, error) {
+	return expandTemplate(inlineTemplate, in, FuncMap(cfg), EnvMap(cfg, args...))
 }
 
 // MustExpand expands the given Go text/template string. It panics if there is
 // an error.
-func MustExpand(in string, args ...map[string]interface{}) string {
-	out, err := Expand(in, args...)
+func MustExpand(cfg *Settings, in string, args ...map[string]interface{}) string {
+	out, err := Expand(cfg, in, args...)
 	if err != nil {
 		panic(err)
 	}
@@ -63,16 +58,8 @@ func MustExpand(in string, args ...map[string]interface{}) string {
 
 // ExpandFile expands the Go text/template read from src and writes the output
 // to dst.
-func ExpandFile(src, dst string, args ...map[string]interface{}) error {
-	return expandFile(src, dst, EnvMap(args...))
-}
-
-// MustExpandFile expands the Go text/template read from src and writes the
-// output to dst. It panics if there is an error.
-func MustExpandFile(src, dst string, args ...map[string]interface{}) {
-	if err := ExpandFile(src, dst, args...); err != nil {
-		panic(err)
-	}
+func ExpandFile(cfg *Settings, src, dst string, args ...map[string]interface{}) error {
+	return expandFile(cfg, src, dst, EnvMap(cfg, args...))
 }
 
 func expandTemplate(name, tmpl string, funcs template.FuncMap, args ...map[string]interface{}) (string, error) {
@@ -117,18 +104,18 @@ func joinMaps(args ...map[string]interface{}) map[string]interface{} {
 	return out
 }
 
-func expandFile(src, dst string, args ...map[string]interface{}) error {
+func expandFile(cfg *Settings, src, dst string, args ...map[string]interface{}) error {
 	tmplData, err := os.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("failed reading from template %v, %w", src, err)
 	}
 
-	output, err := expandTemplate(src, string(tmplData), FuncMap, args...)
+	output, err := expandTemplate(src, string(tmplData), FuncMap(cfg), args...)
 	if err != nil {
 		return err
 	}
 
-	dst, err = expandTemplate(inlineTemplate, dst, FuncMap, args...)
+	dst, err = expandTemplate(inlineTemplate, dst, FuncMap(cfg), args...)
 	if err != nil {
 		return err
 	}
@@ -461,7 +448,7 @@ func untar(sourceFile, destinationDir string) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err = os.MkdirAll(path, os.FileMode(header.Mode)); err != nil {
+			if err = os.MkdirAll(path, header.FileInfo().Mode()); err != nil {
 				return err
 			}
 		case tar.TypeReg:
@@ -479,7 +466,7 @@ func untar(sourceFile, destinationDir string) error {
 				return err
 			}
 
-			if err = os.Chmod(path, os.FileMode(header.Mode)); err != nil {
+			if err = os.Chmod(path, header.FileInfo().Mode()); err != nil {
 				return err
 			}
 
@@ -521,12 +508,13 @@ var (
 	parallelJobsSemaphore chan int
 )
 
-func parallelJobs() chan int {
+func parallelJobs(ctx context.Context) chan int {
 	parallelJobsLock.Lock()
 	defer parallelJobsLock.Unlock()
 
 	if parallelJobsSemaphore == nil {
-		max := numParallel()
+		cfg := SettingsFromContext(ctx)
+		max := numParallel(cfg)
 		parallelJobsSemaphore = make(chan int, max)
 		log.Println("Max parallel jobs =", max)
 	}
@@ -534,20 +522,27 @@ func parallelJobs() chan int {
 	return parallelJobsSemaphore
 }
 
-func numParallel() int {
-	if maxParallel := os.Getenv("MAX_PARALLEL"); maxParallel != "" {
-		if num, err := strconv.Atoi(maxParallel); err == nil && num > 0 {
-			return num
+func numParallel(cfg *Settings) int {
+	// Use the configured max parallel from Config if set
+	if cfg.Build.MaxParallel > 0 {
+		maxParallel := cfg.Build.MaxParallel
+
+		// To be conservative use the minimum of the configured value
+		// and the Docker host CPUs.
+		info, err := GetDockerInfo()
+		// Check that info.NCPU != 0 since docker info doesn't return with an
+		// error status if communication with the daemon failed.
+		if err == nil && info.NCPU != 0 && info.NCPU < maxParallel {
+			maxParallel = info.NCPU
 		}
+
+		return maxParallel
 	}
 
-	// To be conservative use the minimum of the number of CPUs between the host
-	// and the Docker host.
+	// Fallback to runtime.NumCPU() if not configured
 	maxParallel := runtime.NumCPU()
 
 	info, err := GetDockerInfo()
-	// Check that info.NCPU != 0 since docker info doesn't return with an
-	// error status if communcation with the daemon failed.
 	if err == nil && info.NCPU != 0 && info.NCPU < maxParallel {
 		maxParallel = info.NCPU
 	}
@@ -582,10 +577,10 @@ func ParallelCtx(ctx context.Context, fns ...interface{}) {
 					mu.Unlock()
 				}
 				wg.Done()
-				<-parallelJobs()
+				<-parallelJobs(ctx)
 			}()
 			waitStart := time.Now()
-			parallelJobs() <- 1
+			parallelJobs(ctx) <- 1
 			log.Println("Parallel job waited", time.Since(waitStart), "before starting.")
 			if err := fw(ctx); err != nil {
 				mu.Lock()
@@ -779,83 +774,6 @@ func GetSHA512Hash(file string) (string, error) {
 	return computedHash, nil
 }
 
-// Mage executes mage targets in the specified directory.
-func Mage(dir string, targets ...string) error {
-	c := exec.Command("mage", targets...)
-	c.Dir = dir
-	if mg.Verbose() {
-		c.Env = append(os.Environ(), "MAGEFILE_VERBOSE=1")
-	}
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	c.Stdin = os.Stdin
-	log.Println("exec:", strings.Join(c.Args, " "))
-	err := c.Run()
-	return err
-}
-
-// IsUpToDate returns true if dst exists and is older based on modtime than all the sources.
-func IsUpToDate(dst string, sources ...string) bool {
-	if len(sources) == 0 {
-		panic("No sources passed to IsUpToDate")
-	}
-
-	var files []string
-	for _, s := range sources {
-		err := filepath.WalkDir(s, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				if os.IsNotExist(err) {
-					return nil
-				}
-				return err
-			}
-
-			if d.Type().IsRegular() {
-				files = append(files, path)
-			}
-
-			return nil
-		})
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	execute, err := target.Path(dst, files...)
-	return err == nil && !execute
-}
-
-// OSSBeatDir returns the OSS beat directory. You can pass paths and they will
-// be joined and appended to the OSS beat dir.
-func OSSBeatDir(path ...string) string {
-	ossDir := CWD()
-
-	// Check if we need to correct ossDir because it's in x-pack.
-	if parentDir := filepath.Base(filepath.Dir(ossDir)); parentDir == xpackDirName {
-		// If the OSS version of the beat exists.
-		tmp := filepath.Join(ossDir, "../..", BeatName)
-		if _, err := os.Stat(tmp); !os.IsNotExist(err) {
-			ossDir = tmp
-		}
-	}
-
-	return filepath.Join(append([]string{ossDir}, path...)...)
-}
-
-// XPackBeatDir returns the X-Pack beat directory. You can pass paths and they
-// will be joined and appended to the X-Pack beat dir.
-func XPackBeatDir(path ...string) string {
-	// Check if we have an X-Pack only beats
-	cur := CWD()
-
-	if parentDir := filepath.Base(filepath.Dir(cur)); parentDir == xpackDirName {
-		tmp := filepath.Join(filepath.Dir(cur), BeatName)
-		return filepath.Join(append([]string{tmp}, path...)...)
-	}
-
-	return OSSBeatDir(append([]string{XPackDir, BeatName}, path...)...)
-}
-
 // createDir creates the parent directory for the given file.
 // Deprecated: Use CreateDir.
 func createDir(file string) string {
@@ -901,93 +819,4 @@ func ParseVersion(version string) (int, int, int, error) {
 	minor, _ := strconv.Atoi(data["minor"])
 	patch, _ := strconv.Atoi(data["patch"])
 	return major, minor, patch, nil
-}
-
-// ListMatchingEnvVars returns all the environment variables names that begin
-// with prefix.
-func ListMatchingEnvVars(prefixes ...string) []string {
-	var vars []string
-	for _, v := range os.Environ() {
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(v, prefix) {
-				eqIdx := strings.Index(v, "=")
-				if eqIdx != -1 {
-					vars = append(vars, v[:eqIdx])
-				}
-				break
-			}
-		}
-	}
-	return vars
-}
-
-// IntegrationTestEnvVars returns the names of environment variables needed to configure
-// connections to integration test environments.
-func IntegrationTestEnvVars() []string {
-	// Environment variables that can be configured with paths to files
-	// with authentication information.
-	vars := []string{
-		"AWS_SHARED_CREDENTIAL_FILE",
-		"AZURE_AUTH_LOCATION",
-		"GOOGLE_APPLICATION_CREDENTIALS",
-	}
-	// Environment variables with authentication information.
-	prefixes := []string{
-		"AWS_",
-		"AZURE_",
-		"GCP_",
-
-		// Accepted by terraform, but not by many clients, including Beats
-		"GOOGLE_",
-		"GCLOUD_",
-	}
-	for _, prefix := range prefixes {
-		vars = append(vars, ListMatchingEnvVars(prefix)...)
-	}
-	return vars
-}
-
-// ReadGLIBCRequirement returns the required glibc version for a dynamically
-// linked ELF binary. The target machine must have a version equal to or
-// greater than (newer) the returned value.
-func ReadGLIBCRequirement(elfFile string) (*SemanticVersion, error) {
-	e, err := elf.Open(elfFile)
-	if err != nil {
-		return nil, err
-	}
-
-	symbols, err := e.DynamicSymbols()
-	if err != nil {
-		return nil, err
-	}
-
-	versionSet := map[SemanticVersion]struct{}{}
-	for _, sym := range symbols {
-		if strings.HasPrefix(sym.Version, "GLIBC_") {
-			semver, err := NewSemanticVersion(strings.TrimPrefix(sym.Version, "GLIBC_"))
-			if err != nil {
-				continue
-			}
-
-			versionSet[*semver] = struct{}{}
-		}
-	}
-
-	if len(versionSet) == 0 {
-		return nil, fmt.Errorf("no GLIBC symbols found in binary (is this a static binary?)")
-	}
-
-	versions := make([]SemanticVersion, 0, len(versionSet))
-	for ver := range versionSet {
-		versions = append(versions, ver)
-	}
-
-	sort.Slice(versions, func(i, j int) bool {
-		a := versions[i]
-		b := versions[j]
-		return a.LessThan(&b)
-	})
-
-	max := versions[len(versions)-1]
-	return &max, nil
 }

@@ -20,9 +20,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/version"
 )
+
+type VersionOutput struct {
+	Binary *release.VersionInfo `yaml:"binary"`
+	Daemon *release.VersionInfo `yaml:"daemon,omitempty"`
+}
 
 // testAgentPackageVersion returns a func that can be used with t.Run() to execute the version check as a subtest
 func testAgentPackageVersion(ctx context.Context, f *integrationtest.Fixture, binaryOnly bool) func(*testing.T) {
@@ -98,11 +104,24 @@ func getAgentVersionOutput(t *testing.T, f *integrationtest.Fixture, ctx context
 
 // unmarshalVersionOutput retrieves the version string for binary or daemon from "version" subcommand yaml output
 func unmarshalVersionOutput(t *testing.T, cmdOutput []byte, binaryOrDaemonKey string) string {
-	versionCmdOutput := map[string]any{}
+	t.Helper()
+	versionCmdOutput := &VersionOutput{}
 	err := yaml.Unmarshal(cmdOutput, &versionCmdOutput)
 	require.NoError(t, err, "error parsing 'version' command output")
-	require.Contains(t, versionCmdOutput, binaryOrDaemonKey)
-	return versionCmdOutput[binaryOrDaemonKey].(map[any]any)["version"].(string)
+	var versionInfo *release.VersionInfo
+	switch binaryOrDaemonKey {
+	case "binary":
+		versionInfo = versionCmdOutput.Binary
+	case "daemon":
+		versionInfo = versionCmdOutput.Daemon
+	default:
+		t.Errorf("expected either 'binary' or 'daemon', got: %s", binaryOrDaemonKey)
+	}
+	require.NotNil(t, versionInfo)
+	require.NotZero(t, versionInfo.BuildTime)
+	require.NotZero(t, versionInfo.Commit)
+	require.NotZero(t, versionInfo.Version)
+	return versionInfo.Version
 }
 
 // findPkgVersionFiles scans recursively a root directory and returns all the package version files encountered

@@ -33,13 +33,13 @@ func (m *IntegrationTestStep) Use(dir string) (bool, error) {
 // Setup ensures the mage binary is built.
 //
 // Multiple uses of this step will only build the mage binary once.
-func (m *IntegrationTestStep) Setup(_ map[string]string) error {
+func (m *IntegrationTestStep) Setup(_ *Settings, _ map[string]string) error {
 	// Pre-build a mage binary to execute.
 	buildMageOnce.Do(func() { mg.Deps(buildMage) })
 	return nil
 }
 
 // Teardown does nothing.
-func (m *IntegrationTestStep) Teardown(_ map[string]string) error {
+func (m *IntegrationTestStep) Teardown(_ *Settings, _ map[string]string) error {
 	return nil
 }

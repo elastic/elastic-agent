@@ -1,0 +1,133 @@
+name: "Sweeper: Coordinator and Health Status Accuracy"
+on:
+  schedule:
+    - cron: "0 9 * * 5"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  run:
+    uses: elastic/ai-github-actions/.github/workflows/gh-aw-code-quality-audit.lock.yml@v0
+    with:
+      title-prefix: "[coordinator-status-accuracy]"
+      severity-threshold: "high"
+      setup-commands: |
+        sudo apt-get update && sudo apt-get install -y libpcap-dev librpm-dev python3-venv
+        export GOTOOLCHAIN=auto
+        make mage
+      additional-instructions: |
+        You are a **coordinator and health status accuracy sweeper** for Elastic Agent. Your
+        goal is to find every code path where the agent reports an incorrect health state —
+        showing healthy when degraded, degraded when healthy, or getting stuck in a transient
+        state permanently — and write a failing test for each confirmed issue.
+
+        ## The component
+
+        The coordinator is the central orchestration hub. It lives under
+        `internal/pkg/agent/application/coordinator/`:
+
+        - `coordinator.go` — Main coordinator: receives policy/config, manages components,
+          integrates Fleet, upgrade, and OTel translation
+        - `coordinator_state.go` — Aggregates overall state from: coordinator state, Fleet
+          gateway state, component runtime states, OTel aggregate status, and upgrade details
+        - `handler.go` — Request/action handling entry points
+        - `config_operations.go` / `config_patcher.go` — Config transform and patching
+
+        Component runtime management lives under `pkg/component/runtime/`:
+
+        - `manager.go` — Runtime manager: starts/stops component processes, gRPC communication
+          with elastic-agent-client, streams state updates
+        - `state.go` — Component/unit state structures
+        - `subscription.go` — Subscriptions to state change events
+
+        Status is exposed through:
+        - `pkg/control/v2/server/server.go` — gRPC control server (used by `elastic-agent status`)
+        - `internal/pkg/agent/application/monitoring/liveness.go` — HTTP liveness endpoint
+        - `internal/pkg/agent/application/monitoring/readiness.go` — Readiness handling
+        - Fleet check-in (status is sent as part of each check-in payload)
+
+        ## The bug class
+
+        Health status misreporting is the second-most common bug category (~40+ issues).
+        The recurring failure modes are:
+
+        **Transient unhealthy states that persist**: The agent goes unhealthy briefly during
+        normal operations (adding/removing integrations, changing log level, restarting
+        components) and never recovers back to healthy. Historical bugs include: agent staying
+        degraded after a log level change to "warning" (the component restarts but status is
+        not updated), agent staying unhealthy after removing and re-adding Elastic Defend
+        (status from the old component instance is not cleared), and agent staying in
+        "Updating" state indefinitely after a policy change.
+
+        **Status from removed components not being cleaned up**: When a component is removed
+        from the agent's policy, its last-known status should be cleared from the aggregate
+        state. Bugs have occurred where the removed component's "unhealthy" status persists
+        in the aggregate, keeping the overall agent in a degraded state permanently.
+
+        **Out-of-order status updates**: Component state updates can arrive asynchronously
+        and out of order. If the coordinator processes an older "unhealthy" update after a
+        newer "healthy" update, the agent's reported state will be incorrect. The coordinator
+        needs to handle timestamp-based ordering or sequence numbers.
+
+        **Monitoring endpoint status divergence**: The gRPC control server (used by
+        `elastic-agent status`), the Fleet check-in payload, and the HTTP liveness endpoint
+        can all report different states for the same agent at the same time. This happens
+        when one reporting path caches state while another reads it live, or when the
+        liveness endpoint only considers component state but not coordinator/fleet state.
+
+        **Agent healthy but components silently failing**: The agent reports healthy overall
+        while individual components or units are in an error state. This occurs when the
+        aggregation logic treats missing status as healthy, or when error states from service
+        runtime components (Elastic Defend, Fleet Server) are not propagated to the aggregate.
+
+        ## How to investigate
+
+        Start with `coordinator_state.go`. Read how the aggregate state is computed from the
+        individual sources (coordinator, fleet, components, OTel). Ask: if one source reports
+        unhealthy and then is removed, does the aggregate state recompute? Is there a race
+        between receiving a component removal and receiving a late status update from that
+        component?
+
+        Read `pkg/component/runtime/manager.go` and `subscription.go`. Ask: when a component
+        is stopped, is its subscription cleaned up? Can a late status update from a stopped
+        component be delivered to the coordinator after the component is removed from the
+        expected set?
+
+        Read `monitoring/liveness.go`. Ask: does it read from the same state source as the
+        gRPC server and Fleet check-in? If not, can they diverge?
+
+        For the common "agent goes unhealthy on log level change" pattern: trace how a log
+        level change in Fleet policy flows through the coordinator to the component runtime.
+        Does changing the log level cause a component restart? If so, is the transient
+        "starting" state handled without marking the agent as degraded?
+
+        ## For each risk you confirm
+
+        Write a Go test. Create mock components that send status updates in specific sequences
+        (healthy → unhealthy → removed, or out-of-order timestamps). Assert the coordinator's
+        aggregate state is correct at each point. Run:
+        `go test ./internal/pkg/agent/application/coordinator/... ./pkg/component/runtime/...`
+
+        ## The bar for filing
+
+        Only report findings that a real Fleet-managed or standalone agent could encounter
+        through normal operations: changing policy, adding/removing integrations, changing
+        log levels, restarting components, network interruptions to Fleet. The status
+        inaccuracy must be observable by a user (through the `elastic-agent status` command,
+        Fleet UI, or Kubernetes liveness probe). Do not file findings about internal state
+        that is never exposed to users.
+
+        ## Output
+
+        File a single issue containing:
+        - Confirmed issues with test code, the exact state transition sequence, and fix direction
+        - A priority ranking: permanent incorrect states first, then transient inaccuracies,
+          then cosmetic issues
+        - State transitions and aggregation paths you audited and found correct
+    secrets:
+      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

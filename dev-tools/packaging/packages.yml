@@ -46,7 +46,6 @@ settings:
         MS_GOTOOLCHAIN_TELEMETRY_ENABLED: "0"
       tags:
         - requirefips
-        - ms_tls13kdf
       platforms:
         - *linux-amd64
         - *linux-arm64

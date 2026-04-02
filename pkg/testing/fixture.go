@@ -71,6 +71,11 @@ type Fixture struct {
 	// it's set by FileNamePrefix and once it's set, FileNamePrefix will return
 	// its value.
 	fileNamePrefix string
+
+	// procMutex protects access to proc and stopping
+	procMutex sync.Mutex
+	proc      *process.Info
+	stopping  bool
 }
 
 // FixtureOpt is an option for the fixture.
@@ -355,6 +360,31 @@ func (f *Fixture) PackageFormat() string {
 	return f.packageFormat
 }
 
+// SetInstallBasePath records the install base path on the fixture. This is
+// needed when the agent is installed manually (e.g. via rpm -U) without going
+// through fixture.Install(), so that helpers such as FindRunDir can locate the
+// correct data directory.
+func (f *Fixture) SetInstallBasePath(path string) {
+	if f.installOpts == nil {
+		f.installOpts = &InstallOpts{}
+	}
+	f.installOpts.BasePath = path
+}
+
+// AgentDataDir returns the path to the agent's data directory, accounting for
+// any install prefix. For rpm/deb this is "{prefix}/var/lib/elastic-agent";
+// for other package formats it is the fixture's work directory.
+func (f *Fixture) AgentDataDir() string {
+	if pf := f.packageFormat; pf == "deb" || pf == "rpm" {
+		prefix := ""
+		if f.installOpts != nil {
+			prefix = f.installOpts.BasePath
+		}
+		return prefix + "/var/lib/elastic-agent"
+	}
+	return f.workDir
+}
+
 func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 	filename := filepath.Base(artifactFile)
 	_, ext, err := splitFileType(filename)
@@ -556,9 +586,33 @@ func (f *Fixture) RunOtelWithClient(ctx context.Context, states ...State) error 
 	return f.executeWithClient(ctx, "otel", false, false, false, states...)
 }
 
+// Stop gracefully stops the Elastic Agent process that has been started
+// by [RunOtelWithCliet] or [Run].
+// If the Elastic Agent has been installed, or the process
+// has not been started by [RunOtelWithClient] or [Run],
+// Stop fails the test by calling t.Error
+func (f *Fixture) Stop() {
+	f.procMutex.Lock()
+	defer f.procMutex.Unlock()
+
+	if f.installed {
+		f.t.Error("an installed Elastic Agent cannot be stopped")
+	}
+
+	if f.proc == nil {
+		f.t.Error("Elastic Agent has not been started")
+	}
+
+	f.stopping = true
+
+	if err := f.proc.Stop(); err != nil {
+		f.t.Errorf("Elastic Agent returned an error when stopping: %s", err)
+	}
+}
+
 func (f *Fixture) executeWithClient(ctx context.Context, command string, disableEncryptedStore bool, shouldWatchState bool, enableTestingMode bool, states ...State) error {
 	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
-		f.t.Fatal("Context passed to Fixture.Run() has no deadline set.")
+		f.t.Error("Context passed to Fixture.Run() has no deadline set.")
 	}
 
 	if f.binaryName != "elastic-agent" {
@@ -616,11 +670,13 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 
 	args = append(args, f.additionalArgs...)
 
-	proc, err := process.Start(
+	f.procMutex.Lock()
+	f.proc, err = process.Start(
 		f.binaryPath(),
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+	f.procMutex.Unlock()
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
@@ -637,20 +693,23 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		doneChan = time.After(f.runLength)
 	}
 
-	procWaitCh := proc.Wait()
+	procWaitCh := f.proc.Wait()
 	killProc := func() {
-		_ = proc.Kill()
+		_ = f.proc.Kill()
 		<-procWaitCh
 	}
 
-	stopping := false
+	f.procMutex.Lock()
+	f.stopping = false
+	f.procMutex.Unlock()
+
 	for {
 		select {
 		case <-ctx.Done():
 			killProc()
 			return ctx.Err()
 		case ps := <-procWaitCh:
-			if stopping {
+			if f.stopping {
 				return nil
 			}
 			return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
@@ -667,7 +726,7 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
 			}
 		case err := <-stateErrCh:
-			if !stopping {
+			if !f.stopping {
 				// Give the log watchers a second to write out the agent logs.
 				// Client connnection failures can happen quickly enough to prevent logging.
 				time.Sleep(time.Second)
@@ -676,10 +735,10 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 				return fmt.Errorf("elastic-agent client received unexpected error: %w", err)
 			}
 		case <-doneChan:
-			if !stopping {
+			if !f.stopping {
 				// trigger the stop
-				stopping = true
-				_ = proc.Stop()
+				f.stopping = true
+				_ = f.proc.Stop()
 			}
 		case state := <-stateCh:
 			if smInstance != nil {
@@ -689,10 +748,10 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 					return fmt.Errorf("state management failed with unexpected error: %w", err)
 				}
 				if !cont {
-					if !stopping {
+					if !f.stopping {
 						// trigger the stop
-						stopping = true
-						_ = proc.Stop()
+						f.stopping = true
+						_ = f.proc.Stop()
 					}
 				} else if cfg != "" {
 					err := performConfigure(ctx, agentClient, cfg, 3*time.Second)
@@ -758,6 +817,7 @@ func (f *Fixture) PrepareAgentCommand(ctx context.Context, args []string, opts .
 			return nil, fmt.Errorf("error adding opts to Exec: %w", err)
 		}
 	}
+
 	return cmd, nil
 }
 
@@ -1421,11 +1481,7 @@ func FindComponentsDir(dir, version string) (string, error) {
 
 // FindRunDir identifies the directory that holds the run folder.
 func FindRunDir(fixture *Fixture) (string, error) {
-	agentWorkDir := fixture.WorkDir()
-	if pf := fixture.PackageFormat(); pf == "deb" || pf == "rpm" {
-		// these are hardcoded paths in packages.yml
-		agentWorkDir = "/var/lib/elastic-agent"
-	}
+	agentWorkDir := fixture.AgentDataDir()
 
 	version := fixture.Version()
 	versionDir, err := findAgentDataVersionDir(agentWorkDir, version)

@@ -49,8 +49,10 @@ processors:
     limit_mib: 4000
     spike_limit_mib: 800
   elasticapm:
+  ratelimit:
   tail_sampling:
   logdedup:
+  beat:
 
 receivers:
   nop:
@@ -105,6 +107,37 @@ receivers:
           value_type: int
         scalar_oids:
           - oid: ".1.3.6.1.2.1.1.8.0"
+  kafkametrics:
+    brokers: [localhost:9092]
+    protocol_version: 2.0.0
+    scrapers:
+      - brokers
+      - topics
+      - consumers
+    collection_interval: 60s
+  haproxy:
+    endpoint: http://localhost:8404/stats
+  mongodb:
+    hosts:
+      - endpoint: localhost:27017
+  rabbitmq:
+    endpoint: http://localhost:15672
+    username: guest
+    password: guest
+  memcached:
+    endpoint: localhost:11211
+  couchdb:
+    endpoint: http://localhost:5984
+  oracledb:
+    datasource: oracle://otel:password@localhost:1521/orcl
+  vcenter:
+    endpoint: https://vcenter.example.com
+    username: test
+    password: test
+    tls:
+      insecure_skip_verify: true
+  zookeeper:
+    endpoint: localhost:2181
 
 connectors:
   spanmetrics:
@@ -202,7 +235,16 @@ service:
         - postgresql
         - prometheusremotewrite
         - snmp
+        - kafkametrics
         - statsd
+        - haproxy
+        - mongodb
+        - rabbitmq
+        - memcached
+        - couchdb
+        - oracledb
+        - vcenter
+        - zookeeper
 
     metrics/aggregated:
       receivers:

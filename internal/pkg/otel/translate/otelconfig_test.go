@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+	internalConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -28,6 +29,7 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 func TestBeatNameToDefaultDatastreamType(t *testing.T) {
@@ -374,7 +376,7 @@ func TestGetOtelConfig(t *testing.T) {
 		}
 	}
 
-	defaultGlobalProcessorsForFilebeat := []map[string]any{
+	defaultGlobalProcessors := []map[string]any{
 		{
 			"add_host_metadata": map[string]any{
 				"when.not.contains.tags": "forwarded",
@@ -385,16 +387,9 @@ func TestGetOtelConfig(t *testing.T) {
 		{"add_kubernetes_metadata": nil},
 	}
 
-	defaultGlobalProcessorsForMetricbeat := []map[string]any{
-		{"add_host_metadata": nil},
-		{"add_cloud_metadata": nil},
-		{"add_docker_metadata": nil},
-		{"add_kubernetes_metadata": nil},
-	}
-
 	// expects input id
-	expectedFilestreamConfig := func(id string) map[string]any {
-		return map[string]any{
+	expectedFilestreamConfig := func(id string) (config map[string]any) {
+		config = map[string]any{
 			"filebeat": map[string]any{
 				"inputs": []map[string]any{
 					{
@@ -436,7 +431,6 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 			},
-			"processors": defaultGlobalProcessorsForFilebeat,
 			"logging": map[string]any{
 				"with_fields": map[string]any{
 					"component": map[string]any{
@@ -456,6 +450,55 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"management.otel.enabled": true,
 		}
+		return config
+	}
+
+	expectedBeatMetricConfig := map[string]any{
+		"metricbeat": map[string]any{
+			"modules": []map[string]any{
+				{
+					"data_stream": map[string]any{"dataset": "generic-1"},
+					"hosts":       "http://localhost:5066",
+					"id":          "test-1",
+					"index":       "metrics-generic-1-default",
+					"metricsets":  []interface{}{"stats"},
+					"period":      "60s",
+					"processors":  defaultInputProcessors("test-1", "generic-1", "metrics"),
+					"module":      "beat",
+				},
+			},
+		},
+		"path": map[string]any{
+			"home": paths.Components(),
+			"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+		},
+		"queue": map[string]any{
+			"mem": map[string]any{
+				"events": float64(3200),
+				"flush": map[string]any{
+					"min_events": float64(1600),
+					"timeout":    "10s",
+				},
+			},
+		},
+		"logging": map[string]any{
+			"with_fields": map[string]any{
+				"component": map[string]any{
+					"binary":  "metricbeat",
+					"dataset": "elastic_agent.metricbeat",
+					"type":    "beat/metrics",
+					"id":      "beat-metrics-monitoring",
+				},
+				"log": map[string]any{
+					"source": "beat-metrics-monitoring",
+				},
+			},
+		},
+		"http": map[string]any{
+			"enabled": true,
+			"host":    "localhost",
+		},
+		"management.otel.enabled": true,
 	}
 
 	getBeatMonitoringConfig := func(_, _ string) map[string]any {
@@ -468,10 +511,11 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		model          *component.Model
-		expectedConfig *confmap.Conf
-		expectedError  error
+		name              string
+		model             *component.Model
+		expectedConfig    *confmap.Conf
+		expectedError     error
+		defaultProcessors *bool // value of the default_processors feature flag
 	}{
 		{
 			name: "no supported components",
@@ -525,6 +569,66 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"filebeatreceiver/_agent-component/filestream-default": expectedFilestreamConfig("filestream-default"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/filestream-default": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"filebeatreceiver/_agent-component/filestream-default"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name:              "filestream with default processors disabled",
+			defaultProcessors: func() *bool { b := false; return &b }(), // Looking forward to Go v1.26 and its `new(false)` notation
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "filestream-default",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "filestream-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(fileStreamConfig),
+							},
+							{
+								ID:     "filestream-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-default": expectedFilestreamConfig("filestream-default"),
 				},
@@ -534,6 +638,300 @@ func TestGetOtelConfig(t *testing.T) {
 						"logs/_agent-component/filestream-default": map[string][]string{
 							"exporters": {"elasticsearch/_agent-component/default"},
 							"receivers": {"filebeatreceiver/_agent-component/filestream-default"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "filestream with global processors",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "filestream-default",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "filestream-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(fileStreamConfig),
+							},
+							{
+								ID:   "filestream-default",
+								Type: client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig(extraParams{
+									key:   "processors",
+									value: []any{"filter/remove-something", "beat", "batch"},
+								})),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"filebeatreceiver/_agent-component/filestream-default": expectedFilestreamConfig("filestream-default"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/filestream-default": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component", "filter/remove-something", "beat", "batch"},
+							"receivers":  {"filebeatreceiver/_agent-component/filestream-default"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "metricbeat with logstash output",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "beat-metrics-monitoring",
+						InputType:  "beat/metrics",
+						OutputType: "logstash",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"metricbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "beat/metrics-monitoring",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(beatMetricsConfig),
+							},
+							{
+								ID:   "beat/metrics-default",
+								Type: client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"type":                       "logstash",
+									"hosts":                      []any{"localhost:5044"},
+									"queue.mem.events":           3200,
+									"queue.mem.flush.min_events": 1600,
+									"queue.mem.flush.timeout":    "10s",
+								}),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"logstash/_agent-component/default": map[string]any{
+						"hosts": []any{"localhost:5044"},
+						"backoff": map[string]any{
+							"init": "1s",
+							"max":  "1m0s",
+						},
+						"bulk_max_size":            uint64(2048),
+						"compression_level":        uint64(3),
+						"escape_html":              false,
+						"index":                    "",
+						"loadbalance":              false,
+						"max_retries":              uint64(3),
+						"pipelining":               uint64(2),
+						"proxy_url":                "",
+						"proxy_use_local_resolver": false,
+						"slow_start":               false,
+						"timeout":                  "30s",
+						"ttl":                      "0s",
+						"worker":                   int64(0),
+						"workers":                  int64(0),
+					},
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": map[string]any{
+						"metricbeat": map[string]any{
+							"modules": []map[string]any{
+								{
+									"data_stream": map[string]any{"dataset": "generic-1"},
+									"hosts":       "http://localhost:5066",
+									"id":          "test-1",
+									"index":       "metrics-generic-1-default",
+									"metricsets":  []interface{}{"stats"},
+									"period":      "60s",
+									"processors":  defaultInputProcessors("test-1", "generic-1", "metrics"),
+									"module":      "beat",
+								},
+							},
+						},
+						"path": map[string]any{
+							"home": paths.Components(),
+							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+						},
+						"queue": map[string]any{
+							"mem": map[string]any{
+								"events": float64(3200),
+								"flush": map[string]any{
+									"min_events": float64(1600),
+									"timeout":    "10s",
+								},
+							},
+						},
+						"logging": map[string]any{
+							"with_fields": map[string]any{
+								"component": map[string]any{
+									"binary":  "metricbeat",
+									"dataset": "elastic_agent.metricbeat",
+									"type":    "beat/metrics",
+									"id":      "beat-metrics-monitoring",
+								},
+								"log": map[string]any{
+									"source": "beat-metrics-monitoring",
+								},
+							},
+						},
+						"http": map[string]any{
+							"enabled": true,
+							"host":    "localhost",
+						},
+						"management.otel.enabled": true,
+					},
+				},
+				"service": map[string]any{
+					"pipelines": map[string]any{
+						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
+							"exporters":  {"logstash/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "metricbeat with kafka output",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "beat-metrics-monitoring",
+						InputType:  "beat/metrics",
+						OutputType: "kafka",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"metricbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "beat/metrics-monitoring",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(beatMetricsConfig),
+							},
+							{
+								ID:   "beat/metrics-default",
+								Type: client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"type":                       "kafka",
+									"hosts":                      []any{"127.0.0.1:9022"},
+									"topic":                      "%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}",
+									"queue.mem.events":           3200,
+									"queue.mem.flush.min_events": 1600,
+									"queue.mem.flush.timeout":    "10s",
+								}),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"kafka/_agent-component/default": map[string]any{
+						"brokers":              []string{"127.0.0.1:9022"},
+						"topic_from_attribute": "topic",
+						"client_id":            "beats",
+						"metadata": map[string]any{
+							"full":             false,
+							"refresh_interval": 10 * time.Minute,
+							"retry": map[string]any{
+								"backoff": 250 * time.Millisecond,
+								"max":     3,
+							},
+						},
+						"producer": map[string]any{
+							"compression": "gzip",
+							"compression_params": map[string]any{
+								"level": 4,
+							},
+							"max_message_bytes": 1000000,
+							"required_acks":     1,
+						},
+						"protocol_version": "2.1.0",
+						"retry_on_failure": map[string]any{
+							"initial_interval": 1 * time.Second,
+							"max_interval":     60 * time.Second,
+						},
+						"sending_queue": map[string]any{
+							"batch": map[string]any{
+								"flush_timeout": "10s",
+								"max_size":      2048,
+								"sizer":         "items",
+								"min_size":      0,
+							},
+							"queue_size": 3200,
+						},
+						"timeout": 10 * time.Second,
+					},
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+					"transform/_agent-component/default": map[string]any{
+						"error_mode": "ignore",
+						"log_statements": []string{
+							`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
+							`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["dataset"]], "-"))`,
+							`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-"))`,
+						},
+					},
+				},
+				"receivers": map[string]any{
+					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": expectedBeatMetricConfig,
+				},
+				"service": map[string]any{
+					"pipelines": map[string]any{
+						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
+							"exporters":  {"kafka/_agent-component/default"},
+							"processors": {"beat/_agent-component", "transform/_agent-component/default"},
+							"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring"},
 						},
 					},
 				},
@@ -604,6 +1002,11 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream1-default": expectedFilestreamConfig("filestream1-default"),
 					"filebeatreceiver/_agent-component/filestream2-default": expectedFilestreamConfig("filestream2-default"),
@@ -612,12 +1015,14 @@ func TestGetOtelConfig(t *testing.T) {
 					"extensions": []any{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/filestream1-default": map[string][]string{
-							"exporters": {"elasticsearch/_agent-component/default"},
-							"receivers": {"filebeatreceiver/_agent-component/filestream1-default"},
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"filebeatreceiver/_agent-component/filestream1-default"},
 						},
 						"logs/_agent-component/filestream2-default": map[string][]string{
-							"exporters": {"elasticsearch/_agent-component/default"},
-							"receivers": {"filebeatreceiver/_agent-component/filestream2-default"},
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"filebeatreceiver/_agent-component/filestream2-default"},
 						},
 					},
 				},
@@ -662,6 +1067,11 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": map[string]any{
 						"metricbeat": map[string]any{
@@ -691,7 +1101,6 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
-						"processors": defaultGlobalProcessorsForMetricbeat,
 						"logging": map[string]any{
 							"with_fields": map[string]any{
 								"component": map[string]any{
@@ -716,8 +1125,9 @@ func TestGetOtelConfig(t *testing.T) {
 					"extensions": []any{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
-							"exporters": {"elasticsearch/_agent-component/default"},
-							"receivers": {"metricbeatreceiver/_agent-component/beat-metrics-monitoring"},
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring"},
 						},
 					},
 				},
@@ -762,6 +1172,11 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/system-metrics": map[string]any{
 						"metricbeat": map[string]any{
@@ -802,7 +1217,6 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
-						"processors": defaultGlobalProcessorsForMetricbeat,
 						"logging": map[string]any{
 							"with_fields": map[string]any{
 								"component": map[string]any{
@@ -827,8 +1241,9 @@ func TestGetOtelConfig(t *testing.T) {
 					"extensions": []any{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/system-metrics": map[string][]string{
-							"exporters": {"elasticsearch/_agent-component/default"},
-							"receivers": {"metricbeatreceiver/_agent-component/system-metrics"},
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"metricbeatreceiver/_agent-component/system-metrics"},
 						},
 					},
 				},
@@ -837,6 +1252,19 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.defaultProcessors != nil {
+				originalValue := features.DefaultProcessors()
+				defer func() {
+					err := features.Apply(internalConfig.MustNewConfigFrom(map[string]any{
+						"agent.features.default_processors.enabled": originalValue,
+					}))
+					require.NoError(t, err)
+				}()
+				err := features.Apply(internalConfig.MustNewConfigFrom(map[string]any{
+					"agent.features.default_processors.enabled": *tt.defaultProcessors,
+				}))
+				require.NoError(t, err)
+			}
 			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig, logp.NewNopLogger())
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
@@ -1107,24 +1535,13 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			name: "unsupported output type - kafka",
+			name: "supported output type - kafka",
 			component: &component.Component{
 				ID:         "unsupported-output",
 				InputType:  "filestream",
-				OutputType: "kafka", // unsupported
+				OutputType: "kafka",
 				OutputName: "default",
 			},
-			expectedError: "unsupported output type: kafka",
-		},
-		{
-			name: "unsupported output type - logstash",
-			component: &component.Component{
-				ID:         "unsupported-output",
-				InputType:  "filestream",
-				OutputType: "logstash", // unsupported
-				OutputName: "default",
-			},
-			expectedError: "unsupported output type: logstash",
 		},
 		{
 			name: "unsupported configuration",
@@ -1267,36 +1684,6 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 				"timeout": "1m30s",
 			},
 		},
-		{
-			name: "with kerberos is enabled",
-			outputCfg: map[string]any{
-				"kerberos": map[string]any{
-					"enabled":     true,
-					"auth_type":   "password",
-					"config_path": "temp/krb5.conf",
-					"username":    "beats",
-					"password":    "testing",
-					"realm":       "elastic",
-				},
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"timeout":                 "1m30s",
-				"kerberos": map[string]any{
-					"enabled":          true,
-					"auth_type":        "password",
-					"config_path":      "temp/krb5.conf",
-					"username":         "beats",
-					"password":         "testing",
-					"realm":            "elastic",
-					"enable_krb5_fast": false,
-					"service_name":     "",
-					"keytab":           "",
-				},
-				"proxy_disable": false,
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -1332,16 +1719,9 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			name:          "unsupported output type - kafka",
-			outputType:    "kafka",
-			outputCfg:     map[string]any{},
-			expectedError: "unsupported output type: kafka",
-		},
-		{
-			name:          "unsupported output type - logstash",
-			outputType:    "logstash",
-			outputCfg:     map[string]any{},
-			expectedError: "unsupported output type: logstash",
+			name:       "supported output type - kafka",
+			outputType: "kafka",
+			outputCfg:  map[string]any{},
 		},
 		{
 			name:       "unsupported configuration - indices field",
@@ -1396,17 +1776,17 @@ func TestUnitToExporterConfig(t *testing.T) {
 	originalConfigTranslationFuncForExporter := configTranslationFuncForExporter
 	defer func() { configTranslationFuncForExporter = originalConfigTranslationFuncForExporter }()
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
-		esExporterType: func(c *config.C, l *logp.Logger) (map[string]any, error) {
+		esExporterType: func(c *config.C, _ string, l *logp.Logger) (map[string]any, map[string]any, error) {
 			if c.HasField("unsupported") {
-				return nil, errors.New("unsupported config")
+				return nil, nil, errors.New("unsupported config")
 			}
 			// Simple translation for testing purposes
 			cfgMap := make(map[string]any)
 			if err := c.Unpack(&cfgMap); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			cfgMap["translated"] = true
-			return cfgMap, nil
+			return cfgMap, nil, nil
 		},
 	}
 
@@ -1482,20 +1862,29 @@ func TestUnitToExporterConfig(t *testing.T) {
 				Type: client.UnitTypeOutput,
 				Config: component.MustExpectedConfig(map[string]any{
 					"hosts": []any{"es:9200"},
-					"queue": map[string]any{"mem": map[string]any{"events": 100}},
+					"queue": map[string]any{"mem": map[string]any{"events": 100, "flush": map[string]any{
+						"timeout": "20s",
+					}}},
 				}),
 			},
 			exporterType: esExporterType,
 			outputName:   "default",
 			expectedExporterCfg: map[string]any{
-				"hosts":      []interface{}{"es:9200"},
-				"queue":      map[string]any{"mem": map[string]any{"events": float64(100)}},
+				"hosts": []interface{}{"es:9200"},
+				"queue": map[string]any{"mem": map[string]any{
+					"events": float64(100),
+					"flush": map[string]any{
+						"timeout": "20s",
+					},
+				}},
 				"translated": true,
 				"auth": map[string]any{
 					"authenticator": "beatsauth/_agent-component/default",
 				},
 			},
-			expectedQueueSettings: map[string]any{"mem": map[string]any{"events": float64(100)}},
+			expectedQueueSettings: map[string]any{"mem": map[string]any{"events": float64(100), "flush": map[string]any{
+				"timeout": "20s",
+			}}},
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
@@ -1575,7 +1964,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			exportersCfg, queueSettings, extensionCfg, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
+			exportersCfg, queueSettings, extensionCfg, processorConfig, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
 
 			if tt.expectedError != "" {
 				require.Error(t, err)
@@ -1587,6 +1976,9 @@ func TestUnitToExporterConfig(t *testing.T) {
 			assert.Equal(t, tt.expectedExporterCfg, exportersCfg)
 			assert.Equal(t, tt.expectedQueueSettings, queueSettings)
 			assert.Equal(t, tt.expectedExtensionCfg, extensionCfg)
+			if processorConfig != nil {
+				assert.Equal(t, 1, len(processorConfig))
+			}
 		})
 	}
 }

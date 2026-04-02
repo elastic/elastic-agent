@@ -1100,6 +1100,239 @@ func Test_ApplyPersistedConfig(t *testing.T) {
 	}
 }
 
+// Test_Coordinator_OTelManagerReceivesPersistedConfig verifies that the OTel manager
+// receives the correct configuration when both persisted config and Fleet config contain
+// OTel configuration. This test specifically checks the timing fix where c.otelCfg must
+// be set before refreshComponentModel is called.
+func Test_Coordinator_OTelManagerReceivesPersistedConfig(t *testing.T) {
+	tests := []struct {
+		name                string
+		fleetConfigYAML     string
+		persistedConfigYAML string
+		expectedOTelYAML    string // Expected OTel config passed to manager
+	}{
+		{
+			name: "local otel collector and fleet with otel collector config merged",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+service:
+  telemetry:
+    logs:
+      level: info
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+`,
+			persistedConfigYAML: `
+service:
+  telemetry:
+    resource:
+      policy_id: my-policy-123
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                endpoint: http://localhost:4318
+`,
+			expectedOTelYAML: `
+service:
+  telemetry:
+    logs:
+      level: info
+    resource:
+      policy_id: my-policy-123
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                endpoint: http://localhost:4318
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+`,
+		},
+		{
+			name: "local otel collector but no otel collector config from fleet",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+`,
+			persistedConfigYAML: `
+service:
+  telemetry:
+    resource:
+      policy_id: my-policy-456
+    logs:
+      level: debug
+      processors:
+        - batch:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: http://otlp-endpoint:4318
+receivers:
+  hostmetrics:
+    collection_interval: 30s
+`,
+			expectedOTelYAML: `
+service:
+  telemetry:
+    resource:
+      policy_id: my-policy-456
+    logs:
+      level: debug
+      processors:
+        - batch:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: http://otlp-endpoint:4318
+receivers:
+  hostmetrics:
+    collection_interval: 30s
+`,
+		},
+		{
+			name: "no local collector config but otel collector config in fleet",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+service:
+  telemetry:
+    metrics:
+      level: normal
+exporters:
+  logging:
+    loglevel: debug
+`,
+			persistedConfigYAML: `
+agent:
+  monitoring:
+    enabled: true
+`,
+			expectedOTelYAML: `
+service:
+  telemetry:
+    metrics:
+      level: normal
+exporters:
+  logging:
+    loglevel: debug
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary directory for config
+			tempDir := t.TempDir()
+
+			// Override the config path to point to our temp directory
+			oldConfigPath := paths.Config()
+			paths.SetConfig(tempDir)
+			t.Cleanup(func() { paths.SetConfig(oldConfigPath) })
+
+			// Write persisted config file where paths.ConfigFile() expects it
+			persistedConfigPath := paths.ConfigFile()
+			err := os.WriteFile(persistedConfigPath, []byte(tt.persistedConfigYAML), 0644)
+			require.NoError(t, err)
+
+			// Parse fleet config
+			fleetCfg := config.MustNewConfigFrom(tt.fleetConfigYAML)
+
+			// Create a fake capabilities that allows fleet override
+			fakeCaps := &fakeCapabilities{}
+			fakeCaps.On("AllowFleetOverride").Once().Return(true)
+
+			// applyPersistedConfig will only be applied in containerized environment
+			platform := component.PlatformDetail{Platform: component.Platform{OS: component.Container}}
+			specs, err := component.NewRuntimeSpecs(platform, nil)
+			require.NoError(t, err)
+
+			// Track what config the OTel manager receives
+			var receivedOTelCfg *confmap.Conf
+			fakeOTel := &fakeOTelManager{
+				updateCollectorCallback: func(cfg *confmap.Conf) error {
+					receivedOTelCfg = cfg
+					return nil
+				},
+			}
+
+			// Set up minimal Coordinator for processConfig
+			coord := &Coordinator{
+				logger:           logp.NewLogger("testing"),
+				agentInfo:        &info.AgentInfo{},
+				vars:             emptyVars(t),
+				ast:              emptyAST(t),
+				caps:             fakeCaps,
+				runtimeMgr:       &fakeRuntimeManager{},
+				otelMgr:          fakeOTel,
+				secretMarkerFunc: testSecretMarkerFunc,
+				specs:            specs,
+			}
+
+			// Call processConfig - this triggers the entire flow
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			err = coord.processConfig(ctx, fleetCfg)
+			require.NoError(t, err)
+
+			// Verify the OTel manager received the correct merged configuration
+			require.NotNil(t, receivedOTelCfg, "OTel manager should have received a configuration")
+
+			// Convert received config to YAML for comparison
+			actualOtelMap := receivedOTelCfg.ToStringMap()
+			actualYAML, err := yaml.Marshal(actualOtelMap)
+			require.NoError(t, err, "failed to marshal received OTel config to YAML")
+
+			// Compare the YAML content
+			require.YAMLEq(t, tt.expectedOTelYAML, string(actualYAML),
+				"OTel manager should receive the merged configuration including persisted config")
+		})
+	}
+}
+
+// fakeCapabilities implements the capabilities.Capabilities interface for testing
+type fakeCapabilities struct {
+	mock.Mock
+}
+
+func (f *fakeCapabilities) AllowUpgrade(version string, sourceURI string) bool {
+	args := f.Called(version, sourceURI)
+	return args.Bool(0)
+}
+
+func (f *fakeCapabilities) AllowInput(name string) bool {
+	args := f.Called(name)
+	return args.Bool(0)
+}
+
+func (f *fakeCapabilities) AllowOutput(name string) bool {
+	args := f.Called(name)
+	return args.Bool(0)
+}
+
+func (f *fakeCapabilities) AllowFleetOverride() bool {
+	args := f.Called()
+	return args.Bool(0)
+}
+
 func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
 	// load variables
 	varsMaps := []map[string]any{}
@@ -1614,4 +1847,79 @@ func testBinary(t testing.TB, name string) string {
 		}
 	}
 	return binaryPath
+}
+
+func TestManagerShutdownTimeoutForComponents(t *testing.T) {
+	makeCommandComponent := func(stopTimeout time.Duration) component.Component {
+		return component.Component{
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Command: &component.CommandSpec{
+						Timeouts: component.CommandTimeoutSpec{
+							Stop: stopTimeout,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	makeServiceComponent := func() component.Component {
+		return component.Component{
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Service: &component.ServiceSpec{},
+				},
+			},
+		}
+	}
+
+	t.Run("no components returns minimum timeout", func(t *testing.T) {
+		got := managerShutdownTimeoutForComponents(nil, nil)
+		assert.Equal(t, minManagerShutdownTimeout, got)
+	})
+
+	t.Run("empty components returns minimum timeout", func(t *testing.T) {
+		got := managerShutdownTimeoutForComponents(nil, []component.Component{})
+		assert.Equal(t, minManagerShutdownTimeout, got)
+	})
+
+	t.Run("service-only components return minimum timeout", func(t *testing.T) {
+		got := managerShutdownTimeoutForComponents(nil, []component.Component{makeServiceComponent()})
+		assert.Equal(t, minManagerShutdownTimeout, got)
+	})
+
+	t.Run("command component with zero stop timeout returns minimum", func(t *testing.T) {
+		got := managerShutdownTimeoutForComponents(nil, []component.Component{makeCommandComponent(0)})
+		assert.Equal(t, minManagerShutdownTimeout, got)
+	})
+
+	t.Run("command component with small stop timeout adds buffer", func(t *testing.T) {
+		got := managerShutdownTimeoutForComponents(nil, []component.Component{makeCommandComponent(10 * time.Second)})
+		assert.Equal(t, 10*time.Second+runtime.ShutdownBuffer, got)
+	})
+
+	t.Run("command component with default 30s stop timeout is capped", func(t *testing.T) {
+		got := managerShutdownTimeoutForComponents(nil, []component.Component{makeCommandComponent(30 * time.Second)})
+		assert.Equal(t, runtime.ProcessStopTimeout, got, "30s + 5s buffer = 35s, capped at 30s")
+	})
+
+	t.Run("mix of command and service components uses command max", func(t *testing.T) {
+		comps := []component.Component{
+			makeServiceComponent(),
+			makeCommandComponent(20 * time.Second),
+			makeServiceComponent(),
+		}
+		got := managerShutdownTimeoutForComponents(nil, comps)
+		assert.Equal(t, 20*time.Second+runtime.ShutdownBuffer, got)
+	})
+
+	t.Run("component without InputSpec is skipped", func(t *testing.T) {
+		comps := []component.Component{
+			{InputSpec: nil},
+			makeCommandComponent(15 * time.Second),
+		}
+		got := managerShutdownTimeoutForComponents(nil, comps)
+		assert.Equal(t, 15*time.Second+runtime.ShutdownBuffer, got)
+	})
 }

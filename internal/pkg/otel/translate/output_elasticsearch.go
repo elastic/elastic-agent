@@ -10,22 +10,16 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"reflect"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
-	"github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
 type esToOTelOptions struct {
@@ -59,16 +53,15 @@ var defaultOptions = esToOTelOptions{
 	},
 }
 
-// ToOTelConfig converts a Beat config into OTel elasticsearch exporter config
-// Ensure cloudid is handled before calling this method
+// ESToOTelConfig converts a Beat config into OTel elasticsearch exporter config
 // Note: This method may override output queue settings defined by user.
-func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error) {
+func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string]any, map[string]any, error) {
 	escfg := defaultOptions
 
 	// check for unsupported config
 	err := checkUnsupportedConfig(output)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// apply preset here
@@ -79,7 +72,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		// were overridden
 		overriddenFields, presetConfig, err := elasticsearch.ApplyPreset(preset, output)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		logger.Infof("Applying performance preset '%v': %v",
 			preset, config.DebugString(presetConfig, false))
@@ -90,7 +83,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 	unpackedMap := make(map[string]any)
 	// unpack and validate ES config
 	if err := output.Unpack(&unpackedMap); err != nil {
-		return nil, fmt.Errorf("failed unpacking config. %w", err)
+		return nil, nil, fmt.Errorf("failed unpacking config. %w", err)
 	}
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -100,21 +93,21 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		DecodeHook:      cfgDecodeHookFunc(),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed creating decoder. %w", err)
+		return nil, nil, fmt.Errorf("failed creating decoder. %w", err)
 	}
 
 	err = decoder.Decode(&unpackedMap)
 	if err != nil {
-		return nil, fmt.Errorf("failed decoding config. %w", err)
+		return nil, nil, fmt.Errorf("failed decoding config. %w", err)
 	}
 
 	if err := escfg.Validate(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	hosts, err := getURL(escfg, output)
 	if err != nil {
-		return nil, fmt.Errorf("error creating hosts:%w", err)
+		return nil, nil, fmt.Errorf("error creating hosts:%w", err)
 	}
 	otelYAMLCfg := map[string]any{
 		"endpoints": hosts, // hosts, protocol, path, port
@@ -128,7 +121,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
-				"flush_timeout": "10s",
+				"flush_timeout": getFlushTimeout(logger, output),
 				"max_size":      escfg.BulkMaxSize, // bulk_max_size
 				"min_size":      0,                 // 0 means immediately trigger a flush
 				"sizer":         "items",
@@ -143,22 +136,10 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		"logs_dynamic_pipeline": map[string]any{
 			"enabled": true,
 		},
+		"logs_dynamic_id":         map[string]any{"enabled": true},
+		"include_source_on_error": true,
+		"retry":                   getRetryConfig(escfg),
 	}
-	// Retries
-	retryCfg := map[string]any{
-		"enabled":          true,
-		"max_retries":      escfg.MaxRetries,
-		"initial_interval": escfg.Backoff.Init, // backoff.init
-		"max_interval":     escfg.Backoff.Max,  // backoff.max
-		"retry_on_status":  escfg.RetryOnStatus,
-	}
-	if escfg.MaxRetries == 0 {
-		// Disable retries
-		retryCfg = map[string]any{
-			"enabled": false,
-		}
-	}
-	otelYAMLCfg["retry"] = retryCfg
 
 	// Compression
 	otelYAMLCfg["compression"] = "none"
@@ -182,7 +163,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 	// proxy_url, proxy_headers, proxy_disable are handled by beatsauthextension https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/beatsauthextension
 	// caller of this method should take care of integrating the extension
 
-	return otelYAMLCfg, nil
+	return otelYAMLCfg, nil, nil
 }
 
 // getTotalNumWorkers returns the number of hosts that beats would
@@ -193,6 +174,25 @@ func getTotalNumWorkers(cfg *config.C) int {
 		return 1
 	}
 	return len(hostList)
+}
+
+func getRetryConfig(escfg esToOTelOptions) map[string]any {
+	// Retries
+	retryCfg := map[string]any{
+		"enabled":          true,
+		"max_retries":      escfg.MaxRetries,
+		"initial_interval": escfg.Backoff.Init, // backoff.init
+		"max_interval":     escfg.Backoff.Max,  // backoff.max
+		"retry_on_status":  escfg.RetryOnStatus,
+	}
+
+	if escfg.MaxRetries == 0 {
+		// Disable retries
+		retryCfg = map[string]any{
+			"enabled": false,
+		}
+	}
+	return retryCfg
 }
 
 func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
@@ -239,7 +239,7 @@ func checkUnsupportedConfig(cfg *config.C) error {
 	} else if value, err := cfg.Bool("allow_older_versions", -1); err == nil && !value {
 		return fmt.Errorf("allow_older_versions:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if value, err := cfg.Bool("loadbalance", -1); err == nil && !value {
-		return fmt.Errorf("ladbalance:false is currently not supported: %w", errors.ErrUnsupported)
+		return fmt.Errorf("loadbalance:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("non_indexable_policy") {
 		return fmt.Errorf("non_indexable_policy is currently not supported: %w", errors.ErrUnsupported)
 	} else if val, err := cfg.Int("max_retries", -1); err == nil && val < 0 {
@@ -247,106 +247,4 @@ func checkUnsupportedConfig(cfg *config.C) error {
 	}
 
 	return nil
-}
-
-// Helper function to check if a struct is empty
-func isStructEmpty(s any) bool {
-	return reflect.DeepEqual(s, reflect.Zero(reflect.TypeOf(s)).Interface())
-}
-
-// Helper function to conditionally add fields to the map
-func setIfNotNil(m map[string]any, key string, value any) {
-	if value == nil {
-		return
-	}
-
-	v := reflect.ValueOf(value)
-
-	switch v.Kind() {
-	case reflect.String:
-		if v.String() != "" {
-			m[key] = value
-		}
-	case reflect.Map, reflect.Slice:
-		if v.Len() > 0 {
-			m[key] = value
-		}
-	case reflect.Struct:
-		if !isStructEmpty(value) {
-			m[key] = value
-		}
-	default:
-		m[key] = value
-	}
-}
-
-func getQueueSize(logger *logp.Logger, output *config.C) int {
-	size, err := output.Int("queue.mem.events", -1)
-	if err != nil {
-		logger.Debugf("Failed to get queue size: %v", err)
-		return memqueue.DefaultEvents // return default queue.mem.events for sending_queue in case of an errr
-	}
-	return int(size)
-}
-
-func cfgDecodeHookFunc() mapstructure.DecodeHookFunc {
-	return func(
-		f reflect.Type,
-		t reflect.Type,
-		data any,
-	) (any, error) {
-		if f.Kind() != reflect.String {
-			return data, nil
-		}
-
-		switch {
-		case t == reflect.TypeOf(time.Duration(5)):
-			d, err := time.ParseDuration(data.(string))
-			if err != nil {
-				return d, fmt.Errorf("failed parsing duration: %w", err)
-			} else {
-				return d, nil
-			}
-		case t == reflect.TypeOf(tlscommon.TLSVerificationMode(0)):
-			verificationMode := tlscommon.TLSVerificationMode(0)
-			if err := verificationMode.Unpack(data); err != nil {
-				return nil, fmt.Errorf("failed parsing TLS verification mode: %w", err)
-			}
-			return verificationMode, nil
-		case t == reflect.TypeOf(httpcommon.ProxyURI(url.URL{})):
-			proxyURL := httpcommon.ProxyURI(url.URL{})
-			if err := proxyURL.Unpack(data.(string)); err != nil {
-				return nil, fmt.Errorf("failed parsing proxy_url: %w", err)
-			}
-			return proxyURL, nil
-		case t == reflect.TypeOf(kerberos.AuthType(0)):
-			var authType kerberos.AuthType
-			if err := authType.Unpack(data.(string)); err != nil {
-				return nil, fmt.Errorf("failed parsing kerberos.auth_type: %w", err)
-			}
-			return authType, nil
-		case t == reflect.TypeOf([]string{}):
-			return []string{data.(string)}, nil
-		case t == reflect.TypeOf([]tlscommon.CipherSuite{tlscommon.CipherSuite(0)}):
-			cipherSuite := tlscommon.CipherSuite(0)
-			if err := cipherSuite.Unpack(data); err != nil {
-				return nil, fmt.Errorf("failed parsing ssl cipher_suites: %w", err)
-			}
-			return []tlscommon.CipherSuite{cipherSuite}, nil
-		case t == reflect.TypeOf([]tlscommon.TLSVersion{tlscommon.TLSVersion(0)}):
-			tlsVersion := tlscommon.TLSVersion(0)
-			if err := tlsVersion.Unpack(data); err != nil {
-				return nil, fmt.Errorf("failed parsing ssl supported_protocols: %w", err)
-			}
-			return []tlscommon.TLSVersion{tlsVersion}, nil
-		case t == reflect.TypeOf([]tlscommon.TLSCurveType{tlscommon.TLSCurveType(0)}):
-			tlsCurveType := tlscommon.TLSCurveType(0)
-			if err := tlsCurveType.Unpack(data); err != nil {
-				return nil, fmt.Errorf("failed parsing ssl curve_types: %w", err)
-			}
-			return []tlscommon.TLSCurveType{tlsCurveType}, nil
-		default:
-			return data, nil
-		}
-	}
 }
