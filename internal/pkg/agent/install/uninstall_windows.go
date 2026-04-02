@@ -93,16 +93,18 @@ func markDeleteOnReboot(path string) error {
 // a previous uninstall's scheduleDeleteOnReboot (files matching leftoverPrefix).
 // By the time a new install runs, the old process is gone and these files can
 // be deleted normally.
-func cleanupLeftoverRenames(topPath string) error {
+func cleanupLeftoverRenames(log *logp.Logger, topPath string) error {
 	return filepath.WalkDir(topPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil // best-effort: skip inaccessible entries
+			return nil //nolint:nilerr // best-effort: skip inaccessible entries
 		}
 		if d.IsDir() {
 			return nil
 		}
 		if strings.HasPrefix(d.Name(), leftoverPrefix) {
-			_ = os.Remove(path)
+			if err := os.Remove(path); err != nil {
+				log.Warnf("Failed to remove leftover file %q from a previous uninstall: %v. You may need to delete it manually.", path, err)
+			}
 		}
 		return nil
 	})

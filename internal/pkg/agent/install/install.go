@@ -214,7 +214,7 @@ func setupInstallPath(log *logp.Logger, topPath string, ownership utils.FileOwne
 	// prefix) and schedules it for deletion on reboot. If the system was not
 	// rebooted before reinstalling, these files are still present but no
 	// longer locked, so we can delete them now.
-	if err := cleanupLeftoverRenames(topPath); err != nil {
+	if err := cleanupLeftoverRenames(log, topPath); err != nil {
 		log.Warnf("Failed to clean up leftover files from a previous installation in %q: %v. You may need to delete them manually.", topPath, err)
 	}
 
