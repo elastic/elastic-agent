@@ -431,10 +431,6 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 	c.log.Debugf("gracefully stopping pid %d", c.proc.PID)
 	_ = c.proc.Stop() // SIGTERM
 
-<<<<<<< HEAD
-	if stopErr := c.proc.Stop(); stopErr != nil {
-		return fmt.Errorf("failed to stop process %d: %w", c.proc.Process.Pid, stopErr)
-=======
 	// Block until the process is reaped. This guarantees no zombie is left
 	// behind, whether this is a normal policy-driven stop or a shutdown.
 	// While blocked, Run()'s select loop is paused in the actionStop case,
@@ -446,7 +442,6 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 	exitCode := -1
 	if ps != nil {
 		exitCode = ps.ExitCode()
->>>>>>> 0002dc022 (Fix zombie processes when components fail to shutdown (#13188))
 	}
 	c.forceCompState(client.UnitStateStopped, fmt.Sprintf("Stopped: pid '%d' exited with code '%d'", pid, exitCode))
 	return nil
