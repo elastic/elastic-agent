@@ -222,20 +222,10 @@ type VarsManager interface {
 	Watch() <-chan []*transpiler.Vars
 }
 
-<<<<<<< HEAD
 // ComponentsModifier is a function that takes the computed components model and modifies it before
 // passing it into the components runtime manager.
 type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
 
-// managerShutdownTimeout is how long the coordinator will wait during shutdown
-// to receive termination states from its managers.
-// Note: The current timeout (5s) is shorter than the default stop timeout for
-// subprocess components (30s from process.DefaultConfig()). This means the
-// coordinator may not wait for the subprocesses to finish terminating, preventing
-// Wait() from being called on them. This will result in zombie processes
-// during restart on Unix systems.
-const managerShutdownTimeout = time.Second * 5
-=======
 // minManagerShutdownTimeout is the minimum timeout used when no components are running.
 const minManagerShutdownTimeout = 5 * time.Second
 
@@ -269,7 +259,6 @@ func managerShutdownTimeoutForComponents(log *logger.Logger, components []compon
 	}
 	return timeout
 }
->>>>>>> 0002dc022 (Fix zombie processes when components fail to shutdown (#13188))
 
 type configReloader interface {
 	Reload(*config.Config) error
