@@ -292,6 +292,10 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	if hasEventLoggingOutputChanged {
 		h.config.Settings.EventLoggingConfig = cfg.Settings.EventLoggingConfig
 	}
+	hasLoggingConfigChanged := h.hasLoggingConfigChanged(cfg)
+	if hasLoggingConfigChanged {
+		h.config.Settings.LoggingConfig = cfg.Settings.LoggingConfig
+	}
 
 	// persist configuration
 	err = saveConfig(h.agentInfo, h.config, h.store, h.log)
@@ -305,12 +309,12 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return fmt.Errorf("applying FleetClientConfig: %w", err)
 	}
 
-	// If the event logging output has changed, we need to
+	// If the event logging or file logging output has changed, we need to
 	// re-exec the Elastic-Agent to apply the new logging
 	// output.
 	// The new logging configuration has already been persisted
 	// to the disk, the Elastic-Agent will pick it up once it starts.
-	if hasEventLoggingOutputChanged {
+	if hasEventLoggingOutputChanged || hasLoggingConfigChanged {
 		h.coordinator.ReExec(nil)
 	}
 
@@ -323,6 +327,19 @@ func (h *PolicyChangeHandler) hasEventLoggingOutputChanged(new *configuration.Co
 	case h.config.Settings.EventLoggingConfig.ToFiles != new.Settings.EventLoggingConfig.ToFiles:
 		return true
 	case h.config.Settings.EventLoggingConfig.ToStderr != new.Settings.EventLoggingConfig.ToStderr:
+		return true
+	default:
+		return false
+	}
+}
+
+func (h *PolicyChangeHandler) hasLoggingConfigChanged(new *configuration.Configuration) bool {
+	switch {
+	case h.config.Settings.LoggingConfig.ToFiles != new.Settings.LoggingConfig.ToFiles:
+		return true
+	case h.config.Settings.LoggingConfig.ToStderr != new.Settings.LoggingConfig.ToStderr:
+		return true
+	case h.config.Settings.LoggingConfig.Files != new.Settings.LoggingConfig.Files:
 		return true
 	default:
 		return false
@@ -461,6 +478,7 @@ func fleetToReader(agentID string, headers map[string]string, cfg *configuration
 			"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
 			"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
 			"monitoring.pprof":             cfg.Settings.MonitoringConfig.Pprof,
+			"logging.files":                cfg.Settings.LoggingConfig.Files,
 		},
 	}
 
