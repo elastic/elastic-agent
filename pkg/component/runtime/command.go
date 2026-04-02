@@ -49,6 +49,25 @@ func (m actionMode) String() string {
 	return ""
 }
 
+const (
+	// ShutdownBuffer is the time reserved for SIGKILL delivery, process reaping,
+	// and coordinator shutdown overhead. The SIGTERM grace period is reduced by
+	// this amount so the entire cleanup completes before external process managers
+	// (systemd, Kubernetes) forcibly kill the agent.
+	ShutdownBuffer = process.KillReapTime + 2*time.Second
+
+	// ProcessStopTimeout is the maximum time to wait for a component to stop
+	// before escalating to SIGKILL. ShutdownBuffer time is removed from stop
+	// time so the process may be killed and reaped within this value. Value
+	// was chosen to reflect external process manager defaults (systemd: 90s,
+	// k8s: 30s, windows: 30s).
+	ProcessStopTimeout = 30 * time.Second
+
+	// minGraceTimeout is the minimum SIGTERM grace period when the configured
+	// stop timeout minus ShutdownBuffer would be zero or negative.
+	minGraceTimeout = 1 * time.Second
+)
+
 type MonitoringManager interface {
 	// EnrichArgs enriches arguments provided to application, in
 	// order to enable monitoring of a component.Component identified
@@ -414,25 +433,23 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 
 	// cleanup reserved resources related to monitoring
 	defer c.monitor.Cleanup(c.current.ID) //nolint:errcheck // this is ok
-	cmdSpec := c.getCommandSpec()
-	go func(info *process.Info, timeout time.Duration) {
-		t := time.NewTimer(timeout)
-		defer t.Stop()
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			// kill no matter what (might already be stopped)
-			c.log.Debugf("timeout waiting for pid %d, killing it", c.proc.PID)
-			_ = info.Kill()
-		}
-	}(c.proc, cmdSpec.Timeouts.Stop)
 
 	c.log.Debugf("gracefully stopping pid %d", c.proc.PID)
+	_ = c.proc.Stop() // SIGTERM
 
-	if stopErr := c.proc.Stop(); stopErr != nil {
-		return fmt.Errorf("failed to stop process %s: %w", c.proc.Cmd.String(), stopErr)
+	// Block until the process is reaped. This guarantees no zombie is left
+	// behind, whether this is a normal policy-driven stop or a shutdown.
+	// While blocked, Run()'s select loop is paused in the actionStop case,
+	// so waitOrKill() is the sole reader of procCh — no deadlock.
+	ps := c.waitOrKill()
+
+	pid := c.proc.PID
+	c.proc = nil
+	exitCode := -1
+	if ps != nil {
+		exitCode = ps.ExitCode()
 	}
+	c.forceCompState(client.UnitStateStopped, fmt.Sprintf("Stopped: pid '%d' exited with code '%d'", pid, exitCode))
 	return nil
 }
 
@@ -455,6 +472,50 @@ func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 			state: s,
 		}
 	}()
+}
+
+// waitOrKill waits for the process to exit after SIGTERM.
+// If the process does not exit within the grace period, it sends SIGKILL
+// to force termination. An unresponsive process should be killed and
+// reaped within ProcessStopTimeout.
+// Returns the process state from procCh, or nil if the reap timed out.
+func (c *commandRuntime) waitOrKill() *os.ProcessState {
+	stopTimeout := ProcessStopTimeout
+	if cmdSpec := c.getCommandSpec(); cmdSpec != nil && cmdSpec.Timeouts.Stop > 0 {
+		stopTimeout = cmdSpec.Timeouts.Stop
+	}
+
+	// Remove some time as a buffer for SIGKILL + overhead if unresponsive
+	graceTimeout := stopTimeout - ShutdownBuffer
+	if graceTimeout <= 0 {
+		graceTimeout = minGraceTimeout
+	}
+
+	// Wait for the process to exit gracefully
+	stopTimer := time.NewTimer(graceTimeout)
+	defer stopTimer.Stop()
+	select {
+	case ps := <-c.procCh:
+		c.log.Debugf("process %d reaped successfully during cleanup", c.proc.PID)
+		return ps.state
+	case <-stopTimer.C:
+		c.log.Warnf("process %d did not stop after %s, killing it", c.proc.PID, graceTimeout)
+	}
+
+	_ = c.proc.Kill() // SIGKILL
+
+	// Drain procCh so the startWatcher goroutine can complete and
+	// os.Process.Wait() reaps the child.
+	reapTimer := time.NewTimer(process.KillReapTime)
+	defer reapTimer.Stop()
+	select {
+	case ps := <-c.procCh:
+		c.log.Debugf("process %d reaped successfully after SIGKILL", c.proc.PID)
+		return ps.state
+	case <-reapTimer.C:
+		c.log.Errorf("timed out waiting for process %d to be reaped after SIGKILL", c.proc.PID)
+		return nil
+	}
 }
 
 func (c *commandRuntime) handleProc(state *os.ProcessState) bool {

@@ -1848,3 +1848,78 @@ func testBinary(t testing.TB, name string) string {
 	}
 	return binaryPath
 }
+
+func TestManagerShutdownTimeoutForComponents(t *testing.T) {
+	makeCommandComponent := func(stopTimeout time.Duration) component.Component {
+		return component.Component{
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Command: &component.CommandSpec{
+						Timeouts: component.CommandTimeoutSpec{
+							Stop: stopTimeout,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	makeServiceComponent := func() component.Component {
+		return component.Component{
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Service: &component.ServiceSpec{},
+				},
+			},
+		}
+	}
+
+	t.Run("no components returns minimum timeout", func(t *testing.T) {
+		got := managerShutdownTimeoutForComponents(nil, nil)
+		assert.Equal(t, minManagerShutdownTimeout, got)
+	})
+
+	t.Run("empty components returns minimum timeout", func(t *testing.T) {
+		got := managerShutdownTimeoutForComponents(nil, []component.Component{})
+		assert.Equal(t, minManagerShutdownTimeout, got)
+	})
+
+	t.Run("service-only components return minimum timeout", func(t *testing.T) {
+		got := managerShutdownTimeoutForComponents(nil, []component.Component{makeServiceComponent()})
+		assert.Equal(t, minManagerShutdownTimeout, got)
+	})
+
+	t.Run("command component with zero stop timeout returns minimum", func(t *testing.T) {
+		got := managerShutdownTimeoutForComponents(nil, []component.Component{makeCommandComponent(0)})
+		assert.Equal(t, minManagerShutdownTimeout, got)
+	})
+
+	t.Run("command component with small stop timeout adds buffer", func(t *testing.T) {
+		got := managerShutdownTimeoutForComponents(nil, []component.Component{makeCommandComponent(10 * time.Second)})
+		assert.Equal(t, 10*time.Second+runtime.ShutdownBuffer, got)
+	})
+
+	t.Run("command component with default 30s stop timeout is capped", func(t *testing.T) {
+		got := managerShutdownTimeoutForComponents(nil, []component.Component{makeCommandComponent(30 * time.Second)})
+		assert.Equal(t, runtime.ProcessStopTimeout, got, "30s + 5s buffer = 35s, capped at 30s")
+	})
+
+	t.Run("mix of command and service components uses command max", func(t *testing.T) {
+		comps := []component.Component{
+			makeServiceComponent(),
+			makeCommandComponent(20 * time.Second),
+			makeServiceComponent(),
+		}
+		got := managerShutdownTimeoutForComponents(nil, comps)
+		assert.Equal(t, 20*time.Second+runtime.ShutdownBuffer, got)
+	})
+
+	t.Run("component without InputSpec is skipped", func(t *testing.T) {
+		comps := []component.Component{
+			{InputSpec: nil},
+			makeCommandComponent(15 * time.Second),
+		}
+		got := managerShutdownTimeoutForComponents(nil, comps)
+		assert.Equal(t, 15*time.Second+runtime.ShutdownBuffer, got)
+	})
+}
