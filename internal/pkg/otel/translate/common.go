@@ -245,13 +245,17 @@ func typeSafetyCheck(value map[string]any) error {
 	// the returned valued should match `clienttls.Config` type.
 	// it throws an error if non existing key names  are set
 	var result configtls.ClientConfig
-	d, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+	d, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Squash:      true,
 		Result:      &result,
 		ErrorUnused: true,
 	})
 
-	err := d.Decode(value)
+	if err != nil {
+		return err
+	}
+
+	err = d.Decode(value)
 	if err != nil {
 		return err
 	}
