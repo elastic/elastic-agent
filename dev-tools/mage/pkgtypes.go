@@ -678,7 +678,7 @@ func PackageTarGz(spec PackageSpec) error {
 
 	// Create a new tar archive.
 	w := tar.NewWriter(gzWriter)
-	defer closeOrLog(gzWriter, "tar writer")
+	defer closeOrLog(w, "tar writer")
 
 	// // Replace the darwin-universal by darwin-x86_64 and darwin-arm64. Also
 	// // keep the other files.
