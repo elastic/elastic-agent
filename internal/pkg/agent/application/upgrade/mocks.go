@@ -16,6 +16,7 @@ import (
 	mock "github.com/stretchr/testify/mock"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -367,23 +368,23 @@ func (_m *mockAvailableRollbacksSource) EXPECT() *mockAvailableRollbacksSource_E
 }
 
 // Get provides a mock function for the type mockAvailableRollbacksSource
-func (_mock *mockAvailableRollbacksSource) Get() (map[string]TTLMarker, error) {
+func (_mock *mockAvailableRollbacksSource) Get() (map[string]ttl.TTLMarker, error) {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Get")
 	}
 
-	var r0 map[string]TTLMarker
+	var r0 map[string]ttl.TTLMarker
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (map[string]TTLMarker, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func() (map[string]ttl.TTLMarker, error)); ok {
 		return returnFunc()
 	}
-	if returnFunc, ok := ret.Get(0).(func() map[string]TTLMarker); ok {
+	if returnFunc, ok := ret.Get(0).(func() map[string]ttl.TTLMarker); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]TTLMarker)
+			r0 = ret.Get(0).(map[string]ttl.TTLMarker)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func() error); ok {
@@ -411,18 +412,69 @@ func (_c *mockAvailableRollbacksSource_Get_Call) Run(run func()) *mockAvailableR
 	return _c
 }
 
-func (_c *mockAvailableRollbacksSource_Get_Call) Return(stringToTTLMarker map[string]TTLMarker, err error) *mockAvailableRollbacksSource_Get_Call {
+func (_c *mockAvailableRollbacksSource_Get_Call) Return(stringToTTLMarker map[string]ttl.TTLMarker, err error) *mockAvailableRollbacksSource_Get_Call {
 	_c.Call.Return(stringToTTLMarker, err)
 	return _c
 }
 
-func (_c *mockAvailableRollbacksSource_Get_Call) RunAndReturn(run func() (map[string]TTLMarker, error)) *mockAvailableRollbacksSource_Get_Call {
+func (_c *mockAvailableRollbacksSource_Get_Call) RunAndReturn(run func() (map[string]ttl.TTLMarker, error)) *mockAvailableRollbacksSource_Get_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Remove provides a mock function for the type mockAvailableRollbacksSource
+func (_mock *mockAvailableRollbacksSource) Remove(s string) error {
+	ret := _mock.Called(s)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Remove")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string) error); ok {
+		r0 = returnFunc(s)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// mockAvailableRollbacksSource_Remove_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Remove'
+type mockAvailableRollbacksSource_Remove_Call struct {
+	*mock.Call
+}
+
+// Remove is a helper method to define mock.On call
+//   - s string
+func (_e *mockAvailableRollbacksSource_Expecter) Remove(s interface{}) *mockAvailableRollbacksSource_Remove_Call {
+	return &mockAvailableRollbacksSource_Remove_Call{Call: _e.mock.On("Remove", s)}
+}
+
+func (_c *mockAvailableRollbacksSource_Remove_Call) Run(run func(s string)) *mockAvailableRollbacksSource_Remove_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *mockAvailableRollbacksSource_Remove_Call) Return(err error) *mockAvailableRollbacksSource_Remove_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *mockAvailableRollbacksSource_Remove_Call) RunAndReturn(run func(s string) error) *mockAvailableRollbacksSource_Remove_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Set provides a mock function for the type mockAvailableRollbacksSource
-func (_mock *mockAvailableRollbacksSource) Set(stringToTTLMarker map[string]TTLMarker) error {
+func (_mock *mockAvailableRollbacksSource) Set(stringToTTLMarker map[string]ttl.TTLMarker) error {
 	ret := _mock.Called(stringToTTLMarker)
 
 	if len(ret) == 0 {
@@ -430,7 +482,7 @@ func (_mock *mockAvailableRollbacksSource) Set(stringToTTLMarker map[string]TTLM
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(map[string]TTLMarker) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(map[string]ttl.TTLMarker) error); ok {
 		r0 = returnFunc(stringToTTLMarker)
 	} else {
 		r0 = ret.Error(0)
@@ -444,16 +496,16 @@ type mockAvailableRollbacksSource_Set_Call struct {
 }
 
 // Set is a helper method to define mock.On call
-//   - stringToTTLMarker map[string]TTLMarker
+//   - stringToTTLMarker map[string]ttl.TTLMarker
 func (_e *mockAvailableRollbacksSource_Expecter) Set(stringToTTLMarker interface{}) *mockAvailableRollbacksSource_Set_Call {
 	return &mockAvailableRollbacksSource_Set_Call{Call: _e.mock.On("Set", stringToTTLMarker)}
 }
 
-func (_c *mockAvailableRollbacksSource_Set_Call) Run(run func(stringToTTLMarker map[string]TTLMarker)) *mockAvailableRollbacksSource_Set_Call {
+func (_c *mockAvailableRollbacksSource_Set_Call) Run(run func(stringToTTLMarker map[string]ttl.TTLMarker)) *mockAvailableRollbacksSource_Set_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 map[string]TTLMarker
+		var arg0 map[string]ttl.TTLMarker
 		if args[0] != nil {
-			arg0 = args[0].(map[string]TTLMarker)
+			arg0 = args[0].(map[string]ttl.TTLMarker)
 		}
 		run(
 			arg0,
@@ -467,7 +519,7 @@ func (_c *mockAvailableRollbacksSource_Set_Call) Return(err error) *mockAvailabl
 	return _c
 }
 
-func (_c *mockAvailableRollbacksSource_Set_Call) RunAndReturn(run func(stringToTTLMarker map[string]TTLMarker) error) *mockAvailableRollbacksSource_Set_Call {
+func (_c *mockAvailableRollbacksSource_Set_Call) RunAndReturn(run func(stringToTTLMarker map[string]ttl.TTLMarker) error) *mockAvailableRollbacksSource_Set_Call {
 	_c.Call.Return(run)
 	return _c
 }

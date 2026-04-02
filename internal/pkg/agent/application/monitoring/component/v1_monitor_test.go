@@ -793,16 +793,16 @@ func TestMonitoringConfigOtelOutputSupport(t *testing.T) {
 				"hosts": []string{"localhost:9092"},
 			},
 			expectPrometheusMonitoring: false,
-			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
+			monitoringRuntimeManager:   monitoringcfg.OtelRuntimeManager,
 		},
 		{
-			name: "logstash output - should NOT have prometheus monitoring",
+			name: "logstash output - should have prometheus monitoring",
 			outputConfig: map[string]any{
 				"type":  "logstash",
 				"hosts": []string{"localhost:9092"},
 			},
 			expectPrometheusMonitoring: false,
-			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
+			monitoringRuntimeManager:   monitoringcfg.OtelRuntimeManager,
 		},
 		{
 			name: "elasticsearch output - should have prometheus monitoring",
@@ -810,7 +810,7 @@ func TestMonitoringConfigOtelOutputSupport(t *testing.T) {
 				"type":  "elasticsearch",
 				"hosts": []string{"localhost:9200"},
 			},
-			expectPrometheusMonitoring: true,
+			expectPrometheusMonitoring: false,
 			monitoringRuntimeManager:   monitoringcfg.OtelRuntimeManager,
 		},
 		{

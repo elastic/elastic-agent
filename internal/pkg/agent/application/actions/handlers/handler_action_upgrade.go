@@ -59,7 +59,9 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return nil
 	}
 
-	var uOpts []coordinator.UpgradeOpt
+	uOpts := []coordinator.UpgradeOpt{
+		coordinator.WithRollback(action.Data.Rollback),
+	}
 	if h.tamperProtectionFn() {
 		// Find inputs that want to receive UPGRADE action
 		// Endpoint needs to receive a signed UPGRADE action in order to be able to uncontain itself

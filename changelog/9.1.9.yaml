@@ -1,0 +1,84 @@
+version: 9.1.9
+entries:
+    - kind: bug-fix
+      summary: allow host to be a string for otel configuration translation
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11394
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/11352
+      impact: ""
+      action: ""
+      timestamp: 1764016303
+      file:
+        name: 1764016303-allow-host-to-be-a-string-for-otel-configuration-translation.yaml
+        checksum: 7f3f634b8c2bd92df76f55688508855306604eb7
+    - kind: feature
+      summary: Enable cpu and disk hostmetrics scrapers for Darwin configurations
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11423
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764087321
+      file:
+        name: 1764087321-enable_darwin_cpu_disk_scrapers.yaml
+        checksum: 97a8e7536d0275d4fbe7993c47e868354f42b4e1
+    - kind: bug-fix
+      summary: fix kube-stack null template evaluation for Helm v4
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11481
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764348725
+      file:
+        name: 1764348725-fix_templates_for_helm_4.yaml
+        checksum: b7f752f5de0d910907416ff4b7ac501f83e59ae9
+    - kind: bug-fix
+      summary: Add environment.yaml file to diagnostics
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11484
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/10966
+      impact: ""
+      action: ""
+      timestamp: 1764357992
+      file:
+        name: 1764357992-Add-environment.yml-file-to-diagnostics.yaml
+        checksum: 32d02808ffe0d86635f1fae1998146da5518e734
+    - kind: bug-fix
+      summary: Merge multiple agent keys when loading config
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11619
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3717
+      impact: ""
+      action: ""
+      timestamp: 1764873750
+      file:
+        name: 1764873750-Merge-multiple-agent-keys-when-loading-config.yaml
+        checksum: bd5fdb1aff142e76b888cafd9b3fe171fe7657a2
+    - kind: enhancement
+      summary: Improve input not supported error message to reference installation flavors.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11825
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/11746
+      impact: ""
+      action: ""
+      timestamp: 1765833524
+      file:
+        name: 1765833524-improve-input-not-supported-error-message.yaml
+        checksum: a46c7d283b38448d3c5df4c1245281af2a8efd96

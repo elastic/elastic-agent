@@ -36,5 +36,6 @@ func UnitTest() {
 // Use RACE_DETECTOR=true to enable the race detector.
 func GoUnitTest(ctx context.Context) error {
 	mg.SerialCtxDeps(ctx, goTestDeps...)
-	return devtools.GoTest(ctx, devtools.DefaultGoTestUnitArgs())
+	cfg := devtools.SettingsFromContext(ctx)
+	return devtools.GoTest(ctx, devtools.DefaultGoTestUnitArgs(cfg))
 }

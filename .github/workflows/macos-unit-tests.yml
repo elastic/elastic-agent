@@ -26,6 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          submodules: true
           # pkg/testing/tools/git TestGetReleaseBranches test require full git history
           fetch-depth: 0
 

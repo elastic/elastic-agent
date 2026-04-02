@@ -74,13 +74,14 @@ RUN find / -xdev -perm -4000 -exec chmod u-s {} +
 # Provide a non-root user to run the process.
 RUN groupadd --gid 1000 ${ELASTIC_PRODUCT} && useradd --uid 1000 --gid 1000 --groups 0 --home-dir /usr/share/${ELASTIC_PRODUCT} --no-create-home ${ELASTIC_PRODUCT}
 
-# Elastic Agent permissions
+# Elastic Agent permissions
 RUN find /usr/share//elastic-agent/data -type d -exec chmod 0777 {} \; && \
     find /usr/share//elastic-agent/data -type f -exec chmod 0666 {} \; && \
     chmod 0755 /usr/share//elastic-agent/data/elastic-agent-*/elastic-agent && \
     chmod 0755 /usr/share//elastic-agent/data/elastic-agent-*/components/*beat && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/osquery* || true) && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/apm-server || true) && \
+    (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/cloud-defend || true) && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/endpoint-security || true) && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/fleet-server || true) && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/pf-elastic-collector || true) && \

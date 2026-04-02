@@ -38,6 +38,7 @@ import (
 type Fixture struct {
 	t       *testing.T
 	version string
+	hash    string
 	caller  string
 
 	fetcher         Fetcher
@@ -70,6 +71,11 @@ type Fixture struct {
 	// it's set by FileNamePrefix and once it's set, FileNamePrefix will return
 	// its value.
 	fileNamePrefix string
+
+	// procMutex protects access to proc and stopping
+	procMutex sync.Mutex
+	proc      *process.Info
+	stopping  bool
 }
 
 // FixtureOpt is an option for the fixture.
@@ -207,6 +213,19 @@ func (f *Fixture) Version() string {
 	return f.version
 }
 
+// Hash returns the Elastic Agent build commit hash (populated only after the fixture has been prepared/extracted)
+func (f *Fixture) Hash() string {
+	return f.hash
+}
+
+// ShortHash returns the Elastic Agent build commit hash in short form (populated only after the fixture has been prepared/extracted)
+func (f *Fixture) ShortHash() string {
+	if len(f.hash) < 6 {
+		return f.hash
+	}
+	return f.hash[:6]
+}
+
 // Prepare prepares the Elastic Agent for usage.
 //
 // This must be called before `Configure`, `Run`, or `Install` can be called.
@@ -256,6 +275,18 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	}
 	f.extractDir = finalDir
 	f.workDir = finalDir
+
+	// not done for certain types of packages
+	if f.packageFormat != "deb" && f.packageFormat != "rpm" {
+		// collect the hash: it's done by reading the `.build_hash.txt` (the same information can be gathered by the manifest but that involves YAML unmarshalling)
+
+		hashBytes, err := os.ReadFile(filepath.Join(finalDir, ".build_hash.txt"))
+		if err != nil {
+			return fmt.Errorf("reading .build_hash.txt from the extracted archive: %w", err)
+		}
+		f.hash = string(hashBytes)
+	}
+
 	return nil
 }
 
@@ -327,6 +358,31 @@ func (f *Fixture) SrcPackage(ctx context.Context) (string, error) {
 // PackageFormat returns the package format for the  fixture
 func (f *Fixture) PackageFormat() string {
 	return f.packageFormat
+}
+
+// SetInstallBasePath records the install base path on the fixture. This is
+// needed when the agent is installed manually (e.g. via rpm -U) without going
+// through fixture.Install(), so that helpers such as FindRunDir can locate the
+// correct data directory.
+func (f *Fixture) SetInstallBasePath(path string) {
+	if f.installOpts == nil {
+		f.installOpts = &InstallOpts{}
+	}
+	f.installOpts.BasePath = path
+}
+
+// AgentDataDir returns the path to the agent's data directory, accounting for
+// any install prefix. For rpm/deb this is "{prefix}/var/lib/elastic-agent";
+// for other package formats it is the fixture's work directory.
+func (f *Fixture) AgentDataDir() string {
+	if pf := f.packageFormat; pf == "deb" || pf == "rpm" {
+		prefix := ""
+		if f.installOpts != nil {
+			prefix = f.installOpts.BasePath
+		}
+		return prefix + "/var/lib/elastic-agent"
+	}
+	return f.workDir
 }
 
 func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
@@ -530,9 +586,33 @@ func (f *Fixture) RunOtelWithClient(ctx context.Context, states ...State) error 
 	return f.executeWithClient(ctx, "otel", false, false, false, states...)
 }
 
+// Stop gracefully stops the Elastic Agent process that has been started
+// by [RunOtelWithCliet] or [Run].
+// If the Elastic Agent has been installed, or the process
+// has not been started by [RunOtelWithClient] or [Run],
+// Stop fails the test by calling t.Error
+func (f *Fixture) Stop() {
+	f.procMutex.Lock()
+	defer f.procMutex.Unlock()
+
+	if f.installed {
+		f.t.Error("an installed Elastic Agent cannot be stopped")
+	}
+
+	if f.proc == nil {
+		f.t.Error("Elastic Agent has not been started")
+	}
+
+	f.stopping = true
+
+	if err := f.proc.Stop(); err != nil {
+		f.t.Errorf("Elastic Agent returned an error when stopping: %s", err)
+	}
+}
+
 func (f *Fixture) executeWithClient(ctx context.Context, command string, disableEncryptedStore bool, shouldWatchState bool, enableTestingMode bool, states ...State) error {
 	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
-		f.t.Fatal("Context passed to Fixture.Run() has no deadline set.")
+		f.t.Error("Context passed to Fixture.Run() has no deadline set.")
 	}
 
 	if f.binaryName != "elastic-agent" {
@@ -576,21 +656,27 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 	stdOut := newLogWatcher(logProxy)
 	stdErr := newLogWatcher(logProxy)
 
-	args := []string{command, "-e"}
-	if disableEncryptedStore {
-		args = append(args, "--disable-encrypted-store")
-	}
-	if enableTestingMode {
-		args = append(args, "--testing-mode")
+	args := []string{command}
+	if command != "otel" {
+		// otel command doesn't share these arguments with elastic-agent
+		args = append(args, "-e")
+		if disableEncryptedStore {
+			args = append(args, "--disable-encrypted-store")
+		}
+		if enableTestingMode {
+			args = append(args, "--testing-mode")
+		}
 	}
 
 	args = append(args, f.additionalArgs...)
 
-	proc, err := process.Start(
+	f.procMutex.Lock()
+	f.proc, err = process.Start(
 		f.binaryPath(),
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+	f.procMutex.Unlock()
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
@@ -607,20 +693,23 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		doneChan = time.After(f.runLength)
 	}
 
-	procWaitCh := proc.Wait()
+	procWaitCh := f.proc.Wait()
 	killProc := func() {
-		_ = proc.Kill()
+		_ = f.proc.Kill()
 		<-procWaitCh
 	}
 
-	stopping := false
+	f.procMutex.Lock()
+	f.stopping = false
+	f.procMutex.Unlock()
+
 	for {
 		select {
 		case <-ctx.Done():
 			killProc()
 			return ctx.Err()
 		case ps := <-procWaitCh:
-			if stopping {
+			if f.stopping {
 				return nil
 			}
 			return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
@@ -637,7 +726,7 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
 			}
 		case err := <-stateErrCh:
-			if !stopping {
+			if !f.stopping {
 				// Give the log watchers a second to write out the agent logs.
 				// Client connnection failures can happen quickly enough to prevent logging.
 				time.Sleep(time.Second)
@@ -646,10 +735,10 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 				return fmt.Errorf("elastic-agent client received unexpected error: %w", err)
 			}
 		case <-doneChan:
-			if !stopping {
+			if !f.stopping {
 				// trigger the stop
-				stopping = true
-				_ = proc.Stop()
+				f.stopping = true
+				_ = f.proc.Stop()
 			}
 		case state := <-stateCh:
 			if smInstance != nil {
@@ -659,10 +748,10 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 					return fmt.Errorf("state management failed with unexpected error: %w", err)
 				}
 				if !cont {
-					if !stopping {
+					if !f.stopping {
 						// trigger the stop
-						stopping = true
-						_ = proc.Stop()
+						f.stopping = true
+						_ = f.proc.Stop()
 					}
 				} else if cfg != "" {
 					err := performConfigure(ctx, agentClient, cfg, 3*time.Second)
@@ -728,6 +817,7 @@ func (f *Fixture) PrepareAgentCommand(ctx context.Context, args []string, opts .
 			return nil, fmt.Errorf("error adding opts to Exec: %w", err)
 		}
 	}
+
 	return cmd, nil
 }
 
@@ -948,11 +1038,57 @@ func (f *Fixture) IsHealthy(ctx context.Context, opts ...statusOpt) error {
 	}
 
 	if status.State != int(cproto.State_HEALTHY) {
-		return fmt.Errorf("agent isn't healthy, current status: %s",
-			client.State(status.State)) //nolint:gosec // value will never be over 32-bit
+		return fmt.Errorf("agent isn't healthy, current state: %s, full status: %+v",
+			client.State(status.State), status) //nolint:gosec // value will never be over 32-bit
 	}
 
 	return nil
+}
+
+// IsHealthyOrDegradedFromOutput works like IsHealthy, but accepts a Degraded status if the reason is an output in that state.
+// This is useful for tests where we have an ES output, but no actual ES, and we don't care about sending data
+// anywhere.
+func (f *Fixture) IsHealthyOrDegradedFromOutput(ctx context.Context, opts ...statusOpt) error {
+	status, err := f.ExecStatus(ctx, opts...)
+	if err != nil {
+		return fmt.Errorf("agent status returned an error: %w", err)
+	}
+
+	invalidStateErr := fmt.Errorf("agent isn't healthy, current state: %s, full status: %+v",
+		ProtoStateFromInt(status.State), status)
+	switch ProtoStateFromInt(status.State) {
+	case cproto.State_HEALTHY:
+		return nil
+	case cproto.State_DEGRADED:
+		// handled below
+	default:
+		return invalidStateErr
+	}
+
+	for _, compState := range status.Components {
+		switch ProtoStateFromInt(compState.State) {
+		case cproto.State_HEALTHY, cproto.State_DEGRADED:
+		default:
+			return invalidStateErr
+		}
+		for _, unitState := range compState.Units {
+			switch ProtoStateFromInt(unitState.State) {
+			case cproto.State_HEALTHY:
+			case cproto.State_DEGRADED:
+				if cproto.UnitType(unitState.UnitType) != cproto.UnitType_OUTPUT { //nolint:gosec // value will never be over 32-bit
+					return invalidStateErr
+				}
+			default:
+				return invalidStateErr
+			}
+		}
+	}
+
+	return nil
+}
+
+func ProtoStateFromInt(state int) cproto.State {
+	return cproto.State(state) //nolint:gosec // value will never be over 32-bit
 }
 
 // IsInstalled returns true if this fixture has been installed
@@ -984,6 +1120,9 @@ func (f *Fixture) binaryPath() string {
 	}
 	if f.packageFormat == "deb" || f.packageFormat == "rpm" {
 		workDir = "/usr/bin"
+		if f.installOpts != nil && f.installOpts.BasePath != "" {
+			workDir = f.installOpts.BasePath + workDir
+		}
 	}
 	defaultBin := "elastic-agent"
 	if f.binaryName != "" {
@@ -1342,11 +1481,7 @@ func FindComponentsDir(dir, version string) (string, error) {
 
 // FindRunDir identifies the directory that holds the run folder.
 func FindRunDir(fixture *Fixture) (string, error) {
-	agentWorkDir := fixture.WorkDir()
-	if pf := fixture.PackageFormat(); pf == "deb" || pf == "rpm" {
-		// these are hardcoded paths in packages.yml
-		agentWorkDir = "/var/lib/elastic-agent"
-	}
+	agentWorkDir := fixture.AgentDataDir()
 
 	version := fixture.Version()
 	versionDir, err := findAgentDataVersionDir(agentWorkDir, version)
@@ -1503,6 +1638,10 @@ type AgentStatusOutput struct {
 			Message  string `json:"message"`
 			Payload  struct {
 				OsqueryVersion string `json:"osquery_version"`
+				Streams        map[string]struct {
+					Error  string `json:"error"`
+					Status string `json:"status"`
+				} `json:"streams"`
 			} `json:"payload"`
 		} `json:"units"`
 		VersionInfo AgentStatusOutputVersionInfo `json:"version_info,omitempty"`

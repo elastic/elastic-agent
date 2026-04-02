@@ -1,0 +1,103 @@
+extensions:
+  # Activate if API key authentication is needed
+  # Read more: https://www.elastic.co/docs/reference/edot-collector/config/authentication-methods
+  # apikeyauth:
+  #   endpoint: ${env:ELASTIC_ENDPOINT}
+  #   application_privileges:
+  #     - application: "apm"
+  #       privileges: ["config_agent:read"]
+  #       resources: ["*"]
+
+  # Activate if central configuration with bearer token auth is needed
+  # bearertokenauth:
+  #   scheme: "APIKey"
+  #   token: ${env:ELASTIC_API_KEY}
+
+  # Activate if central configuration is needed
+  # apmconfig:
+  #   source:
+  #     elasticsearch:
+  #       endpoint: ${env:ELASTIC_ENDPOINT}
+  #       auth:
+  #         authenticator: bearertokenauth
+  #   opamp:
+  #     protocols:
+  #       http:
+  #         endpoint: 0.0.0.0:4320
+  #         auth:
+  #           authenticator: apikeyauth
+  #         tls:
+  #           cert_file: your/path/to/server.crt
+  #           key_file: your/path/to/server.key
+
+receivers:
+  # Receives data from other Collectors in Agent mode
+  otlp:
+    protocols:
+      grpc:
+        # auth:
+        #  authenticator: apikeyauth
+        endpoint: 0.0.0.0:4317 # Listen on all interfaces
+        # https://www.elastic.co/docs/reference/edot-collector/config/default-config-standalone#collector-receiver-configuration
+        # tls:
+        #   cert_file: your/path/to/server.crt
+        #   key_file: your/path/to/server.key
+      http:
+        # auth:
+        #  authenticator: apikeyauth
+        endpoint: 0.0.0.0:4318 # Listen on all interfaces
+        # tls:
+        #   cert_file: your/path/to/server.crt
+        #   key_file: your/path/to/server.key
+
+connectors:
+  elasticapm: {} # Elastic APM Connector
+
+processors:
+  batch:
+    send_batch_size: 1000
+    timeout: 1s
+    send_batch_max_size: 1500
+  batch/metrics:
+    send_batch_max_size: 0 # Explicitly set to 0 to avoid splitting metrics requests
+    timeout: 1s
+  elasticapm: {} # Elastic APM Processor
+
+exporters:
+  debug: {}
+  elasticsearch/otel:
+    endpoints:
+      - ${env:ELASTIC_ENDPOINT} # Will be populated from environment variable
+    api_key: ${env:ELASTIC_API_KEY} # Will be populated from environment variable
+    # https://www.elastic.co/docs/reference/edot-collector/config/default-config-standalone#secure-the-connection-between-the-edot-collector-and-elastic
+    # tls:
+    #   ca_file: "/path/to/elastic-ca.crt"
+    #   insecure_skip_verify: true
+    mapping:
+      mode: otel
+
+service:
+  # extensions:
+    # - apikeyauth
+    # - bearertokenauth
+    # - apmconfig
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch/metrics]
+      exporters: [debug, elasticsearch/otel]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, elasticapm, elasticsearch/otel]
+    traces:
+      receivers: [otlp]
+      processors: [batch, elasticapm]
+      exporters: [debug, elasticapm, elasticsearch/otel]
+    metrics/aggregated-otel-metrics:
+      receivers:
+        - elasticapm
+      processors: [] # No processors defined in the original for this pipeline
+      exporters:
+        - debug
+        - elasticsearch/otel

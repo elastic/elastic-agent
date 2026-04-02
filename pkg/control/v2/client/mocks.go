@@ -42,6 +42,68 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 	return &MockClient_Expecter{mock: &_m.Mock}
 }
 
+// AvailableRollbacks provides a mock function for the type MockClient
+func (_mock *MockClient) AvailableRollbacks(ctx context.Context) ([]AvailableRollback, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AvailableRollbacks")
+	}
+
+	var r0 []AvailableRollback
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]AvailableRollback, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []AvailableRollback); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]AvailableRollback)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_AvailableRollbacks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AvailableRollbacks'
+type MockClient_AvailableRollbacks_Call struct {
+	*mock.Call
+}
+
+// AvailableRollbacks is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockClient_Expecter) AvailableRollbacks(ctx interface{}) *MockClient_AvailableRollbacks_Call {
+	return &MockClient_AvailableRollbacks_Call{Call: _e.mock.On("AvailableRollbacks", ctx)}
+}
+
+func (_c *MockClient_AvailableRollbacks_Call) Run(run func(ctx context.Context)) *MockClient_AvailableRollbacks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_AvailableRollbacks_Call) Return(availableRollbacks []AvailableRollback, err error) *MockClient_AvailableRollbacks_Call {
+	_c.Call.Return(availableRollbacks, err)
+	return _c
+}
+
+func (_c *MockClient_AvailableRollbacks_Call) RunAndReturn(run func(ctx context.Context) ([]AvailableRollback, error)) *MockClient_AvailableRollbacks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Configure provides a mock function for the type MockClient
 func (_mock *MockClient) Configure(ctx context.Context, config string) error {
 	ret := _mock.Called(ctx, config)

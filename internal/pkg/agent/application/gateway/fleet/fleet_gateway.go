@@ -14,6 +14,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -79,6 +80,10 @@ type stateStore interface {
 	Action() fleetapi.Action
 }
 
+type rollbacksSource interface {
+	Get() (map[string]ttl.TTLMarker, error)
+}
+
 type FleetGateway struct {
 	log                *logger.Logger
 	client             client.Sender
@@ -92,6 +97,8 @@ type FleetGateway struct {
 	stateFetcher       StateFetcher
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
+	rollbackSource     rollbacksSource
+	compression        string
 }
 
 // New creates a new fleet gateway
@@ -103,11 +110,12 @@ func New(
 	stateStore stateStore,
 	stateFetcher StateFetcher,
 	cfg *configuration.FleetCheckin,
+	source rollbacksSource,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
 	st.Backoff = getBackoffSettings(cfg)
-	return newFleetGatewayWithScheduler(
+	gw, err := newFleetGatewayWithScheduler(
 		log,
 		st,
 		agentInfo,
@@ -116,7 +124,13 @@ func New(
 		acker,
 		stateStore,
 		stateFetcher,
+		source,
 	)
+	if err != nil {
+		return nil, err
+	}
+	gw.compression = cfg.GetCompression()
+	return gw, nil
 }
 
 func newFleetGatewayWithScheduler(
@@ -128,18 +142,20 @@ func newFleetGatewayWithScheduler(
 	acker acker.Acker,
 	stateStore stateStore,
 	stateFetcher StateFetcher,
+	source rollbacksSource,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
-		log:          log,
-		client:       client,
-		settings:     settings,
-		agentInfo:    agentInfo,
-		scheduler:    scheduler,
-		acker:        acker,
-		stateFetcher: stateFetcher,
-		stateStore:   stateStore,
-		errCh:        make(chan error),
-		actionCh:     make(chan []fleetapi.Action, 1),
+		log:            log,
+		client:         client,
+		settings:       settings,
+		agentInfo:      agentInfo,
+		scheduler:      scheduler,
+		acker:          acker,
+		stateFetcher:   stateFetcher,
+		stateStore:     stateStore,
+		errCh:          make(chan error),
+		actionCh:       make(chan []fleetapi.Action, 1),
+		rollbackSource: source,
 	}, nil
 }
 
@@ -393,8 +409,31 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	agentPolicyID := getPolicyID(action)
 	policyRevisionIDX := getPolicyRevisionIDX(action)
 
+	// get available rollbacks
+	rollbacks, err := f.rollbackSource.Get()
+	if err != nil {
+		f.log.Warnf("error getting available rollbacks: %s", err.Error())
+		// this should already be nil but let's make sure that we don't include rollbacks in checkin body when encountering errors
+		rollbacks = nil
+	}
+
+	var validRollbacks []fleetapi.CheckinRollback
+	if len(rollbacks) > 0 {
+		now := time.Now()
+		validRollbacks = make([]fleetapi.CheckinRollback, 0, len(rollbacks))
+		for _, rollback := range rollbacks {
+			if rollback.ValidUntil.After(now) {
+				// map the `ttl.Marker` to the `fleetapi.CheckinRollback`
+				validRollbacks = append(validRollbacks, fleetapi.CheckinRollback{
+					Version:    rollback.Version,
+					ValidUntil: rollback.ValidUntil,
+				})
+			}
+		}
+	}
+
 	// checkin
-	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
+	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client, f.compression)
 	req := &fleetapi.CheckinRequest{
 		AckToken:          ackToken,
 		Metadata:          ecsMeta,
@@ -404,6 +443,9 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		UpgradeDetails:    state.UpgradeDetails,
 		AgentPolicyID:     agentPolicyID,
 		PolicyRevisionIDX: policyRevisionIDX,
+	}
+	if len(validRollbacks) > 0 {
+		req.Upgrade.Rollbacks = validRollbacks
 	}
 
 	resp, took, err := cmd.Execute(stateCtx, req)

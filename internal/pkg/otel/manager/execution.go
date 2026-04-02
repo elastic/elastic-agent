@@ -11,8 +11,14 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
+
+// ExecutionFactory creates a collectorExecution. It receives the collector binary path,
+// the health check extension component ID (e.g. "healthcheckv2/<uuid>"), and the
+// user-configured health check port (0 means pick a random port per-start).
+type ExecutionFactory func(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (collectorExecution, error)
 
 type collectorExecution interface {
 	// startCollector starts the otel collector with the given arguments, returning a handle allowing it to be stopped.
@@ -25,7 +31,7 @@ type collectorExecution interface {
 	//   - errCh: Process exit errors are sent to the errCh channel
 	//   - statusCh: Collector's status updates are sent to statusCh channel.
 	//   - forceFetchStatusCh: Channel that is used to trigger a forced status update.
-	startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error)
+	startCollector(ctx context.Context, logLevel logp.Level, collectorLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error)
 }
 
 type collectorHandle interface {
@@ -33,4 +39,14 @@ type collectorHandle interface {
 	// doesn't exit within that time, it will be killed and then it will wait an extra second for it to ensure it's
 	// really stopped.
 	Stop(waitTime time.Duration)
+
+	// Stopped returns whether the process represented the handle has exited.
+	Stopped() bool
+
+	// UpdateConfig sends a new configuration to the running collector for in-place reload.
+	// Returns an error if the config could not be written.
+	UpdateConfig(cfg *confmap.Conf) error
+
+	// LogLevel returns the log level of the running collector.
+	LogLevel() logp.Level
 }

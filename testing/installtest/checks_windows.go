@@ -96,17 +96,18 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		if !hasWellKnownSID(sids, windows.WinBuiltinAdministratorsSid) {
 			return fmt.Errorf("path %s should have ACE for Administrators", topPath)
 		}
-		// that is 3 unique SID's, it should not have anymore
-		if len(sids) > 3 {
-			return fmt.Errorf("DACL has more than allowed ACE for %s", topPath)
+		// that is 4 unique SID's, it should not have anymore
+		if len(sids) > 4 {
+			return fmt.Errorf("DACL has more than allowed ACE for %s (unprivileged): %v", topPath, sids)
 		}
 	} else {
 		if !owner.IsWellKnown(windows.WinBuiltinAdministratorsSid) {
 			return fmt.Errorf("%s not owned by Administrators", topPath)
 		}
-		// that is 1 unique SID, it should not have anymore
-		if len(sids) > 1 {
-			return fmt.Errorf("DACL has more than allowed ACE for %s", topPath)
+		// that is 2 unique SID, it should not have anymore
+		// Administrators and INTERACTIVE
+		if len(sids) > 2 {
+			return fmt.Errorf("DACL has more than allowed ACE for %s (privileged): %v", topPath, sids)
 		}
 	}
 	return nil

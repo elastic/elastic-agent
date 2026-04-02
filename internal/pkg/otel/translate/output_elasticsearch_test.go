@@ -56,6 +56,19 @@ retry:
   initial_interval: 42s
   max_interval: 7m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 sending_queue:
   batch:
     flush_timeout: 10s
@@ -71,14 +84,17 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
-mapping:
-  mode: bodymap
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ToOTelConfig(cfg, logger)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -103,6 +119,19 @@ retry:
   initial_interval: 1s
   max_interval: 1m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 sending_queue:
   batch:
     flush_timeout: 10s
@@ -114,26 +143,95 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
-mapping:
-  mode: bodymap
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ToOTelConfig(cfg, logger)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 	})
 
-	t.Run("test hosts can be a string", func(t *testing.T) {
+	t.Run("test hosts can be a string and parameters is respected", func(t *testing.T) {
 		beatCfg := `
 hosts: "localhost:9200"
 index: "some-index"
 api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
+parameters:
+  somekey : somevalue
+`
+
+		OTelCfg := `
+endpoints:
+  - http://localhost:9200?somekey=somevalue
+logs_index: some-index
+logs_dynamic_pipeline:
+  enabled: true
+retry:
+  enabled: true
+  initial_interval: 1s
+  max_interval: 1m0s
+  max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
+sending_queue:
+  batch:
+    flush_timeout: 10s
+    max_size: 1600
+    min_size: 0
+    sizer: items
+  block_on_overflow: true
+  enabled: true
+  num_consumers: 1
+  queue_size: 3200
+  wait_for_result: true
+max_conns_per_host: 1
+api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+compression: gzip
+compression_params:
+  level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
+ `
+		cfg := config.MustNewConfigFrom(beatCfg)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
+		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
+		expOutput := newFromYamlString(t, OTelCfg)
+		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
+	})
+
+	t.Run("ssl setting of type []string can be a string", func(t *testing.T) {
+		beatCfg := `
+hosts: "localhost:9200"
+index: "some-index"
+api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
+ssl.certificate_authorities: "/not/a/real/path/ca.pem"
+ssl.supported_protocols: "TLSv1.3"
+ssl.cipher_suites: "ECDHE-ECDSA-AES-256-CBC-SHA"
+ssl.curve_types: "P-256"
 `
 
 		OTelCfg := `
@@ -147,6 +245,19 @@ retry:
   initial_interval: 1s
   max_interval: 1m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 sending_queue:
   batch:
     flush_timeout: 10s
@@ -158,16 +269,19 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
-mapping:
-  mode: bodymap
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ToOTelConfig(cfg, logger)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -196,14 +310,30 @@ retry:
   initial_interval: 1s
   max_interval: 1m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 logs_index: some-index
 password: changeme
 user: elastic
-mapping:
-  mode: bodymap
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
 `
 
 		tests := []struct {
@@ -233,7 +363,7 @@ sending_queue:
 max_conns_per_host: 4
 sending_queue:
   batch:
-    flush_timeout: 10s
+    flush_timeout: 5s
     max_size: 1600
     min_size: 0
     sizer: items
@@ -256,13 +386,26 @@ retry:
   initial_interval: 5s
   max_interval: 5m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 logs_index: some-index
 password: changeme
 user: elastic
 max_conns_per_host: 1
 sending_queue:
   batch:
-    flush_timeout: 10s
+    flush_timeout: 20s
     max_size: 1600
     min_size: 0
     sizer: items
@@ -271,11 +414,14 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
-mapping:
-  mode: bodymap
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `,
 			},
 			{
@@ -284,7 +430,7 @@ compression_params:
 max_conns_per_host: 1
 sending_queue:
   batch:
-    flush_timeout: 10s
+    flush_timeout: 1s
     max_size: 50
     min_size: 0
     sizer: items
@@ -317,12 +463,150 @@ sending_queue:
 		for _, test := range tests {
 			t.Run("config translation w/"+test.presetName, func(t *testing.T) {
 				cfg := config.MustNewConfigFrom(fmt.Sprintf(commonBeatCfg, test.presetName))
-				got, err := ToOTelConfig(cfg, logger)
+				got, _, err := ESToOTelConfig(cfg, "", logger)
 				require.NoError(t, err, "error translating elasticsearch output to OTel ES exporter type")
 				expOutput := newFromYamlString(t, test.output)
 				compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 			})
 		}
+	})
+
+	t.Run("test max_retries positive", func(t *testing.T) {
+		beatCfg := `
+hosts:
+  - localhost:9200
+  - localhost:9300
+protocol: http
+max_retries: 5
+path: /foo/bar
+username: elastic
+password: changeme
+index: "some-index"
+backoff:
+  init: 42s
+  max: 420s
+workers: 30
+headers:
+  X-Header-1: foo
+  X-Bar-Header: bar`
+
+		OTelCfg := `
+endpoints:
+  - http://localhost:9200/foo/bar
+  - http://localhost:9300/foo/bar
+logs_index: some-index
+logs_dynamic_pipeline:
+  enabled: true
+max_conns_per_host: 60
+password: changeme
+retry:
+  enabled: true
+  initial_interval: 42s
+  max_interval: 7m0s
+  max_retries: 5
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
+sending_queue:
+  batch:
+    flush_timeout: 10s
+    max_size: 1600
+    min_size: 0
+    sizer: items
+  block_on_overflow: true
+  enabled: true
+  num_consumers: 60
+  queue_size: 3200
+  wait_for_result: true
+user: elastic
+headers:
+  X-Header-1: foo
+  X-Bar-Header: bar
+compression: gzip
+compression_params:
+  level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
+ `
+		cfg := config.MustNewConfigFrom(beatCfg)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
+		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
+		expOutput := newFromYamlString(t, OTelCfg)
+		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
+	})
+
+	t.Run("test max_retries zero", func(t *testing.T) {
+		beatCfg := `
+hosts:
+  - localhost:9200
+  - localhost:9300
+protocol: http
+max_retries: 0
+path: /foo/bar
+username: elastic
+password: changeme
+index: "some-index"
+backoff:
+  init: 42s
+  max: 420s
+workers: 30
+headers:
+  X-Header-1: foo
+  X-Bar-Header: bar`
+
+		OTelCfg := `
+endpoints:
+  - http://localhost:9200/foo/bar
+  - http://localhost:9300/foo/bar
+logs_index: some-index
+logs_dynamic_pipeline:
+  enabled: true
+max_conns_per_host: 60
+password: changeme
+retry:
+  enabled: false
+sending_queue:
+  batch:
+    flush_timeout: 10s
+    max_size: 1600
+    min_size: 0
+    sizer: items
+  block_on_overflow: true
+  enabled: true
+  num_consumers: 60
+  queue_size: 3200
+  wait_for_result: true
+user: elastic
+headers:
+  X-Header-1: foo
+  X-Bar-Header: bar
+compression: gzip
+compression_params:
+  level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
+ `
+		cfg := config.MustNewConfigFrom(beatCfg)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
+		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
+		expOutput := newFromYamlString(t, OTelCfg)
+		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 	})
 }
 
@@ -351,6 +635,19 @@ retry:
   initial_interval: 1s
   max_interval: 1m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 max_conns_per_host: 2
 user: elastic
 sending_queue:
@@ -364,25 +661,55 @@ sending_queue:
   num_consumers: 2
   queue_size: 3200
   wait_for_result: true
-mapping:
-  mode: bodymap
 {{ if gt . 0 }}
 compression: gzip
 compression_params:
   level: {{ . }}
 {{ else }}
 compression: none
-{{ end }}`
+{{ end }}
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true   
+`
 
 	for level := range 9 {
 		t.Run(fmt.Sprintf("compression-level-%d", level), func(t *testing.T) {
 			cfg := config.MustNewConfigFrom(fmt.Sprintf(compressionConfig, level))
-			got, err := ToOTelConfig(cfg, logp.NewNopLogger())
+			got, _, err := ESToOTelConfig(cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 			var otelBuffer bytes.Buffer
 			require.NoError(t, template.Must(template.New("config").Parse(otelConfig)).Execute(&otelBuffer, level))
 			expOutput := newFromYamlString(t, otelBuffer.String())
 			compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
+		})
+	}
+}
+
+func TestToOTelConfig_CheckUnsupported(t *testing.T) {
+	logger := logptest.NewTestingLogger(t, "")
+
+	cases := []struct {
+		name            string
+		cfg             map[string]any
+		wantErrContains string
+	}{
+		{"indices", map[string]any{"indices": []any{"i"}}, "indices is currently not supported"},
+		{"allow_older_versions_false", map[string]any{"allow_older_versions": false}, "allow_older_versions:false is currently not supported"},
+		{"loadbalance_false", map[string]any{"loadbalance": false}, "loadbalance:false is currently not supported"},
+		{"non_indexable_policy", map[string]any{"non_indexable_policy": "x"}, "non_indexable_policy is currently not supported"},
+		{"max_retries_negative", map[string]any{"max_retries": -5}, "max_retries should be non-negative"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cfg, err := config.NewConfigFrom(c.cfg)
+			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
+
+			_, _, err = ESToOTelConfig(cfg, "", logger)
+			require.ErrorContains(t, err, c.wantErrContains)
 		})
 	}
 }

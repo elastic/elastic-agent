@@ -111,7 +111,7 @@ func (f FleetBootstrapOpts) toCmdArgs() []string {
 
 // InstallOpts specifies the options for the install command
 type InstallOpts struct {
-	BasePath       string // --base-path
+	BasePath       string // --base-path or --prefix for RPM installs
 	Force          bool   // --force
 	Insecure       bool   // --insecure
 	NonInteractive bool   // --non-interactive
@@ -201,7 +201,7 @@ func (f *Fixture) installFunc(ctx context.Context, installOpts *InstallOpts, sho
 
 	// check for running agents before installing, but only if not installed into a namespace whose point is allowing two agents at once.
 	if installOpts != nil && !installOpts.Develop && installOpts.Namespace == "" {
-		assert.Empty(f.t, getElasticAgentAndAgentbeatProcesses(f.t), "there should be no running agent at beginning of Install()")
+		assert.Empty(f.t, getElasticAgentAndOtelProcesses(f.t), "there should be no running agent at beginning of Install()")
 	}
 
 	switch f.packageFormat {
@@ -303,8 +303,8 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 			return
 		}
 
-		// If not using an installation namespace, there should be no elastic-agent or agentbeat processes left running.
-		processes := getElasticAgentAndAgentbeatProcesses(f.t)
+		// If not using an installation namespace, there should be no elastic-agent or elastic-otel-collector processes left running.
+		processes := getElasticAgentAndOtelProcesses(f.t)
 		assert.Empty(f.t, processes, "there should be no running agent at the end of the test")
 	})
 
@@ -429,11 +429,11 @@ func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
 	return agentControlPlaneProcesses
 }
 
-// Includes both the main elastic-agent process and the agentbeat sub-processes for ensuring
+// Includes both the main elastic-agent process and the elastic-otel-collector sub-processes for ensuring
 // that no sub-processes are orphaned from their parent process and left running. This
 // primarily tests that Windows Job Object assignment works.
-func getElasticAgentAndAgentbeatProcesses(t *gotesting.T) []runningProcess {
-	return getProcesses(t, `.*(elastic\-agent|agentbeat).*`)
+func getElasticAgentAndOtelProcesses(t *gotesting.T) []runningProcess {
+	return getProcesses(t, `.*(elastic\-agent|elastic\-otel\-collector).*`)
 }
 
 func getProcesses(t *gotesting.T, regex string) []runningProcess {
@@ -464,6 +464,9 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 
 func (f *Fixture) SetDebRpmClient() error {
 	workDir := "/var/lib/elastic-agent"
+	if f.installOpts != nil && f.installOpts.BasePath != "" {
+		workDir = f.installOpts.BasePath + workDir
+	}
 	socketPath, err := control.AddressFromPath(f.operatingSystem, workDir)
 	if err != nil {
 		return fmt.Errorf("failed to get control protcol address: %w", err)
@@ -584,14 +587,25 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		return nil, fmt.Errorf("failed to prepare: %w", err)
 	}
 
+	installArgs := []string{"-E", "rpm", "-i", "-v"}
+	if installOpts.BasePath != "" {
+		installArgs = append(installArgs, "--prefix", installOpts.BasePath)
+		// Make sure that prefix is available to agentFixture so other agent commands can use it
+		if f.installOpts == nil {
+			f.installOpts = &InstallOpts{}
+		}
+		f.installOpts.BasePath = installOpts.BasePath
+	}
+	installArgs = append(installArgs, f.srcPackage)
 	// sudo rpm -iv elastic-agent rpm
-	cmd := exec.CommandContext(ctx, "sudo", "-E", "rpm", "-i", "-v", f.srcPackage) // #nosec G204 -- Need to pass in name of package
+	f.t.Logf("[test %s] RPM install command: %v", f.t.Name(), installArgs)
+	cmd := exec.CommandContext(ctx, "sudo", installArgs...) // #nosec G204 -- Need to pass in name of package
 	if installOpts.InstallServers {
 		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
 	}
-	out, err := cmd.CombinedOutput()
+	installOut, err := cmd.CombinedOutput()
 	if err != nil {
-		return out, fmt.Errorf("rpm install failed: %w output:%s", err, string(out))
+		return installOut, fmt.Errorf("rpm install failed: %w output:%s", err, string(installOut))
 	}
 
 	f.t.Cleanup(func() {
@@ -623,9 +637,9 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	})
 
 	// start elastic-agent
-	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
+	out, err := exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
 	if err != nil {
-		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
+		return out, fmt.Errorf("systemctl start elastic-agent failed: %w output: %s install output: %s", err, string(out), string(installOut))
 	}
 
 	err = f.SetDebRpmClient()
@@ -639,6 +653,9 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 
 	// rpm install doesn't enroll, so need to do that
 	enrollArgs := []string{"elastic-agent", "enroll"}
+	if installOpts.BasePath != "" {
+		enrollArgs = []string{installOpts.BasePath + "/usr/bin/elastic-agent", "enroll"}
+	}
 	if installOpts.Force {
 		enrollArgs = append(enrollArgs, "--force")
 	}

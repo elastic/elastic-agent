@@ -15,6 +15,7 @@ scms:
       commitusingapi: true
       branch: '{{ requiredEnv "BRANCH_NAME" }}'
       force: false
+      submodules: false
 
 actions:
   elastic-agent:

@@ -12,11 +12,13 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -84,16 +86,16 @@ The following actions are possible and grouped based on the actions.
 
   FLEET_ENROLL - set to 1 for enrollment into Fleet Server. If not set, Elastic Agent is run in standalone mode.
   FLEET_URL - URL of the Fleet Server to enroll into
-  FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLED and FLEET_ENROLL is set. Then the token is fetched from Kibana.
-  FLEET_ENROLL_TIMEOUT - The timeout duration for the enroll commnd. Defaults to 10m. A negative value disables the timeout.
+  FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLE and FLEET_ENROLL is set. Then the token is fetched from Kibana.
+  FLEET_ENROLL_TIMEOUT - The timeout duration for the enroll command. Defaults to 10m. A negative value disables the timeout.
   FLEET_CA - path to certificate authority to use with communicate with Fleet Server [$KIBANA_CA]
   FLEET_INSECURE - communicate with Fleet with either insecure HTTP or unverified HTTPS
   ELASTIC_AGENT_CERT - path to certificate to use for connecting to fleet-server.
   ELASTIC_AGENT_CERT_KEY - path to private key use for connecting to fleet-server.
 
-  The following vars are need in the scenario that Elastic Agent should automatically fetch its own token.
+  The following vars are needed in the scenario that Elastic Agent should automatically fetch its own token.
 
-  KIBANA_FLEET_HOST - Kibana host to enable create enrollment token on [$KIBANA_HOST]
+  KIBANA_FLEET_HOST - Kibana host to create an enrollment token on [$KIBANA_HOST]
   FLEET_TOKEN_NAME - token name to use for fetching token from Kibana. This requires Kibana configs to be set.
   FLEET_TOKEN_POLICY_NAME - token policy name to use for fetching token from Kibana. This requires Kibana configs to be set.
 
@@ -129,8 +131,8 @@ The following actions are possible and grouped based on the actions.
   should not setup Fleet.
 
   KIBANA_FLEET_HOST - Kibana host accessible from Fleet Server. [$KIBANA_HOST]
-  KIBANA_FLEET_USERNAME - Kibana username to service token [$KIBANA_USERNAME]
-  KIBANA_FLEET_PASSWORD - Kibana password to service token [$KIBANA_PASSWORD]
+  KIBANA_FLEET_USERNAME - Kibana username for service token [$KIBANA_USERNAME]
+  KIBANA_FLEET_PASSWORD - Kibana password for service token [$KIBANA_PASSWORD]
   KIBANA_FLEET_CA - path to certificate authority to use with communicate with Kibana [$KIBANA_CA]
   KIBANA_REQUEST_RETRY_SLEEP - sleep duration taken when agent performs a request to Kibana [default 1s]
   KIBANA_REQUEST_RETRY_COUNT - number of retries agent performs when executing a request to Kibana [default 30]
@@ -349,7 +351,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		if err != nil {
 			return err
 		}
-		enroll := exec.Command(executable, cmdArgs...)
+		enroll := exec.CommandContext(context.Background(), executable, cmdArgs...)
 		enroll.Stdout = streams.Out
 		enroll.Stderr = streams.Err
 		err = enroll.Start()
@@ -570,27 +572,86 @@ func buildFleetServerConnStr(cfg fleetServerConfig) (string, error) {
 	return fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, path), nil
 }
 
+// kibanaFetchPolicy will find the kibanaPolicy the container needs.
+// If fleet-server is enabled, the fleet policy will be retrieved directly by ID, if that fails name is used, then the default.
+// Otherwise the policy is searched for by name, if that fails, we request the default policy.
 func kibanaFetchPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOStreams) (*kibanaPolicy, error) {
+	defaultFlag := "is_default"
+	if cfg.FleetServer.Enable {
+		fmt.Fprintln(streams.Out, "Attempt to lookup fleet-server policy.")
+		defaultFlag = "is_default_fleet_server"
+		policy, err := kibanaFetchFleetServerPolicy(cfg, client, streams)
+		if policy != nil {
+			fmt.Fprintln(streams.Out, "Found policy.")
+			return policy, nil
+		}
+		if err != nil {
+			fmt.Fprintf(streams.Err, "Unable to find fleet-server policy by id: %v\n", err)
+		}
+	}
+
+	// lookup policy by name
 	var policies kibanaPolicies
-	err := performGET(cfg, client, "/api/fleet/agent_policies", &policies, streams.Err, "Kibana fetch policy")
+	params := url.Values{}
+	if cfg.Fleet.TokenPolicyName != "" {
+		fmt.Fprintf(streams.Out, "Attempt to lookup policy by name: %s\n", cfg.Fleet.TokenPolicyName)
+		params.Set("kuery", fmt.Sprintf("name: %q", cfg.Fleet.TokenPolicyName))
+		err := performGETWithParams(cfg, client, "/api/fleet/agent_policies", params, &policies, streams.Err, "Kibana fetch policy")
+		if err != nil {
+			return nil, err
+		}
+		// successful lookup
+		if len(policies.Items) > 0 {
+			return &policies.Items[0], nil
+		}
+	}
+
+	fmt.Fprintf(streams.Out, "Unable to find policy by name: %q, fallback search for default policy %s: true\n", cfg.Fleet.TokenPolicyName, defaultFlag)
+	// fallback to default flag
+	params.Set("kuery", defaultFlag+": true")
+	err := performGETWithParams(cfg, client, "/api/fleet/agent_policies", params, &policies, streams.Err, "Kibana fetch policy")
 	if err != nil {
 		return nil, err
 	}
-	return findPolicy(cfg, policies.Items)
+	if len(policies.Items) == 0 {
+		return nil, fmt.Errorf("policy not found")
+	}
+	fmt.Fprintf(streams.Out, "Fallback search for default policy found id: %s\n", policies.Items[0].ID)
+	return &policies.Items[0], nil
 }
 
 func kibanaFetchToken(cfg setupConfig, client *kibana.Client, policy *kibanaPolicy, streams *cli.IOStreams, tokenName string) (string, error) {
 	var keys kibanaAPIKeys
-	err := performGET(cfg, client, "/api/fleet/enrollment_api_keys", &keys, streams.Err, "Kibana fetch token")
-	if err != nil {
-		return "", err
-	}
-	key, err := findKey(keys.Items, policy, tokenName)
-	if err != nil {
-		return "", err
+	page := 1
+	params := url.Values{}
+	// kuery is unable to match on a `name: "Default *"` pattern as the * is interpreted literally.
+	params.Set("kuery", fmt.Sprintf("active: true and policy_id: %q", policy.ID))
+	params.Set("perPage", "10000") // set to a very high value to avoid paging
+	var key *kibanaAPIKey
+	for {
+		params.Set("page", strconv.Itoa(page))
+		err := performGETWithParams(cfg, client, "/api/fleet/enrollment_api_keys", params, &keys, streams.Err, "Kibana fetch token")
+		if err != nil {
+			return "", err
+		}
+		if len(keys.Items) == 0 {
+			return "", fmt.Errorf(`unable to find enrollment token named "%s" in policy "%s"`, tokenName, policy.Name)
+		}
+
+		key, err = findKey(keys.Items, policy, tokenName)
+		if err != nil {
+			if keys.Total < keys.PerPage*keys.Page {
+				// No keys found, return an error
+				return "", err
+			}
+		}
+		if key != nil {
+			break
+		}
+		page++
 	}
 	var keyDetail kibanaAPIKeyDetail
-	err = performGET(cfg, client, fmt.Sprintf("/api/fleet/enrollment_api_keys/%s", key.ID), &keyDetail, streams.Err, "Kibana fetch token detail")
+	err := performGET(cfg, client, fmt.Sprintf("/api/fleet/enrollment_api_keys/%s", key.ID), &keyDetail, streams.Err, "Kibana fetch token detail")
 	if err != nil {
 		return "", err
 	}
@@ -617,34 +678,6 @@ func kibanaClient(cfg kibanaConfig, headers map[string]string) (*kibana.Client, 
 		Transport:     transport,
 		Headers:       headers,
 	}, 0, "Elastic-Agent", version.GetDefaultVersion(), version.Commit(), version.BuildTime().String())
-}
-
-func findPolicy(cfg setupConfig, policies []kibanaPolicy) (*kibanaPolicy, error) {
-	policyID := ""
-	policyName := cfg.Fleet.TokenPolicyName
-	if cfg.FleetServer.Enable {
-		policyID = cfg.FleetServer.PolicyID
-	}
-	for _, policy := range policies {
-		if policyID != "" {
-			if policyID == policy.ID {
-				return &policy, nil
-			}
-		} else if policyName != "" {
-			if policyName == policy.Name {
-				return &policy, nil
-			}
-		} else if cfg.FleetServer.Enable {
-			if policy.IsDefaultFleetServer {
-				return &policy, nil
-			}
-		} else {
-			if policy.IsDefault {
-				return &policy, nil
-			}
-		}
-	}
-	return nil, fmt.Errorf(`unable to find policy named "%s"`, policyName)
 }
 
 func findKey(keys []kibanaAPIKey, policy *kibanaPolicy, tokenName string) (*kibanaAPIKey, error) {
@@ -723,9 +756,13 @@ func isTrue(val string) bool {
 }
 
 func performGET(cfg setupConfig, client *kibana.Client, path string, response interface{}, writer io.Writer, msg string) error {
+	return performGETWithParams(cfg, client, path, nil, response, writer, msg)
+}
+
+func performGETWithParams(cfg setupConfig, client *kibana.Client, path string, params url.Values, response interface{}, writer io.Writer, msg string) error {
 	var lastErr error
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
-		code, result, err := client.Request("GET", path, nil, nil, nil)
+		code, result, err := client.Request("GET", path, params, nil, nil)
 		if err != nil || code != 200 {
 			if err != nil {
 				err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",
@@ -816,6 +853,19 @@ func containerCfgOverrides(cfg *configuration.Configuration) {
 		cfg.Settings.LoggingConfig.ToFiles = false
 	}
 
+	if envBool("HTTPPROF") {
+		// sanity checks to ensure monitoring config is setup
+		if cfg.Settings.MonitoringConfig == nil {
+			cfg.Settings.MonitoringConfig = monitoringCfg.DefaultConfig()
+		}
+
+		if cfg.Settings.MonitoringConfig.Pprof == nil {
+			cfg.Settings.MonitoringConfig.Pprof = &monitoringCfg.PprofConfig{}
+		}
+
+		cfg.Settings.MonitoringConfig.Pprof.Enabled = true
+	}
+
 	eventsToStderrEnv := envWithDefault("false", "EVENTS_TO_STDERR")
 	eventsToStderr, err := strconv.ParseBool(eventsToStderrEnv)
 	if err != nil {
@@ -865,6 +915,8 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	paths.SetTop(topPath)
 	paths.SetConfig(configPath)
 	paths.SetControlSocket(socketPath)
+	diagnosticSocketPath := paths.SocketFromPath(runtime.GOOS, topPath, paths.DiagnosticsExtensionSocketName)
+	paths.SetDiagnosticsExtensionSocket(diagnosticSocketPath)
 	// when custom top path is provided the home directory is not versioned
 	paths.SetVersionHome(false)
 	// install path stays on container default mount (otherwise a bind mounted directory could have noexec set)
@@ -978,8 +1030,14 @@ type kibanaPolicy struct {
 	IsDefaultFleetServer bool   `json:"is_default_fleet_server"`
 }
 
+// kibanaPolicies is used when getting a list of policies from the Kibana API
 type kibanaPolicies struct {
 	Items []kibanaPolicy `json:"items"`
+}
+
+// kibanaPolicyResp is used when getting a single policy from the Kibana API
+type kibanaPolicyResp struct {
+	Item kibanaPolicy `json:"item"`
 }
 
 type kibanaAPIKey struct {
@@ -991,7 +1049,10 @@ type kibanaAPIKey struct {
 }
 
 type kibanaAPIKeys struct {
-	Items []kibanaAPIKey `json:"items"`
+	Items   []kibanaAPIKey `json:"items"`
+	Total   int            `json:"total"`
+	PerPage int            `json:"perPage"`
+	Page    int            `json:"page"`
 }
 
 type kibanaAPIKeyDetail struct {
@@ -1100,8 +1161,46 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	}
 
 	storedFleetHosts := storedConfig.Fleet.Client.GetHosts()
-	if len(storedFleetHosts) == 0 || !slices.Contains(storedFleetHosts, setupCfg.Fleet.URL) {
+	if len(storedFleetHosts) == 0 {
+		// No stored Fleet hosts, enrollment is required.
+		return true, nil
+	}
+	// Parse the setup Fleet URL to extract the host portion for comparison.
+	// Stored hosts can be in one of two forms depending on when the config was last saved:
+	//  - Full URL "https://host:port" — after a fleet policy update (handler_action_policy_change
+	//    stores the full URLs sent by Fleet and clears the separate Protocol/Host fields).
+	//  - Host-only "host:port" — right after enrollment, before the first policy update
+	//    (remote.NewConfigFromURL stores Protocol and Host as separate fields).
+	// We must match against both forms so that neither case triggers a spurious re-enrollment.
+	setupFleetURL, err := url.Parse(setupCfg.Fleet.URL)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse fleet URL %q: %w", setupCfg.Fleet.URL, err)
+	}
+	setupFleetHost := setupFleetURL.Host
+	if setupFleetHost == "" {
+		// url.Parse may put the value in Path if there's no scheme (e.g. "host1")
+		// or misinterpret "host:port" as scheme:opaque. Fall back to the raw URL
+		// for the host comparison, and skip the protocol check since there is no
+		// reliable scheme.
+		setupFleetHost = setupCfg.Fleet.URL
+	}
+	// Check for a match against the full URL (post-policy-update form) or
+	// the host-only form (post-enrollment, pre-policy-update form).
+	// Track which form matched so we can decide whether to do the protocol check below.
+	matchedFullURL := slices.Contains(storedFleetHosts, setupCfg.Fleet.URL)
+	matchedHostOnly := slices.Contains(storedFleetHosts, setupFleetHost)
+	if !matchedFullURL && !matchedHostOnly {
 		// The Fleet URL in the setup does not exist in the stored configuration, so enrollment is required.
+		return true, nil
+	}
+	// When the stored config uses the pre-policy-update form (separate Protocol/Host
+	// fields, matched via setupFleetHost above), also verify the protocol hasn't changed.
+	// Skip this check when we matched via the full URL, because the scheme is already
+	// embedded in that URL and the stored Protocol field may hold a stale default value.
+	if !matchedFullURL && setupFleetURL.Host != "" && setupFleetURL.Scheme != "" &&
+		storedConfig.Fleet.Client.Protocol != "" &&
+		setupFleetURL.Scheme != string(storedConfig.Fleet.Client.Protocol) {
+		// The Fleet protocol has changed, so enrollment is required.
 		return true, nil
 	}
 
@@ -1151,6 +1250,12 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	fc, err := newFleetClient(log, storedConfig.Fleet.AccessAPIKey, storedConfig.Fleet.Client)
 	if err != nil {
 		return false, fmt.Errorf("failed to create fleet client: %w", err)
+	}
+
+	// The agent ID is stored under the top-level "agent.id" key (Settings.ID) in fleet.enc,
+	// not under "fleet.agent.id" (Fleet.Info.ID), which is always empty after enrollment.
+	if storedConfig.Settings != nil && storedConfig.Fleet.Info != nil && storedConfig.Fleet.Info.ID == "" {
+		storedConfig.Fleet.Info.ID = storedConfig.Settings.ID
 	}
 
 	// Perform an ACK request with **empty events** to verify the validity of the API token.
@@ -1225,4 +1330,38 @@ func ackFleet(ctx context.Context, client fleetclient.Sender, agentID string) er
 			return err
 		}
 	}, &backoff.ConstantBackOff{Interval: retryInterval})
+}
+
+// kibanaFetchFleetServerPolicy is used to gather the fleet-server policy specified by ID from Kibana
+func kibanaFetchFleetServerPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOStreams) (*kibanaPolicy, error) {
+	// We need to do an explicit get here instead of using client.GetPolicy as we want to "ignore" a 404 response
+	// Kibana returns a 404 if the policy ID does not exist, in this case we'll fall back to making another request for the default fleet-server policy.
+	if cfg.FleetServer.PolicyID != "" {
+		fmt.Fprintf(streams.Out, "Lookup policy by id: %s\n", cfg.FleetServer.PolicyID)
+		var policy kibanaPolicyResp
+		for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
+			code, result, err := client.Request(http.MethodGet, "/api/fleet/agent_policies/"+cfg.FleetServer.PolicyID, nil, nil, nil)
+			if err != nil || (code != http.StatusOK && code != http.StatusNotFound) {
+				if err != nil {
+					err = fmt.Errorf("http GET request to %s/api/fleet/agent_policies/%s fails: %w. Response: %s",
+						client.URL, cfg.FleetServer.PolicyID, err, truncateString(result))
+				} else {
+					err = fmt.Errorf("http GET request to %s/api/fleet/agent_policies/%s fails. StatusCode: %d Response: %s",
+						client.URL, cfg.FleetServer.PolicyID, code, truncateString(result))
+				}
+				fmt.Fprintf(streams.Err, "Kibana fetch policy by ID failed: %v\n", err)
+				<-time.After(cfg.Kibana.RetrySleepDuration)
+				continue
+			}
+			if code == http.StatusOK {
+				if err := json.Unmarshal(result, &policy); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+				}
+				// Successfully found the policy
+				return &policy.Item, nil
+			}
+		}
+		return nil, fmt.Errorf("policy not found")
+	}
+	return nil, nil
 }

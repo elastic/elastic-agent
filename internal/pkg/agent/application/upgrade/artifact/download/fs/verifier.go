@@ -44,7 +44,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Veri
 		return nil, errors.New("expecting PGP key but received none", errors.TypeSecurity)
 	}
 
-	client, err := config.HTTPTransportSettings.Client(
+	client, err := config.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
 			return download.WithHeaders(rt, download.Headers)
@@ -78,7 +78,7 @@ func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtv
 		return fmt.Errorf("failed to verify SHA512 hash: %w", err)
 	}
 
-	if err = v.verifyAsc(artifactPath, skipDefaultPgp, pgpBytes...); err != nil {
+	if err = v.verifyAsc(filename, artifactPath, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
 			if err := os.Remove(artifactPath + ".asc"); err != nil {
@@ -94,7 +94,7 @@ func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtv
 
 func (v *Verifier) Reload(c *artifact.Config) error {
 	// reload client
-	client, err := c.HTTPTransportSettings.Client(
+	client, err := c.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
 			return download.WithHeaders(rt, download.Headers)
@@ -110,7 +110,7 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 	return nil
 }
 
-func (v *Verifier) verifyAsc(fullPath string, skipDefaultKey bool, pgpSources ...string) error {
+func (v *Verifier) verifyAsc(filename, fullPath string, skipDefaultKey bool, pgpSources ...string) error {
 	var pgpBytes [][]byte
 	pgpBytes, err := download.FetchPGPKeys(
 		v.log, v.client, v.defaultKey, skipDefaultKey, pgpSources)
@@ -118,7 +118,7 @@ func (v *Verifier) verifyAsc(fullPath string, skipDefaultKey bool, pgpSources ..
 		return fmt.Errorf("could not fetch pgp keys: %w", err)
 	}
 
-	ascBytes, err := v.getPublicAsc(fullPath)
+	ascBytes, err := v.getPublicAsc(filename)
 	if err != nil {
 		return fmt.Errorf("could not get .asc file: %w", err)
 	}
@@ -126,8 +126,9 @@ func (v *Verifier) verifyAsc(fullPath string, skipDefaultKey bool, pgpSources ..
 	return download.VerifyPGPSignatureWithKeys(v.log, fullPath, ascBytes, pgpBytes)
 }
 
-func (v *Verifier) getPublicAsc(fullPath string) ([]byte, error) {
-	fullPath = fmt.Sprintf("%s%s", fullPath, ascSuffix)
+func (v *Verifier) getPublicAsc(filename string) ([]byte, error) {
+	fullPath := filepath.Join(getDropPath(v.config), filename+ascSuffix)
+
 	b, err := os.ReadFile(fullPath)
 	if err != nil {
 		return nil, errors.New(err, fmt.Sprintf("fetching asc file from '%s'", fullPath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))

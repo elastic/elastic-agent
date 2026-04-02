@@ -21,7 +21,7 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 		SilenceUsage:  true, // do not display usage on error
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfgFiles, err := GetConfigFiles(cmd, false)
+			cfgFiles, err := GetConfigFiles(cmd.Flags(), false)
 			if err != nil {
 				return err
 			}

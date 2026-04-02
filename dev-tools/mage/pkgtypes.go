@@ -9,6 +9,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -35,8 +36,8 @@ import (
 )
 
 const (
-	// distributionsDir is the dir where packages are written.
-	distributionsDir = "build/distributions"
+	// DistributionsDir is the dir where packages are written.
+	DistributionsDir = "build/distributions"
 
 	// packageStagingDir is the staging directory for any temporary files that
 	// need to be written to disk for inclusion in a package.
@@ -113,6 +114,7 @@ type PackageSpec struct {
 	ExtraTags               []string               `yaml:"extra_tags,omitempty"`  // Optional
 	Components              []packaging.BinarySpec `yaml:"components"`            // Optional: Components required for this package
 
+	cfg                    *Settings
 	evalContext            map[string]interface{}
 	packageDir             string
 	localPreInstallScript  string
@@ -131,6 +133,7 @@ type PackageFile struct {
 	Template      string                  `yaml:"template,omitempty"` // Input template file.
 	Target        string                  `yaml:"target,omitempty"`   // Target location in package. Relative paths are added to a package specific directory (e.g. metricbeat-7.0.0-linux-x86_64).
 	Mode          os.FileMode             `yaml:"mode,omitempty"`     // Target mode for file. Does not apply when source is a directory.
+	PreserveMode  bool                    `yaml:"preserve_mode"`      // Preserve the original Mode of the file, useful when adding directories and need to preserve the original file permissions
 	ConfigMode    os.FileMode             `yaml:"config_mode,omitempty"`
 	Config        bool                    `yaml:"config"`                    // Mark file as config in the package (deb and rpm only).
 	Modules       bool                    `yaml:"modules"`                   // Mark directory as directory with modules.
@@ -299,7 +302,7 @@ func (typ PackageType) PackagingDir(home string, target BuildPlatform, spec Pack
 }
 
 // Build builds a package based on the provided spec.
-func (typ PackageType) Build(spec PackageSpec) error {
+func (typ PackageType) Build(ctx context.Context, spec PackageSpec) error {
 	switch typ {
 	case RPM:
 		return PackageRPM(spec)
@@ -310,7 +313,7 @@ func (typ PackageType) Build(spec PackageSpec) error {
 	case TarGz:
 		return PackageTarGz(spec)
 	case Docker:
-		return PackageDocker(spec)
+		return PackageDocker(ctx, spec)
 	default:
 		return fmt.Errorf("unknown package type: %v", typ)
 	}
@@ -351,8 +354,8 @@ func (s *PackageSpec) ExtraVar(key, value string) {
 
 // Expand expands a templated string using data from the spec.
 func (s PackageSpec) Expand(in string, args ...map[string]interface{}) (string, error) {
-	return expandTemplate("inline", in, FuncMap,
-		EnvMap(append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
+	return expandTemplate("inline", in, FuncMap(s.cfg),
+		EnvMap(s.cfg, append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
 }
 
 // MustExpand expands a templated string using data from the spec. It panics if
@@ -367,8 +370,8 @@ func (s PackageSpec) MustExpand(in string, args ...map[string]interface{}) strin
 
 // ExpandFile expands a template file using data from the spec.
 func (s PackageSpec) ExpandFile(src, dst string, args ...map[string]interface{}) error {
-	return expandFile(src, dst,
-		EnvMap(append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
+	return expandFile(s.cfg, src, dst,
+		EnvMap(s.cfg, append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
 }
 
 // MustExpandFile expands a template file using data from the spec. It panics if
@@ -387,7 +390,7 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 		if in == "" {
 			return ""
 		}
-		return MustExpand(in, args...)
+		return MustExpand(s.cfg, in, args...)
 	}
 
 	if s.evalContext == nil {
@@ -499,7 +502,7 @@ func (s PackageSpec) ImageName() string {
 		}
 
 		data := s.toMap()
-		for k, v := range varMap() {
+		for k, v := range varMap(s.cfg) {
 			data[k] = v
 		}
 
@@ -626,7 +629,7 @@ func PackageZip(spec PackageSpec) error {
 		if err != nil {
 			return err
 		}
-		spec.OutputFile = filepath.Join(distributionsDir, outputZip)
+		spec.OutputFile = filepath.Join(DistributionsDir, outputZip)
 	}
 	spec.OutputFile = Zip.AddFileExtension(spec.OutputFile)
 
@@ -657,7 +660,7 @@ func PackageTarGz(spec PackageSpec) error {
 		if err != nil {
 			return err
 		}
-		spec.OutputFile = filepath.Join(distributionsDir, outputTarGz)
+		spec.OutputFile = filepath.Join(DistributionsDir, outputTarGz)
 	}
 	spec.OutputFile = TarGz.AddFileExtension(spec.OutputFile)
 
@@ -780,7 +783,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	}
 
 	// Build a tar file as the input to FPM.
-	inputTar := filepath.Join(distributionsDir, "tmp-"+fpmPackageType+"-"+spec.rootDir()+"-"+spec.hash()+".tar.gz")
+	inputTar := filepath.Join(DistributionsDir, "tmp-"+fpmPackageType+"-"+spec.rootDir()+"-"+spec.hash()+".tar.gz")
 	spec.OutputFile = inputTar
 	if err := PackageTarGz(spec); err != nil {
 		return err
@@ -791,7 +794,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	if err != nil {
 		return err
 	}
-	spec.OutputFile = packageType.AddFileExtension(filepath.Join(distributionsDir, outputFile))
+	spec.OutputFile = packageType.AddFileExtension(filepath.Join(DistributionsDir, outputFile))
 
 	dockerRun := sh.RunCmd("docker", "run")
 	var args []string
@@ -906,6 +909,8 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 		}
 
 		switch {
+		case pkgFile.PreserveMode:
+			header.SetMode(info.Mode())
 		case componentConfigFilePattern.MatchString(info.Name()):
 			header.SetMode(componentConfigMode & os.ModePerm)
 		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):
@@ -992,6 +997,8 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		header.Uid, header.Gid = 0, 0
 
 		switch {
+		case pkgFile.PreserveMode:
+			header.Mode = int64(info.Mode())
 		case componentConfigFilePattern.MatchString(info.Name()):
 			header.Mode = int64(componentConfigMode & os.ModePerm)
 		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):
@@ -1096,7 +1103,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 }
 
 // PackageDocker packages the Beat into a docker image.
-func PackageDocker(spec PackageSpec) error {
+func PackageDocker(ctx context.Context, spec PackageSpec) error {
 	if err := HaveDocker(); err != nil {
 		return fmt.Errorf("docker daemon required to build images: %w", err)
 	}
@@ -1105,7 +1112,7 @@ func PackageDocker(spec PackageSpec) error {
 	if err != nil {
 		return err
 	}
-	return b.Build()
+	return b.Build(ctx)
 }
 
 func mustConvertToUnit32(i int64) uint32 {

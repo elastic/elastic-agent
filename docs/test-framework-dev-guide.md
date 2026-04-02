@@ -24,7 +24,7 @@ The integration testing framework spins up resources in GCP.  To achieve this, i
 The Elastic Agent package that is used for integration tests packages Beats built from the Unified Release (as opposed to DRA).  There is no explicit action needed for this prerequisite but just keep in mind that if any Agent integration tests rely on certain Beats features or bugfixes, they may not be available in the integration tests yet because a unified release containing those features or bugfixes may not have happened yet.
 
 #### Helm & Helm charts
-To run the Kubernets integration tests you need to install
+To run the Kubernetes integration tests you need to install
 [helm](https://helm.sh/). Then add and update some helm charts
 repositories:
 
@@ -86,12 +86,9 @@ DEV=true SNAPSHOT=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/a
 The packaging process has many leavers that need to be correctly set:
 
  - `DEV=true|false`: Build with debug symbols
- - `EXTERNAL=true|false`: If `false` it will look for the `beats`
-   folder at the same level as `elastic-agent` and build
-   `x-pack/agentbeat` from there. Be aware that if you change Beats
-   code and there is already an Agentbeat artifact built, it will not
-   be re-build. You need to manually clean the Agentbeat build
-   folder. If `true` it will download the latest snapshot.
+ - `EXTERNAL=true|false`: If `false` it will not download any components
+   and only include the `elastic-otel-collector` which has `beats` bundled in
+   the resulting package.
  - `SNAPSHOT=true|false`: When downloading dependencies (like Beats)
    use snapshot versions. That is required to package from the `main`
    branch with `EXTERNAL=true`.

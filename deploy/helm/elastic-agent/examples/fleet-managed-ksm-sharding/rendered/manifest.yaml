@@ -415,7 +415,7 @@ spec:
           value: fleetToken
         - name: FLEET_ENROLL
           value: "true"
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.3.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:

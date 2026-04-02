@@ -26,10 +26,12 @@ import (
 
 	"github.com/cenkalti/backoff/v5"
 	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	"github.com/elastic/elastic-agent/internal/pkg/acl"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
@@ -781,4 +783,153 @@ func isFIPSCapableVersion(ver *version.ParsedSemVer) bool {
 
 	// All versions starting with 9.1.0-SNAPSHOT are FIPS-capable
 	return true
+}
+
+// TestFleetUpgradeCommandPRBuildWithSource tests upgrading an agent enrolled in fleet using the upgrade command with the --source-uri and --force args
+func TestFleetUpgradeCommandToPRBuildWithSource(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Fleet,
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+	})
+	ctx := t.Context()
+
+	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err, "could not create fixture for latest release")
+	err = startFixture.Prepare(ctx)
+	require.NoError(t, err, "could not prepare startFixture")
+
+	endFixture, err := atesting.NewFixture(
+		t,
+		upgradetest.EnsureSnapshot(define.Version()),
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+	)
+	require.NoError(t, err, "failed to get fixture with PR build")
+	err = endFixture.Prepare(ctx)
+	require.NoError(t, err, "could not prepare endFixture")
+
+	// Process start and end fixtures
+	startVersionInfo, err := startFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	startParsedVersion, err := version.ParseVersion(startVersionInfo.Binary.String())
+	require.NoError(t, err)
+	endVersionInfo, err := endFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+
+	// Download end artifacts
+	// os.MkDirTemp is used here instead of t.TempDir as there were permission issues in the test if t.TempDir was used.
+	sourcePath, err := os.MkdirTemp("", "agent-upgrade-test-*")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if !t.Failed() {
+			if err := os.RemoveAll(sourcePath); err != nil {
+				t.Logf("Error removing path %q: %v", sourcePath, err)
+			}
+		} else {
+			t.Logf("Temporary directory %q preserved for investigation/debugging.", sourcePath)
+		}
+	})
+	// Use acl instead of os here so Windows permissions are set correctly
+	err = acl.Chmod(sourcePath, os.ModePerm)
+	require.NoError(t, err, "unable to set temp dir permissions")
+	t.Logf("Using temp dir %q with %o", sourcePath, os.ModePerm)
+	t.Logf("Downloading version %s to %s", endFixture.Version(), sourcePath)
+	fetcher := atesting.ArtifactFetcher()
+	fetchRes, err := fetcher.Fetch(ctx, runtime.GOOS, runtime.GOARCH, endFixture.Version(), endFixture.PackageFormat())
+	require.NoError(t, err)
+	err = fetchRes.Fetch(ctx, t, sourcePath)
+	require.NoError(t, err)
+
+	if startVersionInfo.Binary.String() == endVersionInfo.Binary.String() &&
+		startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("Build under test is the same as the build from the artifacts repository (version: %s) [commit: %s]",
+			startVersionInfo.Binary.String(), startVersionInfo.Binary.Commit)
+	}
+	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("Target version has the same commit hash %q", endVersionInfo.Binary.Commit)
+	}
+
+	t.Log("Creating Agent policy...")
+	kibClient := info.KibanaClient
+	policyResp, err := kibClient.CreatePolicy(ctx, defaultPolicy())
+	require.NoError(t, err)
+
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(ctx, kibana.CreateEnrollmentAPIKeyRequest{
+		PolicyID: policyResp.ID,
+	})
+	require.NoError(t, err)
+
+	t.Log("Getting default Fleet Server URL...")
+	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
+	require.NoError(t, err)
+
+	err = upgradetest.ConfigureFastWatcher(ctx, startFixture)
+	require.NoError(t, err, "unable to write fast watcher config")
+
+	t.Log("Installing Elastic Agent...")
+	installOpts := atesting.InstallOpts{
+		Force: true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             fleetServerURL,
+			EnrollmentToken: enrollmentToken.APIKey,
+		},
+	}
+	output, err := startFixture.Install(ctx, &installOpts)
+	t.Logf("Install agent output:\n%s", string(output))
+	require.NoError(t, err)
+
+	t.Log("Waiting for Agent to be correct version and healthy...")
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	require.NoError(t, err)
+
+	agentID, err := startFixture.AgentID(ctx)
+	require.NoError(t, err)
+	t.Logf("Agent ID: %q", agentID)
+
+	t.Log("Waiting for enrolled Agent status to be online...")
+	require.Eventually(t, func() bool {
+		return check.FleetAgentStatus(ctx, t, kibClient, agentID, "online")()
+	}, time.Minute*2, time.Second, "Agent did not come online")
+
+	t.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"...",
+		startParsedVersion, startVersionInfo.Binary.Commit,
+		endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
+	upgradeArgs := []string{"upgrade", endVersionInfo.Binary.String(), "--force", "--source-uri", "file://" + sourcePath}
+	upgradeOutput, err := startFixture.Exec(ctx, upgradeArgs)
+	require.NoErrorf(t, err, "Upgrade command failed, output:\n%s", string(upgradeOutput))
+
+	t.Log("Ensure agent status reports upgrade_details")
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		status, err := startFixture.ExecStatus(ctx)
+		require.NoError(c, err)
+		require.NotNil(c, status.UpgradeDetails, "Agent status does not contain upgrade_details.")
+	}, time.Minute*5, time.Second, "Agent does not report upgrade_details.")
+
+	t.Log("Waiting for upgrade watcher to start...")
+	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
+	require.NoError(t, err)
+	t.Log("Upgrade watcher started")
+
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	require.NoError(t, err)
+
+	t.Log("Waiting for upgraded Agent status to be online...")
+	require.Eventually(t, func() bool {
+		return check.FleetAgentStatus(ctx, t, kibClient, agentID, "online")()
+	}, time.Minute*10, time.Second*10, "Agent did not come online")
+
+	t.Log("Check agent version")
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		ver, err := fleettools.GetAgentVersion(ctx, kibClient, agentID)
+		require.NoError(c, err)
+		require.Equal(c, endVersionInfo.Binary.Version, ver)
+	}, time.Minute*5, time.Second)
+
+	t.Log("Waiting for upgrade watcher to finish...")
+	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 1*time.Minute+15*time.Second)
+	require.NoError(t, err)
+
+	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary)
+	require.NoError(t, err, "Post watcher check has failed, agent may have rolled back")
 }

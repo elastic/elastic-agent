@@ -31,10 +31,10 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/config"
+	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -84,6 +84,33 @@ var (
 			},
 		},
 	}
+
+	testConfigNoLogLevel = map[string]interface{}{
+		"receivers": map[string]interface{}{
+			"nop": map[string]interface{}{},
+		},
+		"processors": map[string]interface{}{
+			"batch": map[string]interface{}{},
+		},
+		"exporters": map[string]interface{}{
+			"nop": map[string]interface{}{},
+		},
+		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{
+					"level":   "none",
+					"readers": []any{},
+				},
+			},
+			"pipelines": map[string]interface{}{
+				"logs": map[string]interface{}{
+					"receivers":  []string{"nop"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"nop"},
+				},
+			},
+		},
+	}
 )
 
 type testExecution struct {
@@ -92,12 +119,36 @@ type testExecution struct {
 	handle collectorHandle
 }
 
-func (e *testExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
+// testExecutionFactory returns an ExecutionFactory and the testExecution wrapper it populates.
+// The factory creates subprocess executions using testBinary (overriding the production collector
+// path) and captures them in the returned testExecution for test inspection. An optional inner
+// factory can customize the subprocess creation (e.g. to override reportErrFn); if nil, the
+// default newSubprocessExecution is used.
+func testExecutionFactory(testBinary string, inner ExecutionFactory) (ExecutionFactory, *testExecution) {
+	te := &testExecution{}
+	factory := func(_, healthCheckExtID string, healthCheckPort int) (collectorExecution, error) {
+		var exec collectorExecution
+		var err error
+		if inner != nil {
+			exec, err = inner(testBinary, healthCheckExtID, healthCheckPort)
+		} else {
+			exec, err = newSubprocessExecution(testBinary, healthCheckExtID, healthCheckPort)
+		}
+		if err != nil {
+			return nil, err
+		}
+		te.exec = exec
+		return te, nil
+	}
+	return factory, te
+}
+
+func (e *testExecution) startCollector(ctx context.Context, level logp.Level, collectorLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
 	var err error
-	e.handle, err = e.exec.startCollector(ctx, baseLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
+	e.handle, err = e.exec.startCollector(ctx, level, collectorLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
 	return e.handle, err
 }
 
@@ -111,14 +162,17 @@ func (e *testExecution) getProcessHandle() collectorHandle {
 var _ collectorExecution = &mockExecution{}
 
 type mockExecution struct {
-	errCh            chan error
-	statusCh         chan *status.AggregateStatus
-	cfg              *confmap.Conf
-	collectorStarted chan struct{}
+	errCh               chan error
+	statusCh            chan *status.AggregateStatus
+	cfg                 *confmap.Conf
+	collectorStarted    chan struct{}
+	collectorStartCount int
+	configUpdated       chan struct{}
 }
 
 func (e *mockExecution) startCollector(
 	ctx context.Context,
+	level logp.Level,
 	_ *logger.Logger,
 	_ *logger.Logger,
 	cfg *confmap.Conf,
@@ -137,10 +191,13 @@ func (e *mockExecution) startCollector(
 		reportErr(ctx, errCh, nil)
 	}()
 	handle := &mockCollectorHandle{
-		stopCh: stopCh,
-		cancel: collectorCancel,
+		stopCh:            stopCh,
+		cancel:            collectorCancel,
+		execution:         e,
+		collectorLogLevel: level,
 	}
 	if e.collectorStarted != nil {
+		e.collectorStartCount++
 		e.collectorStarted <- struct{}{}
 	}
 	return handle, nil
@@ -149,8 +206,10 @@ func (e *mockExecution) startCollector(
 var _ collectorHandle = &mockCollectorHandle{}
 
 type mockCollectorHandle struct {
-	stopCh chan struct{}
-	cancel context.CancelFunc
+	stopCh            chan struct{}
+	cancel            context.CancelFunc
+	execution         *mockExecution
+	collectorLogLevel logp.Level
 }
 
 func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
@@ -158,6 +217,29 @@ func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
 	select {
 	case <-time.After(waitTime):
 	case <-h.stopCh:
+	}
+}
+
+func (h *mockCollectorHandle) UpdateConfig(cfg *confmap.Conf) error {
+	h.execution.cfg = cfg
+	select {
+	case h.execution.configUpdated <- struct{}{}:
+	default:
+	}
+
+	return nil
+}
+
+func (h *mockCollectorHandle) LogLevel() logp.Level {
+	return h.collectorLogLevel
+}
+
+func (h *mockCollectorHandle) Stopped() bool {
+	select {
+	case <-h.stopCh:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -213,6 +295,25 @@ func (e *EventListener) getCollectorStatus() *status.AggregateStatus {
 
 // EnsureHealthy ensures that the OTelManager is healthy by checking the latest error and status.
 func (e *EventListener) EnsureHealthy(t *testing.T, u time.Time) {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		e.mtx.Lock()
+		latestErr := e.err
+		latestStatus := e.collectorStatus
+		e.mtx.Unlock()
+
+		// we expect to have a reported error which is nil and a reported status which is StatusOK
+		require.NotNil(collect, latestErr)
+		assert.Nil(collect, latestErr.Value())
+		assert.False(collect, latestErr.Before(u))
+		require.NotNil(collect, latestStatus)
+		require.NotNil(collect, latestStatus.Value())
+		assert.False(collect, latestStatus.Before(u))
+		require.Equal(collect, componentstatus.StatusOK.String(), latestStatus.Value().Status().String())
+	}, 600*time.Second, 1*time.Second, "otel collector never got healthy")
+}
+
+// EnsureFatal ensures that the OTelManager is fatal by checking the latest error and status.
+func (e *EventListener) EnsureFatal(t *testing.T, u time.Time, extraT ...func(collectT *assert.CollectT, latestErr *EventTime[error], latestStatus *EventTime[*status.AggregateStatus])) {
 	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 		e.mtx.Lock()
 		latestErr := e.err
@@ -226,8 +327,13 @@ func (e *EventListener) EnsureHealthy(t *testing.T, u time.Time) {
 		require.NotNil(collect, latestStatus)
 		require.NotNil(collect, latestStatus.Value())
 		assert.False(collect, latestStatus.Before(u))
-		require.Equal(collect, componentstatus.StatusOK, latestStatus.Value().Status())
-	}, 60*time.Second, 1*time.Second, "otel collector never got healthy")
+		require.Equal(collect, componentstatus.StatusFatalError.String(), latestStatus.Value().Status().String())
+
+		// extra checks
+		for _, et := range extraT {
+			et(collect, latestErr, latestStatus)
+		}
+	}, 60*time.Second, 1*time.Second, "otel collector never fatal")
 }
 
 // EnsureOffWithoutError ensures that the OTelManager is off without an error by checking the latest error and status.
@@ -291,6 +397,9 @@ func (t *EventTime[T]) Time() time.Time {
 }
 
 func countHealthCheckExtensionStatuses(status *status.AggregateStatus) uint {
+	if status == nil {
+		return 0
+	}
 	extensions, ok := status.ComponentStatusMap["extensions"]
 	if !ok {
 		return 0
@@ -310,41 +419,38 @@ func TestOTelManager_Run(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
 
-	testBinary := filepath.Join(wd, "testing", "testing")
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
 	const waitTimeForStop = 30 * time.Second
 
 	for _, tc := range []struct {
 		name                string
-		execModeFn          func(collectorRunErr chan error) (collectorExecution, error)
+		makeExecFactory     func(collectorRunErr chan error) ExecutionFactory // nil = default subprocess
 		restarter           collectorRecoveryTimer
 		skipListeningErrors bool
 		testFn              func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error)
 	}{
 		{
-			name: "subprocess collector config updates",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
-			},
+			name:      "subprocess collector config updates",
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.Update(cfg, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil)
 				e.EnsureHealthy(t, updateTime)
 
 				// trigger update
 				updateTime = time.Now()
 				ok := cfg.Delete("service::telemetry::logs::level") // modify the config
 				require.True(t, ok)
-				m.Update(cfg, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil)
 				e.EnsureHealthy(t, updateTime)
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.Update(nil, nil)
+				m.Update(nil, nil, logp.InfoLevel, nil)
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
@@ -352,15 +458,13 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "subprocess collector stopped gracefully outside manager",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
-			},
+			// use default subprocess execution
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.Update(cfg, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil)
 				e.EnsureHealthy(t, updateTime)
 
 				// stop it, this should be restarted by the manager
@@ -369,11 +473,11 @@ func TestOTelManager_Run(t *testing.T) {
 				require.NotNil(t, execHandle, "execModeFn handle should not be nil")
 				execHandle.Stop(waitTimeForStop)
 				e.EnsureHealthy(t, updateTime)
-				assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
+				require.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.Update(nil, nil)
+				m.Update(nil, nil, logp.InfoLevel, nil)
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
@@ -381,17 +485,15 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "subprocess collector killed outside manager",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
-			},
+			// use default subprocess execution
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.Update(cfg, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil)
 				e.EnsureHealthy(t, updateTime)
-				assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
+				require.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
 
 				var oldPHandle *procHandle
 				// repeatedly kill the collector
@@ -409,24 +511,22 @@ func TestOTelManager_Run(t *testing.T) {
 					// the collector should restart and report healthy
 					updateTime = time.Now()
 					e.EnsureHealthy(t, updateTime)
-					assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
+					require.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
 				}
 
 				seenRecoveredTimes := m.recoveryRetries.Load()
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.Update(nil, nil)
+				m.Update(nil, nil, logp.InfoLevel, nil)
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
 			},
 		},
 		{
-			name: "subprocess collector panics",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
-			},
+			name: "subprocess collector panics restarts",
+			// use default subprocess execution
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				err := os.Setenv("TEST_SUPERVISED_COLLECTOR_PANIC", (3 * time.Second).String())
@@ -435,9 +535,8 @@ func TestOTelManager_Run(t *testing.T) {
 					_ = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_PANIC")
 				})
 
-				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
-				m.Update(cfg, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil)
 
 				seenRecoveredTimes := uint32(0)
 				require.Eventually(t, func() bool {
@@ -452,30 +551,63 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.Update(nil, nil)
+				m.Update(nil, nil, logp.InfoLevel, nil)
 				e.EnsureOffWithoutError(t, updateTime)
 				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.GreaterOrEqual(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
 			},
 		},
 		{
+			name: "subprocess collector panics reports fatal",
+			// use default subprocess execution
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
+				// panic instantly always
+				err := os.Setenv("TEST_SUPERVISED_COLLECTOR_PANIC", "0s")
+				require.NoError(t, err, "failed to set TEST_SUPERVISED_COLLECTOR_PANIC env var")
+				t.Cleanup(func() {
+					_ = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_PANIC")
+				})
+
+				cfg := confmap.NewFromStringMap(testConfig)
+				m.Update(cfg, nil, logp.InfoLevel, nil)
+
+				// ensure that it reports a generic fatal error for all components, a panic cannot be assigned to
+				// a specific component in the collector
+				e.EnsureFatal(t, time.Now().Add(time.Second), func(collectT *assert.CollectT, _ *EventTime[error], latestStatus *EventTime[*status.AggregateStatus]) {
+					status := latestStatus.Value()
+
+					metrics, ok := status.ComponentStatusMap["pipeline:metrics"]
+					require.True(collectT, ok, "pipeline metrics should be present")
+					assert.Equal(collectT, metrics.Status(), componentstatus.StatusFatalError)
+
+					logs, ok := status.ComponentStatusMap["pipeline:logs"]
+					require.True(collectT, ok, "pipeline logs should be present")
+					assert.Equal(collectT, logs.Status(), componentstatus.StatusFatalError)
+
+					traces, ok := status.ComponentStatusMap["pipeline:traces"]
+					require.True(collectT, ok, "pipeline traces should be present")
+					assert.Equal(collectT, traces.Status(), componentstatus.StatusFatalError)
+				})
+			},
+		},
+		{
 			name: "subprocess collector killed if delayed and manager is stopped",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				subprocessExec, err := newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
-				if err != nil {
-					return nil, err
-				}
-				subprocessExec.reportErrFn = func(ctx context.Context, errCh chan error, err error) {
-					// override the reportErrFn to send the error to this test collectorRunErr channel
-					// so we can listen to subprocess run errors
-					if errCh != collectorRunErr {
-						// if the error channel is not the one we expect, forward the error to the original reportErrFn
-						reportErr(ctx, errCh, err)
-						return
+			makeExecFactory: func(collectorRunErr chan error) ExecutionFactory {
+				return func(collectorPath, healthCheckExtID string, healthCheckPort int) (collectorExecution, error) {
+					exec, err := newSubprocessExecution(collectorPath, healthCheckExtID, healthCheckPort)
+					if err != nil {
+						return nil, err
 					}
-					collectorRunErr <- err
+					exec.reportErrFn = func(ctx context.Context, errCh chan error, err error) {
+						if errCh != collectorRunErr {
+							reportErr(ctx, errCh, err)
+							return
+						}
+						collectorRunErr <- err
+					}
+					return exec, nil
 				}
-				return &testExecution{exec: subprocessExec}, nil
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -485,7 +617,7 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.Update(cfg, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil)
 				e.EnsureHealthy(t, updateTime)
 
 				// stop the manager to simulate that elastic-agent is shutting down
@@ -513,22 +645,21 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "subprocess collector gracefully exited if delayed a bit and manager is stopped",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				subprocessExec, err := newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
-				if err != nil {
-					return nil, err
-				}
-				subprocessExec.reportErrFn = func(ctx context.Context, errCh chan error, err error) {
-					// override the reportErrFn to send the error to this test collectorRunErr channel
-					// so we can listen to subprocess run errors
-					if errCh != collectorRunErr {
-						// if the error channel is not the one we expect, forward the error to the original reportErrFn
-						reportErr(ctx, errCh, err)
-						return
+			makeExecFactory: func(collectorRunErr chan error) ExecutionFactory {
+				return func(collectorPath, healthCheckExtID string, healthCheckPort int) (collectorExecution, error) {
+					exec, err := newSubprocessExecution(collectorPath, healthCheckExtID, healthCheckPort)
+					if err != nil {
+						return nil, err
 					}
-					collectorRunErr <- err
+					exec.reportErrFn = func(ctx context.Context, errCh chan error, err error) {
+						if errCh != collectorRunErr {
+							reportErr(ctx, errCh, err)
+							return
+						}
+						collectorRunErr <- err
+					}
+					return exec, nil
 				}
-				return &testExecution{exec: subprocessExec}, nil
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -538,7 +669,7 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.Update(cfg, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil)
 				e.EnsureHealthy(t, updateTime)
 
 				// stop the manager to simulate that elastic-agent is shutting down
@@ -566,9 +697,7 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "subprocess user has healthcheck extension",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
-			},
+			// use default subprocess execution
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 
@@ -588,30 +717,34 @@ func TestOTelManager_Run(t *testing.T) {
 				ports, err := findRandomTCPPorts(3)
 				require.NoError(t, err, "failed to find random tcp ports")
 				subprocessExec.collectorHealthCheckPort = ports[0]
-				subprocessExec.collectorMetricsPort = ports[1]
-				err = injectHeathCheckV2Extension(cfg, healthCheckExtensionID, ports[2])
+				m.collectorMetricsPort = ports[1]
+				err = injectHealthCheckV2Extension(cfg, healthCheckExtensionID, ports[2])
 				require.NoError(t, err, "failed to inject user health extension")
 
 				updateTime := time.Now()
-				m.Update(cfg, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil)
 				e.EnsureHealthy(t, updateTime)
 
-				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 1")
+				require.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 1")
 			},
 		},
 		{
-			name: "subprocess collector invalid config",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
-			},
+			name: "subprocess collector empty config",
+			// use default subprocess execution
 			restarter:           newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			skipListeningErrors: true,
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
 				// times without it blocking on sending over the errCh.
 				for range 3 {
-					cfg := confmap.New() // invalid config
-					m.Update(cfg, nil)
+					// empty config
+					//
+					// this is really validating a flow that is not possible with the elastic-agent
+					// if the OTEL configuration is determined to be empty then it will not be ran
+					//
+					// this does give a good test of a truly invalid configuration
+					cfg := confmap.New() // empty config
+					m.Update(cfg, nil, logp.InfoLevel, nil)
 
 					// delay between updates to ensure the collector will have to fail
 					<-time.After(100 * time.Millisecond)
@@ -640,6 +773,49 @@ func TestOTelManager_Run(t *testing.T) {
 				assert.Error(t, err, "otel manager should have returned an error")
 			},
 		},
+		{
+			name: "subprocess collector failed to start",
+			// use default subprocess execution
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
+				// not valid receivers/exporters
+				//
+				// this needs to be reported as status errors
+				cfg := confmap.NewFromStringMap(map[string]interface{}{
+					"receivers": map[string]interface{}{
+						"invalid_receiver": map[string]interface{}{},
+					},
+					"exporters": map[string]interface{}{
+						"invalid_exporter": map[string]interface{}{},
+					},
+					"service": map[string]interface{}{
+						"pipelines": map[string]interface{}{
+							"traces": map[string]interface{}{
+								"receivers": []string{"invalid_receiver"},
+								"exporters": []string{"invalid_exporter"},
+							},
+						},
+					},
+				})
+				m.Update(cfg, nil, logp.InfoLevel, nil)
+				e.EnsureFatal(t, time.Now().Add(time.Second), func(collectT *assert.CollectT, _ *EventTime[error], latestStatus *EventTime[*status.AggregateStatus]) {
+					status := latestStatus.Value()
+
+					traces, ok := status.ComponentStatusMap["pipeline:traces"]
+					require.True(collectT, ok, "pipeline traces should be present")
+					assert.Equal(collectT, traces.Status(), componentstatus.StatusFatalError)
+
+					exporter, ok := traces.ComponentStatusMap["exporter:invalid_exporter"]
+					require.True(collectT, ok, "exporter should be present")
+					receiver, ok := traces.ComponentStatusMap["receiver:invalid_receiver"]
+					require.True(collectT, ok, "receiver should be present")
+
+					// both invalid_receiver and invalid_exporter are invalid
+					assert.Equal(collectT, exporter.Status(), componentstatus.StatusFatalError)
+					assert.Equal(collectT, receiver.Status(), componentstatus.StatusFatalError)
+				})
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
@@ -647,23 +823,21 @@ func TestOTelManager_Run(t *testing.T) {
 			l, _ := loggertest.New("otel")
 			base, obs := loggertest.New("otel")
 
-			m := &OTelManager{
-				logger:            l,
-				baseLogger:        base,
-				errCh:             make(chan error, 1), // holds at most one error
-				updateCh:          make(chan configUpdate, 1),
-				collectorStatusCh: make(chan *status.AggregateStatus),
-				componentStateCh:  make(chan []runtime.ComponentComponentState, 1),
-				doneChan:          make(chan struct{}),
-				collectorRunErr:   make(chan error),
-				recoveryTimer:     tc.restarter,
-				stopTimeout:       waitTimeForStop,
+			// Build the execution factory: wrap the inner factory (or default) in testExecution
+			// so the test can access the process handle.
+			collectorRunErr := make(chan error, 1)
+			var innerFactory ExecutionFactory
+			if tc.makeExecFactory != nil {
+				innerFactory = tc.makeExecFactory(collectorRunErr)
 			}
+			factory, testExec := testExecutionFactory(testBinary, innerFactory)
 
-			executionMode, err := tc.execModeFn(m.collectorRunErr)
-			require.NoError(t, err, "failed to create execution mode")
-			testExecutionMode := &testExecution{exec: executionMode}
-			m.execution = testExecutionMode
+			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, nil, waitTimeForStop, factory)
+			require.NoError(t, err, "could not create otel manager")
+			m.recoveryTimer = tc.restarter
+			if tc.makeExecFactory != nil {
+				m.collectorRunErr = collectorRunErr
+			}
 
 			eListener := &EventListener{}
 			defer func() {
@@ -696,7 +870,7 @@ func TestOTelManager_Run(t *testing.T) {
 				runErr = m.Run(managerCtx)
 			}()
 
-			tc.testFn(t, m, eListener, testExecutionMode, managerCancel, m.collectorRunErr)
+			tc.testFn(t, m, eListener, testExec, managerCancel, m.collectorRunErr)
 
 			cancel()
 			runWg.Wait()
@@ -711,7 +885,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
 
-	testBinary := filepath.Join(wd, "testing", "testing")
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -722,25 +896,16 @@ func TestOTelManager_Logging(t *testing.T) {
 	l, _ := loggertest.New("otel-manager")
 
 	for _, tc := range []struct {
-		name       string
-		execModeFn func(collectorRunErr chan error) (collectorExecution, error)
+		name string
 	}{
 		{
 			name: "subprocess execution",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
-			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			// the execution mode passed here is overridden below so it is irrelevant
-			m, err := NewOTelManager(l, logp.DebugLevel, base, config.SubprocessExecutionMode, nil, nil, nil, waitTimeForStop)
+			factory, _ := testExecutionFactory(testBinary, nil)
+			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, nil, waitTimeForStop, factory)
 			require.NoError(t, err, "could not create otel manager")
-
-			executionMode, err := tc.execModeFn(m.collectorRunErr)
-			require.NoError(t, err, "failed to create execution mode")
-			testExecutionMode := &testExecution{exec: executionMode}
-			m.execution = testExecutionMode
 
 			go func() {
 				err := m.Run(ctx)
@@ -759,14 +924,20 @@ func TestOTelManager_Logging(t *testing.T) {
 			}()
 
 			cfg := confmap.NewFromStringMap(testConfig)
-			m.Update(cfg, nil)
+			m.Update(cfg, nil, logp.InfoLevel, nil)
 
 			// the collector should log to the base logger
 			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 				logs := obs.All()
 				require.NotEmpty(collect, logs, "Logs should not be empty")
-				firstMessage := logs[0].Message
-				assert.Equal(collect, "Internal metrics telemetry disabled", firstMessage)
+				found := false
+				for _, entry := range logs {
+					if entry.Message == "Internal metrics telemetry disabled" {
+						found = true
+						break
+					}
+				}
+				assert.True(collect, found, "Expected log message 'Internal metrics telemetry disabled' not found in logs")
 			}, time.Second*10, time.Second)
 		})
 	}
@@ -788,21 +959,17 @@ func TestOTelManager_Ports(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
 
-	testBinary := filepath.Join(wd, "testing", "testing")
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
 	const waitTimeForStop = 30 * time.Second
 
 	for _, tc := range []struct {
 		name               string
-		execModeFn         func(collectorRunErr chan error) (collectorExecution, error)
 		healthCheckEnabled bool
 	}{
 		{
-			name: "subprocess execution",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary, metricsPort, healthCheckPort)
-			},
+			name:               "subprocess execution",
 			healthCheckEnabled: true,
 		},
 	} {
@@ -819,22 +986,18 @@ func TestOTelManager_Ports(t *testing.T) {
 				}
 			})
 
-			// the execution mode passed here is overridden below so it is irrelevant
+			factory, _ := testExecutionFactory(testBinary, nil)
 			m, err := NewOTelManager(
 				l,
-				logp.DebugLevel,
-				base, config.SubprocessExecutionMode,
-				nil,
+				logp.InfoLevel,
+				base,
+				&info.AgentInfo{},
 				&agentCollectorConfig,
 				nil,
 				waitTimeForStop,
+				factory,
 			)
 			require.NoError(t, err, "could not create otel manager")
-
-			executionMode, err := tc.execModeFn(m.collectorRunErr)
-			require.NoError(t, err, "failed to create execution mode")
-			testExecutionMode := &testExecution{exec: executionMode}
-			m.execution = testExecutionMode
 
 			go func() {
 				err := m.Run(ctx)
@@ -855,7 +1018,7 @@ func TestOTelManager_Ports(t *testing.T) {
 
 			cfg := confmap.NewFromStringMap(testConfig)
 			cfg.Delete("service::telemetry::metrics::level") // change this to default
-			m.Update(cfg, nil)
+			m.Update(cfg, nil, logp.InfoLevel, nil)
 
 			// wait until status reflects the config update
 			require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -902,11 +1065,12 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	netListen = func(network string, address string) (net.Listener, error) {
 		mx.Lock()
 		defer mx.Unlock()
-		l, err := net.Listen(network, address)
+		lc := &net.ListenConfig{}
+		l, err := lc.Listen(t.Context(), network, address)
 		if err != nil {
 			return nil, err
 		}
-		if timesCalled < 2 {
+		if timesCalled < 1 {
 			// only actually close the listener after test completion, freeing the port
 			t.Cleanup(func() {
 				assert.NoError(t, l.Close())
@@ -925,7 +1089,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
 
-	testBinary := filepath.Join(wd, "testing", "testing")
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
 	const waitTimeForStop = 30 * time.Second
@@ -942,20 +1106,18 @@ func TestOTelManager_PortConflict(t *testing.T) {
 		}
 	})
 
-	// the execution mode passed here is overridden below so it is irrelevant
+	factory, _ := testExecutionFactory(testBinary, nil)
 	m, err := NewOTelManager(
 		l,
-		logp.DebugLevel,
-		base, config.SubprocessExecutionMode,
-		nil,
+		logp.InfoLevel,
+		base,
+		&info.AgentInfo{},
 		nil,
 		nil,
 		waitTimeForStop,
+		factory,
 	)
 	require.NoError(t, err, "could not create otel manager")
-	executionMode, err := newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
-	require.NoError(t, err, "could not create subprocess execution mode")
-	m.execution = executionMode
 
 	go func() {
 		err := m.Run(ctx)
@@ -979,7 +1141,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	// no retries, collector is not running
 	assert.Equal(t, uint32(0), m.recoveryRetries.Load())
 
-	m.Update(cfg, nil)
+	m.Update(cfg, nil, logp.InfoLevel, nil)
 
 	// wait until status reflects the config update
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -1044,9 +1206,14 @@ func newTestLogger() *logger.Logger {
 
 func TestOTelManager_buildMergedConfig(t *testing.T) {
 	// Common parameters used across all test cases
-	commonAgentInfo := &info.AgentInfo{}
-	commonBeatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
-	testComp := testComponent("test-component")
+	var (
+		commonAgentInfo                  = &info.AgentInfo{}
+		commonBeatMonitoringConfigGetter = mockBeatMonitoringConfigGetter
+		testComp                         = testComponent("test-component")
+		invalidLogpLevel                 = logp.DebugLevel - 1
+		testOtelConfigLevel              = logp.InfoLevel
+		configUpdateLevel                = logp.WarnLevel
+	)
 
 	tests := []struct {
 		name                string
@@ -1054,35 +1221,48 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 		components          []component.Component
 		expectedKeys        []string
 		expectedErrorString string
+		expectedLogLevel    logp.Level
 	}{
 		{
-			name:         "nil config returns nil",
-			collectorCfg: nil,
-			components:   nil,
+			name:             "nil config returns nil",
+			collectorCfg:     nil,
+			components:       nil,
+			expectedLogLevel: invalidLogpLevel,
 		},
 		{
-			name:         "empty config returns empty config",
-			collectorCfg: nil,
-			components:   nil,
-			expectedKeys: []string{},
+			name:             "empty config returns empty config",
+			collectorCfg:     nil,
+			components:       nil,
+			expectedKeys:     []string{},
+			expectedLogLevel: invalidLogpLevel,
 		},
 		{
-			name:         "collector config only",
-			collectorCfg: confmap.NewFromStringMap(testConfig),
-			components:   nil,
-			expectedKeys: []string{"receivers", "exporters", "service", "processors"},
+			name:             "collector config only",
+			collectorCfg:     confmap.NewFromStringMap(testConfig),
+			components:       nil,
+			expectedKeys:     []string{"receivers", "exporters", "service", "processors"},
+			expectedLogLevel: testOtelConfigLevel,
 		},
 		{
-			name:         "components only",
-			collectorCfg: nil,
-			components:   []component.Component{testComp},
-			expectedKeys: []string{"receivers", "exporters", "service"},
+			name:             "components only",
+			collectorCfg:     nil,
+			components:       []component.Component{testComp},
+			expectedKeys:     []string{"receivers", "exporters", "service"},
+			expectedLogLevel: configUpdateLevel,
 		},
 		{
-			name:         "both collector config and components",
-			collectorCfg: confmap.NewFromStringMap(testConfig),
-			components:   []component.Component{testComp},
-			expectedKeys: []string{"receivers", "exporters", "service", "processors"},
+			name:             "collector config with log level config and components",
+			collectorCfg:     confmap.NewFromStringMap(testConfig),
+			components:       []component.Component{testComp},
+			expectedKeys:     []string{"receivers", "exporters", "service", "processors"},
+			expectedLogLevel: testOtelConfigLevel,
+		},
+		{
+			name:             "collector config without log level config and components",
+			collectorCfg:     confmap.NewFromStringMap(testConfigNoLogLevel),
+			components:       []component.Component{testComp},
+			expectedKeys:     []string{"receivers", "exporters", "service", "processors"},
+			expectedLogLevel: configUpdateLevel,
 		},
 		{
 			name:         "component config generation error",
@@ -1094,16 +1274,22 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				// Missing InputSpec which should cause an error during config generation
 			}},
 			expectedErrorString: "failed to generate otel config: unknown otel receiver type for input type: filestream",
+			expectedLogLevel:    -1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfgUpdate := configUpdate{
-				collectorCfg: tt.collectorCfg,
-				components:   tt.components,
+				collectorCfg:  tt.collectorCfg,
+				components:    tt.components,
+				agentLogLevel: configUpdateLevel,
 			}
-			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
+			mgr := &OTelManager{
+				healthCheckExtComponentID: "healthcheckv2/test-uuid",
+				collectorMetricsPort:      8888,
+			}
+			result, err := mgr.buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)
@@ -1117,6 +1303,13 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			if len(tt.expectedKeys) == 0 {
 				assert.Nil(t, result)
 				return
+			}
+
+			// assert log level provided by user is given precedence.
+			if tt.expectedLogLevel > invalidLogpLevel {
+				lvl, err := newLogLevelAfterConfigUpdate(cfgUpdate, result)
+				assert.NoError(t, err, "newLogLevelAfterConfigUpdate() call failed")
+				assert.Equal(t, tt.expectedLogLevel, lvl)
 			}
 
 			require.NotNil(t, result)
@@ -1168,6 +1361,9 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							"extension:elastic_diagnostics/test": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							"extension:healthcheckv2/uuid": {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 						},
@@ -1253,9 +1449,10 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := &OTelManager{
-				logger:                 newTestLogger(),
-				components:             tt.components,
-				currentComponentStates: make(map[string]runtime.ComponentComponentState),
+				managerLogger:             newTestLogger(),
+				components:                tt.components,
+				healthCheckExtComponentID: "healthcheckv2/uuid",
+				currentComponentStates:    make(map[string]runtime.ComponentComponentState),
 			}
 
 			componentStates, err := mgr.handleOtelStatusUpdate(tt.inputStatus)
@@ -1359,7 +1556,7 @@ func TestOTelManager_processComponentStates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := &OTelManager{
-				logger:                 newTestLogger(),
+				managerLogger:          newTestLogger(),
 				currentComponentStates: tt.currentComponentStates,
 			}
 
@@ -1380,26 +1577,29 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	agentInfo := &info.AgentInfo{}
 	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
+	configUpdated := make(chan struct{}, 1) // buffered to avoid deadlocks in the mock execution
 
 	execution := &mockExecution{
 		collectorStarted: collectorStarted,
+		configUpdated:    configUpdated,
 	}
 
-	// Create manager with test dependencies
-	mgr := OTelManager{
-		logger:                     testLogger,
-		baseLogger:                 testLogger,
-		errCh:                      make(chan error, 1), // holds at most one error
-		updateCh:                   make(chan configUpdate, 1),
-		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
-		componentStateCh:           make(chan []runtime.ComponentComponentState),
-		doneChan:                   make(chan struct{}),
-		recoveryTimer:              newRestarterNoop(),
-		execution:                  execution,
-		agentInfo:                  agentInfo,
-		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
-		collectorRunErr:            make(chan error),
+	// Create manager with mock execution factory
+	mockFactory := func(string, string, int) (collectorExecution, error) {
+		return execution, nil
 	}
+	mgr, err := NewOTelManager(
+		testLogger,
+		logp.InfoLevel,
+		testLogger,
+		agentInfo,
+		nil,
+		beatMonitoringConfigGetter,
+		time.Second,
+		mockFactory,
+	)
+	require.NoError(t, err)
+	mgr.recoveryTimer = newRestarterNoop()
 
 	// Start manager in a goroutine
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
@@ -1429,7 +1629,8 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	components := []component.Component{testComp}
 
 	t.Run("collector config is passed down to the collector execution", func(t *testing.T) {
-		mgr.Update(collectorCfg, nil)
+		logpLevel := logp.InfoLevel
+		mgr.Update(collectorCfg, nil, logpLevel, nil)
 		select {
 		case <-collectorStarted:
 		case <-ctx.Done():
@@ -1437,7 +1638,9 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
-		assert.NoError(t, addCollectorMetricsReader(expectedCfg))
+		assert.NoError(t, maybeInjectLogLevel(expectedCfg, logpLevel))
+		assert.NoError(t, injectHealthCheckV2Extension(expectedCfg, mgr.healthCheckExtComponentID, 0))
+		assert.NoError(t, addCollectorMetricsReader(expectedCfg, mgr.collectorMetricsPort))
 		assert.Equal(t, expectedCfg, execution.cfg)
 
 	})
@@ -1462,9 +1665,9 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	})
 
 	t.Run("component config is passed down to the otel manager", func(t *testing.T) {
-		mgr.Update(collectorCfg, components)
+		mgr.Update(collectorCfg, nil, logp.InfoLevel, components)
 		select {
-		case <-collectorStarted:
+		case <-configUpdated:
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector config update")
 		}
@@ -1478,9 +1681,9 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	})
 
 	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
-		mgr.Update(nil, components)
+		mgr.Update(nil, nil, logp.InfoLevel, components)
 		select {
-		case <-collectorStarted:
+		case <-configUpdated:
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector config update")
 		}
@@ -1518,35 +1721,178 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		case execution.statusCh <- otelStatus:
 		}
 
-		componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
-		require.NoError(t, err)
-		require.NotNil(t, componentState)
-		require.Len(t, componentState, 1)
-		assert.Equal(t, componentState[0].Component, testComp)
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
+			require.NoError(collect, err)
+			require.NotNil(collect, componentState)
+			require.Len(collect, componentState, 1)
+			assert.Equal(collect, componentState[0].Component, testComp)
 
-		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-		require.NoError(t, err)
-		require.NotNil(t, collectorStatus)
-		assert.Len(t, collectorStatus.ComponentStatusMap, 0)
+			collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+			require.NoError(collect, err)
+			require.NotNil(collect, collectorStatus)
+			assert.Len(collect, collectorStatus.ComponentStatusMap, 0)
+		}, time.Second*5, time.Millisecond)
 	})
 
-	t.Run("collector error is passed up to the component manager", func(t *testing.T) {
+	t.Run("collector execution error is passed as status not error", func(t *testing.T) {
 		collectorErr := errors.New("collector error")
+
+		var err error
+		var aggStatus *status.AggregateStatus
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case aggStatus = <-mgr.WatchCollector():
+				case <-mgr.WatchComponents():
+					// don't block (ignored for test)
+				case e := <-mgr.Errors():
+					err = e
+					if err != nil {
+						// only return if real error (nil is just clearing the error state)
+						return
+					}
+				case <-time.After(time.Second):
+					// didn't get an error (good!)
+					return
+				}
+			}
+		}()
 
 		select {
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector status update")
 		case execution.errCh <- collectorErr:
 		}
+		wg.Wait()
 
-		// we should get an error
-		select {
-		case <-ctx.Done():
-			t.Fatal("timeout waiting for collector status update")
-		case err := <-mgr.Errors():
-			assert.Equal(t, collectorErr, err)
-		}
+		// should not come in as an error
+		require.Nil(t, err, "got unexpected error from the collector execution")
+
+		// should have a fatal error in status
+		require.NotNil(t, aggStatus)
+		assert.Equal(t, aggStatus.Status(), componentstatus.StatusFatalError)
 	})
+
+	assert.Equal(t, 1, execution.collectorStartCount)
+}
+
+// TestOTelManager_RestartOnLogLevelChange verifies that the collector subprocess is restarted
+// when the effective log level changes. This is necessary because the manager wraps the collector's
+// stdout/stderr in log writers configured at a specific level, and those cannot be changed at runtime.
+func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
+	testLogger, _ := loggertest.New("test")
+	collectorStarted := make(chan struct{}, 5)
+
+	execution := &mockExecution{
+		collectorStarted: collectorStarted,
+	}
+
+	mockFactory := func(string, string, int) (collectorExecution, error) {
+		return execution, nil
+	}
+	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, nil, time.Second, mockFactory)
+	require.NoError(t, err)
+	mgr.recoveryTimer = newRestarterNoop()
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+
+	go func() {
+		err := mgr.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	}()
+
+	// Drain status channels to prevent blocking the run loop.
+	go func() {
+		for {
+			select {
+			case <-mgr.WatchCollector():
+			case <-mgr.WatchComponents():
+			case <-mgr.Errors():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Start the collector with InfoLevel. The config doesn't include a log level,
+	// so the effective collector log level comes from the agent log level parameter.
+	cfg := confmap.NewFromStringMap(testConfigNoLogLevel)
+	mgr.Update(cfg, nil, logp.InfoLevel, nil)
+
+	select {
+	case <-collectorStarted:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for initial collector start")
+	}
+
+	// Send the same config but with a different agent log level.
+	// The collector must be restarted because the stdout/stderr log writers
+	// are created at startup with a specific level and cannot be reconfigured.
+	mgr.Update(cfg, nil, logp.DebugLevel, nil)
+
+	select {
+	case <-collectorStarted:
+		// Collector was restarted with the new log level.
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected collector to be restarted after log level change, but it was not")
+	}
+}
+
+// TestOTelManager_CollectorRunErrWithNilConfig verifies that the manager does not panic when a
+// non-nil error arrives on collectorRunErr while mergedCollectorCfg is nil. This can happen when
+// the collector process reports an error after its configuration has been cleared.
+func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
+	managerLogger, obs := loggertest.New("otel-manager")
+	collectorLogger, _ := loggertest.New("otel")
+
+	mockFactory := func(string, string, int) (collectorExecution, error) {
+		return &mockExecution{}, nil
+	}
+	mgr, err := NewOTelManager(
+		managerLogger,
+		logp.InfoLevel,
+		collectorLogger,
+		&info.AgentInfo{},
+		nil,
+		nil,
+		time.Second,
+		mockFactory,
+	)
+	require.NoError(t, err)
+	mgr.recoveryTimer = newRestarterNoop()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// Send a non-nil, non-context.Canceled error while mergedCollectorCfg is nil.
+	// This exercises the else branch of the collectorRunErr case in Run(), which
+	// calls reportStartupErr → otelConfigToStatus with a nil config.
+	runErr := errors.New("collector crashed")
+	mgr.collectorRunErr <- runErr
+	go func() {
+		select {
+		case s := <-mgr.WatchCollector():
+			if s == nil {
+				cancel()
+			}
+		case <-ctx.Done():
+		}
+	}()
+
+	assert.NotPanics(t, func() {
+		// Run will process the collectorRunErr, then block on the select.
+		// Cancel the context so it exits after handling the error.
+		err := mgr.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
+	expectedLogMessage := fmt.Sprintf("otel collector shut down with error: %v", runErr)
+	warnMessages := obs.FilterMessage(expectedLogMessage)
+	require.Equal(t, 1, warnMessages.Len())
 }
 
 // TestManagerAlwaysEmitsStoppedStatesForComponents checks that the manager always emits a STOPPED state for a component
@@ -1554,7 +1900,6 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	// Setup test logger and dependencies
 	testLogger, _ := loggertest.New("test")
-	agentInfo := &info.AgentInfo{}
 	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
 
@@ -1562,20 +1907,22 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		collectorStarted: collectorStarted,
 	}
 
-	// Create manager with test dependencies
+	// Create manager with mock execution factory
+	mockFactory := func(string, string, int) (collectorExecution, error) {
+		return execution, nil
+	}
 	mgr, err := NewOTelManager(
 		testLogger,
-		logp.DebugLevel,
+		logp.InfoLevel,
 		testLogger,
-		config.SubprocessExecutionMode, // irrelevant, we'll override it
-		agentInfo,
+		&info.AgentInfo{},
 		nil,
 		beatMonitoringConfigGetter,
 		time.Second,
+		mockFactory,
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
-	mgr.execution = execution
 
 	// Start manager in a goroutine
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
@@ -1606,7 +1953,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		},
 	}
 	// start the collector by giving it a mock config
-	mgr.Update(nil, components)
+	mgr.Update(nil, nil, logp.InfoLevel, components)
 	select {
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for collector status update")
@@ -1629,7 +1976,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	assert.Equal(t, componentState.State.State, client.UnitStateHealthy)
 
 	// stop the component by sending a nil config
-	mgr.Update(nil, nil)
+	mgr.Update(nil, nil, logp.InfoLevel, nil)
 
 	// then send a nil status, indicating the collector is not running the component anymore
 	// do this a few times to see if the STOPPED state isn't lost along the way
@@ -1659,20 +2006,22 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		collectorStarted: collectorStarted,
 	}
 
-	// Create manager with test dependencies
+	// Create manager with mock execution factory
+	mockFactory := func(string, string, int) (collectorExecution, error) {
+		return execution, nil
+	}
 	mgr, err := NewOTelManager(
 		testLogger,
-		logp.DebugLevel,
+		logp.InfoLevel,
 		testLogger,
-		config.SubprocessExecutionMode, // irrelevant, we'll override it
 		agentInfo,
 		nil,
 		beatMonitoringConfigGetter,
 		time.Second,
+		mockFactory,
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
-	mgr.execution = execution
 
 	// Start manager in a goroutine
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
@@ -1689,7 +2038,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		Event: componentstatus.NewEvent(componentstatus.StatusStarting),
 	}
 	// start the collector by giving it a mock config
-	mgr.Update(nil, components)
+	mgr.Update(nil, nil, logp.InfoLevel, components)
 	select {
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for collector status update")
@@ -1713,7 +2062,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 	assert.Equal(t, componentState.State.Message, "STARTING")
 
 	// stop the component by sending a nil config
-	mgr.Update(nil, nil)
+	mgr.Update(nil, nil, logp.InfoLevel, nil)
 
 	// then send a nil status, indicating the collector is not running the component anymore
 	// do this a few times to see if the STOPPED state isn't lost along the way
@@ -1934,8 +2283,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
 					"host":                "localhost",
-					"port":                fmt.Sprintf("${env:%s}", componentmonitoring.OtelCollectorMetricsPortEnvVarName),
-					"without_scope_info":  true,
+					"port":                0,
 					"without_units":       true,
 					"without_type_suffix": true,
 				},
@@ -1959,7 +2307,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 
 	t.Run("readers does not exist", func(t *testing.T) {
 		conf := otelConfigWithReaders(nil)
-		err := addCollectorMetricsReader(conf)
+		err := addCollectorMetricsReader(conf, 0)
 		require.NoError(t, err)
 
 		readers := conf.Get("service::telemetry::metrics::readers")
@@ -1973,7 +2321,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 
 	t.Run("readers is an empty list", func(t *testing.T) {
 		conf := otelConfigWithReaders([]any{})
-		err := addCollectorMetricsReader(conf)
+		err := addCollectorMetricsReader(conf, 0)
 		require.NoError(t, err)
 
 		readers := conf.Get("service::telemetry::metrics::readers")
@@ -1988,7 +2336,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 	t.Run("readers has existing items", func(t *testing.T) {
 		existingReader := map[string]any{"foo": "bar"}
 		conf := otelConfigWithReaders([]any{existingReader})
-		err := addCollectorMetricsReader(conf)
+		err := addCollectorMetricsReader(conf, 0)
 		require.NoError(t, err)
 
 		readers := conf.Get("service::telemetry::metrics::readers")
@@ -2003,10 +2351,40 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 
 	t.Run("readers is not a list", func(t *testing.T) {
 		conf := otelConfigWithReaders("not a list")
-		err := addCollectorMetricsReader(conf)
+		err := addCollectorMetricsReader(conf, 0)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "couldn't convert value of service::telemetry::metrics::readers to a list")
 	})
+}
+
+func TestMonitoringReceiverProcessors(t *testing.T) {
+	exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
+	procName := translate.GetProcessorID().String()
+	pipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
+	baseConfig := map[string]any{
+		"exporters": map[string]any{
+			exporterName: nil,
+		},
+	}
+	cfg := confmap.NewFromStringMap(baseConfig)
+	monitoringConfig := &config.MonitoringConfig{}
+	agentInfo := &info.AgentInfo{}
+	components := []component.Component{}
+	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components)
+	require.NoError(t, err, "injectMonitoringReceiver should succeed")
+	result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+	expectedBeatsProcessors := translate.GetDefaultProcessors()
+	actualBeatsProcessors := result["processors."+procName+".processors"]
+	assert.NotNil(t, actualBeatsProcessors, "monitoring receiver processors should not be nil")
+	if actualBeatsProcessors != nil {
+		assert.ElementsMatch(t, expectedBeatsProcessors, actualBeatsProcessors, "monitoring processors don't match expected value")
+	}
+
+	expectedPipelineProcessors := []string{procName}
+	actualPipelineProcessors := result["service.pipelines."+pipelineName+".processors"]
+	assert.NotNil(t, actualPipelineProcessors, "processors for monitoring receiver pipeline should not be nil")
+	assert.ElementsMatch(t, expectedPipelineProcessors, actualPipelineProcessors, "monitoring receiver pipeline processors should match default")
 }
 
 // fakeCloseListener is a wrapper around a net.Listener that ignores the Close() method. This is used in a very particular

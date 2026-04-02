@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
@@ -54,12 +55,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
-	"github.com/elastic/elastic-agent/pkg/component"
+	pkgcomponent "github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -149,7 +151,7 @@ func TestCoordinatorReportsUnhealthyComponents(t *testing.T) {
 	}
 
 	unhealthyComponent := runtime.ComponentComponentState{
-		Component: component.Component{ID: "test-component-1"},
+		Component: pkgcomponent.Component{ID: "test-component-1"},
 		State: runtime.ComponentState{
 			State:   client.UnitStateDegraded,
 			Message: "test message",
@@ -314,14 +316,14 @@ func TestCoordinatorComponentStatesAreSeparate(t *testing.T) {
 	}
 
 	comp1 := runtime.ComponentComponentState{
-		Component: component.Component{ID: "test-component-1"},
+		Component: pkgcomponent.Component{ID: "test-component-1"},
 		State: runtime.ComponentState{
 			State:   client.UnitStateStarting,
 			Message: "test message",
 		},
 	}
 	comp2 := runtime.ComponentComponentState{
-		Component: component.Component{ID: "test-component-2"},
+		Component: pkgcomponent.Component{ID: "test-component-2"},
 		State: runtime.ComponentState{
 			State:   client.UnitStateStarting,
 			Message: "test message",
@@ -392,7 +394,7 @@ func TestCoordinatorReportsUnhealthyUnits(t *testing.T) {
 		UnitType: client.UnitTypeOutput,
 		UnitID:   "output-unit-1"}
 	comp := runtime.ComponentComponentState{
-		Component: component.Component{ID: "test-component-1"},
+		Component: pkgcomponent.Component{ID: "test-component-1"},
 		State: runtime.ComponentState{
 			State:   client.UnitStateHealthy,
 			Message: "everything is fine",
@@ -468,7 +470,9 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	}()
 
 	tmpDir := t.TempDir()
-	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, &info.AgentInfo{}, new(upgrade.AgentWatcherHelper), upgrade.NewTTLMarkerRegistry(nil, tmpDir))
+	agentInfo, err := info.NewAgentInfo(ctx, false)
+	require.NoError(t, err)
+	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, agentInfo, new(upgrade.AgentWatcherHelper), ttl.NewTTLMarkerRegistry(nil, tmpDir))
 	require.NoError(t, err, "errored when creating a new upgrader")
 
 	// Channels have buffer length 1, so we don't have to run on multiple
@@ -501,6 +505,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		ast:                emptyAST(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 		secretMarkerFunc:   testSecretMarkerFunc,
+		agentInfo:          agentInfo,
 	}
 
 	// Send an invalid config update and confirm that Coordinator reports
@@ -593,6 +598,9 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 	defer cancel()
 	logger := logp.NewLogger("testing")
 
+	agentInfo, err := info.NewAgentInfo(t.Context(), false)
+	require.NoError(t, err)
+
 	// Channels have buffer length 1 so we don't have to run on multiple
 	// goroutines.
 	stateChan := make(chan State, 1)
@@ -618,6 +626,7 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 		ast:                emptyAST(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 		secretMarkerFunc:   testSecretMarkerFunc,
+		agentInfo:          agentInfo,
 	}
 
 	// This configuration produces a valid AST but its EQL condition is
@@ -692,7 +701,7 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 
 	// Create a mocked runtime manager that will report the update call
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			return nil
 		},
 	}
@@ -832,10 +841,10 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManager(t *testing.T) {
 	configChan := make(chan ConfigChange, 1)
 
 	// Create a mocked runtime manager that will report the update call
-	var updated bool                     // Set by runtime manager callback
-	var components []component.Component // Set by runtime manager callback
+	var updated bool                        // Set by runtime manager callback
+	var components []pkgcomponent.Component // Set by runtime manager callback
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			updated = true
 			components = comp
 			return nil
@@ -894,7 +903,7 @@ inputs:
 	component := components[0]
 	assert.Equal(t, "filestream-default", component.ID)
 	require.NotNil(t, component.Err, "Input with no spec should produce a component error")
-	assert.Equal(t, "input not supported", component.Err.Error(), "Input with no spec should report 'input not supported'")
+	assert.EqualError(t, pkgcomponent.ErrInputNotSupported, component.Err.Error(), "Input with no spec should report 'input not supported'")
 	require.Equal(t, 2, len(component.Units))
 
 	units := component.Units
@@ -977,10 +986,10 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	configChan := make(chan ConfigChange, 1)
 
 	// Create a mocked runtime manager that will report the update call
-	var updated bool                     // Set by runtime manager callback
-	var components []component.Component // Set by runtime manager callback
+	var updated bool                        // Set by runtime manager callback
+	var components []pkgcomponent.Component // Set by runtime manager callback
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			updated = true
 			components = comp
 			return nil
@@ -997,12 +1006,12 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	}
 
 	// we need the filestream spec to be able to convert to Otel config
-	componentSpec := component.InputRuntimeSpec{
+	componentSpec := pkgcomponent.InputRuntimeSpec{
 		InputType:  "filestream",
-		BinaryName: "agentbeat",
-		Spec: component.InputSpec{
+		BinaryName: "elastic-otel-collector",
+		Spec: pkgcomponent.InputSpec{
 			Name: "filestream",
-			Command: &component.CommandSpec{
+			Command: &pkgcomponent.CommandSpec{
 				Args: []string{"filebeat"},
 			},
 			Platforms: []string{
@@ -1017,9 +1026,9 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 		},
 	}
 
-	platform, err := component.LoadPlatformDetail()
+	platform, err := pkgcomponent.LoadPlatformDetail()
 	require.NoError(t, err)
-	specs, err := component.NewRuntimeSpecs(platform, []component.InputRuntimeSpec{componentSpec})
+	specs, err := pkgcomponent.NewRuntimeSpecs(platform, []pkgcomponent.InputRuntimeSpec{componentSpec})
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
@@ -1087,7 +1096,7 @@ service:
 		runtimeComponent := components[0]
 		assert.Equal(t, "system/metrics-default", runtimeComponent.ID)
 		require.NotNil(t, runtimeComponent.Err, "Input with no spec should produce a component error")
-		assert.Equal(t, "input not supported", runtimeComponent.Err.Error(), "Input with no spec should report 'input not supported'")
+		assert.EqualError(t, pkgcomponent.ErrInputNotSupported, runtimeComponent.Err.Error(), "Input with no spec should report 'input not supported'")
 		require.Equal(t, 2, len(runtimeComponent.Units))
 
 		units := runtimeComponent.Units
@@ -1151,6 +1160,87 @@ service:
 		assert.Len(t, components, 2, "both components should be assigned to the runtime manager")
 	})
 
+	t.Run("dynamic input switches from otel to process runtime", func(t *testing.T) {
+		// Reset state from previous test runs
+		updated = false
+		otelUpdated = false
+		components = nil
+		otelConfig = nil
+
+		// Track components sent to otel manager
+		var otelComponents []pkgcomponent.Component
+		otelManager.updateComponentCallback = func(comp []pkgcomponent.Component) error {
+			otelComponents = comp
+			return nil
+		}
+
+		// Create a policy where the filestream input uses a dynamic provider variable.
+		// The input is configured for OTel runtime, but because it uses a dynamic provider
+		// (local_dynamic) and dynamic_inputs is set to "process", it should be switched to process runtime.
+		cfg := config.MustNewConfigFrom(`
+agent.internal.runtime.filebeat.filestream: otel
+agent.internal.runtime.dynamic_inputs: process
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+inputs:
+  - id: dynamic-filestream-input
+    type: filestream
+    path: "${local_dynamic.path}"
+    use_output: default
+`)
+
+		// Create vars with the local_dynamic provider mapping
+		// The vars tree needs to have local_dynamic.path so the variable ${local_dynamic.path} can be resolved
+		vars, err := transpiler.NewVarsWithProcessors("local_dynamic-1", map[string]interface{}{
+			"local_dynamic": map[string]interface{}{
+				"path": "/var/log/test.log",
+			},
+		}, "local_dynamic", nil, nil, "", "local_dynamic")
+		require.NoError(t, err)
+		coord.vars = []*transpiler.Vars{vars}
+
+		// Set a varsMgr so the coordinator can generate the component model
+		coord.varsMgr = &fakeVarsManager{}
+
+		// Send the policy change
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
+
+		// The component should be routed to the runtime manager (not otel) because
+		// it uses a dynamic provider variable
+		assert.True(t, updated, "Runtime manager should be updated")
+		assert.True(t, otelUpdated, "OTel manager should be updated")
+
+		// Find the filestream component - it should be in the runtime manager's components
+		// because dynamic inputs are switched to process runtime
+		var filestreamInRuntime bool
+		for _, comp := range components {
+			if strings.Contains(comp.ID, "filestream") {
+				filestreamInRuntime = true
+				assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager,
+					"Dynamic input should use ProcessRuntimeManager")
+				assert.True(t, comp.Dynamic, "Component should be marked as dynamic")
+			}
+		}
+
+		// The filestream should NOT be in otel components
+		var filestreamInOtel bool
+		for _, comp := range otelComponents {
+			if strings.Contains(comp.ID, "filestream") {
+				filestreamInOtel = true
+			}
+		}
+
+		assert.True(t, filestreamInRuntime, "Dynamic filestream input should be in runtime manager")
+		assert.False(t, filestreamInOtel, "Dynamic filestream input should NOT be in otel manager")
+	})
+
 }
 
 func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
@@ -1175,12 +1265,12 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 	otelManager := &fakeOTelManager{}
 
 	// we need the filestream spec to be able to convert to Otel config
-	componentSpec := component.InputRuntimeSpec{
+	componentSpec := pkgcomponent.InputRuntimeSpec{
 		InputType:  "filestream",
-		BinaryName: "agentbeat",
-		Spec: component.InputSpec{
+		BinaryName: "elastic-otel-collector",
+		Spec: pkgcomponent.InputSpec{
 			Name: "filestream",
-			Command: &component.CommandSpec{
+			Command: &pkgcomponent.CommandSpec{
 				Args: []string{"filebeat"},
 			},
 			Platforms: []string{
@@ -1195,9 +1285,9 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 		},
 	}
 
-	platform, err := component.LoadPlatformDetail()
+	platform, err := pkgcomponent.LoadPlatformDetail()
 	require.NoError(t, err)
-	specs, err := component.NewRuntimeSpecs(platform, []component.InputRuntimeSpec{componentSpec})
+	specs, err := pkgcomponent.NewRuntimeSpecs(platform, []pkgcomponent.InputRuntimeSpec{componentSpec})
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
@@ -1273,7 +1363,7 @@ inputs:
 		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
 		require.Len(t, coord.componentModel, 1, "there should be one component")
 		compState := runtime.ComponentComponentState{
-			Component: component.Component{
+			Component: pkgcomponent.Component{
 				ID: "filestream-default",
 			},
 			State: runtime.ComponentState{
@@ -1307,7 +1397,7 @@ inputs: []
 		require.Len(t, coord.componentModel, 0, "there should be one component")
 
 		compState := runtime.ComponentComponentState{
-			Component: component.Component{
+			Component: pkgcomponent.Component{
 				ID: "filestream-default",
 			},
 			State: runtime.ComponentState{
@@ -1334,7 +1424,7 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	const errorStr = "update failed for testing reasons"
 	// Create a mocked runtime manager that always reports an error
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			return errors.New(errorStr)
 		},
 		errChan: updateErrChan,
@@ -1459,10 +1549,10 @@ func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 	varsChan := make(chan []*transpiler.Vars, 1)
 
 	// Create a mocked runtime manager that will report the update call
-	var updated bool                     // Set by runtime manager callback
-	var components []component.Component // Set by runtime manager callback
+	var updated bool                        // Set by runtime manager callback
+	var components []pkgcomponent.Component // Set by runtime manager callback
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			updated = true
 			components = comp
 			return nil
@@ -1601,20 +1691,20 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	runtimeStateChan := make(chan runtime.ComponentComponentState)
 	componentUpdateChan := make(chan []runtime.ComponentComponentState)
 
-	otelComponent := component.Component{
+	otelComponent := pkgcomponent.Component{
 		ID:             "filestream-default",
 		InputType:      "filestream",
 		OutputType:     "elasticsearch",
-		RuntimeManager: component.OtelRuntimeManager,
-		InputSpec: &component.InputRuntimeSpec{
-			BinaryName: "agentbeat",
-			Spec: component.InputSpec{
-				Command: &component.CommandSpec{
+		RuntimeManager: pkgcomponent.OtelRuntimeManager,
+		InputSpec: &pkgcomponent.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: pkgcomponent.InputSpec{
+				Command: &pkgcomponent.CommandSpec{
 					Args: []string{"filebeat"},
 				},
 			},
 		},
-		Units: []component.Unit{
+		Units: []pkgcomponent.Unit{
 			{
 				ID:   "filestream-unit",
 				Type: client.UnitTypeInput,
@@ -1633,7 +1723,7 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	}
 
 	processComponent := otelComponent
-	processComponent.RuntimeManager = component.ProcessRuntimeManager
+	processComponent.RuntimeManager = pkgcomponent.ProcessRuntimeManager
 	processComponent.ID = "filestream-process"
 
 	compState := runtime.ComponentComponentState{
@@ -1827,14 +1917,14 @@ func TestCoordinator_ContainerAgent_SkipsMigrate(t *testing.T) {
 		upgradeErr:  errors.New("failed upgrade"),
 	}
 
-	platformSpecs, _ := component.NewRuntimeSpecs(component.PlatformDetail{
-		Platform:                     component.Platform{OS: component.Container},
+	platformSpecs, _ := pkgcomponent.NewRuntimeSpecs(pkgcomponent.PlatformDetail{
+		Platform:                     pkgcomponent.Platform{OS: pkgcomponent.Container},
 		NativeArch:                   "",
 		Family:                       "",
 		Major:                        0,
 		Minor:                        0,
 		IsInstalledViaExternalPkgMgr: false,
-		User:                         component.UserDetail{},
+		User:                         pkgcomponent.UserDetail{},
 	}, nil)
 	coord := &Coordinator{
 		stateBroadcaster:   broadcaster.New(State{}, 0, 0),
@@ -1887,7 +1977,7 @@ func TestCoordinator_FleetServer_SkipsMigration(t *testing.T) {
 
 	// is fleet server
 	coord.state.Components = append(coord.state.Components, runtime.ComponentComponentState{
-		Component: component.Component{
+		Component: pkgcomponent.Component{
 			InputType: fleetServer,
 		},
 	})
@@ -1903,7 +1993,6 @@ func TestCoordinator_FleetServer_SkipsMigration(t *testing.T) {
 }
 
 func TestCoordinator_InitiatesMigration(t *testing.T) {
-	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
 	cfgPath := paths.Config()
 	defer paths.SetConfig(cfgPath)
 
@@ -2007,7 +2096,7 @@ func TestCoordinator_InitiatesMigration(t *testing.T) {
 	}
 
 	coord.state.Components = append(coord.state.Components, runtime.ComponentComponentState{
-		Component: component.Component{
+		Component: pkgcomponent.Component{
 			InputType: "not-a-fleet-server",
 		},
 	})
@@ -2064,7 +2153,6 @@ func TestCoordinator_InitiatesMigration(t *testing.T) {
 }
 
 func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
-	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
 	cfgPath := paths.Config()
 	defer paths.SetConfig(cfgPath)
 
@@ -2168,7 +2256,7 @@ func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
 	}
 
 	coord.state.Components = append(coord.state.Components, runtime.ComponentComponentState{
-		Component: component.Component{
+		Component: pkgcomponent.Component{
 			InputType: "not-a-fleet-server",
 		},
 	})
@@ -2375,7 +2463,7 @@ func TestHasEndpoint(t *testing.T) {
 			State{
 				Components: []runtime.ComponentComponentState{
 					{
-						Component: component.Component{
+						Component: pkgcomponent.Component{
 							InputType: endpoint,
 						},
 					},
@@ -2388,7 +2476,7 @@ func TestHasEndpoint(t *testing.T) {
 			State{
 				Components: []runtime.ComponentComponentState{
 					{
-						Component: component.Component{
+						Component: pkgcomponent.Component{
 							InputType: "not endpoint",
 						},
 					},
@@ -2513,4 +2601,105 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 			},
 		},
 	}, upgradeDetails)
+}
+
+func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
+	logger := logp.NewLogger("testing")
+
+	// otelSupportedComponent returns a minimal component that passes
+	// VerifyComponentIsOtelSupported so the dynamic-inputs logic can be
+	// exercised independently.
+	otelSupportedComponent := func(dynamic bool) pkgcomponent.Component {
+		return pkgcomponent.Component{
+			ID:             "test-component",
+			RuntimeManager: pkgcomponent.OtelRuntimeManager,
+			Dynamic:        dynamic,
+			OutputType:     "elasticsearch",
+			Units: []pkgcomponent.Unit{
+				{
+					ID:   "test-unit",
+					Type: client.UnitTypeOutput,
+					Config: &proto.UnitExpectedConfig{
+						Type: "elasticsearch",
+					},
+				},
+			},
+		}
+	}
+
+	t.Run("no change when DynamicInputs is empty", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{DynamicInputs: ""}
+		comp := otelSupportedComponent(true)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager)
+	})
+
+	t.Run("no change when component is not dynamic", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: string(pkgcomponent.ProcessRuntimeManager),
+		}
+		comp := otelSupportedComponent(false)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager)
+	})
+
+	t.Run("dynamic component switches to the configured runtime", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: string(pkgcomponent.ProcessRuntimeManager),
+		}
+		comp := otelSupportedComponent(true)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		assert.Equal(t, pkgcomponent.RuntimeManager(runtimeCfg.DynamicInputs), comp.RuntimeManager)
+	})
+
+	t.Run("default configuration switches dynamic otel components to process runtime", func(t *testing.T) {
+		runtimeCfg := pkgcomponent.DefaultRuntimeConfig()
+		comp := otelSupportedComponent(true)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager)
+	})
+}
+
+func TestGetDynamicInputs(t *testing.T) {
+	// Import the kubernetes provider to register "kubernetes" as a dynamic provider
+	// This is done via import side effects in the actual application
+	_ = composable.Providers
+
+	t.Run("returns empty map when inputToDynamicProvider is nil", func(t *testing.T) {
+		result := getDynamicInputs(nil)
+		assert.NotNil(t, result)
+		assert.Empty(t, result)
+	})
+
+	t.Run("returns empty map when inputToDynamicProvider is empty", func(t *testing.T) {
+		result := getDynamicInputs(map[string]string{})
+		assert.NotNil(t, result)
+		assert.Empty(t, result)
+	})
+
+	t.Run("identifies inputs with dynamic provider variables", func(t *testing.T) {
+		// The `local_dynamic` provider is registered via import side effect above
+		inputToDynamicProvider := map[string]string{
+			"static-input":  "",              // no dynamic provider
+			"dynamic-input": "local_dynamic", // uses local_dynamic provider
+		}
+		result := getDynamicInputs(inputToDynamicProvider)
+		assert.NotNil(t, result)
+		// The static-input should NOT be marked as dynamic (empty provider)
+		assert.False(t, result["static-input"], "static-input should not be marked as dynamic")
+		// The dynamic-input SHOULD be marked as dynamic because it uses local_dynamic provider
+		assert.True(t, result["dynamic-input"], "dynamic-input should be marked as dynamic")
+	})
+
+	t.Run("inputs with non-dynamic provider variables are not marked dynamic", func(t *testing.T) {
+		// The env provider is a context provider, not a dynamic provider
+		inputToDynamicProvider := map[string]string{
+			"env-input": "env",
+		}
+		result := getDynamicInputs(inputToDynamicProvider)
+		assert.NotNil(t, result)
+		// The env provider is a context provider, not a dynamic provider
+		// So this input should NOT be marked as dynamic
+		assert.False(t, result["env-input"], "env-input should not be marked as dynamic")
+	})
 }

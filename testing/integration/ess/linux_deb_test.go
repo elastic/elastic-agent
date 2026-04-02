@@ -63,7 +63,7 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 	testDebLogIngestFleetManagedWithCheck(ctx, t, agentFixture, info, installOpts,
 		testComponentsPresence(ctx, agentFixture,
 			[]componentPresenceDefinition{
-				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
 				{"pf-host-agent", []string{"linux"}},
 			},
@@ -111,7 +111,7 @@ func TestDebInstallsServers(t *testing.T) {
 	testDebLogIngestFleetManagedWithCheck(ctx, t, agentFixture, info, installOpts,
 		testComponentsPresence(ctx, agentFixture,
 			[]componentPresenceDefinition{
-				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
 				{"pf-host-agent", []string{"linux"}},
 				{"cloudbeat", []string{"linux"}},
@@ -320,7 +320,7 @@ func testDebUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 		// for previous versions full install should be preserved
 		t.Run("check components set", testComponentsPresence(ctx, endFixture,
 			[]componentPresenceDefinition{
-				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
 				{"pf-host-agent", []string{"linux"}},
 				{"cloudbeat", []string{"linux"}},
@@ -335,7 +335,7 @@ func testDebUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 		// for 9.0+ versions basic install should be preserved
 		t.Run("check components set", testComponentsPresence(ctx, endFixture,
 			[]componentPresenceDefinition{
-				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
 				{"pf-host-agent", []string{"linux"}},
 			},

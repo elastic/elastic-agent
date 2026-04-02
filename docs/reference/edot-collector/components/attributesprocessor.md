@@ -2,11 +2,9 @@
 navigation_title: Attributes processor
 description: The attributes processor is an OpenTelemetry Collector component that modifies resource attributes and span, metric, or log attributes before they are exported.
 applies_to:
-  stack:
+  stack: ga
   serverless:
-  observability:
-  product:
-    edot_collector:
+    observability: ga
 products:
   - id: elastic-agent
   - id: observability

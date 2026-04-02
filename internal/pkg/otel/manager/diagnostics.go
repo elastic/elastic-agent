@@ -54,7 +54,7 @@ func (m *OTelManager) PerformDiagnostics(ctx context.Context, req ...runtime.Com
 	for _, existingComp := range currentComponents {
 		inputComp, ok := unitByID[existingComp.ID]
 		if !ok {
-			m.logger.Warnf("requested diagnostics for component %s, but it does not exist in the manager", existingComp.ID)
+			m.managerLogger.Warnf("requested diagnostics for component %s, but it does not exist in the manager", existingComp.ID)
 			continue
 		}
 		for _, unit := range existingComp.Units {
@@ -64,7 +64,7 @@ func (m *OTelManager) PerformDiagnostics(ctx context.Context, req ...runtime.Com
 					Unit:      unit,
 				})
 			} else {
-				m.logger.Warnf("requested diagnostics for unit %s, but it does not exist in the manager", unit.ID)
+				m.managerLogger.Warnf("requested diagnostics for unit %s, but it does not exist in the manager", unit.ID)
 			}
 		}
 	}
@@ -100,7 +100,7 @@ func (m *OTelManager) PerformComponentDiagnostics(
 				Component: inputComp,
 			})
 		} else {
-			m.logger.Warnf("requested diagnostics for component %s, but it does not exist in the manager", existingComp.ID)
+			m.managerLogger.Warnf("requested diagnostics for component %s, but it does not exist in the manager", existingComp.ID)
 		}
 	}
 
@@ -111,7 +111,7 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	//	2. It is refusing the connections.
 	// Return error for any other scenario.
 	if err != nil {
-		m.logger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
+		m.managerLogger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
 		if !errors.Is(err, syscall.ENOENT) && !errors.Is(err, syscall.ECONNREFUSED) {
 			return nil, fmt.Errorf("error fetching otel diagnostics: %w", err)
 		}

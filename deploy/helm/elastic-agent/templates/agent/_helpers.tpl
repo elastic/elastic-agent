@@ -76,6 +76,12 @@ Validate fleet configuration
 {{- range $idx, $certificateAuthorityConfig := $sslCertificateAuthoritiesConfig -}}
 {{- include "elasticagent.init.valueFrom" (list $ $certificateAuthorityConfig (printf "%s.ssl.certificate_authorities.%d" $outputName $idx)) -}}
 {{- end -}}
+{{- if (dig "ssl" "certificate" dict $outputVal)  }}
+{{- include "elasticagent.init.valueFrom" (list $ $outputVal.ssl.certificate (printf "%s.ssl.certificate" $outputName)) -}}
+{{- end -}}
+{{- if (dig "ssl" "key" dict $outputVal)   }}
+{{- include "elasticagent.init.valueFrom" (list $ $outputVal.ssl.key (printf "%s.ssl.key" $outputName)) -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
@@ -89,6 +95,7 @@ Initialise input templates if we are not deploying as managed
  as they change the k8s configuration of presets e.g. necessary volume mounts, etc. */}}
 {{- include "elasticagent.kubernetes.init" $ -}}
 {{- include "elasticagent.system.init" $ -}}
+{{- include "elasticagent.cloudDefend.init" $ -}}
 {{- include "elasticagent.autoops.init" $ -}}
 {{/* initialise inputs the custom integrations only if fleet is disabled */}}
 {{- if eq $.Values.agent.fleet.enabled false -}}

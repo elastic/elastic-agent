@@ -67,27 +67,24 @@ func (d *DockerIntegrationTester) StepRequirements() IntegrationTestSteps {
 }
 
 // Test performs the tests with docker-compose.
-func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[string]string) error {
+func (d *DockerIntegrationTester) Test(dir string, mageTarget string, cfg *Settings, env map[string]string) error {
 	var err error
-	d.buildImagesOnce.Do(func() { err = dockerComposeBuildImages() })
+	d.buildImagesOnce.Do(func() { err = d.dockerComposeBuildImages(cfg) })
 	if err != nil {
 		return err
 	}
 
 	// Determine the path to use inside the container.
-	repo, err := GetProjectRepoInfo()
-	if err != nil {
-		return err
-	}
+	repo := cfg.RepoInfo
 	dockerRepoRoot := filepath.Join("/go/src", repo.CanonicalRootImportPath)
 	dockerGoCache := filepath.Join(dockerRepoRoot, "build/docker-gocache")
-	magePath := filepath.Join("/go/src", repo.CanonicalRootImportPath, repo.SubDir, "build/mage-linux-"+GOARCH)
+	magePath := filepath.Join("/go/src", repo.CanonicalRootImportPath, repo.SubDir, "build/mage-linux-"+cfg.Build.GOARCH)
 	goPkgCache := filepath.Join(filepath.SplitList(build.Default.GOPATH)[0], "pkg/mod/cache/download")
 	dockerGoPkgCache := "/gocache"
 
 	// Execute the inside of docker-compose.
-	args := []string{"-p", dockerComposeProjectName(), "run",
-		"-e", "DOCKER_COMPOSE_PROJECT_NAME=" + dockerComposeProjectName(),
+	args := []string{"-p", d.dockerComposeProjectName(cfg), "run",
+		"-e", "DOCKER_COMPOSE_PROJECT_NAME=" + d.dockerComposeProjectName(cfg),
 		// Disable strict.perms because we mount host dirs inside containers
 		// and the UID/GID won't meet the strict requirements.
 		"-e", "BEAT_STRICT_PERMS=false",
@@ -116,10 +113,7 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[st
 		mageTarget,
 	)
 
-	composeEnv, err := integTestDockerComposeEnvVars()
-	if err != nil {
-		return err
-	}
+	composeEnv := integTestDockerComposeEnvVars(cfg)
 
 	_, testErr := sh.Exec(
 		composeEnv,
@@ -129,7 +123,7 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[st
 		args...,
 	)
 
-	err = saveDockerComposeLogs(dir, mageTarget, composeEnv)
+	err = d.saveDockerComposeLogs(dir, mageTarget, cfg, composeEnv)
 	if err != nil && testErr == nil {
 		// saving docker-compose logs failed but the test didn't.
 		return err
@@ -146,7 +140,7 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[st
 		io.Discard,
 		out,
 		"docker-compose",
-		"-p", dockerComposeProjectName(),
+		"-p", d.dockerComposeProjectName(cfg),
 		"rm", "--stop", "--force",
 	)
 	if err != nil && testErr == nil {
@@ -156,7 +150,7 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[st
 	return testErr
 }
 
-func saveDockerComposeLogs(rootDir string, mageTarget string, composeEnv map[string]string) error {
+func (d *DockerIntegrationTester) saveDockerComposeLogs(rootDir string, mageTarget string, cfg *Settings, composeEnv map[string]string) error {
 	var (
 		composeLogDir      = filepath.Join(rootDir, "build", "system-tests", "docker-logs")
 		composeLogFileName = filepath.Join(composeLogDir, "TEST-docker-compose-"+mageTarget+".log")
@@ -177,7 +171,7 @@ func saveDockerComposeLogs(rootDir string, mageTarget string, composeEnv map[str
 		composeLogFile, // stdout
 		composeLogFile, // stderr
 		"docker-compose",
-		"-p", dockerComposeProjectName(),
+		"-p", d.dockerComposeProjectName(cfg),
 		"logs",
 		"--no-color",
 	)
@@ -189,16 +183,11 @@ func saveDockerComposeLogs(rootDir string, mageTarget string, composeEnv map[str
 }
 
 // InsideTest performs the tests inside of environment.
-func (d *DockerIntegrationTester) InsideTest(test func() error) error {
+func (d *DockerIntegrationTester) InsideTest(test func() error, cfg *Settings) error {
 	// Fix file permissions after test is done writing files as root.
 	if runtime.GOOS != "windows" {
-		repo, err := GetProjectRepoInfo()
-		if err != nil {
-			return err
-		}
-
 		// Handle virtualenv and the current project dir.
-		defer DockerChown(path.Join(repo.RootDir, "build"))
+		defer DockerChown(path.Join(cfg.RepoInfo.RootDir, "build"))
 		defer DockerChown(".")
 	}
 	return test()
@@ -207,38 +196,29 @@ func (d *DockerIntegrationTester) InsideTest(test func() error) error {
 // integTestDockerComposeEnvVars returns the environment variables used for
 // executing docker-compose (not the variables passed into the containers).
 // docker-compose uses these when evaluating docker-compose.yml files.
-func integTestDockerComposeEnvVars() (map[string]string, error) {
-	esBeatsDir, err := ElasticBeatsDir()
-	if err != nil {
-		return nil, err
-	}
-
+func integTestDockerComposeEnvVars(cfg *Settings) map[string]string {
 	return map[string]string{
-		"ES_BEATS":          esBeatsDir,
+		"ES_BEATS":          cfg.ElasticBeatsDir,
 		"STACK_ENVIRONMENT": StackEnvironment,
 		// Deprecated use STACK_ENVIRONMENT instead (it's more descriptive).
 		"TESTING_ENVIRONMENT": StackEnvironment,
-	}, nil
+	}
 }
 
 // dockerComposeProjectName returns the project name to use with docker-compose.
 // It is passed to docker-compose using the `-p` flag. And is passed to our
 // Go and Python testing libraries through the DOCKER_COMPOSE_PROJECT_NAME
 // environment variable.
-func dockerComposeProjectName() string {
-	commit, err := CommitHash()
+func (d *DockerIntegrationTester) dockerComposeProjectName(cfg *Settings) string {
+	commit, err := cfg.Build.CommitHash()
 	if err != nil {
 		panic(fmt.Errorf("failed to construct docker compose project name: %w", err))
 	}
 
-	version, err := BeatQualifiedVersion()
-	if err != nil {
-		panic(fmt.Errorf("failed to construct docker compose project name: %w", err))
-	}
-	version = strings.NewReplacer(".", "_").Replace(version)
+	version := strings.NewReplacer(".", "_").Replace(cfg.BeatQualifiedVersion())
 
 	projectName := "{{.BeatName}}_{{.Version}}_{{.ShortCommit}}-{{.StackEnvironment}}"
-	projectName = MustExpand(projectName, map[string]interface{}{
+	projectName = MustExpand(cfg, projectName, map[string]interface{}{
 		"StackEnvironment": StackEnvironment,
 		"ShortCommit":      commit[:10],
 		"Version":          version,
@@ -247,20 +227,17 @@ func dockerComposeProjectName() string {
 }
 
 // dockerComposeBuildImages builds all images in the docker-compose.yml file.
-func dockerComposeBuildImages() error {
+func (d *DockerIntegrationTester) dockerComposeBuildImages(cfg *Settings) error {
 	fmt.Println(">> Building docker images")
 
-	composeEnv, err := integTestDockerComposeEnvVars()
-	if err != nil {
-		return err
-	}
+	composeEnv := integTestDockerComposeEnvVars(cfg)
 
-	args := []string{"-p", dockerComposeProjectName(), "build", "--force-rm"}
-	if _, noCache := os.LookupEnv("DOCKER_NOCACHE"); noCache {
+	args := []string{"-p", d.dockerComposeProjectName(cfg), "build", "--force-rm"}
+	if cfg.Docker.NoCache {
 		args = append(args, "--no-cache")
 	}
 
-	if _, forcePull := os.LookupEnv("DOCKER_PULL"); forcePull {
+	if cfg.Docker.ForcePull {
 		args = append(args, "--pull")
 	}
 
@@ -269,7 +246,7 @@ func dockerComposeBuildImages() error {
 		out = os.Stderr
 	}
 
-	_, err = sh.Exec(
+	_, err := sh.Exec(
 		composeEnv,
 		out,
 		os.Stderr,

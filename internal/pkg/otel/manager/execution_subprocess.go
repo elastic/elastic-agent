@@ -5,81 +5,88 @@
 package manager
 
 import (
-	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
+	"strings"
+	"sync"
 	"time"
 
-	"github.com/gofrs/uuid/v5"
-	"go.opentelemetry.io/collector/component"
-	"gopkg.in/yaml.v3"
-
-	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
-
-	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/yaml.v3"
+
+	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
-	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 const (
-	OtelSetSupervisedFlagName           = "supervised"
-	OtelSupervisedLoggingLevelFlagName  = "supervised.logging.level"
-	OtelSupervisedMonitoringURLFlagName = "supervised.monitoring.url"
+	OtelSetSupervisedFlagName                 = "supervised"
+	OtelSupervisedLoggingLevelFlagName        = "supervised.logging.level"
+	OtelSupervisedMonitoringURLFlagName       = "supervised.monitoring.url"
+	OtelFeatureGatesFlagName                  = "feature-gates"
+	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
+
+	// stdinGobProviderScheme must match agentprovider.StdinGobProviderSchemeName.
+	// Duplicated here to avoid a cross-module import from the main module into
+	// the internal/edot submodule.
+	stdinGobProviderScheme = "stdingob"
 )
 
-// newSubprocessExecution creates a new execution which runs the otel collector in a subprocess. A metricsPort or
-// healthCheckPort of 0 will result in a random port being used.
-func newSubprocessExecution(logLevel logp.Level, collectorPath string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
-	nsUUID, err := uuid.NewV4()
-	if err != nil {
-		return nil, fmt.Errorf("cannot generate UUID: %w", err)
-	}
-	componentType, err := component.NewType(healthCheckExtensionName)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create component type: %w", err)
-	}
-	healthCheckExtensionID := component.NewIDWithName(componentType, nsUUID.String()).String()
-
+// newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
+// healthCheckExtensionID is the pre-constructed component ID string (e.g. "healthcheckv2/<uuid>").
+// A healthCheckPort of 0 will result in a random port being selected on each start.
+func newSubprocessExecution(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (*subprocessExecution, error) {
 	return &subprocessExecution{
 		collectorPath: collectorPath,
 		collectorArgs: []string{
-			"otel",
 			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
-			fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, logLevel.String()),
 			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
+			// Enable feature gate to report internal telemetry for the Elasticsearch exporter partitioned
+			// by the exporter instance (e.g. separating the monitoring exporter from general inputs),
+			// matching the behavior of other Collector telemetry metrics like queue state.
+			fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelElasticsearchExporterTelemetryFeature),
 		},
-		logLevel:                 logLevel,
 		healthCheckExtensionID:   healthCheckExtensionID,
-		collectorMetricsPort:     metricsPort,
 		collectorHealthCheckPort: healthCheckPort,
 		reportErrFn:              reportErr,
 	}, nil
 }
 
+// subprocessExecution implements collectorExecution by running the collector in a subprocess.
 type subprocessExecution struct {
 	collectorPath            string
 	collectorArgs            []string
-	logLevel                 logp.Level
 	healthCheckExtensionID   string
-	collectorMetricsPort     int
-	collectorHealthCheckPort int
+	collectorHealthCheckPort int                                                    // user-configured port; 0 means pick a random port per-start
 	reportErrFn              func(ctx context.Context, errCh chan error, err error) // required for testing
 }
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
-func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
+func (r *subprocessExecution) startCollector(
+	ctx context.Context,
+	lvl logp.Level,
+	collectorLogger *logger.Logger,
+	logger *logger.Logger,
+	cfg *confmap.Conf,
+	processErrCh chan error,
+	statusCh chan *otelstatus.AggregateStatus,
+	forceFetchStatusCh chan struct{},
+) (collectorHandle, error) {
 	if cfg == nil {
 		// configuration is required
 		return nil, errors.New("no configuration provided")
@@ -95,63 +102,67 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 		return nil, fmt.Errorf("cannot access collector path: %w", err)
 	}
 
-	httpHealthCheckPort, collectorMetricsPort, err := r.getCollectorPorts()
+	httpHealthCheckPort, err := r.getCollectorHealthCheckPort()
 	if err != nil {
 		return nil, fmt.Errorf("could not find port for collector: %w", err)
 	}
 
-	if err := injectHeathCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
-		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
-	}
-
-	confMap := cfg.ToStringMap()
-	confBytes, err := yaml.Marshal(confMap)
+	// prepare and serialize config first so we can exit early if there's a problem
+	cfgYamlBytes, err := prepareAndSerializeConfig(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
+		return nil, err
 	}
 
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(baseLogger.Core(), zapcore.Level(r.logLevel))
+	stdOutLast := newZapLast(collectorLogger.Core())
+	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
 	// info level for stdErr because by default collector writes to stderr
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(baseLogger.Core(), zapcore.Level(r.logLevel))
+	stdErrLast := newZapLast(collectorLogger.Core())
+	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
-	// Set the environment variable for the collector metrics port. See comment at the constant definition for more information.
-	env = append(env, fmt.Sprintf("%s=%d", componentmonitoring.OtelCollectorMetricsPortEnvVarName, collectorMetricsPort))
+
+	// set collector args and add --config flag with the stdingob:stdin URI
+	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:", stdinGobProviderScheme))
+	// Override the health check endpoint placeholder (port 0) with the actual resolved port.
+	// Uses the OTel collector --set flag to override a specific config value after all config sources are merged.
+	collectorArgs = append(collectorArgs, fmt.Sprintf("--set=extensions::%s::http::endpoint=localhost:%d", r.healthCheckExtensionID, httpHealthCheckPort))
+
 	processInfo, err := process.Start(r.collectorPath,
-		process.WithArgs(r.collectorArgs),
+		process.WithArgs(collectorArgs),
 		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
-			c.Stdin = bytes.NewReader(confBytes)
 			c.Stdout = stdOut
 			c.Stderr = stdErr
 			return nil
 		}),
 	)
-	if err != nil {
+	if err != nil || processInfo.Process == nil {
 		// we failed to start the process
+		if err == nil {
+			err = errors.New("process is nil")
+		}
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
+
 	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
-	if processInfo.Process == nil {
-		// this should not happen but just in case
-		procCtxCancel()
-		return nil, fmt.Errorf("failed to start supervised collector: process is nil")
+
+	processDoneCh := make(chan struct{})
+	reportPipeErrFn := func(err error) {
+		r.reportErrFn(ctx, processErrCh, err)
 	}
 
-	ctl := &procHandle{
-		processDoneCh: make(chan struct{}),
-		processInfo:   processInfo,
-		log:           logger,
-	}
-
+	ctl := newProcHandle(processInfo, logger, lvl, processDoneCh, reportPipeErrFn)
 	healthCheckDone := make(chan struct{})
+	ctl.wg.Add(3)
 	go func() {
 		defer func() {
 			close(healthCheckDone)
+			ctl.wg.Done()
 		}()
-		currentStatus := aggregateStatus(componentstatus.StatusStarting, nil)
+		currentStatus := status.AggregateStatus(componentstatus.StatusStarting, nil)
 		r.reportSubprocessCollectorStatus(ctx, statusCh, currentStatus)
 
 		// specify a max duration of not being able to get the status from the collector
@@ -163,8 +174,9 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 		const healthCheckPollDuration = 1 * time.Second
 		healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
 		defer healthCheckPollTimer.Stop()
+		client := http.Client{}
 		for {
-			statuses, err := AllComponentsStatuses(procCtx, httpHealthCheckPort)
+			statuses, err := AllComponentsStatuses(procCtx, client, httpHealthCheckPort)
 			if err != nil {
 				switch {
 				case errors.Is(err, context.Canceled):
@@ -178,7 +190,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 			} else {
 				maxFailuresTimer.Reset(maxFailuresDuration)
 				removeManagedHealthCheckExtensionStatus(statuses, r.healthCheckExtensionID)
-				if !compareStatuses(currentStatus, statuses) {
+				if !status.CompareStatuses(currentStatus, statuses) {
 					currentStatus = statuses
 					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 				}
@@ -194,11 +206,11 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 			case <-healthCheckPollTimer.C:
 				healthCheckPollTimer.Reset(healthCheckPollDuration)
 			case <-maxFailuresTimer.C:
-				failedToConnectStatuses := aggregateStatus(
+				failedToConnectStatuses := status.AggregateStatus(
 					componentstatus.StatusRecoverableError,
 					errors.New("failed to connect to collector"),
 				)
-				if !compareStatuses(currentStatus, failedToConnectStatuses) {
+				if !status.CompareStatuses(currentStatus, failedToConnectStatuses) {
 					currentStatus = statuses
 					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 				}
@@ -207,6 +219,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 	}()
 
 	go func() {
+		defer ctl.wg.Done()
 		procState, procErr := processInfo.Process.Wait()
 		logger.Debugf("wait for pid %d returned", processInfo.PID)
 		procCtxCancel()
@@ -220,7 +233,20 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 				// report nil error so that the caller can be notified that the process has exited without error
 				r.reportErrFn(ctx, processErrCh, nil)
 			} else {
-				r.reportErrFn(ctx, processErrCh, fmt.Errorf("supervised collector (pid: %d) exited with error: %s", procState.Pid(), procState.String()))
+				var procReportErr error
+				stderrMsg := stdErrLast.LastMessage()
+				stdoutMsg := stdOutLast.LastMessage()
+				if stderrMsg != "" {
+					// use stderr messages as the error
+					procReportErr = errors.New(stderrMsg)
+				} else if stdoutMsg != "" {
+					// use stdout messages as the error
+					procReportErr = errors.New(stdoutMsg)
+				} else {
+					// neither case use standard process error
+					procReportErr = fmt.Errorf("supervised collector (pid: %d) exited with error: %s", procState.Pid(), procState.String())
+				}
+				r.reportErrFn(ctx, processErrCh, procReportErr)
 			}
 			return
 		}
@@ -228,21 +254,29 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 		r.reportErrFn(ctx, processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
 	}()
 
+	// The pipeWriter goroutine writes the initial config and subsequent updates asynchronously to the pipe.
+	// Any errors are reported directly to processErrCh via reportErrFn.
+	go func() {
+		defer ctl.wg.Done()
+		ctl.writeToPipe(processInfo.Stdin)
+	}()
+	ctl.updateConfigYamlBytes(cfgYamlBytes)
+
 	return ctl, nil
 }
 
 // cloneCollectorStatus creates a deep copy of the provided AggregateStatus.
-func cloneCollectorStatus(aStatus *status.AggregateStatus) *status.AggregateStatus {
+func cloneCollectorStatus(aStatus *otelstatus.AggregateStatus) *otelstatus.AggregateStatus {
 	if aStatus == nil {
 		return nil
 	}
 
-	st := &status.AggregateStatus{
+	st := &otelstatus.AggregateStatus{
 		Event: aStatus.Event,
 	}
 
 	if len(aStatus.ComponentStatusMap) > 0 {
-		st.ComponentStatusMap = make(map[string]*status.AggregateStatus, len(aStatus.ComponentStatusMap))
+		st.ComponentStatusMap = make(map[string]*otelstatus.AggregateStatus, len(aStatus.ComponentStatusMap))
 		for k, cs := range aStatus.ComponentStatusMap {
 			st.ComponentStatusMap[k] = cloneCollectorStatus(cs)
 		}
@@ -251,45 +285,59 @@ func cloneCollectorStatus(aStatus *status.AggregateStatus) *status.AggregateStat
 	return st
 }
 
-func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Context, statusCh chan *status.AggregateStatus, collectorStatus *status.AggregateStatus) {
+func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Context, statusCh chan *otelstatus.AggregateStatus, collectorStatus *otelstatus.AggregateStatus) {
 	// we need to clone the status to prevent any mutation on the receiver side
 	// affecting the original ref
 	clonedStatus := cloneCollectorStatus(collectorStatus)
 	reportCollectorStatus(ctx, statusCh, clonedStatus)
 }
 
-// getCollectorPorts returns the ports used by the OTel collector. If the ports set in the execution struct are 0,
-// random ports are returned instead.
-func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsPort int, err error) {
-	randomPorts := make([]*int, 0, 2)
-	// if the ports are defined (non-zero), use them
-	if r.collectorMetricsPort == 0 {
-		randomPorts = append(randomPorts, &metricsPort)
-	} else {
-		metricsPort = r.collectorMetricsPort
+func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
+	metricReadersUntyped := conf.Get("service::telemetry::metrics::readers")
+	if metricReadersUntyped == nil {
+		metricReadersUntyped = []any{}
 	}
-	if r.collectorHealthCheckPort == 0 {
-		randomPorts = append(randomPorts, &healthCheckPort)
-	} else {
-		healthCheckPort = r.collectorHealthCheckPort
+	metricsReadersList, ok := metricReadersUntyped.([]any)
+	if !ok {
+		return fmt.Errorf("couldn't convert value of service::telemetry::metrics::readers to a list: %v", metricReadersUntyped)
 	}
 
-	if len(randomPorts) == 0 {
-		return healthCheckPort, metricsPort, nil
+	metricsReader := map[string]any{
+		"pull": map[string]any{
+			"exporter": map[string]any{
+				"prometheus": map[string]any{
+					"host":                "localhost",
+					"port":                port,
+					"without_units":       true,
+					"without_type_suffix": true,
+				},
+			},
+		},
 	}
-
-	// we need at least one random port, create it
-	ports, err := findRandomTCPPorts(len(randomPorts))
-	if err != nil {
-		return 0, 0, err
+	metricsReadersList = append(metricsReadersList, metricsReader)
+	confMap := map[string]any{
+		"service::telemetry::metrics::readers": metricsReadersList,
 	}
-	for i, port := range ports {
-		*randomPorts[i] = port
+	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
+		return fmt.Errorf("failed to merge config: %w", mergeErr)
 	}
-	return healthCheckPort, metricsPort, nil
+	return nil
 }
 
-func removeManagedHealthCheckExtensionStatus(status *status.AggregateStatus, healthCheckExtensionID string) {
+// getCollectorHealthCheckPort returns the health check port used by the OTel collector.
+// If the port set in the execution struct is 0, a random port is returned instead.
+func (r *subprocessExecution) getCollectorHealthCheckPort() (int, error) {
+	if r.collectorHealthCheckPort != 0 {
+		return r.collectorHealthCheckPort, nil
+	}
+	ports, err := findRandomTCPPorts(1)
+	if err != nil {
+		return 0, err
+	}
+	return ports[0], nil
+}
+
+func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus, healthCheckExtensionID string) {
 	extensions, exists := status.ComponentStatusMap["extensions"]
 	if !exists {
 		return
@@ -300,14 +348,64 @@ func removeManagedHealthCheckExtensionStatus(status *status.AggregateStatus, hea
 }
 
 type procHandle struct {
-	processDoneCh chan struct{}
-	processInfo   *process.Info
-	log           *logger.Logger
+	processDoneCh     chan struct{}
+	processInfo       *process.Info
+	log               *logger.Logger
+	collectorLogLevel logp.Level
+	configCh          chan []byte    // buffered(1), latest-config-wins
+	reportErrFn       func(error)    // reports pipe write errors to processErrCh
+	wg                sync.WaitGroup // covers process monitoring and config submission
+}
+
+func newProcHandle(
+	processInfo *process.Info,
+	log *logger.Logger,
+	collectorLogLevel logp.Level,
+	processDoneCh chan struct{},
+	reportErrFn func(error),
+) *procHandle {
+	return &procHandle{
+		processDoneCh:     processDoneCh,
+		processInfo:       processInfo,
+		log:               log,
+		collectorLogLevel: collectorLogLevel,
+		configCh:          make(chan []byte, 1),
+		reportErrFn:       reportErrFn,
+	}
+}
+
+// writeToPipe owns the pipe lifecycle. It loops writing configs queued via configCh until the process
+// exits. Errors are reported via reportErrFn.
+func (s *procHandle) writeToPipe(pipeWriter io.WriteCloser) {
+	encoder := gob.NewEncoder(pipeWriter)
+
+	// Loop: write configs until the process exits.
+	for {
+		select {
+		case <-s.processDoneCh:
+			return
+		case cfgBytes := <-s.configCh:
+			if err := encoder.Encode(cfgBytes); err != nil {
+				// We may get an error here if we're trying to write a config, but the process exits. This isn't
+				// really an error, so it's best to avoid reporting it. Check processDoneCh to be sure.
+				select {
+				case <-s.processDoneCh:
+				default:
+					if !errors.Is(err, io.ErrClosedPipe) {
+						s.reportErrFn(fmt.Errorf("failed to write config update: %w", err))
+					}
+				}
+
+				return
+			}
+		}
+	}
 }
 
 // Stop stops the process. If the process is already stopped, it does nothing. If the process does not stop within
 // processKillAfter or due to an error, it will be killed.
 func (s *procHandle) Stop(waitTime time.Duration) {
+	defer s.wg.Wait()
 	select {
 	case <-s.processDoneCh:
 		// process has already exited
@@ -337,4 +435,100 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 		s.log.Warnf("supervised collector subprocess didn't exit in time after killing it")
 	case <-s.processDoneCh:
 	}
+}
+
+func (s *procHandle) Stopped() bool {
+	select {
+	case <-s.processDoneCh:
+		return true
+	default:
+	}
+	return false
+}
+
+// UpdateConfig submits a new configuration to the collector process.
+func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
+	yamlBytes, err := prepareAndSerializeConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	s.updateConfigYamlBytes(yamlBytes)
+
+	return nil
+}
+
+// updateConfigYamlBytes submits a new serialized configuration to the collector process.
+func (s *procHandle) updateConfigYamlBytes(cfgYamlBytes []byte) {
+	// Drain any pending config (latest-wins semantics).
+	select {
+	case <-s.configCh:
+	default:
+	}
+	s.configCh <- cfgYamlBytes
+}
+
+// LogLevel return the otel collector's log level.
+func (s *procHandle) LogLevel() logp.Level {
+	return s.collectorLogLevel
+}
+
+// prepareAndSerializeConfig serializes the configuration to yaml.
+func prepareAndSerializeConfig(cfg *confmap.Conf) ([]byte, error) {
+	if cfg == nil {
+		return nil, errors.New("no configuration provided")
+	}
+
+	confMap := cfg.ToStringMap()
+	yamlBytes, err := yaml.Marshal(confMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
+	}
+
+	return yamlBytes, nil
+}
+
+type zapWriter interface {
+	Write(zapcore.Entry, []zapcore.Field) error
+}
+
+// zapLast is a zapWriter that tracks the most recent error context from the
+// collector subprocess. It uses a heuristic to distinguish structured (JSON)
+// log entries from unstructured plain-text output:
+//
+//   - Structured entries (fields != nil) are normal collector logs. Each one
+//     resets the accumulated messages and stands on its own.
+//   - Unstructured entries (fields == nil) are plain-text lines, typically from
+//     multi-line errors (e.g. errors.Join output written to stderr). These are
+//     accumulated so LastMessage can reconstruct the full error.
+type zapLast struct {
+	wrapped zapWriter
+	msgs    []string
+	mx      sync.Mutex
+}
+
+func newZapLast(w zapWriter) *zapLast {
+	return &zapLast{wrapped: w}
+}
+
+func (z *zapLast) Write(entry zapcore.Entry, fields []zapcore.Field) error {
+	z.mx.Lock()
+	if fields != nil {
+		// Structured (JSON) log entry — reset and store as standalone message.
+		z.msgs = z.msgs[:0]
+	}
+	if entry.Message != "" {
+		z.msgs = append(z.msgs, entry.Message)
+	}
+	z.mx.Unlock()
+	return z.wrapped.Write(entry, fields)
+}
+
+// LastMessage returns the most recent message context. For multi-line
+// plain-text output (e.g. errors.Join), the accumulated lines are joined
+// with "; " to reconstruct the full error text.
+func (z *zapLast) LastMessage() string {
+	z.mx.Lock()
+	defer z.mx.Unlock()
+	return strings.Join(z.msgs, "; ")
 }

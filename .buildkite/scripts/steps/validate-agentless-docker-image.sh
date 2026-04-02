@@ -24,14 +24,13 @@ _SELF=$(dirname "$0")
 source "${_SELF}/../common.sh"
 
 if [ -z "$SERVICE_VERSION" ]; then
-    echo "No SHA found for environment: $ENVIRONMENT"
+    echo "SERVICE_VERSION environment variable is not set"
     exit 1
 fi
 
 DOCKER_TAG="git-${SERVICE_VERSION}"
 PRIVATE_IMAGE="${PRIVATE_REPO}:${DOCKER_TAG}"
 
-echo "Environment: ${ENVIRONMENT}"
 echo "Commit SHA: ${SERVICE_VERSION}"
 echo "Validating image: ${PRIVATE_IMAGE}"
 

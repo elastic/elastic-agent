@@ -7,7 +7,7 @@
 outputs:
   # name of the output
   default:
-    # -- type of the output [one of `ESPlainAuthBasic`, `ESPlainAuthAPI`, `ESSecretAuthBasic`, `ESSecretAuthAPI`, `ESECKRef`]
+    # -- type of the output [one of `ESPlainAuthBasic`, `ESPlainAuthAPI`, `ESSecretAuthBasic`, `ESSecretAuthAPI`, `ESECKRef`, `Logstash`]
     # @section -- 1.1 - Output Object
     # @sectionDescriptionTemplate -- OutputObject
     # @key -- outputs.{name}.type
@@ -43,6 +43,51 @@ outputs:
     # @section -- 1.1 - Output Object
     # @key -- outputs.{name}.namespace
     namespace: ""
+    # -- hosts of the output [required for type `Logstash`]
+    # @section -- 1.1 - Output Object
+    # @default -- `[]`
+    # @key -- outputs.{name}.hosts
+    #hosts: ["logstash:5044"]
+    # -- SSL/TLS configuration for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl
+    #ssl:
+    # -- enable SSL/TLS for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.enabled
+    #  enabled: false
+    # -- path to the CA certificate for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.certificateAuthorities
+    #  certificateAuthorities: ""
+    # verification mode for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.verification_mode
+    #  verification_mode: certificate
+    # -- path to the client certificate for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.certificate
+    #  certificate:
+    # -- contents to the client certificate for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.certificate.value
+    #  value: ""      
+    # -- path to the client private key for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.key
+    #  key: 
+    # -- path to the client private key for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.key.valueFromSecret
+    #    valueFromSecret:
+    # -- Secret name for the client private key for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.key.valueFromSecret.name
+    #     name: ""
+    # -- Key in the secret for the client private key for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.key.valueFromSecret.key
+    #      key: ""
 kubernetes:
   # -- enable Kubernetes integration.
   # @section -- 2 - Kubernetes integration
@@ -151,7 +196,7 @@ kubernetes:
       # -- enable containers logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/container-logs)
       # @section -- 2 - Kubernetes integration
       enabled: true
-      # -- BETA: enable rotated logs ingestion. WARNING: enabling it might cause date re-ingestion on existing deployments. [ref](https://www.elastic.co/docs/reference/integrations/kubernetes/container-logs#ingesting-rotated-container-logs)
+      # -- enable rotated logs ingestion. WARNING: enabling it might cause data re-ingestion on existing deployments. [ref](https://www.elastic.co/docs/reference/integrations/kubernetes/container-logs#ingesting-rotated-container-logs)
       rotated_logs: false
       # -- containers logs stream vars
       # @section -- 2 - Kubernetes integration
@@ -344,6 +389,60 @@ system:
     # -- enable metrics
     # @section -- 4 - System integration
     enabled: true
+cloudDefend:
+  # -- enable Cloud Defend (Defend for Containers) integration.
+  # @section -- 4.1 - Cloud Defend integration
+  enabled: false
+  # -- package policy ID used in cloud_defend input and stream IDs. If empty, a random UUID is generated with Helm uuidv4.
+  # @section -- 4.1 - Cloud Defend integration
+  policy_id: ""
+  # -- package policy revision used in cloud_defend input.
+  # @section -- 4.1 - Cloud Defend integration
+  revision: 1
+  # -- name of the output used in Cloud Defend integration. Note that this output needs to be defined in
+  # [outputs](#1-outputs)
+  # @section -- 4.1 - Cloud Defend integration
+  output: default
+  # -- output namespace
+  # @section -- 4.1 - Cloud Defend integration
+  namespace: default
+  # -- security policy with process and file selectors/responses embedded into the alerts stream (standalone only)
+  # @section -- 4.1 - Cloud Defend integration
+  securityPolicy:
+    process:
+      selectors:
+        - name: allProcesses
+          operation:
+            - fork
+            - exec
+      responses:
+        - match:
+            - allProcesses
+          actions:
+            - log
+    file:
+      selectors:
+        - name: executableChanges
+          operation:
+            - createExecutable
+            - modifyExecutable
+      responses:
+        - match:
+            - executableChanges
+          actions:
+            - alert
+  heartbeat:
+    # -- heartbeat stream period
+    # @section -- 4.1 - Cloud Defend integration
+    period: 30m
+  metrics:
+    # -- metrics stream metricsets
+    # @section -- 4.1 - Cloud Defend integration
+    metricsets:
+      - cloud_defend
+    # -- metrics stream period
+    # @section -- 4.1 - Cloud Defend integration
+    period: 24h
 # -- extra [user-defined integrations](https://www.elastic.co/guide/en/fleet/current/elastic-agent-input-configuration.html) to be added to the Elastic Agent
 # An example can be found [here](./examples/nginx-custom-integration/README.md)
 # @section -- 5 - User Extra Integrations
@@ -351,13 +450,13 @@ extraIntegrations: {}
 agent:
   # -- elastic-agent version
   # @section -- 6 - Elastic-Agent Configuration
-  version: 9.3.0
+  version: 9.4.0
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
     repository: docker.elastic.co/elastic-agent/elastic-agent
     pullPolicy: IfNotPresent
-    tag: "9.3.0-SNAPSHOT"
+    tag: "9.4.0-SNAPSHOT"
   # -- image pull secrets
   # @section -- 6 - Elastic-Agent Configuration
   imagePullSecrets: []

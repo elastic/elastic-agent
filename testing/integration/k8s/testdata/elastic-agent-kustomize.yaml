@@ -717,6 +717,8 @@ spec:
               fieldPath: metadata.name
         - name: ELASTIC_NETINFO
           value: "false"
+        - name: HOSTFS_PROC_PATH
+          value: /hostfs/proc
         - name: API_KEY
           valueFrom:
             secretKeyRef:
@@ -732,7 +734,7 @@ spec:
             configMapKeyRef:
               key: ca_trusted
               name: elastic-agent-configs-k799f79hhb
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.3.0
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0
         name: elastic-agent-standalone
         resources:
           limits:
@@ -767,6 +769,14 @@ spec:
           readOnly: true
         - mountPath: /sys/kernel/debug
           name: sys-kernel-debug
+        - mountPath: /boot
+          name: boot
+          readOnly: true
+        - mountPath: /sys/fs/bpf
+          name: sys-fs-bpf
+        - mountPath: /sys/kernel/security
+          name: sys-kernel-security
+          readOnly: true
         - mountPath: /usr/share/elastic-agent/state
           name: elastic-agent-state
       dnsPolicy: ClusterFirstWithHostNet
@@ -803,6 +813,15 @@ spec:
       - hostPath:
           path: /sys/kernel/debug
         name: sys-kernel-debug
+      - hostPath:
+          path: /boot
+        name: boot
+      - hostPath:
+          path: /sys/fs/bpf
+        name: sys-fs-bpf
+      - hostPath:
+          path: /sys/kernel/security
+        name: sys-kernel-security
       - hostPath:
           path: /var/lib/elastic-agent-standalone/kube-system/state
           type: DirectoryOrCreate

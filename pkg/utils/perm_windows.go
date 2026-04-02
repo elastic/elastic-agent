@@ -18,6 +18,8 @@ const (
 	SystemSID = "S-1-5-32-544"
 	// EveryoneSID is the SID for Everyone.
 	EveryoneSID = "S-1-1-0"
+	// InteractiveSID is the SID for Interactive users.
+	InteractiveSID = "S-1-5-4"
 )
 
 // FileOwner is the ownership a file should have.
@@ -61,9 +63,15 @@ func CurrentFileOwner() (FileOwner, error) {
 	}, nil
 }
 
-// HasStrictExecPerms ensures that the path is executable by the owner and that the owner of the file
+// HasStrictExecPerms ensures that the path is executable by the owner.
+func HasStrictExecPerms(path string) error {
+	// TODO: Need to add check on Windows to ensure that the ACL are correct for the binary before execution.
+	return nil
+}
+
+// HasStrictExecPermsAndOwnership ensures that the path is executable by the owner and that the owner of the file
 // is the same as the UID or root.
-func HasStrictExecPerms(path string, uid int) error {
+func HasStrictExecPermsAndOwnership(path string, uid int) error {
 	// TODO: Need to add check on Windows to ensure that the ACL are correct for the binary before execution.
 	return nil
 }

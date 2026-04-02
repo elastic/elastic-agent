@@ -1,0 +1,77 @@
+kubernetes:
+  enabled: true
+  output: test
+  namespace: test
+  scheduler:
+    enabled: true
+  controller_manager:
+    enabled: true
+
+outputs:
+  test:
+    type: Logstash
+    hosts:
+    - myhost:5443
+    loadbalance: true
+    ttl: "10s"
+    slow_start: false
+    timeout: "30s"
+
+    workers: 5
+    pipelining: 1
+    bulk_max_size: 1600
+    queue:
+      mem: 
+        flush:
+         timeout: "30s"
+         min_events: 1600
+        events:  3200
+    max_retries: 3
+    compression_level: 5
+    backoff:
+      max: "30s"
+      init: "1s"
+    allow_older_versions: false
+    ssl:
+      certificate: 
+        valueFromSecret: 
+            name: cert-secret
+            key: cert
+      key: 
+        valueFromSecret:
+            name: cert-secret
+            key: key
+      verificationMode: certificate
+      certificateAuthorities:
+        - value: |-
+            -----BEGIN CERTIFICATE-----
+            MIIDSjCCAjKgAwIBAgIRALx9cV4kYFWe1ZtMXLzfX4cwDQYJKoZIhvcNAQELBQAw
+            LzETMBEGA1UECxMKbW9uaXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRw
+            MB4XDTI1MDQwODEyMDAwMFoXDTI2MDQwODEyMDAwMFowLzETMBEGA1UECxMKbW9u
+            aXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRwMIIBIjANBgkqhkiG9w0B
+            AQEFAAOCAQ8AMIIBCgKCAQEAwk7mDcV4hO6WKnz2z2gC+ODb2xF6aP6sB5o3rZ2F
+            R0vbPY9EYI56bxSB3zT5mx0I3XsdKy8JK3AeY32K5CPv7tkHeGqTxJfYKwKXWpO4
+            rN9i3PtZZ3ZX5iPBiGUKuZJH2HQolZt/8OoyH5n3FEs/zNVbrXL6RuMjVzRGyJhR
+            UeYpXib35SKvwWWNHh9fHV1m8WUdJxvEY9ohkry0ENj6tzB9Om+yKq5Scdw3hC5h
+            X1f6+fY7ElZjVQ2lXnyrRHKpLjcDhI9cRm7r1qeKcHQMxz4Rzk3NYOBfMiEn+pns
+            OLqUz9tK0q3VgbIUlFe94CEZ2DDkRpsIqyfRTUutOwIDAQABo2EwXzAOBgNVHQ8B
+            Af8EBAMCAoQwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMA8GA1UdEwEB
+            /wQFMAMBAf8wHQYDVR0OBBYEFDUYT4RsXgjJJz38XfQHTTZVr8gOMA0GCSqGSIb3
+            DQEBCwUAA4IBAQCvIXs1b8Pe4W5PbqQtnAV+wsyq4XqB7kFNTfZBx8eh5RMqG4y8
+            pTRSDM3I+hMI1K2XpMyUM4dyaZPz2yxOZ7UgvxFwLdHDb9uYaXJ38Rm3FxV9Z+Lr
+            ZPbXce2po5WT1em8MyxLgTStbMaXYHlsk09Fj4hF9Gy93bz4iVR7cUbDgkZd7ZPP
+            uN2bDD9kU+1iyqYv44YGbEv0UTKhrT37GkBzZ3H4cGy8sKnuwz7Z0I8v+FZzKN4L
+            Knk2MCWxZQ6t4nnqmkFoK4nSlAmW5Fnj7c2YwPYsZnscEcFlS0YDNmwC8wvDdDHL
+            tD0YrMZxZDh0LAGWAW72rT+mSPCWq5eB2ZtS
+            -----END CERTIFICATE-----
+agent:
+  unprivileged: true
+  presets:
+    perNode:
+      agent:
+        monitoring:
+          use_output: test
+    clusterWide:
+      agent:
+        monitoring:
+          use_output: test

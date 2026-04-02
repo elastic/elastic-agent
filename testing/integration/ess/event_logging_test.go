@@ -91,7 +91,7 @@ func TestEventLogFile(t *testing.T) {
 	logFilepath := path.Join(t.TempDir(), t.Name())
 	integration.GenerateLogFile(t, logFilepath, time.Millisecond*100, 20)
 
-	cfg := fmt.Sprintf(eventLogConfig, esURL, logFilepath)
+	cfg := fmt.Sprintf(eventLogConfig, esURL.String(), logFilepath)
 
 	if err := agentFixture.Prepare(ctx); err != nil {
 		t.Fatalf("cannot prepare Elastic-Agent fixture: %s", err)

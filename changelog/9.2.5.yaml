@@ -1,0 +1,81 @@
+version: 9.2.5
+entries:
+    - kind: bug-fix
+      summary: osquery-extensions-fix
+      description: "Fixing file permission issues for osquery extensions on Windows.\nIt approches the problem by adding List Content permission to Logged in users so Directory permissions are not altered by UAC when traversing Agent directory structure.\nAfter this user won't be prompted with UAC and when opening e.g log files, instead user will run into access denied in editor of choice. \nElevated editor must be used to open files that require elevated permissions.\n"
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12189
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1767958618
+      file:
+        name: 1767958618-osquery-extensions-fix.yaml
+        checksum: 10b9e32931f09fe5239e25612af70777a888a1a1
+    - kind: bug-fix
+      summary: Update the kube-stack otel gateway collector endpoint to be OTEL_K8S_POD_IP as the previous value was causing an undefined log warning
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12205
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1768216020
+      file:
+        name: 1768216020-use-correct-endpoint-for-gateway-collector.yaml
+        checksum: 124dba1a470d73dd72dd17bb56c4d7eae3cf1666
+    - kind: bug-fix
+      summary: Emit the correct error message when the app lock cannot be acquired
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12225
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1768299909
+      file:
+        name: 1768299909-fix-applock-error.yaml
+        checksum: d823958a6f6574021c89862f1f55c6d9a8344036
+    - kind: enhancement
+      summary: Support --prefix flag when installing from RPM
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12263
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/141
+      impact: ""
+      action: ""
+      timestamp: 1768496853
+      file:
+        name: 1768496853-Support---prefix-flag-when-installing-from-RPM.yaml
+        checksum: 4e141b2f36cb1bde05138157136354569efc4200
+    - kind: other
+      summary: synthetics-upgrade-node-lts-22
+      description: Upgrade NodeJS to latest LTS v22.22
+      component: elastic-agent
+      pr:
+        - https://github.com/owner/repo/1234
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1769091290
+      file:
+        name: 1769091290-synthetics-upgrade-node-lts-22.yaml
+        checksum: bde031208f082d4508d042bf02e662c5e1771091
+    - kind: bug-fix
+      summary: Fix elasticsearch retry behavior in OTEL runtime for reliable delivery
+      description: Elastic Agent running on the OTEL runtime now retries the same Elasticsearch response codes as standalone Beats, including 5xx errors. Previously, only 429 responses were retried, which could result in dropped events under certain failure conditions.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12455
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1769600823
+      file:
+        name: 1769600823-fix-elasticsearch-retry-behavior-in-otel-runtime-for-reliable-delivery.yaml
+        checksum: 1f6f98f2d1e5cf1bf7e1fbf8c0b000fd2d7d3ca7

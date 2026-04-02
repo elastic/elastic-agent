@@ -18,6 +18,7 @@ var packageArchMap = map[string]string{
 	"linux-binary-arm64":      "linux-arm64.tar.gz",
 	"windows-binary-32":       "windows-x86.zip",
 	"windows-binary-64":       "windows-x86_64.zip",
+	"windows-binary-arm64":    "windows-arm64.zip",
 	"darwin-binary-32":        "darwin-x86_64.tar.gz",
 	"darwin-binary-64":        "darwin-x86_64.tar.gz",
 	"darwin-binary-arm64":     "darwin-aarch64.tar.gz",
