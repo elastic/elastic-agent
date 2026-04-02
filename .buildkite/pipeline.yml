@@ -206,6 +206,7 @@ steps:
             allowed: true
 
       - label: "Unit tests - Windows 11"
+        skip: "See https://github.com/elastic/elastic-agent/issues/13428"
         key: "unit-tests-win11"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
