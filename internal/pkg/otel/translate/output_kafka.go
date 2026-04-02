@@ -7,6 +7,9 @@ package translate
 import (
 	"errors"
 	"fmt"
+	"strings"
+
+	otelcomponent "go.opentelemetry.io/collector/component"
 
 	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
 	"github.com/elastic/beats/v7/libbeat/outputs/kafka"
@@ -14,17 +17,21 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
-func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, error) {
+const transformProcessorType = "transform"
+
+// KafkaToOTelConfig translates kafka output to OTel config
+// It returns kafka exporter, transform processor (if required) and error
+func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger) (map[string]any, map[string]any, error) {
 	kConfig, err := kafka.ReadConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("error reading kafka config: %w", err)
+		return nil, nil, fmt.Errorf("error reading kafka config: %w", err)
 	}
 
 	if err := checkUnsupportedKafkaConfig(config, logger); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	maxMessageBytes := 100000
+	maxMessageBytes := 1000000
 	if kConfig.MaxMessageBytes != nil {
 		maxMessageBytes = *kConfig.MaxMessageBytes
 	}
@@ -68,7 +75,9 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 			},
 		},
 		"timeout": kConfig.BrokerTimeout,
-		"topic":   kConfig.Topic,
+		"logs": map[string]any{
+			"topic": kConfig.Topic,
+		},
 	}
 
 	if kConfig.Username != "" {
@@ -84,9 +93,6 @@ func KafkaToOTelConfig(config *config.C, logger *logp.Logger) (map[string]any, e
 		}
 	}
 
-<<<<<<< Updated upstream
-	return kafkaExporter, nil
-=======
 	// compiles topic and validates against any malformed strings
 	fmtstr, err := fmtstr.CompileEvent(kConfig.Topic)
 	if err != nil {
@@ -204,26 +210,10 @@ func getLogBody(field string) string {
 func getTransformProcessorID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(transformProcessorType), extensionName)
->>>>>>> Stashed changes
 }
 
 // log warning for unsupported config
 func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
-
-	// topic field always exists here, otherwise Validate function above throws an error
-	str, err := cfg.String("topic", -1)
-	if err != nil {
-		return err
-	}
-
-	fmtstr, err := fmtstr.CompileEvent(str)
-	if err != nil {
-		return err
-	}
-
-	if !fmtstr.IsConst() {
-		return fmt.Errorf("dynamic topic selection is currently not supported: %w", errors.ErrUnsupported)
-	}
 
 	if cfg.HasField("partition") {
 		return fmt.Errorf("partition is currently not supported: %w", errors.ErrUnsupported)
@@ -235,8 +225,8 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 		return fmt.Errorf("timeout is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("ssl") {
 		return fmt.Errorf("ssl parameters are currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("bullk_flush_frequency") {
-		logger.Warn("bullk_flush_frequency is deprecated")
+	} else if cfg.HasField("bulk_flush_frequency") {
+		logger.Warn("bulk_flush_frequency is deprecated")
 	}
 
 	return nil

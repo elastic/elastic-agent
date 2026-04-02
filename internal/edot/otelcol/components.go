@@ -13,6 +13,8 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 	"go.opentelemetry.io/collector/service/telemetry/otelconftelemetry"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
 	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
@@ -71,6 +73,7 @@ import (
 
 	elasticapmprocessor "github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor"
 	elastictraceprocessor "github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
+	"github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
@@ -107,6 +110,7 @@ import (
 	"github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension"
 
 	// Connectors
+	otlpjsonconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector"
 	routingconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector"
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
@@ -148,8 +152,8 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
 			elasticmonitoringreceiver.NewFactory(),
-			fbreceiver.NewFactory(),
-			mbreceiver.NewFactory(),
+			fbreceiver.NewFactoryWithSettings(fbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
+			mbreceiver.NewFactoryWithSettings(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
@@ -200,6 +204,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			memorylimiterprocessor.NewFactory(),
 			elasticapmprocessor.NewFactory(),
 			elastictraceprocessor.NewFactory(), // deprecated, will be removed in future
+			ratelimitprocessor.NewFactory(),
 			tailsamplingprocessor.NewFactory(),
 			logdedupprocessor.NewFactory(),
 			beatprocessor.NewFactory(),
@@ -228,6 +233,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		factories.Connectors, err = otelcol.MakeFactoryMap[connector.Factory](
+			otlpjsonconnector.NewFactory(),
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
 			elasticapmconnector.NewFactory(),

@@ -5,11 +5,13 @@
 package translate
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 )
@@ -29,8 +31,10 @@ required_acks: 1
 compression: gzip
 max_message_bytes: 1000000`,
 		expectedMap: map[string]any{
-			"brokers":   []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
-			"topic":     "static-topic",
+			"brokers": []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
+			"logs": map[string]any{
+				"topic": "static-topic",
+			},
 			"client_id": "beats",
 			"metadata": map[string]any{
 				"full":             false,
@@ -76,8 +80,10 @@ username: elastic
 password: changeme
 max_message_bytes: 1000000`,
 			expectedMap: map[string]any{
-				"brokers":   []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
-				"topic":     "static-topic",
+				"brokers": []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
+				"logs": map[string]any{
+					"topic": "static-topic",
+				},
 				"client_id": "beats",
 				"metadata": map[string]any{
 					"full":             false,
@@ -119,20 +125,63 @@ max_message_bytes: 1000000`,
 				},
 			},
 		},
+		{
+			name: "when dynamic topic is provided",
+			input: `
+hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
+topic: "%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}"
+required_acks: 1
+compression: gzip
+max_message_bytes: 1000000`,
+			expectedMap: map[string]any{
+				"brokers":              []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
+				"topic_from_attribute": "topic", // this field is an the addition
+				"client_id":            "beats",
+				"metadata": map[string]any{
+					"full":             false,
+					"refresh_interval": 10 * time.Minute,
+					"retry": map[string]any{
+						"backoff": 250 * time.Millisecond,
+						"max":     3,
+					},
+				},
+				"producer": map[string]any{
+					"compression": "gzip",
+					"compression_params": map[string]any{
+						"level": 4,
+					},
+					"max_message_bytes": 1000000,
+					"required_acks":     1,
+				},
+				"protocol_version": "2.1.0",
+				"retry_on_failure": map[string]any{
+					"initial_interval": 1 * time.Second,
+					"max_interval":     60 * time.Second,
+				},
+				"sending_queue": map[string]any{
+					"batch": map[string]any{
+						"flush_timeout": "10s",
+						"max_size":      2048,
+						"sizer":         "items",
+						"min_size":      0,
+					},
+					"queue_size": 3200,
+				},
+				"timeout": 10 * time.Second,
+			},
+		},
 	}
 
 	for _, testc := range testCases {
 		t.Run(testc.name, func(t *testing.T) {
 			cfg, err := config.NewConfigFrom(testc.input)
 			require.NoError(t, err, "error creating kafka config")
-			gotMap, err := KafkaToOTelConfig(cfg, logp.NewNopLogger())
+			gotMap, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating kafka to kafka exporter")
 			require.Equal(t, testc.expectedMap, gotMap)
 		})
 	}
 }
-<<<<<<< Updated upstream
-=======
 
 func TestDynamicTopicSetter(t *testing.T) {
 	testCases := []struct {
@@ -241,4 +290,3 @@ func TestDynamicTopicSetter(t *testing.T) {
 		})
 	}
 }
->>>>>>> Stashed changes

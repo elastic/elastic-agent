@@ -13,7 +13,9 @@ kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Move AutoOps sizer configuration to the batch level
+summary: |
+  Updated k8s example manifests. Added HOSTFS_PROC_PATH environment variable due-to procfs fix in cloud-defend
+  and mount points required for cloud-defend.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
@@ -36,7 +38,7 @@ component: elastic-agent
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-# pr: https://github.com/owner/repo/1234
+pr: https://github.com/elastic/elastic-agent/pull/12989
 
 # AUTOMATED
 # OPTIONAL to manually add other issue URLs
