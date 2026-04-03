@@ -23,6 +23,10 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{changelog} /changelog/bundles
+:type: known-issue
+:::
+
 :::{dropdown} Elastic Agent becomes unhealthy when using the warning log level
 **Applies to: {{agent}} 9.3.0**
 

@@ -14,5 +14,13 @@ Over time, certain Elastic functionality becomes outdated and is replaced or rem
 
 Review the deprecated functionality for {{product}}. While deprecations have no immediate impact, we strongly encourage you update your implementation after you upgrade. To learn how to upgrade, check out [Upgrade](docs-content://deploy-manage/upgrade.md).
 
+## New
+
+:::{changelog} /changelog/bundles
+:type: deprecation
+:::
+
+## Old
+
 :::{include} /release-notes/_snippets/deprecations.md
 :::
