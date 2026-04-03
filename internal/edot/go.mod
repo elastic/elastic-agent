@@ -7,12 +7,7 @@ replace github.com/elastic/elastic-agent => ../../
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260403001402-0ea4844da3ac
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.33.3
-=======
 	github.com/elastic/elastic-agent-libs v0.34.0
-	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
->>>>>>> 96f09b0cd (build(deps): bump github.com/elastic/elastic-agent-libs from 0.33.3 to 0.34.0 (#13450))
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.36.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.36.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.36.0
