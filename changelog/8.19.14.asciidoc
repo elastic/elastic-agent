@@ -34,7 +34,6 @@ The 8.19.14 release adds the following new and notable features.
 
 * Update Go version to 1.25.8. https://github.com/elastic/elastic-agent/pull/10156[#10156] 
 * Update OTel components to v0.145.0. https://github.com/elastic/elastic-agent/pull/13104[#13104] 
-* Update OTel components to v0.147.0. https://github.com/elastic/elastic-agent/pull/13203[#13203] 
 * Update otel to v1.54.0/v0.148.0. https://github.com/elastic/elastic-agent/pull/13317[#13317] 
 
 

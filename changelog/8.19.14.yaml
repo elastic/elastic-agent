@@ -109,19 +109,6 @@ entries:
         name: 1773760327-fix-container-enrollment-to-not-re-enroll-when-the-fleet_url-is-the-same.yaml
         checksum: 364abe82a2729e67dc33b89b6f4177eedaa4fac7
     - kind: enhancement
-      summary: Update OTel components to v0.147.0
-      description: ""
-      component: elastic-agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/13203
-      issue: []
-      impact: ""
-      action: ""
-      timestamp: 1773838908
-      file:
-        name: 1773838908-update-otel-components-to-v0.147.0.yaml
-        checksum: 8e1d99c7ee31e3cdde6938835283c9d452058c15
-    - kind: enhancement
       summary: update otel to v1.54.0/v0.148.0
       description: ""
       component: elastic-agent
