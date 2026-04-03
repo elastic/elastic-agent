@@ -23,7 +23,7 @@ const (
 	ProviderAWS   ProviderType = "aws"
 	ProviderAzure ProviderType = "azure"
 	ProviderGCP   ProviderType = "gcp"
-	ProviderOkta  ProviderType = "okta"
+	// ProviderOkta  ProviderType = "okta"
 )
 
 // Result represents the result of a permission verification.
@@ -86,8 +86,8 @@ type ProviderConfig struct {
 	// GCP configuration
 	ProjectID string
 
-	// Okta configuration
-	OktaDomain string
+	// // Okta configuration
+	// OktaDomain string
 
 	// Generic configuration
 	Endpoint string
@@ -190,9 +190,9 @@ func (c AzureAuthConfig) IsConfigured() bool {
 //	Application Default Credentials (gcloud auth application-default login).
 type GCPAuthConfig struct {
 	// Identity Federation OIDC fields
-	IDTokenFile              string // Path to the OIDC JWT token file
-	Audience string // Full resource name of the GCP WIF provider used as the STS exchange audience
-	ServiceAccountEmail      string // GCP service account to impersonate via WIF
+	IDTokenFile         string // Path to the OIDC JWT token file
+	Audience            string // Full resource name of the GCP WIF provider used as the STS exchange audience
+	ServiceAccountEmail string // GCP service account to impersonate via WIF
 
 	// AWS-mediated WIF fields (populated from IdentityFederationConfig)
 	GlobalRoleARN        string // Elastic global AWS IAM role for the intermediate hop
@@ -217,28 +217,28 @@ func (c GCPAuthConfig) IsConfigured() bool {
 	return c.IsIdentityFederation() || c.UseDefaultCredentials
 }
 
-// OktaAuthConfig contains Okta authentication configuration.
-type OktaAuthConfig struct {
-	// Domain is the Okta domain (e.g., dev-123456.okta.com).
-	Domain string
+// // OktaAuthConfig contains Okta authentication configuration.
+// type OktaAuthConfig struct {
+// 	// Domain is the Okta domain (e.g., dev-123456.okta.com).
+// 	Domain string
 
-	// APIToken is the Okta API token.
-	APIToken string
+// 	// APIToken is the Okta API token.
+// 	APIToken string
 
-	// ClientID is the OAuth 2.0 client ID (for OAuth authentication).
-	ClientID string
+// 	// ClientID is the OAuth 2.0 client ID (for OAuth authentication).
+// 	ClientID string
 
-	// PrivateKey is the private key for OAuth authentication.
-	PrivateKey string
-}
+// 	// PrivateKey is the private key for OAuth authentication.
+// 	PrivateKey string
+// }
 
-// ProviderType implements AuthConfig.
-func (c OktaAuthConfig) ProviderType() ProviderType { return ProviderOkta }
+// // ProviderType implements AuthConfig.
+// func (c OktaAuthConfig) ProviderType() ProviderType { return ProviderOkta }
 
-// IsConfigured implements AuthConfig.
-func (c OktaAuthConfig) IsConfigured() bool {
-	return c.Domain != "" && (c.APIToken != "" || (c.ClientID != "" && c.PrivateKey != ""))
-}
+// // IsConfigured implements AuthConfig.
+// func (c OktaAuthConfig) IsConfigured() bool {
+// 	return c.Domain != "" && (c.APIToken != "" || (c.ClientID != "" && c.PrivateKey != ""))
+// }
 
 // Verifier is the interface for permission verifiers.
 // Each cloud/identity provider implements this interface.

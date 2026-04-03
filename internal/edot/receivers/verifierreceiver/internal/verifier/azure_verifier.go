@@ -6,6 +6,7 @@ package verifier // import "github.com/elastic/elastic-agent/internal/edot/recei
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -16,15 +17,10 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appservice/armappservice"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v6"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v6"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"go.uber.org/zap"
 )
 
@@ -40,6 +36,13 @@ type AzureVerifier struct {
 	cachedSubscriptionID string
 	subscriptionOnce     sync.Once
 	subscriptionErr      error
+
+	// cachedPermissions holds the effective permissions (actions) for the
+	// authenticated principal at subscription scope, loaded once per session.
+	cachedPermissions    []string
+	cachedNotPermissions []string
+	permissionsOnce      sync.Once
+	permissionsErr       error
 }
 
 var _ Verifier = (*AzureVerifier)(nil)
@@ -181,8 +184,137 @@ func (v *AzureVerifier) discoverSubscriptionID(ctx context.Context) (string, err
 	return v.cachedSubscriptionID, v.subscriptionErr
 }
 
-// Verify checks if an Azure permission is granted by making a minimal API call
-// for the corresponding Azure resource provider.
+// azurePermissionsResponse is the shape of the ARM
+// /subscriptions/{id}/providers/Microsoft.Authorization/permissions response.
+type azurePermissionsResponse struct {
+	Value []struct {
+		Actions    []string `json:"actions"`
+		NotActions []string `json:"notActions"`
+	} `json:"value"`
+	NextLink *string `json:"nextLink"`
+}
+
+// loadPermissions fetches and caches the effective permissions for the
+// authenticated principal at the subscription scope. It calls the ARM
+// permissions endpoint directly:
+//
+//	GET /subscriptions/{id}/providers/Microsoft.Authorization/permissions
+//
+// The result is cached for the lifetime of the verifier instance.
+func (v *AzureVerifier) loadPermissions(ctx context.Context, subscriptionID string) error {
+	v.permissionsOnce.Do(func() {
+		v.permissionsErr = v.doLoadPermissions(ctx, subscriptionID)
+		if v.permissionsErr == nil {
+			v.logger.Info("Loaded Azure effective permissions",
+				zap.Int("actions", len(v.cachedPermissions)),
+				zap.Int("not_actions", len(v.cachedNotPermissions)),
+			)
+		}
+	})
+	return v.permissionsErr
+}
+
+func (v *AzureVerifier) doLoadPermissions(ctx context.Context, subscriptionID string) error {
+	token, err := v.credential.GetToken(ctx, policy.TokenRequestOptions{
+		Scopes: []string{"https://management.azure.com/.default"},
+	})
+	if err != nil {
+		return fmt.Errorf("getting ARM bearer token: %w", err)
+	}
+
+	nextURL := fmt.Sprintf(
+		"https://management.azure.com/subscriptions/%s/providers/Microsoft.Authorization/permissions?api-version=2022-04-01",
+		subscriptionID,
+	)
+
+	for nextURL != "" {
+		page, err := v.fetchPermissionsPage(ctx, nextURL, token.Token)
+		if err != nil {
+			return err
+		}
+		for _, perm := range page.Value {
+			v.cachedPermissions = append(v.cachedPermissions, perm.Actions...)
+			v.cachedNotPermissions = append(v.cachedNotPermissions, perm.NotActions...)
+		}
+		if page.NextLink != nil && *page.NextLink != "" {
+			nextURL = *page.NextLink
+		} else {
+			nextURL = ""
+		}
+	}
+	return nil
+}
+
+func (v *AzureVerifier) fetchPermissionsPage(ctx context.Context, url, bearerToken string) (azurePermissionsResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return azurePermissionsResponse{}, fmt.Errorf("creating permissions request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+bearerToken)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := v.armHTTPClient.Do(req)
+	if err != nil {
+		return azurePermissionsResponse{}, fmt.Errorf("calling ARM permissions API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return azurePermissionsResponse{}, fmt.Errorf("ARM permissions API returned HTTP %d", resp.StatusCode)
+	}
+
+	var result azurePermissionsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return azurePermissionsResponse{}, fmt.Errorf("decoding permissions response: %w", err)
+	}
+	return result, nil
+}
+
+// checkPermission returns true if the given Azure action is covered by the
+// cached permissions (considering wildcards) and not excluded by notActions.
+func (v *AzureVerifier) checkPermission(action string) bool {
+	granted := false
+	for _, perm := range v.cachedPermissions {
+		if matchAzurePermission(perm, action) {
+			granted = true
+			break
+		}
+	}
+	if !granted {
+		return false
+	}
+	for _, notPerm := range v.cachedNotPermissions {
+		if matchAzurePermission(notPerm, action) {
+			return false
+		}
+	}
+	return true
+}
+
+// matchAzurePermission reports whether the Azure RBAC permission pattern
+// matches the given action. Both are compared case-insensitively.
+// Supported wildcard forms: "*", "Microsoft.Compute/*", "Microsoft.Compute/virtualMachines/*".
+func matchAzurePermission(pattern, action string) bool {
+	pattern = strings.ToLower(pattern)
+	action = strings.ToLower(action)
+	if pattern == action || pattern == "*" {
+		return true
+	}
+	if strings.HasSuffix(pattern, "/*") {
+		prefix := strings.TrimSuffix(pattern, "/*")
+		return strings.HasPrefix(action, prefix+"/")
+	}
+	if strings.HasSuffix(pattern, "*") {
+		prefix := strings.TrimSuffix(pattern, "*")
+		return strings.HasPrefix(action, prefix)
+	}
+	return false
+}
+
+// Verify checks if an Azure permission is granted by comparing the action
+// against the principal's effective permissions at subscription scope.
+// For CSPM and asset inventory integrations, RBAC role assignment is verified
+// instead via armauthorization:ListRoleAssignments.
 func (v *AzureVerifier) Verify(ctx context.Context, permission Permission, providerCfg ProviderConfig) Result {
 	start := time.Now()
 
@@ -205,195 +337,48 @@ func (v *AzureVerifier) Verify(ctx context.Context, permission Permission, provi
 		}
 	}
 
-	// Parse the action to determine the resource provider.
-	// Azure actions look like "Microsoft.Compute/virtualMachines/read".
-	service := extractAzureService(permission.Action)
-
 	v.logger.Debug("Verifying Azure permission",
-		zap.String("service", service),
 		zap.String("action", permission.Action),
 		zap.String("subscription_id", subscriptionID),
+		zap.String("method", string(permission.Method)),
 	)
 
 	var result Result
-	switch service {
-	case "Microsoft.Resources":
-		result = v.verifyResources(ctx, subscriptionID, permission.Action)
-	case "Microsoft.Compute":
-		result = v.verifyCompute(ctx, subscriptionID, permission.Action)
-	case "Microsoft.Storage":
-		result = v.verifyStorage(ctx, subscriptionID, permission.Action)
-	case "Microsoft.Insights":
-		result = v.verifyInsights(ctx, subscriptionID, permission.Action)
-	case "Microsoft.Web":
-		result = v.verifyWeb(ctx, subscriptionID, permission.Action)
-	case "Microsoft.Network":
-		result = v.verifyNetwork(ctx, subscriptionID, permission.Action)
-	default:
-		if permission.Method == MethodPolicyAttachmentCheck {
-			result = v.verifyPolicyAttachment(ctx, subscriptionID, permission.Action)
-		} else {
-			result = Result{
-				Status:       StatusSkipped,
-				ErrorMessage: "Unsupported Azure service: " + service,
-			}
-		}
+	if permission.Method == MethodPolicyAttachmentCheck {
+		result = v.verifyPolicyAttachment(ctx, subscriptionID, permission.Action)
+	} else {
+		result = v.verifyViaPermissionsList(ctx, subscriptionID, permission.Action)
 	}
 
 	result.Duration = time.Since(start)
 	return result
 }
 
-// extractAzureService returns the top-level resource provider from an Azure
-// action string (e.g. "Microsoft.Compute" from "Microsoft.Compute/virtualMachines/read").
-func extractAzureService(action string) string {
-	parts := strings.SplitN(action, "/", 2)
-	if len(parts) == 0 {
-		return ""
-	}
-	return parts[0]
-}
-
-func (v *AzureVerifier) verifyResources(ctx context.Context, subscriptionID, action string) Result {
-	switch {
-	case strings.Contains(action, "subscriptions/resources/read"):
-		client, err := armresources.NewClient(subscriptionID, v.credential, v.armClientOptions())
-		if err != nil {
-			return v.handleAzureError(err, action)
-		}
-		pager := client.NewListPager(nil)
-		// Fetch only the first page to verify access.
-		_, err = pager.NextPage(ctx)
-		return v.handleAzureError(err, action)
-
-	case strings.Contains(action, "subscriptions/read"):
-		client, err := armsubscriptions.NewClient(v.credential, v.armClientOptions())
-		if err != nil {
-			return v.handleAzureError(err, action)
-		}
-		pager := client.NewListPager(nil)
-		_, err = pager.NextPage(ctx)
-		return v.handleAzureError(err, action)
-
-	default:
+// verifyViaPermissionsList checks whether the action is present in the
+// principal's effective subscription-scope permissions loaded from the ARM
+// permissions API. This is the authoritative permission check: it evaluates
+// the effective RBAC result without making any data-plane API calls.
+func (v *AzureVerifier) verifyViaPermissionsList(ctx context.Context, subscriptionID, action string) Result {
+	if err := v.loadPermissions(ctx, subscriptionID); err != nil {
 		return Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported Resources action: " + action,
+			Status:       StatusError,
+			ErrorCode:    "PermissionsLoadError",
+			ErrorMessage: fmt.Sprintf("failed to load Azure permissions: %v", err),
+			Endpoint:     "Microsoft.Authorization/permissions",
 		}
 	}
-}
 
-func (v *AzureVerifier) verifyCompute(ctx context.Context, subscriptionID, action string) Result {
-	switch {
-	case strings.Contains(action, "virtualMachines/read"):
-		client, err := armcompute.NewVirtualMachinesClient(subscriptionID, v.credential, v.armClientOptions())
-		if err != nil {
-			return v.handleAzureError(err, action)
-		}
-		pager := client.NewListAllPager(nil)
-		_, err = pager.NextPage(ctx)
-		return v.handleAzureError(err, action)
-
-	default:
-		return Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported Compute action: " + action,
-		}
-	}
-}
-
-func (v *AzureVerifier) verifyStorage(ctx context.Context, subscriptionID, action string) Result {
-	switch {
-	case strings.Contains(action, "storageAccounts/read"):
-		client, err := armstorage.NewAccountsClient(subscriptionID, v.credential, v.armClientOptions())
-		if err != nil {
-			return v.handleAzureError(err, action)
-		}
-		pager := client.NewListPager(nil)
-		_, err = pager.NextPage(ctx)
-		return v.handleAzureError(err, action)
-
-	case strings.Contains(action, "blobServices/containers/read"):
-		// Listing blob containers requires a storage account name. Fall back to
-		// listing storage accounts as a proxy check.
-		client, err := armstorage.NewAccountsClient(subscriptionID, v.credential, v.armClientOptions())
-		if err != nil {
-			return v.handleAzureError(err, action)
-		}
-		pager := client.NewListPager(nil)
-		_, err = pager.NextPage(ctx)
-		if err != nil {
-			return v.handleAzureError(err, action)
-		}
+	if v.checkPermission(action) {
 		return Result{
 			Status:   StatusGranted,
-			Endpoint: action + " (verified via storageAccounts list)",
-		}
-
-	default:
-		return Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported Storage action: " + action,
+			Endpoint: "Microsoft.Authorization/permissions",
 		}
 	}
-}
-
-func (v *AzureVerifier) verifyInsights(ctx context.Context, subscriptionID, action string) Result {
-	switch {
-	case strings.Contains(action, "eventtypes/values/Read"):
-		client, err := armmonitor.NewActivityLogsClient(subscriptionID, v.credential, v.armClientOptions())
-		if err != nil {
-			return v.handleAzureError(err, action)
-		}
-		// Filter to the last hour to keep the response small.
-		filter := "eventTimestamp ge '" + time.Now().Add(-1*time.Hour).UTC().Format(time.RFC3339) + "'"
-		pager := client.NewListPager(filter, nil)
-		_, err = pager.NextPage(ctx)
-		return v.handleAzureError(err, action)
-
-	default:
-		return Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported Insights action: " + action,
-		}
-	}
-}
-
-func (v *AzureVerifier) verifyWeb(ctx context.Context, subscriptionID, action string) Result {
-	switch {
-	case strings.Contains(action, "sites/config/Read") || strings.Contains(action, "sites/read") || strings.Contains(action, "sites/*/read"):
-		client, err := armappservice.NewWebAppsClient(subscriptionID, v.credential, v.armClientOptions())
-		if err != nil {
-			return v.handleAzureError(err, action)
-		}
-		pager := client.NewListPager(nil)
-		_, err = pager.NextPage(ctx)
-		return v.handleAzureError(err, action)
-
-	default:
-		return Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported Web action: " + action,
-		}
-	}
-}
-
-func (v *AzureVerifier) verifyNetwork(ctx context.Context, subscriptionID, action string) Result {
-	switch {
-	case strings.Contains(action, "networkSecurityGroups/read"):
-		client, err := armnetwork.NewSecurityGroupsClient(subscriptionID, v.credential, v.armClientOptions())
-		if err != nil {
-			return v.handleAzureError(err, action)
-		}
-		pager := client.NewListAllPager(nil)
-		_, err = pager.NextPage(ctx)
-		return v.handleAzureError(err, action)
-
-	default:
-		return Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported Network action: " + action,
-		}
+	return Result{
+		Status:       StatusDenied,
+		ErrorCode:    "PermissionNotGranted",
+		ErrorMessage: fmt.Sprintf("action %s is not in the principal's effective permissions at subscription scope", action),
+		Endpoint:     "Microsoft.Authorization/permissions",
 	}
 }
 
@@ -401,6 +386,9 @@ func (v *AzureVerifier) verifyNetwork(ctx context.Context, subscriptionID, actio
 // specific built-in role assigned at the subscription scope.
 // The action string is the role name (e.g. "Reader") and the role definition
 // GUID is embedded in the method for known roles.
+//
+// This method is used for CSPM and asset inventory integrations that require
+// specific RBAC role assignments rather than individual action permissions.
 func (v *AzureVerifier) verifyPolicyAttachment(ctx context.Context, subscriptionID, roleName string) Result {
 	roleGUID := resolveAzureRoleGUID(roleName)
 	if roleGUID == "" {
