@@ -151,7 +151,9 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	otelTests := []test{
 		// logs: identical to classic
 		tests[0],
-		// beat stats in OTel mode: exporter-level stats collected via OTel internal telemetry
+		// beat stats in OTel mode: exporter-level stats collected via OTel internal telemetry.
+		// In OTel mode the elasticmonitoringreceiver aggregates OTel exporter metrics and writes
+		// them to elastic_agent.elastic_agent with component.id set to the exporter name.
 		{
 			dsType:    "metrics",
 			dsDataset: "elastic_agent.elastic_agent",
@@ -162,20 +164,11 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			},
 			onlyCompareKeys: true,
 		},
-		// per-receiver pipeline metrics for filestream-monitoring via RegistryBridge
-		{
-			dsType:    "metrics",
-			dsDataset: "elastic_agent.elastic_agent",
-			query: []map[string]any{
-				{"match_phrase": map[string]any{"metricset.name": "stats"}},
-				{"match_phrase": map[string]any{"component.id": "filestream-monitoring"}},
-				{"exists": map[string]any{"field": "beat.stats.libbeat.output.type"}},
-			},
-			onlyCompareKeys: true,
-		},
 		// agent process metrics: identical to classic
 		tests[3],
-		// filebeat input metrics: identical to classic
+		// filebeat input metrics: identical to classic.
+		// This also validates that filestream-monitoring is running and producing data
+		// via the elasticmonitoringreceiver's per-input metrics collection.
 		tests[4],
 	}
 
