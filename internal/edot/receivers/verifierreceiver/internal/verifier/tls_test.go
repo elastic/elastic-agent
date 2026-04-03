@@ -403,10 +403,10 @@ func TestAzureVerifier_CredentialsAndARMClientsAreIndependent(t *testing.T) {
 // construction.
 func TestGCPVerifier_UsesTLS13Client(t *testing.T) {
 	v, err := NewGCPVerifier(context.Background(), zap.NewNop(), GCPAuthConfig{
-		IDTokenFile:              writeFakeTokenFile(t),
-		Audience: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider",
-		GlobalRoleARN:            "arn:aws:iam::123456789012:role/TestRole",
-		ProjectID:                "test-project",
+		IDTokenFile:   writeFakeTokenFile(t),
+		Audience:      "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider",
+		GlobalRoleARN: "arn:aws:iam::123456789012:role/TestRole",
+		ProjectID:     "test-project",
 	})
 	require.NoError(t, err)
 	require.True(t, v.configured)
