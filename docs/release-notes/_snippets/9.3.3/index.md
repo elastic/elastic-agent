@@ -1,0 +1,18 @@
+## 9.3.3 [elastic-agent-release-notes-9.3.3]
+
+
+
+### Features and enhancements [elastic-agent-9.3.3-features-enhancements]
+
+
+* Add Cloud Defend Integration support to the helm chart. [#13074](https://github.com/elastic/elastic-agent/pull/13074) 
+* Update Go version to 1.25.8. [#10156](https://github.com/elastic/elastic-agent/pull/10156) 
+* Update OTel Collector components to v0.147.0. [#13205](https://github.com/elastic/elastic-agent/pull/13205) [#13448](https://github.com/elastic/elastic-agent/pull/13448) [#13449](https://github.com/elastic/elastic-agent/pull/13449) 
+* Update otel to v1.54.0/v0.148.0. [#13205](https://github.com/elastic/elastic-agent/pull/13205) [#13448](https://github.com/elastic/elastic-agent/pull/13448) [#13449](https://github.com/elastic/elastic-agent/pull/13449) 
+
+
+### Fixes [elastic-agent-9.3.3-fixes]
+
+
+* Fix container enrollment to not re-enroll when the fleet_url is the same. [#13205](https://github.com/elastic/elastic-agent/pull/13205) [#13448](https://github.com/elastic/elastic-agent/pull/13448) [#13449](https://github.com/elastic/elastic-agent/pull/13449) 
+
