@@ -46,12 +46,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13399
-        - https://github.com/elastic/elastic-agent/pull/13188
-        - https://github.com/elastic/elastic-agent/pull/13444
-        - https://github.com/elastic/elastic-agent/pull/13445
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/13272
+        - https://github.com/elastic/elastic-agent/pull/13104
+      issue: []
       impact: ""
       action: ""
       timestamp: 1773138205
@@ -64,12 +60,8 @@ entries:
         In some cases, a late update from an older component instance could overwrite a newer state.  This could cause components to be missing from the status output. With this fix, updates from older instances are ignored if a newer update has already been processed.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13399
-        - https://github.com/elastic/elastic-agent/pull/13188
-        - https://github.com/elastic/elastic-agent/pull/13444
-        - https://github.com/elastic/elastic-agent/pull/13445
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/13272
+        - https://github.com/elastic/elastic-agent/pull/13119
+      issue: []
       impact: ""
       action: ""
       timestamp: 1773217838
@@ -81,12 +73,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13399
-        - https://github.com/elastic/elastic-agent/pull/13188
-        - https://github.com/elastic/elastic-agent/pull/13444
-        - https://github.com/elastic/elastic-agent/pull/13445
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/13272
+        - https://github.com/elastic/elastic-agent/pull/13140
+      issue: []
       impact: ""
       action: ""
       timestamp: 1773392178
@@ -98,10 +86,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13399
         - https://github.com/elastic/elastic-agent/pull/13188
-        - https://github.com/elastic/elastic-agent/pull/13444
-        - https://github.com/elastic/elastic-agent/pull/13445
       issue:
         - https://github.com/elastic/elastic-agent/issues/13272
       impact: ""
@@ -115,12 +100,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13399
-        - https://github.com/elastic/elastic-agent/pull/13188
-        - https://github.com/elastic/elastic-agent/pull/13444
-        - https://github.com/elastic/elastic-agent/pull/13445
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/13272
+        - https://github.com/elastic/elastic-agent/pull/13187
+      issue: []
       impact: ""
       action: ""
       timestamp: 1773760327
@@ -132,12 +113,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13399
-        - https://github.com/elastic/elastic-agent/pull/13188
-        - https://github.com/elastic/elastic-agent/pull/13444
-        - https://github.com/elastic/elastic-agent/pull/13445
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/13272
+        - https://github.com/elastic/elastic-agent/pull/13203
+      issue: []
       impact: ""
       action: ""
       timestamp: 1773838908
@@ -149,12 +126,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13399
-        - https://github.com/elastic/elastic-agent/pull/13188
-        - https://github.com/elastic/elastic-agent/pull/13444
-        - https://github.com/elastic/elastic-agent/pull/13445
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/13272
+        - https://github.com/elastic/elastic-agent/pull/13317
+      issue: []
       impact: ""
       action: ""
       timestamp: 1774382936
@@ -166,12 +139,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13399
-        - https://github.com/elastic/elastic-agent/pull/13188
-        - https://github.com/elastic/elastic-agent/pull/13444
-        - https://github.com/elastic/elastic-agent/pull/13445
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/13272
+        - https://github.com/elastic/elastic-agent/pull/13391
+      issue: []
       impact: ""
       action: ""
       timestamp: 1774970286
