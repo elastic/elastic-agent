@@ -444,10 +444,6 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 			},
-			"http": map[string]any{
-				"enabled": true,
-				"host":    "localhost",
-			},
 			"management.otel.enabled": true,
 		}
 		return config
@@ -494,20 +490,7 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			},
 		},
-		"http": map[string]any{
-			"enabled": true,
-			"host":    "localhost",
-		},
 		"management.otel.enabled": true,
-	}
-
-	getBeatMonitoringConfig := func(_, _ string) map[string]any {
-		return map[string]any{
-			"http": map[string]any{
-				"enabled": true,
-				"host":    "localhost",
-			},
-		}
 	}
 
 	tests := []struct {
@@ -814,10 +797,6 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
-						"http": map[string]any{
-							"enabled": true,
-							"host":    "localhost",
-						},
 						"management.otel.enabled": true,
 					},
 				},
@@ -1114,10 +1093,6 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
-						"http": map[string]any{
-							"enabled": true,
-							"host":    "localhost",
-						},
 						"management.otel.enabled": true,
 					},
 				},
@@ -1230,10 +1205,6 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
-						"http": map[string]any{
-							"enabled": true,
-							"host":    "localhost",
-						},
 						"management.otel.enabled": true,
 					},
 				},
@@ -1265,7 +1236,7 @@ func TestGetOtelConfig(t *testing.T) {
 				}))
 				require.NoError(t, err)
 			}
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig, logp.NewNopLogger())
+			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, logp.NewNopLogger())
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff
@@ -1284,20 +1255,6 @@ func TestGetOtelConfig(t *testing.T) {
 
 func TestGetReceiversConfigForComponent(t *testing.T) {
 	testAgentInfo := &info.AgentInfo{}
-	mockBeatMonitoringConfigGetter := func(componentID, beatName string) map[string]any {
-		return nil // Behavior when self-monitoring is disabled
-	}
-
-	customBeatMonitoringConfigGetter := func(componentID, beatName string) map[string]any {
-		return map[string]any{
-			"http": map[string]any{
-				"enabled": true,
-				"host":    "custom-host:5067",
-				"port":    5067,
-			},
-		}
-	}
-
 	// Create proper component configurations that match existing test patterns
 	filebeatComponent := &component.Component{
 		ID:        "filebeat-test-id",
@@ -1373,21 +1330,19 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                       string
-		component                  *component.Component
-		outputQueueConfig          map[string]any
-		beatMonitoringConfigGetter BeatMonitoringConfigGetter
-		expectedError              string
-		expectedReceiverType       string
-		expectedBeatName           string
+		name                 string
+		component            *component.Component
+		outputQueueConfig    map[string]any
+		expectedError        string
+		expectedReceiverType string
+		expectedBeatName     string
 	}{
 		{
-			name:                       "filebeat component with default monitoring",
-			component:                  filebeatComponent,
-			outputQueueConfig:          nil,
-			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
-			expectedReceiverType:       "filebeatreceiver",
-			expectedBeatName:           "filebeat",
+			name:                 "filebeat component with default monitoring",
+			component:            filebeatComponent,
+			outputQueueConfig:    nil,
+			expectedReceiverType: "filebeatreceiver",
+			expectedBeatName:     "filebeat",
 		},
 		{
 			name:      "metricbeat component with custom monitoring and queue config",
@@ -1396,9 +1351,8 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				"type": "memory",
 				"size": 1000,
 			},
-			beatMonitoringConfigGetter: customBeatMonitoringConfigGetter,
-			expectedReceiverType:       "metricbeatreceiver",
-			expectedBeatName:           "metricbeat",
+			expectedReceiverType: "metricbeatreceiver",
+			expectedBeatName:     "metricbeat",
 		},
 		{
 			name: "component with no input units",
@@ -1424,10 +1378,9 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 					},
 				},
 			},
-			outputQueueConfig:          nil,
-			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
-			expectedReceiverType:       "filebeatreceiver",
-			expectedBeatName:           "filebeat",
+			outputQueueConfig:    nil,
+			expectedReceiverType: "filebeatreceiver",
+			expectedBeatName:     "filebeat",
 		},
 		{
 			name: "unsupported component type",
@@ -1435,9 +1388,8 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				ID:        "unsupported-test-id",
 				InputType: "unsupported",
 			},
-			outputQueueConfig:          nil,
-			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
-			expectedError:              "unknown otel receiver type for input type: unsupported",
+			outputQueueConfig: nil,
+			expectedError:     "unknown otel receiver type for input type: unsupported",
 		},
 	}
 
@@ -1447,7 +1399,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				tt.component,
 				testAgentInfo,
 				tt.outputQueueConfig,
-				tt.beatMonitoringConfigGetter,
 			)
 
 			if tt.expectedError != "" {
@@ -1479,13 +1430,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				assert.NotContains(t, receiverConfig, "queue", "queue config should not be present")
 			}
 
-			// Verify monitoring configuration is present (http section should exist)
-			assert.Contains(t, receiverConfig, "http", "http monitoring config should be present")
-			expectedMonitoringConfig := tt.beatMonitoringConfigGetter(tt.component.ID, tt.component.InputSpec.BinaryName)
-			// If the monitoring getter is not nil, verify the http section is the same
-			if expectedMonitoringConfig != nil {
-				assert.Equal(t, expectedMonitoringConfig["http"], receiverConfig["http"])
-			}
 		})
 	}
 }

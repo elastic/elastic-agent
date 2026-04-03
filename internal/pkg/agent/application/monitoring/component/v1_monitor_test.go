@@ -606,7 +606,7 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 			}
 		}
 	}
-	assert.Len(t, streamsForInputMetrics, 3)
+	assert.Len(t, streamsForInputMetrics, 2)
 }
 
 func TestMonitoringWithOtelRuntime(t *testing.T) {

@@ -134,7 +134,7 @@ func TestStandaloneEncyptedConfigInstall(t *testing.T) {
 			status, err := fixture.ExecStatus(ctx)
 			assert.NoError(c, err)
 			assert.Equal(c, int(cproto.State_HEALTHY), status.State, "Expected healthy status")
-			assert.Len(c, status.Components, 3, "unexpected number of components") // Current components are all monitoring related:  beat/metrics-monitoring, filestream-monitoring, http/metrics-monitoring
+			assert.Len(c, status.Components, 2, "unexpected number of components") // Current components are all monitoring related: filestream-monitoring, http/metrics-monitoring (beat/metrics-monitoring is omitted in OTel mode since monitoring components don't expose unix sockets)
 		}, time.Minute, time.Second)
 
 		_, err = os.Stat(filepath.Join(topPath, "fleet.enc"))
@@ -161,7 +161,7 @@ func TestStandaloneEncyptedConfigInstall(t *testing.T) {
 			status, err := fixture.ExecStatus(ctx)
 			assert.NoError(c, err)
 			assert.Equal(c, int(cproto.State_HEALTHY), status.State, "Expected healthy status")
-			assert.Len(c, status.Components, 3, "unexpected number of components") // Current components are all monitoring related:  beat/metrics-monitoring, filestream-monitoring, http/metrics-monitoring
+			assert.Len(c, status.Components, 2, "unexpected number of components") // Current components are all monitoring related: filestream-monitoring, http/metrics-monitoring (beat/metrics-monitoring is omitted in OTel mode since monitoring components don't expose unix sockets)
 		}, time.Minute, time.Second)
 
 		p, err := os.ReadFile(filepath.Join(topPath, "elastic-agent.yml"))

@@ -105,9 +105,62 @@ func (mr *monitoringReceiver) updateMetrics() {
 		}
 		mr.sendExporterMetricsEvent(componentID, metrics)
 	}
+
+	// Send per-input metrics, one document per input, for filebeat only.
+	// Metricbeat has no per-input monitoring equivalent; other beat types are
+	// not expected to have a corresponding *_input datastream.
+	componentMetrics := collectComponentInputMetrics(resourceMetrics.ScopeMetrics)
+	for compID, compData := range componentMetrics {
+		if compData.beatType != "filebeat" {
+			continue
+		}
+		for _, inputMetrics := range compData.inputs {
+			mr.sendInputMetricsEvent(compID, compData.beatType, inputMetrics)
+		}
+	}
+
+	// Send per-receiver pipeline metrics, one document per Beat receiver.
+	// The pipeline runs internally within each Beat receiver, so separate
+	// events allow visibility into which receiver's pipeline may be backed up.
+	receiverPipelineMetrics := collectReceiverMetrics(resourceMetrics.ScopeMetrics)
+	for compID, fields := range receiverPipelineMetrics {
+		mr.sendReceiverPipelineMetricsEvent(compID, fields)
+	}
 }
 
 func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metrics exporterMetrics) {
+	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
+	addMetricsToEventFields(mr.logger, metrics, &beatEvent)
+	_, _ = beatEvent.Put("component.id", componentID)
+	// Any Beat running as an OTel receiver uses the otelconsumer output type by
+	// definition. This is a string label, not a numeric metric, so it cannot
+	// arrive via OTel internal telemetry and must be set statically here. The
+	// Agent Metrics dashboard filters on this value to distinguish OTel-mode
+	// output from classic Elasticsearch output.
+	_, _ = beatEvent.Put("beat.stats.libbeat.output.type", "otelconsumer")
+	mr.sendLogRecord(beatEvent, componentID)
+}
+
+func (mr *monitoringReceiver) sendReceiverPipelineMetricsEvent(componentID string, fields map[string]any) {
+	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
+	_, _ = beatEvent.Put("component.id", componentID)
+	for k, v := range fields {
+		_, _ = beatEvent.Put(k, v)
+	}
+	mr.sendLogRecord(beatEvent, componentID)
+}
+
+func (mr *monitoringReceiver) sendInputMetricsEvent(componentID string, beatType string, inputMetrics map[string]any) {
+	beatEvent := mapstr.M(mr.config.InputEventTemplate.Fields).Clone()
+	_, _ = beatEvent.Put("component.id", componentID)
+	namespace := beatType + "_input"
+	for k, v := range inputMetrics {
+		_, _ = beatEvent.Put(namespace+"."+k, v)
+	}
+	mr.sendLogRecord(beatEvent, componentID)
+}
+
+func (mr *monitoringReceiver) sendLogRecord(beatEvent mapstr.M, componentID string) {
 	pLogs := plog.NewLogs()
 	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
 	sourceLogs := resourceLogs.ScopeLogs().AppendEmpty()
@@ -115,11 +168,6 @@ func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metri
 	logRecord := logRecords.AppendEmpty()
 
 	sourceLogs.Scope().Attributes().PutStr("elastic.mapping.mode", "bodymap")
-
-	// Initialize to the configured event template
-	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
-	addMetricsToEventFields(mr.logger, metrics, &beatEvent)
-	_, _ = beatEvent.Put("component.id", componentID)
 
 	// Set timestamp
 	now := time.Now()
@@ -140,7 +188,6 @@ func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metri
 				logRecord.Attributes().PutStr("data_stream."+subField, vStr)
 			}
 		}
-
 	}
 
 	// Set log record body to computed fields

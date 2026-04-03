@@ -7,6 +7,7 @@ package elasticmonitoring
 import (
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
@@ -60,6 +61,18 @@ const (
 
 	otelComponentIDKey   = "otelcol.component.id"
 	otelComponentKindKey = "otelcol.component.kind"
+
+	otelInputIDKey   = "input_id"
+	otelInputTypeKey = "input_type"
+
+	// registryBridgeScopeName is the instrumentation scope name used by the
+	// RegistryBridge in beats, which bridges Beats monitoring registries into
+	// OTel async instruments. Metrics from this scope carry a "receiver"
+	// data point attribute containing the OTel component ID.
+	registryBridgeScopeName = "github.com/elastic/beats/v7/x-pack/otel/telemetry"
+	// registryBridgeReceiverKey is the data point attribute key set by the
+	// RegistryBridge to identify which Beat receiver emitted the metric.
+	registryBridgeReceiverKey = "receiver"
 )
 
 // Add the integer referenced by value, if it isn't nil, to the given
@@ -135,12 +148,11 @@ func addMetric(metrics *exporterMetrics, met metricdata.Metrics) {
 	}
 }
 
-// Given an internal telemetry scope, return the ID of the corresponding
-// exporter if there is one.
-func exporterIDForScope(scope instrumentation.Scope) string {
-	kind, ok := scope.Attributes.Value(otelComponentKindKey)
-	if !ok || kind.AsString() != "exporter" {
-		// Only exporter components have an exporter ID to return.
+// componentIDForScope returns the otelcol.component.id from the scope
+// attributes if it matches the given kind, or empty string otherwise.
+func componentIDForScope(scope instrumentation.Scope, kind string) string {
+	kindVal, ok := scope.Attributes.Value(otelComponentKindKey)
+	if !ok || kindVal.AsString() != kind {
 		return ""
 	}
 	id, ok := scope.Attributes.Value(otelComponentIDKey)
@@ -150,12 +162,24 @@ func exporterIDForScope(scope instrumentation.Scope) string {
 	return id.AsString()
 }
 
+// agentComponentID extracts the agent component ID from an OTel component ID.
+// OTel component IDs follow the pattern "{type}/_agent-component/{compID}".
+// Returns the compID portion, or empty string if the pattern doesn't match.
+func agentComponentID(otelComponentID string) string {
+	const prefix = "_agent-component/"
+	idx := strings.Index(otelComponentID, prefix)
+	if idx < 0 {
+		return ""
+	}
+	return otelComponentID[idx+len(prefix):]
+}
+
 func convertScopeMetrics(scopeMetrics []metricdata.ScopeMetrics) map[string]exporterMetrics {
 	const elasticsearchPrefix = "elasticsearch/"
 	exporters := map[string]exporterMetrics{}
 
 	for _, sm := range scopeMetrics {
-		exporterID := exporterIDForScope(sm.Scope)
+		exporterID := componentIDForScope(sm.Scope, "exporter")
 		if !strings.HasPrefix(exporterID, elasticsearchPrefix) {
 			// Only handle metrics corresponding to exporter state we know how
 			// to monitor (just elasticsearch for now)
@@ -180,6 +204,163 @@ func mapstrSetWithErrorLog(logger *zap.Logger, event *mapstr.M, key string, valu
 		logger.Error("Couldn't set key while generating metrics event",
 			zap.String("key", key), zap.Error(err))
 	}
+}
+
+// componentInputData holds the per-input metrics for a single agent component,
+// along with the beat type derived from the OTel receiver component ID
+// (e.g. "filebeat" for a filebeatreceiver component).
+type componentInputData struct {
+	beatType string
+	inputs   map[string]map[string]any // sanitizedInputID -> fields
+}
+
+// beatTypeFromOtelID extracts the beat type from an OTel component ID.
+// OTel component IDs follow the pattern "{type}[/{rest}]", where {type} is
+// e.g. "filebeatreceiver". The "receiver" suffix is stripped to get the beat
+// type (e.g. "filebeat").
+func beatTypeFromOtelID(otelComponentID string) string {
+	typePart := otelComponentID
+	if idx := strings.Index(otelComponentID, "/"); idx >= 0 {
+		typePart = otelComponentID[:idx]
+	}
+	return strings.TrimSuffix(typePart, "receiver")
+}
+
+// collectComponentInputMetrics iterates all scope metrics and aggregates data
+// points that carry an "input_id" attribute, grouped by the agent component
+// they belong to (extracted from the scope's otelcol.component.id).
+// Returns a map from agent component ID to componentInputData, which holds
+// the beat type and a map keyed by sanitized input ID. Each input entry
+// contains "id" (original input_id), optionally "input" (input_type), and
+// the raw metric name/value pairs.
+func collectComponentInputMetrics(scopeMetrics []metricdata.ScopeMetrics) map[string]componentInputData {
+	components := map[string]componentInputData{}
+	for _, sm := range scopeMetrics {
+		// Resolve the full OTel component ID for this scope, preferring the
+		// receiver kind but falling back to any component ID present (e.g.
+		// beat bridge metrics that may not carry a component kind attribute).
+		otelID := componentIDForScope(sm.Scope, "receiver")
+		if otelID == "" {
+			id, ok := sm.Scope.Attributes.Value(otelComponentIDKey)
+			if !ok {
+				continue
+			}
+			otelID = id.AsString()
+		}
+
+		compID := agentComponentID(otelID)
+		if compID == "" {
+			continue
+		}
+
+		data, exists := components[compID]
+		if !exists {
+			data = componentInputData{
+				beatType: beatTypeFromOtelID(otelID),
+				inputs:   map[string]map[string]any{},
+			}
+		}
+
+		for _, met := range sm.Metrics {
+			switch v := met.Data.(type) {
+			case metricdata.Gauge[int64]:
+				for _, dp := range v.DataPoints {
+					addInputDataPoint(data.inputs, met.Name, dp.Attributes, dp.Value)
+				}
+			case metricdata.Sum[int64]:
+				for _, dp := range v.DataPoints {
+					addInputDataPoint(data.inputs, met.Name, dp.Attributes, dp.Value)
+				}
+			case metricdata.Gauge[float64]:
+				for _, dp := range v.DataPoints {
+					addInputDataPoint(data.inputs, met.Name, dp.Attributes, dp.Value)
+				}
+			case metricdata.Sum[float64]:
+				for _, dp := range v.DataPoints {
+					addInputDataPoint(data.inputs, met.Name, dp.Attributes, dp.Value)
+				}
+			}
+		}
+
+		components[compID] = data
+	}
+	return components
+}
+
+func addInputDataPoint[N int64 | float64](dataset map[string]map[string]any, name string, attrs attribute.Set, value N) {
+	inputIDVal, ok := attrs.Value(otelInputIDKey)
+	if !ok {
+		return
+	}
+	inputID := inputIDVal.AsString()
+
+	entry, exists := dataset[inputID]
+	if !exists {
+		entry = map[string]any{"id": inputID}
+	}
+
+	if inputTypeVal, ok := attrs.Value(otelInputTypeKey); ok {
+		entry["input"] = inputTypeVal.AsString()
+	}
+
+	entry[name] = value
+	dataset[inputID] = entry
+}
+
+// collectReceiverMetrics collects all metrics emitted by the RegistryBridge
+// (scope name: github.com/elastic/beats/v7/x-pack/otel/telemetry).
+// Each data point carries a "receiver" attribute containing the OTel component ID.
+// Metrics are mapped to fields as "beat.stats.{beatType}.{metricName}", where
+// beatType is derived from the receiver OTel component ID (e.g. "filebeat").
+// This matches the standard Beats monitoring schema
+// (e.g. "beat.stats.filebeat.harvester.running", "beat.stats.filebeat.registrar.states.current").
+// Returns a map from agent component ID to a map of field names to values,
+// one entry per receiver.
+func collectReceiverMetrics(scopeMetrics []metricdata.ScopeMetrics) map[string]map[string]any {
+	components := map[string]map[string]any{}
+	for _, sm := range scopeMetrics {
+		if sm.Scope.Name != registryBridgeScopeName {
+			continue
+		}
+		for _, met := range sm.Metrics {
+			switch v := met.Data.(type) {
+			case metricdata.Gauge[int64]:
+				for _, dp := range v.DataPoints {
+					addReceiverDataPoint(components, dp.Attributes, met.Name, dp.Value)
+				}
+			case metricdata.Sum[int64]:
+				for _, dp := range v.DataPoints {
+					addReceiverDataPoint(components, dp.Attributes, met.Name, dp.Value)
+				}
+			case metricdata.Gauge[float64]:
+				for _, dp := range v.DataPoints {
+					addReceiverDataPoint(components, dp.Attributes, met.Name, dp.Value)
+				}
+			case metricdata.Sum[float64]:
+				for _, dp := range v.DataPoints {
+					addReceiverDataPoint(components, dp.Attributes, met.Name, dp.Value)
+				}
+			}
+		}
+	}
+	return components
+}
+
+func addReceiverDataPoint[N int64 | float64](components map[string]map[string]any, attrs attribute.Set, metricName string, value N) {
+	receiverVal, ok := attrs.Value(registryBridgeReceiverKey)
+	if !ok {
+		return
+	}
+	otelID := receiverVal.AsString()
+	compID := agentComponentID(otelID)
+	if compID == "" {
+		return
+	}
+	field := "beat.stats." + beatTypeFromOtelID(otelID) + "." + metricName
+	if _, exists := components[compID]; !exists {
+		components[compID] = map[string]any{}
+	}
+	components[compID][field] = value
 }
 
 // Add the given metrics as fields on the event, with field names following
