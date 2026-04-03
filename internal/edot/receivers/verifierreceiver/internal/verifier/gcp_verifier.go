@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,14 +19,9 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/google/externalaccount"
-	cloudasset "google.golang.org/api/cloudasset/v1"
 	"google.golang.org/api/cloudresourcemanager/v3"
-	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	logging "google.golang.org/api/logging/v2"
 	"google.golang.org/api/option"
-	pubsubapi "google.golang.org/api/pubsub/v1"
-	storageapi "google.golang.org/api/storage/v1"
 )
 
 // GCPVerifier implements permission verification for GCP.
@@ -136,10 +131,10 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 			httpClient.CloseIdleConnections()
 			return &GCPVerifier{logger: logger, configured: false}, nil
 		}
-		opts = append(opts,
-			option.WithCredentials(creds),
-			option.WithHTTPClient(httpClient),
-		)
+		// option.WithHTTPClient bypasses credential injection, so pass only
+		// the credentials here. The FIPS HTTP client was injected into the ADC
+		// discovery path via the context above.
+		opts = append(opts, option.WithCredentials(creds))
 		if authConfig.ProjectID == "" && creds.ProjectID != "" {
 			authConfig.ProjectID = creds.ProjectID
 		}
@@ -148,6 +143,17 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 		logger.Warn("GCP credentials not fully configured")
 		httpClient.CloseIdleConnections()
 		return &GCPVerifier{logger: logger, configured: false}, nil
+	}
+
+	// Fall back to well-known environment variables when no project ID was derived
+	// from the config (e.g., testing with Application Default Credentials that
+	// don't embed a project).
+	if authConfig.ProjectID == "" {
+		if p := os.Getenv("GOOGLE_CLOUD_PROJECT"); p != "" {
+			authConfig.ProjectID = p
+		} else if p := os.Getenv("GCLOUD_PROJECT"); p != "" {
+			authConfig.ProjectID = p
+		}
 	}
 
 	logger.Info("GCP credential configured successfully",
@@ -176,7 +182,9 @@ func (v *GCPVerifier) Close() error {
 	return nil
 }
 
-// Verify checks if a GCP permission is granted by making a minimal API call.
+// Verify checks if a GCP permission is granted using testIamPermissions.
+// For CSPM and asset inventory integrations, IAM role binding is verified
+// instead via cloudresourcemanager:GetIamPolicy.
 func (v *GCPVerifier) Verify(ctx context.Context, permission Permission, providerCfg ProviderConfig) Result {
 	start := time.Now()
 
@@ -194,188 +202,64 @@ func (v *GCPVerifier) Verify(ctx context.Context, permission Permission, provide
 		projectID = providerCfg.ProjectID
 	}
 
-	// GCP permissions look like "service.resource.verb" (e.g. "compute.instances.list").
-	service := extractGCPService(permission.Action)
-
 	v.logger.Debug("Verifying GCP permission",
-		zap.String("service", service),
 		zap.String("action", permission.Action),
 		zap.String("project_id", projectID),
+		zap.String("method", string(permission.Method)),
 	)
 
 	var result Result
-	switch service {
-	case "resourcemanager":
-		result = v.verifyResourceManager(ctx, projectID, permission.Action)
-	case "cloudasset":
-		result = v.verifyCloudAsset(ctx, projectID, permission.Action)
-	case "logging":
-		result = v.verifyLogging(ctx, projectID, permission.Action)
-	case "storage":
-		result = v.verifyStorage(ctx, projectID, permission.Action)
-	case "pubsub":
-		result = v.verifyPubSub(ctx, projectID, permission.Action)
-	case "compute":
-		result = v.verifyCompute(ctx, projectID, permission.Action)
-	default:
-		if permission.Method == MethodPolicyAttachmentCheck {
-			result = v.verifyPolicyAttachment(ctx, projectID, permission.Action)
-		} else {
-			result = Result{
-				Status:       StatusSkipped,
-				ErrorMessage: "Unsupported GCP service: " + service,
-			}
-		}
+	if permission.Method == MethodPolicyAttachmentCheck {
+		result = v.verifyPolicyAttachment(ctx, projectID, permission.Action)
+	} else {
+		result = v.testIAMPermissions(ctx, projectID, permission.Action)
 	}
 
 	result.Duration = time.Since(start)
 	return result
 }
 
-// extractGCPService returns the service prefix from a GCP permission string
-// (e.g. "compute" from "compute.instances.list").
-func extractGCPService(action string) string {
-	parts := strings.SplitN(action, ".", 2)
-	if len(parts) == 0 {
-		return ""
+// testIAMPermissions checks whether the authenticated principal has the given
+// GCP IAM permission using the Cloud Resource Manager testIamPermissions API.
+// This is the authoritative permission check: it evaluates all applicable IAM
+// policies at the project level (including inherited organization/folder bindings)
+// without making any data-plane API calls.
+func (v *GCPVerifier) testIAMPermissions(ctx context.Context, projectID, action string) Result {
+	svc, err := cloudresourcemanager.NewService(ctx, v.opts...)
+	if err != nil {
+		return v.handleGCPError(err, "cloudresourcemanager:NewService")
 	}
-	return parts[0]
-}
 
-func (v *GCPVerifier) verifyResourceManager(ctx context.Context, projectID, action string) Result {
-	switch {
-	case strings.Contains(action, "projects.get"):
-		svc, err := cloudresourcemanager.NewService(ctx, v.opts...)
-		if err != nil {
-			return v.handleGCPError(err, action)
-		}
-		_, err = svc.Projects.Get("projects/" + projectID).Context(ctx).Do()
-		return v.handleGCPError(err, action)
-
-	default:
-		return Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported Resource Manager action: " + action,
-		}
+	resp, err := svc.Projects.TestIamPermissions("projects/"+projectID,
+		&cloudresourcemanager.TestIamPermissionsRequest{
+			Permissions: []string{action},
+		},
+	).Context(ctx).Do()
+	if err != nil {
+		return v.handleGCPError(err, "cloudresourcemanager:TestIamPermissions")
 	}
-}
 
-func (v *GCPVerifier) verifyCloudAsset(ctx context.Context, projectID, action string) Result {
-	switch {
-	case strings.Contains(action, "searchAllResources"):
-		svc, err := cloudasset.NewService(ctx, v.opts...)
-		if err != nil {
-			return v.handleGCPError(err, action)
-		}
-		_, err = svc.V1.SearchAllResources("projects/" + projectID).PageSize(1).Context(ctx).Do()
-		return v.handleGCPError(err, action)
-
-	default:
-		return Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported Cloud Asset action: " + action,
+	for _, granted := range resp.Permissions {
+		if granted == action {
+			return Result{
+				Status:   StatusGranted,
+				Endpoint: "cloudresourcemanager:TestIamPermissions",
+			}
 		}
 	}
-}
-
-func (v *GCPVerifier) verifyLogging(ctx context.Context, projectID, action string) Result {
-	switch {
-	case strings.Contains(action, "logEntries.list"):
-		svc, err := logging.NewService(ctx, v.opts...)
-		if err != nil {
-			return v.handleGCPError(err, action)
-		}
-		_, err = svc.Entries.List(&logging.ListLogEntriesRequest{
-			ResourceNames: []string{"projects/" + projectID},
-			PageSize:      1,
-		}).Context(ctx).Do()
-		return v.handleGCPError(err, action)
-
-	default:
-		return Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported Logging action: " + action,
-		}
-	}
-}
-
-func (v *GCPVerifier) verifyStorage(ctx context.Context, projectID, action string) Result {
-	switch {
-	case strings.Contains(action, "buckets.list"):
-		svc, err := storageapi.NewService(ctx, v.opts...)
-		if err != nil {
-			return v.handleGCPError(err, action)
-		}
-		_, err = svc.Buckets.List(projectID).MaxResults(1).Context(ctx).Do()
-		return v.handleGCPError(err, action)
-
-	case strings.Contains(action, "objects.get") || strings.Contains(action, "objects.list"):
-		svc, err := storageapi.NewService(ctx, v.opts...)
-		if err != nil {
-			return v.handleGCPError(err, action)
-		}
-		_, err = svc.Buckets.List(projectID).MaxResults(1).Context(ctx).Do()
-		if err != nil {
-			return v.handleGCPError(err, action)
-		}
-		return Result{
-			Status:   StatusGranted,
-			Endpoint: action + " (verified via buckets.list)",
-		}
-
-	default:
-		return Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported Storage action: " + action,
-		}
-	}
-}
-
-func (v *GCPVerifier) verifyPubSub(ctx context.Context, projectID, action string) Result {
-	switch {
-	case strings.Contains(action, "subscriptions.consume"):
-		svc, err := pubsubapi.NewService(ctx, v.opts...)
-		if err != nil {
-			return v.handleGCPError(err, action)
-		}
-		_, err = svc.Projects.Subscriptions.List("projects/" + projectID).Context(ctx).Do()
-		if err != nil {
-			return v.handleGCPError(err, action)
-		}
-		return Result{
-			Status:   StatusGranted,
-			Endpoint: action + " (verified via subscriptions.list)",
-		}
-
-	default:
-		return Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported Pub/Sub action: " + action,
-		}
-	}
-}
-
-func (v *GCPVerifier) verifyCompute(ctx context.Context, projectID, action string) Result {
-	switch {
-	case strings.Contains(action, "instances.list"):
-		svc, err := compute.NewService(ctx, v.opts...)
-		if err != nil {
-			return v.handleGCPError(err, action)
-		}
-		// List instances in a single zone is not required; use aggregated list.
-		_, err = svc.Instances.AggregatedList(projectID).MaxResults(1).Context(ctx).Do()
-		return v.handleGCPError(err, action)
-
-	default:
-		return Result{
-			Status:       StatusSkipped,
-			ErrorMessage: "Unsupported Compute action: " + action,
-		}
+	return Result{
+		Status:       StatusDenied,
+		ErrorCode:    "PermissionNotGranted",
+		ErrorMessage: fmt.Sprintf("permission %s is not granted on project %s", action, projectID),
+		Endpoint:     "cloudresourcemanager:TestIamPermissions",
 	}
 }
 
 // verifyPolicyAttachment checks whether the expected IAM role is bound to the
 // service account in the project's IAM policy.
+//
+// This method is used for CSPM and asset inventory integrations that require
+// specific IAM role bindings rather than individual permissions.
 func (v *GCPVerifier) verifyPolicyAttachment(ctx context.Context, projectID, expectedRole string) Result {
 	svc, err := cloudresourcemanager.NewService(ctx, v.opts...)
 	if err != nil {

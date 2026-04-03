@@ -51,7 +51,7 @@ type ProvidersConfig struct {
 	AWS   AWSProviderConfig   `mapstructure:"aws"`
 	Azure AzureProviderConfig `mapstructure:"azure"`
 	GCP   GCPProviderConfig   `mapstructure:"gcp"`
-	Okta  OktaProviderConfig  `mapstructure:"okta"`
+	// Okta  OktaProviderConfig  `mapstructure:"okta"`
 }
 
 // IdentityFederationConfig contains shared OIDC fields for the identity federation
@@ -288,58 +288,58 @@ func (cfg *GCPCredentials) ToAuthConfig(cc IdentityFederationConfig, identityFed
 	}
 }
 
-// OktaProviderConfig contains Okta authentication configuration.
-type OktaProviderConfig struct {
-	// Credentials contains the Okta authentication credentials.
-	Credentials OktaCredentials `mapstructure:"credentials"`
-}
+// // OktaProviderConfig contains Okta authentication configuration.
+// type OktaProviderConfig struct {
+// 	// Credentials contains the Okta authentication credentials.
+// 	Credentials OktaCredentials `mapstructure:"credentials"`
+// }
 
-// OktaCredentials contains the Okta credentials.
-type OktaCredentials struct {
-	// Domain is the Okta domain (e.g., dev-123456.okta.com).
-	Domain string `mapstructure:"domain"`
+// // OktaCredentials contains the Okta credentials.
+// type OktaCredentials struct {
+// 	// Domain is the Okta domain (e.g., dev-123456.okta.com).
+// 	Domain string `mapstructure:"domain"`
 
-	// APIToken is the Okta API token.
-	APIToken string `mapstructure:"api_token"`
+// 	// APIToken is the Okta API token.
+// 	APIToken string `mapstructure:"api_token"`
 
-	// ClientID is the OAuth 2.0 client ID (for OAuth authentication).
-	ClientID string `mapstructure:"client_id"`
+// 	// ClientID is the OAuth 2.0 client ID (for OAuth authentication).
+// 	ClientID string `mapstructure:"client_id"`
 
-	// PrivateKey is the private key for OAuth authentication.
-	PrivateKey string `mapstructure:"private_key"`
-}
+// 	// PrivateKey is the private key for OAuth authentication.
+// 	PrivateKey string `mapstructure:"private_key"`
+// }
 
-// Validate validates the Okta credentials.
-func (cfg *OktaCredentials) Validate() error {
-	if cfg.Domain == "" && cfg.APIToken == "" && cfg.ClientID == "" {
-		return nil // Not configured
-	}
-	if cfg.Domain == "" {
-		return errors.New("domain must be specified")
-	}
-	if cfg.APIToken == "" && cfg.ClientID == "" {
-		return errors.New("either api_token or client_id must be specified")
-	}
-	if cfg.ClientID != "" && cfg.PrivateKey == "" {
-		return errors.New("private_key must be specified when using client_id")
-	}
-	return nil
-}
+// // Validate validates the Okta credentials.
+// func (cfg *OktaCredentials) Validate() error {
+// 	if cfg.Domain == "" && cfg.APIToken == "" && cfg.ClientID == "" {
+// 		return nil // Not configured
+// 	}
+// 	if cfg.Domain == "" {
+// 		return errors.New("domain must be specified")
+// 	}
+// 	if cfg.APIToken == "" && cfg.ClientID == "" {
+// 		return errors.New("either api_token or client_id must be specified")
+// 	}
+// 	if cfg.ClientID != "" && cfg.PrivateKey == "" {
+// 		return errors.New("private_key must be specified when using client_id")
+// 	}
+// 	return nil
+// }
 
-// IsConfigured returns true if Okta credentials are configured.
-func (cfg *OktaCredentials) IsConfigured() bool {
-	return cfg.Domain != "" && (cfg.APIToken != "" || (cfg.ClientID != "" && cfg.PrivateKey != ""))
-}
+// // IsConfigured returns true if Okta credentials are configured.
+// func (cfg *OktaCredentials) IsConfigured() bool {
+// 	return cfg.Domain != "" && (cfg.APIToken != "" || (cfg.ClientID != "" && cfg.PrivateKey != ""))
+// }
 
-// ToAuthConfig converts the config to a verifier.OktaAuthConfig.
-func (cfg *OktaCredentials) ToAuthConfig() verifier.OktaAuthConfig {
-	return verifier.OktaAuthConfig{
-		Domain:     cfg.Domain,
-		APIToken:   cfg.APIToken,
-		ClientID:   cfg.ClientID,
-		PrivateKey: cfg.PrivateKey,
-	}
-}
+// // ToAuthConfig converts the config to a verifier.OktaAuthConfig.
+// func (cfg *OktaCredentials) ToAuthConfig() verifier.OktaAuthConfig {
+// 	return verifier.OktaAuthConfig{
+// 		Domain:     cfg.Domain,
+// 		APIToken:   cfg.APIToken,
+// 		ClientID:   cfg.ClientID,
+// 		PrivateKey: cfg.PrivateKey,
+// 	}
+// }
 
 // PolicyConfig represents an agent policy with its integrations.
 type PolicyConfig struct {
@@ -431,8 +431,8 @@ func GetProviderForPackage(packageName string) verifier.ProviderType {
 		return verifier.ProviderAzure
 	case "gcp":
 		return verifier.ProviderGCP
-	case "okta":
-		return verifier.ProviderOkta
+	// case "okta":
+	// 	return verifier.ProviderOkta
 	default:
 		return ""
 	}

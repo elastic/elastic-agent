@@ -111,7 +111,7 @@ func NewPermissionRegistry() *PermissionRegistry {
 	registry.registerAWSIntegrations()
 	registry.registerAzureIntegrations()
 	registry.registerGCPIntegrations()
-	registry.registerOktaIntegrations()
+	// registry.registerOktaIntegrations()
 
 	return registry
 }
@@ -300,342 +300,342 @@ func (r *PermissionRegistry) GetVersionConstraints(integrationType string) []str
 
 // registerAWSIntegrations registers all AWS-based integrations.
 func (r *PermissionRegistry) registerAWSIntegrations() {
-	// AWS CloudTrail - commonly used for security auditing
-	// https://www.elastic.co/docs/current/integrations/aws/cloudtrail
-	//
-	// v2.0.0+: Added sqs:DeleteMessage as required (queue-based ingestion became default)
-	r.register("aws_cloudtrail", ">=2.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{
-				Action:   "cloudtrail:LookupEvents",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "cloudtrail:DescribeTrails",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-			{
-				Action:   "cloudtrail:GetTrailStatus",
-				Required: false,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-			{
-				Action:   "s3:GetObject",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "s3:ListBucket",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "sqs:ReceiveMessage",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "sqs:DeleteMessage",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-		},
-	})
-	// v1.x: Original permission set (SQS optional)
-	r.register("aws_cloudtrail", ">=1.0.0,<2.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{
-				Action:   "cloudtrail:LookupEvents",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "cloudtrail:DescribeTrails",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-			{
-				Action:   "cloudtrail:GetTrailStatus",
-				Required: false,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-			{
-				Action:   "s3:GetObject",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "s3:ListBucket",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "sqs:ReceiveMessage",
-				Required: false,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "sqs:DeleteMessage",
-				Required: false,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-		},
-	})
+	// // AWS CloudTrail - commonly used for security auditing
+	// // https://www.elastic.co/docs/current/integrations/aws/cloudtrail
+	// //
+	// // v2.0.0+: Added sqs:DeleteMessage as required (queue-based ingestion became default)
+	// r.register("aws_cloudtrail", ">=2.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAWS,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "cloudtrail:LookupEvents",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "cloudtrail:DescribeTrails",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 		{
+	// 			Action:   "cloudtrail:GetTrailStatus",
+	// 			Required: false,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 		{
+	// 			Action:   "s3:GetObject",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "s3:ListBucket",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "sqs:ReceiveMessage",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "sqs:DeleteMessage",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 	},
+	// })
+	// // v1.x: Original permission set (SQS optional)
+	// r.register("aws_cloudtrail", ">=1.0.0,<2.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAWS,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "cloudtrail:LookupEvents",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "cloudtrail:DescribeTrails",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 		{
+	// 			Action:   "cloudtrail:GetTrailStatus",
+	// 			Required: false,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 		{
+	// 			Action:   "s3:GetObject",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "s3:ListBucket",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "sqs:ReceiveMessage",
+	// 			Required: false,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "sqs:DeleteMessage",
+	// 			Required: false,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 	},
+	// })
 
-	// AWS GuardDuty - threat detection service
-	r.register("aws_guardduty", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{
-				Action:   "guardduty:ListDetectors",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-			{
-				Action:   "guardduty:GetFindings",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "guardduty:ListFindings",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-		},
-	})
+	// // AWS GuardDuty - threat detection service
+	// r.register("aws_guardduty", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAWS,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "guardduty:ListDetectors",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 		{
+	// 			Action:   "guardduty:GetFindings",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "guardduty:ListFindings",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 	},
+	// })
 
-	// AWS Security Hub - security findings aggregation
-	r.register("aws_securityhub", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{
-				Action:   "securityhub:GetFindings",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "securityhub:BatchGetSecurityControls",
-				Required: false,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "securityhub:DescribeHub",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-		},
-	})
+	// // AWS Security Hub - security findings aggregation
+	// r.register("aws_securityhub", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAWS,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "securityhub:GetFindings",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "securityhub:BatchGetSecurityControls",
+	// 			Required: false,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "securityhub:DescribeHub",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 	},
+	// })
 
-	// AWS S3 - storage access logs
-	r.register("aws_s3", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{
-				Action:   "s3:ListBucket",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "s3:GetObject",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "s3:GetBucketLocation",
-				Required: false,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-		},
-	})
+	// // AWS S3 - storage access logs
+	// r.register("aws_s3", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAWS,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "s3:ListBucket",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "s3:GetObject",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "s3:GetBucketLocation",
+	// 			Required: false,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 	},
+	// })
 
-	// AWS EC2 - compute instance metrics
-	r.register("aws_ec2", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{
-				Action:   "ec2:DescribeInstances",
-				Required: true,
-				Method:   MethodDryRun,
-				Category: "data_access",
-			},
-			{
-				Action:   "ec2:DescribeRegions",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-			{
-				Action:   "cloudwatch:GetMetricData",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-		},
-	})
+	// // AWS EC2 - compute instance metrics
+	// r.register("aws_ec2", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAWS,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "ec2:DescribeInstances",
+	// 			Required: true,
+	// 			Method:   MethodDryRun,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "ec2:DescribeRegions",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 		{
+	// 			Action:   "cloudwatch:GetMetricData",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 	},
+	// })
 
-	// AWS VPC Flow Logs
-	r.register("aws_vpcflow", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{
-				Action:   "logs:FilterLogEvents",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "logs:DescribeLogGroups",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-			{
-				Action:   "logs:DescribeLogStreams",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-			{
-				Action:   "ec2:DescribeFlowLogs",
-				Required: false,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-		},
-	})
+	// // AWS VPC Flow Logs
+	// r.register("aws_vpcflow", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAWS,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "logs:FilterLogEvents",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "logs:DescribeLogGroups",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 		{
+	// 			Action:   "logs:DescribeLogStreams",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 		{
+	// 			Action:   "ec2:DescribeFlowLogs",
+	// 			Required: false,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 	},
+	// })
 
-	// AWS WAF - Web Application Firewall logs
-	r.register("aws_waf", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{
-				Action:   "wafv2:GetWebACL",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-			{
-				Action:   "wafv2:ListWebACLs",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-			{
-				Action:   "s3:GetObject",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "s3:ListBucket",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-		},
-	})
+	// // AWS WAF - Web Application Firewall logs
+	// r.register("aws_waf", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAWS,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "wafv2:GetWebACL",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 		{
+	// 			Action:   "wafv2:ListWebACLs",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 		{
+	// 			Action:   "s3:GetObject",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "s3:ListBucket",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 	},
+	// })
 
-	// AWS Route53 - DNS query logs
-	r.register("aws_route53", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{
-				Action:   "logs:FilterLogEvents",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "logs:DescribeLogGroups",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-			{
-				Action:   "route53:ListHostedZones",
-				Required: false,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-		},
-	})
+	// // AWS Route53 - DNS query logs
+	// r.register("aws_route53", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAWS,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "logs:FilterLogEvents",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "logs:DescribeLogGroups",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 		{
+	// 			Action:   "route53:ListHostedZones",
+	// 			Required: false,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 	},
+	// })
 
-	// AWS ELB - Elastic Load Balancer access logs
-	r.register("aws_elb", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{
-				Action:   "s3:GetObject",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "s3:ListBucket",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "elasticloadbalancing:DescribeLoadBalancers",
-				Required: false,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-		},
-	})
+	// // AWS ELB - Elastic Load Balancer access logs
+	// r.register("aws_elb", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAWS,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "s3:GetObject",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "s3:ListBucket",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "elasticloadbalancing:DescribeLoadBalancers",
+	// 			Required: false,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 	},
+	// })
 
-	// AWS CloudFront - CDN access logs
-	r.register("aws_cloudfront", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{
-				Action:   "s3:GetObject",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "s3:ListBucket",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "cloudfront:ListDistributions",
-				Required: false,
-				Method:   MethodAPICall,
-				Category: "management",
-			},
-		},
-	})
+	// // AWS CloudFront - CDN access logs
+	// r.register("aws_cloudfront", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAWS,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "s3:GetObject",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "s3:ListBucket",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "cloudfront:ListDistributions",
+	// 			Required: false,
+	// 			Method:   MethodAPICall,
+	// 			Category: "management",
+	// 		},
+	// 	},
+	// })
 
 	// AWS CSPM - Cloud Security Posture Management
 	// Verifies that the SecurityAudit managed policy is attached to the assumed role.
@@ -668,44 +668,44 @@ func (r *PermissionRegistry) registerAWSIntegrations() {
 
 // registerAzureIntegrations registers all Azure-based integrations.
 func (r *PermissionRegistry) registerAzureIntegrations() {
-	// Azure Activity Logs
-	r.register("azure_activitylogs", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAzure,
-		Permissions: []Permission{
-			{
-				Action:   "Microsoft.Insights/eventtypes/values/Read",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-		},
-	})
+	// // Azure Activity Logs
+	// r.register("azure_activitylogs", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAzure,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "Microsoft.Insights/eventtypes/values/Read",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 	},
+	// })
 
-	// Azure Audit Logs
-	r.register("azure_auditlogs", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAzure,
-		Permissions: []Permission{
-			{
-				Action:   "Microsoft.Insights/eventtypes/values/Read",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-		},
-	})
+	// // Azure Audit Logs
+	// r.register("azure_auditlogs", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAzure,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "Microsoft.Insights/eventtypes/values/Read",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 	},
+	// })
 
-	// Azure Blob Storage
-	r.register("azure_blob_storage", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderAzure,
-		Permissions: []Permission{
-			{
-				Action:   "Microsoft.Storage/storageAccounts/blobServices/containers/read",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-		},
-	})
+	// // Azure Blob Storage
+	// r.register("azure_blob_storage", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderAzure,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 	},
+	// })
 
 	// Azure CSPM - Cloud Security Posture Management
 	// Verifies that the Reader built-in role is assigned at subscription scope.
@@ -738,50 +738,50 @@ func (r *PermissionRegistry) registerAzureIntegrations() {
 
 // registerGCPIntegrations registers all GCP-based integrations.
 func (r *PermissionRegistry) registerGCPIntegrations() {
-	// GCP Audit Logs
-	r.register("gcp_audit", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderGCP,
-		Permissions: []Permission{
-			{
-				Action:   "logging.logEntries.list",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-		},
-	})
+	// // GCP Audit Logs
+	// r.register("gcp_audit", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderGCP,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "logging.logEntries.list",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 	},
+	// })
 
-	// GCP Cloud Storage
-	r.register("gcp_storage", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderGCP,
-		Permissions: []Permission{
-			{
-				Action:   "storage.objects.get",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-			{
-				Action:   "storage.objects.list",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-		},
-	})
+	// // GCP Cloud Storage
+	// r.register("gcp_storage", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderGCP,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "storage.objects.get",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 		{
+	// 			Action:   "storage.objects.list",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 	},
+	// })
 
-	// GCP Pub/Sub
-	r.register("gcp_pubsub", ">=0.0.0", IntegrationPermissions{
-		Provider: verifier.ProviderGCP,
-		Permissions: []Permission{
-			{
-				Action:   "pubsub.subscriptions.consume",
-				Required: true,
-				Method:   MethodAPICall,
-				Category: "data_access",
-			},
-		},
-	})
+	// // GCP Pub/Sub
+	// r.register("gcp_pubsub", ">=0.0.0", IntegrationPermissions{
+	// 	Provider: verifier.ProviderGCP,
+	// 	Permissions: []Permission{
+	// 		{
+	// 			Action:   "pubsub.subscriptions.consume",
+	// 			Required: true,
+	// 			Method:   MethodAPICall,
+	// 			Category: "data_access",
+	// 		},
+	// 	},
+	// })
 
 	// GCP CSPM - Cloud Security Posture Management
 	// Verifies that roles/cloudasset.viewer and roles/browser are bound to the
@@ -826,9 +826,9 @@ func (r *PermissionRegistry) registerGCPIntegrations() {
 	})
 }
 
-// registerOktaIntegrations is a placeholder for Okta-based integrations.
-// Okta entries are intentionally not registered until an Okta verifier
-// factory is implemented and wired in receiver.go. Registering them now
-// would cause VerifierNotInitialized errors at runtime.
-func (r *PermissionRegistry) registerOktaIntegrations() {
-}
+// // registerOktaIntegrations is a placeholder for Okta-based integrations.
+// // Okta entries are intentionally not registered until an Okta verifier
+// // factory is implemented and wired in receiver.go. Registering them now
+// // would cause VerifierNotInitialized errors at runtime.
+// func (r *PermissionRegistry) registerOktaIntegrations() {
+// }

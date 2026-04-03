@@ -81,7 +81,7 @@ func TestConfig_Validate(t *testing.T) {
 					{
 						PolicyID: "policy-1",
 						Integrations: []IntegrationConfig{
-							{PolicyTemplate: "system", PackageName: "okta"},
+							{PolicyTemplate: "system", PackageName: "gcp"},
 						},
 					},
 				},
@@ -344,11 +344,11 @@ func TestGetProviderForPackage(t *testing.T) {
 			packageName: "gcp",
 			want:        verifier.ProviderGCP,
 		},
-		{
-			name:        "Okta",
-			packageName: "okta",
-			want:        verifier.ProviderOkta,
-		},
+		// {
+		// 	name:        "Okta",
+		// 	packageName: "okta",
+		// 	want:        verifier.ProviderOkta,
+		// },
 		{
 			name:        "Unknown",
 			packageName: "unknown",
@@ -481,8 +481,8 @@ func TestGCPCredentials_ProjectID(t *testing.T) {
 		{
 			name: "derived from service account email (preferred)",
 			cfg: GCPCredentials{
-				ServiceAccountEmail:      "sa@my-project.iam.gserviceaccount.com",
-				Audience: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/p",
+				ServiceAccountEmail: "sa@my-project.iam.gserviceaccount.com",
+				Audience:            "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/p",
 			},
 			want: "my-project",
 		},
@@ -496,8 +496,8 @@ func TestGCPCredentials_ProjectID(t *testing.T) {
 		{
 			name: "non-service-account email falls back to WIF",
 			cfg: GCPCredentials{
-				ServiceAccountEmail:      "user@example.com",
-				Audience: "//iam.googleapis.com/projects/555/locations/global/workloadIdentityPools/pool/providers/p",
+				ServiceAccountEmail: "user@example.com",
+				Audience:            "//iam.googleapis.com/projects/555/locations/global/workloadIdentityPools/pool/providers/p",
 			},
 			want: "555",
 		},

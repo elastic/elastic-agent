@@ -175,20 +175,20 @@ func (r *verifierReceiver) initializeVerifiers(ctx context.Context) {
 		r.logger.Debug("GCP credentials not configured")
 	}
 
-	// Initialize Okta verifier if configured
-	if r.config.Providers.Okta.Credentials.IsConfigured() {
-		r.logger.Info("Initializing Okta verifier",
-			zap.String("domain", r.config.Providers.Okta.Credentials.Domain),
-		)
+	// // Initialize Okta verifier if configured
+	// if r.config.Providers.Okta.Credentials.IsConfigured() {
+	// 	r.logger.Info("Initializing Okta verifier",
+	// 		zap.String("domain", r.config.Providers.Okta.Credentials.Domain),
+	// 	)
 
-		if err := r.verifierRegistry.InitializeVerifier(ctx, r.config.Providers.Okta.Credentials.ToAuthConfig()); err != nil {
-			r.logger.Warn("Failed to initialize Okta verifier", zap.Error(err))
-		} else {
-			r.logger.Info("Okta verifier initialized successfully")
-		}
-	} else {
-		r.logger.Debug("Okta credentials not configured")
-	}
+	// 	if err := r.verifierRegistry.InitializeVerifier(ctx, r.config.Providers.Okta.Credentials.ToAuthConfig()); err != nil {
+	// 		r.logger.Warn("Failed to initialize Okta verifier", zap.Error(err))
+	// 	} else {
+	// 		r.logger.Info("Okta verifier initialized successfully")
+	// 	}
+	// } else {
+	// 	r.logger.Debug("Okta credentials not configured")
+	// }
 
 	// Log summary of initialized verifiers
 	initialized := r.verifierRegistry.InitializedProviders()
@@ -364,10 +364,10 @@ func (r *verifierReceiver) verifyPermission(
 		providerCfg.ProjectID = projectID
 	}
 
-	// Okta-specific config
-	if domain, ok := integration.Config["domain"].(string); ok {
-		providerCfg.OktaDomain = domain
-	}
+	// // Okta-specific config
+	// if domain, ok := integration.Config["domain"].(string); ok {
+	// 	providerCfg.OktaDomain = domain
+	// }
 
 	// Get the verifier for this provider
 	v := r.verifierRegistry.GetVerifier(provider)
