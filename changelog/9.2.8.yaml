@@ -18,10 +18,9 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13391
-        - https://github.com/elastic/elastic-agent/pull/13446
-        - https://github.com/elastic/elastic-agent/pull/13447
-      issue: []
+        - https://github.com/elastic/elastic-agent/pull/12663
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12524
       impact: ""
       action: ""
       timestamp: 1770671850
@@ -33,10 +32,9 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13391
-        - https://github.com/elastic/elastic-agent/pull/13446
-        - https://github.com/elastic/elastic-agent/pull/13447
-      issue: []
+        - https://github.com/elastic/elastic-agent/pull/13187
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/13185
       impact: ""
       action: ""
       timestamp: 1773760327
@@ -48,9 +46,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13391
-        - https://github.com/elastic/elastic-agent/pull/13446
-        - https://github.com/elastic/elastic-agent/pull/13447
+        - https://github.com/elastic/elastic-agent/pull/13230
       issue: []
       impact: ""
       action: ""
@@ -64,8 +60,6 @@ entries:
       component: elastic-agent
       pr:
         - https://github.com/elastic/elastic-agent/pull/13391
-        - https://github.com/elastic/elastic-agent/pull/13446
-        - https://github.com/elastic/elastic-agent/pull/13447
       issue: []
       impact: ""
       action: ""
