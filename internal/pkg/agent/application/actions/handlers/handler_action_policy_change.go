@@ -293,6 +293,10 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		h.config.Settings.EventLoggingConfig = cfg.Settings.EventLoggingConfig
 	}
 
+	if loggingConfig != nil {
+		h.config.Settings.LoggingConfig.Level = loggingConfig.Level
+	}
+
 	// persist configuration
 	err = saveConfig(h.agentInfo, h.config, h.store, h.log)
 	if err != nil {
