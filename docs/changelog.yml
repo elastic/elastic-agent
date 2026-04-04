@@ -1,0 +1,126 @@
+# Changelog Configuration
+# This file configures the valid values for changelog fields using the pivot structure.
+# Place this file as `changelog.yml` in the `docs/` directory
+
+# Products configuration (optional)
+# If not specified, all products from products.yml are allowed
+products:
+  # List of available product IDs (empty = all from products.yml)
+  available:
+    - elastic-agent
+  # Default products when --products not specified
+  # default:
+  #   - product: elasticsearch
+  #     lifecycle: ga
+
+# Extraction configuration
+# Controls automatic extraction of information from PR descriptions
+extract:
+  # Auto-extract release notes from PR descriptions (default: true)
+  # Can be overridden by CLI --no-extract-release-notes
+  release_notes: true
+  # Auto-extract issues from PR body (default: true)
+  # Looks for patterns like "Fixes #123", "Closes #456", etc.
+  issues: true
+
+# Available lifecycle values (strongly typed: preview, beta, ga)
+lifecycles:
+  - preview
+  - beta
+  - ga
+
+# Pivot configuration for types, subtypes, and areas with label mappings.
+# By default we render entries grouped by type > subtype > area.
+# NOTE: subtype and area are optional and either may be omitted.
+# Labels are specified in a "label -> value" format
+pivot:
+  # Type definitions with optional labels
+  # At a minimum, feature, bug-fix, and breaking-change must be configured.
+  # Keys are type names, values can be:
+  #   - simple string: comma-separated label list (e.g., ">bug, >fix")
+  #   - empty/null: no labels for this type
+  #   - object: { labels: "...", subtypes: {...} } for breaking-change type only
+  types:
+    # Complex object form with subtypes (ONLY allowed for breaking-change)
+    # Subtypes help categorize breaking changes by their nature
+    breaking-change:
+      labels: "breaking change"
+      # subtypes:
+      #   api: ">api-breaking"
+      #   behavioral: ">behavioral-breaking"
+      #   configuration: ">config-breaking"
+      #   dependency: ">dependency-breaking"
+      #   subscription: ">subscription-breaking"
+      #   plugin: ">plugin-breaking"
+      #   security: ">security-breaking"
+      #   other:
+    # Simple string form: labels as comma-separated string
+    bug-fix: ">bug, bug"
+    deprecation: "Deprecation"
+    feature:
+    enhancement: "enhancement"
+    docs: "docs, documentation"
+    known-issue:
+    other:
+    regression: "regression"
+    security:
+
+  # Area definitions with labels
+  # Keys are area display names, values are label strings
+  # Multiple labels can be comma-separated
+  # areas:
+    # Example mappings - customize based on your label naming conventions
+    # Autoscaling: ":Distributed Coordination/Autoscaling"
+    # Search: ":Search/Search"
+    # Security: ":Security/Security"
+    # Watcher: ":Data Management/Watcher"
+
+# Block configuration - combined create and publish blockers
+block:
+  # Global labels that block changelog creation for all products (comma-separated string)
+  create: "skip-changelog, backport"
+
+  # Block changelog entries from publishing based on entry type or area
+  # publish:
+  #   types:
+  #     - deprecation
+  #     - known-issue
+  #   areas:
+  #     - "Internal"
+
+  # Product-specific overrides (override global blockers, don't merge)
+  # Dictionary key can be a single product ID or comma-separated product IDs
+  # product:
+    # Example: Block these labels for elasticsearch and kibana
+    # 'elasticsearch, kibana':
+    #   create: ">test"
+    #   publish:
+    #     types:
+    #       - docs
+    # Example: Block ILM label for cloud-serverless
+    # 'cloud-serverless':
+    #   create: "ILM"
+    #   publish:
+    #     areas:
+    #       - "ILM"
+
+# Bundle configuration (profiles and defaults)
+# bundle:
+  # Input directory containing changelog YAML files
+  # directory: docs/changelog
+  # Output directory for bundled changelog files
+  # output_directory: docs/releases
+  # Whether to resolve (copy contents) by default
+  # resolve: true
+
+  # Named bundle profiles for different release scenarios
+  # profiles:
+    # Example: Elasticsearch release profile
+    # elasticsearch-release:
+    #   products: "elasticsearch {version} {lifecycle}"
+    #   output: "elasticsearch-{version}.yaml"
+
+    # Example: Serverless release profile
+    # serverless-release:
+    #   products: "cloud-serverless {version} *"
+    #   output: "serverless-{version}.yaml"
