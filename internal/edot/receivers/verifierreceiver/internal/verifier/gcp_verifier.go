@@ -101,7 +101,7 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 		}
 
 		// Inject the FIPS HTTP client into the OAuth2 token-source context so
-		// that GCP STS token exchange uses FIPS-compliant TLS.
+		// that the GCP STS token exchange uses FIPS-compliant TLS.
 		ctxWithClient := context.WithValue(ctx, oauth2.HTTPClient, httpClient)
 		tokenSource, err := externalaccount.NewTokenSource(ctxWithClient, extCfg)
 		if err != nil {
@@ -109,10 +109,13 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 			httpClient.CloseIdleConnections()
 			return &GCPVerifier{logger: logger, configured: false}, nil
 		}
-		opts = append(opts,
-			option.WithTokenSource(tokenSource),
-			option.WithHTTPClient(httpClient),
-		)
+		// oauth2.NewClient uses the FIPS client from the context as its base
+		// transport and wraps it with oauth2.Transport, which attaches the Bearer
+		// token to every GCP API request. This keeps all traffic FIPS-compliant
+		// while ensuring credentials are not bypassed.
+		// Note: option.WithHTTPClient bypasses credential injection when used
+		// alongside option.WithTokenSource, so we use a single pre-wrapped client.
+		opts = append(opts, option.WithHTTPClient(oauth2.NewClient(ctxWithClient, tokenSource)))
 		logger.Info("GCP identity federation AWS-mediated WIF credential configured",
 			zap.String("audience", authConfig.Audience),
 			zap.String("global_role", authConfig.GlobalRoleARN),

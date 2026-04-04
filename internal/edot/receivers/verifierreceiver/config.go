@@ -109,25 +109,28 @@ type AWSCredentials struct {
 }
 
 // Validate validates the AWS credentials.
+// Testing flow: set use_default_credentials to true.
+// Production flow: both role_arn and external_id must be provided for identity federation.
 func (cfg *AWSCredentials) Validate() error {
 	if cfg.UseDefaultCredentials {
-		return nil
+		return nil // testing flow
 	}
 	if cfg.RoleARN == "" && cfg.ExternalID == "" {
-		return nil // Not configured; identity federation config may supply the rest
+		return nil // not configured
 	}
 	if cfg.RoleARN == "" {
-		return errors.New("role_arn must be specified when external_id is set")
+		return errors.New("role_arn must be specified")
 	}
-	// external_id is optional in identity federation mode (only required for direct mode)
+	if cfg.ExternalID == "" {
+		return errors.New("external_id must be specified")
+	}
 	return nil
 }
 
-// IsConfigured returns true if AWS credentials are configured (with or without
-// identity federation config -- the identity federation fields are checked separately
-// during verifier initialization).
+// IsConfigured returns true if AWS credentials are configured for either the
+// testing flow (use_default_credentials) or the production flow (role_arn + external_id).
 func (cfg *AWSCredentials) IsConfigured() bool {
-	return cfg.RoleARN != "" || cfg.UseDefaultCredentials
+	return cfg.UseDefaultCredentials || (cfg.RoleARN != "" && cfg.ExternalID != "")
 }
 
 // ToAuthConfig converts the config to a verifier.AWSAuthConfig, merging in
@@ -165,7 +168,7 @@ func (cfg *AzureCredentials) Validate() error {
 		return nil
 	}
 	if cfg.TenantID == "" && cfg.ClientID == "" {
-		return nil // Not configured; identity federation may provide the JWT
+		return nil // not configured
 	}
 	if cfg.TenantID == "" {
 		return errors.New("tenant_id must be specified")
@@ -263,13 +266,28 @@ func gcpProjectNumberFromAudience(audience string) string {
 }
 
 // Validate validates the GCP credentials.
+// Testing flow: set use_default_credentials to true.
+// Production flow: both audience and service_account_email must be provided for identity federation.
 func (cfg *GCPCredentials) Validate() error {
+	if cfg.UseDefaultCredentials {
+		return nil // testing flow
+	}
+	if cfg.Audience == "" && cfg.ServiceAccountEmail == "" {
+		return nil // not configured
+	}
+	if cfg.Audience == "" {
+		return errors.New("audience must be specified")
+	}
+	if cfg.ServiceAccountEmail == "" {
+		return errors.New("service_account_email must be specified")
+	}
 	return nil
 }
 
-// IsConfigured returns true if GCP credentials are configured.
+// IsConfigured returns true if GCP credentials are configured for either the
+// testing flow (use_default_credentials) or the production flow (audience + service_account_email).
 func (cfg *GCPCredentials) IsConfigured() bool {
-	return cfg.Audience != "" || cfg.UseDefaultCredentials
+	return cfg.UseDefaultCredentials || (cfg.Audience != "" && cfg.ServiceAccountEmail != "")
 }
 
 // ToAuthConfig converts the config to a verifier.GCPAuthConfig, merging in

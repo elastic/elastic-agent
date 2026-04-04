@@ -246,18 +246,18 @@ func TestAWSCredentials_Validate(t *testing.T) {
 			wantErr: "",
 		},
 		{
-			name: "valid - role_arn without external_id (identity federation provides global role)",
+			name: "invalid - role_arn without external_id",
 			credentials: AWSCredentials{
 				RoleARN: "arn:aws:iam::123456789012:role/ElasticAgentRole",
 			},
-			wantErr: "",
+			wantErr: "external_id must be specified",
 		},
 		{
 			name: "invalid - external_id without role_arn",
 			credentials: AWSCredentials{
 				ExternalID: "test-external-id",
 			},
-			wantErr: "role_arn must be specified when external_id is set",
+			wantErr: "role_arn must be specified",
 		},
 	}
 
@@ -288,14 +288,14 @@ func TestAWSCredentials_IsConfigured(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "role_arn only (identity federation will supply OIDC chain)",
+			name: "role_arn only is not sufficient (external_id also required for production)",
 			credentials: AWSCredentials{
 				RoleARN: "arn:aws:iam::123456789012:role/ElasticAgentRole",
 			},
-			want: true,
+			want: false,
 		},
 		{
-			name: "role_arn with external_id (identity federation mode)",
+			name: "role_arn with external_id (production flow)",
 			credentials: AWSCredentials{
 				RoleARN:    "arn:aws:iam::123456789012:role/ElasticAgentRole",
 				ExternalID: "test-external-id",
@@ -468,6 +468,110 @@ func TestGCPProjectNumberFromAudience(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, gcpProjectNumberFromAudience(tt.audience))
+		})
+	}
+}
+
+func TestGCPCredentials_Validate(t *testing.T) {
+	tests := []struct {
+		name        string
+		credentials GCPCredentials
+		wantErr     string
+	}{
+		{
+			name:        "valid - empty (not configured)",
+			credentials: GCPCredentials{},
+			wantErr:     "",
+		},
+		{
+			name: "valid - use_default_credentials (testing flow)",
+			credentials: GCPCredentials{
+				UseDefaultCredentials: true,
+			},
+			wantErr: "",
+		},
+		{
+			name: "valid - fully configured (production flow)",
+			credentials: GCPCredentials{
+				Audience:            "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider",
+				ServiceAccountEmail: "sa@my-project.iam.gserviceaccount.com",
+			},
+			wantErr: "",
+		},
+		{
+			name: "invalid - audience without service_account_email",
+			credentials: GCPCredentials{
+				Audience: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider",
+			},
+			wantErr: "service_account_email must be specified",
+		},
+		{
+			name: "invalid - service_account_email without audience",
+			credentials: GCPCredentials{
+				ServiceAccountEmail: "sa@my-project.iam.gserviceaccount.com",
+			},
+			wantErr: "audience must be specified",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.credentials.Validate()
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestGCPCredentials_IsConfigured(t *testing.T) {
+	tests := []struct {
+		name        string
+		credentials GCPCredentials
+		want        bool
+	}{
+		{
+			name:        "empty",
+			credentials: GCPCredentials{},
+			want:        false,
+		},
+		{
+			name: "use_default_credentials (testing flow)",
+			credentials: GCPCredentials{
+				UseDefaultCredentials: true,
+			},
+			want: true,
+		},
+		{
+			name: "audience and service_account_email (production flow)",
+			credentials: GCPCredentials{
+				Audience:            "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider",
+				ServiceAccountEmail: "sa@my-project.iam.gserviceaccount.com",
+			},
+			want: true,
+		},
+		{
+			name: "audience only is not sufficient",
+			credentials: GCPCredentials{
+				Audience: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider",
+			},
+			want: false,
+		},
+		{
+			name: "service_account_email only is not sufficient",
+			credentials: GCPCredentials{
+				ServiceAccountEmail: "sa@my-project.iam.gserviceaccount.com",
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.credentials.IsConfigured())
 		})
 	}
 }
