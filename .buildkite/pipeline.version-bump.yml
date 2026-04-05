@@ -10,7 +10,6 @@ notify:
         🚦 Pipeline waiting for approval 🚦
         Repo: `${REPO}`
 
-        Ready to fetch DRA artifacts - please unblock when ready.
         New version: `${NEW_VERSION}`
         Branch: `${BRANCH}`
         Workflow: `${WORKFLOW}`
@@ -29,33 +28,3 @@ steps:
       - WORKFLOW: ${WORKFLOW}
     key: block-get-dra-artifacts
     blocked_state: running
-
-  - label: "Fetch DRA Artifacts"
-    key: fetch-dra-artifacts
-    depends_on: block-get-dra-artifacts
-    agents:
-      image: docker.elastic.co/release-eng/wolfi-build-essential-release-eng:latest
-      cpu: 2
-      memory: 4G
-      ephemeralStorage: 10G
-    command:
-      - echo "Starting DRA artifacts retrieval..."
-    timeout_in_minutes: 240
-    retry:
-      automatic:
-        - exit_status: "*"
-          limit: 2
-      manual:
-        permit_on_passed: true
-
-    plugins:
-      - elastic/json-watcher#v1.0.0:
-          url: "https://artifacts-staging.elastic.co/elastic-agent-package/latest/${BRANCH}.json"
-          field: ".version"
-          expected_value: "${NEW_VERSION}"
-          polling_interval: "30"
-      - elastic/json-watcher#v1.0.0:
-          url: "https://storage.googleapis.com/elastic-artifacts-snapshot/elastic-agent-package/latest/${BRANCH}.json"
-          field: ".version"
-          expected_value: "${NEW_VERSION}-SNAPSHOT"
-          polling_interval: "30"
