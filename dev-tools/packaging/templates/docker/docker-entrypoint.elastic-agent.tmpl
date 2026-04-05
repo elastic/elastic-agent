@@ -1,9 +1,58 @@
 #!/bin/bash
+{{- $beatHome := printf "%s/%s" "/usr/share" .BeatName }}
 
 # Update umask to retain group write permissions on runtime directories: $root/tmp/default, $root/logs/default and $root/run/default
 umask 0007
 
 set -eo pipefail
+
+# Custom CA certificate handling.
+# Users can mount .crt files into {{ $beatHome }}/certs/ca/ to trust internal CAs.
+# NODE_EXTRA_CA_CERTS is set in the Dockerfile to point to the bundle path.
+CA_DIR="{{ $beatHome }}/certs/ca"
+CA_BUNDLE="${CA_DIR}/ca-bundle.crt"
+# Remove any stale bundle before scanning for mounted .crt files
+rm -f "$CA_BUNDLE"
+if [ -d "$CA_DIR" ] && compgen -G "${CA_DIR}"/*.crt >/dev/null 2>&1; then
+  # Concatenate all mounted .crt files into a single bundle for NODE_EXTRA_CA_CERTS
+  cat "$CA_DIR"/*.crt > "$CA_BUNDLE" 2>/dev/null || true
+
+  # Update system trust store if running as root
+  if [ "$(id -u)" -eq 0 ]; then
+    if command -v update-ca-trust &>/dev/null; then
+      cp "$CA_DIR"/*.crt /etc/pki/ca-trust/source/anchors/ 2>/dev/null || true
+      update-ca-trust || true
+    elif command -v update-ca-certificates &>/dev/null; then
+      cp "$CA_DIR"/*.crt /usr/local/share/ca-certificates/ 2>/dev/null || true
+      update-ca-certificates || true
+    fi
+  fi
+
+  # Populate the per-user NSS database for headless Chromium (used by Playwright synthetics).
+  # The Chromium browser process does not read NODE_EXTRA_CA_CERTS or system PEM bundles
+  # directly — it reads from ~/.pki/nssdb via libnss. On Wolfi, update-ca-certificates
+  # does not feed NSS at all; on UBI, update-ca-trust feeds /etc/pki/nssdb but Chromium
+  # in containers reads the per-user DB. This block covers both variants and OpenShift
+  # non-root runs where the system NSS database is not writable.
+  if command -v certutil &>/dev/null; then
+    NSSDB="${HOME:-{{ $beatHome }}}/.pki/nssdb"
+    mkdir -p "$NSSDB" || true
+    # Initialise an empty NSS DB if one does not already exist
+    certutil -d sql:"$NSSDB" -N --empty-password 2>/dev/null || true
+    for crt in "$CA_DIR"/*.crt; do
+      [ -f "$crt" ] || continue
+      [ "$crt" = "$CA_BUNDLE" ] && continue
+      cert_name="$(basename "$crt" .crt)"
+      # CT,, = trusted CA for TLS server auth; no email or object-signing trust
+      certutil -d sql:"$NSSDB" -A -t "CT,," -n "$cert_name" -i "$crt" 2>/dev/null || true
+    done
+  fi
+
+else
+  # No custom CAs mounted — unset NODE_EXTRA_CA_CERTS to avoid Node.js
+  # warnings about a missing certificate file on every invocation.
+  unset NODE_EXTRA_CA_CERTS
+fi
 
 # For information on the possible environment variables that can be passed into the container. Run the following
 # command for information on the options that are available.
