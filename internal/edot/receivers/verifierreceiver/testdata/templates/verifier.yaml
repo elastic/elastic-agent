@@ -1,0 +1,54 @@
+# Verifier Integration Template
+# This template defines how the verifier receiver should be configured
+# when used as a Fleet integration.
+#
+# Variables are substituted by Fleet/Elastic Agent when the policy is applied:
+# - ${var:identity_federation_id} - Unique identifier for the Identity Federation
+# - ${var:verification_id} - Unique verification session ID
+# - ${var:namespace} - Kibana Space namespace for data routing (from the Fleet policy)
+# - ${var:providers.aws.credentials.*} - AWS credentials for verification
+# - ${var:policies} - List of policies with integrations to verify
+
+receivers:
+  verifier:
+    identity_federation_id: ${var:identity_federation_id}
+    identity_federation_name: ${var:identity_federation_name}
+    verification_id: ${var:verification_id}
+    verification_type: ${var:verification_type}
+    providers:
+      aws:
+        credentials:
+          role_arn: ${var:providers.aws.credentials.role_arn}
+          external_id: ${var:providers.aws.credentials.external_id}
+    policies: ${var:policies}
+
+processors:
+  # Set data stream routing attributes and identity federation namespace at the
+  # pipeline level, the same way other integrations handle namespace configuration.
+  # The namespace comes from the Fleet policy (Kibana Space) rather than being
+  # embedded in the receiver config.
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: ${var:namespace}
+      - action: insert
+        key: identity_federation.namespace
+        value: ${var:namespace}
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    logs/verifier:
+      receivers: [verifier]
+      processors: [resource/verifier]
+      exporters: [debug]

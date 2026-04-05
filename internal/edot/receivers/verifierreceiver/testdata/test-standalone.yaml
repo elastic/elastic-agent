@@ -1,0 +1,141 @@
+# Standalone test configuration for the verifier receiver
+# 
+# Run with:
+#   cd opentelemetry-collector-components
+#   make genelasticcol
+#   ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-standalone.yaml
+#
+# For AWS Identity Federation authentication:
+#   1. Set the role_arn to the IAM role ARN in the target AWS account
+#   2. Set the external_id to the value from Identity Federation setup
+#
+# Without provider credentials, the receiver will still run but report "error" status
+# with "VerifierNotInitialized" for permissions requiring those providers.
+
+receivers:
+  verifier:
+    identity_federation_id: "cc-test-12345"
+    identity_federation_name: "Local Test Connector"
+    account_type: "single-account"
+    verification_id: "verify-local-001"
+    verification_type: "on_demand"
+    
+    # Provider Credentials — each provider supports two mutually exclusive auth modes:
+    #   1. Identity Federation (production) - OIDC JWT injected by the agentless controller
+    #   2. Default credentials (testing)   - use_default_credentials: true
+    providers:
+      # AWS — choose one mode:
+      #
+      # Testing (default credential chain):
+      #   Credential sources tried in order: AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars,
+      #   ~/.aws/credentials (profile selected via AWS_PROFILE), ECS container creds, EC2/EKS IMDSv2.
+      # aws:
+      #   credentials:
+      #     use_default_credentials: true
+      #
+      # Production (Identity Federation):
+      # aws:
+      #   credentials:
+      #     role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
+      #     external_id: "your-external-id-from-elastic"
+      aws:
+        credentials:
+          # use_default_credentials: true
+          # role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
+          # external_id: "your-external-id-from-elastic"
+
+      # Azure — choose one mode:
+      #
+      # Testing (DefaultAzureCredential):
+      #   Credential sources tried in order: AZURE_CLIENT_ID/AZURE_CLIENT_SECRET/AZURE_TENANT_ID
+      #   env vars, workload identity, managed identity, az login, azd.
+      #   The subscription is discovered automatically — no subscription_id needed.
+      # azure:
+      #   credentials:
+      #     use_default_credentials: true
+      #
+      # Production (Identity Federation):
+      # azure:
+      #   credentials:
+      #     tenant_id: "your-tenant-id"
+      #     client_id: "your-client-id"
+      
+      # GCP — two mutually exclusive modes:
+      #
+      # Testing (Application Default Credentials):
+      #   Project is resolved from GOOGLE_CLOUD_PROJECT env var or GCE/GKE metadata.
+      # gcp:
+      #   credentials:
+      #     use_default_credentials: true
+      #
+      # Production (Identity Federation / WIF):
+      #   Project is derived from service_account_email (preferred) or audience.
+      # gcp:
+      #   credentials:
+      #     audience: "//iam.googleapis.com/projects/PROJECT_NUMBER/..."
+      #     service_account_email: "sa@PROJECT_ID.iam.gserviceaccount.com"
+      
+      # Okta Authentication (future)
+      # okta:
+      #   credentials:
+      #     domain: "dev-123456.okta.com"
+      #     api_token: "your-api-token"
+    
+    policies:
+      - policy_id: "policy-aws-security"
+        policy_name: "AWS Security Monitoring"
+        integrations:
+          - policy_template: "cloudtrail"
+            package_name: "aws"
+            package_policy_id: "pp-cloudtrail-001"
+            package_title: "AWS"
+            package_version: "2.17.0"
+            config:
+              account_id: "123456789012"
+              region: "us-east-1"
+          - policy_template: "guardduty"
+            package_name: "aws"
+            package_policy_id: "pp-guardduty-001"
+            package_title: "AWS"
+            package_version: "1.5.0"
+            config:
+              account_id: "123456789012"
+              region: "us-east-1"
+      - policy_id: "policy-aws-infra"
+        policy_name: "AWS Infrastructure"
+        integrations:
+          - policy_template: "s3"
+            package_name: "aws"
+            package_policy_id: "pp-s3-001"
+            package_title: "AWS"
+            package_version: "1.0.0"
+            config:
+              account_id: "123456789012"
+              region: "us-west-2"
+
+processors:
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    logs:
+      receivers: [verifier]
+      processors: [resource/verifier]
+      exporters: [debug]

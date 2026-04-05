@@ -1,0 +1,123 @@
+# Test configuration for verifier receiver
+# This file demonstrates the OTel Collector configuration format for the verifier receiver
+
+receivers:
+  # Default verifier configuration
+  verifier:
+    identity_federation_id: "cc-12345"
+    identity_federation_name: "Production Connector"
+    verification_id: "verify-abc123"
+    verification_type: "scheduled"
+    # AWS Authentication - Identity Federation STS AssumeRole
+    providers:
+      aws:
+        credentials:
+          role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
+          external_id: "elastic-external-id-12345"
+    policies:
+      - policy_id: "verifier-policy"
+        policy_name: "Verifier-Policy-Production-Connector-abc12345"
+        integrations:
+          - policy_template: "cloudtrail"
+            package_name: "aws"
+            package_policy_id: "pp-cloudtrail-001"
+            package_title: "AWS"
+            package_version: "2.17.0"
+            config:
+              account_id: "123456789012"
+              region: "us-east-1"
+          - policy_template: "guardduty"
+            package_name: "aws"
+            package_policy_id: "pp-guardduty-001"
+            package_title: "AWS"
+            package_version: "1.5.0"
+            config:
+              account_id: "123456789012"
+              region: "us-east-1"
+          - policy_template: "ec2"
+            package_name: "aws"
+            package_policy_id: "pp-ec2-001"
+            package_title: "AWS"
+            config:
+              account_id: "123456789012"
+              region: "us-west-2"
+
+  # Named verifier instance for single integration testing
+  verifier/single-integration:
+    identity_federation_id: "cc-single"
+    identity_federation_name: "Single Integration Test Connector"
+    verification_id: "verify-single-001"
+    verification_type: "on_demand"
+    providers:
+      aws:
+        credentials:
+          role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
+          external_id: "elastic-external-id-single"
+    policies:
+      - policy_id: "verifier-policy"
+        policy_name: "Verifier-Policy-Single-abc12345"
+        integrations:
+          - policy_template: "s3"
+            package_name: "aws"
+            package_policy_id: "pp-s3-001"
+            package_title: "AWS"
+            config:
+              account_id: "123456789012"
+
+  # Named verifier instance for Security Hub testing
+  verifier/security-hub:
+    identity_federation_id: "cc-securityhub"
+    identity_federation_name: "Security Hub Connector"
+    verification_id: "verify-sechub-001"
+    verification_type: "on_demand"
+    providers:
+      aws:
+        credentials:
+          role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
+          external_id: "elastic-external-id-sechub"
+    policies:
+      - policy_id: "verifier-policy"
+        policy_name: "Verifier-Policy-SecurityHub-abc12345"
+        integrations:
+          - policy_template: "securityhub"
+            package_name: "aws"
+            package_policy_id: "pp-securityhub-001"
+            package_title: "AWS"
+            config:
+              account_id: "123456789012"
+              region: "us-east-1"
+
+processors:
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    logs:
+      receivers: [verifier]
+      processors: [resource/verifier]
+      exporters: [debug]
+    logs/single:
+      receivers: [verifier/single-integration]
+      processors: [resource/verifier]
+      exporters: [debug]
+    logs/security:
+      receivers: [verifier/security-hub]
+      processors: [resource/verifier]
+      exporters: [debug]
