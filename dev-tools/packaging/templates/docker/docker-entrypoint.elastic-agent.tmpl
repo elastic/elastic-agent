@@ -1,9 +1,21 @@
 #!/bin/bash
+{{- $beatHome := printf "%s/%s" "/usr/share" .BeatName }}
 
 # Update umask to retain group write permissions on runtime directories: $root/tmp/default, $root/logs/default and $root/run/default
 umask 0007
 
 set -eo pipefail
+
+# Beats performs strict file-ownership checks (OwnerHasExclusiveWritePerms):
+# config/module YAML files must be owned by the running EUID or root. When
+# running under an arbitrary UID (e.g. OpenShift), any file owned by the
+# built-in elastic-agent (UID 1000) will fail the check. Config YAMLs are
+# chowned to root at build time to satisfy the check, but we also disable
+# strict perms as a safety net for any files we might miss.
+# See: https://discuss.elastic.co/t/elastic-agent-beats-problem-when-running-as-a-non-root-randomized-uid/385353
+if [ "$(id -u)" != "1000" ] && [ "$(id -u)" != "0" ]; then
+  export BEAT_STRICT_PERMS=false
+fi
 
 # For information on the possible environment variables that can be passed into the container. Run the following
 # command for information on the options that are available.
