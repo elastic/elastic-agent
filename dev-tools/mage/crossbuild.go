@@ -168,15 +168,6 @@ func CrossBuild(ctx context.Context, cfg *Settings, options ...CrossBuildOption)
 	return nil
 }
 
-// CrossBuildXPack executes the 'golangCrossBuild' target in the Beat's
-// associated x-pack directory to produce a version of the Beat that contains
-// Elastic licensed content.
-func CrossBuildXPack(ctx context.Context, cfg *Settings, options ...CrossBuildOption) error {
-	o := []CrossBuildOption{InDir("x-pack", cfg.Beat.Name)}
-	o = append(o, options...)
-	return CrossBuild(ctx, cfg, o...)
-}
-
 // buildMage pre-compiles the magefile to a binary using the GOARCH parameter.
 // It has the benefit of speeding up the build because the
 // mage -compile is done only once rather than in each Docker container.
