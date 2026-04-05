@@ -164,6 +164,11 @@ type fileDispositionInfo struct {
 	DeleteFile bool
 }
 
+// postUninstall performs post-uninstall tasks for Windows systems.
+func postUninstall() error {
+	return RemoveUninstallEntry()
+}
+
 // killNoneChildProcess provides a way of killing a process that is not started as a child of this process.
 //
 // On Windows when running in unprivileged mode the internal way that golang uses DuplicateHandle to perform the kill

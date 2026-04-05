@@ -185,7 +185,7 @@ func Test_watchCmd(t *testing.T) {
 						opt(settings)
 
 						return !settings.RemoveMarker
-					})).
+					}), mock.Anything).
 					Return(nil)
 			},
 			args: args{
@@ -234,7 +234,7 @@ func Test_watchCmd(t *testing.T) {
 							opt(settings)
 
 							return settings.RemoveMarker
-						})).Return(nil)
+						}), mock.Anything).Return(nil)
 			},
 			args: args{
 				cfg: configuration.DefaultUpgradeConfig().Watcher,

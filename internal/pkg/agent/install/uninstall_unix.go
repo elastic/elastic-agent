@@ -26,3 +26,8 @@ func isRetryableError(_ error) bool {
 func killNoneChildProcess(proc *os.Process) error {
 	return proc.Kill()
 }
+
+// postUninstall performs post-uninstall tasks for non-Windows systems.
+func postUninstall() error {
+	return nil
+}

@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -253,7 +254,19 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			// that agent was rolled back and the reason
 			removeMarker = false
 		}
-		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, WithRemoveMarker(removeMarker))
+
+		// remove the registry entry when rolling back to pre-9.4 agents that don't manage it,
+		// for >= 9.4 the old agent's handleUpgrade() will update it on restart
+		revertRegistryHook := func(ctx context.Context, log *logger.Logger, topDirPath string) error {
+			if versionParseErr == nil && previousVersion.Less(*semver.NewParsedSemVer(9, 4, 0, "SNAPSHOT", "")) {
+				if err := install.RemoveUninstallEntry(); err != nil {
+					log.Warnf("failed to remove uninstall registry entry during rollback: %v", err)
+				}
+			}
+			return nil
+		}
+
+		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, WithRemoveMarker(removeMarker), WithPreRestartHook(revertRegistryHook))
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)

@@ -265,6 +265,14 @@ We pass a `-test.count` flag along with the name match
 We pass a `-test.run` flag along with the names of the tests we want to run in OR
 `GOTEST_FLAGS="-test.run ^(TestStandaloneUpgrade|TestFleetManagedUpgrade)$" mage integration:test`
 
+#### Selecting specific upgrade versions
+
+By default, upgrade tests read the list of versions from `testing/integration/testdata/.upgrade-test-agent-versions.yml`. When developing or debugging upgrade tests it's useful to limit to specific versions using the `TEST_UPGRADE_VERSIONS` environment variable.
+This variable takes a comma-separated list of versions and is passed to the remote test runner.
+
+- `TEST_UPGRADE_VERSIONS="9.3.1" mage integration:single TestStandaloneUpgrade` to test upgrading from `9.3.1` only.
+- `TEST_UPGRADE_VERSIONS="9.3.1,9.2.6" mage integration:single TestStandaloneUpgrade` to test upgrading from `9.3.1` and `9.2.6`.
+
 ##### Run Serverless tests
 The test framework includes a smoke test suite to check elastic-agent in a serverless environment. The suite can be run via the `integration:TestServerless` mage target.
 

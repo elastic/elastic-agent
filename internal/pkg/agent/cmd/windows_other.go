@@ -12,6 +12,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
-func newReExecWindowsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
+func newReExecWindowsCommand(_ []string, _ *cli.IOStreams) *cobra.Command {
+	return nil
+}
+
+func newWindowsCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 	return nil
 }

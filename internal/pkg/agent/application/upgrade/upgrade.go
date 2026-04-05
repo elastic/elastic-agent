@@ -70,6 +70,8 @@ var (
 	ErrAgentInstallNotFound = errors.New("agent install descriptor not found")
 	// Version_9_3_0_SNAPSHOT is the minimum version for manual rollback and rollback reason
 	Version_9_3_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 3, 0, "SNAPSHOT", "")
+	// Version_9_4_0_SNAPSHOT is the minimum version that manages the Windows Add/Remove Programs registry entry
+	Version_9_4_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 4, 0, "SNAPSHOT", "")
 )
 
 func init() {
@@ -451,6 +453,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(err, rollbackErr)
+	}
+
+	// when downgrading to a pre-9.4 agent that doesn't manage the registry entry,
+	// remove it now so no stale entry is left behind
+	if parsedVersion.Less(*Version_9_4_0_SNAPSHOT) {
+		if err := install.RemoveUninstallEntry(); err != nil {
+			u.log.Warnf("failed to remove uninstall registry entry: %v", err)
+		}
 	}
 
 	rollbackWindow := disableRollbackWindow

@@ -14,7 +14,7 @@ import (
 )
 
 // postInstall performs post installation for unix-based systems.
-func postInstall(topPath string) error {
+func postInstall(_ string, _ utils.FileOwner) error {
 	// do nothing
 	return nil
 }
@@ -32,7 +32,22 @@ func withServiceOptions(username string, groupName string, _ string) ([]serviceO
 	return []serviceOpt{withUserGroup(username, groupName)}, nil
 }
 
-func serviceConfigure(ownership utils.FileOwner) error {
+func configureServicePermissions(_ utils.FileOwner) error {
 	// do nothing on unix
+	return nil
+}
+
+func ConfigureRegistryPermissions(_ utils.FileOwner) error {
+	// do nothing on unix
+	return nil
+}
+
+// UpsertUninstallEntry is a no-op on non-Windows platforms.
+func UpsertUninstallEntry(_, _ string) error {
+	return nil
+}
+
+// RemoveUninstallEntry is a no-op on non-Windows platforms.
+func RemoveUninstallEntry() error {
 	return nil
 }

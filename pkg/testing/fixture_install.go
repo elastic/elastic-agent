@@ -361,6 +361,10 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 			return
 		}
 		require.NoErrorf(f.t, err, "uninstalling agent failed. Output: %q", out)
+
+		for _, hook := range f.postUninstallHooks {
+			hook(f.t)
+		}
 	})
 
 	return out, nil

@@ -67,6 +67,10 @@ type Fixture struct {
 	// Uninstall token value that is needed for the agent uninstall if it's tamper protected
 	uninstallToken string
 
+	// postUninstallHooks are functions called after a successful uninstall
+	// during fixture cleanup.
+	postUninstallHooks []func(t *testing.T)
+
 	// fileNamePrefix is a prefix to be used when saving files from this test.
 	// it's set by FileNamePrefix and once it's set, FileNamePrefix will return
 	// its value.
@@ -338,6 +342,12 @@ func (f *Fixture) ConfigureOtel(ctx context.Context, yamlConfig []byte) error {
 // SetUninstallToken sets uninstall token
 func (f *Fixture) SetUninstallToken(uninstallToken string) {
 	f.uninstallToken = uninstallToken
+}
+
+// PostUninstallHook registers a function to be called after a successful
+// uninstall during fixture cleanup.
+func (f *Fixture) PostUninstallHook(hook func(t *testing.T)) {
+	f.postUninstallHooks = append(f.postUninstallHooks, hook)
 }
 
 // WorkDir returns the installed fixture's work dir AKA base dir AKA top dir. This

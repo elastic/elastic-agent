@@ -132,3 +132,44 @@ The new process looks like this:
   - we invoke the current agent binary if the new version < 8.13.0 (needed to make sure it supports the paths written in the update marker)
   - we invoke the new agent binary if the new version > 8.13.0
 - Shutdown current agent and its command components, copy components state once again and restart
+
+### Windows Add/Remove Programs registry entry
+
+Starting from version 9.4.0, Elastic Agent creates an entry in the Windows
+`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall` registry key during
+installation. This makes the agent visible in the Windows "Add or Remove
+Programs" list with metadata such as version, publisher, install date, and
+uninstall command.
+
+#### How the version is kept in sync
+
+The registry entry's `DisplayVersion` is updated by the **new agent** on startup
+when an upgrade marker is present. On rollback, the old agent restarts with the
+marker still present and reverts `DisplayVersion` to its own version.
+
+For **privileged** installs the agent runs as `LocalSystem` and can always
+write to the registry.
+
+For **unprivileged** installs the registry key's ACL is configured during
+installation to grant the `elastic-agent-user` write access. This allows the
+unprivileged agent to update `DisplayVersion` after an upgrade.
+
+#### Upgrading from a version before 9.4.0 (unprivileged)
+
+When upgrading from a version that did not create the registry entry, the
+new agent will not have permission to create the key because the ACL was never
+set.
+
+To create the entry and set the correct ACL after upgrading, run:
+
+```
+elastic-agent windows registry update
+```
+
+This creates the registry key, writes the current version and configures the
+ACL so future unprivileged upgrades can update it automatically.
+
+#### Uninstall
+
+The registry entry is removed during `elastic-agent uninstall` as part of the
+platform-specific post-uninstall cleanup.

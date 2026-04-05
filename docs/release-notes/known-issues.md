@@ -23,6 +23,25 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} Windows Add/Remove Programs issues after upgrade from pre-9.4.0
+**Applies to: {{agent}} 9.4.0+**
+
+Starting in 9.4.0, {{agent}} manages its own stable entry in the Windows Add/Remove Programs list. When upgrading from a version before 9.4.0, two issues may occur:
+
+- **Unprivileged mode**: the new agent cannot create the registry entry because the required ACL was never set by the older version.
+- **MSI installation**: a duplicate entry from the MSI installer may remain visible in the list.
+
+**Workaround**
+
+Run the following command to create or update the registry entry, set the correct permissions and remove any duplicate MSI entries:
+
+```
+elastic-agent windows registry update
+```
+
+This command is only needed once if you encounter one of the issues described above. Subsequent upgrades will handle the registry entry automatically.
+:::
+
 :::{dropdown} Elastic Agent 9.3.x fails to start on MacOS when OSQuery Manager integration is used
 **Applies to: {{agent}} 9.3.0, 9.3.1**
 

@@ -38,10 +38,12 @@ func NamespaceTopPath(namespace string) string {
 }
 
 type CheckOpts struct {
-	Privileged bool
-	Namespace  string
-	Username   string
-	Group      string
+	Privileged    bool
+	Namespace     string
+	Username      string
+	Group         string
+	StartVersion  string
+	TargetVersion string
 }
 
 func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts *CheckOpts) error {
@@ -75,6 +77,10 @@ func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts
 
 	// Specific checks depending on the platform.
 	return checkPlatform(ctx, f, topPath, opts)
+}
+
+func CheckUninstallSuccess(opts *CheckOpts) error {
+	return checkUninstallPlatform(opts)
 }
 
 func exeOnWindows(filename string) string {

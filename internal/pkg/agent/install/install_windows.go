@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
@@ -30,7 +31,7 @@ const (
 )
 
 // postInstall performs post installation for Windows systems.
-func postInstall(topPath string) error {
+func postInstall(topPath string, ownership utils.FileOwner) error {
 	// delete the top-level elastic-agent.exe
 	binary := filepath.Join(topPath, paths.BinaryName)
 	err := os.Remove(binary)
@@ -52,6 +53,14 @@ func postInstall(topPath string) error {
 	realBinary := paths.BinaryPath(paths.VersionedHome(topPath), paths.BinaryName)
 	err = os.Symlink(realBinary, binary)
 	if err != nil {
+		return err
+	}
+
+	// register in Add/Remove Programs
+	if err := UpsertUninstallEntry(topPath, release.VersionWithSnapshot()); err != nil {
+		return err
+	}
+	if err := ConfigureRegistryPermissions(ownership); err != nil {
 		return err
 	}
 
@@ -96,11 +105,11 @@ func withServiceOptions(username string, groupName string, password string) ([]s
 	return []serviceOpt{withUserGroup(username, groupName), withPassword(password)}, nil
 }
 
-// serviceConfigure sets the security descriptor for the service
+// configureServicePermissions sets the security descriptor for the service
 //
 // gives user the ability to control the service, needed when installed with --unprivileged or
 // ReExec is not possible on Windows.
-func serviceConfigure(ownership utils.FileOwner) error {
+func configureServicePermissions(ownership utils.FileOwner) error {
 	// Modify registry to allow logging to eventlog as "Elastic Agent".
 	err := eventlog.InstallAsEventCreate(paths.ServiceName(), eventlog.Info|eventlog.Warning|eventlog.Error)
 	if err != nil && !strings.Contains(err.Error(), "registry key already exists") {
