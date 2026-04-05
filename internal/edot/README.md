@@ -37,6 +37,7 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | [apachereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/apachereceiver/v0.148.0/receiver/apachereceiver/README.md) | v0.148.0 |
 | [awss3receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awss3receiver/v0.148.0/receiver/awss3receiver/README.md) | v0.148.0 |
+| [azureeventhubreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/azureeventhubreceiver/v0.148.0/receiver/azureeventhubreceiver/README.md) | v0.148.0 |
 | [couchdbreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/couchdbreceiver/v0.148.0/receiver/couchdbreceiver/README.md) | v0.148.0 |
 | [dockerstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/dockerstatsreceiver/v0.148.0/receiver/dockerstatsreceiver/README.md) | v0.148.0 |
 | [elasticapmintakereceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/elasticapmintakereceiver/v0.36.0/receiver/elasticapmintakereceiver/README.md) | v0.36.0 |
