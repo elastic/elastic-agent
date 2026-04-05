@@ -11,11 +11,19 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 	"syscall"
-	"unsafe"
+	"time"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 )
+
+// leftoverPrefix is used to rename blocked executables during uninstall.
+// Files with this prefix are cleaned up on the next install.
+const leftoverPrefix = ".elastic-agent-leftover"
 
 func isBlockingOnExe(err error) bool {
 	if err == nil {
@@ -39,38 +47,67 @@ func isRetryableError(err error) bool {
 	return errno == syscall.ERROR_ACCESS_DENIED || errno == windows.ERROR_SHARING_VIOLATION
 }
 
-func removeBlockingExe(blockingErr error) error {
-	path, _ := getPathFromError(blockingErr)
-	if path == "" {
+// scheduleDeleteOnReboot renames the blocked executable in place (same
+// directory, recognizable prefix) and schedules it for deletion on the next
+// reboot via MoveFileEx/MOVEFILE_DELAY_UNTIL_REBOOT. Renaming in-place avoids
+// triggering EDR software. On the next install, any leftover files matching
+// the prefix are cleaned up by cleanupLeftoverRenames.
+func scheduleDeleteOnReboot(log *logp.Logger, blockingErr error, _ string) error {
+	blockedPath, _ := getPathFromError(blockingErr)
+	if blockedPath == "" {
 		return nil
 	}
 
-	// open handle for delete only
-	h, err := openDeleteHandle(path)
-	if err != nil {
-		return fmt.Errorf("failed to open handle for %q: %w", path, err)
+	dir := filepath.Dir(blockedPath)
+	ext := filepath.Ext(blockedPath)
+	renamed := filepath.Join(dir, fmt.Sprintf("%s-%d%s", leftoverPrefix, time.Now().UnixNano(), ext))
+
+	if err := os.Rename(blockedPath, renamed); err != nil {
+		return fmt.Errorf("failed to rename %q to %q: %w", blockedPath, renamed, err)
+	}
+	log.Infof("Renamed blocked executable %q to %q", blockedPath, renamed)
+
+	if err := markDeleteOnReboot(renamed); err != nil {
+		log.Warnf("Failed to schedule %q for deletion on reboot: %v. The file will be cleaned up on next install.", renamed, err)
+		// Not fatal — the file is already renamed out of the way and will
+		// be cleaned up by cleanupLeftoverRenames on next install.
+	} else {
+		log.Infof("Scheduled %q for deletion on reboot", renamed)
 	}
 
-	// rename handle
-	err = renameHandle(h)
-	_ = windows.CloseHandle(h)
-	if err != nil {
-		return fmt.Errorf("failed to rename handle for %q: %w", path, err)
-	}
-
-	// re-open handle
-	h, err = openDeleteHandle(path)
-	if err != nil {
-		return fmt.Errorf("failed to open handle after rename for %q: %w", path, err)
-	}
-
-	// dispose of the handle
-	err = disposeHandle(h)
-	_ = windows.CloseHandle(h)
-	if err != nil {
-		return fmt.Errorf("failed to dispose handle for %q: %w", path, err)
-	}
 	return nil
+}
+
+// markDeleteOnReboot schedules a file or directory for deletion on the next
+// Windows reboot. This only writes a registry entry
+// (PendingFileRenameOperations) and does not touch the file itself.
+func markDeleteOnReboot(path string) error {
+	p, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return err
+	}
+	return windows.MoveFileEx(p, nil, windows.MOVEFILE_DELAY_UNTIL_REBOOT)
+}
+
+// cleanupLeftoverRenames walks topPath and removes any files left behind by
+// a previous uninstall's scheduleDeleteOnReboot (files matching leftoverPrefix).
+// By the time a new install runs, the old process is gone and these files can
+// be deleted normally.
+func cleanupLeftoverRenames(log *logp.Logger, topPath string) error {
+	return filepath.WalkDir(topPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil //nolint:nilerr // best-effort: skip inaccessible entries
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if strings.HasPrefix(d.Name(), leftoverPrefix) {
+			if err := os.Remove(path); err != nil {
+				log.Warnf("Failed to remove leftover file %q from a previous uninstall: %v. You may need to delete it manually.", path, err)
+			}
+		}
+		return nil
+	})
 }
 
 func getPathFromError(blockingErr error) (string, syscall.Errno) {
@@ -82,86 +119,6 @@ func getPathFromError(blockingErr error) (string, syscall.Errno) {
 		}
 	}
 	return "", 0
-}
-
-func openDeleteHandle(path string) (windows.Handle, error) {
-	wPath, err := windows.UTF16PtrFromString(path)
-	if err != nil {
-		return 0, err
-	}
-	handle, err := windows.CreateFile(
-		wPath,
-		windows.DELETE,
-		0,
-		nil,
-		windows.OPEN_EXISTING,
-		windows.FILE_ATTRIBUTE_NORMAL,
-		0,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return handle, nil
-}
-
-func renameHandle(hHandle windows.Handle) error {
-	wRename, err := windows.UTF16FromString(":agentrm")
-	if err != nil {
-		return err
-	}
-
-	var rename fileRenameInfo
-	lpwStream := &wRename[0]
-	rename.FileNameLength = uint32(unsafe.Sizeof(lpwStream))
-
-	// RtlCopyMemory (https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlcopymemory)
-	//   Return value - None
-	_, _, _ = windows.NewLazyDLL("kernel32.dll").NewProc("RtlCopyMemory").Call(
-		uintptr(unsafe.Pointer(&rename.FileName[0])),
-		uintptr(unsafe.Pointer(lpwStream)),
-		unsafe.Sizeof(lpwStream),
-	)
-
-	err = windows.SetFileInformationByHandle(
-		hHandle,
-		windows.FileRenameInfo,
-		(*byte)(unsafe.Pointer(&rename)),
-		uint32(unsafe.Sizeof(rename)+unsafe.Sizeof(lpwStream)),
-	)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func disposeHandle(hHandle windows.Handle) error {
-	var deleteFile fileDispositionInfo
-	deleteFile.DeleteFile = true
-
-	err := windows.SetFileInformationByHandle(
-		hHandle,
-		windows.FileDispositionInfo,
-		(*byte)(unsafe.Pointer(&deleteFile)),
-		uint32(unsafe.Sizeof(deleteFile)),
-	)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type fileRenameInfo struct {
-	Union struct {
-		ReplaceIfExists bool
-		Flags           uint32
-	}
-	RootDirectory  windows.Handle
-	FileNameLength uint32
-	FileName       [1]uint16
-}
-
-type fileDispositionInfo struct {
-	DeleteFile bool
 }
 
 // killNoneChildProcess provides a way of killing a process that is not started as a child of this process.

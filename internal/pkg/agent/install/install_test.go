@@ -6,8 +6,10 @@ package install
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/jaypipes/ghw"
@@ -15,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -224,8 +227,43 @@ func TestSetupInstallPath(t *testing.T) {
 	tmpdir := t.TempDir()
 	ownership, err := utils.CurrentFileOwner()
 	require.NoError(t, err)
-	err = setupInstallPath(tmpdir, ownership)
+	err = setupInstallPath(logp.L(), tmpdir, ownership)
 	require.NoError(t, err)
 	markerFilePath := filepath.Join(tmpdir, paths.MarkerFileName)
 	require.FileExists(t, markerFilePath)
+}
+
+func TestSetupInstallPathCleansUpLeftoverRenames(t *testing.T) {
+	tmpdir := t.TempDir()
+	topPath := filepath.Join(tmpdir, "Elastic", "Agent")
+
+	// Simulate leftover renamed executable from a previous uninstall.
+	dataDir := filepath.Join(topPath, "data", "elastic-agent-old")
+	require.NoError(t, os.MkdirAll(dataDir, 0o755))
+	leftoverFile := filepath.Join(dataDir, ".elastic-agent-leftover.exe")
+	require.NoError(t, os.WriteFile(leftoverFile, []byte("old binary"), 0o644))
+
+	// Also create a normal file that should NOT be deleted.
+	normalFile := filepath.Join(topPath, "some-config.yml")
+	require.NoError(t, os.WriteFile(normalFile, []byte("config"), 0o644))
+
+	ownership, err := utils.CurrentFileOwner()
+	require.NoError(t, err)
+
+	err = setupInstallPath(logp.L(), topPath, ownership)
+	require.NoError(t, err)
+
+	// The install marker should exist (fresh install).
+	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
+	require.FileExists(t, markerFilePath)
+
+	// Leftover renamed executable should be cleaned up (Windows only).
+	if runtime.GOOS == "windows" {
+		_, err = os.Stat(leftoverFile)
+		assert.ErrorIs(t, err, fs.ErrNotExist, "leftover renamed exe should be removed")
+	}
+
+	// Normal files should still be present.
+	_, err = os.Stat(normalFile)
+	assert.NoError(t, err, "normal config file should not be deleted")
 }

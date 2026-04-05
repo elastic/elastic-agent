@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -1595,7 +1596,7 @@ func createTempDir(t *testing.T) string {
 
 	cleanup := func() {
 		if !t.Failed() {
-			if err := install.RemovePath(tempDir); err != nil {
+			if err := install.RemovePath(logp.L(), tempDir); err != nil {
 				t.Errorf("could not remove temp dir '%s': %s", tempDir, err)
 			}
 		} else {
