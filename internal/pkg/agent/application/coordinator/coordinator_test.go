@@ -46,6 +46,7 @@ import (
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -569,10 +570,65 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 	require.True(t, ok)
 
 	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
+	acker.On("Commit", mock.Anything).Return(nil)
 
 	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, WithSkipVerifyOverride(true), WithSkipDefaultPgp(true)))
 
 	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
+	acker.AssertCalled(t, "Commit", mock.Anything)
+}
+
+func TestReplayedRollbackActionAcked(t *testing.T) {
+	coordCh := make(chan error, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	upgradeManager := &fakeUpgradeManager{
+		upgradeable: true,
+	}
+
+	acker := &fakeActionAcker{}
+	coord, _, _ := createCoordinator(t, ctx,
+		ManagedCoordinator(true),
+		WithUpgradeManager(upgradeManager),
+		WithActionAcker(acker))
+
+	var coordWait sync.WaitGroup
+	coordWait.Add(1)
+	go func() {
+		coordWait.Done()
+		err := coord.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			// allowed error
+			err = nil
+		}
+		coordCh <- err
+	}()
+
+	coordWait.Wait()
+
+	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
+	actionUpgrade, ok := action.(*fleetapi.ActionUpgrade)
+	require.True(t, ok)
+	actionUpgrade.Data.Rollback = true
+	actionUpgrade.Data.Version = release.VersionWithSnapshot()
+
+	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
+	acker.On("Commit", mock.Anything).Return(nil)
+
+	// A rollback targeting the current version should be detected as replayed and acked without processing
+	require.NoError(t, coord.Upgrade(t.Context(), release.VersionWithSnapshot(), "", actionUpgrade, WithRollback(true)))
+
+	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
+	acker.AssertCalled(t, "Commit", mock.Anything)
+	assert.False(t, upgradeManager.upgradeCalled, "upgrade should not have been called for a replayed rollback action")
+
+	// Replayed rollback should not create or modify any UpgradeDetails
+	state := coord.State()
+	assert.Nil(t, state.UpgradeDetails, "no upgrade details should be present after replayed rollback is handled")
+
+	cancel()
+	require.NoError(t, <-coordCh)
 }
 
 func TestPreUpgradeCallback(t *testing.T) {
@@ -1542,8 +1598,14 @@ func (f *fakeUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
 }
 
 func (f *fakeUpgradeManager) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {
-	if acker != nil {
-		return acker.Ack(ctx, action)
+	if acker == nil {
+		return nil
+	}
+	if err := acker.Ack(ctx, action); err != nil {
+		return err
+	}
+	if err := acker.Commit(ctx); err != nil {
+		return err
 	}
 	return nil
 }
