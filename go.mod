@@ -66,6 +66,7 @@ require (
 	go.elastic.co/go-licence-detector v0.7.0
 	go.opentelemetry.io/collector/component/componentstatus v0.148.1-0.20260320051400-372cc483b303
 	go.opentelemetry.io/collector/component/componenttest v0.148.0
+	go.opentelemetry.io/collector/config/configtls v1.54.0
 	go.opentelemetry.io/collector/confmap/xconfmap v0.148.0
 	go.opentelemetry.io/collector/exporter/exportertest v0.148.0
 	go.opentelemetry.io/collector/extension/extensiontest v0.148.0
@@ -304,7 +305,6 @@ require (
 	go.opentelemetry.io/collector/config/configoptional v1.54.0 // indirect
 	go.opentelemetry.io/collector/config/configretry v1.54.0 // indirect
 	go.opentelemetry.io/collector/config/configtelemetry v0.148.0 // indirect
-	go.opentelemetry.io/collector/config/configtls v1.54.0 // indirect
 	go.opentelemetry.io/collector/connector/connectortest v0.148.0 // indirect
 	go.opentelemetry.io/collector/connector/xconnector v0.148.0 // indirect
 	go.opentelemetry.io/collector/consumer v1.54.0 // indirect
