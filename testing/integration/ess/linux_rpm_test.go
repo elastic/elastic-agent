@@ -405,6 +405,7 @@ func TestRpmWithPrefix(t *testing.T) {
 
 		snapshotPackage, err := snapshotFixture.SrcPackage(ctx)
 		require.NoError(t, err)
+		snapshotFixture.SetInstallBasePath("/opt/elastic-agent")
 
 		const migrationMarkerFile = "migration_marker.file"
 		runDir, err := atesting.FindRunDir(agentFixture)
