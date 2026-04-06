@@ -488,7 +488,6 @@ func TestDiagnosticStripComponentUnitsConfig(t *testing.T) {
 			ID:         "test-component",
 			InputType:  "cel",
 			OutputType: "elasticsearch",
-			OutputName: "default",
 			Units: []component.Unit{
 				{
 					ID:       "cel-input",
