@@ -310,6 +310,33 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		return nil
 	}
 
+	checkConfigStripped := func(root map[string]any) error {
+		comps, ok := root["components"].([]any)
+		if !ok {
+			return nil
+		}
+		for _, comp := range comps {
+			compMap, ok := comp.(map[string]any)
+			if !ok {
+				continue
+			}
+			units, ok := compMap["units"].([]any)
+			if !ok {
+				continue
+			}
+			for _, unit := range units {
+				unitMap, ok := unit.(map[string]any)
+				if !ok {
+					continue
+				}
+				if _, hasConfig := unitMap["config"]; hasConfig {
+					return fmt.Errorf("found 'config' key in unit, expected it to be stripped")
+				}
+			}
+		}
+		return nil
+	}
+
 	for _, fileName := range fileNames {
 		path := filepath.Join(extractionDir, fileName)
 		stat, err := os.Stat(path)
@@ -323,8 +350,15 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		err = yaml.NewDecoder(f).Decode(&yObj)
 		require.NoError(t, err)
 
+		t.Logf("checking redaction for file %q", fileName)
 		err = checkRedacted(yObj)
 		require.NoError(t, err, "file %q has non-redacted values", path)
+
+		if strings.HasPrefix(fileName, "components-") {
+			t.Logf("checking unit config is stripped from file %q", fileName)
+			err = checkConfigStripped(yObj)
+			require.NoError(t, err, "file %q has unit config that should be stripped", path)
+		}
 	}
 }
 
