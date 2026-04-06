@@ -65,6 +65,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [prometheusremotewritereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusremotewritereceiver/v0.148.0/receiver/prometheusremotewritereceiver/README.md) | v0.148.0 |
 | [rabbitmqreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/rabbitmqreceiver/v0.148.0/receiver/rabbitmqreceiver/README.md) | v0.148.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.148.0/receiver/receivercreator/README.md) | v0.148.0 |
+| [receivertest](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/receivertest/v0.148.0/receiver/receivertest/README.md) | v0.148.0 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.148.0/receiver/redisreceiver/README.md) | v0.148.0 |
 | [snmpreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/snmpreceiver/v0.148.0/receiver/snmpreceiver/README.md) | v0.148.0 |
 | [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlserverreceiver/v0.148.0/receiver/sqlserverreceiver/README.md) | v0.148.0 |
