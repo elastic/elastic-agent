@@ -339,7 +339,7 @@ metrics shown in the Fleet UI for every Agent are computed as follows from the d
       the Elasticsearch query.
 2. The 5-minute average CPU utilization (in %) for each of the processes is summed up to arrive at a total CPU utilization
    (in %) for the Agent process and all Beat processes managed by Agent. This is the `sum_cpu` aggregation in the Elasticsearch
-   query. The result is the total CPU utilization (in %) by Agent and it's child Beat processes across all available cores
+   query. The result is the total CPU utilization (in %) by Agent and its child Beat processes across all available cores
    (as opposed to being normalized per-core). For example, if a machine has 8 cores, the resulting value will be in the range of
    (0%, 800%).
 

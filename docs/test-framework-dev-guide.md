@@ -24,7 +24,7 @@ The integration testing framework spins up resources in GCP.  To achieve this, i
 The Elastic Agent package that is used for integration tests packages Beats built from the Unified Release (as opposed to DRA).  There is no explicit action needed for this prerequisite but just keep in mind that if any Agent integration tests rely on certain Beats features or bugfixes, they may not be available in the integration tests yet because a unified release containing those features or bugfixes may not have happened yet.
 
 #### Helm & Helm charts
-To run the Kubernets integration tests you need to install
+To run the Kubernetes integration tests you need to install
 [helm](https://helm.sh/). Then add and update some helm charts
 repositories:
 
