@@ -876,10 +876,7 @@ func processorsForServiceComponentFilestream(compInfo componentInfo, dataset str
 // processorsForProcessMetrics returns processors used for process metrics.
 func processorsForProcessMetrics(binaryName, unitID, namespace, dataset string, agentInfo info.Agent) []any {
 	return []any{
-		addDataStreamFieldsProcessor(dataset, namespace),
-		addEventFieldsProcessor(dataset),
-		addElasticAgentFieldsProcessor(binaryName, agentInfo),
-		addAgentFieldsProcessor(agentInfo.AgentID()),
+		addProcessName(binaryName),
 		addComponentFieldsProcessor(binaryName, unitID),
 	}
 }
@@ -891,10 +888,7 @@ func processorsForBeatsStream(
 	runtimeManager component.RuntimeManager,
 ) []any {
 	processors := []any{
-		addDataStreamFieldsProcessor(dataset, namespace),
-		addEventFieldsProcessor(dataset),
-		addElasticAgentFieldsProcessor(binaryName, agentInfo),
-		addAgentFieldsProcessor(agentInfo.AgentID()),
+		addProcessName(binaryName),
 		addComponentFieldsProcessor(binaryName, unitID),
 	}
 	if runtimeManager == component.OtelRuntimeManager { // we don't want process metrics for beats receivers
@@ -924,8 +918,7 @@ func processorsForHttpStream(binaryName, unitID, dataset string, agentInfo info.
 	}
 	return []any{
 		addEventFieldsProcessor(dataset),
-		addElasticAgentFieldsProcessor(sanitizedName, agentInfo),
-		addAgentFieldsProcessor(agentInfo.AgentID()),
+		addProcessName(sanitizedName),
 		addCopyFieldsProcessor(httpCopyRules(), true, false),
 		dropFieldsProcessor(fieldsToDrop, true),
 		addComponentFieldsProcessor(binaryName, unitID),
@@ -935,40 +928,10 @@ func processorsForHttpStream(binaryName, unitID, dataset string, agentInfo info.
 // processorsForAgentHttpStream returns the processors used for the agent metric stream in the beats input.
 func processorsForAgentHttpStream(binaryName, processName, unitID, namespace, dataset string, agentInfo info.Agent) []any {
 	return []any{
-		addDataStreamFieldsProcessor(dataset, namespace),
-		addEventFieldsProcessor(dataset),
-		addElasticAgentFieldsProcessor(processName, agentInfo),
-		addAgentFieldsProcessor(agentInfo.AgentID()),
+		addProcessName(processName),
 		addCopyFieldsProcessor(httpCopyRules(), true, false),
 		dropFieldsProcessor([]any{"http"}, true),
 		addComponentFieldsProcessor(binaryName, unitID),
-	}
-}
-
-// addElasticAgentFieldsProcessor returns a processor definition that adds agent information in an `elastic_agent` field.
-func addElasticAgentFieldsProcessor(processName string, agentInfo info.Agent) map[string]any {
-	return map[string]any{
-		"add_fields": map[string]any{
-			"target": "elastic_agent",
-			"fields": map[string]any{
-				"id":       agentInfo.AgentID(),
-				"version":  agentInfo.Version(),
-				"snapshot": agentInfo.Snapshot(),
-				"process":  processName,
-			},
-		},
-	}
-}
-
-// addAgentFieldsProcessor returns a processor definition that adds the agent ID under an `agent.id` field.
-func addAgentFieldsProcessor(agentID string) map[string]any {
-	return map[string]any{
-		"add_fields": map[string]any{
-			"target": "agent",
-			"fields": map[string]any{
-				"id": agentID,
-			},
-		},
 	}
 }
 
@@ -980,20 +943,6 @@ func addComponentFieldsProcessor(binaryName, unitID string) map[string]any {
 			"fields": map[string]any{
 				"id":     unitID,
 				"binary": binaryName,
-			},
-		},
-	}
-}
-
-// addDataStreamFieldsProcessor returns a processor definition that adds datastream information.
-func addDataStreamFieldsProcessor(dataset, namespace string) map[string]any {
-	return map[string]any{
-		"add_fields": map[string]any{
-			"target": "data_stream",
-			"fields": map[string]any{
-				"type":      "metrics",
-				"dataset":   dataset,
-				"namespace": namespace,
 			},
 		},
 	}
@@ -1407,4 +1356,15 @@ func monitoringDrop(path string) (drop string) {
 	}
 
 	return path
+}
+
+func addProcessName(processName string) map[string]any {
+	return map[string]any{
+		"add_fields": map[string]any{
+			"target": "elastic_agent",
+			"fields": map[string]any{
+				"process": processName,
+			},
+		},
+	}
 }

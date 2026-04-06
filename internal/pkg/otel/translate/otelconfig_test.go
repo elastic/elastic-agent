@@ -322,55 +322,19 @@ func TestGetOtelConfig(t *testing.T) {
 	defaultInputProcessors := func(streamId, dataset string, namespace string) []any {
 		return []any{
 			mapstr.M{
-				"add_fields": mapstr.M{
-					"fields": mapstr.M{
-						"input_id": "test",
-					},
-					"target": "@metadata",
-				},
-			},
-			mapstr.M{
-				"add_fields": mapstr.M{
-					"fields": mapstr.M{
+				"add_agent_metadata": mapstr.M{
+					"data_stream": mapstr.M{
 						"dataset":   dataset,
 						"namespace": "default",
 						"type":      namespace,
 					},
-					"target": "data_stream",
-				},
-			},
-			mapstr.M{
-				"add_fields": mapstr.M{
-					"fields": mapstr.M{
-						"dataset": dataset,
-					},
-					"target": "event",
-				},
-			},
-			mapstr.M{
-				"add_fields": mapstr.M{
-					"fields": mapstr.M{
-						"stream_id": streamId,
-					},
-					"target": "@metadata",
-				},
-			},
-			mapstr.M{
-				"add_fields": mapstr.M{
-					"fields": mapstr.M{
+					"elastic_agent": mapstr.M{
 						"id":       agentInfo.AgentID(),
 						"snapshot": agentInfo.Snapshot(),
 						"version":  agentInfo.Version(),
 					},
-					"target": "elastic_agent",
-				},
-			},
-			mapstr.M{
-				"add_fields": mapstr.M{
-					"fields": mapstr.M{
-						"id": agentInfo.AgentID(),
-					},
-					"target": "agent",
+					"input_id":  "test",
+					"stream_id": streamId,
 				},
 			},
 		}
