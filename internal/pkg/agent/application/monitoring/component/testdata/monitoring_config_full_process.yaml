@@ -132,25 +132,8 @@ inputs:
     processors:
     - add_fields:
         fields:
-          dataset: elastic_agent.metricbeat
-          namespace: default
-          type: metrics
-        target: data_stream
-    - add_fields:
-        fields:
-          dataset: elastic_agent.metricbeat
-        target: event
-    - add_fields:
-        fields:
-          id: ""
           process: metricbeat
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - add_fields:
         fields:
           binary: metricbeat
@@ -171,25 +154,8 @@ inputs:
     processors:
     - add_fields:
         fields:
-          dataset: elastic_agent.filebeat
-          namespace: default
-          type: metrics
-        target: data_stream
-    - add_fields:
-        fields:
-          dataset: elastic_agent.filebeat
-        target: event
-    - add_fields:
-        fields:
-          id: ""
           process: filebeat
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - add_fields:
         fields:
           binary: filebeat
@@ -210,25 +176,8 @@ inputs:
     processors:
     - add_fields:
         fields:
-          dataset: elastic_agent.filebeat
-          namespace: default
-          type: metrics
-        target: data_stream
-    - add_fields:
-        fields:
-          dataset: elastic_agent.filebeat
-        target: event
-    - add_fields:
-        fields:
-          id: ""
           process: filebeat
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - add_fields:
         fields:
           binary: filebeat
@@ -249,25 +198,8 @@ inputs:
     processors:
     - add_fields:
         fields:
-          dataset: elastic_agent.filebeat
-          namespace: default
-          type: metrics
-        target: data_stream
-    - add_fields:
-        fields:
-          dataset: elastic_agent.filebeat
-        target: event
-    - add_fields:
-        fields:
-          id: ""
           process: filebeat
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - add_fields:
         fields:
           binary: filebeat
@@ -296,25 +228,8 @@ inputs:
     processors:
     - add_fields:
         fields:
-          dataset: elastic_agent.metricbeat
-          namespace: default
-          type: metrics
-        target: data_stream
-    - add_fields:
-        fields:
-          dataset: elastic_agent.metricbeat
-        target: event
-    - add_fields:
-        fields:
-          id: ""
           process: metricbeat
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - add_fields:
         fields:
           binary: metricbeat
@@ -345,25 +260,8 @@ inputs:
     processors:
     - add_fields:
         fields:
-          dataset: elastic_agent.elastic_agent
-          namespace: default
-          type: metrics
-        target: data_stream
-    - add_fields:
-        fields:
-          dataset: elastic_agent.elastic_agent
-        target: event
-    - add_fields:
-        fields:
-          id: ""
           process: elastic-agent
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - copy_fields:
         fail_on_error: false
         fields:
@@ -406,25 +304,8 @@ inputs:
     processors:
     - add_fields:
         fields:
-          dataset: elastic_agent.elastic_agent
-          namespace: default
-          type: metrics
-        target: data_stream
-    - add_fields:
-        fields:
-          dataset: elastic_agent.elastic_agent
-        target: event
-    - add_fields:
-        fields:
-          id: ""
           process: elastic-otel-collector
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - copy_fields:
         fail_on_error: false
         fields:
@@ -471,15 +352,8 @@ inputs:
         target: event
     - add_fields:
         fields:
-          id: ""
           process: metricbeat
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - copy_fields:
         fail_on_error: false
         fields:
@@ -526,15 +400,8 @@ inputs:
         target: event
     - add_fields:
         fields:
-          id: ""
           process: filebeat
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - copy_fields:
         fail_on_error: false
         fields:
@@ -582,15 +449,8 @@ inputs:
         target: event
     - add_fields:
         fields:
-          id: ""
           process: filebeat
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - copy_fields:
         fail_on_error: false
         fields:
@@ -637,15 +497,8 @@ inputs:
         target: event
     - add_fields:
         fields:
-          id: ""
           process: filebeat
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - copy_fields:
         fail_on_error: false
         fields:
@@ -693,15 +546,8 @@ inputs:
         target: event
     - add_fields:
         fields:
-          id: ""
           process: filebeat
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - copy_fields:
         fail_on_error: false
         fields:
@@ -749,15 +595,8 @@ inputs:
         target: event
     - add_fields:
         fields:
-          id: ""
           process: filebeat
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - copy_fields:
         fail_on_error: false
         fields:
@@ -805,15 +644,8 @@ inputs:
         target: event
     - add_fields:
         fields:
-          id: ""
           process: metricbeat
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - copy_fields:
         fail_on_error: false
         fields:
@@ -860,25 +692,8 @@ inputs:
     processors:
     - add_fields:
         fields:
-          dataset: elastic_agent.endpoint_security
-          namespace: default
-          type: metrics
-        target: data_stream
-    - add_fields:
-        fields:
-          dataset: elastic_agent.endpoint_security
-        target: event
-    - add_fields:
-        fields:
-          id: ""
           process: endpoint_security
-          snapshot: false
-          version: placeholder
         target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
     - add_fields:
         fields:
           binary: endpoint_security
