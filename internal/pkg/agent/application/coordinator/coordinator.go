@@ -229,14 +229,39 @@ type VarsManager interface {
 	Watch() <-chan []*transpiler.Vars
 }
 
-// managerShutdownTimeout is how long the coordinator will wait during shutdown
-// to receive termination states from its managers.
-// Note: The current timeout (5s) is shorter than the default stop timeout for
-// subprocess components (30s from process.DefaultConfig()). This means the
-// coordinator may not wait for the subprocesses to finish terminating, preventing
-// Wait() from being called on them. This will result in zombie processes
-// during restart on Unix systems.
-const managerShutdownTimeout = time.Second * 5
+// minManagerShutdownTimeout is the minimum timeout used when no components are running.
+const minManagerShutdownTimeout = 5 * time.Second
+
+// managerShutdownTimeoutForComponents computes the manager shutdown timeout based on passed components.
+// It returns the maximum stop timeout across all command components plus a buffer,
+// capped at runtime.ProcessStopTimeout so the agent exits before external process
+// managers (systemd, Kubernetes, etc.) forcibly kill it.
+// Emits a warning log if a component's stop timeout exceeds runtime.ProcessStopTimeout.
+func managerShutdownTimeoutForComponents(log *logger.Logger, components []component.Component) time.Duration {
+	var maxTimeout time.Duration
+	for _, comp := range components {
+		if comp.InputSpec == nil || comp.InputSpec.Spec.Command == nil {
+			continue
+		}
+		stopTimeout := comp.InputSpec.Spec.Command.Timeouts.Stop
+		if stopTimeout > runtime.ProcessStopTimeout && log != nil {
+			log.Warnf("component %s has stop timeout %s which exceeds the typical process manager limit of %s; "+
+				"the agent may be terminated before the component fully shuts down",
+				comp.ID, stopTimeout, runtime.ProcessStopTimeout)
+		}
+		if stopTimeout > maxTimeout {
+			maxTimeout = stopTimeout
+		}
+	}
+	if maxTimeout <= 0 {
+		return minManagerShutdownTimeout
+	}
+	timeout := maxTimeout + runtime.ShutdownBuffer
+	if timeout > runtime.ProcessStopTimeout {
+		return runtime.ProcessStopTimeout
+	}
+	return timeout
+}
 
 type configReloader interface {
 	Reload(*config.Config) error
@@ -1258,11 +1283,11 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current expected components model of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				comps := c.componentModel
+				redacted := stripComponentUnitsConfig(c.componentModel)
 				o, err := yaml.Marshal(struct {
 					Components []component.Component `yaml:"components"`
 				}{
-					Components: comps,
+					Components: redacted,
 				})
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
@@ -1282,10 +1307,11 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				for i := 0; i < len(components); i++ {
 					componentConfigs[i] = components[i].Component
 				}
+				redacted := stripComponentUnitsConfig(componentConfigs)
 				o, err := yaml.Marshal(struct {
 					Components []component.Component `yaml:"components"`
 				}{
-					Components: componentConfigs,
+					Components: redacted,
 				})
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
@@ -1406,6 +1432,22 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 	return hooks
 }
 
+// stripComponentUnitsConfig returns a copy of the components with Unit.Config
+// removed to prevent secret leakage in diagnostics.
+func stripComponentUnitsConfig(comps []component.Component) []component.Component {
+	result := make([]component.Component, len(comps))
+	copy(result, comps)
+	for i := range result {
+		units := make([]component.Unit, len(result[i].Units))
+		copy(units, result[i].Units)
+		for j := range units {
+			units[j].Config = nil
+		}
+		result[i].Units = units
+	}
+	return result
+}
+
 // runner performs the actual work of running all the managers.
 // Called on the main Coordinator goroutine, from Coordinator.Run.
 //
@@ -1485,7 +1527,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 
 	// If we got fatal errors from any of the managers, return them.
 	// Otherwise, just return the context's closing error.
-	err := collectManagerErrors(managerShutdownTimeout, varsErrCh, runtimeErrCh, configErrCh, otelErrCh, upgradeMarkerWatcherErrCh)
+	err := collectManagerErrors(managerShutdownTimeoutForComponents(c.logger, c.componentModel), varsErrCh, runtimeErrCh, configErrCh, otelErrCh, upgradeMarkerWatcherErrCh)
 	if err != nil {
 		c.logger.Debugf("Manager errors on Coordinator shutdown: %v", err.Error())
 		return err

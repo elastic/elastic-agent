@@ -1,0 +1,13 @@
+type: verifier
+github_project: elastic/elastic-agent
+
+status:
+  class: receiver
+  stability:
+    development: [logs]
+  distributions: []
+  codeowners:
+    active: [jeniawhite]
+
+tests:
+  skip_lifecycle: true # Receiver uses integration finders
