@@ -285,7 +285,9 @@ func TestDynamicTopicSetter(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, test.expectedTransformMap, dynamicTopicSetterProcessor(test.topic, "default"))
+			processor, err := dynamicTopicSetterProcessor(test.topic, "default")
+			require.NoError(t, err)
+			require.Equal(t, test.expectedTransformMap, processor)
 		})
 	}
 }
