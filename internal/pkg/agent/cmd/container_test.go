@@ -67,6 +67,60 @@ func TestEnvTimeout(t *testing.T) {
 	require.Equal(t, time.Second*10, res)
 }
 
+func TestEnvMapSlice(t *testing.T) {
+	testCases := []struct {
+		name     string
+		env      string
+		expected map[string]string
+	}{
+		{
+			name: "basic",
+			env:  "key1=value1",
+			expected: map[string]string{
+				"key1": "value1",
+			},
+		},
+		{
+			name: "multiple",
+			env:  "key1=value1,key2=value2",
+			expected: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+		},
+		{
+			name: "multiple with quotes",
+			env:  `key1=value1,key2="value2"`,
+			expected: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+		},
+		{
+			name: "multiple with quotes and commas",
+			env:  `key1=value1,key2="value2,value3"`,
+			expected: map[string]string{
+				"key1": "value1",
+				"key2": "value2,value3",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("TEST_ENV_MAP_SLICE", tc.env)
+			defer os.Unsetenv("TEST_ENV_MAP_SLICE")
+			res := envMapSlice("TEST_ENV_MAP_SLICE")
+			require.EqualValues(t, tc.expected, res)
+		})
+	}
+}
+
+func TestEnvMapSlice_NoEnv(t *testing.T) {
+	res := envMapSlice("TEST_ENV_MAP_SLICE")
+	require.Nil(t, res)
+}
+
 func TestContainerTestPaths(t *testing.T) {
 	cases := map[string]struct {
 		config   string
