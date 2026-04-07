@@ -63,8 +63,8 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 			InputType: make(map[string]string),
 		},
 		Output: map[string]string{
-			"logstash": string(ProcessRuntimeManager), // Force all inputs using the Logstash output to use the process runtime
-			"kafka":    string(ProcessRuntimeManager), // Force all inputs using the kafka output to use the process runtime
+			"logstash": string(OtelRuntimeManager), // Force all inputs using the Logstash output to use the otel runtime
+			"kafka":    string(OtelRuntimeManager), // Force all inputs using the kafka output to use the otel runtime
 		},
 	}
 }
