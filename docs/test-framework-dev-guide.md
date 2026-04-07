@@ -15,12 +15,7 @@ provides a high level overview of the testing framework.
 #### Go version
 Go version should be at least the same than the one in [.go-version](https://github.com/elastic/elastic-agent/blob/main/.go-version) file at the root of this repository.
 
-<<<<<<< HEAD
-
-### GCloud CLI
-=======
 #### GCloud CLI
->>>>>>> 65a3c9a05 (Add AGENTS.md, and a CLAUDE.md that is a symlink to AGENTS.md (#13290))
 The integration testing framework spins up resources in GCP.  To achieve this, it needs the
 [GCloud CLI](https://cloud.google.com/sdk/gcloud) to be installed on the system where the tests are initiated from.
 
@@ -63,11 +58,6 @@ Go to https://docker-auth.elastic.co/ and authenticate with Okta to receive your
 
 [elastic_docker_registry]: docker.elastic.co
 
-<<<<<<< HEAD
-### Running the tests
-
-The test are run with mage using the `integration` namespace:
-=======
 ### Packaging
 Before you can run any test, you first need to package the Elastic
 Agent version you want to test. For that you'll need to run `mage package`, for example:
@@ -164,7 +154,6 @@ AGENT_VERSION="9.2.0-SNAPSHOT" mage -v integration:single TestLogIngestionFleetM
 # If testing on Kubernetes
 SNAPSHOT=true INSTANCE_PROVISIONER=kind mage -v integration:testKubernetesSingle TestKubernetesJournaldInput
 ```
->>>>>>> 65a3c9a05 (Add AGENTS.md, and a CLAUDE.md that is a symlink to AGENTS.md (#13290))
 
 #### ESS oriented tests
 

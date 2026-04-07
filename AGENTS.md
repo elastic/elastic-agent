@@ -74,12 +74,6 @@ High-level areas:
 
 Entry flow: `main.go` → `cmd.NewCommand()` → Cobra command tree → `application.New()` initializes platform specs, config managers, and the coordinator.
 
-### `beats/` is a git submodule — do not modify for agent changes
-
-The **`beats/`** directory is a **git submodule** (see `.gitmodules`: `elastic/beats`). The main module **replaces** `github.com/elastic/beats/v7` with `./beats` in `go.mod`.
-
-**Do not edit files under `beats/` when implementing changes to the Elastic Agent codebase.** Agent work belongs in this repo’s own packages (for example `internal/`, `pkg/`, `specs/`). Submodule bumps are a separate, intentional maintenance step — not part of routine feature or bugfix work.
-
 ## Deployment architecture
 
 Refer to [architecture.md](./docs/architecture.md).
@@ -109,7 +103,7 @@ See [docs/test-framework-dev-guide.md](./docs/test-framework-dev-guide.md).
 
 Major **direct** dependencies agents often interact with (see [go.mod](./go.mod) for the full graph):
 
-- **`github.com/elastic/beats/v7`** — Beat libraries (vendored via **`beats/` submodule**; do not edit submodule for agent-only changes)
+- **`github.com/elastic/beats/v7`** — Beat libraries
 - **`github.com/elastic/elastic-agent-client/v7`** — agent ↔ component gRPC client protocol
 - **`github.com/elastic/go-elasticsearch/v8`** — Elasticsearch client
 - **`github.com/spf13/cobra`** — CLI
@@ -135,7 +129,7 @@ mage format:license  # applies the right license header.
 CI and local checks enforce the following (details in [.golangci.yml](./.golangci.yml), [magefile.go](./magefile.go), and the Makefile):
 
 - **Imports / format:** **`goimports`** with local prefix **`github.com/elastic`** (golangci formatters). Use **`mage fmt`** for formatting; **`mage check:all`** does not run the Go linter (see below).
-- **License headers:** **`go-licenser`** with **Elastic License 2.0** (`mage check:license` / part of **`mage check:all`**). The `beats` tree is excluded because it is a submodule.
+- **License headers:** **`go-licenser`** with **Elastic License 2.0** (`mage check:license` / part of **`mage check:all`**).
 - **Lint:** **[golangci-lint](https://golangci-lint.run/)** per [.golangci.yml](./.golangci.yml). Notable rules include:
   - **`forbidigo`**: `fmt.Print*` is forbidden in most code — use structured logging (for example **zerolog**).
   - **`depguard`**: avoid legacy **`math/rand`**; prefer **`math/rand/v2`**.
@@ -158,7 +152,6 @@ Principles and repo-specific process: [CONTRIBUTING.md](./CONTRIBUTING.md).
 - **Update docs and tests** when behavior, configuration, or operator-facing workflow changes.
 - **Make non-obvious intent clear** through naming, structure, or brief “why” comments when needed.
 - **Formatting:** All go files must be formatted with `go fmt` and the `goimports` tool, the `mage fmt` target can be used for this.
-- **Do not modify `beats/`** for routine Elastic Agent work (submodule boundary).
 - **Changelog:** For notable changes, add a fragment using **[elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool)**. Typical usage: `elastic-agent-changelog-tool new "$TITLE"` (see the tool’s [usage docs](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/usage.md)). PRs may use the **`skip-changelog`** label when appropriate; see `changelog/` for examples.
 - **`go.mod` / NOTICE:** If you change **`go.mod`** or add/update Go dependencies, regenerate **`NOTICE.txt`** and **`NOTICE-fips.txt`** with `mage notice`
 - **Before opening a PR (minimum):** **`mage test:unit`** and linting (**`mage check:lint`** or **`make lint`**) should pass. Also run **`mage check:all`** when your change should satisfy license + integration metadata + docs layout checks. For CI parity, use **`make check-ci`** (see [Makefile](./Makefile); note **`check-ci` does not run golangci-lint**, which CI runs in GitHub Actions) and **`make check`** when you want the linter plus the same **`check-ci`** steps.
