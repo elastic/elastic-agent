@@ -86,16 +86,16 @@ The following actions are possible and grouped based on the actions.
 
   FLEET_ENROLL - set to 1 for enrollment into Fleet Server. If not set, Elastic Agent is run in standalone mode.
   FLEET_URL - URL of the Fleet Server to enroll into
-  FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLED and FLEET_ENROLL is set. Then the token is fetched from Kibana.
-  FLEET_ENROLL_TIMEOUT - The timeout duration for the enroll commnd. Defaults to 10m. A negative value disables the timeout.
+  FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLE and FLEET_ENROLL is set. Then the token is fetched from Kibana.
+  FLEET_ENROLL_TIMEOUT - The timeout duration for the enroll command. Defaults to 10m. A negative value disables the timeout.
   FLEET_CA - path to certificate authority to use with communicate with Fleet Server [$KIBANA_CA]
   FLEET_INSECURE - communicate with Fleet with either insecure HTTP or unverified HTTPS
   ELASTIC_AGENT_CERT - path to certificate to use for connecting to fleet-server.
   ELASTIC_AGENT_CERT_KEY - path to private key use for connecting to fleet-server.
 
-  The following vars are need in the scenario that Elastic Agent should automatically fetch its own token.
+  The following vars are needed in the scenario that Elastic Agent should automatically fetch its own token.
 
-  KIBANA_FLEET_HOST - Kibana host to enable create enrollment token on [$KIBANA_HOST]
+  KIBANA_FLEET_HOST - Kibana host to create an enrollment token on [$KIBANA_HOST]
   FLEET_TOKEN_NAME - token name to use for fetching token from Kibana. This requires Kibana configs to be set.
   FLEET_TOKEN_POLICY_NAME - token policy name to use for fetching token from Kibana. This requires Kibana configs to be set.
 
@@ -131,8 +131,8 @@ The following actions are possible and grouped based on the actions.
   should not setup Fleet.
 
   KIBANA_FLEET_HOST - Kibana host accessible from Fleet Server. [$KIBANA_HOST]
-  KIBANA_FLEET_USERNAME - Kibana username to service token [$KIBANA_USERNAME]
-  KIBANA_FLEET_PASSWORD - Kibana password to service token [$KIBANA_PASSWORD]
+  KIBANA_FLEET_USERNAME - Kibana username for service token [$KIBANA_USERNAME]
+  KIBANA_FLEET_PASSWORD - Kibana password for service token [$KIBANA_PASSWORD]
   KIBANA_FLEET_CA - path to certificate authority to use with communicate with Kibana [$KIBANA_CA]
   KIBANA_REQUEST_RETRY_SLEEP - sleep duration taken when agent performs a request to Kibana [default 1s]
   KIBANA_REQUEST_RETRY_COUNT - number of retries agent performs when executing a request to Kibana [default 30]
@@ -351,7 +351,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		if err != nil {
 			return err
 		}
-		enroll := exec.Command(executable, cmdArgs...)
+		enroll := exec.CommandContext(context.Background(), executable, cmdArgs...)
 		enroll.Stdout = streams.Out
 		enroll.Stderr = streams.Err
 		err = enroll.Start()
@@ -1161,8 +1161,46 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	}
 
 	storedFleetHosts := storedConfig.Fleet.Client.GetHosts()
-	if len(storedFleetHosts) == 0 || !slices.Contains(storedFleetHosts, setupCfg.Fleet.URL) {
+	if len(storedFleetHosts) == 0 {
+		// No stored Fleet hosts, enrollment is required.
+		return true, nil
+	}
+	// Parse the setup Fleet URL to extract the host portion for comparison.
+	// Stored hosts can be in one of two forms depending on when the config was last saved:
+	//  - Full URL "https://host:port" — after a fleet policy update (handler_action_policy_change
+	//    stores the full URLs sent by Fleet and clears the separate Protocol/Host fields).
+	//  - Host-only "host:port" — right after enrollment, before the first policy update
+	//    (remote.NewConfigFromURL stores Protocol and Host as separate fields).
+	// We must match against both forms so that neither case triggers a spurious re-enrollment.
+	setupFleetURL, err := url.Parse(setupCfg.Fleet.URL)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse fleet URL %q: %w", setupCfg.Fleet.URL, err)
+	}
+	setupFleetHost := setupFleetURL.Host
+	if setupFleetHost == "" {
+		// url.Parse may put the value in Path if there's no scheme (e.g. "host1")
+		// or misinterpret "host:port" as scheme:opaque. Fall back to the raw URL
+		// for the host comparison, and skip the protocol check since there is no
+		// reliable scheme.
+		setupFleetHost = setupCfg.Fleet.URL
+	}
+	// Check for a match against the full URL (post-policy-update form) or
+	// the host-only form (post-enrollment, pre-policy-update form).
+	// Track which form matched so we can decide whether to do the protocol check below.
+	matchedFullURL := slices.Contains(storedFleetHosts, setupCfg.Fleet.URL)
+	matchedHostOnly := slices.Contains(storedFleetHosts, setupFleetHost)
+	if !matchedFullURL && !matchedHostOnly {
 		// The Fleet URL in the setup does not exist in the stored configuration, so enrollment is required.
+		return true, nil
+	}
+	// When the stored config uses the pre-policy-update form (separate Protocol/Host
+	// fields, matched via setupFleetHost above), also verify the protocol hasn't changed.
+	// Skip this check when we matched via the full URL, because the scheme is already
+	// embedded in that URL and the stored Protocol field may hold a stale default value.
+	if !matchedFullURL && setupFleetURL.Host != "" && setupFleetURL.Scheme != "" &&
+		storedConfig.Fleet.Client.Protocol != "" &&
+		setupFleetURL.Scheme != string(storedConfig.Fleet.Client.Protocol) {
+		// The Fleet protocol has changed, so enrollment is required.
 		return true, nil
 	}
 
@@ -1212,6 +1250,12 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	fc, err := newFleetClient(log, storedConfig.Fleet.AccessAPIKey, storedConfig.Fleet.Client)
 	if err != nil {
 		return false, fmt.Errorf("failed to create fleet client: %w", err)
+	}
+
+	// The agent ID is stored under the top-level "agent.id" key (Settings.ID) in fleet.enc,
+	// not under "fleet.agent.id" (Fleet.Info.ID), which is always empty after enrollment.
+	if storedConfig.Settings != nil && storedConfig.Fleet.Info != nil && storedConfig.Fleet.Info.ID == "" {
+		storedConfig.Fleet.Info.ID = storedConfig.Settings.ID
 	}
 
 	// Perform an ACK request with **empty events** to verify the validity of the API token.

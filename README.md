@@ -113,8 +113,8 @@ To install the agent extract the package and run the install command:
 
 ```sh
 cd build/distributions
-tar xvfz build/distributions/elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64.tar.gz
-cd build/distributions/elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64
+tar xvfz elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64.tar.gz
+cd elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64
 sudo elastic-agent install
 ```
 

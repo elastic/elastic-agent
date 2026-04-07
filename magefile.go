@@ -96,19 +96,12 @@ import (
 )
 
 const (
-	goLicenserRepo    = "github.com/elastic/go-licenser"
-	buildDir          = "build"
-	metaDir           = "_meta"
-	snapshotEnv       = "SNAPSHOT"
-	devEnv            = "DEV"
-	fipsEnv           = "FIPS"
-	externalArtifacts = "EXTERNAL"
-	platformsEnv      = "PLATFORMS"
-	packagesEnv       = "PACKAGES"
-	dockerVariants    = "DOCKER_VARIANTS"
-	configFile        = "elastic-agent.yml"
-	checksumFilename  = "checksum.yml"
-	commitLen         = 7
+	goLicenserRepo   = "github.com/elastic/go-licenser"
+	buildDir         = "build"
+	metaDir          = "_meta"
+	configFile       = "elastic-agent.yml"
+	checksumFilename = "checksum.yml"
+	commitLen        = 7
 
 	cloudImageTmpl = "docker.elastic.co/observability-ci/elastic-agent:%s"
 
@@ -240,6 +233,12 @@ func (Dev) RegenerateMocks() error {
 // InstallGoLicenser install go-licenser to check license of the files.
 func (Prepare) InstallGoLicenser() error {
 	return GoInstall(goLicenserRepo)
+}
+
+// InstallGolangciLint downloads and installs golangci-lint using the version
+// specified in .tool-versions.
+func (Prepare) InstallGolangciLint() error {
+	return devtools.InstallGolangciLint()
 }
 
 // All build all the things for the current projects.
@@ -465,6 +464,18 @@ func buildTestBinaries(testBinaryPkgs []string) error {
 // All run all the code and docs checks.
 func (Check) All() {
 	mg.SerialDeps(Check.License, Integration.Check, Check.DocsFiles)
+}
+
+// Lint downloads golangci-lint and runs the linter on current changes only.
+func (Check) Lint(ctx context.Context) error {
+	mg.Deps(Prepare.InstallGolangciLint)
+	return devtools.Lint(ctx)
+}
+
+// LintAll downloads golangci-lint and runs the linter on the whole codebase.
+func (Check) LintAll() error {
+	mg.Deps(Prepare.InstallGolangciLint)
+	return devtools.LintAll()
 }
 
 // License makes sure that all the Golang files have the appropriate license header.
