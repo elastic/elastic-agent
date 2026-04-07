@@ -27,7 +27,7 @@ scanners:
             param: "elastic-agent"
           - type: "regex"
             pointer: "/name"
-            param: "^ogc(.*)"
+            param: "^(ogc|linux-|vm-|windows-)(.*)"
           - type: "!="
             pointer: "/state"
             param: "unknown"
