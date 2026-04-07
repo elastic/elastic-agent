@@ -14,5 +14,5 @@
 ### Fixes [elastic-agent-9.3.3-fixes]
 
 
-* Fix container enrollment to not re-enroll when the fleet_url is the same. [#13187](https://github.com/elastic/elastic-agent/pull/13187) 
+* Fix container enrollment so it does not re-enroll when the Fleet URL is the same. [#13187](https://github.com/elastic/elastic-agent/pull/13187) 
 
