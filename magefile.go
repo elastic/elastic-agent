@@ -58,10 +58,10 @@ import (
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
+	"github.com/elastic/elastic-agent/pkg/testing/gcloud"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
-	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/git"
 	pv "github.com/elastic/elastic-agent/pkg/testing/tools/product_versions"
@@ -2098,9 +2098,8 @@ func (Integration) Clean(ctx context.Context) error {
 	fmt.Println("--- Clean mage artifacts")
 	_ = os.RemoveAll(".agent-testing")
 
-	// Clean out .integration-cache/.ogc-cache always
+	// Clean out .integration-cache always
 	defer os.RemoveAll(".integration-cache")
-	defer os.RemoveAll(".ogc-cache")
 
 	_, err := os.Stat(".integration-cache")
 	if err == nil {
@@ -3103,7 +3102,7 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		datacenter = "us-central1-a"
 	}
 
-	ogcCfg := ogc.Config{
+	gcloudCfg := gcloud.Config{
 		ServiceTokenPath: serviceTokenPath,
 		Datacenter:       datacenter,
 	}
@@ -3111,18 +3110,18 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	var instanceProvisioner tcommon.InstanceProvisioner
 	instanceProvisionerMode := cfg.IntegrationTest.InstanceProvisioner
 	switch instanceProvisionerMode {
-	case "", ogc.Name:
-		instanceProvisionerMode = ogc.Name
-		instanceProvisioner, err = ogc.NewProvisioner(ogcCfg)
+	case "", gcloud.Name:
+		instanceProvisionerMode = gcloud.Name
+		instanceProvisioner, err = gcloud.NewProvisioner(gcloudCfg)
 	case multipass.Name:
 		instanceProvisioner = multipass.NewProvisioner()
 	case kind.Name:
 		instanceProvisioner = kind.NewProvisioner()
 	default:
-		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass', not %s", instanceProvisionerMode)
+		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud' or 'multipass', not %s", instanceProvisionerMode)
 	}
 
-	email, err := ogcCfg.ClientEmail()
+	email, err := gcloudCfg.ClientEmail()
 	if err != nil {
 		return nil, err
 	}
