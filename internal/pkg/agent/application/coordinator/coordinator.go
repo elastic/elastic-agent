@@ -1283,11 +1283,11 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current expected components model of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				comps := c.componentModel
+				redacted := stripComponentUnitsConfig(c.componentModel)
 				o, err := yaml.Marshal(struct {
 					Components []component.Component `yaml:"components"`
 				}{
-					Components: comps,
+					Components: redacted,
 				})
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
@@ -1307,10 +1307,11 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				for i := 0; i < len(components); i++ {
 					componentConfigs[i] = components[i].Component
 				}
+				redacted := stripComponentUnitsConfig(componentConfigs)
 				o, err := yaml.Marshal(struct {
 					Components []component.Component `yaml:"components"`
 				}{
-					Components: componentConfigs,
+					Components: redacted,
 				})
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
@@ -1429,6 +1430,22 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 		},
 	}
 	return hooks
+}
+
+// stripComponentUnitsConfig returns a copy of the components with Unit.Config
+// removed to prevent secret leakage in diagnostics.
+func stripComponentUnitsConfig(comps []component.Component) []component.Component {
+	result := make([]component.Component, len(comps))
+	copy(result, comps)
+	for i := range result {
+		units := make([]component.Unit, len(result[i].Units))
+		copy(units, result[i].Units)
+		for j := range units {
+			units[j].Config = nil
+		}
+		result[i].Units = units
+	}
+	return result
 }
 
 // runner performs the actual work of running all the managers.
