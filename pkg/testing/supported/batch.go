@@ -171,7 +171,7 @@ func createBatchID(batch common.OSBatch) string {
 	id += "-" + strings.ReplaceAll(batch.Batch.Group, ".", "")
 
 	// The batchID needs to be at most 63 characters long otherwise
-	// GCE will reject the instance name.
+	// OGC will fail to instantiate the VM.
 	maxIDLen := 63
 	if len(id) > maxIDLen {
 		hash := fmt.Sprintf("%x", sha512.Sum384([]byte(id)))
