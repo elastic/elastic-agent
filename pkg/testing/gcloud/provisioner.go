@@ -147,12 +147,6 @@ func (p *provisioner) createInstance(ctx context.Context, batch common.OSBatch, 
 	instanceName := sanitizeInstanceName(batch.ID)
 	sshMeta := fmt.Sprintf("%s:%s", layout.Username, strings.TrimSpace(publicKey))
 
-	// Build metadata string
-	metadata := fmt.Sprintf("ssh-keys=%s", sshMeta)
-	if batch.OS.Type == define.Windows {
-		metadata += ",enable-windows-ssh=TRUE"
-	}
-
 	// Build labels string
 	var labelParts []string
 	for k, v := range instanceLabels {
@@ -165,17 +159,42 @@ func (p *provisioner) createInstance(ctx context.Context, batch common.OSBatch, 
 	createCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
-	output, err := p.run(createCtx, "compute", "instances", "create", instanceName,
+	args := []string{
+		"compute", "instances", "create", instanceName,
 		"--zone", p.cfg.Datacenter,
 		"--machine-type", layout.InstanceSize,
 		"--image-family", layout.ImageFamily,
 		"--image-project", layout.ImageProject,
 		"--boot-disk-size", "50GB",
-		"--metadata", metadata,
 		"--labels", strings.Join(labelParts, ","),
 		"--format", "json",
 		"--quiet",
-	)
+	}
+
+	if batch.OS.Type == define.Windows {
+		// Windows needs a startup script to install OpenSSH and configure the public key.
+		// The enable-windows-ssh metadata alone is not sufficient for key-based auth.
+		startupScript := windowsStartupScript(layout.Username, strings.TrimSpace(publicKey))
+		scriptFile, err := os.CreateTemp("", "gcloud-windows-startup-*.ps1")
+		if err != nil {
+			return common.Instance{}, fmt.Errorf("failed to create startup script: %w", err)
+		}
+		defer os.Remove(scriptFile.Name())
+		if _, err := scriptFile.WriteString(startupScript); err != nil {
+			scriptFile.Close()
+			return common.Instance{}, fmt.Errorf("failed to write startup script: %w", err)
+		}
+		scriptFile.Close()
+
+		args = append(args,
+			"--metadata-from-file", fmt.Sprintf("windows-startup-script-ps1=%s", scriptFile.Name()),
+			"--metadata", fmt.Sprintf("ssh-keys=%s,enable-windows-ssh=TRUE", sshMeta),
+		)
+	} else {
+		args = append(args, "--metadata", fmt.Sprintf("ssh-keys=%s", sshMeta))
+	}
+
+	output, err := p.run(createCtx, args...)
 	if err != nil {
 		return common.Instance{}, fmt.Errorf("gcloud compute instances create failed: %w", err)
 	}
@@ -261,6 +280,58 @@ func (i gceInstance) externalIP() string {
 		}
 	}
 	return ""
+}
+
+// windowsStartupScript returns a PowerShell script that installs and configures
+// OpenSSH server on a Windows GCE instance, including adding the provided SSH
+// public key for the given user and setting the default shell to PowerShell.
+func windowsStartupScript(username, publicKey string) string {
+	return fmt.Sprintf(`
+# Install Chocolatey
+[System.Net.ServicePointManager]::SecurityProtocol = 3072
+iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+# Install OpenSSH Server
+Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+
+# Start and enable the SSH service
+Start-Service sshd
+Set-Service -Name sshd -StartupType Automatic
+
+# Configure firewall rule for SSH
+New-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -DisplayName "OpenSSH Server (sshd)" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 -ErrorAction SilentlyContinue
+
+# Set cmd.exe as default shell (the test runner expects cmd, not PowerShell)
+New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Windows\System32\cmd.exe" -PropertyType String -Force
+
+# Create user profile directory if needed
+$profilePath = "C:\Users\%s"
+if (-not (Test-Path $profilePath)) {
+    New-Item -ItemType Directory -Path $profilePath -Force
+}
+
+# Set up authorized_keys for administrators group
+$sshDir = "C:\ProgramData\ssh"
+if (-not (Test-Path $sshDir)) {
+    New-Item -ItemType Directory -Path $sshDir -Force
+}
+$authorizedKeysFile = Join-Path $sshDir "administrators_authorized_keys"
+Set-Content -Path $authorizedKeysFile -Value "%s"
+
+# Fix permissions on authorized_keys file
+icacls $authorizedKeysFile /inheritance:r /grant "SYSTEM:(F)" /grant "BUILTIN\Administrators:(F)"
+
+# Also set up user-level authorized_keys
+$userSshDir = Join-Path $profilePath ".ssh"
+if (-not (Test-Path $userSshDir)) {
+    New-Item -ItemType Directory -Path $userSshDir -Force
+}
+$userAuthorizedKeys = Join-Path $userSshDir "authorized_keys"
+Set-Content -Path $userAuthorizedKeys -Value "%s"
+
+# Restart sshd to pick up configuration changes
+Restart-Service sshd
+`, username, publicKey, publicKey)
 }
 
 // sanitizeInstanceName converts a batch ID into a valid GCE instance name.
