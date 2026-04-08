@@ -235,17 +235,20 @@ func TestSetupInstallPath(t *testing.T) {
 
 func TestSetupInstallPathCleansUpLeftoverRenames(t *testing.T) {
 	tmpdir := t.TempDir()
+	// topPath = tmpdir/Elastic/Agent; parent = tmpdir/Elastic
 	topPath := filepath.Join(tmpdir, "Elastic", "Agent")
+	parent := filepath.Dir(topPath)
+	require.NoError(t, os.MkdirAll(topPath, 0o755))
 
-	// Simulate leftover renamed executable from a previous uninstall.
-	dataDir := filepath.Join(topPath, "data", "elastic-agent-old")
-	require.NoError(t, os.MkdirAll(dataDir, 0o755))
-	leftoverFile := filepath.Join(dataDir, ".elastic-agent-leftover.exe")
-	require.NoError(t, os.WriteFile(leftoverFile, []byte("old binary"), 0o644))
+	// Simulate a leftover sibling directory from a previous uninstall
+	// (scheduleDeleteOnReboot renames the whole install dir to a sibling).
+	leftoverDir := filepath.Join(parent, ".elastic-agent-leftover-12345")
+	require.NoError(t, os.Mkdir(leftoverDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(leftoverDir, "elastic-agent.exe"), []byte("old binary"), 0o644))
 
-	// Also create a normal file that should NOT be deleted.
-	normalFile := filepath.Join(topPath, "some-config.yml")
-	require.NoError(t, os.WriteFile(normalFile, []byte("config"), 0o644))
+	// Also create an unrelated sibling that should NOT be deleted.
+	unrelatedDir := filepath.Join(parent, "other-dir")
+	require.NoError(t, os.Mkdir(unrelatedDir, 0o755))
 
 	ownership, err := utils.CurrentFileOwner()
 	require.NoError(t, err)
@@ -257,13 +260,13 @@ func TestSetupInstallPathCleansUpLeftoverRenames(t *testing.T) {
 	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
 	require.FileExists(t, markerFilePath)
 
-	// Leftover renamed executable should be cleaned up (Windows only).
+	// Leftover sibling directory should be cleaned up (Windows only).
 	if runtime.GOOS == "windows" {
-		_, err = os.Stat(leftoverFile)
-		assert.ErrorIs(t, err, fs.ErrNotExist, "leftover renamed exe should be removed")
+		_, err = os.Stat(leftoverDir)
+		assert.ErrorIs(t, err, fs.ErrNotExist, "leftover sibling directory should be removed")
 	}
 
-	// Normal files should still be present.
-	_, err = os.Stat(normalFile)
-	assert.NoError(t, err, "normal config file should not be deleted")
+	// Unrelated sibling should still exist.
+	_, err = os.Stat(unrelatedDir)
+	assert.NoError(t, err, "unrelated sibling directory should not be deleted")
 }

@@ -121,8 +121,7 @@ func TestRemoveAllSucceedsAfterRename(t *testing.T) {
 }
 
 // TestScheduleDeleteOnReboot verifies that scheduleDeleteOnReboot renames the
-// blocked executable in place with the leftover prefix and keeps it in the
-// same directory.
+// entire install directory to a sibling with the leftover prefix.
 func TestScheduleDeleteOnReboot(t *testing.T) {
 	tmpDir := t.TempDir()
 	destDir := filepath.Join(tmpDir, "target")
@@ -134,12 +133,12 @@ func TestScheduleDeleteOnReboot(t *testing.T) {
 	err := scheduleDeleteOnReboot(logp.L(), blockingErr, destDir)
 	require.NoError(t, err)
 
-	// The original path should be gone (renamed).
-	_, err = os.Stat(exePath)
-	assert.ErrorIs(t, err, fs.ErrNotExist, "original exe path should no longer exist")
+	// The original install directory should be gone (renamed to a sibling).
+	_, err = os.Stat(destDir)
+	assert.ErrorIs(t, err, fs.ErrNotExist, "original install directory should no longer exist")
 
-	// A file with the leftover prefix should exist in the same directory.
-	entries, err := os.ReadDir(destDir)
+	// A sibling directory with the leftover prefix should exist in the parent.
+	entries, err := os.ReadDir(tmpDir)
 	require.NoError(t, err)
 
 	var found bool
@@ -149,7 +148,35 @@ func TestScheduleDeleteOnReboot(t *testing.T) {
 			break
 		}
 	}
-	assert.True(t, found, "renamed file with prefix %q should exist in %s", leftoverPrefix, destDir)
+	assert.True(t, found, "sibling directory with prefix %q should exist in %s", leftoverPrefix, tmpDir)
+}
+
+// TestCleanupLeftoverRenames verifies that cleanupLeftoverRenames removes
+// leftover sibling directories from a previous uninstall.
+func TestCleanupLeftoverRenames(t *testing.T) {
+	tmpDir := t.TempDir()
+	installDir := filepath.Join(tmpDir, "Agent")
+	require.NoError(t, os.Mkdir(installDir, 0o755))
+
+	// Create a leftover sibling directory from a previous uninstall.
+	leftover := filepath.Join(tmpDir, leftoverPrefix+"-12345678")
+	require.NoError(t, os.Mkdir(leftover, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(leftover, "elastic-agent.exe"), []byte("fake"), 0o644))
+
+	// Create an unrelated sibling that should NOT be removed.
+	unrelated := filepath.Join(tmpDir, "other-dir")
+	require.NoError(t, os.Mkdir(unrelated, 0o755))
+
+	err := cleanupLeftoverRenames(logp.L(), installDir)
+	require.NoError(t, err)
+
+	// The leftover sibling should be gone.
+	_, err = os.Stat(leftover)
+	assert.ErrorIs(t, err, fs.ErrNotExist, "leftover directory should be removed")
+
+	// The unrelated sibling should still exist.
+	_, err = os.Stat(unrelated)
+	assert.NoError(t, err, "unrelated sibling directory should be preserved")
 }
 
 // TestRemoveAllDeletesEverythingExceptBlockingExe verifies that os.RemoveAll
