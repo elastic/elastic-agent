@@ -559,7 +559,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 
 // TestStandaloneUpgradeReplayedRollback is a regression test for
 // https://github.com/elastic/elastic-agent/issues/12910.
-// After a successful manual rollback, we trigger a rollback twice
+// After a successful manual rollback, we trigger a rollback a second time
 // to ensure that a replayed rollback is handled gracefully.
 // This test verifies that the agent handles the replayed action and
 // does not get stuck in "Upgrading" or "Upgrade failed" state.
