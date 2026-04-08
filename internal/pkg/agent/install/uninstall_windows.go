@@ -75,7 +75,7 @@ func scheduleDeleteOnReboot(log *logp.Logger, _ error, rootPath string) error {
 	var dirs []string
 	_ = filepath.WalkDir(renamed, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil // skip inaccessible entries
+			return filepath.SkipDir // skip inaccessible entries
 		}
 		if d.IsDir() {
 			dirs = append(dirs, path)
