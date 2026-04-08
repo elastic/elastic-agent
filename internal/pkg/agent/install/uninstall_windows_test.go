@@ -121,24 +121,27 @@ func TestRemoveAllSucceedsAfterRename(t *testing.T) {
 }
 
 // TestScheduleDeleteOnReboot verifies that scheduleDeleteOnReboot renames the
-// entire install directory to a sibling with the leftover prefix.
+// versioned directory (direct parent of the blocked exe) to a sibling with the
+// leftover prefix, leaving the install root intact.
 func TestScheduleDeleteOnReboot(t *testing.T) {
 	tmpDir := t.TempDir()
-	destDir := filepath.Join(tmpDir, "target")
-	require.NoError(t, os.Mkdir(destDir, 0o755))
+	// Simulate the real layout: <root>/data/<versioned>/elastic-agent.exe
+	dataDir := filepath.Join(tmpDir, "target", "data")
+	versionedDir := filepath.Join(dataDir, "elastic-agent-8.15.0")
+	require.NoError(t, os.MkdirAll(versionedDir, 0o755))
 
-	_, exePath := startBlockingExe(t, destDir)
+	_, exePath := startBlockingExe(t, versionedDir)
 
 	blockingErr := makeBlockingError(exePath)
-	err := scheduleDeleteOnReboot(logp.L(), blockingErr, destDir)
+	err := scheduleDeleteOnReboot(logp.L(), blockingErr, filepath.Join(tmpDir, "target"))
 	require.NoError(t, err)
 
-	// The original install directory should be gone (renamed to a sibling).
-	_, err = os.Stat(destDir)
-	assert.ErrorIs(t, err, fs.ErrNotExist, "original install directory should no longer exist")
+	// The versioned directory should be gone (renamed to a sibling in dataDir).
+	_, err = os.Stat(versionedDir)
+	assert.ErrorIs(t, err, fs.ErrNotExist, "versioned directory should no longer exist")
 
-	// A sibling directory with the leftover prefix should exist in the parent.
-	entries, err := os.ReadDir(tmpDir)
+	// A sibling directory with the leftover prefix should exist in dataDir.
+	entries, err := os.ReadDir(dataDir)
 	require.NoError(t, err)
 
 	var found bool
@@ -148,35 +151,37 @@ func TestScheduleDeleteOnReboot(t *testing.T) {
 			break
 		}
 	}
-	assert.True(t, found, "sibling directory with prefix %q should exist in %s", leftoverPrefix, tmpDir)
+	assert.True(t, found, "sibling directory with prefix %q should exist in %s", leftoverPrefix, dataDir)
 }
 
 // TestCleanupLeftoverRenames verifies that cleanupLeftoverRenames removes
-// leftover sibling directories from a previous uninstall.
+// leftover directories anywhere under topPath from a previous uninstall.
 func TestCleanupLeftoverRenames(t *testing.T) {
 	tmpDir := t.TempDir()
 	installDir := filepath.Join(tmpDir, "Agent")
-	require.NoError(t, os.Mkdir(installDir, 0o755))
+	dataDir := filepath.Join(installDir, "data")
+	require.NoError(t, os.MkdirAll(dataDir, 0o755))
 
-	// Create a leftover sibling directory from a previous uninstall.
-	leftover := filepath.Join(tmpDir, leftoverPrefix+"-12345678")
+	// Create a leftover directory inside the data dir (sibling of the
+	// versioned dir, as scheduleDeleteOnReboot produces).
+	leftover := filepath.Join(dataDir, leftoverPrefix+"-12345678")
 	require.NoError(t, os.Mkdir(leftover, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(leftover, "elastic-agent.exe"), []byte("fake"), 0o644))
 
-	// Create an unrelated sibling that should NOT be removed.
-	unrelated := filepath.Join(tmpDir, "other-dir")
+	// Create an unrelated directory that should NOT be removed.
+	unrelated := filepath.Join(dataDir, "elastic-agent-8.15.0")
 	require.NoError(t, os.Mkdir(unrelated, 0o755))
 
 	err := cleanupLeftoverRenames(logp.L(), installDir)
 	require.NoError(t, err)
 
-	// The leftover sibling should be gone.
+	// The leftover directory should be gone.
 	_, err = os.Stat(leftover)
 	assert.ErrorIs(t, err, fs.ErrNotExist, "leftover directory should be removed")
 
-	// The unrelated sibling should still exist.
+	// The unrelated directory should still exist.
 	_, err = os.Stat(unrelated)
-	assert.NoError(t, err, "unrelated sibling directory should be preserved")
+	assert.NoError(t, err, "unrelated directory should not be deleted")
 }
 
 // TestRemoveAllDeletesEverythingExceptBlockingExe verifies that os.RemoveAll

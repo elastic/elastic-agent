@@ -235,19 +235,18 @@ func TestSetupInstallPath(t *testing.T) {
 
 func TestSetupInstallPathCleansUpLeftoverRenames(t *testing.T) {
 	tmpdir := t.TempDir()
-	// topPath = tmpdir/Elastic/Agent; parent = tmpdir/Elastic
 	topPath := filepath.Join(tmpdir, "Elastic", "Agent")
-	parent := filepath.Dir(topPath)
-	require.NoError(t, os.MkdirAll(topPath, 0o755))
+	dataDir := filepath.Join(topPath, "data")
+	require.NoError(t, os.MkdirAll(dataDir, 0o755))
 
-	// Simulate a leftover sibling directory from a previous uninstall
-	// (scheduleDeleteOnReboot renames the whole install dir to a sibling).
-	leftoverDir := filepath.Join(parent, ".elastic-agent-leftover-12345")
+	// Simulate a leftover directory inside data from a previous uninstall
+	// (scheduleDeleteOnReboot renames the versioned dir to a sibling in data).
+	leftoverDir := filepath.Join(dataDir, ".elastic-agent-leftover-12345")
 	require.NoError(t, os.Mkdir(leftoverDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(leftoverDir, "elastic-agent.exe"), []byte("old binary"), 0o644))
 
-	// Also create an unrelated sibling that should NOT be deleted.
-	unrelatedDir := filepath.Join(parent, "other-dir")
+	// Create an unrelated directory inside data that should NOT be deleted.
+	unrelatedDir := filepath.Join(dataDir, "elastic-agent-8.15.0")
 	require.NoError(t, os.Mkdir(unrelatedDir, 0o755))
 
 	ownership, err := utils.CurrentFileOwner()
@@ -260,13 +259,13 @@ func TestSetupInstallPathCleansUpLeftoverRenames(t *testing.T) {
 	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
 	require.FileExists(t, markerFilePath)
 
-	// Leftover sibling directory should be cleaned up (Windows only).
+	// Leftover directory should be cleaned up (Windows only).
 	if runtime.GOOS == "windows" {
 		_, err = os.Stat(leftoverDir)
-		assert.ErrorIs(t, err, fs.ErrNotExist, "leftover sibling directory should be removed")
+		assert.ErrorIs(t, err, fs.ErrNotExist, "leftover directory should be removed")
 	}
 
-	// Unrelated sibling should still exist.
+	// Unrelated directory should still exist.
 	_, err = os.Stat(unrelatedDir)
-	assert.NoError(t, err, "unrelated sibling directory should not be deleted")
+	assert.NoError(t, err, "unrelated directory should not be deleted")
 }

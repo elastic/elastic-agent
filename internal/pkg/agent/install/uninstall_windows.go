@@ -48,21 +48,28 @@ func isRetryableError(err error) bool {
 	return errno == syscall.ERROR_ACCESS_DENIED || errno == windows.ERROR_SHARING_VIOLATION
 }
 
-// scheduleDeleteOnReboot renames the entire rootPath directory to a sibling
-// directory with a recognizable prefix, then schedules it for deletion on the
-// next reboot via MoveFileEx/MOVEFILE_DELAY_UNTIL_REBOOT. Renaming the whole
-// directory (rather than moving the exe out of it) avoids triggering EDR
-// software that monitors cross-directory file moves. On the next install, any
-// leftover sibling directories matching the prefix are cleaned up by
-// cleanupLeftoverRenames.
-func scheduleDeleteOnReboot(log *logp.Logger, _ error, rootPath string) error {
-	parent := filepath.Dir(rootPath)
+// scheduleDeleteOnReboot renames the versioned directory containing the blocked
+// executable to a sibling with a recognizable prefix, then schedules it for
+// deletion on the next reboot via MoveFileEx/MOVEFILE_DELAY_UNTIL_REBOOT.
+// Renaming within the same parent directory avoids needing write permission to
+// the parent of the install root and avoids triggering EDR software that
+// monitors cross-directory moves. On the next install, any leftover directories
+// matching the prefix are cleaned up by cleanupLeftoverRenames.
+func scheduleDeleteOnReboot(log *logp.Logger, blockingErr error, _ string) error {
+	blockedPath, _ := getPathFromError(blockingErr)
+	if blockedPath == "" {
+		return fmt.Errorf("could not determine blocked path from error: %w", blockingErr)
+	}
+
+	// The versioned directory is the direct parent of the blocked exe.
+	versionedDir := filepath.Dir(blockedPath)
+	parent := filepath.Dir(versionedDir)
 	renamed := filepath.Join(parent, fmt.Sprintf("%s-%d", leftoverPrefix, time.Now().UnixNano()))
 
-	if err := os.Rename(rootPath, renamed); err != nil {
-		return fmt.Errorf("failed to rename %q to %q: %w", rootPath, renamed, err)
+	if err := os.Rename(versionedDir, renamed); err != nil {
+		return fmt.Errorf("failed to rename %q to %q: %w", versionedDir, renamed, err)
 	}
-	log.Infof("Renamed install directory %q to %q", rootPath, renamed)
+	log.Infof("Renamed %q to %q", versionedDir, renamed)
 
 	// Schedule all remaining files and directories for deletion on the next
 	// reboot. PendingFileRenameOperations entries are processed in order, so
@@ -75,7 +82,7 @@ func scheduleDeleteOnReboot(log *logp.Logger, _ error, rootPath string) error {
 	var dirs []string
 	_ = filepath.WalkDir(renamed, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return filepath.SkipDir // skip inaccessible entries
+			return filepath.SkipDir
 		}
 		if d.IsDir() {
 			dirs = append(dirs, path)
@@ -106,25 +113,23 @@ func markDeleteOnReboot(path string) error {
 	return windows.MoveFileEx(p, nil, windows.MOVEFILE_DELAY_UNTIL_REBOOT)
 }
 
-// cleanupLeftoverRenames removes any sibling directories left behind by a
-// previous uninstall's scheduleDeleteOnReboot (directories matching
-// leftoverPrefix in the parent of topPath). By the time a new install runs,
-// the old process is gone and these directories can be deleted normally.
+// cleanupLeftoverRenames walks topPath and removes any directories left behind
+// by a previous uninstall's scheduleDeleteOnReboot (directories matching
+// leftoverPrefix anywhere under topPath). By the time a new install runs, the
+// old process is gone and these directories can be deleted normally.
 func cleanupLeftoverRenames(log *logp.Logger, topPath string) error {
-	parent := filepath.Dir(topPath)
-	entries, err := os.ReadDir(parent)
-	if err != nil {
-		return fmt.Errorf("failed to read parent directory %q: %w", parent, err)
-	}
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), leftoverPrefix) {
-			path := filepath.Join(parent, e.Name())
-			if err := os.RemoveAll(path); err != nil {
-				log.Warnf("Failed to remove leftover directory %q from a previous uninstall: %v. You may need to delete it manually.", path, err)
-			}
+	return filepath.WalkDir(topPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil //nolint:nilerr // best-effort: skip inaccessible entries
 		}
-	}
-	return nil
+		if !d.IsDir() || !strings.HasPrefix(d.Name(), leftoverPrefix) {
+			return nil
+		}
+		if err := os.RemoveAll(path); err != nil {
+			log.Warnf("Failed to remove leftover directory %q from a previous uninstall: %v. You may need to delete it manually.", path, err)
+		}
+		return filepath.SkipDir
+	})
 }
 
 func getPathFromError(blockingErr error) (string, syscall.Errno) {

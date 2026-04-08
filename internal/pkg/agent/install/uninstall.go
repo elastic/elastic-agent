@@ -296,11 +296,13 @@ func RemovePath(log *logp.Logger, path string) error {
 		log.Debugf("RemovePath attempt %d failed after %s: %v", attempt, time.Since(start).Truncate(time.Millisecond), lastErr)
 
 		if isBlockingOnExe(lastErr) {
-			// Rename the entire install directory to a sibling with a
-			// recognizable prefix, then schedule it for deletion on reboot.
-			// After the rename, nothing remains at the original path.
+			// Rename the versioned directory (direct parent of the blocked
+			// exe) and schedule it for deletion on reboot. The first
+			// os.RemoveAll already deleted everything else it could; the
+			// renamed directory still holds the running exe so another
+			// RemoveAll would fail the same way.
 			if err := scheduleDeleteOnReboot(log, lastErr, path); err != nil {
-				log.Errorf("Failed to schedule install directory for removal: %v. You may need to manually delete %q.", err, path)
+				log.Errorf("Failed to schedule blocked executable for removal: %v. You may need to manually delete %q.", err, path)
 				return fmt.Errorf("failed to handle blocked executable in %q: %w", path, err)
 			}
 			return nil
