@@ -7,7 +7,7 @@ notify:
       channels:
         - "#ingest-notifications"
       message: |
-        🚦 Pipeline waiting for approval 🚦
+        🚦 Pipeline waiting to be unblocked 🚦
         Repo: `${REPO}`
 
         New version: `${NEW_VERSION}`
@@ -17,8 +17,8 @@ notify:
     if: build.state == "blocked"
 
 steps:
-  # TODO: replace this block step by real version bump logic
-  - block: "Ready to fetch for DRA artifacts?"
+  # TODO: replace steps with branch creation logic
+  - block: "Placeholder blocked step"
     prompt: |
       Unblock when your team is ready to proceed.
 
@@ -28,3 +28,14 @@ steps:
       - WORKFLOW: ${WORKFLOW}
     key: block-get-dra-artifacts
     blocked_state: running
+
+  - label: "Create branch for version bump"
+    key: branch-for-version-bump
+    depends_on: block-get-dra-artifacts
+    agents:
+      image: docker.elastic.co/release-eng/wolfi-build-essential-release-eng:latest
+      cpu: 250m
+      memory: 512Mi
+      ephemeralStorage: 1Gi
+    command:
+      - echo "Placeholder"
