@@ -166,10 +166,19 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		},
 		// agent process metrics: identical to classic
 		tests[3],
-		// filebeat input metrics: identical to classic.
-		// This also validates that filestream-monitoring is running and producing data
-		// via the elasticmonitoringreceiver's per-input metrics collection.
-		tests[4],
+		// filebeat input metrics: in OTel mode the elasticmonitoringreceiver emits per-input
+		// metrics with metricset.name "stats" (from its event template), not "json" which is
+		// what the classic http/metrics-monitoring metricbeat uses when scraping /inputs/.
+		{
+			dsType:          "metrics",
+			dsDataset:       "elastic_agent.filebeat_input",
+			onlyCompareKeys: true,
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "stats"}},
+				{"match_phrase": map[string]any{"component.id": "filestream-monitoring"}},
+				{"exists": map[string]any{"field": "filebeat_input.bytes_processed_total"}},
+			},
+		},
 	}
 
 	installOpts := atesting.InstallOpts{
