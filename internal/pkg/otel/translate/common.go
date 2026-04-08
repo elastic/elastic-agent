@@ -167,8 +167,9 @@ func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any
 		otelTLSConfig["insecure_skip_verify"] = true
 	case tlscommon.VerifyStrict, tlscommon.VerifyCertificate:
 		logger.Warn("verification mode strict/certificate is not supported. Falling back to verification_mode:full")
+	case tlscommon.VerifyFull: // no-op
 	default:
-		return nil, fmt.Errorf("unknown verification mode")
+		return nil, fmt.Errorf("unknown verification mode %v", tlsConfig.VerificationMode)
 	}
 
 	// unpacks -> ssl.certificate_authorities
