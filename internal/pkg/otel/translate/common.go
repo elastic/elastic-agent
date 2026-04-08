@@ -150,15 +150,15 @@ func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any
 		return nil, nil
 	}
 
+	// validate the beats config before proceeding
+	if err := tlsConfig.Validate(); err != nil {
+		return nil, err
+	}
+
 	if !tlsConfig.IsEnabled() {
 		return map[string]any{
 			"insecure": true,
 		}, nil
-	}
-
-	// validate the beats config before proceeding
-	if err := tlsConfig.Validate(); err != nil {
-		return nil, err
 	}
 
 	// handles verification_mode: none and full
@@ -168,6 +168,7 @@ func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any
 	case tlscommon.VerifyStrict, tlscommon.VerifyCertificate:
 		logger.Warn("verification mode strict/certificate is not supported. Falling back to verification_mode:full")
 	default:
+		return nil, fmt.Errorf("unknown verification mode")
 	}
 
 	// unpacks -> ssl.certificate_authorities
