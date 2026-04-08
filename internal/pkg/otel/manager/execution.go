@@ -15,6 +15,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+// ExecutionFactory creates a collectorExecution. It receives the collector binary path,
+// the health check extension component ID (e.g. "healthcheckv2/<uuid>"), and the
+// user-configured health check port (0 means pick a random port per-start).
+type ExecutionFactory func(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (collectorExecution, error)
+
 type collectorExecution interface {
 	// startCollector starts the otel collector with the given arguments, returning a handle allowing it to be stopped.
 	// Cancelling the context will stop all goroutines involved in the execution.
