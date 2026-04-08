@@ -1,0 +1,79 @@
+# GCP verifier test using application default credentials (ADC).
+#
+# Prerequisites:
+#   gcloud auth application-default login
+#
+# The GCP project is resolved at runtime from Application Default Credentials.
+# Set the GOOGLE_CLOUD_PROJECT environment variable (or GCLOUD_PROJECT) if the
+# project is not already configured in your ADC file or GCE/GKE metadata:
+#
+#   export GOOGLE_CLOUD_PROJECT=your-project-id
+#   ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-gcp.yaml
+
+receivers:
+  verifier:
+    identity_federation_id: "cc-test-gcp"
+    identity_federation_name: "GCP Test"
+    account_type: "single-account"
+    verification_id: "verify-gcp-001"
+    verification_type: "on_demand"
+
+    providers:
+      gcp:
+        credentials:
+          use_default_credentials: true
+
+    policies:
+      - policy_id: "policy-gcp-security"
+        policy_name: "GCP Security"
+        integrations:
+          - policy_template: "audit"
+            package_name: "gcp"
+            package_policy_id: "pp-audit-001"
+            package_title: "GCP"
+          - policy_template: "cspm"
+            package_name: "gcp"
+            package_policy_id: "pp-cspm-001"
+            package_title: "GCP"
+          - policy_template: "asset_inventory"
+            package_name: "gcp"
+            package_policy_id: "pp-asset-001"
+            package_title: "GCP"
+          - policy_template: "storage"
+            package_name: "gcp"
+            package_policy_id: "pp-storage-001"
+            package_title: "GCP"
+          - policy_template: "pubsub"
+            package_name: "gcp"
+            package_policy_id: "pp-pubsub-001"
+            package_title: "GCP"
+
+processors:
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    logs:
+      receivers: [verifier]
+      processors: [resource/verifier]
+      exporters: [debug]
