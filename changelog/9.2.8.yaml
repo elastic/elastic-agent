@@ -1,0 +1,69 @@
+version: 9.2.8
+entries:
+    - kind: enhancement
+      summary: Update Go version to 1.25.8
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10156
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1758822287
+      file:
+        name: 1758822287-bump-golang-1.25.8.yaml
+        checksum: fa096c55691ea42f62d54f8187450a0c8cdd5a7b
+    - kind: bug-fix
+      summary: Fix an issue where monitoring could reingest its own error logs in a feedback loop
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12663
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12524
+      impact: ""
+      action: ""
+      timestamp: 1770671850
+      file:
+        name: 1770671850-otel-monitoring-log-feedback.yaml
+        checksum: 3651f054a305b8a8add604cf893a9e68e25ff7cd
+    - kind: bug-fix
+      summary: fix container enrollment to not re-enroll when the fleet_url is the same
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13187
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/13185
+      impact: ""
+      action: ""
+      timestamp: 1773760327
+      file:
+        name: 1773760327-fix-container-enrollment-to-not-re-enroll-when-the-fleet_url-is-the-same.yaml
+        checksum: 364abe82a2729e67dc33b89b6f4177eedaa4fac7
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.147.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13230
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1773935030
+      file:
+        name: 1773935030-update-otel-components-to-v0.147.0.yaml
+        checksum: c1de490693c252bf60bdb7df8e812aa18002498a
+    - kind: other
+      summary: upgrade nodejs to v22.22.2
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13391
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1774970286
+      file:
+        name: 1774970286-dependency-upgrade-nodejs-v22.22.2.yaml
+        checksum: 4d04aad7a92b42313addfed47353d2d87984b772

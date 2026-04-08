@@ -1,0 +1,54 @@
+// begin 8.19.14 relnotes
+
+[[release-notes-8.19.14]]
+==  8.19.14
+
+Review important information about the  8.19.14 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-8.19.14]]
+=== New features
+
+The 8.19.14 release adds the following new and notable features.
+
+
+
+
+* Add Cloud Defend Integration support to the helm chart. https://github.com/elastic/elastic-agent/pull/13074[#13074] 
+
+
+[discrete]
+[[enhancements-8.19.14]]
+=== Enhancements
+
+
+
+
+* Update Go to v1.25.8. https://github.com/elastic/elastic-agent/pull/10156[#10156] 
+* Update OTel components to v0.145.0. https://github.com/elastic/elastic-agent/pull/13104[#13104] 
+* Update OTel to v1.54.0/v0.148.0. https://github.com/elastic/elastic-agent/pull/13317[#13317] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.14]]
+=== Bug fixes
+
+
+
+
+* Update Kubernetes example manifests and add `HOSTFS_PROC_PATH` environment variable due to `procfs` fix in `cloud-defend` as well as mount points required for `cloud-defend`. https://github.com/elastic/elastic-agent/pull/12989[#12989] 
+* Fix an issue where some components could be missing from the status output. https://github.com/elastic/elastic-agent/pull/13119[#13119] 
+* Prevent zombie processes when component fails to shutdown. https://github.com/elastic/elastic-agent/pull/13188[#13188] https://github.com/elastic/elastic-agent/issues/13272[#13272]
+* Fix container enrollment so it does not re-enroll when the Fleet URL is the same. https://github.com/elastic/elastic-agent/pull/13187[#13187] 
+
+// end 8.19.14 relnotes
