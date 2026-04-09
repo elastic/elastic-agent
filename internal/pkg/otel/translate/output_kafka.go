@@ -107,7 +107,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			return nil, nil, fmt.Errorf("error translating kafka topic: %w", err)
 		}
 		// delete topic set under logs
-		delete(kafkaExporter, "logs")
+		delete(kafkaExporter["logs"].(map[string]any), "topic")
 		return kafkaExporter, processor, nil
 	}
 	return kafkaExporter, nil, nil

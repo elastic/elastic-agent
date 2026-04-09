@@ -33,6 +33,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/testcontainers/testcontainers-go/modules/kafka"
+
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommontest"
@@ -44,7 +46,6 @@ import (
 	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/sarama"
-	"github.com/testcontainers/testcontainers-go/modules/kafka"
 )
 
 const apmProcessingContent = `2023-06-19 05:20:50 ERROR This is a test error message
