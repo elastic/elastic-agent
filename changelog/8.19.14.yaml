@@ -1,0 +1,136 @@
+version: 8.19.14
+entries:
+    - kind: enhancement
+      summary: Update Go version to 1.25.8
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10156
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1758822287
+      file:
+        name: 1758822287-bump-golang-1.25.8.yaml
+        checksum: fa096c55691ea42f62d54f8187450a0c8cdd5a7b
+    - kind: bug-fix
+      summary: |
+        Updated k8s example manifests. Added HOSTFS_PROC_PATH environment variable due-to procfs fix in cloud-defend
+        and mount points required for cloud-defend.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12989
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1772715054
+      file:
+        name: 1772715054-cloud-defend-procfs.yaml
+        checksum: 380617ec2ad2b4eb8e982c733e2a02e9005e46ac
+    - kind: feature
+      summary: Add Cloud Defend Integration support to the helm chart
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13074
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1772815729
+      file:
+        name: 1772815729-cloud-defend-helm-chart.yaml
+        checksum: 46069879efe82be441003d51ef5110ebfeb1124d
+    - kind: enhancement
+      summary: Update OTel components to v0.145.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13104
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1773138205
+      file:
+        name: 1773138205-update-otel-components-to-v0.145.0.yaml
+        checksum: f7d0ca59efef03c3ed09b04422cdf6be24f012c1
+    - kind: bug-fix
+      summary: Fix an issue where some components could be missing from the status output
+      description: |
+        In some cases, a late update from an older component instance could overwrite a newer state.  This could cause components to be missing from the status output. With this fix, updates from older instances are ignored if a newer update has already been processed.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13119
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1773217838
+      file:
+        name: 1773217838-main.yaml
+        checksum: 9ff6f8a3221e3ae28562f165dbd9d4bad684d7d3
+    - kind: unknown
+      summary: Fix the elastic-agent build time as reported by the version command
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13140
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1773392178
+      file:
+        name: 1773392178-fix-agent-buildtime.yaml
+        checksum: 570441a6912ee2ad229ca16be43edd6d8a47bf76
+    - kind: bug-fix
+      summary: Prevent zombie processes when component fails to shutdown
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13188
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/13272
+      impact: ""
+      action: ""
+      timestamp: 1773697016
+      file:
+        name: 1773697016-Prevent-zombie-processes-when-component-fails-to-shutdown.yaml
+        checksum: f175d8dd952507f35c2f8d49f3c14fff9bdfd846
+    - kind: bug-fix
+      summary: fix container enrollment to not re-enroll when the fleet_url is the same
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13187
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1773760327
+      file:
+        name: 1773760327-fix-container-enrollment-to-not-re-enroll-when-the-fleet_url-is-the-same.yaml
+        checksum: 364abe82a2729e67dc33b89b6f4177eedaa4fac7
+    - kind: enhancement
+      summary: update otel to v1.54.0/v0.148.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13317
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1774382936
+      file:
+        name: 1774382936-update-otel-to-v1.54.0-v0.148.0.yaml
+        checksum: 3e109ffc27e1ee86ca926de3a574c5e6c5cb275a
+    - kind: other
+      summary: upgrade nodejs to v22.22.2
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13391
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1774970286
+      file:
+        name: 1774970286-dependency-upgrade-nodejs-v22.22.2.yaml
+        checksum: 4d04aad7a92b42313addfed47353d2d87984b772
