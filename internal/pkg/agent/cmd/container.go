@@ -744,7 +744,7 @@ func envMap(key string) map[string]string {
 	return m
 }
 
-func envMapSlice(envKey string) map[string]string {
+func envStringMap(envKey string) map[string]string {
 	input, ok := os.LookupEnv(envKey)
 	if !ok {
 		return nil
