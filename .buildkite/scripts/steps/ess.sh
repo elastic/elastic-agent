@@ -20,6 +20,10 @@ function ess_up() {
 
   # Extract the cluster name from the cluster information file
   CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
+  if [ -z "${CLUSTER_NAME}" ] || [ "${CLUSTER_NAME}" = "null" ]; then
+    echo "Error: Failed to extract ClusterName from cluster-info.json" >&2
+    return 1
+  fi
 
   # Store the cluster name as a meta-data
   METADATA_PREFIX="${METADATA_PREFIX:-""}"
@@ -51,8 +55,13 @@ function ess_load_secrets() {
 
   # Source the secrets file
   # shellcheck source=/dev/null
-  source "${secrets_file}" || rm "$secrets_file"
+  local src_rc=0
+  source "${secrets_file}" || src_rc=$?
   rm "$secrets_file" || true
+  if [ "$src_rc" -ne 0 ]; then
+    echo "Error: Failed to source secrets file (exit code ${src_rc})" >&2
+    return 1
+  fi
 
   # Print loaded variable names for debugging (not values)
   env | grep -E '^(ELASTICSEARCH|KIBANA|FLEET_SERVER|INTEGRATIONS_SERVER|AGENT_POLICY_ID)' | cut -d= -f1
