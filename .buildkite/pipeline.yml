@@ -9,8 +9,7 @@ env:
   IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1772525581"
   IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1772525581"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1772525581"
-  #IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1772525581"
-  IMAGE_WIN_10: "general-windows-10"
+  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1772326901"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1774746107"
 
 steps:
