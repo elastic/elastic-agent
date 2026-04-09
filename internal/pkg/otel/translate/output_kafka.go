@@ -76,7 +76,8 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		},
 		"timeout": kConfig.BrokerTimeout,
 		"logs": map[string]any{
-			"topic": kConfig.Topic,
+			"topic":    kConfig.Topic,
+			"encoding": "raw",
 		},
 	}
 
