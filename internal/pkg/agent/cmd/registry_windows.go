@@ -42,9 +42,7 @@ func newWindowsRegistryUpdateCommandWithArgs() *cobra.Command {
 		Use:   "update",
 		Short: "Update the Elastic Agent Windows Add/Remove Programs registry entry",
 		Long: `Creates or updates the Elastic Agent entry in the Windows Add/Remove Programs list
-and configures the registry key ACL so unprivileged upgrades can update it automatically.
-
-This is typically needed once after upgrading from a version before 9.4.0 in unprivileged mode.`,
+and configures the registry key ACL so unprivileged upgrades can update it automatically.`,
 		Args: cobra.ExactArgs(0),
 		Run: func(c *cobra.Command, args []string) {
 			if err := windowsRegistryUpdateCmd(); err != nil {
@@ -59,10 +57,8 @@ func newWindowsRegistryRemoveCommandWithArgs() *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove",
 		Short: "Remove the Elastic Agent Windows Add/Remove Programs registry entry",
-		Long: `Removes the Elastic Agent entry from the Windows Add/Remove Programs list.
-
-This can be used to recover from an unforeseen problem caused by the registry entry.`,
-		Args: cobra.ExactArgs(0),
+		Long:  `Removes the Elastic Agent entry from the Windows Add/Remove Programs list.`,
+		Args:  cobra.ExactArgs(0),
 		Run: func(c *cobra.Command, args []string) {
 			if err := windowsRegistryRemoveCmd(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n%s\n", err, troubleshootMessage)
