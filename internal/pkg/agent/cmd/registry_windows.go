@@ -32,6 +32,7 @@ func newWindowsCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 	}
 
 	registry.AddCommand(newWindowsRegistryUpdateCommandWithArgs())
+	registry.AddCommand(newWindowsRegistryRemoveCommandWithArgs())
 	cmd.AddCommand(registry)
 	return cmd
 }
@@ -47,6 +48,23 @@ This is typically needed once after upgrading from a version before 9.4.0 in unp
 		Args: cobra.ExactArgs(0),
 		Run: func(c *cobra.Command, args []string) {
 			if err := windowsRegistryUpdateCmd(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n%s\n", err, troubleshootMessage)
+				os.Exit(1)
+			}
+		},
+	}
+}
+
+func newWindowsRegistryRemoveCommandWithArgs() *cobra.Command {
+	return &cobra.Command{
+		Use:   "remove",
+		Short: "Remove the Elastic Agent Windows Add/Remove Programs registry entry",
+		Long: `Removes the Elastic Agent entry from the Windows Add/Remove Programs list.
+
+This can be used to recover from an unforeseen problem caused by the registry entry.`,
+		Args: cobra.ExactArgs(0),
+		Run: func(c *cobra.Command, args []string) {
+			if err := windowsRegistryRemoveCmd(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n%s\n", err, troubleshootMessage)
 				os.Exit(1)
 			}
@@ -85,6 +103,22 @@ func windowsRegistryUpdateCmd() error {
 	// when upgrading outside of MSI, remove it since we now manage our own stable entry
 	if err := install.RemoveMSIUninstallEntries(); err != nil {
 		return fmt.Errorf("failed to remove MSI uninstall registry entries: %w", err)
+	}
+
+	return nil
+}
+
+func windowsRegistryRemoveCmd() error {
+	isAdmin, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("unable to perform windows registry remove while checking for Administrator rights: %w", err)
+	}
+	if !isAdmin {
+		return fmt.Errorf("unable to perform windows registry remove, not executed with %s permissions", utils.PermissionUser)
+	}
+
+	if err := install.RemoveUninstallEntry(); err != nil {
+		return fmt.Errorf("failed to remove registry entry: %w", err)
 	}
 
 	return nil
