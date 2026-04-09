@@ -34,8 +34,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
-var errMultipleAgentVersionDirs = errors.New("multiple agent data directories found for the same version")
-
 // Fixture handles the setup and management of the Elastic Agent.
 type Fixture struct {
 	t       *testing.T
@@ -1447,7 +1445,10 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read contents of the data directory %s: %w", dataDir, err)
 	}
-	var versionDir string
+	var (
+		versionDir        string
+		versionDirModTime time.Time
+	)
 	for _, fi := range agentVersions {
 		filename := fi.Name()
 		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
@@ -1457,10 +1458,17 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 				// directories, we don't want first found
 				continue
 			}
-			if versionDir != "" {
-				return filepath.Join(dataDir, versionDir), errMultipleAgentVersionDirs
+			info, err := fi.Info()
+			if err != nil {
+				continue
 			}
-			versionDir = filename
+			// After an upgrade within the same version, two directories with
+			// different build hashes will exist. Use the most recently modified
+			// one because that is the active install.
+			if versionDir == "" || info.ModTime().After(versionDirModTime) {
+				versionDir = filename
+				versionDirModTime = info.ModTime()
+			}
 		}
 	}
 	if versionDir == "" {
@@ -1473,11 +1481,7 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 func FindComponentsDir(dir, version string) (string, error) {
 	versionDir, err := findAgentDataVersionDir(dir, version)
 	if err != nil {
-		if errors.Is(err, errMultipleAgentVersionDirs) {
-			fmt.Fprintf(os.Stderr, "WARNING: %s for version %q; stale directories from a previous test run should be cleaned up\n", err, version)
-		} else {
-			return "", err
-		}
+		return "", err
 	}
 	componentsDir := filepath.Join(versionDir, "components")
 	fi, err := os.Stat(componentsDir)
@@ -1494,11 +1498,7 @@ func FindRunDir(fixture *Fixture) (string, error) {
 	version := fixture.Version()
 	versionDir, err := findAgentDataVersionDir(agentWorkDir, version)
 	if err != nil {
-		if errors.Is(err, errMultipleAgentVersionDirs) {
-			fixture.t.Logf("WARNING: %s for version %q; stale directories from a previous test run should be cleaned up", err, version)
-		} else {
-			return "", err
-		}
+		return "", err
 	}
 	runDir := filepath.Join(versionDir, "run")
 	fi, err := os.Stat(runDir)
