@@ -2831,6 +2831,15 @@ func (w *ZapWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestSystemMetricsWithKafkaOutput(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
 
 	k, err := kafka.Run(t.Context(),
 		"confluentinc/confluent-local:7.5.0",
@@ -2858,7 +2867,7 @@ func TestSystemMetricsWithKafkaOutput(t *testing.T) {
 	for _, tt := range tableTests {
 		type otelConfigOptions struct {
 			RuntimeExperimental string
-			broker              string
+			Broker              string
 		}
 
 		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -2881,7 +2890,7 @@ inputs:
 outputs:
   default:
     type: kafka
-    hosts: ["localhost:9092"]
+    hosts: {{.Broker}}
     topic: test-topic
 agent.monitoring:
   metrics: false
@@ -2894,7 +2903,7 @@ agent.monitoring:
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			otelConfigOptions{
 				RuntimeExperimental: tt.runtimeExperimental,
-				broker:              brokers[0],
+				Broker:              brokers[0],
 			})
 
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -2979,15 +2988,17 @@ agent.monitoring:
 
 			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 			"agent.version",
-			"host.cpu.usage",
 		}
 
 		// TODO: @metadata field needs to be be supported
 		delete(agentDoc, "@metadata")
 
+		agentDoc = agentDoc.Flatten()
+		otelDoc = otelDoc.Flatten()
+
 		// system cpu metrics differ between runs
-		StripNondeterminism(agentDoc, "system.cpu")
-		StripNondeterminism(otelDoc, "system.cpu")
+		StripNondeterminism(agentDoc, "cpu")
+		StripNondeterminism(otelDoc, "cpu")
 
 		AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for cpu metricset")
 		AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for cpu metricset")

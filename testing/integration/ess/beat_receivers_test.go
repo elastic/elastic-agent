@@ -702,6 +702,7 @@ outputs:
 	})
 }
 
+// stripNondeterminism strips fields that are expected to change for system/metrics documents
 func StripNondeterminism(m mapstr.M, mset string) {
 	// These metrics will change from run to run
 	prefixes := []string{
