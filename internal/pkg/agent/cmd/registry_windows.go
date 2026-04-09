@@ -69,17 +69,20 @@ func windowsRegistryUpdateCmd() error {
 		return fmt.Errorf("failed to update registry entry: %w", err)
 	}
 
-	// configure the ACL so the elastic-agent-user can update the entry on future unprivileged upgrades;
+	// configure the ACL so the service user can update the entry on future unprivileged upgrades;
 	// this is a recovery path for agents upgraded from pre-9.4.0 where the ACL was never set
 	var ownership utils.FileOwner
-	if uid, err := install.FindUID(install.ElasticUsername); err == nil {
-		ownership.UID = uid
+	if username, err := install.GetServiceUsername(); err == nil && username != "" {
+		if uid, err := install.FindUID(username); err == nil {
+			ownership.UID = uid
+		}
 	}
 	if err := install.ConfigureRegistryPermissions(ownership); err != nil {
 		return fmt.Errorf("failed to configure registry permissions: %w", err)
 	}
 
-	// remove stale MSI entries that may have been left by an earlier MSI installation
+	// MSI installations create a version-specific Add/Remove Programs entry that is never cleaned up
+	// when upgrading outside of MSI, remove it since we now manage our own stable entry
 	if err := install.RemoveMSIUninstallEntries(); err != nil {
 		return fmt.Errorf("failed to remove MSI uninstall registry entries: %w", err)
 	}
