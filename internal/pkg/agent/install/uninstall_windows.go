@@ -55,14 +55,20 @@ func isRetryableError(err error) bool {
 // the parent of the install root and avoids triggering EDR software that
 // monitors cross-directory moves. On the next install, any leftover directories
 // matching the prefix are cleaned up by cleanupLeftoverRenames.
-func scheduleDeleteOnReboot(log *logp.Logger, blockingErr error, _ string) error {
+func scheduleDeleteOnReboot(log *logp.Logger, blockingErr error, rootPath string) error {
 	blockedPath, _ := getPathFromError(blockingErr)
 	if blockedPath == "" {
 		return fmt.Errorf("could not determine blocked path from error: %w", blockingErr)
 	}
 
-	// The versioned directory is the direct parent of the blocked exe.
-	versionedDir := filepath.Dir(blockedPath)
+	// The blocked exe may be anywhere within the versioned directory (e.g.
+	// directly inside it or nested under components\). Find the ancestor that
+	// sits two levels below rootPath (rootPath\data\<versioned>) so we rename
+	// at the right level regardless of the exe's depth.
+	versionedDir, err := versionedDirFromBlocked(rootPath, blockedPath)
+	if err != nil {
+		return err
+	}
 	parent := filepath.Dir(versionedDir)
 	renamed := filepath.Join(parent, fmt.Sprintf("%s-%d", leftoverPrefix, time.Now().UnixNano()))
 
@@ -100,6 +106,23 @@ func scheduleDeleteOnReboot(log *logp.Logger, blockingErr error, _ string) error
 	}
 
 	return nil
+}
+
+// versionedDirFromBlocked returns the ancestor of blockedPath that is a direct
+// child of rootPath's second level (rootPath\data\<versioned>). The blocked
+// executable may be nested arbitrarily deep within the versioned directory, so
+// we cannot rely on filepath.Dir alone.
+func versionedDirFromBlocked(rootPath, blockedPath string) (string, error) {
+	rel, err := filepath.Rel(rootPath, blockedPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("blocked path %q is not within install root %q", blockedPath, rootPath)
+	}
+	// Split into at most 3 parts: e.g. ["data", "elastic-agent-X.Y.Z", "rest"]
+	parts := strings.SplitN(filepath.ToSlash(rel), "/", 3)
+	if len(parts) < 2 {
+		return "", fmt.Errorf("blocked path %q is too shallow within install root %q", blockedPath, rootPath)
+	}
+	return filepath.Join(rootPath, parts[0], parts[1]), nil
 }
 
 // markDeleteOnReboot schedules a file or directory for deletion on the next

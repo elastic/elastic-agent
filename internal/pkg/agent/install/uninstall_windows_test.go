@@ -121,19 +121,20 @@ func TestRemoveAllSucceedsAfterRename(t *testing.T) {
 }
 
 // TestScheduleDeleteOnReboot verifies that scheduleDeleteOnReboot renames the
-// versioned directory (direct parent of the blocked exe) to a sibling with the
-// leftover prefix, leaving the install root intact.
+// versioned directory to a sibling with the leftover prefix, regardless of how
+// deeply nested the blocked executable is within that directory.
 func TestScheduleDeleteOnReboot(t *testing.T) {
-	tmpDir := t.TempDir()
-	// Simulate the real layout: <root>/data/<versioned>/elastic-agent.exe
-	dataDir := filepath.Join(tmpDir, "target", "data")
+	rootPath := filepath.Join(t.TempDir(), "target")
+	dataDir := filepath.Join(rootPath, "data")
 	versionedDir := filepath.Join(dataDir, "elastic-agent-8.15.0")
-	require.NoError(t, os.MkdirAll(versionedDir, 0o755))
+	// Simulate the real layout: the exe lives inside a components subdirectory.
+	componentsDir := filepath.Join(versionedDir, "components")
+	require.NoError(t, os.MkdirAll(componentsDir, 0o755))
 
-	_, exePath := startBlockingExe(t, versionedDir)
+	_, exePath := startBlockingExe(t, componentsDir)
 
 	blockingErr := makeBlockingError(exePath)
-	err := scheduleDeleteOnReboot(logp.L(), blockingErr, filepath.Join(tmpDir, "target"))
+	err := scheduleDeleteOnReboot(logp.L(), blockingErr, rootPath)
 	require.NoError(t, err)
 
 	// The versioned directory should be gone (renamed to a sibling in dataDir).
