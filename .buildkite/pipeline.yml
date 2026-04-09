@@ -187,6 +187,7 @@ steps:
     key: "extended-windows"
     steps:
       - label: "Unit tests - Windows 10"
+        skip: "See https://github.com/elastic/elastic-agent/issues/13428"
         key: "unit-tests-win10"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
