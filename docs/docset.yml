@@ -10,6 +10,7 @@ cross_links:
   - beats
   - opentelemetry
   - ecs
+  - integration-docs
 toc:
   - toc: release-notes
   - toc: reference/edot-collector
