@@ -92,6 +92,20 @@ func UpsertUninstallEntry(topPath, displayVersion string) error {
 	return nil
 }
 
+// RemoveUninstallEntry deletes the Elastic Agent entry from
+// the Windows "Add or Remove Programs" list.
+func RemoveUninstallEntry() error {
+	keyPath := agentUninstallKeyPath()
+	err := registry.DeleteKey(registry.LOCAL_MACHINE, keyPath)
+	if errors.Is(err, registry.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("deleting uninstall registry key %q: %w", keyPath, err)
+	}
+	return nil
+}
+
 // RemoveMSIUninstallEntries removes Add/Remove Programs entries created by the
 // MSI installer to avoid duplicates.
 // See: https://github.com/elastic/elastic-stack-installers
@@ -140,20 +154,6 @@ func findMSIProductCodes() []string {
 		}
 	}
 	return guids
-}
-
-// RemoveUninstallEntry deletes the Elastic Agent entry from
-// the Windows "Add or Remove Programs" list.
-func RemoveUninstallEntry() error {
-	keyPath := agentUninstallKeyPath()
-	err := registry.DeleteKey(registry.LOCAL_MACHINE, keyPath)
-	if errors.Is(err, registry.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("deleting uninstall registry key %q: %w", keyPath, err)
-	}
-	return nil
 }
 
 // ConfigureRegistryPermissions sets the security descriptor for the uninstall registry key

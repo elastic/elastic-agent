@@ -59,6 +59,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
+	semver "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -834,6 +835,15 @@ func handleUpgrade(log *logger.Logger) (*upgrade.UpdateMarker, error) {
 			log.Infof("insufficient permissions to update uninstall registry entry, can be fixed by running 'elastic-agent windows registry update'")
 		} else {
 			log.Warnf("failed to update uninstall registry entry: %v", err)
+		}
+	} else {
+		// MSI installations create their own entry with a version-specific ProductCode GUID,
+		// remove it to avoid a duplicate in Add/Remove Programs after upgrading from pre-9.4.0
+		prevVersion, parseErr := semver.ParseVersion(upgradeMarker.PrevVersion)
+		if parseErr == nil && prevVersion.Less(*semver.NewParsedSemVer(9, 4, 0, "SNAPSHOT", "")) {
+			if err := install.RemoveMSIUninstallEntries(); err != nil {
+				log.Warnf("failed to remove MSI uninstall registry entries: %v", err)
+			}
 		}
 	}
 

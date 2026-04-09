@@ -51,3 +51,8 @@ func UpsertUninstallEntry(_, _ string) error {
 func RemoveUninstallEntry() error {
 	return nil
 }
+
+// RemoveMSIUninstallEntries is a no-op on non-Windows platforms.
+func RemoveMSIUninstallEntries() error {
+	return nil
+}
