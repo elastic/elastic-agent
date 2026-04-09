@@ -60,12 +60,13 @@ func startBlockingExe(t *testing.T, destDir string) (*exec.Cmd, string) {
 // a directory containing a running executable (or schedules leftovers for
 // reboot deletion and returns nil).
 func TestRemovePath(t *testing.T) {
-	destDir := filepath.Join(t.TempDir(), "target")
-	require.NoError(t, os.Mkdir(destDir, 0o755))
+	rootPath := filepath.Join(t.TempDir(), "target")
+	versionedDir := filepath.Join(rootPath, "data", "elastic-agent-8.15.0")
+	require.NoError(t, os.MkdirAll(versionedDir, 0o755))
 
-	startBlockingExe(t, destDir)
+	startBlockingExe(t, versionedDir)
 
-	err := RemovePath(logp.L(), destDir)
+	err := RemovePath(logp.L(), rootPath)
 	assert.NoError(t, err)
 }
 
