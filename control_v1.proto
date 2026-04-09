@@ -7,7 +7,7 @@ syntax = "proto3";
 // proto namespace/package name is shared with elastic-agent-client
 // we need to be careful with modifications to avoid name collisions
 // proto is here to maintain backward compatibility and cannot be changed.
-// elastic-agent-client namespace is likely change after 8.6
+// elastic-agent-client namespace is likely to change after 8.6
 package proto;
 
 option cc_enable_arenas = true;
@@ -65,14 +65,14 @@ message UpgradeRequest {
   // this version field.
   string version = 1;
 
-  // (Optional) Use a different source URI then configured.
+  // (Optional) Use a different source URI than configured.
   //
   // If provided the upgrade process will use the provided sourceURI instead of the configured
   // sourceURI in the configuration.
   string sourceURI = 2;
 }
 
-// A upgrade response message.
+// An upgrade response message.
 message UpgradeResponse {
   // Response status.
   ActionStatus status = 1;
@@ -112,7 +112,7 @@ service ElasticAgentControl {
   // Fetches the currently running version of the Elastic Agent.
   rpc Version(Empty) returns (VersionResponse);
 
-  // Fetches the currently status of the Elastic Agent.
+  // Fetches the current status of the Elastic Agent.
   rpc Status(Empty) returns (StatusResponse);
 
   // Restart restarts the current running Elastic Agent.

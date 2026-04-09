@@ -24,7 +24,8 @@ Known issues are significant defects or limitations that may impact your impleme
 % :::
 
 :::{dropdown} Elastic Agent 9.3.x fails to start on MacOS when OSQuery Manager integration is used
-**Applies to: {{agent}} 9.3.0 9.3.1**
+**Applies to: {{agent}} 9.3.0, 9.3.1**
+
 On March 5, 2026, a known issue was discovered that prevents {{agent}} 9.3.0 and above from starting when:
 - {{agent}} is installed on MacOS.
 - The OSQuery Manager integration is installed.

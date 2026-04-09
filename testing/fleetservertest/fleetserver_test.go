@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
@@ -161,8 +162,38 @@ func ExampleNewServer_checkin() {
 		})},
 		WithAgentID(agentID))
 
+	defaultCheckinConfig := configuration.DefaultFleetCheckin()
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
+
+	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	if err != nil {
+		panic(fmt.Sprintf("ExampleNewServer_checkin failed executing checkin: %v", err))
+	}
+
+	fmt.Println(got.Actions)
+	// Output:
+	// [id: anActionID, type: POLICY_CHANGE]
+}
+
+func ExampleNewServer_checkin_compress() {
+	agentID := "agentID"
+	tmpl := TmplPolicy{}
+
+	actions, err := NewActionPolicyChangeWithFakeComponent("anActionID", tmpl)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get new actions: %v", err))
+	}
+
+	// NewHandlerCheckin
+	ts := NewServer(&Handlers{
+		CheckinFn: NewHandlerCheckin(func() (CheckinAction, *HTTPError) {
+			return CheckinAction{Actions: []string{actions.data}}, nil
+		})},
+		WithAgentID(agentID))
+
+	cmd := fleetapi.NewCheckinCmd(
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, "gzip")
 
 	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err != nil {
@@ -199,8 +230,9 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 		})},
 		WithAgentID(agentID))
 
+	defaultCheckinConfig := configuration.DefaultFleetCheckin()
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 
 	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err != nil {
@@ -459,8 +491,9 @@ func ExampleNewServer_checkin_fakeComponent() {
 	})
 
 	// 1st call, nextAction() will return a POLICY_CHANGE.
+	defaultCheckinConfig := configuration.DefaultFleetCheckin()
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing 3rd checkin: %v", err))
@@ -525,8 +558,9 @@ func ExampleNewServer_checkin_withDelay() {
 	})
 
 	// 1st - call actions have a delay.
+	defaultCheckinConfig := configuration.DefaultFleetCheckin()
 	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 
 	start := time.Now()
 	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
@@ -707,8 +741,9 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 	// =========================================================================
 	// 4th - instantiate the fleetapi commands
+	defaultCheckinConfig := configuration.DefaultFleetCheckin()
 	cmdCheckin := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 	cmdAck := fleetapi.NewAckCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathAgentAcks(agentID)})
 
@@ -805,6 +840,11 @@ func (s sender) Send(
 		panic(fmt.Sprintf("could not create new request to fleet-test-server: %v", err))
 	}
 	r.Header.Set(NewAuthorizationHeader(""))
+	for k, vs := range headers {
+		for _, v := range vs {
+			r.Header.Set(k, v)
+		}
+	}
 
 	return http.DefaultClient.Do(r)
 }

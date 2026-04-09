@@ -18,7 +18,6 @@ import (
 	"time"
 
 	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
@@ -47,20 +46,10 @@ const (
 	stdinGobProviderScheme = "stdingob"
 )
 
-// ConfigModifier is a function that can modify an otel config.
-// Used for injecting a healthcheck extension and telemetry config.
-type ConfigModifier func(cfg *confmap.Conf) error
-
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
-// A healthCheckPort of 0 will result in a random port being used. A metricsPort of 0 means the
-// collector will pick a random port at startup.
-func newSubprocessExecution(collectorPath string, uuid string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
-	componentType, err := component.NewType(healthCheckExtensionName)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create component type: %w", err)
-	}
-	healthCheckExtensionID := component.NewIDWithName(componentType, uuid).String()
-
+// healthCheckExtensionID is the pre-constructed component ID string (e.g. "healthcheckv2/<uuid>").
+// A healthCheckPort of 0 will result in a random port being selected on each start.
+func newSubprocessExecution(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (*subprocessExecution, error) {
 	return &subprocessExecution{
 		collectorPath: collectorPath,
 		collectorArgs: []string{
@@ -72,7 +61,6 @@ func newSubprocessExecution(collectorPath string, uuid string, metricsPort int, 
 			fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelElasticsearchExporterTelemetryFeature),
 		},
 		healthCheckExtensionID:   healthCheckExtensionID,
-		collectorMetricsPort:     metricsPort,
 		collectorHealthCheckPort: healthCheckPort,
 		reportErrFn:              reportErr,
 	}, nil
@@ -83,8 +71,7 @@ type subprocessExecution struct {
 	collectorPath            string
 	collectorArgs            []string
 	healthCheckExtensionID   string
-	collectorMetricsPort     int
-	collectorHealthCheckPort int
+	collectorHealthCheckPort int                                                    // user-configured port; 0 means pick a random port per-start
 	reportErrFn              func(ctx context.Context, errCh chan error, err error) // required for testing
 }
 
@@ -120,19 +107,8 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("could not find port for collector: %w", err)
 	}
 
-	var configModifier ConfigModifier = func(cfg *confmap.Conf) error {
-		if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
-			return fmt.Errorf("failed to inject health check extension: %w", err)
-		}
-
-		if err := addCollectorMetricsReader(cfg, r.collectorMetricsPort); err != nil {
-			return fmt.Errorf("failed to add collector metrics reader: %w", err)
-		}
-
-		return nil
-	}
 	// prepare and serialize config first so we can exit early if there's a problem
-	cfgYamlBytes, err := prepareAndSerializeConfig(cfg, configModifier)
+	cfgYamlBytes, err := prepareAndSerializeConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +125,9 @@ func (r *subprocessExecution) startCollector(
 	// set collector args and add --config flag with the stdingob:stdin URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
 	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:", stdinGobProviderScheme))
+	// Override the health check endpoint placeholder (port 0) with the actual resolved port.
+	// Uses the OTel collector --set flag to override a specific config value after all config sources are merged.
+	collectorArgs = append(collectorArgs, fmt.Sprintf("--set=extensions::%s::http::endpoint=localhost:%d", r.healthCheckExtensionID, httpHealthCheckPort))
 
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(collectorArgs),
@@ -175,7 +154,7 @@ func (r *subprocessExecution) startCollector(
 		r.reportErrFn(ctx, processErrCh, err)
 	}
 
-	ctl := newProcHandle(processInfo, logger, lvl, processDoneCh, reportPipeErrFn, configModifier)
+	ctl := newProcHandle(processInfo, logger, lvl, processDoneCh, reportPipeErrFn)
 	healthCheckDone := make(chan struct{})
 	ctl.wg.Add(3)
 	go func() {
@@ -313,19 +292,6 @@ func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Contex
 	reportCollectorStatus(ctx, statusCh, clonedStatus)
 }
 
-// getCollectorHealthCheckPort returns the health check port used by the OTel collector.
-// If the port set in the execution struct is 0, a random port is returned instead.
-func (r *subprocessExecution) getCollectorHealthCheckPort() (int, error) {
-	if r.collectorHealthCheckPort != 0 {
-		return r.collectorHealthCheckPort, nil
-	}
-	ports, err := findRandomTCPPorts(1)
-	if err != nil {
-		return 0, err
-	}
-	return ports[0], nil
-}
-
 func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
 	metricReadersUntyped := conf.Get("service::telemetry::metrics::readers")
 	if metricReadersUntyped == nil {
@@ -358,6 +324,19 @@ func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
 	return nil
 }
 
+// getCollectorHealthCheckPort returns the health check port used by the OTel collector.
+// If the port set in the execution struct is 0, a random port is returned instead.
+func (r *subprocessExecution) getCollectorHealthCheckPort() (int, error) {
+	if r.collectorHealthCheckPort != 0 {
+		return r.collectorHealthCheckPort, nil
+	}
+	ports, err := findRandomTCPPorts(1)
+	if err != nil {
+		return 0, err
+	}
+	return ports[0], nil
+}
+
 func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus, healthCheckExtensionID string) {
 	extensions, exists := status.ComponentStatusMap["extensions"]
 	if !exists {
@@ -373,8 +352,7 @@ type procHandle struct {
 	processInfo       *process.Info
 	log               *logger.Logger
 	collectorLogLevel logp.Level
-	configCh          chan []byte // buffered(1), latest-config-wins
-	configModifier    ConfigModifier
+	configCh          chan []byte    // buffered(1), latest-config-wins
 	reportErrFn       func(error)    // reports pipe write errors to processErrCh
 	wg                sync.WaitGroup // covers process monitoring and config submission
 }
@@ -385,7 +363,7 @@ func newProcHandle(
 	collectorLogLevel logp.Level,
 	processDoneCh chan struct{},
 	reportErrFn func(error),
-	configModifier ConfigModifier) *procHandle {
+) *procHandle {
 	return &procHandle{
 		processDoneCh:     processDoneCh,
 		processInfo:       processInfo,
@@ -393,7 +371,6 @@ func newProcHandle(
 		collectorLogLevel: collectorLogLevel,
 		configCh:          make(chan []byte, 1),
 		reportErrFn:       reportErrFn,
-		configModifier:    configModifier,
 	}
 }
 
@@ -451,12 +428,13 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 	}
 
 	// since we are here this means that the process either got an error at stop or did not stop within the timeout,
-	// kill it and give one more mere second for the process wait to be called
+	// kill it and wait for the process to be reaped
 	_ = s.processInfo.Kill()
 	select {
-	case <-time.After(1 * time.Second):
-		s.log.Warnf("supervised collector subprocess didn't exit in time after killing it")
+	case <-time.After(process.KillReapTime):
+		s.log.Errorf("timed out waiting for supervised collector process %d to be reaped after SIGKILL", s.processInfo.PID)
 	case <-s.processDoneCh:
+		s.log.Debugf("supervised collector process %d reaped successfully after SIGKILL", s.processInfo.PID)
 	}
 }
 
@@ -471,7 +449,7 @@ func (s *procHandle) Stopped() bool {
 
 // UpdateConfig submits a new configuration to the collector process.
 func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
-	yamlBytes, err := prepareAndSerializeConfig(cfg, s.configModifier)
+	yamlBytes, err := prepareAndSerializeConfig(cfg)
 	if err != nil {
 		return err
 	}
@@ -496,16 +474,10 @@ func (s *procHandle) LogLevel() logp.Level {
 	return s.collectorLogLevel
 }
 
-// prepareAndSerializeConfig prepares the configuration, modifying it if needed, and then serializes it to yaml.
-func prepareAndSerializeConfig(cfg *confmap.Conf, configModifier ConfigModifier) ([]byte, error) {
+// prepareAndSerializeConfig serializes the configuration to yaml.
+func prepareAndSerializeConfig(cfg *confmap.Conf) ([]byte, error) {
 	if cfg == nil {
 		return nil, errors.New("no configuration provided")
-	}
-
-	if configModifier != nil {
-		if err := configModifier(cfg); err != nil {
-			return nil, err
-		}
 	}
 
 	confMap := cfg.ToStringMap()
