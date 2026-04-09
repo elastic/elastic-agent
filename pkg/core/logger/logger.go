@@ -130,11 +130,12 @@ func new(name string, cfg, eventLoggerCfg *Config, logInternal bool) (*Logger, e
 		return nil, fmt.Errorf("could not convert event log config: %w", err)
 	}
 
-	if err := configure.LoggingWithTypedOutputs("", commonCfg, eventLoggercommonCfg, "log.type", "event", outputs...); err != nil {
+	logger, err := configure.LoggingWithTypedOutputsLocal("", commonCfg, eventLoggercommonCfg, "log.type", "event", outputs...)
+	if err != nil {
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
 
-	return logp.NewLogger(name), nil
+	return logger.Named(name), nil
 }
 
 func ToCommonConfig(cfg *Config) (*config.C, error) {
