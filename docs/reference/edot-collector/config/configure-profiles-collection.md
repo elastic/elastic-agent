@@ -109,7 +109,7 @@ The minimum supported versions of each interpreter are:
 
 The `profilingmetrics` connector transforms profiling data into OpenTelemetry metrics. It walks each sample's stack trace and produces per-resource delta metrics that break down CPU time by frame type (kernel, native, JVM, Go, Python, etc.), shared library, kernel subsystem, and system call. This reduces ingest traffic and storage costs compared to sending raw profiling data, while still providing actionable insight into where your application spends its time.
 
-The generated metrics power the [Elastic OTel Profiling Metrics integration](integration-docs://profilingmetrics_otel.md) dashboards.
+The generated metrics power the [Elastic OTel Profiling Metrics integration](integration-docs://reference/profilingmetrics_otel.md) dashboards.
 
 The following example sends profiling data through the connector and exports the resulting metrics to {{es}}:
 
