@@ -3,6 +3,11 @@ set -euo pipefail
 
 source .buildkite/scripts/steps/ess.sh
 
-ESS_REGION="${ESS_REGION:-gcp-us-west2}"
+METADATA_PREFIX=""
+if [[ "${FIPS:-false}" == "true" ]]; then
+  METADATA_PREFIX="fips."
+  echo "Using FIPS metadata prefix: ${METADATA_PREFIX}"
+fi
+export METADATA_PREFIX
 
-ess_down "$ESS_REGION"
+ess_down
