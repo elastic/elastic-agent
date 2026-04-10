@@ -273,6 +273,33 @@ func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (b
 	return false, nil
 }
 
+// leftoverPrefix is used to rename blocked executables during uninstall.
+// Files with this prefix placed at the install root are cleaned up on the next install.
+const leftoverPrefix = ".elastic-agent-leftover"
+
+// cleanupLeftoverRenames removes any files at the top level of topPath left
+// behind by a previous uninstall's scheduleDeleteOnReboot (files matching
+// leftoverPrefix). By the time a new install runs, the old process is gone
+// and these files can be deleted normally.
+func cleanupLeftoverRenames(log *logp.Logger, topPath string) error {
+	entries, err := os.ReadDir(topPath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("failed to read %q: %w", topPath, err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), leftoverPrefix) {
+			path := filepath.Join(topPath, e.Name())
+			if err := os.Remove(path); err != nil {
+				log.Warnf("Failed to remove leftover file %q from a previous uninstall: %v. You may need to delete it manually.", path, err)
+			}
+		}
+	}
+	return nil
+}
+
 // RemovePath helps with removal path where there is a probability
 // of running into an executable running that might prevent removal
 // on Windows.
