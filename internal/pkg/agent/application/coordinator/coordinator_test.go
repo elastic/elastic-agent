@@ -627,7 +627,7 @@ func TestReplayedRollbackActionAcked(t *testing.T) {
 	// Fleet knows the agent completed the rollback (not empty/nil details).
 	state := coord.State()
 	require.NotNil(t, state.UpgradeDetails, "upgrade details should be present after replayed rollback is handled")
-	assert.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State), "upgrade details state should be rollback")
+	assert.Equal(t, details.StateRollback, state.UpgradeDetails.State, "upgrade details state should be rollback")
 
 	cancel()
 	require.NoError(t, <-coordCh)
