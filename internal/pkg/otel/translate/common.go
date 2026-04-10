@@ -260,5 +260,5 @@ func typeSafetyCheck(value map[string]any) error {
 	if err != nil {
 		return err
 	}
-	return err
+	return nil
 }
