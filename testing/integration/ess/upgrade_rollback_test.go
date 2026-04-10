@@ -435,10 +435,8 @@ func TestFleetManagedUpgradeRollback(t *testing.T) {
 
 	agentData, err := kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
 	require.NoError(t, err, "failed to get agent from Fleet API")
-	if agentData.UpgradeDetails != nil {
-		assert.NotEqual(t, "UPG_FAILED", agentData.UpgradeDetails.State,
-			"Fleet must not show agent in UPG_FAILED state after rollback")
-	}
+	require.NotNil(t, agentData.UpgradeDetails)
+	require.Equal(t, "UPG_ROLLBACK", agentData.UpgradeDetails.State)
 
 	// 5. Verify agent stays healthy and is not stuck in Upgrading/Failed state.
 	// The real replayed-action scenario from issue #12910 happens at the Fleet
@@ -459,6 +457,8 @@ func TestFleetManagedUpgradeRollback(t *testing.T) {
 	}
 	assert.NotEqual(t, "updating", agentData.Status,
 		"Fleet must not show agent as updating after rollback")
+	assert.NotNil(t, agentData.UpgradeDetails)
+	assert.Equal(t, "UPG_ROLLBACK", agentData.UpgradeDetails.State)
 }
 
 type rollbackTriggerFunc func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture)
