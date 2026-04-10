@@ -1,0 +1,5 @@
+kind: feature
+
+summary: Add Azure encoding extension to EDOT Collector.
+
+component: elastic-agent
