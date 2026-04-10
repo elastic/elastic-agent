@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/jaypipes/ghw"
@@ -257,11 +256,8 @@ func TestSetupInstallPathCleansUpLeftoverRenames(t *testing.T) {
 	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
 	require.FileExists(t, markerFilePath)
 
-	// Leftover file should be cleaned up (Windows only).
-	if runtime.GOOS == "windows" {
-		_, err = os.Stat(leftoverFile)
-		assert.ErrorIs(t, err, fs.ErrNotExist, "leftover file should be removed")
-	}
+	_, err = os.Stat(leftoverFile)
+	assert.ErrorIs(t, err, fs.ErrNotExist, "leftover file should be removed")
 
 	// Unrelated file should still exist.
 	_, err = os.Stat(unrelatedFile)
