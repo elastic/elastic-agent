@@ -39,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
@@ -1922,4 +1923,434 @@ func TestManagerShutdownTimeoutForComponents(t *testing.T) {
 		got := managerShutdownTimeoutForComponents(nil, comps)
 		assert.Equal(t, 15*time.Second+runtime.ShutdownBuffer, got)
 	})
+}
+
+func TestUpdateManagersWithConfig_DefersOTelDuringRuntimeTransition(t *testing.T) {
+	// Track which managers received updates and in what order.
+	var mu sync.Mutex
+	var updateOrder []string
+	var runtimeComponents []component.Component
+	var otelComponents []component.Component
+
+	fakeRuntime := &fakeRuntimeManager{
+		updateCallback: func(comps []component.Component) error {
+			mu.Lock()
+			updateOrder = append(updateOrder, "runtime")
+			runtimeComponents = comps
+			mu.Unlock()
+			return nil
+		},
+	}
+	fakeOTel := &fakeOTelManager{
+		updateComponentCallback: func(comps []component.Component) error {
+			mu.Lock()
+			updateOrder = append(updateOrder, "otel")
+			otelComponents = comps
+			mu.Unlock()
+			return nil
+		},
+	}
+
+	coord := &Coordinator{
+		logger:           logp.NewLogger("test"),
+		runtimeMgr:       fakeRuntime,
+		otelMgr:          fakeOTel,
+		stateBroadcaster: broadcaster.New(State{}, 64, 32),
+		currentCfg: &configuration.Configuration{
+			Settings: configuration.DefaultConfiguration().Settings,
+		},
+		state: State{
+			// filestream-monitoring is currently running in process mode.
+			Components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{
+						ID:             "filestream-monitoring",
+						RuntimeManager: component.ProcessRuntimeManager,
+					},
+					State: runtime.ComponentState{
+						State: client.UnitStateHealthy,
+					},
+				},
+			},
+		},
+	}
+
+	// Model moves filestream-monitoring from process to OTel.
+	model := &component.Model{
+		Components: []component.Component{
+			{
+				ID:             "filestream-monitoring",
+				RuntimeManager: component.OtelRuntimeManager,
+			},
+		},
+	}
+
+	coord.updateManagersWithConfig(model)
+
+	// Both managers should have been updated: runtime gets full model (stops
+	// the process component), OTel gets initial model WITHOUT the transitioning
+	// component (so it's not started yet).
+	mu.Lock()
+	assert.Equal(t, []string{"runtime", "otel"}, updateOrder, "both managers should get initial update")
+	assert.Empty(t, runtimeComponents, "runtime model should not contain the transitioning component")
+	assert.Empty(t, otelComponents, "OTel initial model should exclude transitioning component")
+	mu.Unlock()
+
+	// A pending update should exist for the OTel manager.
+	assert.NotEmpty(t, coord.pendingManagerUpdates, "OTel update should be pending")
+	assert.True(t, coord.pendingManagerUpdates[0].waiting["filestream-monitoring"])
+
+	// Simulate the component reaching STOPPED via the main loop.
+	coord.applyComponentState(runtime.ComponentComponentState{
+		Component: component.Component{
+			ID:             "filestream-monitoring",
+			RuntimeManager: component.ProcessRuntimeManager,
+		},
+		State: runtime.ComponentState{
+			State: client.UnitStateStopped,
+		},
+	})
+
+	// Now the OTel manager should have received the full update with the component.
+	mu.Lock()
+	assert.Equal(t, []string{"runtime", "otel", "otel"}, updateOrder, "OTel should get full update after component stops")
+	assert.Len(t, otelComponents, 1)
+	assert.Equal(t, "filestream-monitoring", otelComponents[0].ID)
+	mu.Unlock()
+	assert.Empty(t, coord.pendingManagerUpdates, "pending update should be cleared")
+}
+
+func TestUpdateManagersWithConfig_CancelsPendingOnNewUpdate(t *testing.T) {
+	var mu sync.Mutex
+	var otelUpdateCount int
+
+	fakeRuntime := &fakeRuntimeManager{
+		updateCallback: func(comps []component.Component) error { return nil },
+	}
+	fakeOTel := &fakeOTelManager{
+		updateComponentCallback: func(comps []component.Component) error {
+			mu.Lock()
+			otelUpdateCount++
+			mu.Unlock()
+			return nil
+		},
+	}
+
+	coord := &Coordinator{
+		logger:           logp.NewLogger("test"),
+		runtimeMgr:       fakeRuntime,
+		otelMgr:          fakeOTel,
+		stateBroadcaster: broadcaster.New(State{}, 64, 32),
+		currentCfg: &configuration.Configuration{
+			Settings: configuration.DefaultConfiguration().Settings,
+		},
+		state: State{
+			Components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{
+						ID:             "filestream-monitoring",
+						RuntimeManager: component.ProcessRuntimeManager,
+					},
+					State: runtime.ComponentState{
+						State: client.UnitStateHealthy,
+					},
+				},
+			},
+		},
+	}
+
+	// First update: moves filestream-monitoring to OTel → deferred.
+	model1 := &component.Model{
+		Components: []component.Component{
+			{
+				ID:             "filestream-monitoring",
+				RuntimeManager: component.OtelRuntimeManager,
+			},
+		},
+	}
+	coord.updateManagersWithConfig(model1)
+	assert.NotEmpty(t, coord.pendingManagerUpdates, "first update should be pending")
+
+	// Second update: moves it back to process → cancels pending, sends OTel
+	// update directly (no components moving to OTel).
+	model2 := &component.Model{
+		Components: []component.Component{
+			{
+				ID:             "filestream-monitoring",
+				RuntimeManager: component.ProcessRuntimeManager,
+			},
+		},
+	}
+	coord.updateManagersWithConfig(model2)
+	assert.Empty(t, coord.pendingManagerUpdates, "pending should be cancelled")
+
+	mu.Lock()
+	assert.Equal(t, 2, otelUpdateCount, "OTel should have been updated twice (initial partial from model1 + full from model2)")
+	mu.Unlock()
+}
+
+func TestUpdateManagersWithConfig_NoTransition_UpdatesBothImmediately(t *testing.T) {
+	var mu sync.Mutex
+	var updateOrder []string
+
+	fakeRuntime := &fakeRuntimeManager{
+		updateCallback: func(comps []component.Component) error {
+			mu.Lock()
+			updateOrder = append(updateOrder, "runtime")
+			mu.Unlock()
+			return nil
+		},
+	}
+	fakeOTel := &fakeOTelManager{
+		updateComponentCallback: func(comps []component.Component) error {
+			mu.Lock()
+			updateOrder = append(updateOrder, "otel")
+			mu.Unlock()
+			return nil
+		},
+	}
+
+	coord := &Coordinator{
+		logger:           logp.NewLogger("test"),
+		runtimeMgr:       fakeRuntime,
+		otelMgr:          fakeOTel,
+		stateBroadcaster: broadcaster.New(State{}, 64, 32),
+		currentCfg: &configuration.Configuration{
+			Settings: configuration.DefaultConfiguration().Settings,
+		},
+		state: State{},
+	}
+
+	// No components transitioning between runtimes.
+	model := &component.Model{
+		Components: []component.Component{
+			{
+				ID:             "some-process-component",
+				RuntimeManager: component.ProcessRuntimeManager,
+			},
+			{
+				ID:             "some-otel-component",
+				RuntimeManager: component.OtelRuntimeManager,
+			},
+		},
+	}
+
+	coord.updateManagersWithConfig(model)
+
+	mu.Lock()
+	assert.Equal(t, []string{"runtime", "otel"}, updateOrder, "both managers should be updated immediately")
+	mu.Unlock()
+	assert.Empty(t, coord.pendingManagerUpdates, "no pending update when no transition")
+}
+
+func TestUpdateManagersWithConfig_DefersRuntimeDuringOTelToProcessTransition(t *testing.T) {
+	var mu sync.Mutex
+	var updateOrder []string
+	var runtimeComponents []component.Component
+
+	fakeRuntime := &fakeRuntimeManager{
+		updateCallback: func(comps []component.Component) error {
+			mu.Lock()
+			updateOrder = append(updateOrder, "runtime")
+			runtimeComponents = comps
+			mu.Unlock()
+			return nil
+		},
+	}
+	fakeOTel := &fakeOTelManager{
+		updateComponentCallback: func(comps []component.Component) error {
+			mu.Lock()
+			updateOrder = append(updateOrder, "otel")
+			mu.Unlock()
+			return nil
+		},
+	}
+
+	coord := &Coordinator{
+		logger:           logp.NewLogger("test"),
+		runtimeMgr:       fakeRuntime,
+		otelMgr:          fakeOTel,
+		stateBroadcaster: broadcaster.New(State{}, 64, 32),
+		currentCfg: &configuration.Configuration{
+			Settings: configuration.DefaultConfiguration().Settings,
+		},
+		state: State{
+			// filestream-monitoring is currently running in OTel mode.
+			Components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{
+						ID:             "filestream-monitoring",
+						RuntimeManager: component.OtelRuntimeManager,
+					},
+					State: runtime.ComponentState{
+						State: client.UnitStateHealthy,
+					},
+				},
+			},
+		},
+	}
+
+	// Model moves filestream-monitoring from OTel to process.
+	model := &component.Model{
+		Components: []component.Component{
+			{
+				ID:             "filestream-monitoring",
+				RuntimeManager: component.ProcessRuntimeManager,
+			},
+		},
+	}
+
+	coord.updateManagersWithConfig(model)
+
+	// Both managers should have been updated: OTel gets full model (stops the
+	// receiver), runtime gets initial model WITHOUT the transitioning component.
+	mu.Lock()
+	assert.Equal(t, []string{"runtime", "otel"}, updateOrder, "both managers should get initial update")
+	assert.Empty(t, runtimeComponents, "runtime initial model should exclude transitioning component")
+	mu.Unlock()
+
+	// A pending update should exist for the runtime manager.
+	assert.NotEmpty(t, coord.pendingManagerUpdates, "runtime update should be pending")
+	assert.True(t, coord.pendingManagerUpdates[0].waiting["filestream-monitoring"])
+
+	// Simulate the OTel component reaching STOPPED.
+	coord.applyComponentState(runtime.ComponentComponentState{
+		Component: component.Component{
+			ID:             "filestream-monitoring",
+			RuntimeManager: component.OtelRuntimeManager,
+		},
+		State: runtime.ComponentState{
+			State: client.UnitStateStopped,
+		},
+	})
+
+	// Now the runtime manager should have received the full update with the component.
+	mu.Lock()
+	assert.Equal(t, []string{"runtime", "otel", "runtime"}, updateOrder, "runtime should get full update after OTel component stops")
+	assert.Len(t, runtimeComponents, 1)
+	assert.Equal(t, "filestream-monitoring", runtimeComponents[0].ID)
+	mu.Unlock()
+	assert.Empty(t, coord.pendingManagerUpdates, "pending update should be cleared")
+}
+
+func TestUpdateManagersWithConfig_BidirectionalTransition(t *testing.T) {
+	// Two components swap runtimes in the same config change:
+	//   filestream-monitoring: process → OTel
+	//   system/metrics-default: OTel → process
+
+	var mu sync.Mutex
+	var runtimeUpdates [][]string // component IDs per runtime Update call
+	var otelUpdates    [][]string // component IDs per OTel Update call
+
+	fakeRuntime := &fakeRuntimeManager{
+		updateCallback: func(comps []component.Component) error {
+			ids := make([]string, len(comps))
+			for i, c := range comps {
+				ids[i] = c.ID
+			}
+			mu.Lock()
+			runtimeUpdates = append(runtimeUpdates, ids)
+			mu.Unlock()
+			return nil
+		},
+	}
+	fakeOTel := &fakeOTelManager{
+		updateComponentCallback: func(comps []component.Component) error {
+			ids := make([]string, len(comps))
+			for i, c := range comps {
+				ids[i] = c.ID
+			}
+			mu.Lock()
+			otelUpdates = append(otelUpdates, ids)
+			mu.Unlock()
+			return nil
+		},
+	}
+
+	coord := &Coordinator{
+		logger:           logp.NewLogger("test"),
+		runtimeMgr:       fakeRuntime,
+		otelMgr:          fakeOTel,
+		stateBroadcaster: broadcaster.New(State{}, 64, 32),
+		currentCfg: &configuration.Configuration{
+			Settings: configuration.DefaultConfiguration().Settings,
+		},
+		state: State{
+			Components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{
+						ID:             "filestream-monitoring",
+						RuntimeManager: component.ProcessRuntimeManager,
+					},
+					State: runtime.ComponentState{State: client.UnitStateHealthy},
+				},
+				{
+					Component: component.Component{
+						ID:             "system/metrics-default",
+						RuntimeManager: component.OtelRuntimeManager,
+					},
+					State: runtime.ComponentState{State: client.UnitStateHealthy},
+				},
+			},
+		},
+	}
+
+	// New model swaps both components' runtimes.
+	model := &component.Model{
+		Components: []component.Component{
+			{
+				ID:             "filestream-monitoring",
+				RuntimeManager: component.OtelRuntimeManager,
+			},
+			{
+				ID:             "system/metrics-default",
+				RuntimeManager: component.ProcessRuntimeManager,
+			},
+		},
+	}
+
+	coord.updateManagersWithConfig(model)
+
+	// Both managers should get initial updates EXCLUDING the transitioning
+	// components. Runtime gets system/metrics excluded, OTel gets filestream excluded.
+	mu.Lock()
+	require.Len(t, runtimeUpdates, 1, "runtime should have 1 initial update")
+	assert.Empty(t, runtimeUpdates[0], "runtime initial update should exclude system/metrics-default")
+	require.Len(t, otelUpdates, 1, "otel should have 1 initial update")
+	assert.Empty(t, otelUpdates[0], "otel initial update should exclude filestream-monitoring")
+	mu.Unlock()
+
+	// Two pending updates — one per direction.
+	assert.Len(t, coord.pendingManagerUpdates, 2, "should have 2 pending updates (one per direction)")
+
+	// Stop process component (filestream-monitoring) — triggers OTel full update.
+	coord.applyComponentState(runtime.ComponentComponentState{
+		Component: component.Component{
+			ID:             "filestream-monitoring",
+			RuntimeManager: component.ProcessRuntimeManager,
+		},
+		State: runtime.ComponentState{State: client.UnitStateStopped},
+	})
+
+	mu.Lock()
+	require.Len(t, otelUpdates, 2, "otel should have 2 updates after filestream stops")
+	assert.Equal(t, []string{"filestream-monitoring"}, otelUpdates[1])
+	require.Len(t, runtimeUpdates, 1, "runtime should still have 1 update")
+	mu.Unlock()
+	assert.Len(t, coord.pendingManagerUpdates, 1, "1 pending update remaining")
+
+	// Stop OTel component (system/metrics-default) — triggers runtime full update.
+	coord.applyComponentState(runtime.ComponentComponentState{
+		Component: component.Component{
+			ID:             "system/metrics-default",
+			RuntimeManager: component.OtelRuntimeManager,
+		},
+		State: runtime.ComponentState{State: client.UnitStateStopped},
+	})
+
+	mu.Lock()
+	require.Len(t, runtimeUpdates, 2, "runtime should have 2 updates after system/metrics stops")
+	assert.Equal(t, []string{"system/metrics-default"}, runtimeUpdates[1])
+	mu.Unlock()
+	assert.Empty(t, coord.pendingManagerUpdates, "all pending updates should be cleared")
 }

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"reflect"
 	"strings"
@@ -267,6 +268,14 @@ type configReloader interface {
 	Reload(*config.Config) error
 }
 
+// pendingManagerUpdate holds a deferred manager update along with the set of
+// component IDs that must reach STOPPED before the update is applied. The
+// apply function is called once all waited components have stopped.
+type pendingManagerUpdate struct {
+	apply   func()
+	waiting map[string]bool
+}
+
 // Coordinator manages the entire state of the Elastic Agent.
 //
 // All configuration changes, update variables, and upgrade actions are managed and controlled by the coordinator.
@@ -378,6 +387,12 @@ type Coordinator struct {
 	// The final component model generated from ast and vars (this is the same
 	// value that is sent to the runtime manager).
 	componentModel []component.Component
+
+	// pendingManagerUpdates holds deferred manager updates waiting for
+	// components in the old runtime to reach STOPPED before the new runtime
+	// starts them. There can be up to two entries when components move in
+	// both directions (process→OTel and OTel→process) simultaneously.
+	pendingManagerUpdates []pendingManagerUpdate
 
 	// Protection section
 	protection protection.Config
@@ -1939,19 +1954,120 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 
 // updateManagersWithConfig updates runtime managers with the component model and config.
 // Components may be sent to different runtimes depending on various criteria.
+//
+// When components move between runtimes (process↔OTel), the old runtime must
+// fully stop the component before the new runtime starts it. Otherwise both
+// instances run simultaneously and fight over shared resources (filestream
+// registry, log cursors, network ports), causing duplicate log ingestion.
+//
+// To handle this without blocking, the receiving manager gets a model that
+// excludes the transitioning components. A pendingManagerUpdate is stored for
+// each direction. When the main loop's applyComponentState sees the old
+// instances reach STOPPED, it applies the full model to the receiving manager.
 func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
+	// Cancel any pending updates from a previous call. A new model supersedes
+	// whatever was waiting.
+	if len(c.pendingManagerUpdates) > 0 {
+		c.logger.Info("Cancelling previous pending manager updates due to new component model")
+		c.pendingManagerUpdates = nil
+	}
+
 	runtimeModel, otelModel := c.splitModelBetweenManagers(model)
-	c.logger.With("components", runtimeModel.Components).Debug("Updating runtime manager model")
-	c.runtimeMgr.Update(*runtimeModel)
-	c.logger.With("components", otelModel.Components).Debug("Updating otel manager model")
-	if len(otelModel.Components) > 0 {
-		componentIDs := make([]string, 0, len(otelModel.Components))
-		for _, comp := range otelModel.Components {
+
+	// Detect components moving between runtimes and build current models
+	// that exclude the transitioning components in a single pass per model.
+	currentRuntime := make(map[string]component.RuntimeManager, len(c.state.Components))
+	for _, compState := range c.state.Components {
+		currentRuntime[compState.Component.ID] = compState.Component.RuntimeManager
+	}
+
+	movingToOtel := make(map[string]bool)
+	movingToProcess := make(map[string]bool)
+
+	currentOTelComponents := make([]component.Component, 0, len(otelModel.Components))
+	for _, comp := range otelModel.Components {
+		if currentRuntime[comp.ID] == component.ProcessRuntimeManager {
+			movingToOtel[comp.ID] = true
+		} else {
+			currentOTelComponents = append(currentOTelComponents, comp)
+		}
+	}
+
+	currentRuntimeModel := *runtimeModel
+	currentRuntimeComponents := make([]component.Component, 0, len(runtimeModel.Components))
+	for _, comp := range runtimeModel.Components {
+		if currentRuntime[comp.ID] == component.OtelRuntimeManager {
+			movingToProcess[comp.ID] = true
+		} else {
+			currentRuntimeComponents = append(currentRuntimeComponents, comp)
+		}
+	}
+	currentRuntimeModel.Components = currentRuntimeComponents
+
+	// Send current models to both managers — this stops old instances
+	// without starting new ones for transitioning components.
+	c.logger.With("components", currentRuntimeModel.Components).Debug("Updating runtime manager model")
+	c.runtimeMgr.Update(currentRuntimeModel)
+	c.applyOTelUpdate(currentOTelComponents)
+
+	// Defer full model updates for each transition direction.
+	if len(movingToOtel) > 0 {
+		c.logger.With("components", maps.Keys(movingToOtel)).Info("Deferring OTel components until process instances stop")
+		fullOTelComponents := otelModel.Components
+		c.pendingManagerUpdates = append(c.pendingManagerUpdates, pendingManagerUpdate{
+			waiting: movingToOtel,
+			apply: func() {
+				c.logger.Infof("All process-to-OTel transitioning components have stopped, applying OTel update: %v", maps.Keys(movingToOtel))
+				c.applyOTelUpdate(fullOTelComponents)
+			},
+		})
+	}
+
+	if len(movingToProcess) > 0 {
+		c.logger.With("components", maps.Keys(movingToProcess)).Info("Deferring runtime components until OTel instances stop")
+		fullRuntimeModel := *runtimeModel
+		c.pendingManagerUpdates = append(c.pendingManagerUpdates, pendingManagerUpdate{
+			waiting: movingToProcess,
+			apply: func() {
+				c.logger.Infof("All OTel-to-process transitioning components have stopped, applying runtime update: %v", maps.Keys(movingToProcess))
+				c.runtimeMgr.Update(fullRuntimeModel)
+			},
+		})
+	}
+}
+
+// applyOTelUpdate sends an update to the OTel manager.
+func (c *Coordinator) applyOTelUpdate(components []component.Component) {
+	c.logger.With("components", components).Debug("Updating otel manager model")
+	if len(components) > 0 {
+		componentIDs := make([]string, 0, len(components))
+		for _, comp := range components {
 			componentIDs = append(componentIDs, comp.ID)
 		}
 		c.logger.With("component_ids", componentIDs).Info("Using OpenTelemetry collector runtime.")
 	}
-	c.otelMgr.Update(c.otelCfg, c.currentCfg.Settings.MonitoringConfig, c.state.LogLevel, otelModel.Components)
+	c.otelMgr.Update(c.otelCfg, c.currentCfg.Settings.MonitoringConfig, c.state.LogLevel, components)
+}
+
+// checkPendingManagerUpdate is called from applyComponentState when a component
+// reaches STOPPED. It checks all pending manager updates and removes the
+// component from their wait sets. When a wait set becomes empty, the deferred
+// update is applied.
+func (c *Coordinator) checkPendingManagerUpdate(componentID string) {
+	remaining := c.pendingManagerUpdates[:0]
+	for i := range c.pendingManagerUpdates {
+		p := &c.pendingManagerUpdates[i]
+		if p.waiting[componentID] {
+			delete(p.waiting, componentID)
+			c.logger.Infof("Component %q stopped, %d remaining before deferred update", componentID, len(p.waiting))
+		}
+		if len(p.waiting) == 0 {
+			p.apply()
+		} else {
+			remaining = append(remaining, *p)
+		}
+	}
+	c.pendingManagerUpdates = remaining
 }
 
 // splitModelBetweenManager splits the model components between the runtime manager and the otel manager.
