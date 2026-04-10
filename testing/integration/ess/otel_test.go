@@ -2832,15 +2832,15 @@ func (w *ZapWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestSystemMetricsWithKafkaOutput(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: integration.Default,
-		Local: true,
-		OS: []define.OS{
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		},
-		Stack: &define.Stack{},
-	})
+	// define.Require(t, define.Requirements{
+	// 	Group: integration.Default,
+	// 	Local: true,
+	// 	OS: []define.OS{
+	// 		{Type: define.Linux},
+	// 		{Type: define.Darwin},
+	// 	},
+	// 	Stack: &define.Stack{},
+	// })
 
 	k, err := kafka.Run(t.Context(),
 		"confluentinc/confluent-local:7.5.0",
@@ -2887,12 +2887,16 @@ inputs:
       period: 1s
       data_stream:
         dataset: e2e
-      namespace: "json_namespace"
+        namespace: {{.RuntimeExperimental}}
 outputs:
   default:
     type: kafka
     hosts: {{.Broker}}
-    topic: test-topic
+    topic: '%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}'
+    max_message_bytes: 1000000
+    required_acks: 1
+    broker_timeout: 30s
+    queue.mem.flush.timeout: 0s
 agent.monitoring:
   metrics: false
   logs: false
@@ -2943,7 +2947,7 @@ agent.monitoring:
 		consumer, err := sarama.NewConsumer([]string{brokers[0]}, sarama.NewConfig())
 		require.NoError(t, err)
 
-		partitionConsumer, err := consumer.ConsumePartition("test-topic", 0, sarama.OffsetNewest)
+		partitionConsumer, err := consumer.ConsumePartition("metrics-e2e-"+tt.runtimeExperimental, 0, sarama.OffsetNewest)
 		require.NoError(t, err)
 
 		// Make sure find the logs
