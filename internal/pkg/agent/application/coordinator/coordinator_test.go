@@ -2020,17 +2020,31 @@ func TestUpdateManagersWithConfig_DefersOTelDuringRuntimeTransition(t *testing.T
 	assert.Empty(t, coord.pendingManagerUpdates, "pending update should be cleared")
 }
 
-func TestUpdateManagersWithConfig_CancelsPendingOnNewUpdate(t *testing.T) {
+func TestUpdateManagersWithConfig_QueuesNewUpdateWhileTransitioning(t *testing.T) {
 	var mu sync.Mutex
-	var otelUpdateCount int
+	var runtimeUpdates [][]string
+	var otelUpdates    [][]string
 
 	fakeRuntime := &fakeRuntimeManager{
-		updateCallback: func(comps []component.Component) error { return nil },
+		updateCallback: func(comps []component.Component) error {
+			ids := make([]string, len(comps))
+			for i, c := range comps {
+				ids[i] = c.ID
+			}
+			mu.Lock()
+			runtimeUpdates = append(runtimeUpdates, ids)
+			mu.Unlock()
+			return nil
+		},
 	}
 	fakeOTel := &fakeOTelManager{
 		updateComponentCallback: func(comps []component.Component) error {
+			ids := make([]string, len(comps))
+			for i, c := range comps {
+				ids[i] = c.ID
+			}
 			mu.Lock()
-			otelUpdateCount++
+			otelUpdates = append(otelUpdates, ids)
 			mu.Unlock()
 			return nil
 		},
@@ -2051,41 +2065,57 @@ func TestUpdateManagersWithConfig_CancelsPendingOnNewUpdate(t *testing.T) {
 						ID:             "filestream-monitoring",
 						RuntimeManager: component.ProcessRuntimeManager,
 					},
-					State: runtime.ComponentState{
-						State: client.UnitStateHealthy,
-					},
+					State: runtime.ComponentState{State: client.UnitStateHealthy},
 				},
 			},
 		},
 	}
 
-	// First update: moves filestream-monitoring to OTel → deferred.
+	// First update: moves filestream-monitoring to OTel -- transition pending.
 	model1 := &component.Model{
 		Components: []component.Component{
-			{
-				ID:             "filestream-monitoring",
-				RuntimeManager: component.OtelRuntimeManager,
-			},
+			{ID: "filestream-monitoring", RuntimeManager: component.OtelRuntimeManager},
 		},
 	}
 	coord.updateManagersWithConfig(model1)
 	assert.NotEmpty(t, coord.pendingManagerUpdates, "first update should be pending")
 
-	// Second update: moves it back to process → cancels pending, sends OTel
-	// update directly (no components moving to OTel).
+	// Second update arrives while transition is in progress -- queued.
 	model2 := &component.Model{
 		Components: []component.Component{
-			{
-				ID:             "filestream-monitoring",
-				RuntimeManager: component.ProcessRuntimeManager,
-			},
+			{ID: "filestream-monitoring", RuntimeManager: component.ProcessRuntimeManager},
 		},
 	}
 	coord.updateManagersWithConfig(model2)
-	assert.Empty(t, coord.pendingManagerUpdates, "pending should be cancelled")
+	assert.NotEmpty(t, coord.pendingManagerUpdates, "pending transitions should still be active")
+	assert.NotNil(t, coord.queuedModel, "new model should be queued")
 
 	mu.Lock()
-	assert.Equal(t, 2, otelUpdateCount, "OTel should have been updated twice (initial partial from model1 + full from model2)")
+	// Only the first model's current updates should have been applied.
+	assert.Len(t, runtimeUpdates, 1, "only first model's runtime update")
+	assert.Len(t, otelUpdates, 1, "only first model's otel update")
+	mu.Unlock()
+
+	// Complete the first transition — component stops.
+	coord.applyComponentState(runtime.ComponentComponentState{
+		Component: component.Component{
+			ID:             "filestream-monitoring",
+			RuntimeManager: component.ProcessRuntimeManager,
+		},
+		State: runtime.ComponentState{State: client.UnitStateStopped},
+	})
+
+	// First transition's deferred update fires, then the queued model is
+	// applied. The queued model moves filestream back to process, which is
+	// a no-transition update (it's now in OTel from the first transition's
+	// deferred update, so moving to process is a new transition).
+	assert.Nil(t, coord.queuedModel, "queued model should be consumed")
+
+	mu.Lock()
+	// We expect multiple updates as both the deferred apply and queued model
+	// are processed.
+	assert.Greater(t, len(runtimeUpdates), 1, "runtime should have received additional updates")
+	assert.Greater(t, len(otelUpdates), 1, "otel should have received additional updates")
 	mu.Unlock()
 }
 
@@ -2235,8 +2265,8 @@ func TestUpdateManagersWithConfig_DefersRuntimeDuringOTelToProcessTransition(t *
 
 func TestUpdateManagersWithConfig_BidirectionalTransition(t *testing.T) {
 	// Two components swap runtimes in the same config change:
-	//   filestream-monitoring: process → OTel
-	//   system/metrics-default: OTel → process
+	//   filestream-monitoring: process to OTel
+	//   system/metrics-default: OTel to process
 
 	var mu sync.Mutex
 	var runtimeUpdates [][]string // component IDs per runtime Update call

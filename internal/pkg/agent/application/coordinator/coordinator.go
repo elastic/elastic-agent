@@ -391,8 +391,14 @@ type Coordinator struct {
 	// pendingManagerUpdates holds deferred manager updates waiting for
 	// components in the old runtime to reach STOPPED before the new runtime
 	// starts them. There can be up to two entries when components move in
-	// both directions (process→OTel and OTel→process) simultaneously.
+	// both directions (process-to-OTel and OTel-to-process) simultaneously.
 	pendingManagerUpdates []pendingManagerUpdate
+
+	// queuedModel holds a component model that arrived while runtime
+	// transitions were still in progress. It is applied once all pending
+	// transitions complete, ensuring old instances are fully stopped before
+	// any new model is processed.
+	queuedModel *component.Model
 
 	// Protection section
 	protection protection.Config
@@ -1952,24 +1958,30 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 	return nil
 }
 
-// updateManagersWithConfig updates runtime managers with the component model and config.
-// Components may be sent to different runtimes depending on various criteria.
+// updateManagersWithConfig updates runtime managers with the component model.
 //
-// When components move between runtimes (process↔OTel), the old runtime must
-// fully stop the component before the new runtime starts it. Otherwise both
-// instances run simultaneously and fight over shared resources (filestream
-// registry, log cursors, network ports), causing duplicate log ingestion.
+// When components move between the process and OTel runtimes, the old
+// runtime must fully stop the component before the new runtime starts it.
+// Otherwise both instances run simultaneously and compete for shared
+// resources (filestream registry, log cursors, ports), causing duplicate
+// log ingestion.
 //
-// To handle this without blocking, the receiving manager gets a model that
-// excludes the transitioning components. A pendingManagerUpdate is stored for
-// each direction. When the main loop's applyComponentState sees the old
-// instances reach STOPPED, it applies the full model to the receiving manager.
+// To handle this without blocking, the receiving manager gets a model
+// that excludes the transitioning components. A pendingManagerUpdate is
+// stored for each direction. When applyComponentState sees the old
+// instances reach STOPPED, it applies the full model to the receiving
+// manager. If a new config arrives while transitions are in progress,
+// it is queued and applied once all current transitions complete.
 func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 	// Cancel any pending updates from a previous call. A new model supersedes
 	// whatever was waiting.
+	// If there are pending transitions from a previous update, queue this
+	// model to be applied once they complete. Applying it now could start
+	// new instances while old ones are still shutting down.
 	if len(c.pendingManagerUpdates) > 0 {
-		c.logger.Info("Cancelling previous pending manager updates due to new component model")
-		c.pendingManagerUpdates = nil
+		c.logger.Info("Runtime transitions still in progress, queuing new component model")
+		c.queuedModel = model
+		return
 	}
 
 	runtimeModel, otelModel := c.splitModelBetweenManagers(model)
@@ -2068,6 +2080,14 @@ func (c *Coordinator) checkPendingManagerUpdate(componentID string) {
 		}
 	}
 	c.pendingManagerUpdates = remaining
+
+	// If all transitions are done and a model was queued, apply it now.
+	if len(c.pendingManagerUpdates) == 0 && c.queuedModel != nil {
+		c.logger.Info("All runtime transitions complete, applying queued component model")
+		model := c.queuedModel
+		c.queuedModel = nil
+		c.updateManagersWithConfig(model)
+	}
 }
 
 // splitModelBetweenManager splits the model components between the runtime manager and the otel manager.
