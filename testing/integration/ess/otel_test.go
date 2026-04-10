@@ -2896,7 +2896,7 @@ outputs:
     max_message_bytes: 1000000
     required_acks: 1
     broker_timeout: 30s
-    queue.mem.flush.timeout: 0s
+    queue.mem.flush.timeout: 1s
 agent.monitoring:
   metrics: false
   logs: false
