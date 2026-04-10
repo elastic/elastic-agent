@@ -245,10 +245,12 @@ collectors:
                 enabled: false
               host.arch:
                 enabled: true
-              host.ip:
-                enabled: true
-              host.mac:
-                enabled: true
+              # Disabling host.ip and host.mac due to high cardinality
+              # See issue: https://github.com/elastic/opentelemetry-dev/issues/1311
+              # host.ip:
+              #   enabled: true
+              # host.mac:
+              #   enabled: true
               host.cpu.vendor.id:
                 enabled: true
               host.cpu.family:
