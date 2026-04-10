@@ -236,18 +236,16 @@ func TestSetupInstallPath(t *testing.T) {
 func TestSetupInstallPathCleansUpLeftoverRenames(t *testing.T) {
 	tmpdir := t.TempDir()
 	topPath := filepath.Join(tmpdir, "Elastic", "Agent")
-	dataDir := filepath.Join(topPath, "data")
-	require.NoError(t, os.MkdirAll(dataDir, 0o755))
+	require.NoError(t, os.MkdirAll(topPath, 0o755))
 
-	// Simulate a leftover directory inside data from a previous uninstall
-	// (scheduleDeleteOnReboot renames the versioned dir to a sibling in data).
-	leftoverDir := filepath.Join(dataDir, ".elastic-agent-leftover-12345")
-	require.NoError(t, os.Mkdir(leftoverDir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(leftoverDir, "elastic-agent.exe"), []byte("old binary"), 0o644))
+	// Simulate a leftover file at the install root from a previous uninstall
+	// (scheduleDeleteOnReboot renames the blocked exe to rootPath/<prefix>-<ts>.exe).
+	leftoverFile := filepath.Join(topPath, ".elastic-agent-leftover-12345.exe")
+	require.NoError(t, os.WriteFile(leftoverFile, []byte("old binary"), 0o644))
 
-	// Create an unrelated directory inside data that should NOT be deleted.
-	unrelatedDir := filepath.Join(dataDir, "elastic-agent-8.15.0")
-	require.NoError(t, os.Mkdir(unrelatedDir, 0o755))
+	// Create an unrelated file that should NOT be deleted.
+	unrelatedFile := filepath.Join(topPath, "elastic-agent.yml")
+	require.NoError(t, os.WriteFile(unrelatedFile, []byte("config"), 0o644))
 
 	ownership, err := utils.CurrentFileOwner()
 	require.NoError(t, err)
@@ -259,13 +257,13 @@ func TestSetupInstallPathCleansUpLeftoverRenames(t *testing.T) {
 	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
 	require.FileExists(t, markerFilePath)
 
-	// Leftover directory should be cleaned up (Windows only).
+	// Leftover file should be cleaned up (Windows only).
 	if runtime.GOOS == "windows" {
-		_, err = os.Stat(leftoverDir)
-		assert.ErrorIs(t, err, fs.ErrNotExist, "leftover directory should be removed")
+		_, err = os.Stat(leftoverFile)
+		assert.ErrorIs(t, err, fs.ErrNotExist, "leftover file should be removed")
 	}
 
-	// Unrelated directory should still exist.
-	_, err = os.Stat(unrelatedDir)
-	assert.NoError(t, err, "unrelated directory should not be deleted")
+	// Unrelated file should still exist.
+	_, err = os.Stat(unrelatedFile)
+	assert.NoError(t, err, "unrelated file should not be deleted")
 }

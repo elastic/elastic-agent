@@ -21,9 +21,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
-// leftoverPrefix is used to rename the install directory during uninstall when
-// a running executable prevents deletion. Sibling directories with this prefix
-// are cleaned up on the next install.
+// leftoverPrefix is used to rename blocked executables during uninstall.
+// Files with this prefix placed at the install root are cleaned up on the next install.
 const leftoverPrefix = ".elastic-agent-leftover"
 
 func isBlockingOnExe(err error) bool {
@@ -48,81 +47,34 @@ func isRetryableError(err error) bool {
 	return errno == syscall.ERROR_ACCESS_DENIED || errno == windows.ERROR_SHARING_VIOLATION
 }
 
-// scheduleDeleteOnReboot renames the versioned directory containing the blocked
-// executable to a sibling with a recognizable prefix, then schedules it for
-// deletion on the next reboot via MoveFileEx/MOVEFILE_DELAY_UNTIL_REBOOT.
-// Renaming within the same parent directory avoids needing write permission to
-// the parent of the install root and avoids triggering EDR software that
-// monitors cross-directory moves. On the next install, any leftover directories
-// matching the prefix are cleaned up by cleanupLeftoverRenames.
+// scheduleDeleteOnReboot renames the blocked executable to the install root
+// with a recognizable prefix, then schedules it for deletion on the next
+// reboot via MoveFileEx/MOVEFILE_DELAY_UNTIL_REBOOT. Renaming to the install
+// root (rather than to an external temp dir) keeps the file on the same volume
+// and within the install tree, avoiding cross-directory move heuristics in EDR
+// software. On the next install, leftover files matching the prefix are cleaned
+// up by cleanupLeftoverRenames.
 func scheduleDeleteOnReboot(log *logp.Logger, blockingErr error, rootPath string) error {
 	blockedPath, _ := getPathFromError(blockingErr)
 	if blockedPath == "" {
 		return fmt.Errorf("could not determine blocked path from error: %w", blockingErr)
 	}
 
-	// The blocked exe may be anywhere within the versioned directory (e.g.
-	// directly inside it or nested under components\). Find the ancestor that
-	// sits two levels below rootPath (rootPath\data\<versioned>) so we rename
-	// at the right level regardless of the exe's depth.
-	versionedDir, err := versionedDirFromBlocked(rootPath, blockedPath)
-	if err != nil {
-		return err
-	}
-	parent := filepath.Dir(versionedDir)
-	renamed := filepath.Join(parent, fmt.Sprintf("%s-%d", leftoverPrefix, time.Now().UnixNano()))
+	ext := filepath.Ext(blockedPath)
+	renamed := filepath.Join(rootPath, fmt.Sprintf("%s-%d%s", leftoverPrefix, time.Now().UnixNano(), ext))
 
-	if err := os.Rename(versionedDir, renamed); err != nil {
-		return fmt.Errorf("failed to rename %q to %q: %w", versionedDir, renamed, err)
+	if err := os.Rename(blockedPath, renamed); err != nil {
+		return fmt.Errorf("failed to rename %q to %q: %w", blockedPath, renamed, err)
 	}
-	log.Infof("Renamed %q to %q", versionedDir, renamed)
+	log.Infof("Renamed blocked executable %q to %q", blockedPath, renamed)
 
-	// Schedule all remaining files and directories for deletion on the next
-	// reboot. PendingFileRenameOperations entries are processed in order, so
-	// scheduling files first and directories bottom-up ensures each directory
-	// is empty by the time the Session Manager tries to remove it.
-	//
-	// By this point os.RemoveAll has already deleted everything it could, so
-	// the tree will only contain the running executable and its ancestor
-	// directories — a very short walk.
-	var dirs []string
-	_ = filepath.WalkDir(renamed, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return filepath.SkipDir
-		}
-		if d.IsDir() {
-			dirs = append(dirs, path)
-			return nil
-		}
-		if err := markDeleteOnReboot(path); err != nil {
-			log.Warnf("Failed to schedule %q for deletion on reboot: %v. You may need to delete it manually.", path, err)
-		}
-		return nil
-	})
-	for i := len(dirs) - 1; i >= 0; i-- {
-		if err := markDeleteOnReboot(dirs[i]); err != nil {
-			log.Warnf("Failed to schedule directory %q for deletion on reboot: %v. You may need to delete it manually.", dirs[i], err)
-		}
+	if err := markDeleteOnReboot(renamed); err != nil {
+		log.Warnf("Failed to schedule %q for deletion on reboot: %v. You may need to delete it manually.", renamed, err)
+	} else {
+		log.Infof("Scheduled %q for deletion on reboot", renamed)
 	}
 
 	return nil
-}
-
-// versionedDirFromBlocked returns the ancestor of blockedPath that is a direct
-// child of rootPath's second level (rootPath\data\<versioned>). The blocked
-// executable may be nested arbitrarily deep within the versioned directory, so
-// we cannot rely on filepath.Dir alone.
-func versionedDirFromBlocked(rootPath, blockedPath string) (string, error) {
-	rel, err := filepath.Rel(rootPath, blockedPath)
-	if err != nil || strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("blocked path %q is not within install root %q", blockedPath, rootPath)
-	}
-	// Split into at most 3 parts: e.g. ["data", "elastic-agent-X.Y.Z", "rest"]
-	parts := strings.SplitN(filepath.ToSlash(rel), "/", 3)
-	if len(parts) < 2 {
-		return "", fmt.Errorf("blocked path %q is too shallow within install root %q", blockedPath, rootPath)
-	}
-	return filepath.Join(rootPath, parts[0], parts[1]), nil
 }
 
 // markDeleteOnReboot schedules a file or directory for deletion on the next
@@ -136,23 +88,27 @@ func markDeleteOnReboot(path string) error {
 	return windows.MoveFileEx(p, nil, windows.MOVEFILE_DELAY_UNTIL_REBOOT)
 }
 
-// cleanupLeftoverRenames walks topPath and removes any directories left behind
-// by a previous uninstall's scheduleDeleteOnReboot (directories matching
-// leftoverPrefix anywhere under topPath). By the time a new install runs, the
-// old process is gone and these directories can be deleted normally.
+// cleanupLeftoverRenames removes any files at the top level of topPath left
+// behind by a previous uninstall's scheduleDeleteOnReboot (files matching
+// leftoverPrefix). By the time a new install runs, the old process is gone
+// and these files can be deleted normally.
 func cleanupLeftoverRenames(log *logp.Logger, topPath string) error {
-	return filepath.WalkDir(topPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil //nolint:nilerr // best-effort: skip inaccessible entries
-		}
-		if !d.IsDir() || !strings.HasPrefix(d.Name(), leftoverPrefix) {
+	entries, err := os.ReadDir(topPath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
-		if err := os.RemoveAll(path); err != nil {
-			log.Warnf("Failed to remove leftover directory %q from a previous uninstall: %v. You may need to delete it manually.", path, err)
+		return fmt.Errorf("failed to read %q: %w", topPath, err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), leftoverPrefix) {
+			path := filepath.Join(topPath, e.Name())
+			if err := os.Remove(path); err != nil {
+				log.Warnf("Failed to remove leftover file %q from a previous uninstall: %v. You may need to delete it manually.", path, err)
+			}
 		}
-		return filepath.SkipDir
-	})
+	}
+	return nil
 }
 
 func getPathFromError(blockingErr error) (string, syscall.Errno) {

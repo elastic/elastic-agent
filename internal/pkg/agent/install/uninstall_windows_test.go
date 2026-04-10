@@ -61,10 +61,11 @@ func startBlockingExe(t *testing.T, destDir string) (*exec.Cmd, string) {
 // reboot deletion and returns nil).
 func TestRemovePath(t *testing.T) {
 	rootPath := filepath.Join(t.TempDir(), "target")
-	versionedDir := filepath.Join(rootPath, "data", "elastic-agent-8.15.0")
-	require.NoError(t, os.MkdirAll(versionedDir, 0o755))
+	// Simulate the real layout: exe nested inside the versioned/components dirs.
+	componentsDir := filepath.Join(rootPath, "data", "elastic-agent-8.15.0", "components")
+	require.NoError(t, os.MkdirAll(componentsDir, 0o755))
 
-	startBlockingExe(t, versionedDir)
+	startBlockingExe(t, componentsDir)
 
 	err := RemovePath(logp.L(), rootPath)
 	assert.NoError(t, err)
@@ -122,14 +123,12 @@ func TestRemoveAllSucceedsAfterRename(t *testing.T) {
 }
 
 // TestScheduleDeleteOnReboot verifies that scheduleDeleteOnReboot renames the
-// versioned directory to a sibling with the leftover prefix, regardless of how
-// deeply nested the blocked executable is within that directory.
+// blocked executable to the install root with the leftover prefix, regardless
+// of how deeply nested the exe is within the install tree.
 func TestScheduleDeleteOnReboot(t *testing.T) {
 	rootPath := filepath.Join(t.TempDir(), "target")
-	dataDir := filepath.Join(rootPath, "data")
-	versionedDir := filepath.Join(dataDir, "elastic-agent-8.15.0")
-	// Simulate the real layout: the exe lives inside a components subdirectory.
-	componentsDir := filepath.Join(versionedDir, "components")
+	// Simulate the real layout: exe nested inside components.
+	componentsDir := filepath.Join(rootPath, "data", "elastic-agent-8.15.0", "components")
 	require.NoError(t, os.MkdirAll(componentsDir, 0o755))
 
 	_, exePath := startBlockingExe(t, componentsDir)
@@ -138,12 +137,12 @@ func TestScheduleDeleteOnReboot(t *testing.T) {
 	err := scheduleDeleteOnReboot(logp.L(), blockingErr, rootPath)
 	require.NoError(t, err)
 
-	// The versioned directory should be gone (renamed to a sibling in dataDir).
-	_, err = os.Stat(versionedDir)
-	assert.ErrorIs(t, err, fs.ErrNotExist, "versioned directory should no longer exist")
+	// The original exe path should be gone.
+	_, err = os.Stat(exePath)
+	assert.ErrorIs(t, err, fs.ErrNotExist, "original exe path should no longer exist")
 
-	// A sibling directory with the leftover prefix should exist in dataDir.
-	entries, err := os.ReadDir(dataDir)
+	// A leftover file with the prefix should exist at the install root.
+	entries, err := os.ReadDir(rootPath)
 	require.NoError(t, err)
 
 	var found bool
@@ -153,37 +152,33 @@ func TestScheduleDeleteOnReboot(t *testing.T) {
 			break
 		}
 	}
-	assert.True(t, found, "sibling directory with prefix %q should exist in %s", leftoverPrefix, dataDir)
+	assert.True(t, found, "leftover file with prefix %q should exist in %s", leftoverPrefix, rootPath)
 }
 
 // TestCleanupLeftoverRenames verifies that cleanupLeftoverRenames removes
-// leftover directories anywhere under topPath from a previous uninstall.
+// leftover files at the top level of topPath from a previous uninstall.
 func TestCleanupLeftoverRenames(t *testing.T) {
-	tmpDir := t.TempDir()
-	installDir := filepath.Join(tmpDir, "Agent")
-	dataDir := filepath.Join(installDir, "data")
-	require.NoError(t, os.MkdirAll(dataDir, 0o755))
+	installDir := filepath.Join(t.TempDir(), "Agent")
+	require.NoError(t, os.Mkdir(installDir, 0o755))
 
-	// Create a leftover directory inside the data dir (sibling of the
-	// versioned dir, as scheduleDeleteOnReboot produces).
-	leftover := filepath.Join(dataDir, leftoverPrefix+"-12345678")
-	require.NoError(t, os.Mkdir(leftover, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(leftover, "elastic-agent.exe"), []byte("fake"), 0o644))
+	// Create a leftover file at the install root (as scheduleDeleteOnReboot produces).
+	leftover := filepath.Join(installDir, leftoverPrefix+"-12345678.exe")
+	require.NoError(t, os.WriteFile(leftover, []byte("fake"), 0o644))
 
-	// Create an unrelated directory that should NOT be removed.
-	unrelated := filepath.Join(dataDir, "elastic-agent-8.15.0")
-	require.NoError(t, os.Mkdir(unrelated, 0o755))
+	// Create an unrelated file that should NOT be removed.
+	unrelated := filepath.Join(installDir, "elastic-agent.yml")
+	require.NoError(t, os.WriteFile(unrelated, []byte("config"), 0o644))
 
 	err := cleanupLeftoverRenames(logp.L(), installDir)
 	require.NoError(t, err)
 
-	// The leftover directory should be gone.
+	// The leftover file should be gone.
 	_, err = os.Stat(leftover)
-	assert.ErrorIs(t, err, fs.ErrNotExist, "leftover directory should be removed")
+	assert.ErrorIs(t, err, fs.ErrNotExist, "leftover file should be removed")
 
-	// The unrelated directory should still exist.
+	// The unrelated file should still exist.
 	_, err = os.Stat(unrelated)
-	assert.NoError(t, err, "unrelated directory should not be deleted")
+	assert.NoError(t, err, "unrelated file should not be deleted")
 }
 
 // TestRemoveAllDeletesEverythingExceptBlockingExe verifies that os.RemoveAll
