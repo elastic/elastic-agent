@@ -473,9 +473,23 @@ agent:
     # -- Fleet server URL
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     url: ""
+    urlFromSecret:
+      # -- Secret name for the Fleet Server URL
+      # @section -- 6.1 - Elastic-Agent Managed Configuration
+      name: ""
+      # -- Secret key for the Fleet Server URL
+      # @section -- 6.1 - Elastic-Agent Managed Configuration
+      key: ""
     # -- Fleet enrollment token
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     token: ""
+    tokenFromSecret:
+      # -- Secret name for the Fleet enrollment token
+      # @section -- 6.1 - Elastic-Agent Managed Configuration
+      name: ""
+      # -- Secret key for the Fleet enrollment token
+      # @section -- 6.1 - Elastic-Agent Managed Configuration
+      key: ""
     # -- Communicate with Fleet with either insecure HTTP or unverified HTTPS
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     insecure: false

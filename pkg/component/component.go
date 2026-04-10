@@ -62,10 +62,7 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier
 			InputType: make(map[string]string),
 		},
-		Output: map[string]string{
-			"logstash": string(ProcessRuntimeManager), // Force all inputs using the Logstash output to use the process runtime
-			"kafka":    string(ProcessRuntimeManager), // Force all inputs using the kafka output to use the process runtime
-		},
+		Output: map[string]string{},
 	}
 }
 
