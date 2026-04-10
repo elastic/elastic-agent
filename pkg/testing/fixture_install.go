@@ -601,7 +601,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 
 		f.t.Logf("removing installed agent files")
 		basePath := "/"
-		if installOpts.BasePath != "" {
+		if installOpts != nil && installOpts.BasePath != "" {
 			basePath = installOpts.BasePath
 		}
 		rmArgs := []string{"rm", "-rf",
