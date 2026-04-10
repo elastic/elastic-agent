@@ -2832,15 +2832,15 @@ func (w *ZapWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestSystemMetricsWithKafkaOutput(t *testing.T) {
-	// define.Require(t, define.Requirements{
-	// 	Group: integration.Default,
-	// 	Local: true,
-	// 	OS: []define.OS{
-	// 		{Type: define.Linux},
-	// 		{Type: define.Darwin},
-	// 	},
-	// 	Stack: &define.Stack{},
-	// })
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
 
 	k, err := kafka.Run(t.Context(),
 		"confluentinc/confluent-local:7.5.0",
