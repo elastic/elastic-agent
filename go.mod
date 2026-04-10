@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.25.8
+go 1.25.9
 
 // Use upstream commit post PR#43744 which adds Attributes() to the pkg/status Event interface.
 // internal/common is pinned to v0.148.0 to resolve the unreachable pseudo-version that
