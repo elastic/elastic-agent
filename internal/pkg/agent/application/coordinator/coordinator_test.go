@@ -623,9 +623,11 @@ func TestReplayedRollbackActionAcked(t *testing.T) {
 	acker.AssertCalled(t, "Commit", mock.Anything)
 	assert.False(t, upgradeManager.upgradeCalled, "upgrade should not have been called for a replayed rollback action")
 
-	// Replayed rollback should not create or modify any UpgradeDetails
+	// Replayed rollback should report UpgradeDetails with StateRollback so that
+	// Fleet knows the agent completed the rollback (not empty/nil details).
 	state := coord.State()
-	assert.Nil(t, state.UpgradeDetails, "no upgrade details should be present after replayed rollback is handled")
+	require.NotNil(t, state.UpgradeDetails, "upgrade details should be present after replayed rollback is handled")
+	assert.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State), "upgrade details state should be rollback")
 
 	cancel()
 	require.NoError(t, <-coordCh)

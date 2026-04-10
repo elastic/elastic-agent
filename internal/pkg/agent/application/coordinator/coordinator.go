@@ -837,30 +837,6 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		return err
 	}
 
-	// Detect replayed rollback actions: if this is a rollback request and the
-	// agent is already running the target version, the rollback was already
-	// performed. Ack the action and return without processing.
-	// Upgrade details are not set at this point so the checkin will not send any,
-	// indicating a successful rollback.
-	// This can happen when the rolled-back agent starts with an ackToken from
-	// before the rollback action was received and Fleet Server re-sends it.
-	if uOpts.rollback && release.VersionWithSnapshot() == version {
-		actionID := ""
-		if action != nil {
-			actionID = action.ActionID
-		}
-		c.logger.Infow(
-			"Received a rollback action targeting the current version, "+
-				"likely a replayed action; acking without processing",
-			"action_id", actionID,
-			"version", version,
-		)
-		if action != nil {
-			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
-		}
-		return nil
-	}
-
 	// override the overall state to upgrading until the re-execution is complete
 	c.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
 
@@ -871,6 +847,28 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	}
 	det := details.NewDetails(version, details.StateRequested, actionID)
 	det.RegisterObserver(c.SetUpgradeDetails)
+
+	// Detect replayed rollback actions: if this is a rollback request and the
+	// agent is already running the target version, the rollback was already
+	// performed. Ack the action and return without processing.
+	// Upgrade details are not set at this point so the checkin will not send any,
+	// indicating a successful rollback.
+	// This can happen when the rolled-back agent starts with an ackToken from
+	// before the rollback action was received and Fleet Server re-sends it.
+	if uOpts.rollback && release.VersionWithSnapshot() == version {
+		c.logger.Infow(
+			"Received a rollback action targeting the current version, "+
+				"likely a replayed action; acking without processing",
+			"action_id", actionID,
+			"version", version,
+		)
+		c.ClearOverrideState()
+		det.SetState(details.StateRollback)
+		if action != nil {
+			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
+		}
+		return nil
+	}
 
 	// early check outside of upgrader before overriding the state
 	if !c.upgradeMgr.Upgradeable() {

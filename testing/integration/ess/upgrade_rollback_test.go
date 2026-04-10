@@ -613,10 +613,9 @@ func TestStandaloneUpgradeReplayedRollback(t *testing.T) {
 
 	state, err := replayClient.State(ctx)
 	require.NoError(t, err, "error getting agent state")
-	if state.UpgradeDetails != nil {
-		assert.NotEqual(t, string(details.StateFailed), state.UpgradeDetails.State,
-			"agent must not be in failed upgrade state after replayed rollback")
-	}
+	require.NotNil(t, state.UpgradeDetails, "upgrade details should be present after replayed rollback")
+	assert.Equal(t, string(details.StateRollback), state.UpgradeDetails.State,
+		"upgrade details state should be rollback after replayed rollback")
 }
 
 func assertListRollbacks(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, expectedValidUntil time.Time) {
