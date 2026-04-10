@@ -119,6 +119,14 @@ func TestEnvStringMap(t *testing.T) {
 				"key1": "val2,val2,key3=val4",
 			},
 		},
+		{
+			name: "key value with quotes and user agent",
+			env:  `key1="val2",User-Agent=test-user-agent`,
+			expected: map[string]string{
+				"key1":       "val2",
+				"User-Agent": "test-user-agent",
+			},
+		},
 	}
 
 	for _, tc := range testCases {

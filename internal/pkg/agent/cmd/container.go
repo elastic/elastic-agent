@@ -754,7 +754,7 @@ func envStringMap(envKey string) map[string]string {
 	// 1. A key (\w+)
 	// 2. An equals sign (=)
 	// 3. Either a quoted string "([^"]*)" OR unquoted characters ([^,]+)
-	re := regexp.MustCompile(`(\w+)=(?:"([^"]*)"|([^,]+))`)
+	re := regexp.MustCompile(`([\w\-]+)=(?:"([^"]*)"|([^,]+))`)
 	matches := re.FindAllStringSubmatch(input, -1)
 
 	result := make(map[string]string)
