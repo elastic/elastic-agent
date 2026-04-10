@@ -1445,7 +1445,10 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read contents of the data directory %s: %w", dataDir, err)
 	}
-	var versionDir string
+	var (
+		versionDir        string
+		versionDirModTime time.Time
+	)
 	for _, fi := range agentVersions {
 		filename := fi.Name()
 		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
@@ -1455,8 +1458,17 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 				// directories, we don't want first found
 				continue
 			}
-			versionDir = filename
-			break
+			info, err := fi.Info()
+			if err != nil {
+				continue
+			}
+			// After an upgrade within the same version, two directories with
+			// different build hashes will exist. Use the most recently modified
+			// one because that is the active install.
+			if versionDir == "" || info.ModTime().After(versionDirModTime) {
+				versionDir = filename
+				versionDirModTime = info.ModTime()
+			}
 		}
 	}
 	if versionDir == "" {
