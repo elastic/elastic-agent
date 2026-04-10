@@ -660,6 +660,37 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			},
 		},
 		{
+			name: "helm managed agent fleet credentials from secret",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepCreateFleetCredentialsSecret("fleet-credentials"),
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+					"agent": map[string]any{
+						"unprivileged": false,
+						"image": map[string]any{
+							"repository": kCtx.agentImageRepo,
+							"tag":        kCtx.agentImageTag,
+							"pullPolicy": "Never",
+						},
+						"fleet": map[string]any{
+							"enabled": true,
+							"urlFromSecret": map[string]any{
+								"name": "fleet-credentials",
+								"key":  "url",
+							},
+							"tokenFromSecret": map[string]any{
+								"name": "fleet-credentials",
+								"key":  "token",
+							},
+							"preset": "perNode",
+						},
+					},
+				}),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+			},
+		},
+		{
 			name: "helm standalone agent unprivileged kubernetes hints",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
@@ -1559,6 +1590,24 @@ func k8sStepHintsRedisDelete() k8sTestStep {
 
 		err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, redisPod)
 		require.NoError(t, err, "failed to delete redis k8s objects")
+	}
+}
+
+func k8sStepCreateFleetCredentialsSecret(secretName string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+			StringData: map[string]string{
+				"url":   kCtx.enrollParams.FleetURL,
+				"token": kCtx.enrollParams.EnrollmentToken,
+			},
+		}
+
+		err := k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, namespace: namespace}, secret)
+		require.NoError(t, err, "failed to create fleet credentials secret")
 	}
 }
 
