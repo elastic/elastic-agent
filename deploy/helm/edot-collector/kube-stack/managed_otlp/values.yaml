@@ -246,7 +246,7 @@ collectors:
               host.arch:
                 enabled: true
               # Disabling host.ip and host.mac due to high cardinality
-              # See issue: https://github.com/elastic/opentelemetry-dev/issues/1311
+              # See issue: https://github.com/elastic/elastic-agent/issues/13575
               # host.ip:
               #   enabled: true
               # host.mac:
