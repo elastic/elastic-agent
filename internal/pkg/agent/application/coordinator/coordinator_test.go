@@ -39,7 +39,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
-	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
@@ -53,6 +52,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
 const (
@@ -2023,7 +2023,7 @@ func TestUpdateManagersWithConfig_DefersOTelDuringRuntimeTransition(t *testing.T
 func TestUpdateManagersWithConfig_QueuesNewUpdateWhileTransitioning(t *testing.T) {
 	var mu sync.Mutex
 	var runtimeUpdates [][]string
-	var otelUpdates    [][]string
+	var otelUpdates [][]string
 
 	fakeRuntime := &fakeRuntimeManager{
 		updateCallback: func(comps []component.Component) error {
@@ -2270,7 +2270,7 @@ func TestUpdateManagersWithConfig_BidirectionalTransition(t *testing.T) {
 
 	var mu sync.Mutex
 	var runtimeUpdates [][]string // component IDs per runtime Update call
-	var otelUpdates    [][]string // component IDs per OTel Update call
+	var otelUpdates [][]string    // component IDs per OTel Update call
 
 	fakeRuntime := &fakeRuntimeManager{
 		updateCallback: func(comps []component.Component) error {
