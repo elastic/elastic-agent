@@ -1,0 +1,14 @@
+kubernetes:
+  enabled: true
+system:
+  enabled: true
+agent:
+  fleet:
+    enabled: true
+    urlFromSecret:
+      name: fleet-credentials
+      key: url
+    tokenFromSecret:
+      name: fleet-credentials
+      key: token
+    preset: perNode
