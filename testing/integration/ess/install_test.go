@@ -79,13 +79,6 @@ func TestInstallWithoutBasePathWithCustomUser(t *testing.T) {
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
-		OS: []define.OS{
-			{
-				Type: define.Darwin,
-			}, {
-				Type: define.Linux,
-			},
-		},
 	})
 
 	// Get path to Elastic Agent executable
@@ -160,7 +153,10 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	checks := &installtest.CheckOpts{Privileged: opts.Privileged}
+	checks := &installtest.CheckOpts{
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
+	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
@@ -260,7 +256,10 @@ func TestInstallServersWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	checks := &installtest.CheckOpts{Privileged: opts.Privileged}
+	checks := &installtest.CheckOpts{
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
+	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
@@ -331,7 +330,10 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in default base path
-	checks := &installtest.CheckOpts{Privileged: opts.Privileged}
+	checks := &installtest.CheckOpts{
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
+	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, checks))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
@@ -387,7 +389,10 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
-	checks := &installtest.CheckOpts{Privileged: opts.Privileged}
+	checks := &installtest.CheckOpts{
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
+	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
@@ -438,7 +443,8 @@ func TestInstallSecondAgentInDevelopmentNamespace(t *testing.T) {
 	// Check that Agent was installed in default base path
 	topPath := installtest.DefaultTopPath()
 	checks := &installtest.CheckOpts{
-		Privileged: opts.Privileged,
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
@@ -489,9 +495,10 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 	// Check that Agent was installed in default base path
 	topPath := installtest.DefaultTopPath()
 	checks := &installtest.CheckOpts{
-		Privileged: opts.Privileged,
-		Username:   customUsername,
-		Group:      customGroup,
+		Privileged:    opts.Privileged,
+		Username:      customUsername,
+		Group:         customGroup,
+		TargetVersion: fixture.Version(),
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
@@ -582,10 +589,11 @@ func testSecondAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, b
 		}
 
 		checks := &installtest.CheckOpts{
-			Privileged: installOpts.Privileged,
-			Namespace:  installOpts.Namespace,
-			Username:   installOpts.Username,
-			Group:      installOpts.Group,
+			Privileged:    installOpts.Privileged,
+			Namespace:     installOpts.Namespace,
+			Username:      installOpts.Username,
+			Group:         installOpts.Group,
+			TargetVersion: fixture.Version(),
 		}
 
 		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))

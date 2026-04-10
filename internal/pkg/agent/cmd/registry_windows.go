@@ -86,10 +86,16 @@ func windowsRegistryUpdateCmd() error {
 	// configure the ACL so the service user can update the entry on future unprivileged upgrades;
 	// this is a recovery path for agents upgraded from pre-9.4.0 where the ACL was never set
 	var ownership utils.FileOwner
-	if username, err := install.GetServiceUsername(); err == nil && username != "" {
-		if uid, err := install.FindUID(username); err == nil {
-			ownership.UID = uid
+	username, err := install.GetServiceUsername()
+	if err != nil {
+		return fmt.Errorf("failed to get service username: %w", err)
+	}
+	if username != "" {
+		uid, err := install.FindUID(username)
+		if err != nil {
+			return fmt.Errorf("failed to find UID for user %q: %w", username, err)
 		}
+		ownership.UID = uid
 	}
 	if err := install.ConfigureRegistryPermissions(ownership); err != nil {
 		return fmt.Errorf("failed to configure registry permissions: %w", err)

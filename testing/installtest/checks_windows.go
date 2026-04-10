@@ -125,9 +125,19 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 			// run 'windows registry update' to fix this
 			startVersion, parseErr := version.ParseVersion(opts.StartVersion)
 			if parseErr == nil && startVersion.Less(*version.NewParsedSemVer(9, 4, 0, "SNAPSHOT", "")) {
-				if _, execErr := f.Exec(ctx, []string{"windows", "registry", "update"}); execErr != nil {
-					return fmt.Errorf("failed to run 'windows registry update': %w", execErr)
+				// integration tests don't use the MSI installer, so we need a fake entry to verify the cleanup
+				if err := createFakeMSIEntry(); err != nil {
+					return fmt.Errorf("failed to create fake MSI entry: %w", err)
 				}
+
+				if err := f.ExecWindowsRegistryUpdate(ctx); err != nil {
+					return fmt.Errorf("failed to run 'windows registry update': %w", err)
+				}
+
+				if guids := install.FindMSIProductCodes(); len(guids) > 0 {
+					return fmt.Errorf("MSI uninstall registry entries still present after 'windows registry update': %v", guids)
+				}
+
 				displayVersion, err = getRegistryDisplayVersion(opts.Namespace)
 				if err != nil {
 					return fmt.Errorf("uninstall registry entry still missing after 'windows registry update' for %s: %w", topPath, err)
@@ -136,6 +146,24 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		}
 		if err == nil && displayVersion != opts.TargetVersion {
 			return fmt.Errorf("uninstall registry DisplayVersion mismatch for %s: got %q, want %q", topPath, displayVersion, opts.TargetVersion)
+		}
+
+		// verify 'windows registry remove' deletes the entry and that 'windows registry update' can recreate it
+		if err := f.ExecWindowsRegistryRemove(ctx); err != nil {
+			return fmt.Errorf("failed to run 'windows registry remove': %w", err)
+		}
+		if _, err := getRegistryDisplayVersion(opts.Namespace); err == nil {
+			return fmt.Errorf("uninstall registry entry still present after 'windows registry remove' for %s", topPath)
+		}
+		if err := f.ExecWindowsRegistryUpdate(ctx); err != nil {
+			return fmt.Errorf("failed to run 'windows registry update' after remove: %w", err)
+		}
+		displayVersion, err = getRegistryDisplayVersion(opts.Namespace)
+		if err != nil {
+			return fmt.Errorf("uninstall registry entry missing after 'windows registry update' recreate for %s: %w", topPath, err)
+		}
+		if displayVersion != opts.TargetVersion {
+			return fmt.Errorf("uninstall registry DisplayVersion mismatch after recreate for %s: got %q, want %q", topPath, displayVersion, opts.TargetVersion)
 		}
 	}
 
@@ -168,6 +196,23 @@ func getRegistryDisplayVersion(namespace string) (string, error) {
 		return "", err
 	}
 	return v, nil
+}
+
+func createFakeMSIEntry() error {
+	guid := "{E550A894-5C44-5BEF-9967-000000000000}"
+	keyPath := install.UninstallKeyPath + `\` + guid
+	k, _, err := registry.CreateKey(registry.LOCAL_MACHINE, keyPath, registry.CREATE_SUB_KEY|registry.SET_VALUE)
+	if err != nil {
+		return fmt.Errorf("creating fake MSI key %q: %w", keyPath, err)
+	}
+	defer k.Close()
+	if err := k.SetStringValue("DisplayName", "Elastic Agent"); err != nil {
+		return fmt.Errorf("setting DisplayName: %w", err)
+	}
+	if err := k.SetDWordValue("WindowsInstaller", 1); err != nil {
+		return fmt.Errorf("setting WindowsInstaller: %w", err)
+	}
+	return nil
 }
 
 func hasSID(sids []*windows.SID, m *windows.SID) bool {

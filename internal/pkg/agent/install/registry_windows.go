@@ -110,7 +110,7 @@ func RemoveUninstallEntry() error {
 // MSI installer to avoid duplicates.
 // See: https://github.com/elastic/elastic-stack-installers
 func RemoveMSIUninstallEntries() error {
-	guids := findMSIProductCodes()
+	guids := FindMSIProductCodes()
 	for _, guid := range guids {
 		if err := registry.DeleteKey(registry.LOCAL_MACHINE, UninstallKeyPath+`\`+guid); err != nil {
 			return fmt.Errorf("deleting MSI uninstall registry key %q: %w", guid, err)
@@ -119,8 +119,8 @@ func RemoveMSIUninstallEntries() error {
 	return nil
 }
 
-// findMSIProductCodes searches the Uninstall registry for MSI entries.
-func findMSIProductCodes() []string {
+// FindMSIProductCodes searches the Uninstall registry for MSI entries.
+func FindMSIProductCodes() []string {
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, UninstallKeyPath, registry.ENUMERATE_SUB_KEYS)
 	if err != nil {
 		return nil
