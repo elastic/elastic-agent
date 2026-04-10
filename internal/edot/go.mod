@@ -16,7 +16,7 @@ replace (
 )
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260408154315-966fd56d6107
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260409163158-7c13620afa4e
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.34.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.36.0
@@ -342,7 +342,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/getsentry/sentry-go v0.37.0 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.6 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
