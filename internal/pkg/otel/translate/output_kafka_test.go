@@ -33,7 +33,8 @@ max_message_bytes: 1000000`,
 		expectedMap: map[string]any{
 			"brokers": []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
 			"logs": map[string]any{
-				"topic": "static-topic",
+				"topic":    "static-topic",
+				"encoding": "raw",
 			},
 			"client_id": "beats",
 			"metadata": map[string]any{
@@ -82,7 +83,8 @@ max_message_bytes: 1000000`,
 			expectedMap: map[string]any{
 				"brokers": []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
 				"logs": map[string]any{
-					"topic": "static-topic",
+					"topic":    "static-topic",
+					"encoding": "raw",
 				},
 				"client_id": "beats",
 				"metadata": map[string]any{
@@ -166,6 +168,9 @@ max_message_bytes: 1000000`,
 						"min_size":      0,
 					},
 					"queue_size": 3200,
+				},
+				"logs": map[string]any{
+					"encoding": "raw",
 				},
 				"timeout": 10 * time.Second,
 			},
