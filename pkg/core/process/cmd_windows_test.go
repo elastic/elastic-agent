@@ -48,26 +48,16 @@ func TestTerminateCmdWithoutConsole(t *testing.T) {
 		_, _, _ = kernel32.NewProc("AllocConsole").Call()
 	})
 
-	cmd, err := getCmd(ctx, testBinary, nil, os.Getuid(), os.Getgid(), t.Name())
+	proc, err := Start(testBinary,
+		WithContext(ctx),
+		WithArgs([]string{t.Name()}),
+		WithNewConsole(),
+	)
 	if err != nil {
-		t.Fatalf("'getCmd' failed: %s", err)
+		t.Fatalf("failed to start process: %s", err)
 	}
 
-	// Give the child its own console via WithNewConsole so that
-	// attachAndBreak can attach to it and deliver CTRL_BREAK_EVENT.
-	if err := WithNewConsole()(cmd); err != nil {
-		t.Fatalf("WithNewConsole failed: %s", err)
-	}
-
-	out, err := cmd.StderrPipe()
-	if err != nil {
-		t.Fatalf("cannot get stderr pipe for child process: %s", err)
-	}
-	sc := bufio.NewScanner(out)
-
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("cannot start child process: %s", err)
-	}
+	sc := bufio.NewScanner(proc.Stderr)
 
 	// Wait for the child to be ready.
 	for sc.Scan() {
@@ -80,8 +70,8 @@ func TestTerminateCmdWithoutConsole(t *testing.T) {
 		}
 	}
 
-	if err := terminateCmd(cmd.Process); err != nil {
-		t.Fatalf("did not expect an error from 'terminateCmd': %s", err)
+	if err := proc.Stop(); err != nil {
+		t.Fatalf("did not expect an error from Stop(): %s", err)
 	}
 
 	expectedMsg := "Got signal: " + syscall.SIGINT.String()
@@ -107,14 +97,11 @@ func TestTerminateCmdWithoutConsole(t *testing.T) {
 			t.Log("Child process output:", sc.Text())
 		}
 	} else {
-		_, _ = io.Copy(io.Discard, out)
+		_, _ = io.Copy(io.Discard, proc.Stderr)
 	}
 
-	if err := cmd.Wait(); err != nil {
-		t.Fatalf("cmd did not finish successfully: %s", err)
-	}
-
-	if cmd.ProcessState.ExitCode() != 0 {
-		t.Fatalf("process did not finish successfully, exit code: %d", cmd.ProcessState.ExitCode())
+	ps := <-proc.Wait()
+	if ps.ExitCode() != 0 {
+		t.Fatalf("process did not finish successfully, exit code: %d", ps.ExitCode())
 	}
 }

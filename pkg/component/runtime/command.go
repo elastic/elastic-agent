@@ -407,7 +407,8 @@ func (c *commandRuntime) start(comm Communicator) error {
 	proc, err := process.Start(path,
 		process.WithArgs(args),
 		process.WithEnv(env),
-		process.WithCmdOptions(attachOutErr(c.logStd, c.logErr), dirPath(workDir), process.WithNewConsole()))
+		process.WithCmdOptions(attachOutErr(c.logStd, c.logErr), dirPath(workDir)),
+		process.WithNewConsole())
 	if err != nil {
 		return fmt.Errorf("failed to start process: %w", err)
 	}

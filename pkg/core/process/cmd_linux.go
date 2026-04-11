@@ -53,7 +53,8 @@ func killCmd(proc *os.Process) error {
 	return proc.Kill()
 }
 
-// terminateCmd sends SIGTERM to the process
-func terminateCmd(proc *os.Process) error {
+// terminateCmd sends SIGTERM to the process.
+// The newConsole parameter is only used on Windows and is ignored here.
+func terminateCmd(proc *os.Process, _ bool) error {
 	return proc.Signal(syscall.SIGTERM)
 }

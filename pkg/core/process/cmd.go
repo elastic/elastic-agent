@@ -57,21 +57,24 @@ func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ..
 	return cmd, nil
 }
 
-// WithNewConsole is a CmdOption that gives the child process its own hidden
+// WithNewConsole is a StartOption that gives the child process its own hidden
 // console. This is required for attachAndBreak to deliver CTRL_BREAK_EVENT
 // when the parent runs as a Windows service with no console.
 //
 // Use this for component processes (beats) that need graceful shutdown via
 // CTRL_BREAK_EVENT. The OTel collector subprocess does not need this because
 // it is stopped via stdin pipe closure.
-func WithNewConsole() CmdOption {
-	return func(c *exec.Cmd) error {
-		if c.SysProcAttr == nil {
-			c.SysProcAttr = &syscall.SysProcAttr{}
-		}
-		c.SysProcAttr.CreationFlags |= windows.CREATE_NEW_CONSOLE
-		c.SysProcAttr.HideWindow = true
-		return nil
+func WithNewConsole() StartOption {
+	return func(cfg *StartConfig) {
+		cfg.newConsole = true
+		cfg.cmdOpts = append(cfg.cmdOpts, func(c *exec.Cmd) error {
+			if c.SysProcAttr == nil {
+				c.SysProcAttr = &syscall.SysProcAttr{}
+			}
+			c.SysProcAttr.CreationFlags |= windows.CREATE_NEW_CONSOLE
+			c.SysProcAttr.HideWindow = true
+			return nil
+		})
 	}
 }
 
@@ -81,11 +84,19 @@ func killCmd(proc *os.Process) error {
 }
 
 // terminateCmd sends CTRL_BREAK_EVENT to the process for graceful shutdown.
-// It first tries a direct send which works when a console is already attached
-// (e.g. running from a terminal). If that fails with ERROR_INVALID_HANDLE
-// (typical when running as a Windows service with no console), it falls back
-// to attaching to the child's console for delivery.
-func terminateCmd(proc *os.Process) error {
+//
+// If the process has its own console (newConsole=true, from WithNewConsole),
+// we must use attachAndBreak because the direct GenerateConsoleCtrlEvent
+// sends to the caller's console, not the child's — the event is silently
+// lost even though the call returns success.
+//
+// For processes that share the caller's console (newConsole=false), the
+// direct call works. If it fails with ERROR_INVALID_HANDLE (no console,
+// e.g. running as a Windows service), we fall back to attachAndBreak.
+func terminateCmd(proc *os.Process, newConsole bool) error {
+	if newConsole {
+		return attachAndBreak(proc)
+	}
 	err := windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(proc.Pid)) //nolint:gosec // PID is always non-negative
 	if err == nil {
 		return nil

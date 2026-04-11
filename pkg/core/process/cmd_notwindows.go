@@ -6,9 +6,7 @@
 
 package process
 
-import "os/exec"
-
 // WithNewConsole is a no-op on non-Windows platforms.
-func WithNewConsole() CmdOption {
-	return func(c *exec.Cmd) error { return nil }
+func WithNewConsole() StartOption {
+	return func(cfg *StartConfig) {}
 }
