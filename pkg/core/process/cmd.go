@@ -33,7 +33,7 @@ var (
 func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ...string) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	if ctx == nil {
-		cmd = exec.Command(path, arg...)
+		cmd = exec.Command(path, arg...) //nolint:noctx // ctx is intentionally optional for callers that don't need cancellation
 	} else {
 		cmd = exec.CommandContext(ctx, path, arg...)
 	}
@@ -86,7 +86,7 @@ func killCmd(proc *os.Process) error {
 // (typical when running as a Windows service with no console), it falls back
 // to attaching to the child's console for delivery.
 func terminateCmd(proc *os.Process) error {
-	err := windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(proc.Pid))
+	err := windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(proc.Pid)) //nolint:gosec // PID is always non-negative
 	if err == nil {
 		return nil
 	}
@@ -114,7 +114,7 @@ func attachAndBreak(proc *os.Process) error {
 	consoleMu.Lock()
 	defer consoleMu.Unlock()
 
-	pid := uint32(proc.Pid)
+	pid := uint32(proc.Pid) //nolint:gosec // PID is always non-negative
 
 	// Attach to the child's console so we can send it CTRL_BREAK_EVENT.
 	r1, _, err := procAttachConsole.Call(uintptr(pid))
@@ -125,7 +125,7 @@ func attachAndBreak(proc *os.Process) error {
 	sendErr := windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, pid)
 
 	// Detach from the child's console.
-	procFreeConsole.Call()
+	_, _, _ = procFreeConsole.Call()
 
 	return sendErr
 }

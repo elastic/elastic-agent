@@ -41,11 +41,11 @@ func TestTerminateCmdWithoutConsole(t *testing.T) {
 
 	// Free the current console BEFORE starting the child to simulate the
 	// Windows service scenario where no console exists.
-	procFreeConsole.Call()
+	_, _, _ = procFreeConsole.Call()
 	t.Cleanup(func() {
 		// Re-allocate a console so subsequent tests (or the test runner)
 		// still have one.
-		kernel32.NewProc("AllocConsole").Call()
+		_, _, _ = kernel32.NewProc("AllocConsole").Call()
 	})
 
 	cmd, err := getCmd(ctx, testBinary, nil, os.Getuid(), os.Getgid(), t.Name())
