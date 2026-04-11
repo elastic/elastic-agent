@@ -33,6 +33,7 @@ var instanceLabels = map[string]string{
 	"org":      "obs",
 	"team":     "elastic-agent-control-plane",
 	"project":  "elastic-agent",
+	"purpose":  "integration-test",
 }
 
 type provisioner struct {
@@ -144,8 +145,9 @@ func (p *provisioner) createInstance(ctx context.Context, batch common.OSBatch, 
 		return common.Instance{}, fmt.Errorf("unsupported OS: %s/%s", batch.OS.Type, batch.OS.Arch)
 	}
 
+	publicKey = strings.TrimSpace(publicKey)
 	instanceName := sanitizeInstanceName(batch.ID)
-	sshMeta := fmt.Sprintf("%s:%s", layout.Username, strings.TrimSpace(publicKey))
+	sshMeta := fmt.Sprintf("%s:%s", layout.Username, publicKey)
 
 	// Build labels string
 	var labelParts []string
@@ -174,7 +176,7 @@ func (p *provisioner) createInstance(ctx context.Context, batch common.OSBatch, 
 	if batch.OS.Type == define.Windows {
 		// Windows needs a startup script to install OpenSSH and configure the public key.
 		// The enable-windows-ssh metadata alone is not sufficient for key-based auth.
-		startupScript := windowsStartupScript(layout.Username, strings.TrimSpace(publicKey))
+		startupScript := windowsStartupScript(layout.Username, publicKey)
 		scriptFile, err := os.CreateTemp("", "gcloud-windows-startup-*.ps1")
 		if err != nil {
 			return common.Instance{}, fmt.Errorf("failed to create startup script: %w", err)
@@ -250,6 +252,9 @@ func (p *provisioner) run(ctx context.Context, args ...string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to start gcloud %s: %w", args[0], err)
 	}
 	ps := <-proc.Wait()
+	if ps == nil {
+		return nil, fmt.Errorf("gcloud %s: process wait failed: %s", strings.Join(args, " "), stderr.String())
+	}
 	if ps.ExitCode() != 0 {
 		return nil, fmt.Errorf("gcloud %s exited with code %d: %s", strings.Join(args, " "), ps.ExitCode(), stderr.String())
 	}
@@ -316,7 +321,7 @@ if (-not (Test-Path $sshDir)) {
     New-Item -ItemType Directory -Path $sshDir -Force
 }
 $authorizedKeysFile = Join-Path $sshDir "administrators_authorized_keys"
-Set-Content -Path $authorizedKeysFile -Value "%s"
+Set-Content -Path $authorizedKeysFile -Value '%s'
 
 # Fix permissions on authorized_keys file
 icacls $authorizedKeysFile /inheritance:r /grant "SYSTEM:(F)" /grant "BUILTIN\Administrators:(F)"
@@ -327,7 +332,7 @@ if (-not (Test-Path $userSshDir)) {
     New-Item -ItemType Directory -Path $userSshDir -Force
 }
 $userAuthorizedKeys = Join-Path $userSshDir "authorized_keys"
-Set-Content -Path $userAuthorizedKeys -Value "%s"
+Set-Content -Path $userAuthorizedKeys -Value '%s'
 
 # Restart sshd to pick up configuration changes
 Restart-Service sshd
