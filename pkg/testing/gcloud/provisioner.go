@@ -252,6 +252,9 @@ func (p *provisioner) run(ctx context.Context, args ...string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to start gcloud %s: %w", args[0], err)
 	}
 	ps := <-proc.Wait()
+	if proc.Stdin != nil {
+		_ = proc.Stdin.Close()
+	}
 	if ps == nil {
 		return nil, fmt.Errorf("gcloud %s: process wait failed: %s", strings.Join(args, " "), stderr.String())
 	}
@@ -290,7 +293,14 @@ func (i gceInstance) externalIP() string {
 // windowsStartupScript returns a PowerShell script that installs and configures
 // OpenSSH server on a Windows GCE instance, including adding the provided SSH
 // public key for the given user and setting the default shell to PowerShell.
+// escapePowerShellSingleQuote escapes single quotes for use in PowerShell
+// single-quoted strings by doubling them (e.g., ' becomes '').
+func escapePowerShellSingleQuote(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
+}
+
 func windowsStartupScript(username, publicKey string) string {
+	publicKey = escapePowerShellSingleQuote(publicKey)
 	return fmt.Sprintf(`
 # Install Chocolatey
 [System.Net.ServicePointManager]::SecurityProtocol = 3072
