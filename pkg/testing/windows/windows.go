@@ -187,7 +187,7 @@ func (WindowsRunner) Run(ctx context.Context, verbose bool, c ssh.SSHClient, log
 	if len(tests) > 0 {
 		script := toPowershellScript(agentVersion, prefix, verbose, tests, env)
 
-		results, err := runTestsOnWindows(ctx, logger, "non-sudo", prefix, script, c, batch.SudoTests)
+		results, err := runTestsOnWindows(ctx, logger, "non-sudo", prefix, script, c, batch.Tests)
 		if err != nil {
 			return common.OSRunnerResult{}, fmt.Errorf("error running non-sudo tests: %w", err)
 		}
