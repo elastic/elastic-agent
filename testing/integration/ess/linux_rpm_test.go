@@ -436,24 +436,45 @@ func TestRpmWithPrefix(t *testing.T) {
 
 		snapshotPackage, err := snapshotFixture.SrcPackage(ctx)
 		require.NoError(t, err)
+		snapshotFixture.SetInstallBasePath("/opt/elastic-agent")
 
+		// When the snapshot version differs from the local build, set up a
+		// migration marker so we can verify the data directory migration after
+		// upgrade. When versions match (same patch), the agent reuses the
+		// existing data directory so there is no migration to verify.
+		sameVersion := define.Version() == snapshotFixture.Version()
+		var runDir string
 		const migrationMarkerFile = "migration_marker.file"
-		runDir, err := atesting.FindRunDir(agentFixture)
-		require.NoError(t, err, "failed at getting run dir")
+		if !sameVersion {
+			runDir, err = atesting.FindRunDir(agentFixture)
+			require.NoError(t, err, "failed at getting run dir")
+			runMigrationMarker := filepath.Join(runDir, migrationMarkerFile)
+			f, err := os.Create(runMigrationMarker)
+			require.NoErrorf(t, err, "failed to create %q file", runMigrationMarker)
+			_ = f.Close()
+		}
 
-		out, err := exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", "--prefix", "/opt/elastic-agent", snapshotPackage).CombinedOutput()
+		// --force is needed because the latest snapshot version may match the
+		// locally built version (same patch), causing RPM to reject the upgrade
+		// with "already installed" errors.
+		out, err := exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", "--force", "--prefix", "/opt/elastic-agent", snapshotPackage).CombinedOutput()
+		require.NoError(t, err, string(out))
+
+		// RPM scriptlets do not restart the service for prefix installs; do it explicitly.
+		out, err = exec.CommandContext(ctx, "sudo", "systemctl", "restart", "elastic-agent").CombinedOutput()
 		require.NoError(t, err, string(out))
 
 		t.Run("service file is not a symlink into prefix after upgrade", func(t *testing.T) {
 			checkServiceFileNotSymlinkInPrefix(t, "/opt/elastic-agent")
 		})
 
-		// Verify upgrade succeeds - similar to testRpmUpgrade
-		newRunDir, err := atesting.FindRunDir(snapshotFixture)
-		require.NoError(t, err, "failed at getting run dir")
-		require.NotEqual(t, runDir, newRunDir, "the run dirs from upgrade should not match")
-		newRunMigrationMarker := filepath.Join(newRunDir, migrationMarkerFile)
-		require.FileExistsf(t, newRunMigrationMarker, "%q is missing", newRunMigrationMarker)
+		if !sameVersion {
+			newRunDir, err := atesting.FindRunDir(snapshotFixture)
+			require.NoError(t, err, "failed at getting run dir")
+			require.NotEqual(t, runDir, newRunDir, "the run dirs from upgrade should not match")
+			newRunMigrationMarker := filepath.Join(newRunDir, migrationMarkerFile)
+			require.FileExistsf(t, newRunMigrationMarker, "%q is missing", newRunMigrationMarker)
+		}
 
 		status, err := agentFixture.ExecStatus(ctx)
 		require.NoError(t, err)
