@@ -20,9 +20,10 @@ import (
 )
 
 var (
-	kernel32          = windows.NewLazySystemDLL("kernel32.dll")
-	procAttachConsole = kernel32.NewProc("AttachConsole")
-	procFreeConsole   = kernel32.NewProc("FreeConsole")
+	kernel32             = windows.NewLazySystemDLL("kernel32.dll")
+	procAttachConsole    = kernel32.NewProc("AttachConsole")
+	procFreeConsole      = kernel32.NewProc("FreeConsole")
+	procGetConsoleWindow = kernel32.NewProc("GetConsoleWindow")
 
 	// consoleMu serializes console operations. A Windows process can only be
 	// attached to one console at a time, so concurrent attachAndBreak calls
@@ -57,13 +58,24 @@ func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ..
 	return cmd, nil
 }
 
+// HasConsole returns true if the current process has a console attached.
+// When running as a Windows service there is no console. Use this to
+// decide whether child processes need their own console via WithNewConsole.
+func HasConsole() bool {
+	r1, _, _ := procGetConsoleWindow.Call()
+	return r1 != 0
+}
+
 // WithNewConsole is a StartOption that gives the child process its own hidden
-// console. This is required for attachAndBreak to deliver CTRL_BREAK_EVENT
-// when the parent runs as a Windows service with no console.
+// console via CREATE_NEW_CONSOLE. This is required for attachAndBreak to
+// deliver CTRL_BREAK_EVENT when the parent has no console (Windows service).
 //
-// Use this for component processes (beats) that need graceful shutdown via
-// CTRL_BREAK_EVENT. The OTel collector subprocess does not need this because
-// it is stopped via stdin pipe closure.
+// When the parent already has a console, child processes inherit it and
+// CTRL_BREAK_EVENT can be delivered directly — WithNewConsole is not needed
+// and should not be used, because it isolates the child onto a separate
+// console which requires the more complex attachAndBreak path.
+//
+// Use HasConsole to decide whether to apply this option.
 func WithNewConsole() StartOption {
 	return func(cfg *StartConfig) {
 		cfg.newConsole = true

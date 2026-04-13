@@ -6,6 +6,9 @@
 
 package process
 
+// HasConsole always returns true on non-Windows platforms.
+func HasConsole() bool { return true }
+
 // WithNewConsole is a no-op on non-Windows platforms.
 func WithNewConsole() StartOption {
 	return func(cfg *StartConfig) {}
