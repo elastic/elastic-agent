@@ -3220,6 +3220,8 @@ agent.monitoring:
 		"event.ingested",
 		"event.duration",
 
+		// testcase is different for both agent and otel
+		"testcase",
 		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 		"agent.version",
 
