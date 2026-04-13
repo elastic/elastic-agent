@@ -41,13 +41,15 @@ func GetServiceUsername() (string, error) {
 		return "", fmt.Errorf("failed to retrieve service config: %w", err)
 	}
 
+	// strip the ".\" prefix that SCM adds to local accounts to return the raw username
+	username := strings.TrimPrefix(cfg.ServiceStartName, `.\`)
+
 	// LocalSystem is the privileged default; return empty to indicate no specific user
-	if cfg.ServiceStartName == `.\LocalSystem` || cfg.ServiceStartName == "" {
+	if username == "LocalSystem" || username == "" {
 		return "", nil
 	}
-	// strip the ".\" prefix that SCM adds to local accounts to return the raw username
-	name := strings.TrimPrefix(cfg.ServiceStartName, `.\`)
-	return name, nil
+
+	return username, nil
 }
 
 func withPassword(password string) serviceOpt {
