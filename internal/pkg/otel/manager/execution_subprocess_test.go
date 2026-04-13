@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -42,9 +43,21 @@ func (f *fakeExitState) String() string { return f.str }
 
 // monitorCapture collects the outputs of reportStatusFn and reportErrFn closures
 // without using channels, avoiding any risk of deadlock in synctest bubbles.
+// The mutex guards concurrent writes from monitoring goroutines and reads from the
+// test goroutine; use snapshot() to obtain a race-detector-safe copy for assertions.
 type monitorCapture struct {
+	mu       sync.Mutex
 	statuses []*otelstatus.AggregateStatus
 	errs     []error
+}
+
+// snapshot returns copies of both slices taken under the mutex, safe to read
+// after synctest.Wait() without holding the lock.
+func (c *monitorCapture) snapshot() ([]*otelstatus.AggregateStatus, []error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]*otelstatus.AggregateStatus(nil), c.statuses...),
+		append([]error(nil), c.errs...)
 }
 
 // noopZapWriter discards entries; used to terminate the writer chain in tests.
@@ -413,7 +426,7 @@ func TestProcHandle_Stopped(t *testing.T) {
 func TestProcHandle_ReportProcessExitErr(t *testing.T) {
 	makeHandle := func(t *testing.T) (*procHandle, *monitorCapture) {
 		t.Helper()
-		cap := &monitorCapture{}
+		captured := &monitorCapture{}
 		doneCh := make(chan struct{})
 		t.Cleanup(func() { close(doneCh) })
 		log, err := logger.New("test", false)
@@ -423,49 +436,49 @@ func TestProcHandle_ReportProcessExitErr(t *testing.T) {
 			"", 0,
 			nil, // forceFetchStatusCh
 			func(context.Context, *otelstatus.AggregateStatus) {}, // reportStatusFn (noop)
-			func(_ context.Context, err error) { cap.errs = append(cap.errs, err) },
+			func(_ context.Context, err error) { captured.errs = append(captured.errs, err) },
 			newZapLast(noopZapWriter{}),
 			newZapLast(noopZapWriter{}),
 		)
 		h.processDoneCh = doneCh
-		return h, cap
+		return h, captured
 	}
 
 	t.Run("procErr_is_forwarded", func(t *testing.T) {
-		h, cap := makeHandle(t)
+		h, captured := makeHandle(t)
 		h.reportProcessExitErr(t.Context(), nil, errors.New("wait failed"))
-		require.Len(t, cap.errs, 1)
-		assert.Contains(t, cap.errs[0].Error(), "wait failed")
+		require.Len(t, captured.errs, 1)
+		assert.Contains(t, captured.errs[0].Error(), "wait failed")
 	})
 
 	t.Run("failed_exit_uses_stderr", func(t *testing.T) {
-		h, cap := makeHandle(t)
+		h, captured := makeHandle(t)
 		require.NoError(t, h.stdErrLast.Write(zapcore.Entry{Message: "stderr message"}, nil))
 		h.reportProcessExitErr(t.Context(), &fakeExitState{success: false, pid: 42, str: "exit status 1"}, nil)
-		require.Len(t, cap.errs, 1)
-		assert.Equal(t, "stderr message", cap.errs[0].Error())
+		require.Len(t, captured.errs, 1)
+		assert.Equal(t, "stderr message", captured.errs[0].Error())
 	})
 
 	t.Run("failed_exit_falls_back_to_stdout", func(t *testing.T) {
-		h, cap := makeHandle(t)
+		h, captured := makeHandle(t)
 		require.NoError(t, h.stdOutLast.Write(zapcore.Entry{Message: "stdout message"}, nil))
 		h.reportProcessExitErr(t.Context(), &fakeExitState{success: false, pid: 42, str: "exit status 1"}, nil)
-		require.Len(t, cap.errs, 1)
-		assert.Equal(t, "stdout message", cap.errs[0].Error())
+		require.Len(t, captured.errs, 1)
+		assert.Equal(t, "stdout message", captured.errs[0].Error())
 	})
 
 	t.Run("failed_exit_falls_back_to_process_state_string", func(t *testing.T) {
-		h, cap := makeHandle(t)
+		h, captured := makeHandle(t)
 		h.reportProcessExitErr(t.Context(), &fakeExitState{success: false, pid: 42, str: "exit status 1"}, nil)
-		require.Len(t, cap.errs, 1)
-		assert.Contains(t, cap.errs[0].Error(), "exited with error")
+		require.Len(t, captured.errs, 1)
+		assert.Contains(t, captured.errs[0].Error(), "exited with error")
 	})
 
 	t.Run("successful_exit_reports_nil", func(t *testing.T) {
-		h, cap := makeHandle(t)
+		h, captured := makeHandle(t)
 		h.reportProcessExitErr(t.Context(), &fakeExitState{success: true, pid: 42}, nil)
-		require.Len(t, cap.errs, 1)
-		assert.NoError(t, cap.errs[0])
+		require.Len(t, captured.errs, 1)
+		assert.NoError(t, captured.errs[0])
 	})
 }
 
@@ -478,12 +491,12 @@ func TestProcHandle_ReportProcessExitErr(t *testing.T) {
 func newMonitorTestHandle(
 	t *testing.T,
 	fetchStatus func(context.Context, http.Client, int) (*otelstatus.AggregateStatus, error),
-) (h *procHandle, cap *monitorCapture, waitCh chan struct{}) {
+) (h *procHandle, captured *monitorCapture, waitCh chan struct{}) {
 	t.Helper()
 	log, err := logger.New("test", false)
 	require.NoError(t, err)
 
-	cap = &monitorCapture{}
+	captured = &monitorCapture{}
 	waitCh = make(chan struct{})
 
 	h = newProcHandle(
@@ -491,10 +504,14 @@ func newMonitorTestHandle(
 		"", 0,
 		nil, // forceFetchStatusCh
 		func(_ context.Context, st *otelstatus.AggregateStatus) {
-			cap.statuses = append(cap.statuses, st)
+			captured.mu.Lock()
+			captured.statuses = append(captured.statuses, st)
+			captured.mu.Unlock()
 		},
 		func(_ context.Context, err error) {
-			cap.errs = append(cap.errs, err)
+			captured.mu.Lock()
+			captured.errs = append(captured.errs, err)
+			captured.mu.Unlock()
 		},
 		newZapLast(noopZapWriter{}),
 		newZapLast(noopZapWriter{}),
@@ -504,7 +521,7 @@ func newMonitorTestHandle(
 		<-waitCh
 		return nil, nil
 	}
-	return h, cap, waitCh
+	return h, captured, waitCh
 }
 
 func TestProcHandle_MonitorHealth(t *testing.T) {
@@ -515,25 +532,26 @@ func TestProcHandle_MonitorHealth(t *testing.T) {
 
 	t.Run("initial_starting_status_then_nil_on_clean_exit", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
-			h, cap, waitCh := newMonitorTestHandle(t, alwaysError)
+			h, captured, waitCh := newMonitorTestHandle(t, alwaysError)
 			ctx, cancel := context.WithCancel(t.Context())
 			h.startMonitoring(ctx, cancel)
 			synctest.Wait()
 
 			// The initial StatusStarting must arrive before the first poll.
-			require.Len(t, cap.statuses, 1)
-			require.NotNil(t, cap.statuses[0])
-			assert.Equal(t, componentstatus.StatusStarting, cap.statuses[0].Status())
+			statuses, _ := captured.snapshot()
+			require.Len(t, statuses, 1)
+			require.NotNil(t, statuses[0])
+			assert.Equal(t, componentstatus.StatusStarting, statuses[0].Status())
 
 			// Simulate clean process exit; expect nil status and nil error.
 			close(waitCh)
 			synctest.Wait()
 
-			require.Len(t, cap.statuses, 2)
-			assert.Nil(t, cap.statuses[1])
-
-			require.Len(t, cap.errs, 1)
-			assert.NoError(t, cap.errs[0])
+			statuses, errs := captured.snapshot()
+			require.Len(t, statuses, 2)
+			assert.Nil(t, statuses[1])
+			require.Len(t, errs, 1)
+			assert.NoError(t, errs[0])
 		})
 	})
 
@@ -543,17 +561,18 @@ func TestProcHandle_MonitorHealth(t *testing.T) {
 			fetchOK := func(_ context.Context, _ http.Client, _ int) (*otelstatus.AggregateStatus, error) {
 				return okStatus, nil
 			}
-			h, cap, waitCh := newMonitorTestHandle(t, fetchOK)
+			h, captured, waitCh := newMonitorTestHandle(t, fetchOK)
 			ctx, cancel := context.WithCancel(t.Context())
 			h.startMonitoring(ctx, cancel)
 			synctest.Wait()
 
 			// monitorHealth emits StatusStarting immediately, then the first poll
 			// returns StatusOK (different), so both are recorded in the slice.
-			require.Len(t, cap.statuses, 2)
-			assert.Equal(t, componentstatus.StatusStarting, cap.statuses[0].Status())
-			require.NotNil(t, cap.statuses[1])
-			assert.Equal(t, componentstatus.StatusOK, cap.statuses[1].Status())
+			statuses, _ := captured.snapshot()
+			require.Len(t, statuses, 2)
+			assert.Equal(t, componentstatus.StatusStarting, statuses[0].Status())
+			require.NotNil(t, statuses[1])
+			assert.Equal(t, componentstatus.StatusOK, statuses[1].Status())
 
 			t.Cleanup(func() { close(waitCh) })
 		})
@@ -564,7 +583,7 @@ func TestProcHandle_MonitorHealth(t *testing.T) {
 			// Return the same pointer every call: timestamps are identical so
 			// CompareStatuses returns true and no duplicate report is emitted.
 			okStatus := internalstatus.AggregateStatus(componentstatus.StatusOK, nil)
-			h, cap, waitCh := newMonitorTestHandle(t, func(_ context.Context, _ http.Client, _ int) (*otelstatus.AggregateStatus, error) {
+			h, captured, waitCh := newMonitorTestHandle(t, func(_ context.Context, _ http.Client, _ int) (*otelstatus.AggregateStatus, error) {
 				return okStatus, nil
 			})
 			ctx, cancel := context.WithCancel(t.Context())
@@ -572,14 +591,16 @@ func TestProcHandle_MonitorHealth(t *testing.T) {
 			synctest.Wait()
 
 			// After the first iteration: StatusStarting + StatusOK (first poll, changed).
-			require.Len(t, cap.statuses, 2)
+			statuses, _ := captured.snapshot()
+			require.Len(t, statuses, 2)
 
 			// Advance fake time past one poll interval; monitorHealth runs a second
 			// iteration but must not emit because the status pointer is unchanged.
 			time.Sleep(1500 * time.Millisecond)
 			synctest.Wait()
 
-			assert.Len(t, cap.statuses, 2) // no new status added
+			statuses, _ = captured.snapshot()
+			assert.Len(t, statuses, 2) // no new status added
 
 			t.Cleanup(func() { close(waitCh) })
 		})
@@ -588,7 +609,7 @@ func TestProcHandle_MonitorHealth(t *testing.T) {
 	t.Run("force_fetch_re_emits_current_status", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			okStatus := internalstatus.AggregateStatus(componentstatus.StatusOK, nil)
-			h, cap, waitCh := newMonitorTestHandle(t, func(_ context.Context, _ http.Client, _ int) (*otelstatus.AggregateStatus, error) {
+			h, captured, waitCh := newMonitorTestHandle(t, func(_ context.Context, _ http.Client, _ int) (*otelstatus.AggregateStatus, error) {
 				return okStatus, nil
 			})
 			// forceFetchStatusCh must be a bubble channel.
@@ -598,15 +619,17 @@ func TestProcHandle_MonitorHealth(t *testing.T) {
 			synctest.Wait()
 
 			// After the first iteration: StatusStarting + StatusOK (first poll, changed).
-			require.Len(t, cap.statuses, 2)
+			statuses, _ := captured.snapshot()
+			require.Len(t, statuses, 2)
 
 			// Trigger a force-fetch; the last-seen status must be re-emitted.
 			h.forceFetchStatusCh <- struct{}{}
 			synctest.Wait()
 
-			require.Len(t, cap.statuses, 3)
-			require.NotNil(t, cap.statuses[2])
-			assert.Equal(t, componentstatus.StatusOK, cap.statuses[2].Status())
+			statuses, _ = captured.snapshot()
+			require.Len(t, statuses, 3)
+			require.NotNil(t, statuses[2])
+			assert.Equal(t, componentstatus.StatusOK, statuses[2].Status())
 
 			t.Cleanup(func() { close(waitCh) })
 		})
@@ -614,22 +637,24 @@ func TestProcHandle_MonitorHealth(t *testing.T) {
 
 	t.Run("max_failures_timer_reports_recoverable_error", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
-			h, cap, waitCh := newMonitorTestHandle(t, alwaysError)
+			h, captured, waitCh := newMonitorTestHandle(t, alwaysError)
 			ctx, cancel := context.WithCancel(t.Context())
 			h.startMonitoring(ctx, cancel)
 			synctest.Wait()
 
 			// Verify the initial StatusStarting report arrived.
-			require.Len(t, cap.statuses, 1)
+			statuses, _ := captured.snapshot()
+			require.Len(t, statuses, 1)
 
 			// Advance fake time past the 130 s failure threshold.
 			time.Sleep(131 * time.Second)
 			synctest.Wait()
 
-			require.Len(t, cap.statuses, 2)
-			require.NotNil(t, cap.statuses[1])
-			assert.Equal(t, componentstatus.StatusRecoverableError, cap.statuses[1].Status())
-			assert.EqualError(t, cap.statuses[1].Err(), "failed to connect to collector")
+			statuses, _ = captured.snapshot()
+			require.Len(t, statuses, 2)
+			require.NotNil(t, statuses[1])
+			assert.Equal(t, componentstatus.StatusRecoverableError, statuses[1].Status())
+			assert.EqualError(t, statuses[1].Err(), "failed to connect to collector")
 
 			t.Cleanup(func() { close(waitCh) })
 		})
