@@ -37,6 +37,6 @@
     }
     output {
       file {
-        path => "/usr/share/logstash/testdata/%{testcase}_otel.json"
+        path => "/usr/share/logstash/testdata/%{testcase}.json"
       }
     }

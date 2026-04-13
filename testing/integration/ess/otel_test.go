@@ -1,11 +1,11 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
-//go:build integration
 
 package ess
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	_ "embed"
@@ -3020,15 +3020,15 @@ var pipelineTemplate string
 
 // TestSystemMetricsWithLogstashOutput tests that system metrics can be sent to Logstash output
 func TestSystemMetricsWithLogstashOutput(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: integration.Default,
-		Local: true,
-		OS: []define.OS{
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		},
-		Stack: &define.Stack{},
-	})
+	// define.Require(t, define.Requirements{
+	// 	Group: integration.Default,
+	// 	Local: true,
+	// 	OS: []define.OS{
+	// 		{Type: define.Linux},
+	// 		{Type: define.Darwin},
+	// 	},
+	// 	Stack: &define.Stack{},
+	// })
 	pipeline := filepath.Join(t.TempDir(), "pipelines.yml")
 	require.NoError(t, os.WriteFile(pipeline, []byte(pipelineTemplate), 0o644))
 
@@ -3089,17 +3089,21 @@ volumes:
 	require.NoError(t, err)
 
 	baseURL := "http://localhost:8082"
+	logstash := make(map[string]mapstr.M, 0)
+
 	type otelConfigOptions struct {
 		RuntimeExperimental string
 		TestCaseName        string
+		Host                string
 	}
 
 	tableTests := []struct {
 		name                string
 		runtimeExperimental string
+		host                string
 	}{
-		{name: "agent", runtimeExperimental: "process"},
-		{name: "otel", runtimeExperimental: "otel"},
+		{name: "agent", runtimeExperimental: "process", host: "localhost:5044"},
+		{name: "otel", runtimeExperimental: "otel", host: "localhost:5055"},
 	}
 
 	for _, tt := range tableTests {
@@ -3108,7 +3112,7 @@ volumes:
 		require.NoError(t, err)
 		configTemplate := `
 agent.internal.runtime.output:
-  kafka: {{.RuntimeExperimental}}
+  logstash: {{.RuntimeExperimental}}
 agent.grpc.port: 6799
 inputs:
   - type: system/metrics
@@ -3130,7 +3134,7 @@ inputs:
 outputs:
   default:
     type: logstash
-    hosts: ["localhost:5044"]
+    hosts: ["{{.Host}}"]
     tls:
       insecure: true
 agent.monitoring:
@@ -3147,6 +3151,7 @@ agent.monitoring:
 			otelConfigOptions{
 				RuntimeExperimental: tt.runtimeExperimental,
 				TestCaseName:        testCaseName,
+				Host:                tt.host,
 			})
 
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -3155,6 +3160,7 @@ agent.monitoring:
 		require.NoError(t, err)
 
 		err = fixture.Configure(ctx, configBuffer.Bytes())
+		require.NoError(t, err, "cannot configure Elastic-Agent command: %w", err)
 
 		cmd, err := fixture.PrepareAgentCommand(ctx, nil)
 		require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
@@ -3189,11 +3195,47 @@ agent.monitoring:
 			func(ct *assert.CollectT) {
 				checkURLHasContent(ct, outFileURL)
 			},
-			1*time.Minute, 10*time.Second, "expected Nginx to serve json files over HTTP")
+			2*time.Minute, 10*time.Second, "expected Nginx to serve json files over HTTP")
+
+		// download files from Nginx into testdata directory
+		logstash[tt.name] = downloadData(t, outFileURL)
 
 		cancel()
 		cmd.Wait()
 	}
+
+	agentDoc, agentOk := logstash["agent"]
+	otelDoc, otelOk := logstash["otel"]
+
+	require.True(t, agentOk, "missing document for agent")
+	require.True(t, otelOk, "missing document for otel")
+
+	ignoredFields := []string{
+		"@timestamp",
+		"agent.id",
+		"agent.ephemeral_id",
+		"elastic_agent.id",
+		"data_stream.namespace",
+		"event.ingested",
+		"event.duration",
+
+		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
+		"agent.version",
+
+		// TODO: See issue https://github.com/elastic/beats/issues/50085
+		"metadata.input_id",
+		"metadata.raw_index",
+	}
+
+	agentDoc = agentDoc.Flatten()
+	otelDoc = otelDoc.Flatten()
+
+	// system cpu metrics differ between runs
+	StripNondeterminism(agentDoc, "cpu")
+	StripNondeterminism(otelDoc, "cpu")
+
+	AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for cpu metricset")
+	AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for cpu metricset")
 
 }
 
@@ -3221,4 +3263,29 @@ func checkURLHasContent(ct *assert.CollectT, url string) {
 	if !assert.NotEmpty(ct, body, "URL %s should have content", url) {
 		return
 	}
+}
+
+func downloadData(t *testing.T, url string) mapstr.M {
+	// get http response
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	require.NoError(t, err, "error creating request")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err, "calling nginx endpoint")
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	require.NoError(t, err, "failed to copy data from %s", url)
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var m mapstr.M
+		require.NoError(t, json.Unmarshal(line, &m), "failed to unmarshal line from %s", url)
+		return m
+	}
+	return nil
 }
