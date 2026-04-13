@@ -2,18 +2,18 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build integration
-
 package ess
 
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -29,11 +29,14 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/testcontainers/testcontainers-go/modules/compose"
 	"github.com/testcontainers/testcontainers-go/modules/kafka"
+	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -3009,4 +3012,206 @@ agent.monitoring:
 		AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for cpu metricset")
 
 	})
+}
+
+//go:embed testdata/pipelines.yml
+var pipelineTemplate string
+
+// TestSystemMetricsWithLogstashOutput tests that system metrics can be sent to Logstash output
+func TestSystemMetricsWithLogstashOutput(t *testing.T) {
+
+	pipeline := filepath.Join(t.TempDir(), "pipelines.yml")
+	require.NoError(t, os.WriteFile(pipeline, []byte(pipelineTemplate), 0o644))
+
+	composeContent := fmt.Sprintf(`
+services:
+  init-logstash:
+    image: busybox:latest
+    user: "0:0"
+    command: ["sh", "-c", "chown -R 1000:1000 /data"]
+    volumes:
+      - logstash_testdata:/data
+    restart: "no"
+  logstash:
+    depends_on:
+      init-logstash:
+        condition: service_completed_successfully
+    image: docker.elastic.co/logstash/logstash:9.2.2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9600/_node/stats"]
+      retries: 300
+      interval: 1s
+    volumes:
+      - %s:/usr/share/logstash/config/pipelines.yml
+      - logstash_testdata:/usr/share/logstash/testdata
+    ports:
+      - 9600:9600
+      - 5044:5044
+      - 5055:5055
+  nginx:
+    image: nginx:alpine
+    depends_on:
+      init-logstash:
+        condition: service_completed_successfully
+    volumes:
+      - logstash_testdata:/usr/share/nginx/html:ro
+    ports:
+      - 8082:80
+
+volumes:
+  logstash_testdata:
+`, pipeline)
+
+	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = stack.Down(
+			context.Background(),
+			compose.RemoveOrphans(true),
+			compose.RemoveVolumes(true),
+			compose.RemoveImagesLocal,
+		)
+	})
+
+	// compose.Wait(true) maps to docker compose --wait, which requires every service to stay
+	// running; init-logstash is one-shot and exits 0, so we wait only for logstash via testcontainers.
+	err = stack.
+		WaitForService("logstash", wait.NewHTTPStrategy("/_node/stats").WithPort("9600/tcp").WithStartupTimeout(5*time.Minute)).
+		Up(t.Context(), compose.Wait(true))
+	require.NoError(t, err)
+
+	baseURL := "http://localhost:8082"
+	type otelConfigOptions struct {
+		RuntimeExperimental string
+		TestCaseName        string
+	}
+
+	tableTests := []struct {
+		name                string
+		runtimeExperimental string
+	}{
+		{name: "agent", runtimeExperimental: "process"},
+		{name: "otel", runtimeExperimental: "otel"},
+	}
+
+	for _, tt := range tableTests {
+
+		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+		require.NoError(t, err)
+		configTemplate := `
+agent.internal.runtime.output:
+  kafka: {{.RuntimeExperimental}}
+agent.grpc.port: 6799
+inputs:
+  - type: system/metrics
+    id: system-metrics-test
+    use_output: default
+    streams:
+    - metricsets:
+       - cpu
+      period: 1s
+      data_stream:
+        dataset: e2e
+      namespace: "json_namespace"
+      processors:
+      - add_host_metadata: ~
+      - add_fields:
+         target: ""
+         fields:
+           testcase: {{.TestCaseName}}
+outputs:
+  default:
+    type: logstash
+    hosts: ["localhost:5044"]
+    tls:
+      insecure: true
+agent.monitoring:
+  metrics: false
+  logs: false
+  http:
+    enabled: true
+    port: 6790
+`
+
+		testCaseName := uuid.Must(uuid.NewV4()).String()
+		var configBuffer bytes.Buffer
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			otelConfigOptions{
+				RuntimeExperimental: tt.runtimeExperimental,
+				TestCaseName:        testCaseName,
+			})
+
+		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+		defer cancel()
+		err = fixture.Prepare(ctx)
+		require.NoError(t, err)
+
+		err = fixture.Configure(ctx, configBuffer.Bytes())
+
+		cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+		require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+		output := strings.Builder{}
+		cmd.Stderr = &output
+		cmd.Stdout = &output
+
+		err = cmd.Start()
+		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			if t.Failed() {
+				t.Log("Elastic-Agent output:")
+				t.Log(output.String())
+			}
+		})
+
+		require.Eventually(t, func() bool {
+			err = fixture.IsHealthy(ctx)
+			if err != nil {
+				t.Logf("waiting for agent healthy: %s", err.Error())
+				return false
+			}
+			return true
+		}, 30*time.Second, 1*time.Second)
+
+		outFileURL := fmt.Sprintf("%s/%s.json", baseURL, testCaseName)
+
+		// wait for logs to be published over HTTP
+		require.EventuallyWithTf(t,
+			func(ct *assert.CollectT) {
+				checkURLHasContent(ct, outFileURL)
+			},
+			1*time.Minute, 10*time.Second, "expected Nginx to serve json files over HTTP")
+
+		cancel()
+		cmd.Wait()
+	}
+
+}
+
+func checkURLHasContent(ct *assert.CollectT, url string) {
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	if !assert.NoError(ct, err, "failed to create request for URL %s", url) {
+		return
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if !assert.NoError(ct, err, "URL %s should exist", url) {
+		return
+	}
+	defer resp.Body.Close()
+
+	if !assert.Equal(ct, http.StatusOK, resp.StatusCode, "URL %s should return HTTP 200", url) {
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if !assert.NoError(ct, err, "failed to read body from %s", url) {
+		return
+	}
+
+	if !assert.NotEmpty(ct, body, "URL %s should have content", url) {
+		return
+	}
 }
