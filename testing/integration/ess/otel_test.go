@@ -1,6 +1,7 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
+//go:build integration
 
 package ess
 
@@ -3020,15 +3021,15 @@ var pipelineTemplate string
 
 // TestSystemMetricsWithLogstashOutput tests that system metrics can be sent to Logstash output
 func TestSystemMetricsWithLogstashOutput(t *testing.T) {
-	// define.Require(t, define.Requirements{
-	// 	Group: integration.Default,
-	// 	Local: true,
-	// 	OS: []define.OS{
-	// 		{Type: define.Linux},
-	// 		{Type: define.Darwin},
-	// 	},
-	// 	Stack: &define.Stack{},
-	// })
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
 	pipeline := filepath.Join(t.TempDir(), "pipelines.yml")
 	require.NoError(t, os.WriteFile(pipeline, []byte(pipelineTemplate), 0o644))
 
