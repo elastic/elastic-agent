@@ -290,15 +290,15 @@ func (i gceInstance) externalIP() string {
 	return ""
 }
 
-// windowsStartupScript returns a PowerShell script that installs and configures
-// OpenSSH server on a Windows GCE instance, including adding the provided SSH
-// public key for the given user and setting the default shell to PowerShell.
 // escapePowerShellSingleQuote escapes single quotes for use in PowerShell
-// single-quoted strings by doubling them (e.g., ' becomes '').
+// single-quoted strings by doubling them.
 func escapePowerShellSingleQuote(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
 }
 
+// windowsStartupScript returns a PowerShell script that installs and configures
+// OpenSSH server on a Windows GCE instance, including adding the provided SSH
+// public key for the given user and setting the default shell to PowerShell.
 func windowsStartupScript(username, publicKey string) string {
 	publicKey = escapePowerShellSingleQuote(publicKey)
 	return fmt.Sprintf(`
