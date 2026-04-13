@@ -13,11 +13,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-<<<<<<< HEAD
-=======
 	"net/http/httputil"
 	"runtime"
->>>>>>> 3a937edd9 (Persist logging level on policy change (#13289))
 	"strings"
 	"testing"
 	"text/template"
