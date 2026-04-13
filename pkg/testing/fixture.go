@@ -1029,14 +1029,20 @@ func (f *Fixture) ExecDiagnostics(ctx context.Context, cmd ...string) (string, e
 
 // ExecWindowsRegistryUpdate runs 'elastic-agent windows registry update'.
 func (f *Fixture) ExecWindowsRegistryUpdate(ctx context.Context, opts ...process.CmdOption) error {
-	_, err := f.Exec(ctx, []string{"windows", "registry", "update"}, opts...)
-	return err
+	out, err := f.Exec(ctx, []string{"windows", "registry", "update"}, opts...)
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, out)
+	}
+	return nil
 }
 
 // ExecWindowsRegistryRemove runs 'elastic-agent windows registry remove'.
 func (f *Fixture) ExecWindowsRegistryRemove(ctx context.Context, opts ...process.CmdOption) error {
-	_, err := f.Exec(ctx, []string{"windows", "registry", "remove"}, opts...)
-	return err
+	out, err := f.Exec(ctx, []string{"windows", "registry", "remove"}, opts...)
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, out)
+	}
+	return nil
 }
 
 // AgentID returns the ID of the installed Elastic Agent.

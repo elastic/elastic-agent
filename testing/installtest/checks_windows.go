@@ -152,8 +152,8 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		if err := f.ExecWindowsRegistryRemove(ctx); err != nil {
 			return fmt.Errorf("failed to run 'windows registry remove': %w", err)
 		}
-		if _, err := getRegistryDisplayVersion(opts.Namespace); err == nil {
-			return fmt.Errorf("uninstall registry entry still present after 'windows registry remove' for %s", topPath)
+		if v, err := getRegistryDisplayVersion(opts.Namespace); err == nil {
+			return fmt.Errorf("uninstall registry entry still present after 'windows registry remove' for %s (namespace=%q, version=%q)", topPath, opts.Namespace, v)
 		}
 		if err := f.ExecWindowsRegistryUpdate(ctx); err != nil {
 			return fmt.Errorf("failed to run 'windows registry update' after remove: %w", err)

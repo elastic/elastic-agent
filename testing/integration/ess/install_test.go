@@ -593,10 +593,10 @@ func testSecondAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, b
 			Namespace:     installOpts.Namespace,
 			Username:      installOpts.Username,
 			Group:         installOpts.Group,
-			TargetVersion: fixture.Version(),
+			TargetVersion: devFixture.Version(),
 		}
 
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
+		require.NoError(t, installtest.CheckSuccess(ctx, devFixture, topPath, checks))
 
 		devFixture.PostUninstallHook(func(t *testing.T) {
 			require.NoError(t, installtest.CheckUninstallSuccess(checks))

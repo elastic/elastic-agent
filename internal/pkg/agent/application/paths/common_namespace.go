@@ -11,12 +11,15 @@ import (
 )
 
 const (
-	// installDirNamespaceFmt is the format of the directory agent will be installed to within the base path when using an installation namepsace.
+	// installDirNamespaceFmt is the format of the directory agent will be installed to within the base path when using an installation namespace.
 	// It is $BasePath/Agent-$namespace.
 	installDir                = "Agent"
 	installDirNamespaceSep    = "-"
 	installDirNamespacePrefix = installDir + installDirNamespaceSep
 	installDirNamespaceFmt    = installDirNamespacePrefix + "%s"
+
+	// defaultNamespace is the default (empty) namespace used when no namespace is configured.
+	defaultNamespace = ""
 
 	// DevelopmentNamespace defines the "well known" development namespace.
 	DevelopmentNamespace = "Development"
@@ -26,7 +29,7 @@ const (
 	serviceDisplayNameNamespaceFmt = "Elastic Agent - %s"
 )
 
-// installNamespace is the name of the agent's current installation namepsace.
+// installNamespace is the name of the agent's current installation namespace.
 var installNamespace string
 
 // SetInstallNamespace sets whether the agent is currently in or is being installed in an installation namespace.
@@ -47,21 +50,17 @@ func InstallNamespace() string {
 
 	if RunningInstalled() {
 		// Parse the namespace from the directory once to ensure deterministic behavior from startup.
-		namespace := parseNamespaceFromDir(filepath.Base(Top()))
-		installNamespace = namespace
+		installNamespace = parseNamespaceFromDir(filepath.Base(Top()))
 	}
 
-	return ""
+	return installNamespace
 }
 
 func parseNamespaceFromDir(dir string) string {
 	parts := strings.SplitAfterN(dir, "-", 2)
-	if len(parts) <= 1 {
-		return ""
-	} else if parts[0] != installDirNamespacePrefix {
-		return ""
+	if len(parts) <= 1 || parts[0] != installDirNamespacePrefix {
+		return defaultNamespace
 	}
-
 	return parts[1]
 }
 

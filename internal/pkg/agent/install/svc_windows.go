@@ -8,6 +8,7 @@ package install
 
 import (
 	"fmt"
+	"strings"
 
 	"golang.org/x/sys/windows/svc/mgr"
 
@@ -44,7 +45,9 @@ func GetServiceUsername() (string, error) {
 	if cfg.ServiceStartName == `.\LocalSystem` || cfg.ServiceStartName == "" {
 		return "", nil
 	}
-	return cfg.ServiceStartName, nil
+	// strip the ".\" prefix that SCM adds to local accounts to return the raw username
+	name := strings.TrimPrefix(cfg.ServiceStartName, `.\`)
+	return name, nil
 }
 
 func withPassword(password string) serviceOpt {
