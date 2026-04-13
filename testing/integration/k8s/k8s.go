@@ -7,7 +7,11 @@ package k8s
 import "path/filepath"
 
 const (
+<<<<<<< HEAD
 	KubeStackChartVersion         = "0.14.7"
+=======
+	KubeStackChartVersion         = "0.14.11"
+>>>>>>> 25927236a ([otel/kube-stack] Update the OpenTelemetry Kube Stack Helm Chart to latest versions (#13522))
 	KubeStackChartName            = "opentelemetry-kube-stack"
 	KubeStackChartNameWithVersion = KubeStackChartName + "-" + KubeStackChartVersion
 	KubeStackChartArchiveName     = KubeStackChartNameWithVersion + ".tgz"
