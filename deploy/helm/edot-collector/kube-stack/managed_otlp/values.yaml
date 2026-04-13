@@ -233,6 +233,11 @@ collectors:
             - key: host.name
               from_attribute: k8s.node.name
               action: upsert
+        resource/hostip:
+          attributes:
+            - key: host.ip
+              value: ${env:OTEL_K8S_NODE_IP}
+              action: upsert
         resourcedetection/system:
           # Detects resources from the system and EC2 instances.
           detectors: ["system", "ec2"]
@@ -245,12 +250,12 @@ collectors:
                 enabled: false
               host.arch:
                 enabled: true
-              # Disabling host.ip and host.mac due to high cardinality
+              # Disabling host.ip due to high cardinality
               # See issue: https://github.com/elastic/elastic-agent/issues/13575
               # host.ip:
               #   enabled: true
-              # host.mac:
-              #   enabled: true
+              host.mac:
+                enabled: true
               host.cpu.vendor.id:
                 enabled: true
               host.cpu.family:
@@ -278,6 +283,18 @@ collectors:
             - key: cloud.instance.id
               from_attribute: host.id
               action: insert
+        # Here we only take the first mac address due to host.mac having high cardinality.
+        # See issue: https://github.com/elastic/elastic-agent/pull/13566
+        transform/hostmac_log:
+          log_statements:
+            - context: resource
+              statements:
+                - set(attributes["host.mac"], attributes["host.mac"][0]) where attributes["host.mac"] != nil
+        transform/hostmac_metrics:
+          metric_statements:
+            - context: resource
+              statements:
+                - set(attributes["host.mac"], attributes["host.mac"][0]) where attributes["host.mac"] != nil
         # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
         k8sattributes:
           filter:
@@ -461,6 +478,8 @@ collectors:
               - resourcedetection/gcp
               - resourcedetection/aks
               - resource/hostname
+              - resource/hostip
+              - transform/hostmac_log
               - resource/cloud
             exporters:
               - otlp/gateway
@@ -476,6 +495,8 @@ collectors:
               - resourcedetection/gcp
               - resourcedetection/aks
               - resource/hostname
+              - resource/hostip
+              - transform/hostmac_metrics
               - resource/cloud
             exporters:
               # - debug
@@ -486,6 +507,8 @@ collectors:
             processors:
               - batch/metrics
               - resource/hostname
+              - resource/hostip
+              - transform/hostmac_metrics
             exporters:
               - otlp/gateway
           logs/apm:
@@ -494,6 +517,8 @@ collectors:
             processors:
               - batch
               - resource/hostname
+              - resource/hostip
+              - transform/hostmac_log
             exporters:
               - otlp/gateway
           traces/apm:
@@ -502,6 +527,7 @@ collectors:
             processors:
               - batch
               - resource/hostname
+              - resource/hostip
             exporters:
               - otlp/gateway
   #  Gateway is a K8s deployment EDOT collector focused on processing and
