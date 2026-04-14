@@ -1,7 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
-//go:build integration
 
 package ess
 
@@ -36,6 +35,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/compose"
 	"github.com/testcontainers/testcontainers-go/modules/kafka"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -3019,6 +3019,14 @@ agent.monitoring:
 //go:embed testdata/pipelines.yml
 var pipelineTemplate string
 
+type TestLogConsumer struct {
+	Msgs []string // store the logs as a slice of strings
+}
+
+func (g *TestLogConsumer) Accept(l testcontainers.Log) {
+	g.Msgs = append(g.Msgs, string(l.Content))
+}
+
 // TestSystemMetricsWithLogstashOutput tests that system metrics can be sent to Logstash output
 func TestSystemMetricsWithLogstashOutput(t *testing.T) {
 	define.Require(t, define.Requirements{
@@ -3030,22 +3038,16 @@ func TestSystemMetricsWithLogstashOutput(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 	})
-	pipeline := filepath.Join(t.TempDir(), "pipelines.yml")
+
+	tempDir := t.TempDir()
+	pipeline := filepath.Join(tempDir, "pipelines.yml")
 	require.NoError(t, os.WriteFile(pipeline, []byte(pipelineTemplate), 0o644))
+	logstash_testdata := filepath.Join(tempDir, "logstash_testdata")
+	require.NoError(t, os.Mkdir(logstash_testdata, 0o777))
 
 	composeContent := fmt.Sprintf(`
 services:
-  init-logstash:
-    image: busybox:latest
-    user: "0:0"
-    command: ["sh", "-c", "chown -R 1000:1000 /data"]
-    volumes:
-      - logstash_testdata:/data
-    restart: "no"
   logstash:
-    depends_on:
-      init-logstash:
-        condition: service_completed_successfully
     image: docker.elastic.co/logstash/logstash:9.2.2
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9600/_node/stats"]
@@ -3053,24 +3055,12 @@ services:
       interval: 1s
     volumes:
       - %s:/usr/share/logstash/config/pipelines.yml
-      - logstash_testdata:/usr/share/logstash/testdata
+      - %s:/usr/share/logstash/testdata
     ports:
       - 9600:9600
       - 5044:5044
       - 5055:5055
-  nginx:
-    image: nginx:alpine
-    depends_on:
-      init-logstash:
-        condition: service_completed_successfully
-    volumes:
-      - logstash_testdata:/usr/share/nginx/html:ro
-    ports:
-      - 8082:80
-
-volumes:
-  logstash_testdata:
-`, pipeline)
+`, pipeline, logstash_testdata)
 
 	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
 	require.NoError(t, err)
@@ -3089,7 +3079,7 @@ volumes:
 		Up(t.Context(), compose.Wait(true))
 	require.NoError(t, err)
 
-	baseURL := "http://localhost:8082"
+	// baseURL := "http://localhost:8082"
 	logstash := make(map[string]mapstr.M, 0)
 
 	type otelConfigOptions struct {
@@ -3112,6 +3102,7 @@ volumes:
 		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 		require.NoError(t, err)
 		configTemplate := `
+agent.logging.to_stderr: true
 agent.internal.runtime.output:
   logstash: {{.RuntimeExperimental}}
 agent.grpc.port: 6799
@@ -3177,6 +3168,27 @@ agent.monitoring:
 			if t.Failed() {
 				t.Log("Elastic-Agent output:")
 				t.Log(output.String())
+
+				logCtx, logCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer logCancel()
+
+				lsContainer, err := stack.ServiceContainer(logCtx, "logstash")
+				if err != nil {
+					t.Logf("could not read logs from logstash container: %s", err.Error())
+				}
+				rc, err := lsContainer.Logs(logCtx)
+				if err != nil {
+					t.Logf("could not read logs from logstash container: %s", err.Error())
+					return
+				}
+				defer rc.Close()
+				data, err := io.ReadAll(rc)
+				if err != nil {
+					t.Logf("could not read logs from logstash container: %s", err.Error())
+					return
+				}
+				t.Log("Logstash logs:")
+				t.Log(string(data))
 			}
 		})
 
@@ -3189,12 +3201,13 @@ agent.monitoring:
 			return true
 		}, 30*time.Second, 1*time.Second)
 
-		outFileURL := fmt.Sprintf("%s/%s.json", baseURL, testCaseName)
+		outFileURL := filepath.Join(logstash_testdata, fmt.Sprintf("%s.json", testCaseName))
 
 		// wait for logs to be published over HTTP
 		require.EventuallyWithTf(t,
 			func(ct *assert.CollectT) {
-				checkURLHasContent(ct, outFileURL)
+				_, err := os.Stat(outFileURL)
+				require.NoError(ct, err)
 			},
 			2*time.Minute, 10*time.Second, "expected Nginx to serve json files over HTTP")
 
@@ -3242,43 +3255,9 @@ agent.monitoring:
 
 }
 
-func checkURLHasContent(ct *assert.CollectT, url string) {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
-	if !assert.NoError(ct, err, "failed to create request for URL %s", url) {
-		return
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if !assert.NoError(ct, err, "URL %s should exist", url) {
-		return
-	}
-	defer resp.Body.Close()
-
-	if !assert.Equal(ct, http.StatusOK, resp.StatusCode, "URL %s should return HTTP 200", url) {
-		return
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if !assert.NoError(ct, err, "failed to read body from %s", url) {
-		return
-	}
-
-	if !assert.NotEmpty(ct, body, "URL %s should have content", url) {
-		return
-	}
-}
-
-func downloadData(t *testing.T, url string) mapstr.M {
-	// get http response
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
-	require.NoError(t, err, "error creating request")
-
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err, "calling nginx endpoint")
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(resp.Body)
-	require.NoError(t, err, "failed to copy data from %s", url)
+func downloadData(t *testing.T, file string) mapstr.M {
+	data, err := os.ReadFile(file)
+	require.NoError(t, err, "failed to copy data from %s", file)
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
@@ -3287,7 +3266,7 @@ func downloadData(t *testing.T, url string) mapstr.M {
 			continue
 		}
 		var m mapstr.M
-		require.NoError(t, json.Unmarshal(line, &m), "failed to unmarshal line from %s", url)
+		require.NoError(t, json.Unmarshal(line, &m), "failed to unmarshal line from %s", file)
 		return m
 	}
 	return nil
