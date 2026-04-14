@@ -23,8 +23,12 @@ Write-Host "--- Prepare artifacts"
 $buildkiteJobId = $env:BUILDKITE_JOB_ID
 Move-Item -Path "build/TEST-go-unit.cov" -Destination "coverage-$buildkiteJobId.out"
 Move-Item -Path "build/TEST-go-unit.xml" -Destination "build/TEST-$buildkiteJobId.xml"
+if (Test-Path "build/TEST-edot.cov") {
+  Move-Item -Path "build/TEST-edot.cov" -Destination "coverage-edot-$buildkiteJobId.out"
+}
+if (Test-Path "build/TEST-edot.xml") {
+  Move-Item -Path "build/TEST-edot.xml" -Destination "build/TEST-edot-$buildkiteJobId.xml"
+}
 if ($LASTEXITCODE -ne 0) {
   exit 1
 }
-
-
