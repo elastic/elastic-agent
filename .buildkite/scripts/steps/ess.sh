@@ -42,21 +42,25 @@ function ess_down() {
   oblt-cli cluster destroy --cluster-name "${CLUSTER_NAME}" --force
 }
 
+function get_cluster_secrets {
+  echo "Getting cluster secrets cluster-state"
+  oblt-cli cluster secrets env --cluster-name="${1}" --output-file="${2}"
+}
+
 function ess_load_secrets() {
+  set -x
   echo "~~~ Loading ESS Stack secrets"
 
   METADATA_PREFIX="${METADATA_PREFIX:-""}"
   # Get the cluster name from the meta-data
   CLUSTER_NAME="$(buildkite-agent meta-data get "${METADATA_PREFIX}cluster-name")"
 
-  env | sort
-
-  # Load the ESS stack secrets
+  echo "Searching the ESS stack secrets"
   local secrets_file="secrets.env.sh"
 
   MAX_ATTEMPTS=10
   attempt=0
-  until oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${secrets_file}";
+  until get_cluster_secrets "${CLUSTER_NAME}" "${secrets_file}";
   do
     attempt=$((attempt+1))
     if [[ "${attempt}" -gt "${MAX_ATTEMPTS}" ]]; then
@@ -68,15 +72,18 @@ function ess_load_secrets() {
     echo "[INFO] Retrying to get cluster secrets" >&2
   done
 
+  echo "Loading the ESS stack secrets"
+  local src_rc=0
   # Source the secrets file
   # shellcheck source=/dev/null
-  local src_rc=0
   source "${secrets_file}" || src_rc=$?
   rm "$secrets_file" || true
   if [ "$src_rc" -ne 0 ]; then
     echo "Error: Failed to source secrets file (exit code ${src_rc})" >&2
     return 1
   fi
+
+  set +x
 
   # Print loaded variable names for debugging (not values)
   env | grep -E '^(ELASTICSEARCH|KIBANA|FLEET_SERVER|INTEGRATIONS_SERVER|AGENT_POLICY_ID)' | cut -d= -f1
