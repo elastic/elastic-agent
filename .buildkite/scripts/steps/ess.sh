@@ -48,7 +48,6 @@ function get_cluster_secrets {
 }
 
 function ess_load_secrets() {
-  set -x
   echo "~~~ Loading ESS Stack secrets"
 
   METADATA_PREFIX="${METADATA_PREFIX:-""}"
@@ -83,8 +82,5 @@ function ess_load_secrets() {
     return 1
   fi
 
-  set +x
-
-  # Print loaded variable names for debugging (not values)
-  env | grep -E '^(ELASTICSEARCH|KIBANA|FLEET_SERVER|INTEGRATIONS_SERVER|AGENT_POLICY_ID)' | cut -d= -f1
+  env | sort
 }
