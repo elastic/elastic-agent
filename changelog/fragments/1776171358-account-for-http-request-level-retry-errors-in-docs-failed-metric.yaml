@@ -18,9 +18,9 @@ summary: Fix OTel runtime monitoring underreporting failed docs on retryable err
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: >
   The OTel runtime monitoring now correctly counts all documents from a failed
-  bulk request towards the failed docs metric. Previously, bulk requests that
-  failed with a retryable error (such as HTTP 429) were not reflected in the
-  failed docs count, making output errors invisible in the monitoring data.
+  bulk request towards the `beat.stats.libbeat.output.events.failed` metric.
+  Previously, the document count from bulk requests that failed with a retryable
+  error (such as HTTP 429) was not included in the metric.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
