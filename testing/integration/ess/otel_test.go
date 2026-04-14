@@ -3248,6 +3248,7 @@ agent.monitoring:
 		"testcase",
 		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 		"agent.version",
+		"metadata.version",
 
 		// TODO: See issue https://github.com/elastic/beats/issues/50085
 		"metadata.input_id",
