@@ -49,9 +49,24 @@ function ess_load_secrets() {
   # Get the cluster name from the meta-data
   CLUSTER_NAME="$(buildkite-agent meta-data get "${METADATA_PREFIX}cluster-name")"
 
+  env | sort
+
   # Load the ESS stack secrets
   local secrets_file="secrets.env.sh"
-  oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${secrets_file}"
+
+  MAX_ATTEMPTS=10
+  attempt=0
+  until oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${secrets_file}";
+  do
+    attempt=$((attempt+1))
+    if [[ "${attempt}" -gt "${MAX_ATTEMPTS}" ]]; then
+      echo "[ERROR] Failed to get cluster secrets after ${MAX_ATTEMPTS} attempts.\
+        Your request to create the cluster ${CLUSTER_NAME} might have failed" >&2
+      exit 1
+    fi
+    sleep 60
+    echo "[INFO] Retrying to get cluster secrets" >&2
+  done
 
   # Source the secrets file
   # shellcheck source=/dev/null
