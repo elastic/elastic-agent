@@ -3030,15 +3030,15 @@ func (g *TestLogConsumer) Accept(l testcontainers.Log) {
 
 // TestSystemMetricsWithLogstashOutput tests that system metrics can be sent to Logstash output
 func TestSystemMetricsWithLogstashOutput(t *testing.T) {
-	// define.Require(t, define.Requirements{
-	// 	Group: integration.Default,
-	// 	Local: true,
-	// 	OS: []define.OS{
-	// 		{Type: define.Linux},
-	// 		{Type: define.Darwin},
-	// 	},
-	// 	Stack: &define.Stack{},
-	// })
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
 
 	tempDir := t.TempDir()
 	pipeline := filepath.Join(tempDir, "pipelines.yml")
