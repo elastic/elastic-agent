@@ -32,8 +32,8 @@ func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ..
 			// then also kill the children (only supported on linux)
 			Pdeathsig: syscall.SIGKILL,
 			Credential: &syscall.Credential{
-				Uid:         uint32(uid),
-				Gid:         uint32(gid),
+				Uid:         uint32(uid), //nolint:gosec // G115 Conversion from int to uint32 is safe, isInt32 check above guarantees range.
+				Gid:         uint32(gid), //nolint:gosec // G115 Conversion from int to uint32 is safe, isInt32 check above guarantees range.
 				NoSetGroups: true,
 			},
 		}
