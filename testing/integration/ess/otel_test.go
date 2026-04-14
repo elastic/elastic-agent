@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build integration
-
 package ess
 
 import (
@@ -17,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -31,6 +30,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/testcontainers/testcontainers-go/modules/compose"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -2825,4 +2826,212 @@ func (w *ZapWriter) Write(p []byte) (n int, err error) {
 		w.logger.Sync()
 	}
 	return len(p), nil
+}
+
+func TestSystemMetricsWithKafkaOutput(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok, "failed to get current file path")
+	kafkaPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "beats", "testing", "environments", "docker", "kafka")
+
+	composeContent := fmt.Sprintf(`
+services:
+  kafka:
+    build: %s
+    ports:
+      - 9092:9092
+      - 9093:9093
+      - 9094:9094
+      - 2181:2181
+    environment:
+      - ADVERTISED_HOST=kafka
+`, kafkaPath)
+
+	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = stack.Down(
+			context.Background(),
+			compose.RemoveOrphans(true),
+			compose.RemoveVolumes(true),
+			compose.RemoveImagesLocal,
+		)
+	})
+
+	err = stack.
+		Up(t.Context(), compose.Wait(true))
+	require.NoError(t, err)
+
+	kafkaDocs := make(map[string]mapstr.M, 0)
+
+	tableTests := []struct {
+		name                string
+		runtimeExperimental string
+	}{
+		{name: "agent", runtimeExperimental: "process"},
+		{name: "otel", runtimeExperimental: "otel"},
+	}
+
+	for _, tt := range tableTests {
+		type otelConfigOptions struct {
+			RuntimeExperimental string
+			Broker              string
+			CaCert              string
+		}
+
+		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+		require.NoError(t, err)
+		configTemplate := `
+agent.internal.runtime.output:
+  kafka: {{.RuntimeExperimental}}
+agent.grpc.port: 6799
+inputs:
+  - type: system/metrics
+    id: system-metrics-test
+    use_output: default
+    streams:
+    - metricsets:
+       - cpu
+      period: 1s
+      data_stream:
+        dataset: e2e
+        namespace: {{.RuntimeExperimental}}
+outputs:
+  default:
+    type: kafka
+    hosts: {{.Broker}}
+    topic: '%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}'
+    max_message_bytes: 1000000
+    required_acks: 1
+    broker_timeout: 30s
+    queue.mem.flush.timeout: 1s
+    ssl.certificate_authorities: 
+    - {{.CaCert}}
+    username: beats
+    password: KafkaTest
+    protocol: https
+    sasl.mechanism: SCRAM-SHA-256
+agent.monitoring:
+  metrics: false
+  logs: false
+  http:
+    enabled: true
+    port: 6790
+`
+		var configBuffer bytes.Buffer
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			otelConfigOptions{
+				RuntimeExperimental: tt.runtimeExperimental,
+				Broker:              "kafka:9093",
+				CaCert:              filepath.Join(kafkaPath, "certs", "ca-cert"),
+			})
+
+		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+		defer cancel()
+		err = fixture.Prepare(ctx)
+		require.NoError(t, err)
+
+		err = fixture.Configure(ctx, configBuffer.Bytes())
+
+		cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+		require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+		output := strings.Builder{}
+		cmd.Stderr = &output
+		cmd.Stdout = &output
+
+		err = cmd.Start()
+		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			if t.Failed() {
+				t.Log("Elastic-Agent output:")
+				t.Log(output.String())
+			}
+		})
+
+		require.Eventually(t, func() bool {
+			err = fixture.IsHealthy(ctx)
+			if err != nil {
+				t.Logf("waiting for agent healthy: %s", err.Error())
+				return false
+			}
+			return true
+		}, 30*time.Second, 1*time.Second)
+
+		consumer, err := sarama.NewConsumer([]string{"0.0.0.0:9092"}, sarama.NewConfig())
+		require.NoError(t, err)
+
+		partitionConsumer, err := consumer.ConsumePartition("metrics-e2e-"+tt.runtimeExperimental, 0, sarama.OffsetNewest)
+		require.NoError(t, err)
+
+		// Make sure find the logs
+		require.Eventually(t,
+			func() bool {
+				select {
+				case msg := <-partitionConsumer.Messages():
+					t.Logf("Received message: Topic=%s, Partition=%d, Offset=%d, Key=%s, Value=%s\n",
+						msg.Topic, msg.Partition, msg.Offset, string(msg.Key), string(msg.Value))
+
+					var docs mapstr.M
+					err := json.Unmarshal(msg.Value, &docs)
+					if err != nil {
+						t.Logf("Error unmarshalling message value: %s", err)
+					}
+					kafkaDocs[tt.name] = docs
+					return true
+				default:
+					t.Log("waiting for message from kafka...")
+					return false
+				}
+			}, 2*time.Minute, 5*time.Second,
+			"Expected at least 1 document")
+
+		cancel()
+		cmd.Wait()
+	}
+
+	t.Run("compare documents", func(t *testing.T) {
+		agentDoc, agentOk := kafkaDocs["agent"]
+		otelDoc, otelOk := kafkaDocs["otel"]
+		require.True(t, agentOk, "missing document for agent")
+		require.True(t, otelOk, "missing document for otel")
+
+		ignoredFields := []string{
+			"@timestamp",
+			"agent.id",
+			"agent.ephemeral_id",
+			"elastic_agent.id",
+			"data_stream.namespace",
+			"event.ingested",
+			"event.duration",
+
+			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
+			"agent.version",
+		}
+
+		// TODO: @metadata field needs to be be supported
+		delete(agentDoc, "@metadata")
+
+		agentDoc = agentDoc.Flatten()
+		otelDoc = otelDoc.Flatten()
+
+		// system cpu metrics differ between runs
+		StripNondeterminism(agentDoc, "cpu")
+		StripNondeterminism(otelDoc, "cpu")
+
+		AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for cpu metricset")
+		AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for cpu metricset")
+
+	})
 }
