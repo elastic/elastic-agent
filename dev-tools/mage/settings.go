@@ -1060,9 +1060,6 @@ type PackagingSettings struct {
 	// ManifestURL is the location of manifest file for packaging (from MANIFEST_URL env var)
 	ManifestURL string
 
-	// PackagingFromManifest indicates whether to use manifest for packaging (derived from ManifestURL)
-	PackagingFromManifest bool
-
 	// UsePackageVersion enables reading version from .package-version file (from USE_PACKAGE_VERSION env var)
 	UsePackageVersion bool
 
@@ -1420,7 +1417,6 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 	}
 	if v := os.Getenv("MANIFEST_URL"); v != "" {
 		s.Packaging.ManifestURL = v
-		s.Packaging.PackagingFromManifest = true
 	}
 	if os.Getenv("USE_PACKAGE_VERSION") == "true" {
 		s.Packaging.UsePackageVersion = true
@@ -1434,7 +1430,7 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 
 	// Apply .package-version overrides when USE_PACKAGE_VERSION is set.
 	// This mirrors the old initPackageVersion() behavior: read the file,
-	// set ManifestURL / PackagingFromManifest / AgentDropPath so the
+	// set ManifestURL / AgentDropPath so the
 	// packaging path downloads components from the manifest instead of
 	// fetching them individually. Values from the .package-version file
 	// take precedence over environment variables.
@@ -1444,7 +1440,6 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 			log.Printf("Warning: failed to get package version info: %v", err)
 		}
 		if pv != nil {
-			s.Packaging.PackagingFromManifest = true
 			s.Packaging.ManifestURL = pv.ManifestURL
 			s.Packaging.AgentPackageVersion = pv.CoreVersion
 			s.Build.BeatVersion = pv.CoreVersion

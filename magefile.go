@@ -604,7 +604,7 @@ func Package(ctx context.Context) error {
 		return err
 	}
 
-	if cfg.Packaging.PackagingFromManifest {
+	if cfg.Packaging.ManifestURL != "" {
 		// manifest is not passed into packageAgent below because we want packageAgent to go through the
 		// flow using the elastic-agent-core that was built above. if it was passed in, it would download
 		// elastic-agent-core from the manifest and it would not be the code from this repository in the package
@@ -645,7 +645,7 @@ func downloadManifest(ctx context.Context, cfg *mage.Settings, pkgSpecs []mage.O
 		return errNoAgentDropPath
 	}
 
-	if !cfg.Packaging.PackagingFromManifest {
+	if cfg.Packaging.ManifestURL == "" {
 		return errNoManifest
 	}
 
