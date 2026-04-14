@@ -2946,6 +2946,7 @@ agent.monitoring:
 		require.NoError(t, err)
 
 		err = fixture.Configure(ctx, configBuffer.Bytes())
+		require.NoError(t, err)
 
 		cmd, err := fixture.PrepareAgentCommand(ctx, nil)
 		require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
