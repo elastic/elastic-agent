@@ -29,11 +29,12 @@ const (
 
 // instanceLabels are applied to all created GCE instances.
 var instanceLabels = map[string]string{
-	"division": "engineering",
-	"org":      "obs",
-	"team":     "elastic-agent-control-plane",
-	"project":  "elastic-agent",
-	"purpose":  "integration-test",
+	"division":  "engineering",
+	"org":       "obs",
+	"team":      "elastic-agent-control-plane",
+	"project":   "elastic-agent",
+	"purpose":   "integration-test",
+	"ephemeral": "true",
 }
 
 type provisioner struct {
