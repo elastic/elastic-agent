@@ -3041,6 +3041,7 @@ func TestSystemMetricsWithLogstashOutput(t *testing.T) {
 	})
 
 	tempDir := t.TempDir()
+	require.NoError(t, os.Chmod(tempDir, 0o755))
 	pipeline := filepath.Join(tempDir, "pipelines.yml")
 	require.NoError(t, os.WriteFile(pipeline, []byte(pipelineTemplate), 0o644))
 	logstash_testdata := filepath.Join(tempDir, "logstash_testdata")
@@ -3210,7 +3211,7 @@ agent.monitoring:
 				_, err := os.Stat(outFileURL)
 				require.NoError(ct, err)
 			},
-			2*time.Minute, 10*time.Second, "expected Nginx to serve json files over HTTP")
+			2*time.Minute, 10*time.Second, "expected documents to be published to logstash output for %s mode", tt.name)
 
 		// download files from Nginx into testdata directory
 		logstash[tt.name] = downloadData(t, outFileURL)
