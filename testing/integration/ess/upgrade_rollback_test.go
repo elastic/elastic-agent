@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/integration"
@@ -173,7 +174,539 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		t.Skip("This test is flaky on windows. See https://github.com/elastic/elastic-agent/issues/6733")
 	}
 
+<<<<<<< HEAD
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+=======
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+			defer cancel()
+			from, to := tc.fixturesSetup(t)
+
+			standaloneRollbackRestartTest(ctx, t, from, to)
+		})
+	}
+
+}
+
+// TestFleetManagedUpgradeRollbackOnRestarts tests the scenario where upgrading to a new version
+// of Agent fails due to the new Agent binary not starting up. It checks that the Agent is
+// rolled back to the previous version and that Fleet reports the correct informations
+func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Fleet,
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		Stack: &define.Stack{},
+	})
+
+	type fixturesSetupFunc func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture)
+	testcases := []struct {
+		name          string
+		fixturesSetup fixturesSetupFunc
+	}{
+		{
+			name: "downgrade from current version to previous minor",
+			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
+				// Upgrade from the current build to an older one. The new watcher will be run anyway, and we can check
+				// the postconditions on a rollback
+
+				// Start from the build under test.
+				fromFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+				require.NoError(t, err)
+
+				// Downgrade to a previous version (doesn't really matter what)
+				upgradeToVersion, err := upgradetest.PreviousMinor()
+				require.NoError(t, err)
+				toFixture, err := atesting.NewFixture(
+					t,
+					upgradeToVersion.String(),
+					atesting.WithFetcher(atesting.ArtifactFetcher()),
+				)
+				require.NoError(t, err)
+
+				return fromFixture, toFixture
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+			defer cancel()
+			from, to := tc.fixturesSetup(t)
+
+			managedRollbackRestartTest(ctx, t, info, from, to)
+		})
+	}
+}
+
+// TestFleetManagedUpgradeRollback performs a managed upgrade via Fleet, then
+// triggers a rollback through the Fleet API and verifies the agent returns to
+// the original version without getting stuck in "Upgrading" or "Upgrade failed"
+// state.
+// See https://github.com/elastic/elastic-agent/issues/12910
+func TestFleetManagedUpgradeRollback(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Fleet,
+		Local: false,
+		Sudo:  true,
+		Stack: &define.Stack{},
+	})
+
+	ctx, cancel := testcontext.WithTimeout(t, t.Context(), 30*time.Minute)
+	defer cancel()
+
+	// Use the current build as the starting version and downgrade to
+	// previous minor, so the commit hashes differ and PerformManagedUpgrade
+	// doesn't skip. After upgrade we rollback to the starting version.
+	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	upgradeToVersion, err := upgradetest.PreviousMinor()
+	require.NoError(t, err)
+	upgradeFixture, err := atesting.NewFixture(
+		t,
+		upgradeToVersion.String(),
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+	)
+	require.NoError(t, err)
+
+	startVersionInfo, err := startFixture.ExecVersion(ctx)
+	require.NoError(t, err, "failed to get start agent build version info")
+
+	policyUUID := uuid.Must(uuid.NewV4()).String()
+	policy := kibana.AgentPolicy{
+		Name:        fmt.Sprintf("%s-policy-%s", t.Name(), policyUUID),
+		Namespace:   "default",
+		Description: fmt.Sprintf("Fleet replayed rollback test %s (%s)", t.Name(), policyUUID),
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+
+	kibClient := info.KibanaClient
+
+	// waitFleetOnline polls Fleet until the agent reports "online" status.
+	waitFleetOnline := func(agentID, msg string) {
+		t.Helper()
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			status, sErr := fleettools.GetAgentStatus(ctx, kibClient, agentID)
+			if assert.NoError(ct, sErr) {
+				assert.Equal(ct, "online", status, msg)
+			}
+		}, 2*time.Minute, 10*time.Second)
+	}
+
+	// 1. Perform managed upgrade (from -> to) and let it complete fully.
+	// The Fleet rollback API rejects rollbacks on agents that are still
+	// upgrading, so we must wait for the upgrade to finish.
+	err = PerformManagedUpgrade(ctx, t, info, startFixture, upgradeFixture, policy, false,
+		upgradetest.WithCustomWatcherConfig(fastWatcherCfgWithRollbackWindow),
+	)
+	require.NoError(t, err, "managed upgrade failed")
+
+	agentID, err := startFixture.AgentID(ctx)
+	require.NoError(t, err, "failed to get agent ID")
+	t.Logf("Agent ID: %s", agentID)
+
+	// 2. Wait for Fleet to clear the upgrading state. After the watcher
+	// completes, the agent must check in with nil upgrade_details so Fleet
+	// Server sets upgraded_at and clears upgrade_started_at. The rollback
+	// API rejects agents that are still considered "upgrading".
+	t.Log("Waiting for Fleet to clear upgrade_details...")
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		agentResp, getErr := kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+		if assert.NoError(ct, getErr) {
+			t.Logf("Fleet agent status: %s, upgrade_details: %+v", agentResp.Status, agentResp.UpgradeDetails)
+			assert.Nil(ct, agentResp.UpgradeDetails,
+				"Fleet upgrade_details should be nil after upgrade completes")
+		}
+	}, 5*time.Minute, 15*time.Second)
+
+	// 3. Request rollback via Fleet API
+	t.Logf("Requesting rollback via Fleet API for agent %s", agentID)
+	err = fleettools.RollbackAgent(ctx, kibClient, agentID)
+	require.NoError(t, err, "Fleet API rollback request should succeed")
+
+	// 3. Wait for agent to be healthy at original version.
+	// Use a longer timeout (4 min) because the rollback involves watcher
+	// takedown, symlink switch, and a full agent restart.
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 4*time.Minute, 10*time.Second, t)
+	require.NoError(t, err, "agent should be healthy at original version after rollback")
+
+	// 4. Verify Fleet/Kibana reflects the rollback: agent should be online
+	// and at the rolled-back version with no failed upgrade details.
+	t.Log("Verifying agent status in Fleet after rollback...")
+	waitFleetOnline(agentID, "agent should be online in Fleet after rollback")
+
+	// Poll for Fleet to reflect the rolled-back version; the checkin that
+	// reports the new version may lag behind the agent's local health check.
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		fleetVersion, vErr := fleettools.GetAgentVersion(ctx, kibClient, agentID)
+		if assert.NoError(ct, vErr, "failed to get agent version from Fleet") {
+			assert.Equal(ct, startVersionInfo.Binary.Version, fleetVersion,
+				"Fleet should report the rolled-back agent version")
+		}
+	}, 2*time.Minute, 10*time.Second)
+
+	agentData, err := kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+	require.NoError(t, err, "failed to get agent from Fleet API")
+	require.NotNil(t, agentData.UpgradeDetails)
+	require.Equal(t, "UPG_ROLLBACK", agentData.UpgradeDetails.State)
+
+	// 5. Verify agent stays healthy and is not stuck in Upgrading/Failed state.
+	// The real replayed-action scenario from issue #12910 happens at the Fleet
+	// Server → Agent layer (stale ackToken causes re-delivery of the same
+	// UPGRADE action). That path is covered by TestStandaloneUpgradeReplayedRollback.
+	// Here we verify the Fleet API rollback completed cleanly end-to-end.
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	require.NoError(t, err, "agent should stay healthy after rollback")
+
+	t.Log("Verifying agent status in Fleet after rollback completes...")
+	waitFleetOnline(agentID, "agent should be online in Fleet after rollback")
+
+	agentData, err = kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+	require.NoError(t, err, "failed to get agent from Fleet API after rollback")
+	if agentData.UpgradeDetails != nil {
+		assert.NotEqual(t, "UPG_FAILED", agentData.UpgradeDetails.State,
+			"Fleet must not show agent in UPG_FAILED state after rollback")
+	}
+	assert.NotEqual(t, "updating", agentData.Status,
+		"Fleet must not show agent as updating after rollback")
+	assert.NotNil(t, agentData.UpgradeDetails)
+	assert.Equal(t, "UPG_ROLLBACK", agentData.UpgradeDetails.State)
+}
+
+type rollbackTriggerFunc func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture)
+
+// TestStandaloneUpgradeManualRollback tests the scenario where, after upgrading to a new version
+// of Agent, a manual rollback is triggered. It checks that the Agent is rolled back to the previous version.
+func TestStandaloneUpgradeManualRollback(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Upgrade,
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+
+	type fixturesSetupFunc func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture)
+
+	testcases := []struct {
+		name            string
+		fixturesSetup   fixturesSetupFunc
+		agentConfig     string
+		rollbackTrigger rollbackTriggerFunc
+	}{
+		{
+			name:        "upgrade to a repackaged agent built from the same commit, rollback during grace period",
+			agentConfig: fastWatcherCfgWithRollbackWindow,
+			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
+				// Upgrade from the current build to the same build as Independent Agent Release.
+				fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t, time.Now())
+
+				return fromFixture, toFixture
+			},
+			rollbackTrigger: func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture) {
+				assertListRollbacks(ctx, t, startFixture, time.Now().Add(10*time.Minute))
+				t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)
+				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, "", false, false)
+				require.NoError(t, err, "error triggering manual rollback to version %s", startFixture.Version())
+				t.Logf("received output %s from upgrade command", retVal)
+			},
+		},
+		{
+			name:        "upgrade to a repackaged agent built from the same commit, rollback after grace period",
+			agentConfig: fastWatcherCfgWithRollbackWindow,
+			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
+				// Upgrade from the current build to the same build as Independent Agent Release.
+				fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t, time.Now())
+				return fromFixture, toFixture
+			},
+			rollbackTrigger: func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture) {
+				assertListRollbacks(ctx, t, startFixture, time.Now().Add(9*time.Minute))
+
+				// trim -SNAPSHOT at the end of the fixture version as that is reported as a separate flag
+				expectedVersion := endFixture.Version()
+				expectedSnapshot := false
+				if strings.HasSuffix(expectedVersion, "-SNAPSHOT") {
+					expectedVersion = strings.TrimSuffix(endFixture.Version(), "-SNAPSHOT")
+					expectedSnapshot = true
+				}
+
+				// It will take at least 2 minutes before the agent exits the grace period (see fastWatcherCfgWithRollbackWindow)
+				// let's shoot for up to 4 minutes to exit grace period, checking every 10 seconds
+				require.EventuallyWithT(t, func(collect *assert.CollectT) {
+					state, err := client.State(ctx)
+					require.NoError(collect, err)
+					t.Logf("checking agent state: %+v", state)
+					require.NotNil(collect, state)
+					assert.Nil(collect, state.UpgradeDetails)
+					assert.Equal(t, cproto.State_HEALTHY, state.State)
+					assert.Equal(collect, expectedVersion, state.Info.Version)
+					assert.Equal(collect, expectedSnapshot, state.Info.Snapshot)
+					if runtime.GOOS != "windows" {
+						// on windows the update marker is not removed when cleaning up
+						assert.NoFileExists(collect, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"))
+					}
+				}, 4*time.Minute, 10*time.Second)
+				t.Log("elastic agent is out of grace period.")
+				t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)
+				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, "", false, false)
+				require.NoError(t, err, "error triggering manual rollback to version %s", startFixture.Version())
+				t.Logf("received output %s from upgrade command", retVal)
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+			defer cancel()
+			from, to := tc.fixturesSetup(t)
+
+			err := from.Configure(ctx, []byte(tc.agentConfig))
+			require.NoError(t, err, "error configuring starting fixture")
+			standaloneRollbackTest(
+				ctx, t, from, to, fastWatcherCfgWithRollbackWindow, fmt.Sprintf(details.ReasonManualRollbackPattern, from.Version()),
+				tc.rollbackTrigger)
+		})
+	}
+
+}
+
+// TestStandaloneUpgradeReplayedRollback is a regression test for
+// https://github.com/elastic/elastic-agent/issues/12910.
+// After a successful manual rollback, we trigger a rollback a second time
+// to ensure that a replayed rollback is handled gracefully.
+// This test verifies that the agent handles the replayed action and
+// does not get stuck in "Upgrading" or "Upgrade failed" state.
+func TestStandaloneUpgradeReplayedRollback(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Upgrade,
+		Local: false,
+		Sudo:  true,
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t, time.Now())
+
+	err := fromFixture.Configure(ctx, []byte(fastWatcherCfgWithRollbackWindow))
+	require.NoError(t, err, "error configuring starting fixture")
+
+	// Step 1: Upgrade and rollback using the standard helper.
+	// The trigger just sends the rollback; the helper waits for it to complete.
+	standaloneRollbackTest(
+		ctx, t, fromFixture, toFixture, fastWatcherCfgWithRollbackWindow,
+		fmt.Sprintf(details.ReasonManualRollbackPattern, fromFixture.Version()),
+		func(ctx context.Context, t *testing.T, c client.Client, startFixture, endFixture *atesting.Fixture) {
+			assertListRollbacks(ctx, t, startFixture, time.Now().Add(10*time.Minute))
+			t.Logf("sending rollback: version=%s rollback=%v", startFixture.Version(), true)
+			retVal, err := c.Upgrade(ctx, startFixture.Version(), true, "", false, false)
+			require.NoError(t, err, "rollback should succeed")
+			t.Logf("rollback output: %s", retVal)
+		},
+	)
+
+	// Step 2: After standaloneRollbackTest returns, agent is healthy at fromFixture version.
+	// Now send a replayed rollback (same version as current) and verify it's handled gracefully.
+	startVersionInfo, err := fromFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+
+	replayClient := fromFixture.Client()
+	err = replayClient.Connect(ctx)
+	require.NoError(t, err, "error connecting to agent after first rollback")
+	defer replayClient.Disconnect()
+
+	t.Logf("Sending replayed rollback to version %s (simulating Fleet re-send)", fromFixture.Version())
+	retVal, err := replayClient.Upgrade(ctx, fromFixture.Version(), true, "", false, false)
+	require.NoError(t, err, "replayed rollback should not error")
+	t.Logf("replayed rollback output: %s", retVal)
+
+	// Verify agent stays healthy and is not stuck in failed state
+	err = upgradetest.WaitHealthyAndVersion(ctx, fromFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	require.NoError(t, err, "agent should remain healthy after replayed rollback")
+
+	state, err := replayClient.State(ctx)
+	require.NoError(t, err, "error getting agent state")
+	require.NotNil(t, state.UpgradeDetails, "upgrade details should be present after replayed rollback")
+	assert.Equal(t, string(details.StateRollback), state.UpgradeDetails.State,
+		"upgrade details state should be rollback after replayed rollback")
+}
+
+func assertListRollbacks(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, expectedValidUntil time.Time) {
+	t.Helper()
+	t.Logf("requesting available rollbacks")
+	cmdOutput, err := startFixture.Exec(ctx, []string{"upgrade", "list-rollbacks", "-o", "yaml"})
+	if assert.NoError(t, err, "error listing available rollbacks") {
+		var rollbacks []client.AvailableRollback
+		err = yaml.Unmarshal(cmdOutput, &rollbacks)
+		if assert.NoError(t, err, "error unmarshalling rollbacks") {
+			if assert.Len(t, rollbacks, 1, "expected one rollback") {
+				assert.Equal(t, rollbacks[0].Version, startFixture.Version(), "expected available rollback to start version")
+				assert.Equal(t, rollbacks[0].VersionedHome, filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", startFixture.Version(), startFixture.ShortHash())))
+				assert.WithinDuration(t, expectedValidUntil, rollbacks[0].ValidUntil, 2*time.Minute, "expected valid until")
+			}
+
+		}
+	}
+}
+
+func TestCleanupRollbacks(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Upgrade,
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+
+	now := time.Now()
+
+	type upgradeOperation struct {
+		from *atesting.Fixture
+		to   *atesting.Fixture
+		opts []upgradetest.UpgradeOpt
+	}
+	type fixturesSetupFunc func(t *testing.T) []upgradeOperation
+
+	testcases := []struct {
+		name               string
+		fixturesSetup      fixturesSetupFunc
+		assertAfterUpgrade func(t *testing.T, errUpgrade error, installedFixture *atesting.Fixture, upgradeIndex int, upgrades []upgradeOperation)
+	}{
+		{
+			name: "agent should clear expired rollback after upgrading to a repackaged version",
+			fixturesSetup: func(t *testing.T) []upgradeOperation {
+				from, to := prepareCommitAndRepackagedFixtures(t, now)
+				return []upgradeOperation{{
+					from: from,
+					to:   to,
+					opts: []upgradetest.UpgradeOpt{
+						upgradetest.WithCustomWatcherConfig(fastWatcherCfgWithShortRollbackWindow),
+						upgradetest.WithDisableHashCheck(true),
+					},
+				}}
+			},
+			assertAfterUpgrade: func(t *testing.T, err error, installedFixture *atesting.Fixture, upgradeIndex int, upgrades []upgradeOperation) {
+				require.NoError(t, err, "upgrade should not fail")
+				oldAgentVersionedHome := filepath.Join(installedFixture.WorkDir(), "data", fmt.Sprintf("elastic-agent-%s-%s", upgrades[upgradeIndex].from.Version(), upgrades[upgradeIndex].from.ShortHash()))
+				require.EventuallyWithT(t, func(collect *assert.CollectT) {
+					t.Logf("checking if the rollback directory %q has been cleaned...", oldAgentVersionedHome)
+					assert.NoDirExists(collect, oldAgentVersionedHome, "old rollback should have been cleaned up after expiration")
+				}, 1*time.Minute, 10*time.Second)
+			},
+		},
+		{
+			name: "agent should clear rollbacks upon initiating a new upgrade",
+			fixturesSetup: func(t *testing.T) []upgradeOperation {
+				baseFixture, firstRepackagedFixture := prepareCommitAndRepackagedFixtures(t, now)
+				currentVersion, err := version.ParseVersion(define.Version())
+				require.NoErrorf(t, err, "define.Version() %q is not parsable.", define.Version())
+				secondRepackagedFixture := createRepackagedFixture(t, currentVersion, baseFixture, now.Add(24*time.Hour))
+				return []upgradeOperation{
+					{
+						from: baseFixture,
+						to:   firstRepackagedFixture,
+						opts: []upgradetest.UpgradeOpt{
+							upgradetest.WithCustomWatcherConfig(fastWatcherCfgWithRollbackWindow),
+							upgradetest.WithDisableHashCheck(true),
+						},
+					},
+					{
+						from: firstRepackagedFixture,
+						to:   secondRepackagedFixture,
+						opts: []upgradetest.UpgradeOpt{
+							upgradetest.WithoutInstall(),
+							upgradetest.WithCustomWatcherConfig(fastWatcherCfgWithRollbackWindow),
+							upgradetest.WithDisableHashCheck(true),
+						},
+					},
+				}
+			},
+			assertAfterUpgrade: func(t *testing.T, err error, installedFixture *atesting.Fixture, upgradeIndex int, upgrades []upgradeOperation) {
+				require.NoError(t, err, "upgrade should not fail")
+				if upgradeIndex > 0 {
+					// we are interested to check only after the first upgrade
+					// verify that the previous rollback is gone
+					oldAgentVersionedHome := filepath.Join(installedFixture.WorkDir(), "data", fmt.Sprintf("elastic-agent-%s-%s", upgrades[upgradeIndex-1].from.Version(), upgrades[upgradeIndex-1].from.ShortHash()))
+					t.Logf("checking if the rollback directory %q has been cleaned...", oldAgentVersionedHome)
+					assert.NoDirExists(t, oldAgentVersionedHome, "old rollback should have been cleaned up after expiration")
+				}
+
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			upgradeOperations := tc.fixturesSetup(t)
+			require.Greater(t, len(upgradeOperations), 0, "testcase should specify at least one upgradeOperation")
+
+			// initial install and upgrade
+			var initialUpgrade upgradeOperation
+
+			// follow-up upgrades (to test upgrades in a chain)
+			for i, op := range upgradeOperations {
+				if i == 0 {
+					initialUpgrade = op
+					t.Logf("Performing initial install of version %q and first upgrade to version %q", initialUpgrade.from.Version(), initialUpgrade.to.Version())
+				} else {
+					t.Logf("Performing new upgrade to version %q", op.to.Version())
+				}
+
+				err := upgradetest.PerformUpgrade(
+					t.Context(), initialUpgrade.from, op.to, t, op.opts...)
+				// this is the i-th upgrade
+				tc.assertAfterUpgrade(t, err, initialUpgrade.from, i, upgradeOperations)
+			}
+		})
+	}
+
+}
+
+func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.Info, from *atesting.Fixture, to *atesting.Fixture) {
+	startVersionInfo, err := from.ExecVersion(ctx)
+	require.NoError(t, err, "failed to get start agent build version info")
+
+	endVersionInfo, err := to.ExecVersion(ctx)
+	require.NoError(t, err, "failed to get end agent build version info")
+
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", from.Version(), endVersionInfo.Binary.String())
+
+	policyUUID := uuid.Must(uuid.NewV4()).String()
+
+	policy := kibana.AgentPolicy{
+		Name:        fmt.Sprintf("%s-policy-%s", t.Name(), policyUUID),
+		Namespace:   "default",
+		Description: fmt.Sprintf("Rollback test policy %s (%s)", t.Name(), policyUUID),
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+
+	// Use the post-upgrade hook to skip part of the PerformUpgrade (the checks during the grace period)
+	// because we want to do our own checks for the rollback.
+	var ErrSkipGrace = errors.New("skip grace period")
+	postUpgradeHook := func() error {
+		return ErrSkipGrace
+	}
+
+	err = PerformManagedUpgrade(ctx, t, info, from, to, policy, false,
+		upgradetest.WithPostUpgradeHook(postUpgradeHook),
+		upgradetest.WithDisableHashCheck(true),
+		upgradetest.WithCustomWatcherConfig(reallyFastWatcherCfg),
+	)
+
+	// we expect ErrSkipGrace at this point, meaning that we finished installing but didn't wait for agent to become healthy
+	require.ErrorIs(t, err, ErrSkipGrace, "managed upgrade failed with unexpected error")
+
+	installedAgentClient := from.NewClient()
+	targetVersion, err := to.ExecVersion(ctx)
+	require.NoError(t, err, "failed to get target version")
+	restartContext, cancel := context.WithTimeout(t.Context(), 1*time.Minute)
+>>>>>>> 5e0c87af2 (Fix agent stuck in upgrading state after manual rollback (#13329))
 	defer cancel()
 
 	// Upgrade from an old build because the new watcher from the new build will
