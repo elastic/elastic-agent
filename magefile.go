@@ -106,7 +106,6 @@ const (
 	cloudImageTmpl = "docker.elastic.co/observability-ci/elastic-agent:%s"
 
 	baseURLForSnapshotDRA = "https://snapshots.elastic.co/"
-	agentCoreProjectName  = "elastic-agent-core"
 
 	helmChartPath      = "./deploy/helm/elastic-agent"
 	helmOtelChartPath  = "./deploy/helm/edot-collector/kube-stack"
@@ -604,19 +603,16 @@ func Package(ctx context.Context) error {
 		return err
 	}
 
+	// manifest is not passed into packageAgent below because we want packageAgent to go through the
+	// flow using the elastic-agent-core that was built above. if it was passed in, it would download
+	// elastic-agent-core from the manifest and it would not be the code from this repository in the package
+	cfg, err = cfg.WithManifestInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed downloading manifest: %w", err)
+	}
 	if cfg.Packaging.ManifestURL != "" {
-		// manifest is not passed into packageAgent below because we want packageAgent to go through the
-		// flow using the elastic-agent-core that was built above. if it was passed in, it would download
-		// elastic-agent-core from the manifest and it would not be the code from this repository in the package
-		_, parsedVersion, err := downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
-		if err != nil {
-			return fmt.Errorf("failed downloading manifest: %w", err)
-		}
-		// Apply manifest version info to config
-		cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
-
 		// don't download the elastic-agent-core components; built above
-		if err := downloadManifest(ctx, cfg, pkgSpec, packaging.WithoutProjectName(agentCoreProjectName)); err != nil {
+		if err := downloadManifest(ctx, cfg, pkgSpec, packaging.WithoutProjectName(mage.AgentCoreProjectName)); err != nil {
 			return fmt.Errorf("failed downloading manifest components: %w", err)
 		}
 	}
@@ -1433,12 +1429,12 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
 	}
-	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(agentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
+	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(mage.AgentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
 
 	if len(elasticAgentCoreComponents) != 1 {
 		return fmt.Errorf(
 			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q, fips: %v]: %v",
-			agentCoreProjectName,
+			mage.AgentCoreProjectName,
 			cfg.Build.FIPSBuild,
 			elasticAgentCoreComponents,
 		)
@@ -1494,50 +1490,16 @@ func PackageUsingDRA(ctx context.Context) error {
 
 	// When MANIFEST_URL is not provided in the environment elastic-agent-core packages from build/distributions
 	// will be used instead of pulling from the manifest.
-	var manifestResponse *manifest.Build
-	var dependenciesVersion string
-	manifestURL := cfg.Packaging.ManifestURL
-	if manifestURL == "" {
+	if cfg.Packaging.ManifestURL == "" {
 		fmt.Println("NOTICE: No MANIFEST_URL was provided, using elastic-agent-core packages from build/distributions.")
-	} else {
-		var parsedVersion *version.ParsedSemVer
-		manifestResponse, parsedVersion, err = downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
-		if err != nil {
-			return fmt.Errorf("failed downloading manifest: %w", err)
-		}
-		dependenciesVersion = parsedVersion.VersionWithPrerelease()
-
-		// fix the commit hash independently of the current commit hash on the branch
-		agentCoreProject, ok := manifestResponse.Projects[agentCoreProjectName]
-		if !ok {
-			return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, cfg.Packaging.ManifestURL)
-		}
-		cfg = cfg.WithAgentCommitHashOverride(agentCoreProject.CommitHash)
-
-		// Apply manifest version to config
-		cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
-		ctx = devtools.ContextWithSettings(ctx, cfg)
 	}
-
-	return packageAgent(ctx, cfg, pkgSpec, dependenciesVersion, manifestResponse)
-}
-
-// downloadManifestAndParseVersion downloads the manifest and returns the build info and parsed version.
-// The caller is responsible for applying the version information to the config using:
-//
-//	cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
-func downloadManifestAndParseVersion(ctx context.Context, url string) (*manifest.Build, *version.ParsedSemVer, error) {
-	resp, err := manifest.DownloadManifest(ctx, url)
+	cfg, err = cfg.WithManifestInfo(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("downloading manifest: %w", err)
+		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
+	ctx = devtools.ContextWithSettings(ctx, cfg)
 
-	parsedVersion, err := version.ParseVersion(resp.Version)
-	if err != nil {
-		return nil, nil, fmt.Errorf("parsing manifest version %s: %w", resp.Version, err)
-	}
-
-	return &resp, parsedVersion, nil
+	return packageAgent(ctx, cfg, pkgSpec, cfg.Build.DependenciesVersion, cfg.Packaging.Manifest)
 }
 
 func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string) (*branchInfo, error) {
@@ -1660,11 +1622,11 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *mage.Settings, manifes
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
 	}
-	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(agentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
+	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(mage.AgentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
 	if len(elasticAgentCoreComponents) != 1 {
 		return fmt.Errorf(
 			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q, fips: %v]: %v",
-			agentCoreProjectName,
+			mage.AgentCoreProjectName,
 			cfg.Build.FIPSBuild,
 			elasticAgentCoreComponents,
 		)
@@ -1974,23 +1936,9 @@ func Ironbank(ctx context.Context) error {
 		return nil
 	}
 	cfg := devtools.SettingsFromContext(ctx)
-	// TODO: centralize the manifest loading logic
-	if cfg.Packaging.ManifestURL != "" { // get the version from the manifest
-		var parsedVersion *version.ParsedSemVer
-		manifestResponse, parsedVersion, err := downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
-		if err != nil {
-			return fmt.Errorf("failed downloading manifest: %w", err)
-		}
-
-		// fix the commit hash independently of the current commit hash on the branch
-		agentCoreProject, ok := manifestResponse.Projects[agentCoreProjectName]
-		if !ok {
-			return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, cfg.Packaging.ManifestURL)
-		}
-		cfg = cfg.WithAgentCommitHashOverride(agentCoreProject.CommitHash)
-
-		// Apply manifest version to config
-		cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
+	cfg, err := cfg.WithManifestInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 	if err := prepareIronbankBuild(cfg); err != nil {
 		return fmt.Errorf("failed to prepare the IronBank context: %w", err)
