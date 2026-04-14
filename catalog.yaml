@@ -1,0 +1,63 @@
+---
+apiVersion: elastic.co/v1alpha1
+kind: Component
+metadata:
+  name: elastic-agent
+spec:
+  type: service
+  owner: cloud-observability
+  lifecycle: production
+  system: platform-ingest
+  org: ecp
+  division: engineering
+  ecp:
+    serviceType: compute
+---
+apiVersion: ecp.elastic.co/v1alpha1
+kind: PlacementRequest
+metadata:
+  name: elastic-agent
+spec:
+  componentRef: elastic-agent
+  strategyRefs:
+    - elastic-agent
+  environments:
+    - dev
+    - qa
+    - staging
+    - production
+---
+apiVersion: ecp.elastic.co/v1alpha1
+kind: PlacementStrategy
+metadata:
+  name: elastic-agent
+spec:
+  planes:
+    - management-0
+    - management-1
+  clusterSpread: allPerRegion
+  customSelector:
+    matchExpressions:
+      - key: "infra.k8s.elastic.co/role"
+        operator: In
+        values:
+          - "ecp-platform-deployer"
+          - "ecp-service-deployer"
+          - "mgmt-crmc"
+  environments:
+    - name: dev
+      csps:
+        aws:
+          - "*"
+    - name: qa
+      csps:
+        aws:
+          - "*"
+    - name: staging
+      csps:
+        aws:
+          - "*"
+    - name: production
+      csps:
+        aws:
+          - "*"
