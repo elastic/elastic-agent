@@ -3270,7 +3270,7 @@ func checkURLHasContent(ct *assert.CollectT, url string) {
 
 func downloadData(t *testing.T, url string) mapstr.M {
 	// get http response
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
 	require.NoError(t, err, "error creating request")
 
 	resp, err := http.DefaultClient.Do(req)
