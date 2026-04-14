@@ -2525,8 +2525,8 @@ func generateEnvFile(stack tcommon.Stack) error {
 			return fmt.Errorf("write KIBANA_PASSWORD: %w", err)
 		}
 
-		if _, err := fmt.Fprintf(w, "export INTEGRATIONS_SERVER_HOST=\"%s\"\n", stack.IntegrationsServer); err != nil {
-			return fmt.Errorf("write INTEGRATIONS_SERVER_HOST: %w", err)
+		if _, err := fmt.Fprintf(w, "export ELASTIC_APM_SERVER_URL=\"%s\"\n", stack.IntegrationsServer); err != nil {
+			return fmt.Errorf("write ELASTIC_APM_SERVER_URL: %w", err)
 		}
 		return nil
 	}); err != nil {
@@ -2554,8 +2554,8 @@ func generateEnvFile(stack tcommon.Stack) error {
 			return fmt.Errorf("write KIBANA_PASSWORD: %w", err)
 		}
 
-		if _, err := fmt.Fprintf(w, "$env:INTEGRATIONS_SERVER_HOST=\"%s\"\n", stack.IntegrationsServer); err != nil {
-			return fmt.Errorf("write INTEGRATIONS_SERVER_HOST: %w", err)
+		if _, err := fmt.Fprintf(w, "$env:ELASTIC_APM_SERVER_URL=\"%s\"\n", stack.IntegrationsServer); err != nil {
+			return fmt.Errorf("write ELASTIC_APM_SERVER_URL: %w", err)
 		}
 		return nil
 	})
