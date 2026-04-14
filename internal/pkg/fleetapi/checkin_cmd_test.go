@@ -5,6 +5,7 @@
 package fleetapi
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
@@ -30,6 +32,7 @@ func TestCheckin(t *testing.T) {
 	const requestDelay = time.Millisecond
 	ctx := context.Background()
 	agentInfo := &agentinfo{}
+	defaultCompression := configuration.DefaultFleetCheckin().GetCompression()
 
 	t.Run("Propagate any errors from the server", withServerWithAuthClient(
 		func(t *testing.T) *http.ServeMux {
@@ -48,7 +51,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{}
 
@@ -99,7 +102,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{}
 
@@ -160,7 +163,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{}
 
@@ -192,7 +195,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{}
 
@@ -215,8 +218,8 @@ func TestCheckin(t *testing.T) {
 
 				var req *Request
 
-				content, err := io.ReadAll(r.Body)
-				assert.NoError(t, err)
+				content, err := readMaybeCompressedCheckinBody(r)
+				require.NoError(t, err)
 				assert.NoError(t, json.Unmarshal(content, &req))
 				assert.Equal(t, "linux", req.Metadata.OS.Name)
 
@@ -226,7 +229,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{Metadata: testMetadata()}
 
@@ -249,8 +252,8 @@ func TestCheckin(t *testing.T) {
 
 				var req *Request
 
-				content, err := io.ReadAll(r.Body)
-				assert.NoError(t, err)
+				content, err := readMaybeCompressedCheckinBody(r)
+				require.NoError(t, err)
 				assert.NoError(t, json.Unmarshal(content, &req))
 				assert.Nil(t, req.Metadata)
 
@@ -260,7 +263,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{}
 
@@ -283,8 +286,8 @@ func TestCheckin(t *testing.T) {
 
 				var req *Request
 
-				content, err := io.ReadAll(r.Body)
-				assert.NoError(t, err)
+				content, err := readMaybeCompressedCheckinBody(r)
+				require.NoError(t, err)
 				assert.NoError(t, json.Unmarshal(content, &req))
 				assert.Nil(t, req.Metadata)
 
@@ -299,7 +302,7 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := NewCheckinCmd(agentInfo, client, defaultCompression)
 
 			request := CheckinRequest{}
 
@@ -314,4 +317,72 @@ func TestCheckin(t *testing.T) {
 			}
 		},
 	))
+}
+
+func TestCheckinCompression(t *testing.T) {
+	const withAPIKey = "secret"
+	const resp = `{"actions": []}`
+	agentInfo := &agentinfo{}
+
+	testCases := []struct {
+		name           string
+		compression    string
+		wantCompressed bool
+	}{{
+		name:           "compression=gzip - request body is compressed",
+		compression:    "gzip",
+		wantCompressed: true,
+	}, {
+		name:           "compression=none - request body is not compressed",
+		compression:    "none",
+		wantCompressed: false,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, withServerWithAuthClient(
+			func(t *testing.T) *http.ServeMux {
+				t.Helper()
+
+				mux := http.NewServeMux()
+				path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
+				mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
+					checkinPayload, err := readMaybeCompressedCheckinBody(r)
+					require.NoError(t, err)
+
+					if tc.wantCompressed {
+						assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
+					} else {
+						assert.Empty(t, r.Header.Get("Content-Encoding"))
+					}
+
+					var checkinRequest CheckinRequest
+					require.NoError(t, json.Unmarshal(checkinPayload, &checkinRequest))
+
+					w.WriteHeader(http.StatusOK)
+					fmt.Fprint(w, resp)
+				}, withAPIKey))
+				return mux
+			},
+			withAPIKey,
+			func(t *testing.T, client client.Sender) {
+				cmd := NewCheckinCmd(agentInfo, client, tc.compression)
+				_, _, err := cmd.Execute(t.Context(), &CheckinRequest{})
+				require.NoError(t, err)
+			},
+		))
+	}
+}
+
+func readMaybeCompressedCheckinBody(r *http.Request) ([]byte, error) {
+	if r.Header.Get("Content-Encoding") != "gzip" {
+		return io.ReadAll(r.Body)
+	}
+
+	gzipReader, err := gzip.NewReader(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer gzipReader.Close()
+
+	return io.ReadAll(gzipReader)
 }

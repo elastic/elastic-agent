@@ -96,19 +96,12 @@ import (
 )
 
 const (
-	goLicenserRepo    = "github.com/elastic/go-licenser"
-	buildDir          = "build"
-	metaDir           = "_meta"
-	snapshotEnv       = "SNAPSHOT"
-	devEnv            = "DEV"
-	fipsEnv           = "FIPS"
-	externalArtifacts = "EXTERNAL"
-	platformsEnv      = "PLATFORMS"
-	packagesEnv       = "PACKAGES"
-	dockerVariants    = "DOCKER_VARIANTS"
-	configFile        = "elastic-agent.yml"
-	checksumFilename  = "checksum.yml"
-	commitLen         = 7
+	goLicenserRepo   = "github.com/elastic/go-licenser"
+	buildDir         = "build"
+	metaDir          = "_meta"
+	configFile       = "elastic-agent.yml"
+	checksumFilename = "checksum.yml"
+	commitLen        = 7
 
 	cloudImageTmpl = "docker.elastic.co/observability-ci/elastic-agent:%s"
 
@@ -242,6 +235,12 @@ func (Prepare) InstallGoLicenser() error {
 	return GoInstall(goLicenserRepo)
 }
 
+// InstallGolangciLint downloads and installs golangci-lint using the version
+// specified in .tool-versions.
+func (Prepare) InstallGolangciLint() error {
+	return devtools.InstallGolangciLint()
+}
+
 // All build all the things for the current projects.
 func (Build) All() {
 	mg.Deps(Build.Binary)
@@ -295,7 +294,7 @@ func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch strin
 	if cfg.Build.FIPSBuild {
 		// there is no actual FIPS relevance for this particular binary
 		// but better safe than sorry
-		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips,ms_tls13kdf")
+		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
 		args.Env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
 		args.CGO = true
 	}
@@ -467,6 +466,18 @@ func (Check) All() {
 	mg.SerialDeps(Check.License, Integration.Check, Check.DocsFiles)
 }
 
+// Lint downloads golangci-lint and runs the linter on current changes only.
+func (Check) Lint(ctx context.Context) error {
+	mg.Deps(Prepare.InstallGolangciLint)
+	return devtools.Lint(ctx)
+}
+
+// LintAll downloads golangci-lint and runs the linter on the whole codebase.
+func (Check) LintAll() error {
+	mg.Deps(Prepare.InstallGolangciLint)
+	return devtools.LintAll()
+}
+
 // License makes sure that all the Golang files have the appropriate license header.
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
@@ -539,9 +550,18 @@ func (Test) Unit(ctx context.Context) error {
 // FIPSOnlyUnit runs all the unit tests with GODEBUG=fips140=only.
 func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.TestBinaries)
+
 	cfg := devtools.SettingsFromContext(ctx)
 	params := devtools.DefaultGoTestUnitArgs(cfg)
-	params.Env["GODEBUG"] = "fips140=only"
+	params.Env["FIPS"] = "true"
+
+	// We also set GODEBUG=tlsmlkem=0 to disable the X25519MLKEM768 TLS key
+	// exchange mechanism; without this setting and with the GODEBUG=fips140=only
+	// setting, we get errors in tests like so:
+	// Failed to connect: crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
+	// Note that we are only disabling this TLS key exchange mechanism in tests!
+	params.Env["GODEBUG"] = "fips140=only,tlsmlkem=0"
+	params.Tags = append(params.Tags, "requirefips")
 	return devtools.GoTest(ctx, params)
 }
 
@@ -3529,6 +3549,17 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 	params.Package = "."
 	params.ExtraFlags = append(params.ExtraFlags, "-tags=agentbeat")
 	injectBuildVars(cfg, params.Vars)
+
+	// Workaround for https://github.com/golang/go/issues/75077: the Go PE linker assigns
+	// duplicate virtual addresses to DWARF sections in large binaries, causing Windows to
+	// reject the executable. nodwarf5 avoids this. Only needed for dev builds since
+	// production builds strip debug symbols via -s in DefaultGolangCrossBuildArgs.
+	if cfg.Build.DevBuild && cfg.Build.GOOS == "windows" {
+		if params.Env == nil {
+			params.Env = map[string]string{}
+		}
+		params.Env["GOEXPERIMENT"] = "nodwarf5"
+	}
 
 	// embedded packetbeat is only included in a non-FIPS build
 	if !cfg.Build.FIPSBuild {

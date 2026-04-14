@@ -1,0 +1,75 @@
+# Azure verifier test using default credentials (az login).
+#
+# Prerequisites:
+#   az login
+#
+# The Azure subscription is discovered automatically at runtime by listing the
+# subscriptions visible to the authenticated principal — no subscription ID is
+# needed in the config.
+#
+# Run with:
+#   ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-azure.yaml
+
+receivers:
+  verifier:
+    identity_federation_id: "cc-test-azure"
+    identity_federation_name: "Azure Test"
+    account_type: "single-account"
+    verification_id: "verify-azure-001"
+    verification_type: "on_demand"
+
+    providers:
+      azure:
+        credentials:
+          use_default_credentials: true
+
+    policies:
+      - policy_id: "policy-azure-security"
+        policy_name: "Azure Security"
+        integrations:
+          - policy_template: "activitylogs"
+            package_name: "azure"
+            package_policy_id: "pp-activitylogs-001"
+            package_title: "Azure"
+          - policy_template: "cspm"
+            package_name: "azure"
+            package_policy_id: "pp-cspm-001"
+            package_title: "Azure"
+          - policy_template: "asset_inventory"
+            package_name: "azure"
+            package_policy_id: "pp-asset-001"
+            package_title: "Azure"
+          - policy_template: "blob_storage"
+            package_name: "azure"
+            package_policy_id: "pp-blob-001"
+            package_title: "Azure"
+
+processors:
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    logs:
+      receivers: [verifier]
+      processors: [resource/verifier]
+      exporters: [debug]

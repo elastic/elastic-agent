@@ -209,7 +209,7 @@ The EDOT Collector supports a wide range of metrics receivers for popular softwa
 
  - Redis ([redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver)): Retrieve Redis INFO data from a single Redis instance.
 
- - JMX-based applications ([jmxreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/jmxreceiver)): Open a child Java process running the JMX Metric Gatherer configured with your specified JMX connection information and target Groovy script. It then reports metrics to an implicitly created OTLP receiver.
+ - JMX-based applications: The `jmxreceiver` was removed in EDOT Collector 9.4.0. Use [JMX Scraper](https://github.com/open-telemetry/opentelemetry-java-contrib/tree/main/jmx-scraper) as a standalone Java program instead. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
 
  - Prometheus scrape targets ([prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)): Receives metric data in [Prometheus](https://prometheus.io/) format.
 

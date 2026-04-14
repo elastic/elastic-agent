@@ -168,15 +168,6 @@ func CrossBuild(ctx context.Context, cfg *Settings, options ...CrossBuildOption)
 	return nil
 }
 
-// CrossBuildXPack executes the 'golangCrossBuild' target in the Beat's
-// associated x-pack directory to produce a version of the Beat that contains
-// Elastic licensed content.
-func CrossBuildXPack(ctx context.Context, cfg *Settings, options ...CrossBuildOption) error {
-	o := []CrossBuildOption{InDir("x-pack", cfg.Beat.Name)}
-	o = append(o, options...)
-	return CrossBuild(ctx, cfg, o...)
-}
-
 // buildMage pre-compiles the magefile to a binary using the GOARCH parameter.
 // It has the benefit of speeding up the build because the
 // mage -compile is done only once rather than in each Docker container.
@@ -283,7 +274,10 @@ func (b GolangCrossBuilder) Build() error {
 		args = append(args, "--ulimit", "nofile=262144:262144")
 	}
 
-	if runtime.GOOS != "windows" {
+	// In rootless Docker, container UID 0 maps to the host user's UID, so files
+	// created as root inside the container are already owned by the correct user
+	// on the host.
+	if runtime.GOOS != "windows" && !isRootlessDocker() {
 		args = append(args,
 			"--env", fmt.Sprintf("EXEC_UID=%d", uid),
 			"--env", fmt.Sprintf("EXEC_GID=%d", gid),
@@ -342,6 +336,16 @@ func (b GolangCrossBuilder) Build() error {
 	)
 
 	return dockerRun(args...)
+}
+
+// isRootlessDocker returns true when the Docker daemon is running in rootless
+// mode.
+func isRootlessDocker() bool {
+	out, err := sh.Output("docker", "info", "--format", "{{.SecurityOptions}}")
+	if err != nil {
+		return false
+	}
+	return strings.Contains(out, "rootless")
 }
 
 // DockerChown chowns files generated during build. EXEC_UID and EXEC_GID must

@@ -399,6 +399,50 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	zeroDifferingFields(&agentStatus)
 	zeroDifferingFields(&otelStatus)
 	assert.Equal(t, agentStatus, otelStatus, "expected agent status to be equal to otel status")
+
+	// Make sure we haven't transferred any logs that are supposed to be dropped
+	findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer findCancel()
+	rawQuery := map[string]any{
+		"query": map[string]any{
+			"bool": map[string]any{
+				"filter": []map[string]any{
+					{
+						"terms": map[string]any{
+							"data_stream.namespace": []string{processNamespace, receiverNamespace},
+						},
+					},
+				},
+				"must": []map[string]any{
+					{
+						"bool": map[string]any{
+							"should": []map[string]any{
+								{
+									"match_phrase": map[string]any{
+										"message": "Non-zero metrics in the last",
+									},
+								},
+								{
+									"match_phrase": map[string]any{
+										"message": "Collector internal telemetry metrics updated",
+									},
+								},
+								{
+									"match_phrase": map[string]any{
+										"message": "No non-zero metrics in the last",
+									},
+								},
+							},
+							"minimum_should_match": 1,
+						},
+					},
+				},
+			},
+		},
+	}
+	docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, "logs-*", info.ESClient)
+	require.NoError(t, err)
+	require.Equal(t, 0, docs.Hits.Total.Value)
 }
 
 // TestAgentMetricsInput is a test that compares documents ingested by
@@ -586,22 +630,6 @@ outputs:
 			"agent.version",
 		}
 
-		stripNondeterminism := func(m mapstr.M, mset string) {
-			// These metrics will change from run to run
-			prefixes := []string{
-				fmt.Sprintf("system.%s", mset),
-				fmt.Sprintf("host.%s", mset),
-			}
-
-			for k := range m {
-				for _, prefix := range prefixes {
-					if strings.HasPrefix(k, prefix) {
-						m[k] = nil
-					}
-				}
-			}
-		}
-
 		testCases := []struct {
 			metricset     string
 			yieldDocsFunc func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M)
@@ -664,14 +692,31 @@ outputs:
 					}
 				})
 
-				stripNondeterminism(agentDoc, tt.metricset)
-				stripNondeterminism(otelDoc, tt.metricset)
+				StripNondeterminism(agentDoc, tt.metricset)
+				StripNondeterminism(otelDoc, tt.metricset)
 
 				AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for metricset "+tt.metricset)
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+tt.metricset)
 			})
 		}
 	})
+}
+
+// stripNondeterminism strips fields that are expected to change for system/metrics documents
+func StripNondeterminism(m mapstr.M, mset string) {
+	// These metrics will change from run to run
+	prefixes := []string{
+		fmt.Sprintf("system.%s", mset),
+		fmt.Sprintf("host.%s", mset),
+	}
+
+	for k := range m {
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(k, prefix) {
+				m[k] = nil
+			}
+		}
+	}
 }
 
 // TestBeatsReceiverLogs is a test that compares logs emitted by beats processes to those emitted by beats receivers.
@@ -1384,7 +1429,6 @@ func genIgnoredFields(goos string) []string {
 
 // TestSensitiveLogsESExporter tests sensitive logs from ex-exporter are not sent to fleet
 func TestSensitiveLogsESExporter(t *testing.T) {
-
 	// The ES exporter logs the original document on indexing failure only if
 	// the "telemetry::log_failed_docs_input" setting is enabled and the log level is set to debug.
 	info := define.Require(t, define.Requirements{
@@ -1558,7 +1602,7 @@ agent.logging.stderr: true
 	findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer findCancel()
 
-	docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, "logs-elastic_agent*", map[string]interface{}{
+	docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, "logs-elastic_agent*", map[string]any{
 		"log.type": "event",
 	})
 
@@ -1709,7 +1753,6 @@ agent.logging.stderr: true
 	// assert that error.reason is not part of monitoring logs
 	inputField := monitoringDoc.Hits.Hits[0].Source["error.reason"]
 	assert.Nil(t, inputField)
-
 }
 
 // setStrictMapping takes es client and index name
@@ -1717,12 +1760,12 @@ agent.logging.stderr: true
 // Useful to reproduce mapping conflicts required for testing
 func setStrictMapping(client *elasticsearch.Client, index string) error {
 	// Define the body
-	body := map[string]interface{}{
+	body := map[string]any{
 		"index_patterns": []string{index + "*"},
-		"template": map[string]interface{}{
-			"mappings": map[string]interface{}{
+		"template": map[string]any{
+			"mappings": map[string]any{
 				"dynamic": "strict",
-				"properties": map[string]interface{}{
+				"properties": map[string]any{
 					"@timestamp": map[string]string{"type": "date"},
 					"message":    map[string]string{"type": "integer"}, // we set message type to integer to cause mapping conflict
 				},

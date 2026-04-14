@@ -15,6 +15,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -61,9 +62,7 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier
 			InputType: make(map[string]string),
 		},
-		Output: map[string]string{
-			"logstash": string(ProcessRuntimeManager), // Force all inputs using the Logstash output to use the process runtime
-		},
+		Output: map[string]string{},
 	}
 }
 
@@ -95,7 +94,7 @@ func (r *RuntimeConfig) Validate() error {
 		}
 	}
 
-	allowedOutput := []string{"elasticsearch", "logstash"}
+	allowedOutput := []string{"elasticsearch", "logstash", "kafka"}
 	for name, runtime := range r.Output {
 		if !slices.Contains(allowedOutput, name) {
 			return fmt.Errorf("%s output is not supported", name)
@@ -298,6 +297,10 @@ type Component struct {
 	Component *proto.Component `yaml:"component,omitempty"`
 
 	OutputStatusReporting *StatusReporting `yaml:"-"`
+
+	// LastConfiguredAt records when the component was last configured.
+	// It resets whenever a new configuration is applied.
+	LastConfiguredAt time.Time `yaml:"-"`
 }
 
 type StatusReporting struct {
@@ -369,6 +372,17 @@ func (c *Component) BeatName() string {
 		return c.InputSpec.BeatName()
 	}
 	return ""
+}
+
+// OutputUnit returns the first output unit among c.Units, if any.
+// Agent-built components normally have at most one output unit; if several are present, the first is returned.
+func (c *Component) OutputUnit() (Unit, bool) {
+	for _, u := range c.Units {
+		if u.Type == client.UnitTypeOutput {
+			return u, true
+		}
+	}
+	return Unit{}, false
 }
 
 // GetBeatInputIDForUnit returns the ID of the corresponding input or module in the beat configuration for the unit.
@@ -637,6 +651,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
+					LastConfiguredAt:      time.Now(),
 				})
 			}
 		}
@@ -683,6 +698,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
+					LastConfiguredAt:      time.Now(),
 				})
 			}
 		}
