@@ -65,7 +65,7 @@ func UpgradeAgent(ctx context.Context, client *kibana.Client, agentID, version s
 
 // RollbackAgent requests a rollback for the given agent via the Fleet API.
 // TODO: Replace with a dedicated method once elastic-agent-libs supports
-// the rollback endpoint (POST /api/fleet/agents/{agentId}/rollback).
+// the rollback endpoint (https://github.com/elastic/elastic-agent-libs/pull/399).
 func RollbackAgent(ctx context.Context, client *kibana.Client, agentID string) error {
 	apiURL := fmt.Sprintf("/api/fleet/agents/%s/rollback", agentID)
 	resp, err := client.SendWithContext(ctx, http.MethodPost, apiURL, nil, nil, nil)
