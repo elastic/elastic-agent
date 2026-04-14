@@ -3030,18 +3030,17 @@ func (g *TestLogConsumer) Accept(l testcontainers.Log) {
 
 // TestSystemMetricsWithLogstashOutput tests that system metrics can be sent to Logstash output
 func TestSystemMetricsWithLogstashOutput(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: integration.Default,
-		Local: true,
-		OS: []define.OS{
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		},
-		Stack: &define.Stack{},
-	})
+	// define.Require(t, define.Requirements{
+	// 	Group: integration.Default,
+	// 	Local: true,
+	// 	OS: []define.OS{
+	// 		{Type: define.Linux},
+	// 		{Type: define.Darwin},
+	// 	},
+	// 	Stack: &define.Stack{},
+	// })
 
 	tempDir := t.TempDir()
-	require.NoError(t, os.Chmod(tempDir, 0o755))
 	pipeline := filepath.Join(tempDir, "pipelines.yml")
 	require.NoError(t, os.WriteFile(pipeline, []byte(pipelineTemplate), 0o644))
 	logstash_testdata := filepath.Join(tempDir, "logstash_testdata")
@@ -3049,8 +3048,18 @@ func TestSystemMetricsWithLogstashOutput(t *testing.T) {
 
 	composeContent := fmt.Sprintf(`
 services:
+  init-logstash:
+    image: busybox:latest
+    user: "0:0"
+    command: ["sh", "-c", "chown -R 1000:1000 /data"]
+    volumes:
+      - %s:/data
+    restart: "no"
   logstash:
     image: docker.elastic.co/logstash/logstash:9.2.2
+    depends_on:
+      init-logstash:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9600/_node/stats"]
       retries: 300
@@ -3062,7 +3071,7 @@ services:
       - 9600:9600
       - 5044:5044
       - 5055:5055
-`, pipeline, logstash_testdata)
+`, logstash_testdata, pipeline, logstash_testdata)
 
 	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
 	require.NoError(t, err)
