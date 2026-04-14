@@ -73,9 +73,11 @@ function ess_load_secrets() {
 
   echo "Loading the ESS stack secrets"
   local src_rc=0
-  # Source the secrets file
+  # Source the secrets file with allexport to make variables available outside the function
+  set -a
   # shellcheck source=/dev/null
   source "${secrets_file}" || src_rc=$?
+  set +a
   rm "$secrets_file" || true
   if [ "$src_rc" -ne 0 ]; then
     echo "Error: Failed to source secrets file (exit code ${src_rc})" >&2
