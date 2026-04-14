@@ -3051,7 +3051,7 @@ services:
   init-logstash:
     image: busybox:latest
     user: "0:0"
-    command: ["sh", "-c", "chown -R 1000:1000 /data"]
+    command: ["sh", "-c", "chown -R 1000:1000 /data && chmod 777 /data"]
     volumes:
       - %s:/data
     restart: "no"
