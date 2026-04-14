@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/snapshots"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/integration"
@@ -200,12 +201,12 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		}
 
 		t.Run(fmt.Sprintf("Upgrade RPM from %s - %q", tc.upgradeFromVersion.String(), tc.name), func(t *testing.T) {
-			testRpmUpgrade(t, tc.upgradeFromVersion, info, tc.installingServers, tc.expectingServers)
+			testRpmUpgrade(t, tc.upgradeFromVersion, info, tc.installingServers, tc.expectingServers, "")
 		})
 	}
 }
 
-func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info *define.Info, installingServers bool, expectingServers bool) {
+func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info *define.Info, installingServers bool, expectingServers bool, prefix string) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
@@ -244,6 +245,7 @@ func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 	}
 
 	installOpts := atesting.InstallOpts{
+		BasePath:       prefix,
 		NonInteractive: true,
 		Force:          true,
 		InstallServers: installingServers,
@@ -275,11 +277,14 @@ func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 	// 3. Upgrade rpm to the build version
 	srcPackage, err := endFixture.SrcPackage(ctx)
 	require.NoError(t, err)
-	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	cmdArgs := []string{"rpm", "-U", "-v"}
+	if prefix != "" {
+		cmdArgs = append(cmdArgs, "--prefix", prefix)
+	}
+	cmdArgs = append(cmdArgs, srcPackage)
+	out, err := exec.CommandContext(ctx, "sudo", cmdArgs...).CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	require.NoError(t, err, string(out))
 
-<<<<<<< HEAD
-=======
 	// Inform endFixture of the install prefix so FindRunDir resolves the
 	// correct data directory (e.g. /opt/elastic-agent/var/lib/elastic-agent).
 	if prefix != "" {
@@ -293,7 +298,6 @@ func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 		})
 	}
 
->>>>>>> 3714606be (Fix RPM prefix installation to copy service file instead of symlink. (#13284))
 	newRunDir, err := atesting.FindRunDir(endFixture)
 	require.NoError(t, err, "failed at getting run dir")
 	require.NotEqual(t, runDir, newRunDir, "the run dirs from upgrade should not match")
@@ -402,8 +406,6 @@ func TestRpmWithPrefix(t *testing.T) {
 		InstallServers: false,
 	}
 	testRpmLogIngestFleetManagedWithCheck(ctx, t, agentFixture, info, installOpts, nil)
-<<<<<<< HEAD
-=======
 
 	t.Run("service file is not a symlink into prefix after install", func(t *testing.T) {
 		checkServiceFileNotSymlinkInPrefix(t, installOpts.BasePath)
@@ -434,24 +436,45 @@ func TestRpmWithPrefix(t *testing.T) {
 
 		snapshotPackage, err := snapshotFixture.SrcPackage(ctx)
 		require.NoError(t, err)
+		snapshotFixture.SetInstallBasePath("/opt/elastic-agent")
 
+		// When the snapshot version differs from the local build, set up a
+		// migration marker so we can verify the data directory migration after
+		// upgrade. When versions match (same patch), the agent reuses the
+		// existing data directory so there is no migration to verify.
+		sameVersion := define.Version() == snapshotFixture.Version()
+		var runDir string
 		const migrationMarkerFile = "migration_marker.file"
-		runDir, err := atesting.FindRunDir(agentFixture)
-		require.NoError(t, err, "failed at getting run dir")
+		if !sameVersion {
+			runDir, err = atesting.FindRunDir(agentFixture)
+			require.NoError(t, err, "failed at getting run dir")
+			runMigrationMarker := filepath.Join(runDir, migrationMarkerFile)
+			f, err := os.Create(runMigrationMarker)
+			require.NoErrorf(t, err, "failed to create %q file", runMigrationMarker)
+			_ = f.Close()
+		}
 
-		out, err := exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", "--prefix", "/opt/elastic-agent", snapshotPackage).CombinedOutput()
+		// --force is needed because the latest snapshot version may match the
+		// locally built version (same patch), causing RPM to reject the upgrade
+		// with "already installed" errors.
+		out, err := exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", "--force", "--prefix", "/opt/elastic-agent", snapshotPackage).CombinedOutput()
+		require.NoError(t, err, string(out))
+
+		// RPM scriptlets do not restart the service for prefix installs; do it explicitly.
+		out, err = exec.CommandContext(ctx, "sudo", "systemctl", "restart", "elastic-agent").CombinedOutput()
 		require.NoError(t, err, string(out))
 
 		t.Run("service file is not a symlink into prefix after upgrade", func(t *testing.T) {
 			checkServiceFileNotSymlinkInPrefix(t, "/opt/elastic-agent")
 		})
 
-		// Verify upgrade succeeds - similar to testRpmUpgrade
-		newRunDir, err := atesting.FindRunDir(snapshotFixture)
-		require.NoError(t, err, "failed at getting run dir")
-		require.NotEqual(t, runDir, newRunDir, "the run dirs from upgrade should not match")
-		newRunMigrationMarker := filepath.Join(newRunDir, migrationMarkerFile)
-		require.FileExistsf(t, newRunMigrationMarker, "%q is missing", newRunMigrationMarker)
+		if !sameVersion {
+			newRunDir, err := atesting.FindRunDir(snapshotFixture)
+			require.NoError(t, err, "failed at getting run dir")
+			require.NotEqual(t, runDir, newRunDir, "the run dirs from upgrade should not match")
+			newRunMigrationMarker := filepath.Join(newRunDir, migrationMarkerFile)
+			require.FileExistsf(t, newRunMigrationMarker, "%q is missing", newRunMigrationMarker)
+		}
 
 		status, err := agentFixture.ExecStatus(ctx)
 		require.NoError(t, err)
@@ -512,5 +535,4 @@ func TestRpmWithPrefixUpgrade(t *testing.T) {
 		t.Skipf("unexpected upgrade sequence, %s is not less then %s", fromVersion.String(), currentVersion.String())
 	}
 	testRpmUpgrade(t, fromVersion, info, false, false, "/opt/elastic-agent")
->>>>>>> 3714606be (Fix RPM prefix installation to copy service file instead of symlink. (#13284))
 }
