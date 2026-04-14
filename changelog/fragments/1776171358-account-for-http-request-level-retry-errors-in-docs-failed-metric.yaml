@@ -11,16 +11,18 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Fix OTel runtime monitoring to report HTTP-level output retries in the failed docs count
+summary: Fix OTel runtime monitoring reporting zero failed docs for bulk requests that fail with retryable errors
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: >
   The OTel runtime monitoring now correctly reflects HTTP request-level
-  retry errors in `beat.stats.libbeat.output.events.failed`. Previously, only
-  document-level retries were counted, so transient failures such as HTTP 429
-  responses would leave the failed docs count at zero.
+  retry errors in `beat.stats.libbeat.output.events.failed`. When a bulk
+  request fails with a retryable status error, all documents in that request
+  are counted towards the failed docs metric. Previously, only document-level
+  retries were counted, so retryable HTTP errors would leave the failed docs
+  count at zero even when the exporter was actively retrying.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
