@@ -606,10 +606,13 @@ func Package(ctx context.Context) error {
 	// manifest is not passed into packageAgent below because we want packageAgent to go through the
 	// flow using the elastic-agent-core that was built above. if it was passed in, it would download
 	// elastic-agent-core from the manifest and it would not be the code from this repository in the package
-	cfg, err = cfg.WithManifestInfo(ctx)
+	cfgWithManifest, err := cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
+	// only take the snapshot and version from the manifest, we don't want the commit hash or dependency version
+	cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithBeatVersion(cfgWithManifest.BeatVersion())
+
 	if cfg.Packaging.ManifestURL != "" {
 		// don't download the elastic-agent-core components; built above
 		if err := downloadManifest(ctx, cfg, pkgSpec, packaging.WithoutProjectName(mage.AgentCoreProjectName)); err != nil {
