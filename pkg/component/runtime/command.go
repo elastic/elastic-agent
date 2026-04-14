@@ -404,10 +404,15 @@ func (c *commandRuntime) start(comm Communicator) error {
 	c.lastCheckin = time.Time{}
 	c.missedCheckins = 0
 
-	proc, err := process.Start(path,
+	startOpts := []process.StartOption{
 		process.WithArgs(args),
 		process.WithEnv(env),
-		process.WithCmdOptions(attachOutErr(c.logStd, c.logErr), dirPath(workDir)))
+		process.WithCmdOptions(attachOutErr(c.logStd, c.logErr), dirPath(workDir)),
+	}
+	if !process.HasConsole() {
+		startOpts = append(startOpts, process.WithNewConsole())
+	}
+	proc, err := process.Start(path, startOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to start process: %w", err)
 	}
