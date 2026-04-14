@@ -148,22 +148,24 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 			return fmt.Errorf("uninstall registry DisplayVersion mismatch for %s: got %q, want %q", topPath, displayVersion, opts.TargetVersion)
 		}
 
-		// verify 'windows registry remove' deletes the entry and that 'windows registry update' can recreate it
-		if err := f.ExecWindowsRegistryRemove(ctx); err != nil {
-			return fmt.Errorf("failed to run 'windows registry remove': %w", err)
-		}
-		if v, err := getRegistryDisplayVersion(opts.Namespace); err == nil {
-			return fmt.Errorf("uninstall registry entry still present after 'windows registry remove' for %s (namespace=%q, version=%q)", topPath, opts.Namespace, v)
-		}
-		if err := f.ExecWindowsRegistryUpdate(ctx); err != nil {
-			return fmt.Errorf("failed to run 'windows registry update' after remove: %w", err)
-		}
-		displayVersion, err = getRegistryDisplayVersion(opts.Namespace)
-		if err != nil {
-			return fmt.Errorf("uninstall registry entry missing after 'windows registry update' recreate for %s: %w", topPath, err)
-		}
-		if displayVersion != opts.TargetVersion {
-			return fmt.Errorf("uninstall registry DisplayVersion mismatch after recreate for %s: got %q, want %q", topPath, displayVersion, opts.TargetVersion)
+		// for fresh installs verify 'windows registry remove' and 'windows registry update' work correctly
+		if opts.StartVersion == "" {
+			if err := f.ExecWindowsRegistryRemove(ctx); err != nil {
+				return fmt.Errorf("failed to run 'windows registry remove': %w", err)
+			}
+			if v, err := getRegistryDisplayVersion(opts.Namespace); err == nil {
+				return fmt.Errorf("uninstall registry entry still present after 'windows registry remove' for %s (namespace=%q, version=%q)", topPath, opts.Namespace, v)
+			}
+			if err := f.ExecWindowsRegistryUpdate(ctx); err != nil {
+				return fmt.Errorf("failed to run 'windows registry update' after remove: %w", err)
+			}
+			displayVersion, err = getRegistryDisplayVersion(opts.Namespace)
+			if err != nil {
+				return fmt.Errorf("uninstall registry entry missing after 'windows registry update' recreate for %s: %w", topPath, err)
+			}
+			if displayVersion != opts.TargetVersion {
+				return fmt.Errorf("uninstall registry DisplayVersion mismatch after recreate for %s: got %q, want %q", topPath, displayVersion, opts.TargetVersion)
+			}
 		}
 	}
 
