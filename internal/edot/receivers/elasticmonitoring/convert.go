@@ -107,9 +107,7 @@ func addValue(metrics *exporterMetrics, name string, value int64) {
 		add(&metrics.failedMetrics, &value)
 	case otelDocsProcessedKey:
 		add(&metrics.docsProcessed, &value)
-	case otelDocsRetriedHTTPRequest:
-		fallthrough
-	case otelDocsRetriedKey:
+    case otelDocsRetriedKey, otelDocsRetriedHTTPRequest:
 		add(&metrics.docsRetried, &value)
 	case otelBulkRequestsKey:
 		add(&metrics.bulkRequests, &value)
