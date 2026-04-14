@@ -316,6 +316,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,
 			},
+			"suppress_conflict_errors": true,
 		}
 	}
 
