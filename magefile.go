@@ -4193,22 +4193,17 @@ func (h Helm) Package(ctx context.Context) error {
 	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
 	productionPackage := cfg.Build.SnapshotSet && !cfg.Build.Snapshot
 
-	agentVersion := bversion.GetParsedAgentPackageVersion()
-	agentCoreVersion := agentVersion.CoreVersion()
+	cfg, err := cfg.WithManifestInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed downloading manifest: %w", err)
+	}
+	agentCoreVersion := cfg.BeatVersion()
 	agentImageTag := agentCoreVersion
+	agentChartVersion := agentCoreVersion
 	if !productionPackage {
 		// always use the SNAPSHOT version for image tag if not a production package
-		agentImageTag = agentImageTag + "-SNAPSHOT"
-	}
-
-	agentChartVersion := agentCoreVersion + "-SNAPSHOT"
-	switch {
-	case productionPackage && agentVersion.Major() >= 9:
-		// for 9.0.0 and later versions, elastic-agent Helm chart is GA
-		agentChartVersion = agentCoreVersion
-	case productionPackage && agentVersion.Major() >= 8 && agentVersion.Minor() >= 18:
-		// for 8.18.0 and later versions, elastic-agent Helm chart is GA
-		agentChartVersion = agentCoreVersion
+		agentImageTag = agentImageTag + mage.SnapshotSuffix
+		agentChartVersion = agentChartVersion + mage.SnapshotSuffix
 	}
 
 	for yamlFile, keyVals := range map[string][]struct {
@@ -4241,7 +4236,7 @@ func (h Helm) Package(ctx context.Context) error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
+	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
 		func(format string, v ...interface{}) {})
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
