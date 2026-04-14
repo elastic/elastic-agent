@@ -744,6 +744,36 @@ func envMap(key string) map[string]string {
 	return m
 }
 
+func envStringMap(envKey string) map[string]string {
+	input, ok := os.LookupEnv(envKey)
+	if !ok {
+		return nil
+	}
+
+	// This regex captures:
+	// 1. A key (\w+)
+	// 2. An equals sign (=)
+	// 3. Either a quoted string "([^"]*)" OR unquoted characters ([^,]+)
+	re := regexp.MustCompile(`([\w\-]+)=(?:"([^"]*)"|([^,]+))`)
+	matches := re.FindAllStringSubmatch(input, -1)
+
+	result := make(map[string]string)
+	for _, match := range matches {
+		key := match[1]
+		quotedVal := match[2]
+		unquotedVal := match[3]
+
+		// Use whichever capture group found a match
+		if quotedVal != "" {
+			result[key] = quotedVal
+		} else {
+			result[key] = unquotedVal
+		}
+	}
+
+	return result
+}
+
 func isTrue(val string) bool {
 	trueVals := []string{"1", "true", "yes", "y"}
 	val = strings.ToLower(val)
