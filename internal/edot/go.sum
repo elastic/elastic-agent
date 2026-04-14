@@ -66,8 +66,8 @@ github.com/Azure/azure-sdk-for-go/sdk/azidentity/cache v0.3.2 h1:yz1bePFlP5Vws5+
 github.com/Azure/azure-sdk-for-go/sdk/azidentity/cache v0.3.2/go.mod h1:Pa9ZNPuoNu/GztvBSKk9J1cDJW6vk/n0zLtV4mgd8N8=
 github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2 h1:9iefClla7iYpfYWdzPCRDozdmndjTm8DXdpCzPajMgA=
 github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2/go.mod h1:XtLgD3ZD34DAaVIIAyG3objl5DynM3CQ/vMcbBNJZGI=
-github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs/v2 v2.0.2 h1:EBiOwZYJUMsjLGJ9x0oNY6ADf+5915P/jhhVcn42KXc=
-github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs/v2 v2.0.2/go.mod h1:NjuxmUsBJ0Ya9Xxjhjo06bj3/QB4C8z838I5S88UtQQ=
+github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs v1.3.1 h1:4mb4mIE2yDkBqvlmZr/xhZ/e0+Bkht6C4wbipLHnh3k=
+github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs v1.3.1/go.mod h1:QuMSx40eszn65tKXrzlWuGFRmZVCbloLXGXqct1RIoI=
 github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics v1.1.0 h1:X/C/tY3dxwsuFnSNArmTWKr0O6P59SRY6VsUcIkefEw=
 github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics v1.1.0/go.mod h1:wCAGp7Xm35A5laB8z8yK9p/kU8OEBFuTvUm4eKCzr/M=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0 h1:Hp+EScFOu9HeCbeW8WU2yQPJd4gGwhMgKxWe+G6jNzw=
