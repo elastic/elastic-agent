@@ -80,6 +80,7 @@ sending_queue:
   num_consumers: 60
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 user: elastic
 headers:
   X-Header-1: foo
@@ -143,6 +144,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
@@ -205,6 +207,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
@@ -269,6 +272,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
@@ -355,6 +359,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
  `,
 			},
 			{
@@ -372,6 +377,7 @@ sending_queue:
   num_consumers: 4
   queue_size: 12800
   wait_for_result: true
+suppress_conflict_errors: true
  `,
 			},
 			{
@@ -414,6 +420,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 compression: gzip
 compression_params:
   level: 1
@@ -439,6 +446,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 4100
   wait_for_result: true
+suppress_conflict_errors: true
  `,
 			},
 			{
@@ -456,6 +464,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
  `,
 			},
 		}
@@ -528,6 +537,7 @@ sending_queue:
   num_consumers: 60
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 user: elastic
 headers:
   X-Header-1: foo
@@ -589,6 +599,7 @@ sending_queue:
   num_consumers: 60
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 user: elastic
 headers:
   X-Header-1: foo
@@ -661,6 +672,7 @@ sending_queue:
   num_consumers: 2
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 {{ if gt . 0 }}
 compression: gzip
 compression_params:
