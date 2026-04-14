@@ -33,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
@@ -1318,6 +1319,170 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestBuildMergedConfigPreservesComponentExtensions verifies that
+// service::extensions from the component-generated config are not lost when
+// the user-supplied collector config also defines service::extensions.
+// This is the regression test for the merge-list-overwrite bug described in
+// https://github.com/elastic/elastic-agent/issues/13610.
+func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
+	// Set a temp top path so injectDiagnosticsExtension can compute a valid
+	// socket path without side-effects on the real paths.
+	topPath := paths.Top()
+	tempTopPath := t.TempDir()
+	paths.SetTop(tempTopPath)
+	t.Cleanup(func() { paths.SetTop(topPath) })
+
+	m := &OTelManager{
+		healthCheckExtComponentID: "healthcheckv2/test",
+		collectorMetricsPort:      0,
+	}
+
+	agentInfo := &info.AgentInfo{}
+	monitoringGetter := translate.BeatMonitoringConfigGetter(func(_, _ string) map[string]any { return nil })
+
+	// Component with elasticsearch output: translate.GetOtelConfig always
+	// generates a beatsauth extension for elasticsearch outputs.
+	fileStreamInputConfig := map[string]any{
+		"id":         "test",
+		"use_output": "default",
+		"streams": []any{
+			map[string]any{
+				"id": "test-1",
+				"data_stream": map[string]any{
+					"dataset": "generic-1",
+				},
+				"paths": []any{"/var/log/*.log"},
+			},
+		},
+	}
+	esOutputConfig := map[string]any{
+		"type":     "elasticsearch",
+		"hosts":    []any{"localhost:9200"},
+		"username": "elastic",
+		"password": "password",
+		"preset":   "balanced",
+	}
+	comp := component.Component{
+		ID:             "filestream-default",
+		InputType:      "filestream",
+		OutputType:     "elasticsearch",
+		OutputName:     "default",
+		RuntimeManager: component.OtelRuntimeManager,
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:     "filestream-unit",
+				Type:   client.UnitTypeInput,
+				Config: component.MustExpectedConfig(fileStreamInputConfig),
+			},
+			{
+				ID:     "filestream-default",
+				Type:   client.UnitTypeOutput,
+				Config: component.MustExpectedConfig(esOutputConfig),
+			},
+		},
+	}
+
+	// User-supplied collector config that defines its own service::extensions.
+	collectorCfg := confmap.NewFromStringMap(map[string]any{
+		"extensions": map[string]any{
+			"user_extension": map[string]any{},
+		},
+		"receivers": map[string]any{
+			"nop": map[string]any{},
+		},
+		"exporters": map[string]any{
+			"nop": map[string]any{},
+		},
+		"service": map[string]any{
+			"extensions": []any{"user_extension"},
+			"pipelines": map[string]any{
+				"logs": map[string]any{
+					"receivers": []any{"nop"},
+					"exporters": []any{"nop"},
+				},
+			},
+		},
+	})
+
+	cfgUpdate := configUpdate{
+		collectorCfg: collectorCfg,
+		components:   []component.Component{comp},
+	}
+
+	result, err := m.buildMergedConfig(cfgUpdate, agentInfo, monitoringGetter, logp.NewNopLogger())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	list := serviceExtensionsList(result)
+	require.NotNil(t, list, "service::extensions must be set in the merged config")
+
+	// The component-generated beatsauth extension must survive the merge.
+	assert.Contains(t, list, "beatsauth/_agent-component/default",
+		"component-generated beatsauth extension must be present in merged service::extensions")
+
+	// The user-supplied extension must also be present.
+	assert.Contains(t, list, "user_extension",
+		"user-supplied extension must be present in merged service::extensions")
+}
+
+// TestBuildMergedConfigCollectorOnlyExtensions verifies that when there are no
+// components (and therefore no component-generated extensions), the collector
+// config extensions are still preserved in the merged output.
+func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
+	topPath := paths.Top()
+	tempTopPath := t.TempDir()
+	paths.SetTop(tempTopPath)
+	t.Cleanup(func() { paths.SetTop(topPath) })
+
+	m := &OTelManager{
+		healthCheckExtComponentID: "healthcheckv2/test",
+		collectorMetricsPort:      0,
+	}
+
+	collectorCfg := confmap.NewFromStringMap(map[string]any{
+		"extensions": map[string]any{
+			"user_extension": map[string]any{},
+		},
+		"receivers": map[string]any{
+			"nop": map[string]any{},
+		},
+		"exporters": map[string]any{
+			"nop": map[string]any{},
+		},
+		"service": map[string]any{
+			"extensions": []any{"user_extension"},
+			"pipelines": map[string]any{
+				"logs": map[string]any{
+					"receivers": []any{"nop"},
+					"exporters": []any{"nop"},
+				},
+			},
+		},
+	})
+
+	cfgUpdate := configUpdate{
+		collectorCfg: collectorCfg,
+		// No components: componentOtelCfg will be nil.
+	}
+
+	result, err := m.buildMergedConfig(cfgUpdate, &info.AgentInfo{}, nil, logp.NewNopLogger())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	list := serviceExtensionsList(result)
+	require.NotNil(t, list)
+	assert.Contains(t, list, "user_extension",
+		"collector-config extension must be present in merged service::extensions")
 }
 
 func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
