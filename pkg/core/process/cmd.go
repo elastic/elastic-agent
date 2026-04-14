@@ -13,13 +13,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-<<<<<<< HEAD
-=======
 	"sync"
 	"syscall"
 
 	"golang.org/x/sys/windows"
->>>>>>> 4f3ae4975 (Fix clean stopping of beats on windows (#13581))
 )
 
 var (
@@ -44,8 +41,6 @@ func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ..
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, env...)
 	cmd.Dir = filepath.Dir(path)
-<<<<<<< HEAD
-=======
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		// Signals are sent to process groups, and child process are part of the
 		// parent's process group. So to send a signal to a
@@ -59,13 +54,10 @@ func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ..
 		// https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags
 		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP,
 	}
->>>>>>> 4f3ae4975 (Fix clean stopping of beats on windows (#13581))
 
 	return cmd, nil
 }
 
-<<<<<<< HEAD
-=======
 // HasConsole returns true if the current process has a console attached.
 // When running as a Windows service there is no console. Use this to
 // decide whether child processes need their own console via WithNewConsole.
@@ -99,15 +91,10 @@ func WithNewConsole() StartOption {
 }
 
 // killCmd calls Process.Kill
->>>>>>> 4f3ae4975 (Fix clean stopping of beats on windows (#13581))
 func killCmd(proc *os.Process) error {
 	return proc.Kill()
 }
 
-<<<<<<< HEAD
-func terminateCmd(proc *os.Process) error {
-	return proc.Kill()
-=======
 // terminateCmd sends CTRL_BREAK_EVENT to the process for graceful shutdown.
 //
 // If the process has its own console (newConsole=true, from WithNewConsole),
@@ -164,5 +151,4 @@ func attachAndBreak(proc *os.Process) error {
 	_, _, _ = procFreeConsole.Call()
 
 	return sendErr
->>>>>>> 4f3ae4975 (Fix clean stopping of beats on windows (#13581))
 }

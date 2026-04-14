@@ -25,15 +25,12 @@ type Info struct {
 	Process *os.Process
 	Stdin   io.WriteCloser
 	Stderr  io.ReadCloser
-<<<<<<< HEAD
-=======
 	Cmd     *exec.Cmd
 
 	// newConsole is set when the process was created with its own console
 	// (via WithNewConsole). On Windows this changes how Stop() delivers
 	// the shutdown signal.
 	newConsole bool
->>>>>>> 4f3ae4975 (Fix clean stopping of beats on windows (#13581))
 }
 
 // CmdOption is an option func to change the underlying command
@@ -206,14 +203,12 @@ func startContext(ctx context.Context, path string, uid, gid int, args []string,
 		Process: cmd.Process,
 		Stdin:   stdin,
 		Stderr:  stderr,
+		Cmd:     cmd,
 	}, err
 }
-<<<<<<< HEAD
-=======
 
 // Terminate is a utility function to gracefully shutdown a process.
 // It uses the direct signal path (no console attachment).
 func Terminate(proc *os.Process) error {
 	return terminateCmd(proc, false)
 }
->>>>>>> 4f3ae4975 (Fix clean stopping of beats on windows (#13581))
