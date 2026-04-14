@@ -378,6 +378,7 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 		filepath.Join(wd, "internal", "pkg", "otel", "manager", "testing"),
+		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
 	}
 	return testBinaryPkgs, nil
 }
