@@ -53,10 +53,12 @@ function ess_load_secrets() {
   local secrets_file="secrets.env.sh"
   oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${secrets_file}"
 
-  # Source the secrets file
-  # shellcheck source=/dev/null
+  # Source the secrets file with allexport to make variables available outside the function
   local src_rc=0
+  set -a
+  # shellcheck source=/dev/null
   source "${secrets_file}" || src_rc=$?
+  set +a
   rm "$secrets_file" || true
   if [ "$src_rc" -ne 0 ]; then
     echo "Error: Failed to source secrets file (exit code ${src_rc})" >&2
@@ -64,5 +66,5 @@ function ess_load_secrets() {
   fi
 
   # Print loaded variable names for debugging (not values)
-  env | grep -E '^(ELASTICSEARCH|KIBANA|FLEET_SERVER|INTEGRATIONS_SERVER|AGENT_POLICY_ID)' | cut -d= -f1 || true
+  env | grep -E '^(ELASTICSEARCH|KIBANA|FLEET_SERVER|INTEGRATIONS_SERVER)' | cut -d= -f1 || true
 }
