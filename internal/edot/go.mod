@@ -24,6 +24,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.42.0
 	github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.42.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.44.0
+	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.149.0
@@ -119,7 +120,6 @@ require (
 	github.com/go-openapi/swag/stringutils v0.25.4 // indirect
 	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
-	github.com/gofrs/uuid/v5 v5.4.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20260202012954-cb029daf43ef // indirect
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect

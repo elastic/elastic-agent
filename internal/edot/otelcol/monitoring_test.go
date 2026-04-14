@@ -184,7 +184,6 @@ service:
 	monitoringReceived := make(chan mapstr.M, 1)
 	var httpRequestCount int
 	var ingestedDocsCount int
-	var totalDocsInFailedRequests int
 
 	// Document-level handler
 	deterministicHandler := func(action api.Action, event []byte) int {
@@ -192,7 +191,8 @@ service:
 		require.NoError(t, json.Unmarshal(event, &curEvent))
 
 		if ok, _ := curEvent.HasKey("beat.stats"); ok {
-			// Only capture monitoring event after we've processed the initial startup event
+			// Only capture after the startup event and first interval event have been processed,
+			// so the captured event reflects cumulative metrics from both prior deliveries.
 			if ingestedDocsCount >= 2 {
 				monitoringReceived <- curEvent
 			}
@@ -222,9 +222,6 @@ service:
 
 		// Fail the first 3 HTTP requests: initial request + retries
 		if httpRequestCount <= 3 {
-			// Each monitoring event is included as a batch
-			totalDocsInFailedRequests += 1
-
 			// force a retry
 			w.WriteHeader(http.StatusTooManyRequests)
 			w.Write([]byte("Too Many Requests"))
