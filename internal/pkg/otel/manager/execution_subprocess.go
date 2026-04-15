@@ -140,7 +140,7 @@ func (r *subprocessExecution) startCollector(
 	if err != nil || processInfo.Process == nil {
 		// we failed to start the process
 		if err == nil {
-			err = errors.New("failed to start supervised collector: process is nil")
+			err = errors.New("process is nil")
 		}
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
@@ -423,10 +423,11 @@ loop:
 
 // reportProcessExitErr waits for the collector process to exit and reports the exit status.
 func (s *procHandle) reportProcessExitErr(ctx context.Context, procState processExitState, procErr error) {
+	var allErrors []error
+
 	// if we got an error, report it
 	if procErr != nil {
-		s.reportErrFn(ctx, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
-		return
+		allErrors = append(allErrors, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
 	}
 
 	// if the process exited with an error, get the information from logs
@@ -444,12 +445,11 @@ func (s *procHandle) reportProcessExitErr(ctx context.Context, procState process
 			// neither case use standard process error
 			procReportErr = fmt.Errorf("supervised collector (pid: %d) exited with error: %s", procState.Pid(), procState.String())
 		}
-		s.reportErrFn(ctx, procReportErr)
-		return
+		allErrors = append(allErrors, procReportErr)
 	}
 
-	// exited successfully, report a nil error
-	s.reportErrFn(ctx, nil)
+	// report all the encountered errors
+	s.reportErrFn(ctx, errors.Join(allErrors...))
 }
 
 // writeToPipe owns the pipe lifecycle. It loops writing configs queued via configCh until the process

@@ -480,6 +480,19 @@ func TestProcHandle_ReportProcessExitErr(t *testing.T) {
 		require.Len(t, captured.errs, 1)
 		assert.NoError(t, captured.errs[0])
 	})
+
+	t.Run("procErr_and_failed_exit_are_both_reported", func(t *testing.T) {
+		// When Process.Wait() returns both an error and a non-successful state,
+		// reportProcessExitErr must join both into a single error rather than
+		// discarding one via an early return.
+		h, captured := makeHandle(t)
+		require.NoError(t, h.stdErrLast.Write(zapcore.Entry{Message: "collector crashed"}, nil))
+		h.reportProcessExitErr(t.Context(), &fakeExitState{success: false, pid: 42, str: "exit status 1"}, errors.New("wait failed"))
+		require.Len(t, captured.errs, 1)
+		require.Error(t, captured.errs[0])
+		assert.Contains(t, captured.errs[0].Error(), "wait failed")
+		assert.Contains(t, captured.errs[0].Error(), "collector crashed")
+	})
 }
 
 // newMonitorTestHandle creates a procHandle suitable for monitorHealth unit tests.
