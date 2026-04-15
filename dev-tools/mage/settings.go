@@ -25,7 +25,9 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
+	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -42,6 +44,8 @@ const (
 
 	// ManifestUrlEnvVar is the name of the environment variable containing the Manifest URL used for packaging agent
 	ManifestUrlEnvVar = "MANIFEST_URL"
+	// AgentCoreProjectName is the project name for elastic-agent-core in the build manifest.
+	AgentCoreProjectName = "elastic-agent-core"
 	// AgentCommitHashEnvVar allows to override agent commit hash string during packaging
 
 	// Mapped functions
@@ -859,6 +863,38 @@ func (s *Settings) WithAgentCommitHashOverride(hash string) *Settings {
 	return clone
 }
 
+// WithManifestInfo downloads the manifest at ManifestURL and applies version information to a copy of
+// the settings. It sets Build.Snapshot, Build.BeatVersion, Build.AgentCommitHashOverride,
+// Build.DependenciesVersion, and Packaging.Manifest. It is a no-op if ManifestURL is empty.
+func (s *Settings) WithManifestInfo(ctx context.Context) (*Settings, error) {
+	if s.Packaging.ManifestURL == "" {
+		return s, nil
+	}
+
+	resp, err := manifest.DownloadManifest(ctx, s.Packaging.ManifestURL)
+	if err != nil {
+		return nil, fmt.Errorf("downloading manifest: %w", err)
+	}
+
+	parsedVersion, err := version.ParseVersion(resp.Version)
+	if err != nil {
+		return nil, fmt.Errorf("parsing manifest version %s: %w", resp.Version, err)
+	}
+
+	agentCoreProject, ok := resp.Projects[AgentCoreProjectName]
+	if !ok {
+		return nil, fmt.Errorf("%q project not found in manifest %q", AgentCoreProjectName, s.Packaging.ManifestURL)
+	}
+
+	clone := s.Clone()
+	clone.Packaging.Manifest = &resp
+	clone.Build.Snapshot = parsedVersion.IsSnapshot()
+	clone.Build.BeatVersion = parsedVersion.CoreVersion()
+	clone.Build.AgentCommitHashOverride = agentCoreProject.CommitHash
+	clone.Build.DependenciesVersion = parsedVersion.VersionWithPrerelease()
+	return clone, nil
+}
+
 // WithAgentDropPath returns a copy of the settings with the specified agent drop path.
 func (s *Settings) WithAgentDropPath(path string) *Settings {
 	clone := s.Clone()
@@ -946,6 +982,10 @@ type BuildSettings struct {
 
 	// AgentCommitHashOverride overrides the commit hash for packaging (from AGENT_COMMIT_HASH_OVERRIDE or set programmatically)
 	AgentCommitHashOverride string
+
+	// DependenciesVersion is the version string used when resolving manifest dependency packages (VersionWithPrerelease).
+	// Populated by WithManifestInfo when ManifestURL is set.
+	DependenciesVersion string
 
 	// commitHash is the commit hash of the current build. Can be overridden via the AGENT_COMMIT_HASH_OVERRIDE env var.
 	// We lazy load this value, because inside crossbuild containers, fetching it can fail.
@@ -1060,8 +1100,8 @@ type PackagingSettings struct {
 	// ManifestURL is the location of manifest file for packaging (from MANIFEST_URL env var)
 	ManifestURL string
 
-	// PackagingFromManifest indicates whether to use manifest for packaging (derived from ManifestURL)
-	PackagingFromManifest bool
+	// Manifest is the downloaded manifest response. Populated by WithManifestInfo when ManifestURL is set.
+	Manifest *manifest.Build
 
 	// UsePackageVersion enables reading version from .package-version file (from USE_PACKAGE_VERSION env var)
 	UsePackageVersion bool
@@ -1420,7 +1460,6 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 	}
 	if v := os.Getenv("MANIFEST_URL"); v != "" {
 		s.Packaging.ManifestURL = v
-		s.Packaging.PackagingFromManifest = true
 	}
 	if os.Getenv("USE_PACKAGE_VERSION") == "true" {
 		s.Packaging.UsePackageVersion = true
@@ -1434,7 +1473,7 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 
 	// Apply .package-version overrides when USE_PACKAGE_VERSION is set.
 	// This mirrors the old initPackageVersion() behavior: read the file,
-	// set ManifestURL / PackagingFromManifest / AgentDropPath so the
+	// set ManifestURL / AgentDropPath so the
 	// packaging path downloads components from the manifest instead of
 	// fetching them individually. Values from the .package-version file
 	// take precedence over environment variables.
@@ -1444,7 +1483,6 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 			log.Printf("Warning: failed to get package version info: %v", err)
 		}
 		if pv != nil {
-			s.Packaging.PackagingFromManifest = true
 			s.Packaging.ManifestURL = pv.ManifestURL
 			s.Packaging.AgentPackageVersion = pv.CoreVersion
 			s.Build.BeatVersion = pv.CoreVersion
