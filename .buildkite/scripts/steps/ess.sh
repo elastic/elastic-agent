@@ -3,68 +3,68 @@ set -euo pipefail
 
 function ess_up() {
   echo "~~~ Starting ESS Stack"
+  local WORKSPACE=$(git rev-parse --show-toplevel)
+  local TF_DIR="${WORKSPACE}/test_infra/ess/"
   local STACK_VERSION=$1
-
+  local STACK_BUILD_ID=${2:-""}
+  local ESS_REGION=${3:-"gcp-us-west2"}
+    
   if [ -z "$STACK_VERSION" ]; then
     echo "Error: Specify stack version: ess_up [stack_version]" >&2
     return 1
   fi
 
-  # Create a cluster with the specified stack version and store the cluster information in a file
-  oblt-cli cluster create custom \
-      --template ess-ea-it \
-      --cluster-name-prefix ea-hosted-it \
-      --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$STACK_VERSION\"}" \
-      --output-file="${PWD}/cluster-info.json" \
-      --wait 15
+  BUILDKITE_BUILD_CREATOR="${BUILDKITE_BUILD_CREATOR:-"$(get_git_user_email)"}"
+  BUILDKITE_BUILD_NUMBER="${BUILDKITE_BUILD_NUMBER:-"0"}"
+  BUILDKITE_PIPELINE_SLUG="${BUILDKITE_PIPELINE_SLUG:-"elastic-agent-integration-tests"}"
+  
+  pushd "${TF_DIR}"    
+  terraform init
+  terraform apply \
+    -auto-approve \
+    -var="stack_version=${STACK_VERSION}" \
+    -var="stack_build_id=${STACK_BUILD_ID}" \
+    -var="ess_region=${ESS_REGION}" \
+    -var="creator=${BUILDKITE_BUILD_CREATOR}" \
+    -var="buildkite_id=${BUILDKITE_BUILD_NUMBER}" \
+    -var="pipeline=${BUILDKITE_PIPELINE_SLUG}"
 
-  # Extract the cluster name from the cluster information file
-  CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
-  if [ -z "${CLUSTER_NAME}" ] || [ "${CLUSTER_NAME}" = "null" ]; then
-    echo "Error: Failed to extract ClusterName from cluster-info.json" >&2
-    return 1
-  fi
-
-  # Store the cluster name as a meta-data
-  METADATA_PREFIX="${METADATA_PREFIX:-""}"
-  buildkite-agent meta-data set "${METADATA_PREFIX}cluster-name" "${CLUSTER_NAME}"
-
-  ess_load_secrets
+  export ELASTICSEARCH_HOST=$(terraform output -raw es_host)
+  export ELASTICSEARCH_USERNAME=$(terraform output -raw es_username)
+  export ELASTICSEARCH_PASSWORD=$(terraform output -raw es_password)
+  export KIBANA_HOST=$(terraform output -raw kibana_endpoint)
+  export KIBANA_USERNAME=$ELASTICSEARCH_USERNAME
+  export KIBANA_PASSWORD=$ELASTICSEARCH_PASSWORD
+  export INTEGRATIONS_SERVER_HOST=$(terraform output -raw integrations_server_endpoint)
+  popd
 }
 
 function ess_down() {
   echo "~~~ Tearing down the ESS Stack"
-  METADATA_PREFIX="${METADATA_PREFIX:-""}"
-  # Get the cluster name from the meta-data
-  CLUSTER_NAME="$(buildkite-agent meta-data get "${METADATA_PREFIX}cluster-name")"
-
-  # Destroy the cluster
-  oblt-cli cluster destroy --cluster-name "${CLUSTER_NAME}" --force
+  local ESS_REGION=${1:-"gcp-us-west2"}
+  local WORKSPACE=$(git rev-parse --show-toplevel)
+  local TF_DIR="${WORKSPACE}/test_infra/ess/"
+  
+  pushd "${TF_DIR}"
+  terraform init
+  terraform destroy -auto-approve \
+    -var="ess_region=${ESS_REGION}"
+  popd
 }
 
-function ess_load_secrets() {
-  echo "~~~ Loading ESS Stack secrets"
-
-  METADATA_PREFIX="${METADATA_PREFIX:-""}"
-  # Get the cluster name from the meta-data
-  CLUSTER_NAME="$(buildkite-agent meta-data get "${METADATA_PREFIX}cluster-name")"
-
-  # Load the ESS stack secrets
-  local secrets_file="secrets.env.sh"
-  oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${secrets_file}"
-
-  # Source the secrets file with allexport to make variables available outside the function
-  local src_rc=0
-  set -a
-  # shellcheck source=/dev/null
-  source "${secrets_file}" || src_rc=$?
-  set +a
-  rm "$secrets_file" || true
-  if [ "$src_rc" -ne 0 ]; then
-    echo "Error: Failed to source secrets file (exit code ${src_rc})" >&2
-    return 1
+function get_git_user_email() {
+  if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    echo "unknown"  
+    return
   fi
 
-  # Print loaded variable names for debugging (not values)
-  env | grep -E '^(ELASTICSEARCH|KIBANA|FLEET_SERVER|INTEGRATIONS_SERVER)' | cut -d= -f1 || true
+  local email
+  email=$(git config --get user.email)
+  
+  if [ -z "$email" ]; then
+    echo "unknown"  
+  else
+    echo "$email"
+  fi
 }
+
