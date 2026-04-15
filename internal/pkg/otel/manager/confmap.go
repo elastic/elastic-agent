@@ -4,21 +4,27 @@
 
 package manager
 
-import "go.opentelemetry.io/collector/confmap"
+import (
+	"fmt"
+
+	"go.opentelemetry.io/collector/confmap"
+)
 
 // serviceExtensionsList returns a copy of the service::extensions list from
-// config, or nil if the key is not set or its value is not a []interface{}.
-func serviceExtensionsList(config *confmap.Conf) []interface{} {
+// config, or nil if the key is not set. It returns an error if the value is
+// set but is not a []interface{}.
+func serviceExtensionsList(config *confmap.Conf) ([]interface{}, error) {
 	if !config.IsSet("service::extensions") {
-		return nil
+		return nil, nil
 	}
-	list, ok := config.Get("service::extensions").([]interface{})
+	raw := config.Get("service::extensions")
+	list, ok := raw.([]interface{})
 	if !ok {
-		return nil
+		return nil, fmt.Errorf("service::extensions: expected []interface{}, got %T", raw)
 	}
 	result := make([]interface{}, len(list))
 	copy(result, list)
-	return result
+	return result, nil
 }
 
 // mergeWithExtensions merges src into dst using confmap.Conf.Merge semantics
@@ -27,8 +33,14 @@ func serviceExtensionsList(config *confmap.Conf) []interface{} {
 // This prevents confmap's list-overwrite semantics from silently dropping
 // extensions already registered in dst.
 func mergeWithExtensions(dst, src *confmap.Conf) error {
-	dstExtensions := serviceExtensionsList(dst)
-	srcExtensions := serviceExtensionsList(src)
+	dstExtensions, err := serviceExtensionsList(dst)
+	if err != nil {
+		return fmt.Errorf("merge into service::extensions failed: %w", err)
+	}
+	srcExtensions, err := serviceExtensionsList(src)
+	if err != nil {
+		return fmt.Errorf("merge into service::extensions failed: %w", err)
+	}
 
 	if err := dst.Merge(src); err != nil {
 		return err

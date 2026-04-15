@@ -72,13 +72,6 @@ func AllComponentsStatuses(ctx context.Context, client http.Client, httpHealthCh
 
 // injectHealthCheckV2Extension injects the healthcheckv2 extension into the provided configuration.
 func injectHealthCheckV2Extension(conf *confmap.Conf, healthCheckExtensionID string, httpHealthCheckPort int) error {
-	// Reject configs where service::extensions is set but not a []interface{}.
-	extensionsRaw := conf.Get("service::extensions")
-	if extensionsRaw != nil {
-		if _, ok := extensionsRaw.([]interface{}); !ok {
-			return fmt.Errorf("merge into service::extensions failed: expected []interface{}, got %T", extensionsRaw)
-		}
-	}
 	return mergeWithExtensions(conf, confmap.NewFromStringMap(map[string]interface{}{
 		"extensions": map[string]interface{}{
 			healthCheckExtensionID: map[string]interface{}{

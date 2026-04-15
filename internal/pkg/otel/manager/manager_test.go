@@ -1423,7 +1423,8 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	list := serviceExtensionsList(result)
+	list, err := serviceExtensionsList(result)
+	require.NoError(t, err)
 	require.NotNil(t, list, "service::extensions must be set in the merged config")
 
 	// The component-generated beatsauth extension must survive the merge.
@@ -1479,7 +1480,8 @@ func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	list := serviceExtensionsList(result)
+	list, err := serviceExtensionsList(result)
+	require.NoError(t, err)
 	require.NotNil(t, list)
 	assert.Contains(t, list, "user_extension",
 		"collector-config extension must be present in merged service::extensions")

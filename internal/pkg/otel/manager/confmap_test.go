@@ -15,7 +15,9 @@ import (
 func TestServiceExtensionsList(t *testing.T) {
 	t.Run("not set returns nil", func(t *testing.T) {
 		cfg := confmap.New()
-		assert.Nil(t, serviceExtensionsList(cfg))
+		list, err := serviceExtensionsList(cfg)
+		require.NoError(t, err)
+		assert.Nil(t, list)
 	})
 
 	t.Run("empty list", func(t *testing.T) {
@@ -24,7 +26,8 @@ func TestServiceExtensionsList(t *testing.T) {
 				"extensions": []any{},
 			},
 		})
-		list := serviceExtensionsList(cfg)
+		list, err := serviceExtensionsList(cfg)
+		require.NoError(t, err)
 		assert.NotNil(t, list)
 		assert.Empty(t, list)
 	})
@@ -35,8 +38,21 @@ func TestServiceExtensionsList(t *testing.T) {
 				"extensions": []any{"ext_a", "ext_b"},
 			},
 		})
-		list := serviceExtensionsList(cfg)
+		list, err := serviceExtensionsList(cfg)
+		require.NoError(t, err)
 		assert.Equal(t, []interface{}{"ext_a", "ext_b"}, list)
+	})
+
+	t.Run("wrong type returns error", func(t *testing.T) {
+		cfg := confmap.NewFromStringMap(map[string]any{
+			"service": map[string]any{
+				"extensions": "not-a-slice",
+			},
+		})
+		list, err := serviceExtensionsList(cfg)
+		require.Error(t, err)
+		assert.Nil(t, list)
+		assert.Contains(t, err.Error(), "expected []interface{}")
 	})
 
 	t.Run("returns a copy, not a reference", func(t *testing.T) {
@@ -45,10 +61,13 @@ func TestServiceExtensionsList(t *testing.T) {
 				"extensions": []any{"ext_a"},
 			},
 		})
-		list := serviceExtensionsList(cfg)
+		list, err := serviceExtensionsList(cfg)
+		require.NoError(t, err)
 		list[0] = "mutated"
 		// Original config must be unchanged.
-		assert.Equal(t, []interface{}{"ext_a"}, serviceExtensionsList(cfg))
+		original, err := serviceExtensionsList(cfg)
+		require.NoError(t, err)
+		assert.Equal(t, []interface{}{"ext_a"}, original)
 	})
 }
 
@@ -56,12 +75,18 @@ func TestMergeWithExtensions(t *testing.T) {
 	makeConf := func(data map[string]any) *confmap.Conf {
 		return confmap.NewFromStringMap(data)
 	}
+	extList := func(t *testing.T, cfg *confmap.Conf) []interface{} {
+		t.Helper()
+		list, err := serviceExtensionsList(cfg)
+		require.NoError(t, err)
+		return list
+	}
 
 	t.Run("no-op when neither side has extensions", func(t *testing.T) {
 		dst := makeConf(map[string]any{"receivers": map[string]any{"nop": nil}})
 		src := makeConf(map[string]any{"exporters": map[string]any{"nop": nil}})
 		require.NoError(t, mergeWithExtensions(dst, src))
-		assert.Nil(t, serviceExtensionsList(dst))
+		assert.Nil(t, extList(t, dst))
 	})
 
 	t.Run("dst extensions preserved when src has none", func(t *testing.T) {
@@ -70,7 +95,7 @@ func TestMergeWithExtensions(t *testing.T) {
 		})
 		src := makeConf(map[string]any{"receivers": map[string]any{"nop": nil}})
 		require.NoError(t, mergeWithExtensions(dst, src))
-		assert.Equal(t, []interface{}{"ext_a"}, serviceExtensionsList(dst))
+		assert.Equal(t, []interface{}{"ext_a"}, extList(t, dst))
 	})
 
 	t.Run("src extensions adopted when dst has none", func(t *testing.T) {
@@ -79,7 +104,7 @@ func TestMergeWithExtensions(t *testing.T) {
 			"service": map[string]any{"extensions": []any{"ext_b"}},
 		})
 		require.NoError(t, mergeWithExtensions(dst, src))
-		assert.Equal(t, []interface{}{"ext_b"}, serviceExtensionsList(dst))
+		assert.Equal(t, []interface{}{"ext_b"}, extList(t, dst))
 	})
 
 	t.Run("union when both sides have extensions", func(t *testing.T) {
@@ -90,7 +115,7 @@ func TestMergeWithExtensions(t *testing.T) {
 			"service": map[string]any{"extensions": []any{"ext_b", "shared"}},
 		})
 		require.NoError(t, mergeWithExtensions(dst, src))
-		list := serviceExtensionsList(dst)
+		list := extList(t, dst)
 		assert.Len(t, list, 3)
 		assert.Contains(t, list, "ext_a")
 		assert.Contains(t, list, "ext_b")
@@ -105,7 +130,7 @@ func TestMergeWithExtensions(t *testing.T) {
 			"service": map[string]any{"extensions": []any{"third"}},
 		})
 		require.NoError(t, mergeWithExtensions(dst, src))
-		list := serviceExtensionsList(dst)
+		list := extList(t, dst)
 		require.Len(t, list, 3)
 		assert.Equal(t, "first", list[0])
 		assert.Equal(t, "second", list[1])
@@ -120,7 +145,20 @@ func TestMergeWithExtensions(t *testing.T) {
 			"service": map[string]any{"extensions": []any{"ext_a", "ext_b"}},
 		})
 		require.NoError(t, mergeWithExtensions(dst, src))
-		assert.Equal(t, []interface{}{"ext_a", "ext_b"}, serviceExtensionsList(dst))
+		assert.Equal(t, []interface{}{"ext_a", "ext_b"}, extList(t, dst))
+	})
+
+	t.Run("wrong type in dst returns error", func(t *testing.T) {
+		dst := makeConf(map[string]any{
+			"service": map[string]any{"extensions": "not-a-slice"},
+		})
+		src := makeConf(map[string]any{
+			"service": map[string]any{"extensions": []any{"ext_b"}},
+		})
+		err := mergeWithExtensions(dst, src)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "merge into service::extensions failed")
+		assert.Contains(t, err.Error(), "expected []interface{}")
 	})
 
 	t.Run("other keys merged normally", func(t *testing.T) {
@@ -135,7 +173,7 @@ func TestMergeWithExtensions(t *testing.T) {
 		require.NoError(t, mergeWithExtensions(dst, src))
 		assert.True(t, dst.IsSet("receivers::r1"))
 		assert.True(t, dst.IsSet("exporters::e1"))
-		list := serviceExtensionsList(dst)
+		list := extList(t, dst)
 		assert.Len(t, list, 2)
 		assert.Contains(t, list, "ext_a")
 		assert.Contains(t, list, "ext_b")
