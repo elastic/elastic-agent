@@ -117,9 +117,7 @@ func TestMergeWithExtensions(t *testing.T) {
 		require.NoError(t, mergeWithExtensions(dst, src))
 		list := extList(t, dst)
 		assert.Len(t, list, 3)
-		assert.Contains(t, list, "ext_a")
-		assert.Contains(t, list, "ext_b")
-		assert.Contains(t, list, "shared")
+		assert.Equal(t, []any{"ext_a", "ext_b", "shared"}, list)
 	})
 
 	t.Run("dst entries appear before src-only entries", func(t *testing.T) {
@@ -142,7 +140,7 @@ func TestMergeWithExtensions(t *testing.T) {
 			"service": map[string]any{"extensions": []any{"ext_a", "ext_b"}},
 		})
 		src := makeConf(map[string]any{
-			"service": map[string]any{"extensions": []any{"ext_a", "ext_b"}},
+			"service": map[string]any{"extensions": []any{"ext_a"}},
 		})
 		require.NoError(t, mergeWithExtensions(dst, src))
 		assert.Equal(t, []interface{}{"ext_a", "ext_b"}, extList(t, dst))

@@ -12,26 +12,27 @@ import (
 
 // serviceExtensionsList returns a copy of the service::extensions list from
 // config, or nil if the key is not set. It returns an error if the value is
-// set but is not a []interface{}.
-func serviceExtensionsList(config *confmap.Conf) ([]interface{}, error) {
+// set but is not a []any.
+func serviceExtensionsList(config *confmap.Conf) ([]any, error) {
 	if !config.IsSet("service::extensions") {
 		return nil, nil
 	}
 	raw := config.Get("service::extensions")
-	list, ok := raw.([]interface{})
+	list, ok := raw.([]any)
 	if !ok {
-		return nil, fmt.Errorf("service::extensions: expected []interface{}, got %T", raw)
+		return nil, fmt.Errorf("service::extensions: expected []any, got %T", raw)
 	}
-	result := make([]interface{}, len(list))
+	result := make([]any, len(list))
 	copy(result, list)
 	return result, nil
 }
 
 // mergeWithExtensions merges src into dst using confmap.Conf.Merge semantics
-// for all keys, except for service::extensions where the two lists are unioned:
-// dst's original entries come first, then any src-only entries are appended.
-// This prevents confmap's list-overwrite semantics from silently dropping
-// extensions already registered in dst.
+// for all keys, except for service::extensions where the two lists are unioned
+// with ordering consistent with both input lists. Elements common to both
+// lists act as anchors: unique elements that precede an anchor in their
+// respective list are interleaved before it, preserving each list's relative
+// ordering in the result.
 func mergeWithExtensions(dst, src *confmap.Conf) error {
 	dstExtensions, err := serviceExtensionsList(dst)
 	if err != nil {
@@ -47,28 +48,59 @@ func mergeWithExtensions(dst, src *confmap.Conf) error {
 	}
 
 	// If at most one side contributes extensions, the merge result is correct:
-	// either nothing was present (both nil/empty) or one side provided the full list.
+	// either nothing was present or one side provided the full list.
 	if len(dstExtensions) == 0 || len(srcExtensions) == 0 {
 		return nil
 	}
 
 	// After the merge, dst's service::extensions equals srcExtensions (overwritten).
-	// Rebuild the union: dst's original entries first, then any src-only entries.
-	inDst := make(map[interface{}]struct{}, len(dstExtensions))
-	for _, e := range dstExtensions {
-		inDst[e] = struct{}{}
-	}
-	combined := make([]interface{}, len(dstExtensions), len(dstExtensions)+len(srcExtensions))
-	copy(combined, dstExtensions)
-	for _, e := range srcExtensions {
-		if _, ok := inDst[e]; !ok {
-			combined = append(combined, e)
-		}
-	}
-	if len(combined) == len(dstExtensions) {
-		return nil // all src entries were already in dst; no write needed
-	}
+	// Rebuild the union with ordering consistent with both input lists.
+	combined := mergeExtensionLists(dstExtensions, srcExtensions)
 	return dst.Merge(confmap.NewFromStringMap(map[string]any{
 		"service::extensions": combined,
 	}))
+}
+
+// mergeExtensionLists returns the union of dst and src preserving the ordering
+// within each list. Shared elements (present in both lists) act as
+// synchronisation points: all dst-only elements up to a shared element are
+// emitted first, then all src-only elements preceding it in src, then the
+// shared element itself. Remaining src-only elements are appended at the end.
+func mergeExtensionLists(dst, src []any) []any {
+	inSrc := make(map[any]struct{}, len(src))
+	for _, e := range src {
+		inSrc[e] = struct{}{}
+	}
+	inDst := make(map[any]struct{}, len(dst))
+	for _, e := range dst {
+		inDst[e] = struct{}{}
+	}
+
+	result := make([]any, 0, len(dst)+len(src))
+	j := 0 // current position in src
+
+	for _, e := range dst {
+		if _, shared := inSrc[e]; shared {
+			// Advance src to this shared element, collecting src-only elements.
+			for j < len(src) && src[j] != e {
+				if _, ok := inDst[src[j]]; !ok {
+					result = append(result, src[j])
+				}
+				j++
+			}
+			result = append(result, e)
+			j++ // step past the shared element in src
+		} else {
+			result = append(result, e)
+		}
+	}
+
+	// Append any remaining src-only elements.
+	for ; j < len(src); j++ {
+		if _, ok := inDst[src[j]]; !ok {
+			result = append(result, src[j])
+		}
+	}
+
+	return result
 }
