@@ -2833,15 +2833,15 @@ func (w *ZapWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestSystemMetricsWithKafkaOutput(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: integration.Default,
-		Local: true,
-		OS: []define.OS{
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		},
-		Stack: &define.Stack{},
-	})
+	// define.Require(t, define.Requirements{
+	// 	Group: integration.Default,
+	// 	Local: true,
+	// 	OS: []define.OS{
+	// 		{Type: define.Linux},
+	// 		{Type: define.Darwin},
+	// 	},
+	// 	Stack: &define.Stack{},
+	// })
 
 	_, currentFile, _, ok := runtime.Caller(0)
 	require.True(t, ok, "failed to get current file path")
@@ -2857,7 +2857,7 @@ services:
       - 9094:9094
       - 2181:2181
     environment:
-      - ADVERTISED_HOST=kafka
+      - KAFKA_ADVERTISED_HOST=localhost
 `, kafkaPath)
 
 	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
@@ -2919,8 +2919,12 @@ outputs:
     required_acks: 1
     broker_timeout: 30s
     queue.mem.flush.timeout: 1s
-    ssl.certificate_authorities: 
-    - {{.CaCert}}
+    ssl:
+      certificate_authorities: 
+        - {{.CaCert}}
+      supported_protocols: 
+       - TLSv1.3
+      verification_mode: full
     username: beats
     password: KafkaTest
     protocol: https
@@ -2936,7 +2940,7 @@ agent.monitoring:
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			otelConfigOptions{
 				RuntimeExperimental: tt.runtimeExperimental,
-				Broker:              "kafka:9093",
+				Broker:              "localhost:9093",
 				CaCert:              filepath.Join(kafkaPath, "certs", "ca-cert"),
 			})
 
@@ -2974,7 +2978,7 @@ agent.monitoring:
 			return true
 		}, 30*time.Second, 1*time.Second)
 
-		consumer, err := sarama.NewConsumer([]string{"0.0.0.0:9092"}, sarama.NewConfig())
+		consumer, err := sarama.NewConsumer([]string{"localhost:9094"}, sarama.NewConfig())
 		require.NoError(t, err)
 
 		partitionConsumer, err := consumer.ConsumePartition("metrics-e2e-"+tt.runtimeExperimental, 0, sarama.OffsetNewest)
