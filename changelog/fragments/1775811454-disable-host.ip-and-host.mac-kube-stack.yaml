@@ -13,7 +13,7 @@ kind: enhancement
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Disable host.ip and host.mac resource attributes in kube-stack managed otlp to reduce document size.
+summary: Disable host.ip and host.mac resource attributes in OTel kube-stack Helm configurations to reduce document size.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
@@ -22,7 +22,7 @@ description: |
   Disabled host.ip and host.mac resource attributes in the resourcedetection/system
   processor for the kube-stack daemon collector. On Kubernetes hosts, these attributes
   can expose 50+ entries (mostly IPv6/virtual IPs from k8s networking), adding ~2KB
-  to every document. This significantly impacts cost for traces and metrics where
+  to every document. This significantly impacts cost for logs and metrics where
   metadata overhead exceeds payload size.
 
 # REQUIRED for breaking-change, deprecation, known-issue
