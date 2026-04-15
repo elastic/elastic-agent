@@ -67,6 +67,83 @@ func TestEnvTimeout(t *testing.T) {
 	require.Equal(t, time.Second*10, res)
 }
 
+func TestEnvStringMap(t *testing.T) {
+	testCases := []struct {
+		name     string
+		env      string
+		expected map[string]string
+	}{
+		{
+			name: "basic",
+			env:  "key1=value1",
+			expected: map[string]string{
+				"key1": "value1",
+			},
+		},
+		{
+			name: "multiple",
+			env:  "key1=value1,key2=value2",
+			expected: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+		},
+		{
+			name: "multiple with quotes",
+			env:  `key1=value1,key2="value2"`,
+			expected: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+		},
+		{
+			name: "multiple with quotes and commas",
+			env:  `key1=value1,key2="value2,value3"`,
+			expected: map[string]string{
+				"key1": "value1",
+				"key2": "value2,value3",
+			},
+		},
+		{
+			name: "includes value without key",
+			env:  "key1=value1,key2=value2, val3",
+			expected: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+		},
+		{
+			name: "key value with quotes",
+			env:  `key1="val2,val2,key3=val4"`,
+			expected: map[string]string{
+				"key1": "val2,val2,key3=val4",
+			},
+		},
+		{
+			name: "key value with quotes and user agent",
+			env:  `key1="val2",User-Agent=test-user-agent`,
+			expected: map[string]string{
+				"key1":       "val2",
+				"User-Agent": "test-user-agent",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("TEST_ENV_MAP_SLICE", tc.env)
+			defer os.Unsetenv("TEST_ENV_MAP_SLICE")
+			res := envStringMap("TEST_ENV_MAP_SLICE")
+			require.EqualValues(t, tc.expected, res)
+		})
+	}
+}
+
+func TestEnvStringMap_NoEnv(t *testing.T) {
+	res := envStringMap("TEST_ENV_MAP_SLICE")
+	require.Nil(t, res)
+}
+
 func TestContainerTestPaths(t *testing.T) {
 	cases := map[string]struct {
 		config   string
