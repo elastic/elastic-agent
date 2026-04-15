@@ -198,6 +198,8 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 				c.logger.Warnf("failed to remove workdir for component %s: %v", state.Component.ID, err)
 			}
 		}
+		// Check if a deferred manager update was waiting for this component to stop.
+		c.checkPendingManagerUpdate(state.Component.ID)
 	}
 
 	c.stateNeedsRefresh = true
