@@ -20,7 +20,7 @@ func serviceExtensionsList(config *confmap.Conf) ([]any, error) {
 	raw := config.Get("service::extensions")
 	list, ok := raw.([]any)
 	if !ok {
-		return nil, fmt.Errorf("service::extensions: expected []any, got %T", raw)
+		return nil, fmt.Errorf("service::extensions: expected list, got %T", raw)
 	}
 	result := make([]any, len(list))
 	copy(result, list)

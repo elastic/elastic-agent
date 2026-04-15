@@ -52,7 +52,7 @@ func TestServiceExtensionsList(t *testing.T) {
 		list, err := serviceExtensionsList(cfg)
 		require.Error(t, err)
 		assert.Nil(t, list)
-		assert.Contains(t, err.Error(), "expected []interface{}")
+		assert.Contains(t, err.Error(), "expected list, got string")
 	})
 
 	t.Run("returns a copy, not a reference", func(t *testing.T) {
@@ -156,7 +156,7 @@ func TestMergeWithExtensions(t *testing.T) {
 		err := mergeWithExtensions(dst, src)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "merge into service::extensions failed")
-		assert.Contains(t, err.Error(), "expected []interface{}")
+		assert.Contains(t, err.Error(), "expected list, got string")
 	})
 
 	t.Run("other keys merged normally", func(t *testing.T) {
