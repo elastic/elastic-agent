@@ -259,10 +259,14 @@ Mutate an agent preset based on agent.fleet
 {{- if ($.Values.agent.fleet.kibanaCA)._volumeMount -}}
 {{- $extraVolumeMounts = append $extraVolumeMounts ($.Values.agent.fleet.kibanaCA)._volumeMount -}}
 {{- end -}}
-{{- if $.Values.agent.fleet.url -}}
+{{- if ($.Values.agent.fleet.urlFromSecret).name -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_URL" "valueFrom" (dict "secretKeyRef" (dict "name" ($.Values.agent.fleet.urlFromSecret).name "key" ($.Values.agent.fleet.urlFromSecret).key))) -}}
+{{- else if $.Values.agent.fleet.url -}}
 {{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_URL" "value" $.Values.agent.fleet.url) -}}
 {{- end -}}
-{{- if $.Values.agent.fleet.token -}}
+{{- if ($.Values.agent.fleet.tokenFromSecret).name -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "valueFrom" (dict "secretKeyRef" (dict "name" ($.Values.agent.fleet.tokenFromSecret).name "key" ($.Values.agent.fleet.tokenFromSecret).key))) -}}
+{{- else if $.Values.agent.fleet.token -}}
 {{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "value" $.Values.agent.fleet.token) -}}
 {{- end -}}
 {{- if $.Values.agent.fleet.insecure -}}

@@ -97,7 +97,7 @@ func defaultAccessConfig() (setupConfig, error) {
 			TokenName:       envWithDefault("Default", "FLEET_TOKEN_NAME"),
 			TokenPolicyName: envWithDefault("", "FLEET_TOKEN_POLICY_NAME"),
 			URL:             envWithDefault("", "FLEET_URL"),
-			Headers:         envMap("FLEET_HEADER"),
+			Headers:         getEnvMap("FLEET_HEADER", "FLEET_HEADERS"),
 			DaemonTimeout:   envTimeout("FLEET_DAEMON_TIMEOUT"),
 			EnrollTimeout:   envTimeout("FLEET_ENROLL_TIMEOUT"),
 			Cert:            envWithDefault("", "ELASTIC_AGENT_CERT"),
@@ -123,7 +123,7 @@ func defaultAccessConfig() (setupConfig, error) {
 			InsecureHTTP: envBool("FLEET_SERVER_INSECURE_HTTP"),
 			PolicyID:     envWithDefault("", "FLEET_SERVER_POLICY_ID", "FLEET_SERVER_POLICY"),
 			Port:         envWithDefault("", "FLEET_SERVER_PORT"),
-			Headers:      envMap("FLEET_HEADER"),
+			Headers:      getEnvMap("FLEET_HEADER", "FLEET_HEADERS"),
 			Timeout:      envTimeout("FLEET_SERVER_TIMEOUT"),
 		},
 		Kibana: kibanaConfig{
@@ -137,8 +137,21 @@ func defaultAccessConfig() (setupConfig, error) {
 			},
 			RetrySleepDuration: retrySleepDuration,
 			RetryMaxCount:      retryMaxCount,
-			Headers:            envMap("FLEET_KIBANA_HEADER"),
+			Headers:            getEnvMap("FLEET_KIBANA_HEADER", "FLEET_KIBANA_HEADERS"),
 		},
 	}
 	return cfg, nil
+}
+
+// getEnvMap combines a single value environment variable and a multi value environment variable into a single map
+// values from the multi value environment variable will override values from the single value environment variable
+func getEnvMap(singleValKey string, multiValKey string) map[string]string {
+	singleVal := envMap(singleValKey)
+	multiVal := envStringMap(multiValKey)
+
+	for k, v := range multiVal {
+		singleVal[k] = v
+	}
+
+	return singleVal
 }
