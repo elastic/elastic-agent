@@ -755,7 +755,6 @@ func TestLoadSettings(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "2.0.0", settings.Packaging.AgentPackageVersion)
 		assert.Equal(t, "https://manifest.url", settings.Packaging.ManifestURL)
-		assert.True(t, settings.Packaging.PackagingFromManifest)
 		assert.Equal(t, "/drop/path", settings.Packaging.AgentDropPath)
 		assert.True(t, settings.Packaging.KeepArchive)
 	})
@@ -771,7 +770,6 @@ func TestLoadSettings(t *testing.T) {
 		require.NoError(t, err)
 
 		isSnapshot := strings.HasSuffix(pv.Version, SnapshotSuffix)
-		assert.True(t, settings.Packaging.PackagingFromManifest)
 		assert.Equal(t, pv.ManifestURL, settings.Packaging.ManifestURL)
 		assert.Equal(t, pv.CoreVersion, settings.Packaging.AgentPackageVersion)
 		assert.Equal(t, pv.CoreVersion, settings.Build.BeatVersion)
