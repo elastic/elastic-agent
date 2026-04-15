@@ -32,4 +32,4 @@ buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}es.pwd" $ELA
 buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}kibana.host" $KIBANA_HOST
 buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}kibana.username" $KIBANA_USERNAME
 buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}kibana.pwd" $KIBANA_PASSWORD
-buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}integrations_server.host" $INTEGRATIONS_SERVER_HOST
+buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}integrations_server.host" $ELASTIC_APM_SERVER_URL
