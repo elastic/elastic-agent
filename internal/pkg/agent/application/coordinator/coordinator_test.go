@@ -1996,9 +1996,9 @@ func TestUpdateManagersWithConfig_DefersOTelDuringRuntimeTransition(t *testing.T
 	assert.Empty(t, otelComponents, "OTel initial model should exclude transitioning component")
 	mu.Unlock()
 
-	// A pending update should exist for the OTel manager.
-	assert.NotEmpty(t, coord.pendingManagerUpdates, "OTel update should be pending")
-	assert.True(t, coord.pendingManagerUpdates[0].waiting["filestream-monitoring"])
+	// A pending update should exist for the OTel direction.
+	assert.NotNil(t, coord.pendingTransitions.toOTel, "OTel update should be pending")
+	assert.True(t, coord.pendingTransitions.toOTel.waiting["filestream-monitoring"])
 
 	// Simulate the component reaching STOPPED via the main loop.
 	coord.applyComponentState(runtime.ComponentComponentState{
@@ -2017,7 +2017,7 @@ func TestUpdateManagersWithConfig_DefersOTelDuringRuntimeTransition(t *testing.T
 	assert.Len(t, otelComponents, 1)
 	assert.Equal(t, "filestream-monitoring", otelComponents[0].ID)
 	mu.Unlock()
-	assert.Empty(t, coord.pendingManagerUpdates, "pending update should be cleared")
+	assert.False(t, coord.pendingTransitions.active(), "pending transitions should be cleared")
 }
 
 func TestUpdateManagersWithConfig_QueuesNewUpdateWhileTransitioning(t *testing.T) {
@@ -2078,7 +2078,7 @@ func TestUpdateManagersWithConfig_QueuesNewUpdateWhileTransitioning(t *testing.T
 		},
 	}
 	coord.updateManagersWithConfig(model1)
-	assert.NotEmpty(t, coord.pendingManagerUpdates, "first update should be pending")
+	assert.True(t, coord.pendingTransitions.active(), "first update should be pending")
 
 	// Second update arrives while transition is in progress -- queued.
 	model2 := &component.Model{
@@ -2087,7 +2087,7 @@ func TestUpdateManagersWithConfig_QueuesNewUpdateWhileTransitioning(t *testing.T
 		},
 	}
 	coord.updateManagersWithConfig(model2)
-	assert.NotEmpty(t, coord.pendingManagerUpdates, "pending transitions should still be active")
+	assert.True(t, coord.pendingTransitions.active(), "pending transitions should still be active")
 	assert.NotNil(t, coord.queuedModel, "new model should be queued")
 
 	mu.Lock()
@@ -2170,7 +2170,7 @@ func TestUpdateManagersWithConfig_NoTransition_UpdatesBothImmediately(t *testing
 	mu.Lock()
 	assert.Equal(t, []string{"runtime", "otel"}, updateOrder, "both managers should be updated immediately")
 	mu.Unlock()
-	assert.Empty(t, coord.pendingManagerUpdates, "no pending update when no transition")
+	assert.False(t, coord.pendingTransitions.active(), "no pending transitions")
 }
 
 func TestUpdateManagersWithConfig_DefersRuntimeDuringOTelToProcessTransition(t *testing.T) {
@@ -2239,9 +2239,9 @@ func TestUpdateManagersWithConfig_DefersRuntimeDuringOTelToProcessTransition(t *
 	assert.Empty(t, runtimeComponents, "runtime initial model should exclude transitioning component")
 	mu.Unlock()
 
-	// A pending update should exist for the runtime manager.
-	assert.NotEmpty(t, coord.pendingManagerUpdates, "runtime update should be pending")
-	assert.True(t, coord.pendingManagerUpdates[0].waiting["filestream-monitoring"])
+	// A pending update should exist for the process direction.
+	assert.NotNil(t, coord.pendingTransitions.toProcess, "runtime update should be pending")
+	assert.True(t, coord.pendingTransitions.toProcess.waiting["filestream-monitoring"])
 
 	// Simulate the OTel component reaching STOPPED.
 	coord.applyComponentState(runtime.ComponentComponentState{
@@ -2260,7 +2260,7 @@ func TestUpdateManagersWithConfig_DefersRuntimeDuringOTelToProcessTransition(t *
 	assert.Len(t, runtimeComponents, 1)
 	assert.Equal(t, "filestream-monitoring", runtimeComponents[0].ID)
 	mu.Unlock()
-	assert.Empty(t, coord.pendingManagerUpdates, "pending update should be cleared")
+	assert.False(t, coord.pendingTransitions.active(), "pending transitions should be cleared")
 }
 
 func TestUpdateManagersWithConfig_BidirectionalTransition(t *testing.T) {
@@ -2350,8 +2350,9 @@ func TestUpdateManagersWithConfig_BidirectionalTransition(t *testing.T) {
 	assert.Empty(t, otelUpdates[0], "otel initial update should exclude filestream-monitoring")
 	mu.Unlock()
 
-	// Two pending updates — one per direction.
-	assert.Len(t, coord.pendingManagerUpdates, 2, "should have 2 pending updates (one per direction)")
+	// Both directions should be pending.
+	assert.NotNil(t, coord.pendingTransitions.toOTel, "toOTel should be pending")
+	assert.NotNil(t, coord.pendingTransitions.toProcess, "toProcess should be pending")
 
 	// Stop process component (filestream-monitoring) — triggers OTel full update.
 	coord.applyComponentState(runtime.ComponentComponentState{
@@ -2367,7 +2368,8 @@ func TestUpdateManagersWithConfig_BidirectionalTransition(t *testing.T) {
 	assert.Equal(t, []string{"filestream-monitoring"}, otelUpdates[1])
 	require.Len(t, runtimeUpdates, 1, "runtime should still have 1 update")
 	mu.Unlock()
-	assert.Len(t, coord.pendingManagerUpdates, 1, "1 pending update remaining")
+	assert.Nil(t, coord.pendingTransitions.toOTel, "toOTel should be cleared")
+	assert.NotNil(t, coord.pendingTransitions.toProcess, "toProcess should still be pending")
 
 	// Stop OTel component (system/metrics-default) — triggers runtime full update.
 	coord.applyComponentState(runtime.ComponentComponentState{
@@ -2382,5 +2384,75 @@ func TestUpdateManagersWithConfig_BidirectionalTransition(t *testing.T) {
 	require.Len(t, runtimeUpdates, 2, "runtime should have 2 updates after system/metrics stops")
 	assert.Equal(t, []string{"system/metrics-default"}, runtimeUpdates[1])
 	mu.Unlock()
-	assert.Empty(t, coord.pendingManagerUpdates, "all pending updates should be cleared")
+	assert.False(t, coord.pendingTransitions.active(), "all pending transitions should be cleared")
+}
+
+func TestUpdateManagersWithConfig_TimeoutForceAppliesPendingTransitions(t *testing.T) {
+	// Override the timeout to something tiny so the test doesn't wait.
+	orig := transitionTimeout
+	transitionTimeout = 1 * time.Millisecond
+	t.Cleanup(func() { transitionTimeout = orig })
+
+	var mu sync.Mutex
+	var otelUpdates int
+
+	fakeRuntime := &fakeRuntimeManager{
+		updateCallback: func(comps []component.Component) error { return nil },
+	}
+	fakeOTel := &fakeOTelManager{
+		updateComponentCallback: func(comps []component.Component) error {
+			mu.Lock()
+			otelUpdates++
+			mu.Unlock()
+			return nil
+		},
+	}
+
+	coord := &Coordinator{
+		logger:           logp.NewLogger("test"),
+		runtimeMgr:       fakeRuntime,
+		otelMgr:          fakeOTel,
+		stateBroadcaster: broadcaster.New(State{}, 64, 32),
+		currentCfg: &configuration.Configuration{
+			Settings: configuration.DefaultConfiguration().Settings,
+		},
+		state: State{
+			Components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{
+						ID:             "filestream-monitoring",
+						RuntimeManager: component.ProcessRuntimeManager,
+					},
+					State: runtime.ComponentState{State: client.UnitStateHealthy},
+				},
+			},
+		},
+	}
+
+	// Trigger a process-to-OTel transition.
+	model := &component.Model{
+		Components: []component.Component{
+			{ID: "filestream-monitoring", RuntimeManager: component.OtelRuntimeManager},
+		},
+	}
+	coord.updateManagersWithConfig(model)
+	assert.True(t, coord.pendingTransitions.active(), "transition should be pending")
+
+	mu.Lock()
+	initialOTelUpdates := otelUpdates
+	mu.Unlock()
+
+	// Do NOT send a STOPPED event. Wait for the timeout to expire.
+	time.Sleep(5 * time.Millisecond)
+
+	// Verify the deadline has expired and force-apply, simulating what
+	// runLoopIteration does at the end of each iteration.
+	assert.True(t, coord.pendingTransitions.expired(), "deadline should have expired")
+	coord.forceApplyPendingTransitions()
+
+	// The deferred OTel update should have been force-applied.
+	assert.False(t, coord.pendingTransitions.active(), "transitions should be cleared after timeout")
+	mu.Lock()
+	assert.Greater(t, otelUpdates, initialOTelUpdates, "OTel update should have been force-applied")
+	mu.Unlock()
 }
