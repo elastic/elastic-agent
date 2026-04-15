@@ -71,7 +71,7 @@ func TestGetCmdAndTerminateCmd(t *testing.T) {
 		}
 	}
 
-	if err := terminateCmd(cmd.Process); err != nil {
+	if err := terminateCmd(cmd.Process, false); err != nil {
 		t.Fatalf("did not expect an error from 'terminateCmd': %s", err)
 	}
 
