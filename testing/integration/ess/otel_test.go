@@ -2833,15 +2833,15 @@ func (w *ZapWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestSystemMetricsWithKafkaOutput(t *testing.T) {
-	// define.Require(t, define.Requirements{
-	// 	Group: integration.Default,
-	// 	Local: true,
-	// 	OS: []define.OS{
-	// 		{Type: define.Linux},
-	// 		{Type: define.Darwin},
-	// 	},
-	// 	Stack: &define.Stack{},
-	// })
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
 
 	_, currentFile, _, ok := runtime.Caller(0)
 	require.True(t, ok, "failed to get current file path")
