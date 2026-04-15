@@ -31,7 +31,11 @@ try {
     # Get-Ess-Stack will start the ESS stack if it is a BK retry
     Get-Ess-Stack -StackVersion $STACK_VERSION
     # Load secrets from GCP Secret Manager via oblt-cli
-    ess_load_secrets
+    $result = ess_load_secrets
+    if ($result -ne 0) {
+        Write-Output "Failed to load secrets"
+        exit 1
+    }
     & "$PWD\.buildkite\scripts\buildkite-integration-tests.ps1" $GROUP_NAME $TEST_SUDO
     $TestsExitCode = $LASTEXITCODE
     if ($TestsExitCode -ne 0)
