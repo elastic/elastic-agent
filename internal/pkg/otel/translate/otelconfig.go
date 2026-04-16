@@ -279,7 +279,7 @@ func getCollectorConfigForComponent(
 	}
 
 	var intakeQueueID string
-	if runtimeCfg.SharedReceiverQueues {
+	if runtimeCfg != nil && runtimeCfg.SharedReceiverQueues {
 		// Intake queue ID is arbitrary but needs to be consistent for
 		// receivers with the same output, so just use output name.
 		intakeQueueID = comp.OutputName
