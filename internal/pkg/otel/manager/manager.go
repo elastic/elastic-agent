@@ -64,7 +64,7 @@ type collectorRecoveryTimer interface {
 
 type configUpdate struct {
 	collectorCfg  *confmap.Conf
-	monitoringCfg *monitoringCfg.MonitoringConfig
+	settingsCfg   *configuration.SettingsConfig
 	components    []component.Component
 	agentLogLevel logp.Level
 }
@@ -442,12 +442,17 @@ func (m *OTelManager) buildMergedConfig(
 ) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
 
+	var runtimeCfg *component.RuntimeConfig
+	if cfgUpdate.settingsCfg != nil && cfgUpdate.settingsCfg.Internal != nil {
+		runtimeCfg = cfgUpdate.settingsCfg.Internal.Runtime
+	}
+
 	// Generate component otel config if there are components
 	var componentOtelCfg *confmap.Conf
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, monitoringConfigGetter, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, runtimeCfg, monitoringConfigGetter, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
@@ -464,12 +469,14 @@ func (m *OTelManager) buildMergedConfig(
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 		}
 
-		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil {
-			if mCfg.Enabled && mCfg.MonitorMetrics {
-				// Metrics monitoring is enabled, inject a receiver for the
-				// collector's internal telemetry.
-				if err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components); err != nil {
-					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
+		if cfgUpdate.settingsCfg != nil {
+			if mCfg := cfgUpdate.settingsCfg.MonitoringConfig; mCfg != nil {
+				if mCfg.Enabled && mCfg.MonitorMetrics {
+					// Metrics monitoring is enabled, inject a receiver for the
+					// collector's internal telemetry.
+					if err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components); err != nil {
+						return nil, fmt.Errorf("merging internal telemetry config: %w", err)
+					}
 				}
 			}
 		}
@@ -709,10 +716,10 @@ func (m *OTelManager) applyMergedConfig(
 }
 
 // Update sends collector configuration and component updates to the manager's run loop.
-func (m *OTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component) {
+func (m *OTelManager) Update(cfg *confmap.Conf, settings *configuration.SettingsConfig, ll logp.Level, components []component.Component) {
 	cfgUpdate := configUpdate{
 		collectorCfg:  cfg,
-		monitoringCfg: monitoring,
+		settingsCfg:   settings,
 		components:    components,
 		agentLogLevel: ll,
 	}
