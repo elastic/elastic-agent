@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -33,6 +34,7 @@ import (
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/cli"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -658,6 +660,37 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			},
 		},
 		{
+			name: "helm managed agent fleet credentials from secret",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepCreateFleetCredentialsSecret("fleet-credentials"),
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+					"agent": map[string]any{
+						"unprivileged": false,
+						"image": map[string]any{
+							"repository": kCtx.agentImageRepo,
+							"tag":        kCtx.agentImageTag,
+							"pullPolicy": "Never",
+						},
+						"fleet": map[string]any{
+							"enabled": true,
+							"urlFromSecret": map[string]any{
+								"name": "fleet-credentials",
+								"key":  "url",
+							},
+							"tokenFromSecret": map[string]any{
+								"name": "fleet-credentials",
+								"key":  "token",
+							},
+							"preset": "perNode",
+						},
+					},
+				}),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+			},
+		},
+		{
 			name: "helm standalone agent unprivileged kubernetes hints",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
@@ -1244,6 +1277,69 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 	}
 }
 
+// k8sStepHelmTemplateApply mimics "helm template" followed by "kubectl apply":
+// it renders the chart to manifests and applies them directly.
+func k8sStepHelmTemplateApply(chartPath string, releaseName string, values map[string]any) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		settings := cli.New()
+		settings.SetNamespace(namespace)
+		actionConfig := &action.Configuration{}
+
+		helmChart, err := loader.Load(chartPath)
+		require.NoError(t, err, "failed to load helm chart")
+
+		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
+			func(format string, v ...interface{}) {})
+		require.NoError(t, err, "failed to init helm action config")
+
+		installAction := action.NewInstall(actionConfig)
+		installAction.Namespace = namespace
+		installAction.ReleaseName = releaseName
+		installAction.UseReleaseName = true
+		// DryRun to create the manifest without installing the chart
+		installAction.DryRun = true
+		installAction.Replace = true
+		installAction.ClientOnly = true
+		installAction.IncludeCRDs = true
+		installAction.DisableHooks = false
+
+		installAction.KubeVersion = &chartutil.KubeVersion{Version: "1.27.0"}
+
+		release, err := installAction.Run(helmChart, values)
+		require.NoError(t, err, "failed to render helm chart")
+
+		manifestFile, err := os.CreateTemp("", "helm-template-*.yaml")
+		require.NoError(t, err, "failed to create temp manifest file")
+		manifestPath := manifestFile.Name()
+		_, err = manifestFile.WriteString(release.Manifest)
+		require.NoError(t, err, "failed to write manifest")
+		for _, hook := range release.Hooks {
+			// Hooks are not included in the release.Manifest, so we need to add them manually
+			// to match `helm template` output.
+			_, err = manifestFile.WriteString("\n---\n")
+			require.NoError(t, err, "failed to write hook manifest")
+			_, err = manifestFile.WriteString(hook.Manifest)
+			require.NoError(t, err, "failed to write hook manifest")
+		}
+
+		manifestFile.Close()
+		t.Cleanup(func() { os.Remove(manifestPath) })
+
+		t.Cleanup(func() {
+			if t.Failed() {
+				k8sDumpPods(t, ctx, kCtx.client, t.Name(), namespace, kCtx.logsBasePath, kCtx.createdAt)
+			}
+			// kubectl delete -f to remove all applied resources
+			delCmd := exec.CommandContext(ctx, "kubectl", "delete", "-f", manifestPath, "--ignore-not-found", "--wait", "--timeout=120s")
+			_ = delCmd.Run()
+		})
+		// Use kubectl apply -f to apply the manifest.
+		applyCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", manifestPath)
+		applyOut, applyErr := applyCmd.CombinedOutput()
+		require.NoError(t, applyErr, "kubectl apply failed: %s", string(applyOut))
+	}
+}
+
 func k8sStepLogstashCreate() k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		r, err := os.Open("testdata/logstash.yaml")
@@ -1494,6 +1590,24 @@ func k8sStepHintsRedisDelete() k8sTestStep {
 
 		err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, redisPod)
 		require.NoError(t, err, "failed to delete redis k8s objects")
+	}
+}
+
+func k8sStepCreateFleetCredentialsSecret(secretName string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+			StringData: map[string]string{
+				"url":   kCtx.enrollParams.FleetURL,
+				"token": kCtx.enrollParams.EnrollmentToken,
+			},
+		}
+
+		err := k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, namespace: namespace}, secret)
+		require.NoError(t, err, "failed to create fleet credentials secret")
 	}
 }
 

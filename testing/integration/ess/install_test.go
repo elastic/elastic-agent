@@ -490,12 +490,7 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 
 func testComponentsPresence(ctx context.Context, fixture *atesting.Fixture, requiredComponents []componentPresenceDefinition, unwantedComponents []componentPresenceDefinition) func(*testing.T) {
 	return func(t *testing.T) {
-		agentWorkDir := fixture.WorkDir()
-		if pf := fixture.PackageFormat(); pf == "deb" || pf == "rpm" {
-			// these are hardcoded paths in packages.yml
-			agentWorkDir = "/var/lib/elastic-agent"
-		}
-		componentsDir, err := aTesting.FindComponentsDir(agentWorkDir, fixture.Version())
+		componentsDir, err := aTesting.FindComponentsDir(fixture.AgentDataDir(), fixture.Version())
 		require.NoError(t, err)
 
 		componentsPaths := func(component string) []string {

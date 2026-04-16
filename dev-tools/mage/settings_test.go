@@ -6,6 +6,7 @@ package mage
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,19 +16,16 @@ import (
 func TestGetVersion(t *testing.T) {
 	cfg, err := LoadSettings()
 	require.NoError(t, err)
-	bp, err := BeatQualifiedVersion(cfg)
-	assert.NoError(t, err)
-	_ = bp
+	bp := cfg.BeatQualifiedVersion()
+	assert.NotEmpty(t, bp)
 }
 
 func TestAgentPackageVersion(t *testing.T) {
 	t.Run("agent package version without env var", func(t *testing.T) {
 		cfg, err := LoadSettings()
 		require.NoError(t, err)
-		expectedPkgVersion, err := BeatQualifiedVersion(cfg)
-		require.NoError(t, err)
-		actualPkgVersion, err := AgentPackageVersion(cfg)
-		require.NoError(t, err)
+		expectedPkgVersion := cfg.BeatQualifiedVersion()
+		actualPkgVersion := cfg.AgentPackageVersion()
 		assert.Equal(t, expectedPkgVersion, actualPkgVersion)
 	})
 
@@ -36,8 +34,7 @@ func TestAgentPackageVersion(t *testing.T) {
 		require.NoError(t, err)
 		expectedPkgVersion := "1.2.3-specialrelease+abcdef"
 		cfg.Packaging.AgentPackageVersion = expectedPkgVersion
-		actualPkgVersion, err := AgentPackageVersion(cfg)
-		require.NoError(t, err)
+		actualPkgVersion := cfg.AgentPackageVersion()
 		assert.Equal(t, expectedPkgVersion, actualPkgVersion)
 	})
 
@@ -47,11 +44,9 @@ func TestAgentPackageVersion(t *testing.T) {
 		cfg.Packaging.AgentPackageVersion = "1.2.3-specialrelease+abcdef"
 		funcMap := FuncMap(cfg)
 		assert.Contains(t, funcMap, agentPackageVersionMappedFunc)
-		require.IsType(t, funcMap[agentPackageVersionMappedFunc], func() (string, error) { return "", nil })
-		mappedFuncPkgVersion, err := funcMap[agentPackageVersionMappedFunc].(func() (string, error))()
-		require.NoError(t, err)
-		expectedPkgVersion, err := AgentPackageVersion(cfg)
-		require.NoError(t, err)
+		require.IsType(t, funcMap[agentPackageVersionMappedFunc], func() string { return "" })
+		mappedFuncPkgVersion := funcMap[agentPackageVersionMappedFunc].(func() string)()
+		expectedPkgVersion := cfg.AgentPackageVersion()
 		assert.Equal(t, expectedPkgVersion, mappedFuncPkgVersion)
 	})
 }
@@ -312,7 +307,7 @@ func TestSettingsTestTagsWithFIPS(t *testing.T) {
 
 		tags := s.TestTagsWithFIPS()
 
-		assert.Equal(t, []string{"tag1", "requirefips", "ms_tls13kdf"}, tags)
+		assert.Equal(t, []string{"tag1", "requirefips"}, tags)
 	})
 
 	t.Run("does not modify original tags", func(t *testing.T) {
@@ -332,7 +327,7 @@ func TestSettingsTestTagsWithFIPS(t *testing.T) {
 
 		tags := s.TestTagsWithFIPS()
 
-		assert.Equal(t, []string{"requirefips", "ms_tls13kdf"}, tags)
+		assert.Equal(t, []string{"requirefips"}, tags)
 	})
 }
 
@@ -607,6 +602,7 @@ func TestDefaultSettings(t *testing.T) {
 		assert.False(t, settings.Build.Snapshot)
 		assert.False(t, settings.Build.DevBuild)
 		assert.Greater(t, settings.Build.MaxParallel, 0)
+		assert.NotZero(t, settings.BuildDate)
 
 		// Dev machine defaults
 		assert.Equal(t, DefaultDevMachineImage, settings.DevMachine.MachineImage)
@@ -751,7 +747,6 @@ func TestLoadSettings(t *testing.T) {
 	t.Run("loads packaging settings from env vars", func(t *testing.T) {
 		t.Setenv("AGENT_PACKAGE_VERSION", "2.0.0")
 		t.Setenv("MANIFEST_URL", "https://manifest.url")
-		t.Setenv("USE_PACKAGE_VERSION", "true")
 		t.Setenv("AGENT_DROP_PATH", "/drop/path")
 		t.Setenv("KEEP_ARCHIVE", "true")
 
@@ -760,10 +755,28 @@ func TestLoadSettings(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "2.0.0", settings.Packaging.AgentPackageVersion)
 		assert.Equal(t, "https://manifest.url", settings.Packaging.ManifestURL)
-		assert.True(t, settings.Packaging.PackagingFromManifest)
-		assert.True(t, settings.Packaging.UsePackageVersion)
 		assert.Equal(t, "/drop/path", settings.Packaging.AgentDropPath)
 		assert.True(t, settings.Packaging.KeepArchive)
+	})
+
+	t.Run("applies .package-version overrides when USE_PACKAGE_VERSION is set", func(t *testing.T) {
+		t.Setenv("USE_PACKAGE_VERSION", "true")
+
+		settings, err := LoadSettings()
+		require.NoError(t, err)
+
+		// Read the real .package-version file from the repo root.
+		pv, err := readPackageVersion(settings.RepoInfo.RootDir)
+		require.NoError(t, err)
+
+		isSnapshot := strings.HasSuffix(pv.Version, SnapshotSuffix)
+		assert.Equal(t, pv.ManifestURL, settings.Packaging.ManifestURL)
+		assert.Equal(t, pv.CoreVersion, settings.Packaging.AgentPackageVersion)
+		assert.Equal(t, pv.CoreVersion, settings.Build.BeatVersion)
+		assert.Equal(t, isSnapshot, settings.Build.Snapshot)
+		assert.Equal(t, pv.Version, settings.IntegrationTest.AgentVersion)
+		assert.Equal(t, pv.StackVersion, settings.IntegrationTest.AgentStackVersion)
+		assert.NotEmpty(t, settings.Packaging.AgentDropPath)
 	})
 
 	t.Run("loads integration test settings from env vars", func(t *testing.T) {

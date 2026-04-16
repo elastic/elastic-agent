@@ -13,7 +13,6 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -34,7 +33,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	elasticmonitoringreceiver "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/elasticmonitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -46,6 +44,9 @@ const (
 	// CollectorStopTimeout is the duration to wait for the collector to stop. Note: this needs to be shorter
 	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
 	CollectorStopTimeout = 3 * time.Second
+
+	// elasticMonitoringReceiverName is the component type name for the elastic monitoring receiver.
+	elasticMonitoringReceiverName = "elasticmonitoringreceiver"
 )
 
 type collectorRecoveryTimer interface {
@@ -83,9 +84,10 @@ type OTelManager struct {
 	agentInfo                  info.Agent
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter
 
-	healthCheckExtID string
-	collectorCfg     *confmap.Conf
-	components       []component.Component
+	healthCheckExtComponentID string
+	collectorMetricsPort      int
+	collectorCfg              *confmap.Conf
+	components                []component.Component
 
 	// The current configuration that the OTel collector is using. In the case that
 	// the mergedCollectorCfg is nil then the collector is not running.
@@ -133,6 +135,7 @@ type OTelManager struct {
 }
 
 // NewOTelManager returns a OTelManager.
+// If execFactory is nil, the default subprocess execution is used.
 func NewOTelManager(
 	logger *logger.Logger,
 	collectorLogLevel logp.Level,
@@ -141,6 +144,7 @@ func NewOTelManager(
 	agentCollectorConfig *configuration.CollectorConfig,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
+	execFactory ExecutionFactory,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
@@ -152,8 +156,9 @@ func NewOTelManager(
 	}
 	hcUUIDStr := hcUUID.String()
 
-	// determine the otel collector ports
-	collectorMetricsPort, collectorHealthCheckPort := 0, 0
+	// determine the otel collector metrics port
+	collectorMetricsPort := 0
+	collectorHealthCheckPort := 0
 	if agentCollectorConfig != nil {
 		if agentCollectorConfig.HealthCheckConfig.Endpoint != "" {
 			collectorHealthCheckPort, err = agentCollectorConfig.HealthCheckConfig.Port()
@@ -169,11 +174,22 @@ func NewOTelManager(
 		}
 	}
 
+	componentType, err := otelcomponent.NewType(healthCheckExtensionName)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create component type: %w", err)
+	}
+	healthCheckExtComponentID := otelcomponent.NewIDWithName(componentType, hcUUIDStr).String()
+
 	executable := filepath.Join(paths.Components(), collectorBinaryName)
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-	exec, err = newSubprocessExecution(executable, hcUUIDStr, collectorMetricsPort, collectorHealthCheckPort)
+	if execFactory == nil {
+		execFactory = func(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (collectorExecution, error) {
+			return newSubprocessExecution(collectorPath, healthCheckExtensionID, healthCheckPort)
+		}
+	}
+	exec, err = execFactory(executable, healthCheckExtComponentID, collectorHealthCheckPort)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
+		return nil, fmt.Errorf("failed to create execution: %w", err)
 	}
 
 	return &OTelManager{
@@ -181,7 +197,8 @@ func NewOTelManager(
 		collectorLogger:            collectorLogger,
 		agentInfo:                  agentInfo,
 		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
-		healthCheckExtID:           fmt.Sprintf("extension:healthcheckv2/%s", hcUUIDStr),
+		healthCheckExtComponentID:  healthCheckExtComponentID,
+		collectorMetricsPort:       collectorMetricsPort,
 		errCh:                      make(chan error, 1), // holds at most one error
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
 		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
@@ -191,7 +208,7 @@ func NewOTelManager(
 		doneChan:          make(chan struct{}),
 		execution:         exec,
 		recoveryTimer:     recoveryTimer,
-		collectorRunErr:   make(chan error),
+		collectorRunErr:   make(chan error, 1),
 		stopTimeout:       stopTimeout,
 		collectorLogLevel: collectorLogLevel,
 	}, nil
@@ -216,14 +233,12 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.recoveryTimer.Stop()
 			// our caller context is cancelled so stop the collector and return
 			// has exited.
-			if m.proc != nil {
-				m.proc.Stop(m.stopTimeout)
-			}
+			m.stopCollector()
 			return ctx.Err()
 		case <-m.recoveryTimer.C():
 			m.recoveryTimer.Stop()
 
-			if m.mergedCollectorCfg == nil || m.proc != nil || ctx.Err() != nil {
+			if !m.collectorShouldRun() || m.collectorRunning() || ctx.Err() != nil {
 				// no configuration, or the collector is already running, or the context
 				// is cancelled.
 				continue
@@ -235,28 +250,23 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			newRetries := m.recoveryRetries.Add(1)
 			m.managerLogger.Infof("collector recovery restarting, total retries: %d", newRetries)
-			m.proc, err = m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
-				m.managerLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+			err = m.startCollector(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh)
 			if err != nil {
-				// report a startup error (this gets reported as status)
 				m.reportStartupErr(ctx, err)
-				// reset the restart timer to the next backoff
-				recoveryDelay := m.recoveryTimer.ResetNext()
-				m.managerLogger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 			}
 		case err = <-m.collectorRunErr:
 			m.recoveryTimer.Stop()
 			if err == nil {
 				// err is nil means that the collector has exited cleanly without an error
-				if m.proc != nil {
-					m.proc.Stop(m.stopTimeout)
-					m.proc = nil
+				if m.collectorRunning() {
+					// the collector is already running, no need to do anything
+					continue
 				}
 
 				// no critical error from this point forward
 				reportErr(ctx, m.errCh, nil)
 
-				if m.mergedCollectorCfg == nil {
+				if !m.collectorShouldRun() {
 					// no configuration then the collector should not be
 					// running.
 					continue
@@ -266,14 +276,9 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				m.proc, err = m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
-					m.managerLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+				err = m.startCollector(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh)
 				if err != nil {
-					// report a startup error (this gets reported as status)
 					m.reportStartupErr(ctx, err)
-					// reset the restart timer to the next backoff
-					recoveryDelay := m.recoveryTimer.ResetNext()
-					m.managerLogger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 				}
 			} else {
 				// error occurred while running the collector, this occurs in the
@@ -282,10 +287,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				//
 				// in the case that the configuration is invalid there is no reason to
 				// try again as it will keep failing so we do not trigger a restart
-				if m.proc != nil {
-					m.proc.Stop(m.stopTimeout)
-					m.proc = nil
-				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
 					// report a startup error (this gets reported as status)
@@ -301,7 +302,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.managerLogger)
+			mergedCfg, err := m.buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.managerLogger)
 			if err != nil {
 				// critical error, merging the configuration should always work
 				reportErr(ctx, m.errCh, err)
@@ -370,6 +371,51 @@ func (m *OTelManager) Errors() <-chan error {
 	return m.errCh
 }
 
+// collectorRunning checks if the otel collector is running.
+func (m *OTelManager) collectorRunning() bool {
+	return m.proc != nil && !m.proc.Stopped()
+}
+
+// collectorShouldRun checks if the otel collector should be running.
+func (m *OTelManager) collectorShouldRun() bool {
+	return m.mergedCollectorCfg != nil
+}
+
+// stopCollector stops the otel collector. This function is idempotent.
+func (m *OTelManager) stopCollector() {
+	if m.proc != nil {
+		m.proc.Stop(m.stopTimeout)
+		m.proc = nil
+	}
+}
+
+// startCollector starts the otel collector. This function is not idempotent and will error if the collector is running.
+func (m *OTelManager) startCollector(ctx context.Context,
+	collectorStatusCh chan *status.AggregateStatus,
+	collectorRunErr chan error,
+	forceFetchStatusCh chan struct{},
+) error {
+	if m.collectorRunning() {
+		return errors.New("tried to start otel collector, but it's already running")
+	}
+	proc, err := m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
+		m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+	if err != nil {
+		// failed to create the collector (this is different then
+		// it's failing to run). we do not retry creation on failure
+		// as it will always fail. A new configuration is required for
+		// it not to fail (a new configuration will result in the retry)
+		// since this is a new configuration we want to start the timer
+		// from the initial delay
+		recoveryDelay := m.recoveryTimer.ResetNext()
+		m.managerLogger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
+	} else {
+		// all good at the moment (possible that it will fail)
+		m.proc = proc
+	}
+	return err
+}
+
 // newLogLevelAfterConfigUpdate returns the manager log level after a configuration update, which can
 // be the log level set directly in the collector configuration or if that is not set, the log level
 // of the coordinator (the log level set in the Elastic Agent configuration).
@@ -388,7 +434,7 @@ func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Con
 }
 
 // buildMergedConfig combines collector configuration with component-derived configuration.
-func buildMergedConfig(
+func (m *OTelManager) buildMergedConfig(
 	cfgUpdate configUpdate,
 	agentInfo info.Agent,
 	monitoringConfigGetter translate.BeatMonitoringConfigGetter,
@@ -414,8 +460,7 @@ func buildMergedConfig(
 
 	// Merge component config if it exists
 	if componentOtelCfg != nil {
-		err := mergedOtelCfg.Merge(componentOtelCfg)
-		if err != nil {
+		if err := mergeWithExtensions(mergedOtelCfg, componentOtelCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 		}
 
@@ -423,18 +468,18 @@ func buildMergedConfig(
 			if mCfg.Enabled && mCfg.MonitorMetrics {
 				// Metrics monitoring is enabled, inject a receiver for the
 				// collector's internal telemetry.
-				err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components)
-				if err != nil {
+				if err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components); err != nil {
 					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
 				}
 			}
 		}
 	}
 
-	// Merge with base collector config if it exists
+	// Merge with base collector config if it exists. mergeWithExtensions unions
+	// the service::extensions lists so that component-generated extensions (e.g.
+	// beatsauth) are not silently overwritten by the collector config's list.
 	if cfgUpdate.collectorCfg != nil {
-		err := mergedOtelCfg.Merge(cfgUpdate.collectorCfg)
-		if err != nil {
+		if err := mergeWithExtensions(mergedOtelCfg, cfgUpdate.collectorCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
 	}
@@ -446,6 +491,17 @@ func buildMergedConfig(
 	// if the otel log level is unset, use the agent log level
 	if err := maybeInjectLogLevel(mergedOtelCfg, cfgUpdate.agentLogLevel); err != nil {
 		return nil, err
+	}
+
+	// Inject health check extension with port 0 as a placeholder. The actual port is resolved
+	// per-start by the execution layer and passed to the collector via a CLI flag, where a
+	// confmap converter overrides the placeholder with the real port.
+	if err := injectHealthCheckV2Extension(mergedOtelCfg, m.healthCheckExtComponentID, 0); err != nil {
+		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
+	}
+
+	if err := addCollectorMetricsReader(mergedOtelCfg, m.collectorMetricsPort); err != nil {
+		return nil, fmt.Errorf("failed to add collector metrics reader: %w", err)
 	}
 
 	return mergedOtelCfg, nil
@@ -460,31 +516,23 @@ func maybeInjectLogLevel(config *confmap.Conf, logplevel logp.Level) error {
 	if err != nil {
 		return fmt.Errorf("failed to translate log level: %s", logplevel)
 	}
-	if err := config.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
+	if err := mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
 		return fmt.Errorf("failed to set log level in otel config: %w", err)
 	}
 	return nil
 }
 
 func injectDiagnosticsExtension(config *confmap.Conf) error {
-	extensionCfg := map[string]any{
+	return mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{
 		"extensions": map[string]any{
 			"elastic_diagnostics": map[string]any{
 				"endpoint": paths.DiagnosticsExtensionSocket(),
 			},
 		},
-	}
-	if config.IsSet("service::extensions") {
-		extensionList := config.Get("service::extensions").([]interface{})
-		if slices.Contains(extensionList, "elastic_diagnostics") {
-			// already configured, nothing to do
-			return nil
-		}
-		extensionList = append(extensionList, "elastic_diagnostics")
-		extensionCfg["service::extensions"] = extensionList
-	}
-
-	return config.Merge(confmap.NewFromStringMap(extensionCfg))
+		"service": map[string]any{
+			"extensions": []any{"elastic_diagnostics"},
+		},
+	}))
 }
 
 func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent) map[string]any {
@@ -576,12 +624,11 @@ func injectMonitoringReceiver(
 		return fmt.Errorf("couldn't map exporter IDs to output names: %w", err)
 	}
 
-	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
+	receiverType := otelcomponent.MustNewType(elasticMonitoringReceiverName)
 	receiverName := "internal-telemetry-monitoring"
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
-	processorID := "beat/" + translate.OtelNamePrefix + receiverName
+	processorID := translate.GetProcessorID().String()
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
-
 	pipelineCfg := map[string]any{
 		"receivers": []string{receiverID},
 		"exporters": []string{exporterID},
@@ -601,67 +648,63 @@ func injectMonitoringReceiver(
 		},
 	}
 	if features.DefaultProcessors() {
-		// If default processors are enabled, add them into the base configuration.
+		// If default processors are enabled, reference the shared beat processor.
+		// The processor definition is the same as the one added in GetOtelConfig,
+		// so upon merge one replaces the other with identical content.
 		collectorCfg["processors"] = map[string]any{
 			processorID: map[string]any{
-				"processors": translate.GetDefaultProcessors("collector"),
+				"processors": translate.GetDefaultProcessors(),
 			},
 		}
 		pipelineCfg["processors"] = []string{processorID}
 	}
 
-	return config.Merge(confmap.NewFromStringMap(collectorCfg))
+	return mergeWithExtensions(config, confmap.NewFromStringMap(collectorCfg))
 }
 
-func (m *OTelManager) applyMergedConfig(ctx context.Context,
+func (m *OTelManager) applyMergedConfig(
+	ctx context.Context,
 	collectorStatusCh chan *status.AggregateStatus,
 	collectorRunErr chan error,
 	forceFetchStatusCh chan struct{},
 ) error {
-	if m.proc != nil {
-		m.proc.Stop(m.stopTimeout)
-		m.proc = nil
-		// We wait here for the collector to exit before possibly starting a new one. The execution indicates this
-		// by sending an error over the appropriate channel. It will also send a nil status that we'll either process
-		// after exiting from this function and going back to the main loop, or it will be overridden by the status
-		// from the newly started collector.
-		// This is the only blocking wait inside the main loop involving channels, so we need to be extra careful not to
-		// deadlock.
-		// TODO: Verify if we need to wait for the error at all. Stop() is already blocking.
-		select {
-		case <-collectorRunErr:
-		case <-ctx.Done():
-			// our caller ctx is Done
-			return ctx.Err()
-		}
+	// No configuration, the collector should not be running.
+	if !m.collectorShouldRun() {
+		m.stopCollector()
+		return nil
 	}
 
-	if m.mergedCollectorCfg == nil {
-		// no configuration then the collector should not be
-		// running.
-		// ensure that the coordinator knows that there is no error
-		// as the collector is not running anymore
-		return nil
-	} else {
-		// either a new configuration or the first configuration
-		// that results in the collector being started
-		proc, err := m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
-			m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+	// We have a configuration, need to apply it.
+
+	// Collector isn't running yet, start it.
+	if !m.collectorRunning() {
+		err := m.startCollector(ctx, collectorStatusCh, collectorRunErr, forceFetchStatusCh)
 		if err != nil {
-			// failed to create the collector (this is different then
-			// it's failing to run). we do not retry creation on failure
-			// as it will always fail. A new configuration is required for
-			// it not to fail (a new configuration will result in the retry)
-			// since this is a new configuration we want to start the timer
-			// from the initial delay
-			recoveryDelay := m.recoveryTimer.ResetInitial()
-			m.managerLogger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
-			return err
-		} else {
-			// all good at the moment (possible that it will fail)
-			m.proc = proc
+			// this is a new configuration, so reset the recovery timer
+			m.recoveryTimer.ResetInitial()
 		}
+		return err
 	}
+
+	// Collector is running, update the configuration.
+
+	// If we changed the log level, we need to restart the collector, as our loggers read directly from the collector's
+	// stdout and stderr.
+	if m.proc.LogLevel() != m.collectorLogLevel {
+		m.stopCollector()
+		err := m.startCollector(ctx, collectorStatusCh, collectorRunErr, forceFetchStatusCh)
+		if err != nil {
+			// this is a new configuration, so reset the recovery timer
+			m.recoveryTimer.ResetInitial()
+		}
+		return err
+	}
+
+	// Normal config update
+	if err := m.proc.UpdateConfig(m.mergedCollectorCfg); err != nil {
+		return fmt.Errorf("collector config reload failed: %w", err)
+	}
+
 	return nil
 }
 
@@ -719,7 +762,7 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
-				case extensionKey == m.healthCheckExtID:
+				case extensionKey == "extension:"+m.healthCheckExtComponentID:
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}
@@ -758,15 +801,19 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 // this is done by parsing the `m.mergedCollectorCfg` and converting it into the best effort *status.AggregateStatus.
 func (m *OTelManager) reportStartupErr(ctx context.Context, err error) {
 	criticalErr := func(err error) error {
-		otelStatus, err := otelConfigToStatus(m.mergedCollectorCfg, err)
-		if err != nil {
-			return err
+		otelStatus, statusErr := otelConfigToStatus(m.mergedCollectorCfg, err)
+		if statusErr != nil {
+			return statusErr
+		}
+		if otelStatus == nil {
+			// status is nil, so we've already shut down, no reason to report the error, but we should log it
+			m.managerLogger.Warnf("otel collector shut down with error: %v", err)
 		}
 		return m.reportOtelStatusUpdate(ctx, otelStatus)
 	}(err)
 	if criticalErr != nil {
 		// critical error occurred
-		reportErr(ctx, m.errCh, fmt.Errorf("failed to report statup error: %w", criticalErr))
+		reportErr(ctx, m.errCh, fmt.Errorf("failed to report startup error: %w", criticalErr))
 	} else {
 		// no error reporting (clear critical)
 		reportErr(ctx, m.errCh, nil)
@@ -795,13 +842,11 @@ func (m *OTelManager) processComponentStates(componentStates []runtime.Component
 	for _, componentState := range componentStates {
 		componentIds[componentState.Component.ID] = true
 	}
-	for id := range m.currentComponentStates {
+	for id, comp := range m.currentComponentStates {
 		if _, ok := componentIds[id]; !ok {
 			// this component is not in the configuration anymore, emit a fake STOPPED state
 			componentStates = append(componentStates, runtime.ComponentComponentState{
-				Component: component.Component{
-					ID: id,
-				},
+				Component: comp.Component,
 				State: runtime.ComponentState{
 					State: client.UnitStateStopped,
 				},

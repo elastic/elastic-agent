@@ -5,24 +5,23 @@
 package main
 
 import (
-	"context"
-	"errors"
+	"fmt"
 	"os"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/edot/cmd"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 // This is a test binary used by the OTEL manager unit tests.
-// It launches a supervised collector using cmd.RunCollector, and can be
-// configured via env vars to simulate different scenarios:
+// It mirrors the behavior of the real EDOT binary (internal/edot/main.go)
+// but can be configured via env vars to simulate different scenarios:
 //   - TEST_SUPERVISED_COLLECTOR_PANIC: triggers a panic after the given delay,
 //     allowing tests to verify the manager’s panic/restart behavior.
 //   - TEST_SUPERVISED_COLLECTOR_DELAY: delays process shutdown by the given
 //     duration, letting tests observe graceful termination handling.
 //
-// The binary exits with code 0 on a successful collector run (or when canceled),
+// The binary exits with code 0 on a successful collector run,
 // and code 1 if the collector returns an error.
 func main() {
 	var shutdownDelay time.Duration
@@ -31,9 +30,6 @@ func main() {
 	if shutdownDelayEnvVar != "" {
 		shutdownDelay, _ = time.ParseDuration(shutdownDelayEnvVar)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	if panicEnvVar := os.Getenv("TEST_SUPERVISED_COLLECTOR_PANIC"); panicEnvVar != "" {
 		panicDelay, err := time.ParseDuration(panicEnvVar)
@@ -46,11 +42,11 @@ func main() {
 		})
 	}
 
-	monitoringURL := os.Getenv("TEST_SUPERVISED_COLLECTOR_MONITORING_URL")
-
-	err = cmd.RunCollector(ctx, nil, true, "debug", monitoringURL)
-	if err != nil && !errors.Is(err, context.Canceled) {
-		logp.NewLogger("").Fatal("collector server run finished with error: %v", err)
+	collectorCmd := cmd.NewOtelCommandWithArgs(os.Args, cli.NewIOStreams())
+	err = collectorCmd.Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
 	}
 
 	if shutdownDelay > 0 {

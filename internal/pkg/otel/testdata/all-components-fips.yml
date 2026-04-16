@@ -38,6 +38,7 @@ processors:
     limit_mib: 4000
     spike_limit_mib: 800
   elasticapm:
+  ratelimit:
   tail_sampling:
   beat:
 
@@ -60,6 +61,14 @@ receivers:
   zipkin:
   docker_stats:
   elasticmonitoringreceiver:
+  verifier:
+    cloud_connector_id: "test-cc-001"
+    verification_id: "test-verify-001"
+    policies:
+      - policy_id: "policy-001"
+        integrations:
+          - policy_template: "cloudtrail"
+            package_name: "aws"
 
 connectors:
   spanmetrics:
@@ -111,6 +120,7 @@ service:
         - filelog
         - otlp
         - elasticmonitoringreceiver
+        - verifier
 
     metrics:
       exporters:

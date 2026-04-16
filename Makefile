@@ -19,6 +19,11 @@ install-gotestsum:
 	go install gotest.tools/gotestsum
 	@-gotestsum --version
 
+## install-golangci-lint : Install golangci-lint
+.PHONY: install-golangci-lint
+install-golangci-lint:
+	@mage prepare:installGolangciLint
+
 ## help : Show this help.
 help: Makefile
 	@printf "Usage: make [target] [VARIABLE=value]\nTargets:\n"
@@ -52,9 +57,17 @@ check:
 
 ## check-go: download and run the go linter.
 .PHONY: check-go
-check-go: ## - Run golangci-lint
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.64.5
-	@./bin/golangci-lint run -v
+check-go: lint
+
+## lint: download and run the go linter on current changes.
+.PHONY: lint
+lint:
+	@mage check:lint
+
+## lint-all: download and run the go linter on the whole codebase.
+.PHONY: lint-all
+lint-all:
+	@mage check:lintAll
 
 ## check-no-changes : Check there is no local changes.
 .PHONY: check-no-changes

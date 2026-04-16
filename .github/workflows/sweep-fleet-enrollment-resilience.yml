@@ -1,0 +1,126 @@
+name: "Sweeper: Fleet Enrollment and Communication Resilience"
+on:
+  schedule:
+    - cron: "0 9 * * 4"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  run:
+    uses: elastic/ai-github-actions/.github/workflows/gh-aw-code-quality-audit.lock.yml@v0
+    with:
+      title-prefix: "[fleet-enrollment-resilience]"
+      severity-threshold: "high"
+      setup-commands: |
+        sudo apt-get update && sudo apt-get install -y libpcap-dev librpm-dev python3-venv
+        export GOTOOLCHAIN=auto
+        make mage
+      additional-instructions: |
+        You are a **Fleet enrollment and communication resilience sweeper** for Elastic Agent.
+        Your goal is to find every code path where enrollment can fail and leave the agent in
+        an unrecoverable state, where check-in communication failures cause incorrect behavior,
+        or where re-enrollment logic triggers unnecessarily — and write a failing test for each
+        confirmed issue.
+
+        ## The component
+
+        Fleet communication spans several packages:
+
+        - `internal/pkg/fleetapi/` — HTTP API layer:
+          - `enroll_cmd.go` — Enrollment request/response
+          - `checkin_cmd.go` — Agent check-in payload
+          - `ack_cmd.go` — Action acknowledgment
+          - `client/client.go` — HTTP sender, API version headers, status path
+          - `client/round_trippers.go` — Transport middleware
+          - `acker/` — Ack implementations (fleet, lazy, noop, retrier)
+        - `internal/pkg/agent/application/enroll/enroll.go` — High-level enrollment:
+          token validation, backoff, config persistence
+        - `internal/pkg/agent/application/gateway/fleet/fleet_gateway.go` — Long-running
+          gateway: periodic check-in, action dispatch, backoff on auth errors, integrates
+          coordinator/runtime/OTel status into Fleet state
+        - `internal/pkg/agent/application/managed_mode.go` — Wires managed mode together
+        - `internal/pkg/agent/application/fleet_server_bootstrap.go` — Fleet Server bootstrap
+          when the agent itself runs Fleet Server
+        - `internal/pkg/agent/application/monitoring/liveness.go` — HTTP liveness endpoint
+          for orchestrators (Kubernetes, systemd)
+        - `internal/pkg/agent/application/monitoring/server.go` — Monitoring HTTP server
+
+        ## The bug class
+
+        Fleet communication bugs recur in three categories:
+
+        **Enrollment failures that leave stale state**: When enrollment fails partway through
+        (network error after the server accepts but before the agent persists credentials),
+        the agent can end up with partial state: an API key that the server considers valid
+        but that the agent cannot use, or a fleet.enc file that references a Fleet URL that
+        no longer matches. Historical bugs include: `shouldFleetEnroll` re-triggering enrollment
+        because the stored host URL differs in scheme (http vs https) from the Fleet URL,
+        enrollment failing silently when the policy is not on the first page of API results,
+        and delayed enrollment (`--delay-enroll`) failing to start the service on reboot
+        across multiple platforms.
+
+        **Check-in timing and backoff issues**: The agent checks in with Fleet periodically.
+        Bugs have included: check-in calculations using wall clock time instead of monotonic
+        time (causing storms after NTP sync or manual time changes), retry backoff being too
+        aggressive (thousands of retries per second), and the agent not recovering from
+        transient auth failures (staying offline permanently after a brief Fleet outage).
+
+        **Liveness endpoint inaccuracy**: The `/liveness` endpoint is used by Kubernetes and
+        other orchestrators to determine if the agent is healthy. Bugs have included: the
+        endpoint not being available during enrollment, not considering overall agent state
+        (only component state), and `?failon=degraded` not returning HTTP 500 when the
+        agent is actually degraded.
+
+        **Re-enrollment loops**: Several bugs have caused agents to repeatedly re-enroll
+        when they should not: URL normalization differences, stale enrollment tokens in
+        Kubernetes deployments, and migration between Fleet clusters leaving conflicting state.
+
+        ## How to investigate
+
+        Start with the enrollment flow in `enroll/enroll.go`. Trace from the CLI command or
+        delayed-enroll trigger through credential exchange, config persistence, and first
+        check-in. At each step ask: what happens if this step fails? Is the partial state
+        cleaned up? Can the agent retry from a clean state?
+
+        Then read the Fleet gateway (`gateway/fleet/fleet_gateway.go`). Follow the check-in
+        loop. Ask: how is the check-in interval computed? Is it monotonic-time safe? What
+        happens when the server returns 401, 429, or 500? Does the backoff reset correctly
+        after a successful check-in? What happens to queued actions if check-in fails for
+        an extended period?
+
+        For liveness, read `monitoring/liveness.go`. Ask: what state does it inspect? Does
+        it reflect enrollment state, or only post-enrollment component state? Is there a
+        race between the enrollment completing and the liveness handler being registered?
+
+        For re-enrollment, read the `shouldFleetEnroll` logic and the config comparison code.
+        Ask: under what conditions does the agent decide it needs to re-enroll? Are URL
+        comparisons normalized? What about trailing slashes, port numbers, scheme differences?
+
+        ## For each risk you confirm
+
+        Write a Go test. For enrollment, mock the Fleet API and simulate failure at each step.
+        For check-in, test with simulated clock skew and error responses. For liveness, test
+        the HTTP endpoint at different agent lifecycle stages. Run:
+        `go test ./internal/pkg/fleetapi/... ./internal/pkg/agent/application/gateway/... ./internal/pkg/agent/application/enroll/... ./internal/pkg/agent/application/monitoring/...`
+
+        ## The bar for filing
+
+        Only report findings that a real Fleet-managed agent could encounter: network
+        interruptions, Fleet server restarts, Kubernetes pod restarts, clock drift, migration
+        between clusters. Do not file findings that require manipulating internal state files
+        in ways that cannot happen through normal agent operations.
+
+        ## Output
+
+        File a single issue containing:
+        - Confirmed issues with test code, the exact failure scenario, and fix direction
+        - A priority ranking: unrecoverable states first, then data plane impact, then
+          cosmetic status issues
+        - Communication paths you audited and found resilient
+    secrets:
+      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

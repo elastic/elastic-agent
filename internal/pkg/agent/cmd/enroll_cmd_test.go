@@ -944,3 +944,43 @@ func cleanTags(tags []string) []string {
 	}
 	return r
 }
+
+func Test_EnrollCmd_PrepareFleetServerTLS(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  enroll.EnrollCmdFleetServerOption
+		url  string
+	}{{
+		name: "with cert",
+		cfg: enroll.EnrollCmdFleetServerOption{
+			ConnStr:      "http://elastic.internal:9220",
+			InternalPort: defaultFleetServerInternalPort,
+			Cert:         "exmple-cert",
+			CertKey:      "example-key",
+		},
+		url: "https://localhost:8221",
+	}, {
+		name: "insecure",
+		cfg: enroll.EnrollCmdFleetServerOption{
+			Insecure:     true,
+			ConnStr:      "http://elastic.internal:9220",
+			InternalPort: defaultFleetServerInternalPort,
+		},
+		url: "http://localhost:8221",
+	}}
+	log, _ := loggertest.New("Test_EnrollCmd_PrepareFleetServerTLS")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &enrollCmd{
+				log: log,
+				options: &enroll.EnrollOptions{
+					FleetServer: tt.cfg,
+					URL:         "example.com",
+				},
+			}
+			err := c.prepareFleetTLS()
+			require.NoError(t, err)
+			require.Equal(t, tt.url, c.options.URL)
+		})
+	}
+}

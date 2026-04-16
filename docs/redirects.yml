@@ -1,0 +1,2 @@
+redirects:
+  'reference/edot-collector/config/tail-based-sampling.md': 'reference/edot-collector/config/configure-tracing-collection.md'

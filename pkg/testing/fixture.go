@@ -360,6 +360,31 @@ func (f *Fixture) PackageFormat() string {
 	return f.packageFormat
 }
 
+// SetInstallBasePath records the install base path on the fixture. This is
+// needed when the agent is installed manually (e.g. via rpm -U) without going
+// through fixture.Install(), so that helpers such as FindRunDir can locate the
+// correct data directory.
+func (f *Fixture) SetInstallBasePath(path string) {
+	if f.installOpts == nil {
+		f.installOpts = &InstallOpts{}
+	}
+	f.installOpts.BasePath = path
+}
+
+// AgentDataDir returns the path to the agent's data directory, accounting for
+// any install prefix. For rpm/deb this is "{prefix}/var/lib/elastic-agent";
+// for other package formats it is the fixture's work directory.
+func (f *Fixture) AgentDataDir() string {
+	if pf := f.packageFormat; pf == "deb" || pf == "rpm" {
+		prefix := ""
+		if f.installOpts != nil {
+			prefix = f.installOpts.BasePath
+		}
+		return prefix + "/var/lib/elastic-agent"
+	}
+	return f.workDir
+}
+
 func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 	filename := filepath.Base(artifactFile)
 	_, ext, err := splitFileType(filename)
@@ -1420,7 +1445,10 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read contents of the data directory %s: %w", dataDir, err)
 	}
-	var versionDir string
+	var (
+		versionDir        string
+		versionDirModTime time.Time
+	)
 	for _, fi := range agentVersions {
 		filename := fi.Name()
 		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
@@ -1430,8 +1458,17 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 				// directories, we don't want first found
 				continue
 			}
-			versionDir = filename
-			break
+			info, err := fi.Info()
+			if err != nil {
+				continue
+			}
+			// After an upgrade within the same version, two directories with
+			// different build hashes will exist. Use the most recently modified
+			// one because that is the active install.
+			if versionDir == "" || info.ModTime().After(versionDirModTime) {
+				versionDir = filename
+				versionDirModTime = info.ModTime()
+			}
 		}
 	}
 	if versionDir == "" {
@@ -1456,11 +1493,7 @@ func FindComponentsDir(dir, version string) (string, error) {
 
 // FindRunDir identifies the directory that holds the run folder.
 func FindRunDir(fixture *Fixture) (string, error) {
-	agentWorkDir := fixture.WorkDir()
-	if pf := fixture.PackageFormat(); pf == "deb" || pf == "rpm" {
-		// these are hardcoded paths in packages.yml
-		agentWorkDir = "/var/lib/elastic-agent"
-	}
+	agentWorkDir := fixture.AgentDataDir()
 
 	version := fixture.Version()
 	versionDir, err := findAgentDataVersionDir(agentWorkDir, version)

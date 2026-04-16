@@ -1,0 +1,70 @@
+# AWS verifier test using default credentials (AWS_PROFILE or env vars)
+#
+# Prerequisites:
+#   export AWS_PROFILE=csp   (or configure credentials via env vars)
+#
+# Run with:
+#   ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-aws.yaml
+
+receivers:
+  verifier:
+    identity_federation_id: "cc-test-aws"
+    identity_federation_name: "AWS Test"
+    account_type: "single-account"
+    verification_id: "verify-aws-001"
+    verification_type: "on_demand"
+
+    providers:
+      aws:
+        credentials:
+          use_default_credentials: true
+
+    policies:
+      - policy_id: "policy-aws-security"
+        policy_name: "AWS Security"
+        integrations:
+          - policy_template: "cloudtrail"
+            package_name: "aws"
+            package_policy_id: "pp-cloudtrail-001"
+            package_title: "AWS"
+            package_version: "2.17.0"
+            config:
+              region: "us-east-1"
+          - policy_template: "cspm"
+            package_name: "aws"
+            package_policy_id: "pp-cspm-001"
+            package_title: "AWS"
+          - policy_template: "asset_inventory"
+            package_name: "aws"
+            package_policy_id: "pp-asset-001"
+            package_title: "AWS"
+
+processors:
+  resource/verifier:
+    attributes:
+      - action: insert
+        key: data_stream.type
+        value: logs
+      - action: insert
+        key: data_stream.dataset
+        value: verifier_otel.verification
+      - action: insert
+        key: data_stream.namespace
+        value: "default"
+      - action: insert
+        key: identity_federation.namespace
+        value: "default"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    logs:
+      receivers: [verifier]
+      processors: [resource/verifier]
+      exporters: [debug]

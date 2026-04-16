@@ -50,7 +50,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
 
       - name: Install mage
-        uses: magefile/mage-action@6f50bbb8ea47d56e62dee92392788acbc8192d0b # v3.1.0
+        uses: magefile/mage-action@a662bd8c29d8106879588cfff83b2faf6e6f59db # v4.0.0
         with:
           version: v1.14.0
           install-only: true
@@ -62,7 +62,7 @@ jobs:
         run: ./.github/workflows/bump-agent-versions.sh
 
       - if: ${{ failure()  }}
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -85,7 +85,7 @@ jobs:
 
         # if a PR was created as a result of this job, we notify on the Slack channel
       - if: ${{ startsWith(steps.update.outputs.pr, 'https') }}
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}

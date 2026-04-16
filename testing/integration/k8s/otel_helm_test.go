@@ -150,6 +150,31 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 2, "otc-container"),
 			},
 		},
+		// Template+apply path: exercises "helm template | kubectl apply" instead of "helm install".
+		// Catches config issues (e.g. missing/invalid debug exporter per #12878) that would
+		// cause collector pods to crash at startup.
+		{
+			name: "mOTel with helm template apply kube-stack on cluster",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepHelmTemplateApplyWithValueOptions(KubeStackChartPath, "kube-stack-otel",
+					values.Options{
+						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"},
+						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+
+						JSONValues: []string{
+							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_OTLP_ENDPOINT","value":"%s"}`, "https://otlp.ingest:433"),
+							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, "CHANGEME=="),
+							// Intentionally broken: debug exporter referenced in pipelines but not configured.
+							// Uncomment following line to simulate #12878 - gateway collector will crash at startup failing the test
+							// `collectors.gateway.config.exporters.debug=null`,
+						},
+					},
+				),
+				k8sStepCheckRunningPods("app.kubernetes.io/name=opentelemetry-operator", 1, "manager"),
+				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -169,6 +194,18 @@ func k8sStepHelmDeployWithValueOptions(chartPath string, releaseName string, val
 		helmValues := mergeValues(t, namespace, values)
 
 		k8sStepHelmDeploy(chartPath, releaseName, helmValues)(t, ctx, kCtx, namespace)
+	}
+}
+
+// k8sStepHelmTemplateApplyWithValueOptions is like k8sStepHelmDeployWithValueOptions but
+// uses "helm template | kubectl apply" instead of "helm install". Exercises the
+// template+apply path on the cluster; any config issues cause pods to fail and the
+// test fails (e.g. #12878 - missing debug exporter).
+func k8sStepHelmTemplateApplyWithValueOptions(chartPath string, releaseName string, values values.Options) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		helmValues := mergeValues(t, namespace, values)
+
+		k8sStepHelmTemplateApply(chartPath, releaseName, helmValues)(t, ctx, kCtx, namespace)
 	}
 }
 

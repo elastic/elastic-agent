@@ -500,3 +500,45 @@ spec:
         SLACK_NOTIFICATIONS_CHANNEL: "#ingest-notifications"
         SLACK_NOTIFICATIONS_ON_SUCCESS: "false"
         SLACK_NOTIFICATIONS_ALL_BRANCHES: "false" # only notify for failures on `main` or \d+.\d+ (release) branches
+
+---
+# yaml-language-server: $schema=https://gist.githubusercontent.com/elasticmachine/988b80dae436cafea07d9a4a460a011d/raw/rre.schema.json
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: buildkite-pipeline-elastic-agent-version-bump
+  description: Buildkite Pipeline for Elastic Agent Version Bump
+  links:
+    - title: Pipeline
+      url: https://buildkite.com/elastic/elastic-agent-version-bump
+spec:
+  type: buildkite-pipeline
+  owner: group:ingest-fp
+  system: platform-ingest
+  implementation:
+    apiVersion: buildkite.elastic.dev/v1
+    kind: Pipeline
+    metadata:
+      name: elastic-agent-version-bump
+      description: Buildkite Pipeline for Elastic Agent Version Bump
+    spec:
+      branch_configuration: "main"
+      repository: elastic/elastic-agent
+      pipeline_file: ".buildkite/pipeline.version-bump.yml"
+      provider_settings:
+        build_branches: false
+        build_pull_requests: false
+        trigger_mode: none # don't trigger jobs from github activity
+      cancel_intermediate_builds: true
+      cancel_intermediate_builds_branch_filter: "!main"
+      skip_intermediate_builds: true
+      skip_intermediate_builds_branch_filter: "!main"
+      teams:
+        ingest-fp:
+          access_level: MANAGE_BUILD_AND_READ
+        observablt-robots:
+          access_level: MANAGE_BUILD_AND_READ
+        release-eng:
+          access_level: BUILD_AND_READ
+        everyone:
+          access_level: READ_ONLY
