@@ -16,11 +16,11 @@ require (
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260414074838-323f731f84e5
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260414175739-e9ec484c5a80
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.2
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-	github.com/elastic/elastic-agent-libs v0.34.0
+	github.com/elastic/elastic-agent-libs v0.36.0
 	github.com/elastic/elastic-agent-system-metrics v0.14.3
 	github.com/elastic/elastic-transport-go/v8 v8.10.0
 	github.com/elastic/go-elasticsearch/v8 v8.19.3
@@ -57,7 +57,6 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/compose v0.42.0
-	github.com/testcontainers/testcontainers-go/modules/kafka v0.42.0
 	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639
 	go.elastic.co/apm/module/apmgorilla/v2 v2.6.0
 	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0
@@ -66,6 +65,7 @@ require (
 	go.elastic.co/go-licence-detector v0.7.0
 	go.opentelemetry.io/collector/component/componentstatus v0.149.0
 	go.opentelemetry.io/collector/component/componenttest v0.149.0
+	go.opentelemetry.io/collector/config/configtls v1.55.0
 	go.opentelemetry.io/collector/confmap/xconfmap v0.149.0
 	go.opentelemetry.io/collector/exporter/exportertest v0.149.0
 	go.opentelemetry.io/collector/extension/extensiontest v0.149.0
@@ -95,7 +95,7 @@ require (
 	howett.net/plist v1.0.1
 	k8s.io/api v0.35.2
 	k8s.io/apimachinery v0.35.2
-	k8s.io/cli-runtime v0.34.2
+	k8s.io/cli-runtime v0.35.2
 	k8s.io/client-go v0.35.2
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.77
 	sigs.k8s.io/e2e-framework v0.4.0
@@ -359,7 +359,6 @@ require (
 	go.opentelemetry.io/collector/config/configoptional v1.55.0 // indirect
 	go.opentelemetry.io/collector/config/configretry v1.55.0 // indirect
 	go.opentelemetry.io/collector/config/configtelemetry v0.149.0 // indirect
-	go.opentelemetry.io/collector/config/configtls v1.55.0 // indirect
 	go.opentelemetry.io/collector/connector/connectortest v0.149.0 // indirect
 	go.opentelemetry.io/collector/connector/xconnector v0.149.0 // indirect
 	go.opentelemetry.io/collector/consumer v1.55.0 // indirect

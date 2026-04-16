@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -38,7 +39,6 @@ import (
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/compose"
-	"github.com/testcontainers/testcontainers-go/modules/kafka"
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -2848,17 +2848,37 @@ func TestSystemMetricsWithKafkaOutput(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
-	k, err := kafka.Run(t.Context(),
-		"confluentinc/confluent-local:7.5.0",
-		kafka.WithClusterID("test-cluster"),
-	)
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok, "failed to get current file path")
+	kafkaPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "beats", "testing", "environments", "docker", "kafka")
 
+	composeContent := fmt.Sprintf(`
+services:
+  kafka:
+    build: %s
+    ports:
+      - 9092:9092
+      - 9093:9093
+      - 9094:9094
+      - 2181:2181
+    environment:
+      - KAFKA_ADVERTISED_HOST=localhost
+`, kafkaPath)
+
+	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
 	require.NoError(t, err)
+
 	t.Cleanup(func() {
-		_ = k.Terminate(context.Background())
+		_ = stack.Down(
+			context.Background(),
+			compose.RemoveOrphans(true),
+			compose.RemoveVolumes(true),
+			compose.RemoveImagesLocal,
+		)
 	})
 
-	brokers, err := k.Brokers(t.Context())
+	err = stack.
+		Up(t.Context(), compose.Wait(true))
 	require.NoError(t, err)
 
 	kafkaDocs := make(map[string]mapstr.M, 0)
@@ -2875,6 +2895,7 @@ func TestSystemMetricsWithKafkaOutput(t *testing.T) {
 		type otelConfigOptions struct {
 			RuntimeExperimental string
 			Broker              string
+			CaCert              string
 		}
 
 		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -2903,6 +2924,16 @@ outputs:
     required_acks: 1
     broker_timeout: 30s
     queue.mem.flush.timeout: 1s
+    ssl:
+      certificate_authorities: 
+        - {{.CaCert}}
+      supported_protocols: 
+       - TLSv1.3
+      verification_mode: full
+    username: beats
+    password: KafkaTest
+    protocol: https
+    sasl.mechanism: SCRAM-SHA-256
 agent.monitoring:
   metrics: false
   logs: false
@@ -2914,7 +2945,8 @@ agent.monitoring:
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			otelConfigOptions{
 				RuntimeExperimental: tt.runtimeExperimental,
-				Broker:              brokers[0],
+				Broker:              "localhost:9093",
+				CaCert:              filepath.Join(kafkaPath, "certs", "ca-cert"),
 			})
 
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -2923,6 +2955,7 @@ agent.monitoring:
 		require.NoError(t, err)
 
 		err = fixture.Configure(ctx, configBuffer.Bytes())
+		require.NoError(t, err)
 
 		cmd, err := fixture.PrepareAgentCommand(ctx, nil)
 		require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
@@ -2950,7 +2983,7 @@ agent.monitoring:
 			return true
 		}, 30*time.Second, 1*time.Second)
 
-		consumer, err := sarama.NewConsumer([]string{brokers[0]}, sarama.NewConfig())
+		consumer, err := sarama.NewConsumer([]string{"localhost:9094"}, sarama.NewConfig())
 		require.NoError(t, err)
 
 		partitionConsumer, err := consumer.ConsumePartition("metrics-e2e-"+tt.runtimeExperimental, 0, sarama.OffsetNewest)
