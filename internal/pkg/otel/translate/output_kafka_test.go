@@ -30,7 +30,13 @@ hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
 topic: static-topic
 required_acks: 1
 compression: gzip
-max_message_bytes: 1000000`,
+max_message_bytes: 1000000
+headers:
+- key: "some-key"
+  value: "some value"
+- key: "some-key"
+  value: "another value"
+`,
 		expectedMap: map[string]any{
 			"brokers": []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
 			"logs": map[string]any{
@@ -69,6 +75,14 @@ max_message_bytes: 1000000`,
 				"queue_size": 3200,
 			},
 			"timeout": 10 * time.Second,
+			"record_headers": []map[string]any{
+				{
+					"some-key": "some value",
+				},
+				{
+					"some-key": "another value",
+				},
+			},
 		},
 	},
 		{
