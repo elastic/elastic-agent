@@ -850,6 +850,9 @@ func TestGetOtelConfig(t *testing.T) {
 							},
 							"queue_size": 3200,
 						},
+						"logs": map[string]any{
+							"encoding": "raw",
+						},
 						"timeout": 10 * time.Second,
 					},
 				},

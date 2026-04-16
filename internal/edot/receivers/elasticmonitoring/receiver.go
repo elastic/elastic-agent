@@ -10,7 +10,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/elastic/beats/v7/x-pack/otel/otelmap"
+	"github.com/elastic/beats/v7/libbeat/otel/otelmap"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
 
