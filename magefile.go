@@ -614,7 +614,7 @@ func Package(ctx context.Context) error {
 
 	if cfg.Packaging.ManifestURL != "" {
 		// don't download the elastic-agent-core components; built above
-		if err := downloadManifest(ctx, cfg, pkgSpec, packaging.WithoutProjectName(mage.AgentCoreProjectName)); err != nil {
+		if err := downloadManifest(ctx, cfg, pkgSpec, packaging.WithoutProjectName(devtools.AgentCoreProjectName)); err != nil {
 			return fmt.Errorf("failed downloading manifest components: %w", err)
 		}
 	}
@@ -1431,12 +1431,12 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
 	}
-	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(mage.AgentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
+	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(devtools.AgentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
 
 	if len(elasticAgentCoreComponents) != 1 {
 		return fmt.Errorf(
 			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q, fips: %v]: %v",
-			mage.AgentCoreProjectName,
+			devtools.AgentCoreProjectName,
 			cfg.Build.FIPSBuild,
 			elasticAgentCoreComponents,
 		)
@@ -1624,11 +1624,11 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, man
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
 	}
-	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(mage.AgentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
+	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(devtools.AgentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
 	if len(elasticAgentCoreComponents) != 1 {
 		return fmt.Errorf(
 			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q, fips: %v]: %v",
-			mage.AgentCoreProjectName,
+			devtools.AgentCoreProjectName,
 			cfg.Build.FIPSBuild,
 			elasticAgentCoreComponents,
 		)
@@ -4206,8 +4206,8 @@ func (h Helm) Package(ctx context.Context) error {
 	agentChartVersion := agentCoreVersion
 	if !productionPackage {
 		// always use the SNAPSHOT version for image tag if not a production package
-		agentImageTag = agentImageTag + mage.SnapshotSuffix
-		agentChartVersion = agentChartVersion + mage.SnapshotSuffix
+		agentImageTag = agentImageTag + devtools.SnapshotSuffix
+		agentChartVersion = agentChartVersion + devtools.SnapshotSuffix
 	}
 
 	for yamlFile, keyVals := range map[string][]struct {
