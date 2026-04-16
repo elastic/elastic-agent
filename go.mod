@@ -66,26 +66,14 @@ require (
 	go.elastic.co/apm/v2 v2.7.2
 	go.elastic.co/ecszap v1.0.3
 	go.elastic.co/go-licence-detector v0.7.0
-<<<<<<< HEAD
-	go.opentelemetry.io/collector/component/componentstatus v0.149.0
-	go.opentelemetry.io/collector/component/componenttest v0.149.0
-	go.opentelemetry.io/collector/confmap/xconfmap v0.149.0
-	go.opentelemetry.io/collector/exporter/exportertest v0.149.0
-	go.opentelemetry.io/collector/extension/extensiontest v0.149.0
-	go.opentelemetry.io/collector/pdata v1.55.0
-	go.opentelemetry.io/collector/pipeline v1.55.0
-	go.opentelemetry.io/otel/sdk/metric v1.42.0
-=======
 	go.opentelemetry.io/collector/component/componentstatus v0.149.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/collector/component/componenttest v0.149.1-0.20260408002112-999af6320692
-	go.opentelemetry.io/collector/config/configtls v1.55.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/collector/confmap/xconfmap v0.149.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/collector/exporter/exportertest v0.149.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/collector/extension/extensiontest v0.149.0
 	go.opentelemetry.io/collector/pdata v1.55.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/collector/pipeline v1.55.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/otel/sdk/metric v1.43.0
->>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623))
 	go.uber.org/zap v1.27.1
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/crypto v0.49.0
@@ -99,7 +87,7 @@ require (
 	golang.org/x/time v0.14.0
 	golang.org/x/tools v0.43.0
 	google.golang.org/api v0.257.0
-	google.golang.org/grpc v1.79.3
+	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -329,7 +317,7 @@ require (
 	go.opentelemetry.io/collector/config/configoptional v1.55.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/config/configretry v1.55.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/config/configtelemetry v0.149.0 // indirect
-	go.opentelemetry.io/collector/config/configtls v1.55.0 // indirect
+	go.opentelemetry.io/collector/config/configtls v1.55.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/connector/connectortest v0.149.0 // indirect
 	go.opentelemetry.io/collector/connector/xconnector v0.149.0 // indirect
 	go.opentelemetry.io/collector/consumer v1.55.1-0.20260408002112-999af6320692 // indirect
@@ -357,19 +345,10 @@ require (
 	go.opentelemetry.io/collector/receiver/xreceiver v0.149.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/service v0.149.0 // indirect
 	go.opentelemetry.io/collector/service/hostcapabilities v0.149.0 // indirect
-<<<<<<< HEAD
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.67.0 // indirect
-	go.opentelemetry.io/contrib/otelconf v0.22.0 // indirect
-	go.opentelemetry.io/ebpf-profiler v0.0.202613 // indirect
-	go.opentelemetry.io/otel v1.42.0 // indirect
-=======
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.63.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0 // indirect
 	go.opentelemetry.io/contrib/otelconf v0.22.0 // indirect
 	go.opentelemetry.io/ebpf-profiler v0.0.202614 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
->>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623))
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.18.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.18.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.42.0 // indirect
@@ -382,10 +361,10 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.42.0 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.42.0 // indirect
 	go.opentelemetry.io/otel/log v0.18.0 // indirect
-	go.opentelemetry.io/otel/metric v1.42.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.42.0 // indirect
+	go.opentelemetry.io/otel/metric v1.43.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.18.0 // indirect
-	go.opentelemetry.io/otel/trace v1.42.0 // indirect
+	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
@@ -413,7 +392,7 @@ require (
 )
 
 require (
-	github.com/hashicorp/go-version v1.8.0 // indirect
+	github.com/hashicorp/go-version v1.9.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect; indirecthttps://github.com/elastic/ingest-dev/issues/3253
 	k8s.io/klog/v2 v2.130.1 // indirect
 )
