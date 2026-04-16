@@ -296,6 +296,18 @@ func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsP
 	if len(randomPorts) == 0 {
 		return healthCheckPort, metricsPort, nil
 	}
+<<<<<<< HEAD
+=======
+	metricsReadersList = append(metricsReadersList, metricsReader)
+	confMap := map[string]any{
+		"service::telemetry::metrics::readers": metricsReadersList,
+	}
+	if mergeErr := mergeWithExtensions(conf, confmap.NewFromStringMap(confMap)); mergeErr != nil {
+		return fmt.Errorf("failed to merge config: %w", mergeErr)
+	}
+	return nil
+}
+>>>>>>> 307544376 (Correctly merge component and collector extensions (#13639))
 
 	// we need at least one random port, create it
 	ports, err := findRandomTCPPorts(len(randomPorts))

@@ -12,7 +12,11 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
+<<<<<<< HEAD
 	"slices"
+=======
+	"path/filepath"
+>>>>>>> 307544376 (Correctly merge component and collector extensions (#13639))
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -425,16 +429,29 @@ func buildMergedConfig(
 
 	// Merge component config if it exists
 	if componentOtelCfg != nil {
-		err := mergedOtelCfg.Merge(componentOtelCfg)
-		if err != nil {
+		if err := mergeWithExtensions(mergedOtelCfg, componentOtelCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 		}
+<<<<<<< HEAD
+=======
+
+		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil {
+			if mCfg.Enabled && mCfg.MonitorMetrics {
+				// Metrics monitoring is enabled, inject a receiver for the
+				// collector's internal telemetry.
+				if err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components); err != nil {
+					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
+				}
+			}
+		}
+>>>>>>> 307544376 (Correctly merge component and collector extensions (#13639))
 	}
 
-	// Merge with base collector config if it exists
+	// Merge with base collector config if it exists. mergeWithExtensions unions
+	// the service::extensions lists so that component-generated extensions (e.g.
+	// beatsauth) are not silently overwritten by the collector config's list.
 	if cfgUpdate.collectorCfg != nil {
-		err := mergedOtelCfg.Merge(cfgUpdate.collectorCfg)
-		if err != nil {
+		if err := mergeWithExtensions(mergedOtelCfg, cfgUpdate.collectorCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
 	}
@@ -450,28 +467,170 @@ func buildMergedConfig(
 	return mergedOtelCfg, nil
 }
 
+<<<<<<< HEAD
+=======
+// maybeInjectLogLevel adds the given log level to the collector config if it's not set.
+func maybeInjectLogLevel(config *confmap.Conf, logplevel logp.Level) error {
+	if config.IsSet("service::telemetry::logs::level") {
+		return nil
+	}
+	level, err := translate.LogpLevelToOTel(logplevel)
+	if err != nil {
+		return fmt.Errorf("failed to translate log level: %s", logplevel)
+	}
+	if err := mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
+		return fmt.Errorf("failed to set log level in otel config: %w", err)
+	}
+	return nil
+}
+
+>>>>>>> 307544376 (Correctly merge component and collector extensions (#13639))
 func injectDiagnosticsExtension(config *confmap.Conf) error {
-	extensionCfg := map[string]any{
+	return mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{
 		"extensions": map[string]any{
 			"elastic_diagnostics": map[string]any{
 				"endpoint": paths.DiagnosticsExtensionSocket(),
 			},
 		},
-	}
-	if config.IsSet("service::extensions") {
-		extensionList := config.Get("service::extensions").([]interface{})
-		if slices.Contains(extensionList, "elastic_diagnostics") {
-			// already configured, nothing to do
-			return nil
-		}
-		extensionList = append(extensionList, "elastic_diagnostics")
-		extensionCfg["service::extensions"] = extensionList
-	}
-
-	return config.Merge(confmap.NewFromStringMap(extensionCfg))
+		"service": map[string]any{
+			"extensions": []any{"elastic_diagnostics"},
+		},
+	}))
 }
 
+<<<<<<< HEAD
 func (m *OTelManager) applyMergedConfig(ctx context.Context,
+=======
+func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent) map[string]any {
+	namespace := "default"
+	if monitoring.Namespace != "" {
+		namespace = monitoring.Namespace
+	}
+	agentFields := map[string]any{
+		"id":      agentInfo.AgentID(),
+		"version": agentInfo.Version(),
+	}
+	// Add hostname as agent.name if available
+	agentName, err := os.Hostname()
+	if err == nil {
+		agentFields["name"] = agentName
+	}
+
+	result := map[string]any{
+		"data_stream": map[string]any{
+			"dataset":   "elastic_agent.elastic_agent",
+			"namespace": namespace,
+			"type":      "metrics",
+		},
+		"event": map[string]any{
+			"dataset": "elastic_agent.elastic_agent",
+		},
+		"elastic_agent": map[string]any{
+			"id":       agentInfo.AgentID(),
+			"process":  "elastic-otel-collector",
+			"snapshot": agentInfo.Snapshot(),
+			"version":  agentInfo.Version(),
+		},
+		"agent": agentFields,
+		"component": map[string]any{
+			"binary": "elastic-otel-collector",
+			"id":     "elastic-otel-collector",
+		},
+		"metricset": map[string]any{
+			"name": "stats",
+		},
+	}
+
+	return result
+}
+
+// exporterIDToOutputNameLookup compiles the mapping from raw collector
+// exporter IDs to the policy output names that generated them, so internal
+// telemetry monitoring can associate metrics with the user-defined name.
+func exporterIDToOutputNameLookup(components []component.Component) (map[string]string, error) {
+	lookup := map[string]string{}
+	for _, comp := range components {
+		exporterType, err := translate.OutputTypeToExporterType(comp.OutputType)
+		if err != nil {
+			return nil, err
+		}
+		exporterID := translate.GetExporterID(exporterType, comp.OutputName)
+		// There may be collisions since multiple components can be generated
+		// from the same output, but this is fine since they will all have
+		// the same name as well.
+		lookup[exporterID.String()] = fmt.Sprintf("%v-%v", exporterType, comp.OutputName)
+	}
+	return lookup, nil
+}
+
+func injectMonitoringReceiver(
+	config *confmap.Conf,
+	monitoring *monitoringCfg.MonitoringConfig,
+	agentInfo info.Agent,
+	components []component.Component,
+) error {
+	// Find the monitoring exporter that this pipeline will be writing to
+	exporterType := otelcomponent.MustNewType("elasticsearch")
+	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
+	monitoringExporterFound := false
+	if config.IsSet("exporters") {
+		// Search the defined exporters for one with the expected id for monitoring
+		for exporter := range config.Get("exporters").(map[string]any) {
+			if exporter == exporterID {
+				monitoringExporterFound = true
+			}
+		}
+	}
+	if !monitoringExporterFound {
+		// We can't monitor OTel metrics without OTel-based monitoring
+		return nil
+	}
+	outputNameLookup, err := exporterIDToOutputNameLookup(components)
+	if err != nil {
+		return fmt.Errorf("couldn't map exporter IDs to output names: %w", err)
+	}
+
+	receiverType := otelcomponent.MustNewType(elasticMonitoringReceiverName)
+	receiverName := "internal-telemetry-monitoring"
+	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
+	processorID := translate.GetProcessorID().String()
+	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
+	pipelineCfg := map[string]any{
+		"receivers": []string{receiverID},
+		"exporters": []string{exporterID},
+	}
+	collectorCfg := map[string]any{
+		"receivers": map[string]any{
+			receiverID: map[string]any{
+				"event_template": monitoringEventTemplate(monitoring, agentInfo),
+				"interval":       monitoring.MetricsPeriod,
+				"exporter_names": outputNameLookup,
+			},
+		},
+		"service": map[string]any{
+			"pipelines": map[string]any{
+				pipelineID: pipelineCfg,
+			},
+		},
+	}
+	if features.DefaultProcessors() {
+		// If default processors are enabled, reference the shared beat processor.
+		// The processor definition is the same as the one added in GetOtelConfig,
+		// so upon merge one replaces the other with identical content.
+		collectorCfg["processors"] = map[string]any{
+			processorID: map[string]any{
+				"processors": translate.GetDefaultProcessors(),
+			},
+		}
+		pipelineCfg["processors"] = []string{processorID}
+	}
+
+	return mergeWithExtensions(config, confmap.NewFromStringMap(collectorCfg))
+}
+
+func (m *OTelManager) applyMergedConfig(
+	ctx context.Context,
+>>>>>>> 307544376 (Correctly merge component and collector extensions (#13639))
 	collectorStatusCh chan *status.AggregateStatus,
 	collectorRunErr chan error,
 	forceFetchStatusCh chan struct{},

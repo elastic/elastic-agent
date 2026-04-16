@@ -17,6 +17,7 @@ type forceExtension struct {
 	config map[string]any
 }
 
+<<<<<<< HEAD
 func (fe *forceExtension) Convert(ctx context.Context, conf *confmap.Conf) error {
 	err := func() error {
 		err := conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
@@ -67,8 +68,21 @@ func (fe *forceExtension) Convert(ctx context.Context, conf *confmap.Conf) error
 		if err != nil {
 			return fmt.Errorf("merge into service::extensions failed: %w", err)
 		}
+=======
+func (fe *forceExtension) Convert(_ context.Context, conf *confmap.Conf) error {
+	if conf.IsSet("extensions::" + fe.name) {
+		// already defined by the user, nothing to do
+>>>>>>> 307544376 (Correctly merge component and collector extensions (#13639))
 		return nil
-	}()
+	}
+	err := mergeWithExtensions(conf, confmap.NewFromStringMap(map[string]interface{}{
+		"extensions": map[string]interface{}{
+			fe.name: fe.config,
+		},
+		"service": map[string]interface{}{
+			"extensions": []interface{}{fe.name},
+		},
+	}))
 	if err != nil {
 		return fmt.Errorf("failed to force enable %s extension: %w", fe.name, err)
 	}
