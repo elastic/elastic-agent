@@ -3255,7 +3255,7 @@ agent.monitoring:
 			},
 			2*time.Minute, 10*time.Second, "expected documents to be published to logstash output for %s mode", tt.name)
 
-		// download files from Nginx into testdata directory
+		// download files from Logstash into testdata directory
 		logstash[tt.name] = downloadData(t, outFileURL)
 
 		cancel()
