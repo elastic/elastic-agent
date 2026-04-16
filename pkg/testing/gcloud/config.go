@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package ogc
+package gcloud
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ import (
 	"os"
 )
 
-// Config is the configuration for using OGC.
+// Config is the configuration for using the gcloud CLI provisioner.
 type Config struct {
 	ServiceTokenPath string
 	Datacenter       string
@@ -50,7 +50,6 @@ func (c *Config) ClientEmail() (string, error) {
 
 func (c *Config) ensureParsed() error {
 	if c.content != nil {
-		// already parsed
 		return nil
 	}
 	content, err := c.parse()
@@ -77,11 +76,8 @@ func (c *Config) parse() (*serviceTokenContent, error) {
 	return &content, nil
 }
 
-// serviceTokenContent is parsed content from a service token file.
 type serviceTokenContent struct {
 	Type        string `json:"type"`
 	ProjectID   string `json:"project_id"`
 	ClientEmail string `json:"client_email"`
-
-	// more fields exists but we only need the provided information
 }
