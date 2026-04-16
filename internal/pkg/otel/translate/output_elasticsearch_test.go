@@ -80,6 +80,7 @@ sending_queue:
   num_consumers: 60
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 user: elastic
 headers:
   X-Header-1: foo
@@ -138,6 +139,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
@@ -156,6 +158,76 @@ compression_params:
 hosts: "localhost:9200"
 index: "some-index"
 api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
+<<<<<<< HEAD
+=======
+parameters:
+  somekey : somevalue
+`
+
+		OTelCfg := `
+endpoints:
+  - http://localhost:9200?somekey=somevalue
+logs_index: some-index
+logs_dynamic_pipeline:
+  enabled: true
+retry:
+  enabled: true
+  initial_interval: 1s
+  max_interval: 1m0s
+  max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
+sending_queue:
+  batch:
+    flush_timeout: 10s
+    max_size: 1600
+    min_size: 0
+    sizer: items
+  block_on_overflow: true
+  enabled: true
+  num_consumers: 1
+  queue_size: 3200
+  wait_for_result: true
+suppress_conflict_errors: true
+max_conns_per_host: 1
+api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+compression: gzip
+compression_params:
+  level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
+ `
+		cfg := config.MustNewConfigFrom(beatCfg)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
+		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
+		expOutput := newFromYamlString(t, OTelCfg)
+		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
+	})
+
+	t.Run("ssl setting of type []string can be a string", func(t *testing.T) {
+		beatCfg := `
+hosts: "localhost:9200"
+index: "some-index"
+api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
+ssl.certificate_authorities: "/not/a/real/path/ca.pem"
+ssl.supported_protocols: "TLSv1.3"
+ssl.cipher_suites: "ECDHE-ECDSA-AES-256-CBC-SHA"
+ssl.curve_types: "P-256"
+>>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623))
 `
 
 		OTelCfg := `
@@ -193,6 +265,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
@@ -328,6 +401,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
  `,
 			},
 			{
@@ -345,6 +419,7 @@ sending_queue:
   num_consumers: 4
   queue_size: 12800
   wait_for_result: true
+suppress_conflict_errors: true
  `,
 			},
 			{
@@ -387,6 +462,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 compression: gzip
 compression_params:
   level: 1
@@ -407,6 +483,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 4100
   wait_for_result: true
+suppress_conflict_errors: true
  `,
 			},
 			{
@@ -424,6 +501,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
  `,
 			},
 		}
@@ -496,6 +574,7 @@ sending_queue:
   num_consumers: 60
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 user: elastic
 headers:
   X-Header-1: foo
@@ -552,6 +631,7 @@ sending_queue:
   num_consumers: 60
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 user: elastic
 headers:
   X-Header-1: foo
@@ -619,6 +699,7 @@ sending_queue:
   num_consumers: 2
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 {{ if gt . 0 }}
 compression: gzip
 compression_params:

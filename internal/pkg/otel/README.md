@@ -47,8 +47,17 @@ This section provides a summary of components included in the Elastic Distributi
 | [nginxreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/nginxreceiver/v0.149.0/receiver/nginxreceiver/README.md) | v0.149.0 |
 | [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.149.0/receiver/nopreceiver/README.md) | v0.149.0 |
 | [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.149.0/receiver/otlpreceiver/README.md) | v0.149.0 |
+<<<<<<< HEAD:internal/pkg/otel/README.md
+=======
+| [postgresqlreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/postgresqlreceiver/v0.149.0/receiver/postgresqlreceiver/README.md) | v0.149.0 |
+| [profiling](https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/v0.0.202614/README.md) | v0.0.202614 |
+>>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623)):internal/edot/README.md
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.149.0/receiver/prometheusreceiver/README.md) | v0.149.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.149.0/receiver/receivercreator/README.md) | v0.149.0 |
+<<<<<<< HEAD:internal/pkg/otel/README.md
+=======
+| [receivertest](https://github.com/open-telemetry/opentelemetry-collector/blob/999af6320692/receiver/receivertest/README.md) | v0.149.1-0.20260408002112-999af6320692 |
+>>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623)):internal/edot/README.md
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.149.0/receiver/redisreceiver/README.md) | v0.149.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.149.0/receiver/zipkinreceiver/README.md) | v0.149.0 |
 

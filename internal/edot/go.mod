@@ -4,6 +4,15 @@ go 1.25.9
 
 replace github.com/elastic/elastic-agent => ../../
 
+<<<<<<< HEAD
+=======
+replace github.com/elastic/beats/v7 => ../../beats
+
+// Pin the elasticsearchexporter to a specific commit to include changes from
+// https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47309
+replace github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter => github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.149.1-0.20260409063637-ffa805c75b6a
+
+>>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623))
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260414153330-22e7c154209f
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
@@ -36,10 +45,14 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
+<<<<<<< HEAD
+=======
+	go.opentelemetry.io/collector/component/componenttest v0.149.1-0.20260408002112-999af6320692
+>>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623))
 	go.opentelemetry.io/collector/connector/forwardconnector v0.149.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.149.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.149.0
-	go.opentelemetry.io/ebpf-profiler v0.0.202613
+	go.opentelemetry.io/ebpf-profiler v0.0.202614
 	go.uber.org/zap v1.27.1
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -83,10 +96,22 @@ require (
 	github.com/prometheus/client_golang/exp v0.0.0-20260108101519-fb0838f53562 // indirect
 	github.com/puzpuzpuz/xsync/v4 v4.4.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/component/componentstatus v0.149.0 // indirect
 	go.opentelemetry.io/collector/component/componenttest v0.149.0 // indirect
 	go.opentelemetry.io/collector/config/confighttp v0.149.0 // indirect
 	go.opentelemetry.io/collector/internal/componentalias v0.149.0 // indirect
+=======
+	github.com/schollz/progressbar/v3 v3.13.1 // indirect
+	github.com/sijms/go-ora/v2 v2.9.0 // indirect
+	github.com/teambition/rrule-go v1.8.2 // indirect
+	github.com/u-root/uio v0.0.0-20230220225925-ffce2a382923 // indirect
+	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639 // indirect
+	go.mongodb.org/mongo-driver/v2 v2.3.1 // indirect
+	go.opentelemetry.io/collector/component/componentstatus v0.149.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/config/confighttp v0.149.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/internal/componentalias v0.149.1-0.20260408002112-999af6320692 // indirect
+>>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623))
 	go.opentelemetry.io/collector/processor/processorhelper v0.149.0 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.4 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
@@ -113,26 +138,26 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.149.0
-	go.opentelemetry.io/collector/component v1.55.0
-	go.opentelemetry.io/collector/confmap v1.55.0
+	go.opentelemetry.io/collector/component v1.55.1-0.20260408002112-999af6320692
+	go.opentelemetry.io/collector/confmap v1.55.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/collector/confmap/provider/envprovider v1.55.0
 	go.opentelemetry.io/collector/confmap/provider/fileprovider v1.55.0
 	go.opentelemetry.io/collector/confmap/provider/httpprovider v1.55.0
 	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.45.0
 	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.55.0
 	go.opentelemetry.io/collector/connector v0.149.0
-	go.opentelemetry.io/collector/exporter v1.55.0
+	go.opentelemetry.io/collector/exporter v1.55.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/collector/exporter/debugexporter v0.149.0
 	go.opentelemetry.io/collector/exporter/nopexporter v0.149.0
 	go.opentelemetry.io/collector/exporter/otlpexporter v0.149.0
 	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.149.0
-	go.opentelemetry.io/collector/extension v1.55.0
+	go.opentelemetry.io/collector/extension v1.55.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/collector/extension/memorylimiterextension v0.149.0
-	go.opentelemetry.io/collector/featuregate v1.55.0
+	go.opentelemetry.io/collector/featuregate v1.55.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/collector/otelcol v0.149.0
 	go.opentelemetry.io/collector/processor v1.55.0
 	go.opentelemetry.io/collector/processor/batchprocessor v0.149.0
-	go.opentelemetry.io/collector/receiver v1.55.0
+	go.opentelemetry.io/collector/receiver v1.55.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.149.0
 )
 
@@ -237,7 +262,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/organizations v1.38.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/rds v1.97.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.26.5 // indirect
+<<<<<<< HEAD
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.2 // indirect
+=======
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.98.0 // indirect
+>>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623))
 	github.com/aws/aws-sdk-go-v2/service/servicediscovery v1.39.26 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.16 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.14 // indirect
@@ -575,10 +604,11 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/collector v0.149.0 // indirect
-	go.opentelemetry.io/collector/client v1.55.0 // indirect
-	go.opentelemetry.io/collector/config/configauth v1.55.0 // indirect
-	go.opentelemetry.io/collector/config/configcompression v1.55.0 // indirect
+	go.opentelemetry.io/collector/client v1.55.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/config/configauth v1.55.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/config/configcompression v1.55.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/config/configgrpc v0.149.0 // indirect
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/config/configmiddleware v1.55.0 // indirect
 	go.opentelemetry.io/collector/config/confignet v1.55.0 // indirect
 	go.opentelemetry.io/collector/config/configopaque v1.55.0 // indirect
@@ -599,27 +629,59 @@ require (
 	go.opentelemetry.io/collector/exporter/exportertest v0.149.0 // indirect
 	go.opentelemetry.io/collector/exporter/xexporter v0.149.0 // indirect
 	go.opentelemetry.io/collector/extension/extensionauth v1.55.0 // indirect
+=======
+	go.opentelemetry.io/collector/config/configmiddleware v1.55.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/config/confignet v1.55.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/config/configopaque v1.55.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/config/configoptional v1.55.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/config/configretry v1.55.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/config/configtelemetry v0.149.0
+	go.opentelemetry.io/collector/config/configtls v1.55.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/confmap/xconfmap v0.149.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/connector/connectortest v0.149.0 // indirect
+	go.opentelemetry.io/collector/connector/xconnector v0.149.0 // indirect
+	go.opentelemetry.io/collector/consumer v1.55.1-0.20260408002112-999af6320692
+	go.opentelemetry.io/collector/consumer/consumererror v0.149.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/consumer/consumererror/xconsumererror v0.149.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/consumer/consumertest v0.149.1-0.20260408002112-999af6320692
+	go.opentelemetry.io/collector/consumer/xconsumer v0.149.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/exporter/exporterhelper v0.149.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/exporter/exporterhelper/xexporterhelper v0.149.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/exporter/exportertest v0.149.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/exporter/xexporter v0.149.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/extension/extensionauth v1.55.1-0.20260408002112-999af6320692 // indirect
+>>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623))
 	go.opentelemetry.io/collector/extension/extensioncapabilities v0.149.0 // indirect
-	go.opentelemetry.io/collector/extension/extensionmiddleware v0.149.0 // indirect
+	go.opentelemetry.io/collector/extension/extensionmiddleware v0.149.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/extension/extensiontest v0.149.0 // indirect
-	go.opentelemetry.io/collector/extension/xextension v0.149.0 // indirect
+	go.opentelemetry.io/collector/extension/xextension v0.149.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/filter v0.149.0 // indirect
 	go.opentelemetry.io/collector/internal/fanoutconsumer v0.149.0 // indirect
 	go.opentelemetry.io/collector/internal/memorylimiter v0.149.0 // indirect
 	go.opentelemetry.io/collector/internal/sharedcomponent v0.149.0 // indirect
 	go.opentelemetry.io/collector/internal/telemetry v0.149.0 // indirect
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/pdata v1.55.0 // indirect
 	go.opentelemetry.io/collector/pdata/pprofile v0.149.0 // indirect
+=======
+	go.opentelemetry.io/collector/pdata v1.55.1-0.20260408002112-999af6320692
+	go.opentelemetry.io/collector/pdata/pprofile v0.149.1-0.20260408002112-999af6320692 // indirect
+>>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623))
 	go.opentelemetry.io/collector/pdata/testdata v0.149.0 // indirect
-	go.opentelemetry.io/collector/pdata/xpdata v0.149.0 // indirect
-	go.opentelemetry.io/collector/pipeline v1.55.0 // indirect
-	go.opentelemetry.io/collector/pipeline/xpipeline v0.149.0 // indirect
+	go.opentelemetry.io/collector/pdata/xpdata v0.149.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/pipeline v1.55.1-0.20260408002112-999af6320692 // indirect
+	go.opentelemetry.io/collector/pipeline/xpipeline v0.149.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper/xprocessorhelper v0.149.0 // indirect
 	go.opentelemetry.io/collector/processor/processortest v0.149.0 // indirect
 	go.opentelemetry.io/collector/processor/xprocessor v0.149.0 // indirect
 	go.opentelemetry.io/collector/receiver/receiverhelper v0.149.0 // indirect
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/receiver/receivertest v0.149.0 // indirect
 	go.opentelemetry.io/collector/receiver/xreceiver v0.149.0 // indirect
+=======
+	go.opentelemetry.io/collector/receiver/receivertest v0.149.1-0.20260408002112-999af6320692
+	go.opentelemetry.io/collector/receiver/xreceiver v0.149.1-0.20260408002112-999af6320692 // indirect
+>>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623))
 	go.opentelemetry.io/collector/scraper v0.149.0 // indirect
 	go.opentelemetry.io/collector/scraper/scraperhelper v0.149.0 // indirect
 	go.opentelemetry.io/collector/service v0.149.0
@@ -628,8 +690,13 @@ require (
 	go.opentelemetry.io/contrib/detectors/gcp v1.39.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.67.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.65.0 // indirect
+<<<<<<< HEAD
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.67.0 // indirect
 	go.opentelemetry.io/contrib/otelconf v0.22.0 // indirect
+=======
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0 // indirect
+	go.opentelemetry.io/contrib/otelconf v0.22.0
+>>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623))
 	go.opentelemetry.io/contrib/propagators/b3 v1.42.0 // indirect
 	go.opentelemetry.io/otel v1.42.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.18.0 // indirect

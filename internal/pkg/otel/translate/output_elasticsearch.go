@@ -155,6 +155,13 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		"logs_dynamic_pipeline": map[string]any{
 			"enabled": true,
 		},
+<<<<<<< HEAD
+=======
+		"logs_dynamic_id":          map[string]any{"enabled": true},
+		"include_source_on_error":  true,
+		"retry":                    getRetryConfig(escfg),
+		"suppress_conflict_errors": true,
+>>>>>>> 040921166 ([edot] add suppress_conflict_errors to exporter (#13623))
 	}
 	// Retries
 	retryCfg := map[string]any{
