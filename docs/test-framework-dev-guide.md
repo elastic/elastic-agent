@@ -123,7 +123,7 @@ share similar leavers as the packaging process.
 
  - `INSTANCE_PROVISIONER`: Sets the provisioner used to create
    instances, possible values are:
-     - `ogc`: Uses OGC to create VMs on GCP, if not set, that's the default.
+     - `gcloud`: Uses the `gcloud` CLI to create VMs on GCP, if not set, that's the default.
      - `multipass`: Uses [Multipass](https://canonical.com/multipass) to
        create local VMs.
      - `kind`: Uses [Kind](https://kind.sigs.k8s.io/) to run Kubernetes
@@ -386,7 +386,7 @@ where:
 - `integration:listInstances` lists all VMs and their connection
   command in a human readable table. It also lists the URL for the
   VM page on GCP, which is helpful to verify if the VM still exists
-  (OGC VMs are automatically deleted)
+  (GCE VMs are automatically deleted)
 - `integration:printState` is a shortcut for running the two commands
   above.
 
@@ -518,7 +518,7 @@ be flaky.
 ## Alternative Providers
 
 ### Multipass Instance Provisioner
-By default the integration testing suite uses OGC with GKE to provision instances. In the case that you
+By default the integration testing suite uses the `gcloud` CLI to provision GCE instances. In the case that you
 want to use a local VM instead of a remote VM, you can use the [Multipass](https://multipass.run/) provisioner.
 
 - `INSTANCE_PROVISIONER="multipass" mage integration:test`
@@ -561,8 +561,8 @@ that can break future runs.
 Run `mage integration:clean` before running `mage integration:test` to ensure the tests are
 being run with fresh instances and stack.
 
-### OGC-related errors
-If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then
+### Provisioner-related errors
+If you encounter any errors during instance provisioning, try running `mage integration:clean` and then
 re-running whatever `mage integration:*` target you were trying to run originally when you
 encountered the error.
 

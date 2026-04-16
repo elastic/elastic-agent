@@ -326,7 +326,7 @@ func (r *Runner) runInstances(ctx context.Context, sshAuth ssh.AuthMethod, repoA
 func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger common.Logger, repoArchive string, batch common.OSBatch, instance StateInstance) (common.OSRunnerResult, error) {
 	sshPrivateKeyPath, err := filepath.Abs(filepath.Join(r.cfg.StateDir, "id_rsa"))
 	if err != nil {
-		return common.OSRunnerResult{}, fmt.Errorf("failed to determine OGC SSH private key path: %w", err)
+		return common.OSRunnerResult{}, fmt.Errorf("failed to determine SSH private key path: %w", err)
 	}
 
 	logger.Logf("Starting SSH; connect with `ssh -i %s %s@%s`", sshPrivateKeyPath, instance.Username, instance.IP)
@@ -500,7 +500,7 @@ func (r *Runner) getBuilds(b common.OSBatch) []common.Build {
 
 // prepare prepares for the runner to run.
 //
-// Creates the SSH keys to use, creates the archive of the repo and pulls the latest container for OGC.
+// Creates the SSH keys to use and creates the archive of the repo.
 func (r *Runner) prepare(ctx context.Context) (ssh.AuthMethod, string, error) {
 	wd, err := WorkDir()
 	if err != nil {
