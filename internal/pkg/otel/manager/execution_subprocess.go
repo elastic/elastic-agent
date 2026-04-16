@@ -381,12 +381,13 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 	}
 
 	// since we are here this means that the process either got an error at stop or did not stop within the timeout,
-	// kill it and give one more mere second for the process wait to be called
+	// kill it and wait for the process to be reaped
 	_ = s.processInfo.Kill()
 	select {
-	case <-time.After(1 * time.Second):
-		s.log.Warnf("supervised collector subprocess didn't exit in time after killing it")
+	case <-time.After(process.KillReapTime):
+		s.log.Errorf("timed out waiting for supervised collector process %d to be reaped after SIGKILL", s.processInfo.PID)
 	case <-s.processDoneCh:
+		s.log.Debugf("supervised collector process %d reaped successfully after SIGKILL", s.processInfo.PID)
 	}
 }
 

@@ -6,19 +6,26 @@
 # - enhancement: extends functionality but does not break or fix existing behavior
 # - feature: new functionality
 # - known-issue: problems that we are aware of in a given version
-# - security: impacts on the security of a product or a user’s deployment.
+# - security: impacts on the security of a product or a user's deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: bug-fix
+kind: security
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: fix container enrollment to not re-enroll when the fleet_url is the same
+summary: Strip Unit.Config from components diagnostic files to prevent secret leakage
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-# description:
+description: |
+  The components-expected and components-actual diagnostic files were leaking
+  secrets (API keys, tokens) because Unit.Config contains structpb.Struct fields
+  whose protobuf-style YAML nesting (kind/stringvalue/structvalue) prevented the
+  standard key-based redaction from finding and redacting secret values. The fix
+  strips Unit.Config from the components before serializing to YAML, removing
+  the source of the leak while preserving useful debugging metadata like
+  component IDs, unit IDs, types and log levels.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
@@ -42,4 +49,4 @@ component: elastic-agent
 # OPTIONAL to manually add other issue URLs
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
-# issue: https://github.com/owner/repo/1234
+# issue: https://github.com/elastic/ingest-dev/issues/6933
