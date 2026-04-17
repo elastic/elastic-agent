@@ -792,7 +792,7 @@ func TestRenderInputs(t *testing.T) {
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
-			v, err := RenderInputs(test.input, test.varsArray)
+			v, _, err := RenderInputs(test.input, test.varsArray)
 			if test.err {
 				require.Error(t, err)
 			} else {
@@ -803,8 +803,82 @@ func TestRenderInputs(t *testing.T) {
 	}
 }
 
+func TestRenderInputs_DynamicProviderMap(t *testing.T) {
+	testcases := map[string]struct {
+		input                      Node
+		varsArray                  []*Vars
+		expectedDynamicProviderMap map[string]string
+	}{
+		"no dynamic provider returns empty map": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("filestream")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{}),
+			},
+			// Static inputs (no dynamic provider) are not added to the map
+			expectedDynamicProviderMap: map[string]string{},
+		},
+		"with dynamic provider": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("filestream")),
+					NewKey("path", NewStrVal("${kubernetes.path}")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVarsP("kubernetes-123", map[string]interface{}{
+					"kubernetes": map[string]interface{}{
+						"path": "/var/log/containers",
+					},
+				}, "kubernetes", nil),
+			},
+			expectedDynamicProviderMap: map[string]string{
+				"input-1-kubernetes-123": "kubernetes",
+			},
+		},
+		"mixed static and dynamic inputs": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("static-input")),
+					NewKey("type", NewStrVal("filestream")),
+				}),
+				NewDict([]Node{
+					NewKey("id", NewStrVal("dynamic-input")),
+					NewKey("type", NewStrVal("filestream")),
+					NewKey("path", NewStrVal("${local_dynamic.path}")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{}),
+				mustMakeVarsP("local_dynamic-abc", map[string]interface{}{
+					"local_dynamic": map[string]interface{}{
+						"path": "/var/log/test.log",
+					},
+				}, "local_dynamic", nil),
+			},
+			// Only dynamic inputs are added to the map
+			expectedDynamicProviderMap: map[string]string{
+				"dynamic-input-local_dynamic-abc": "local_dynamic",
+			},
+		},
+	}
+
+	for name, test := range testcases {
+		t.Run(name, func(t *testing.T) {
+			_, dynamicProviderMap, err := RenderInputs(test.input, test.varsArray)
+			require.NoError(t, err)
+			assert.Equal(t, test.expectedDynamicProviderMap, dynamicProviderMap)
+		})
+	}
+}
+
 func mustMakeVarsP(id string, mapping map[string]interface{}, processorKey string, processors Processors) *Vars {
-	v, err := NewVarsWithProcessors(id, mapping, processorKey, processors, nil, "")
+	v, err := NewVarsWithProcessors(id, mapping, processorKey, processors, nil, "", processorKey)
 	if err != nil {
 		panic(err)
 	}

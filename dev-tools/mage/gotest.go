@@ -12,10 +12,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -39,140 +37,35 @@ type GoTestArgs struct {
 	Output              io.Writer         // Write stderr and stdout to Output if set
 }
 
-// TestBinaryArgs are the arguments used when building binary for testing.
-type TestBinaryArgs struct {
-	Name       string // Name of the binary to build
-	InputFiles []string
-}
-
-func makeGoTestArgs(name string) GoTestArgs {
+func makeGoTestArgs(cfg *Settings, name string) GoTestArgs {
 	fileName := fmt.Sprintf("build/TEST-go-%s", strings.ReplaceAll(strings.ToLower(name), " ", "_"))
 	params := GoTestArgs{
 		LogName:         name,
-		Race:            RaceDetector,
+		Race:            cfg.Test.RaceDetector,
 		Packages:        []string{"./..."},
 		OutputFile:      fileName + ".out",
 		JUnitReportFile: fileName + ".xml",
-		Tags:            testTagsFromEnv(),
+		Tags:            cfg.TestTagsWithFIPS(),
 		Env:             make(map[string]string),
 	}
-	if TestCoverage {
+	if cfg.Test.Coverage {
 		params.CoverageProfileFile = fileName + ".cov"
 	}
 	return params
-}
-
-func makeGoTestArgsForModule(name, module string) GoTestArgs {
-	fileName := fmt.Sprintf("build/TEST-go-%s-%s",
-		strings.ReplaceAll(strings.ToLower(name), " ", "_"),
-		strings.ReplaceAll(strings.ToLower(module), " ", "_"),
-	)
-	params := GoTestArgs{
-		LogName:         fmt.Sprintf("%s-%s", name, module),
-		Race:            RaceDetector,
-		Packages:        []string{fmt.Sprintf("./module/%s/...", module)},
-		OutputFile:      fileName + ".out",
-		JUnitReportFile: fileName + ".xml",
-		Tags:            testTagsFromEnv(),
-	}
-	if TestCoverage {
-		params.CoverageProfileFile = fileName + ".cov"
-	}
-	return params
-}
-
-// testTagsFromEnv gets a list of comma-separated tags from the TEST_TAGS
-// environment variables, e.g: TEST_TAGS=aws,azure.
-func testTagsFromEnv() []string {
-	tags := strings.Split(strings.Trim(os.Getenv("TEST_TAGS"), ", "), ",")
-	if FIPSBuild {
-		tags = append(tags, "requirefips", "ms_tls13kdf")
-	}
-	return tags
 }
 
 // DefaultGoTestUnitArgs returns a default set of arguments for running
 // all unit tests. We tag unit test files with '!integration'.
-func DefaultGoTestUnitArgs() GoTestArgs { return makeGoTestArgs("Unit") }
+func DefaultGoTestUnitArgs(cfg *Settings) GoTestArgs {
+	return makeGoTestArgs(cfg, "Unit")
+}
 
 // DefaultGoTestIntegrationArgs returns a default set of arguments for running
 // all integration tests. We tag integration test files with 'integration'.
-func DefaultGoTestIntegrationArgs() GoTestArgs {
-	args := makeGoTestArgs("Integration")
+func DefaultGoTestIntegrationArgs(cfg *Settings) GoTestArgs {
+	args := makeGoTestArgs(cfg, "Integration")
 	args.Tags = append(args.Tags, "integration")
 	return args
-}
-
-// GoTestIntegrationArgsForModule returns a default set of arguments for running
-// module integration tests. We tag integration test files with 'integration'.
-func GoTestIntegrationArgsForModule(module string) GoTestArgs {
-	args := makeGoTestArgsForModule("Integration", module)
-	args.Tags = append(args.Tags, "integration")
-	return args
-}
-
-// DefaultTestBinaryArgs returns the default arguments for building
-// a binary for testing.
-func DefaultTestBinaryArgs() TestBinaryArgs {
-	return TestBinaryArgs{
-		Name: BeatName,
-	}
-}
-
-// GoTestIntegrationForModule executes the Go integration tests sequentially.
-// Currently all test cases must be present under "./module" directory.
-//
-// Motivation: previous implementation executed all integration tests at once,
-// causing high CPU load, high memory usage and resulted in timeouts.
-//
-// This method executes integration tests for a single module at a time.
-// Use TEST_COVERAGE=true to enable code coverage profiling.
-// Use RACE_DETECTOR=true to enable the race detector.
-// Use MODULE=module to run only tests for `module`.
-func GoTestIntegrationForModule(ctx context.Context) error {
-	module := EnvOr("MODULE", "")
-	modulesDirEntry, err := os.ReadDir("./module")
-	if err != nil {
-		return err
-	}
-
-	foundModule := false
-	failedModules := []string{}
-	for _, fi := range modulesDirEntry {
-		if !fi.IsDir() {
-			continue
-		}
-		if module != "" && module != fi.Name() {
-			continue
-		}
-		foundModule = true
-
-		// Set MODULE because only want that modules tests to run inside the testing environment.
-		env := map[string]string{"MODULE": fi.Name()}
-		passThroughEnvs(env, IntegrationTestEnvVars()...)
-		runners, err := NewIntegrationRunners(path.Join("./module", fi.Name()), env)
-		if err != nil {
-			return fmt.Errorf("test setup failed for module %s: %w", fi.Name(), err)
-		}
-		err = runners.Test("goIntegTest", func() error {
-			err := GoTest(ctx, GoTestIntegrationArgsForModule(fi.Name()))
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		if err != nil {
-			// err will already be report to stdout, collect failed module to report at end
-			failedModules = append(failedModules, fi.Name())
-		}
-	}
-	if module != "" && !foundModule {
-		return fmt.Errorf("no module %s", module)
-	}
-	if len(failedModules) > 0 {
-		return fmt.Errorf("failed modules: %s", strings.Join(failedModules, ", "))
-	}
-	return nil
 }
 
 // InstallGoTestTools installs additional tools that are required to run unit and integration tests.
@@ -220,13 +113,13 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	// We use gotestsum to drive the tests and produce a junit report.
 	// The tool runs `go test -json` in order to produce a structured log which makes it easier
 	// to parse the actual test output.
-	// Of OutputFile is given the original JSON file will be written as well.
+	// If OutputFile is given, the original JSON file will be written as well.
 	//
 	// The runner needs to set CLI flags for gotestsum and for "go test". We track the different
-	// CLI flags in the gotestsumArgs and testArgs variables, such that we can finally produce command like:
+	// CLI flags in the gotestsumArgs and testArgs variables, such that we can finally produce a command like:
 	//   $ gotestsum <gotestsum args> -- <go test args>
 	//
-	// The additional arguments given via GoTestArgs are applied to `go test` only. Callers can not
+	// The additional arguments given via GoTestArgs are applied to `go test` only. Callers cannot
 	// modify any of the gotestsum arguments.
 
 	gotestsumArgs := []string{"--no-color", "--junitfile-hide-skipped-tests"}
@@ -371,31 +264,4 @@ func makeCommand(ctx context.Context, env map[string]string, cmd string, args ..
 	log.Println("exec:", cmd, strings.Join(args, " "))
 	fmt.Println("exec:", cmd, strings.Join(args, " "))
 	return c
-}
-
-// BuildSystemTestBinary runs BuildSystemTestGoBinary with default values.
-func BuildSystemTestBinary() error {
-	return BuildSystemTestGoBinary(DefaultTestBinaryArgs())
-}
-
-// BuildSystemTestGoBinary build a binary for testing that is instrumented for
-// testing and measuring code coverage. The binary is only instrumented for
-// coverage when TEST_COVERAGE=true (default is false).
-func BuildSystemTestGoBinary(binArgs TestBinaryArgs) error {
-	args := []string{
-		"test", "-c",
-		"-o", binArgs.Name + ".test",
-	}
-	if TestCoverage {
-		args = append(args, "-coverpkg", "./...")
-	}
-	if len(binArgs.InputFiles) > 0 {
-		args = append(args, binArgs.InputFiles...)
-	}
-
-	start := time.Now()
-	defer func() {
-		log.Printf("BuildSystemTestGoBinary (go %v) took %v.", strings.Join(args, " "), time.Since(start))
-	}()
-	return sh.RunV("go", args...)
 }

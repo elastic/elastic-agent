@@ -24,8 +24,7 @@ func init() {
 }
 
 // IntegrationTester integration tester
-type IntegrationTester struct {
-}
+type IntegrationTester struct{}
 
 // Name returns kubernetes name.
 func (d *IntegrationTester) Name() string {
@@ -55,7 +54,7 @@ func (d *IntegrationTester) StepRequirements() mage.IntegrationTestSteps {
 }
 
 // Test performs the tests with kubernetes.
-func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]string) error {
+func (d *IntegrationTester) Test(dir string, mageTarget string, cfg *mage.Settings, env map[string]string) error {
 	stdOut := io.Discard
 	stdErr := io.Discard
 	if mg.Verbose() {
@@ -83,10 +82,7 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]s
 	}
 
 	// Determine the path to use inside the pod.
-	repo, err := mage.GetProjectRepoInfo()
-	if err != nil {
-		return err
-	}
+	repo := cfg.RepoInfo
 	magePath := filepath.Join("/go/src", repo.CanonicalRootImportPath, repo.SubDir, "build/mage-linux-amd64")
 
 	// Apply the manifest from the dir. This is the requirements for the tests that will
@@ -103,8 +99,7 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]s
 		}
 	}()
 
-	err = waitKubeStateMetricsReadiness(env, stdOut, stdErr)
-	if err != nil {
+	if err := waitKubeStateMetricsReadiness(env, stdOut, stdErr); err != nil {
 		return err
 	}
 
@@ -119,7 +114,9 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]s
 
 	destDir := filepath.Join("/go/src", repo.CanonicalRootImportPath)
 	workDir := filepath.Join(destDir, repo.SubDir)
-	remote, err := NewKubeRemote(kubeConfig, "default", kubernetesClusterName(), workDir, destDir, repo.RootDir)
+	// determine the Go version
+	goVersion := cfg.GoVersion()
+	remote, err := NewKubeRemote(kubeConfig, "default", kubernetesClusterName(cfg), goVersion, workDir, destDir, repo.RootDir)
 	if err != nil {
 		return err
 	}
@@ -132,7 +129,7 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]s
 }
 
 // InsideTest performs the tests inside of environment.
-func (d *IntegrationTester) InsideTest(test func() error) error {
+func (d *IntegrationTester) InsideTest(test func() error, _ *mage.Settings) error {
 	return test()
 }
 
@@ -160,20 +157,16 @@ func waitKubeStateMetricsReadiness(env map[string]string, stdOut, stdErr io.Writ
 }
 
 // kubernetesClusterName generates a name for the Kubernetes cluster.
-func kubernetesClusterName() string {
-	commit, err := mage.CommitHash()
+func kubernetesClusterName(cfg *mage.Settings) string {
+	commit, err := cfg.Build.CommitHash()
 	if err != nil {
 		panic(fmt.Errorf("failed to construct kind cluster name: %w", err))
 	}
 
-	version, err := mage.BeatQualifiedVersion()
-	if err != nil {
-		panic(fmt.Errorf("failed to construct kind cluster name: %w", err))
-	}
-	version = strings.NewReplacer(".", "-").Replace(version)
+	version := strings.NewReplacer(".", "-").Replace(cfg.BeatQualifiedVersion())
 
 	clusterName := "{{.BeatName}}-{{.Version}}-{{.ShortCommit}}-{{.StackEnvironment}}"
-	clusterName = mage.MustExpand(clusterName, map[string]interface{}{
+	clusterName = mage.MustExpand(cfg, clusterName, map[string]interface{}{
 		"StackEnvironment": mage.StackEnvironment,
 		"ShortCommit":      commit[:10],
 		"Version":          version,

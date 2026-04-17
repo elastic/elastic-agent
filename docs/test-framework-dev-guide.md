@@ -15,7 +15,6 @@ provides a high level overview of the testing framework.
 #### Go version
 Go version should be at least the same than the one in [.go-version](https://github.com/elastic/elastic-agent/blob/main/.go-version) file at the root of this repository.
 
-
 #### GCloud CLI
 The integration testing framework spins up resources in GCP.  To achieve this, it needs the
 [GCloud CLI](https://cloud.google.com/sdk/gcloud) to be installed on the system where the tests are initiated from.
@@ -24,7 +23,7 @@ The integration testing framework spins up resources in GCP.  To achieve this, i
 The Elastic Agent package that is used for integration tests packages Beats built from the Unified Release (as opposed to DRA).  There is no explicit action needed for this prerequisite but just keep in mind that if any Agent integration tests rely on certain Beats features or bugfixes, they may not be available in the integration tests yet because a unified release containing those features or bugfixes may not have happened yet.
 
 #### Helm & Helm charts
-To run the Kubernets integration tests you need to install
+To run the Kubernetes integration tests you need to install
 [helm](https://helm.sh/). Then add and update some helm charts
 repositories:
 
@@ -42,7 +41,6 @@ found.
 ESS (production) API Key to create on <https://cloud.elastic.co/account/keys>
 Warning: if you never created a deployment on it, you won't have permission to get this key, so you will need to create one first.
 
-
 #### Setup Serverless deployment
 
 This process is now automated and runs daily, utilizing the existing `oblt-cli` framework. Serverless deployments are created each day and automatically destroyed every three days.
@@ -52,7 +50,6 @@ The automation is configured in the `serverless-project.yml` file located in the
 If necessary, you can create a new serverless deployment manually; the previous deployments will be destroyed automatically, but not immediately. To do so, you need to run the GitHub action called [serverless-project.yml](https://github.com/elastic/elastic-agent/actions/workflows/serverless-project.yml).
 
 Credentials for these deployments are securely stored in Google and can only be accessed by Buildkite pipelines. The access control is set using [OpenID Connect in Google Cloud Platform](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform). And that's managed by the Robots team.
-
 
 ## Running tests
 
@@ -77,7 +74,7 @@ Go to https://docker-auth.elastic.co/ and authenticate with Okta to receive your
 
 ### Packaging
 Before you can run any test, you first need to package the Elastic
-Agent version you want to test. For that you'll need to run
+Agent version you want to test. For that you'll need to run `mage package`, for example:
 
 ```
 DEV=true SNAPSHOT=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
@@ -140,13 +137,18 @@ share similar leavers as the packaging process.
 
  - `INSTANCE_PROVISIONER`: Sets the provisioner used to create
    instances, possible values are:
-     - `ogc`: Uses OGC to create VMs on GCP, if not set, that's the default.
+     - `gcloud`: Uses the `gcloud` CLI to create VMs on GCP, if not set, that's the default.
      - `multipass`: Uses [Multipass](https://canonical.com/multipass) to
        create local VMs.
      - `kind`: Uses [Kind](https://kind.sigs.k8s.io/) to run Kubernetes
        in Docker. This needs to be set if running Kubernetes integration
        tests.
 
+An example for running a single test, including packaging the artifacts for it is:
+```
+EXTERNAL=true DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" SNAPSHOT=true mage package # create elastic-agent SNAPSHOT package using external sources for components
+SNAPSHOT=true INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME # Run TEST_NAME on a multipass VM
+```
 
 ### TL;DR: Packaging and running tests
 **Package the Elastic Agent**
@@ -264,6 +266,14 @@ We pass a `-test.count` flag along with the name match
 ##### Run specific tests
 We pass a `-test.run` flag along with the names of the tests we want to run in OR
 `GOTEST_FLAGS="-test.run ^(TestStandaloneUpgrade|TestFleetManagedUpgrade)$" mage integration:test`
+
+#### Selecting specific upgrade versions
+
+By default, upgrade tests read the list of versions from `testing/integration/testdata/.upgrade-test-agent-versions.yml`. When developing or debugging upgrade tests it's useful to limit to specific versions using the `TEST_UPGRADE_VERSIONS` environment variable.
+This variable takes a comma-separated list of versions and is passed to the remote test runner.
+
+- `TEST_UPGRADE_VERSIONS="9.3.1" mage integration:single TestStandaloneUpgrade` to test upgrading from `9.3.1` only.
+- `TEST_UPGRADE_VERSIONS="9.3.1,9.2.6" mage integration:single TestStandaloneUpgrade` to test upgrading from `9.3.1` and `9.2.6`.
 
 ##### Run Serverless tests
 The test framework includes a smoke test suite to check elastic-agent in a serverless environment. The suite can be run via the `integration:TestServerless` mage target.
@@ -399,7 +409,7 @@ where:
 - `integration:listInstances` lists all VMs and their connection
   command in a human readable table. It also lists the URL for the
   VM page on GCP, which is helpful to verify if the VM still exists
-  (OGC VMs are automatically deleted)
+  (GCE VMs are automatically deleted)
 - `integration:printState` is a shortcut for running the two commands
   above.
 
@@ -534,7 +544,7 @@ be flaky.
 ## Alternative Providers
 
 ### Multipass Instance Provisioner
-By default the integration testing suite uses OGC with GKE to provision instances. In the case that you
+By default the integration testing suite uses the `gcloud` CLI to provision GCE instances. In the case that you
 want to use a local VM instead of a remote VM, you can use the [Multipass](https://multipass.run/) provisioner.
 
 - `INSTANCE_PROVISIONER="multipass" mage integration:test`
@@ -577,8 +587,8 @@ that can break future runs.
 Run `mage integration:clean` before running `mage integration:test` to ensure the tests are
 being run with fresh instances and stack.
 
-### OGC-related errors
-If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then
+### Provisioner-related errors
+If you encounter any errors during instance provisioning, try running `mage integration:clean` and then
 re-running whatever `mage integration:*` target you were trying to run originally when you
 encountered the error.
 

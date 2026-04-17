@@ -78,7 +78,7 @@ func (p *StatefulProvisioner) Create(ctx context.Context, request common.StackRe
 	defer createCancel()
 	deploymentTags := map[string]string{
 		"division":          "engineering",
-		"org":               "ingest",
+		"org":               "obs",
 		"team":              "elastic-agent-control-plane",
 		"project":           "elastic-agent",
 		"integration-tests": "true",

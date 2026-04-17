@@ -335,7 +335,7 @@ func TestVars_ReplaceWithProcessors(t *testing.T) {
 		},
 		"dynamic",
 		processers,
-		nil, "testing")
+		nil, "testing", "dynamic")
 	require.NoError(t, err)
 
 	res, err := vars.Replace("${testing.key1}")
@@ -406,7 +406,7 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 		},
 		"dynamic",
 		processers,
-		fetchContextProviders, "")
+		fetchContextProviders, "", "dynamic")
 	require.NoError(t, err)
 
 	res, err := vars.Replace("${testing.key1}")

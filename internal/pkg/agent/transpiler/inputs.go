@@ -16,15 +16,20 @@ const (
 	// an input defines a set of streams and after conditions are applied all the streams are removed then
 	// the entire input is removed.
 	streamsKey = "streams"
+	idKey      = "id"
 )
 
-// RenderInputs renders dynamic inputs section
-func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
+// RenderInputs renders dynamic inputs section. It also returns a map of input id to the dynamic provider used when
+// rendering that input.
+func RenderInputs(inputs Node, varsArray []*Vars) (Node, map[string]string, error) {
 	l, ok := inputs.Value().(*List)
 	if !ok {
-		return nil, fmt.Errorf("inputs must be an array")
+		return nil, nil, fmt.Errorf("inputs must be an array")
 	}
 	var nodes []varIDMap
+	// the below allocation doesn't account for nodes filtered out by conditions, but it's still preferable to
+	// overallocate once compared to dynamically growing the map
+	inputIdToDynamicProvider := make(map[string]string, len(varsArray)-1)
 	nodesMap := map[uint64]*Dict{}
 	hasher := xxhash.New()
 	for _, vars := range varsArray {
@@ -45,7 +50,7 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 			}
 			if err != nil {
 				// another error that needs to be reported
-				return nil, err
+				return nil, nil, err
 			}
 			if n == nil {
 				// condition removed it
@@ -65,7 +70,7 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 			_, exists := nodesMap[hash]
 			if !exists {
 				nodesMap[hash] = dict
-				nodes = append(nodes, varIDMap{vars.ID(), dict})
+				nodes = append(nodes, varIDMap{vars.ID(), vars.dynamicProvider, dict})
 			}
 		}
 	}
@@ -73,7 +78,7 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 	for _, node := range nodes {
 		if node.id != "" {
 			// vars has unique ID, concat ID onto existing ID
-			idNode, ok := node.d.Find("id")
+			idNode, ok := node.d.Find(idKey)
 			if ok {
 				idKey, _ := idNode.(*Key) // always a Key
 
@@ -93,20 +98,27 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 				case *FloatVal:
 					idKey.value = NewStrVal(fmt.Sprintf("%f-%s", idVal.value, node.id))
 				default:
-					return nil, fmt.Errorf("id field type invalid, expected string, int, uint, or float got: %T", idKey.value)
+					return nil, nil, fmt.Errorf("id field type invalid, expected string, int, uint, or float got: %T", idKey.value)
+				}
+				if node.dynamicProvider != "" {
+					inputIdToDynamicProvider[idKey.value.String()] = node.dynamicProvider
 				}
 			} else {
 				node.d.Insert(NewKey("id", NewStrVal(node.id)))
+				if node.dynamicProvider != "" {
+					inputIdToDynamicProvider[node.id] = node.dynamicProvider
+				}
 			}
 		}
 		nInputs = append(nInputs, promoteProcessors(node.d))
 	}
-	return NewList(nInputs), nil
+	return NewList(nInputs), inputIdToDynamicProvider, nil
 }
 
 type varIDMap struct {
-	id string
-	d  *Dict
+	id              string
+	dynamicProvider string
+	d               *Dict
 }
 
 func getStreams(dict *Dict) *List {

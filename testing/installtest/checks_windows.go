@@ -8,15 +8,19 @@ package installtest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 const ACCESS_ALLOWED_ACE_TYPE = 0
@@ -96,18 +100,119 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		if !hasWellKnownSID(sids, windows.WinBuiltinAdministratorsSid) {
 			return fmt.Errorf("path %s should have ACE for Administrators", topPath)
 		}
-		// that is 3 unique SID's, it should not have anymore
-		if len(sids) > 3 {
-			return fmt.Errorf("DACL has more than allowed ACE for %s", topPath)
+		// that is 4 unique SID's, it should not have anymore
+		if len(sids) > 4 {
+			return fmt.Errorf("DACL has more than allowed ACE for %s (unprivileged): %v", topPath, sids)
 		}
 	} else {
 		if !owner.IsWellKnown(windows.WinBuiltinAdministratorsSid) {
 			return fmt.Errorf("%s not owned by Administrators", topPath)
 		}
-		// that is 1 unique SID, it should not have anymore
-		if len(sids) > 1 {
-			return fmt.Errorf("DACL has more than allowed ACE for %s", topPath)
+		// that is 2 unique SID, it should not have anymore
+		// Administrators and INTERACTIVE
+		if len(sids) > 2 {
+			return fmt.Errorf("DACL has more than allowed ACE for %s (privileged): %v", topPath, sids)
 		}
+	}
+
+	if opts.TargetVersion != "" {
+		displayVersion, err := getRegistryDisplayVersion(opts.Namespace)
+		if err != nil {
+			if opts.Privileged {
+				return fmt.Errorf("uninstall registry entry missing for %s: %w", topPath, err)
+			}
+			// pre-9.4.0 versions never configured the registry ACL, so the new agent couldn't create the entry
+			// run 'windows registry update' to fix this
+			startVersion, parseErr := version.ParseVersion(opts.StartVersion)
+			if parseErr == nil && startVersion.Less(*version.NewParsedSemVer(9, 4, 0, "SNAPSHOT", "")) {
+				// integration tests don't use the MSI installer, so we need a fake entry to verify the cleanup
+				if err := createFakeMSIEntry(); err != nil {
+					return fmt.Errorf("failed to create fake MSI entry: %w", err)
+				}
+
+				if err := f.ExecWindowsRegistryUpdate(ctx); err != nil {
+					return fmt.Errorf("failed to run 'windows registry update': %w", err)
+				}
+
+				if guids := install.FindMSIProductCodes(); len(guids) > 0 {
+					return fmt.Errorf("MSI uninstall registry entries still present after 'windows registry update': %v", guids)
+				}
+
+				displayVersion, err = getRegistryDisplayVersion(opts.Namespace)
+				if err != nil {
+					return fmt.Errorf("uninstall registry entry still missing after 'windows registry update' for %s: %w", topPath, err)
+				}
+			}
+		}
+		if err == nil && displayVersion != opts.TargetVersion {
+			return fmt.Errorf("uninstall registry DisplayVersion mismatch for %s: got %q, want %q", topPath, displayVersion, opts.TargetVersion)
+		}
+
+		// for fresh installs verify 'windows registry remove' and 'windows registry update' work correctly
+		if opts.StartVersion == "" {
+			if err := f.ExecWindowsRegistryRemove(ctx); err != nil {
+				return fmt.Errorf("failed to run 'windows registry remove': %w", err)
+			}
+			if v, err := getRegistryDisplayVersion(opts.Namespace); err == nil {
+				return fmt.Errorf("uninstall registry entry still present after 'windows registry remove' for %s (namespace=%q, version=%q)", topPath, opts.Namespace, v)
+			}
+			if err := f.ExecWindowsRegistryUpdate(ctx); err != nil {
+				return fmt.Errorf("failed to run 'windows registry update' after remove: %w", err)
+			}
+			displayVersion, err = getRegistryDisplayVersion(opts.Namespace)
+			if err != nil {
+				return fmt.Errorf("uninstall registry entry missing after 'windows registry update' recreate for %s: %w", topPath, err)
+			}
+			if displayVersion != opts.TargetVersion {
+				return fmt.Errorf("uninstall registry DisplayVersion mismatch after recreate for %s: got %q, want %q", topPath, displayVersion, opts.TargetVersion)
+			}
+		}
+	}
+
+	return nil
+}
+
+func checkUninstallPlatform(opts *CheckOpts) error {
+	v, err := getRegistryDisplayVersion(opts.Namespace)
+	if errors.Is(err, registry.ErrNotExist) {
+		// key doesn't exist, as expected
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("checking uninstall registry entry: %w", err)
+	}
+	svc := paths.ServiceNameForNamespace(opts.Namespace)
+	return fmt.Errorf("uninstall registry entry for %q still present with DisplayVersion %q", svc, v)
+}
+
+func getRegistryDisplayVersion(namespace string) (string, error) {
+	keyPath := install.AgentUninstallKeyPathForNamespace(namespace)
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
+	if err != nil {
+		return "", err
+	}
+	defer k.Close()
+
+	v, _, err := k.GetStringValue("DisplayVersion")
+	if err != nil {
+		return "", err
+	}
+	return v, nil
+}
+
+func createFakeMSIEntry() error {
+	guid := "{E550A894-5C44-5BEF-9967-000000000000}"
+	keyPath := install.UninstallKeyPath + `\` + guid
+	k, _, err := registry.CreateKey(registry.LOCAL_MACHINE, keyPath, registry.CREATE_SUB_KEY|registry.SET_VALUE)
+	if err != nil {
+		return fmt.Errorf("creating fake MSI key %q: %w", keyPath, err)
+	}
+	defer k.Close()
+	if err := k.SetStringValue("DisplayName", "Elastic Agent"); err != nil {
+		return fmt.Errorf("setting DisplayName: %w", err)
+	}
+	if err := k.SetDWordValue("WindowsInstaller", 1); err != nil {
+		return fmt.Errorf("setting WindowsInstaller: %w", err)
 	}
 	return nil
 }

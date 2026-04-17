@@ -90,6 +90,13 @@ func SwitchExecutingMode(topPath string, pt ProgressDescriber, username string, 
 	// **end critical section**
 	// service is now re-created and started
 
+	// update the registry ACL so the new service user can update the entry on future upgrades
+	pt.Describe("Configuring registry permissions")
+	err = ConfigureRegistryPermissions(ownership)
+	if err != nil {
+		pt.Describe(fmt.Sprintf("Failed to configure registry permissions: %s", err.Error()))
+	}
+
 	return nil
 }
 

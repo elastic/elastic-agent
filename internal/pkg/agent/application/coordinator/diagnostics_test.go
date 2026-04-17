@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/structpb"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -296,6 +297,7 @@ func TestDiagnosticComponentsExpected(t *testing.T) {
 			ID:         "filestream-component",
 			InputType:  "filestream",
 			OutputType: "elasticsearch",
+			OutputName: "default",
 			InputSpec: &component.InputRuntimeSpec{
 				InputType:  "filestream",
 				BinaryName: "filestream-binary",
@@ -317,6 +319,7 @@ components:
   - id: filestream-component
     input_type: filestream
     output_type: elasticsearch
+    output_name: default
     input_spec:
       binary_name: filestream-binary
       binary_path: filestream-path
@@ -351,6 +354,7 @@ func TestDiagnosticComponentsExpectedWithAPM(t *testing.T) {
 			ID:         "some-apm-aware-component",
 			InputType:  "filestream",
 			OutputType: "elasticsearch",
+			OutputName: "default",
 			Component: &proto.Component{
 				ApmConfig: &proto.APMConfig{
 					Elastic: &proto.ElasticAPM{
@@ -375,6 +379,7 @@ components:
   - id: some-apm-aware-component
     input_type: filestream
     output_type: elasticsearch
+    output_name: default
     units: []
     component:
       limits: null
@@ -414,6 +419,7 @@ func TestDiagnosticComponentsActual(t *testing.T) {
 					Err:        errors.New("component error"),
 					InputType:  "test-input",
 					OutputType: "test-output",
+					OutputName: "test-name",
 					Units: []component.Unit{
 						{
 							ID:       "test-unit",
@@ -443,6 +449,7 @@ components:
     error: "component error"
     input_type: "test-input"
     output_type: "test-output"
+    output_name: "test-name"
     units:
       - id: test-unit
         error: {}
@@ -461,6 +468,95 @@ components:
 
 	result := hook.Hook(context.Background())
 	assert.YAMLEq(t, expected, string(result), "components-actual diagnostic returned unexpected value")
+}
+
+// TestDiagnosticStripComponentUnitsConfig verifies that the components-expected
+// and components-actual diagnostics do not leak secrets from Unit.Config.
+func TestDiagnosticStripComponentUnitsConfig(t *testing.T) {
+	secrets := []string{
+		"my-secret-elasticsearch-api-key-12345",
+		"otx-secret-token-67890",
+	}
+
+	outputSource, err := structpb.NewStruct(map[string]any{
+		"api_key": secrets[0],
+		"hosts":   []any{"https://my-cluster.es.cloud:443"},
+		"type":    "elasticsearch",
+	})
+	require.NoError(t, err)
+
+	inputSource, err := structpb.NewStruct(map[string]any{
+		"state": map[string]any{
+			"api_key": secrets[1],
+		},
+	})
+	require.NoError(t, err)
+
+	componentsModel := []component.Component{
+		{
+			ID:         "test-component",
+			InputType:  "cel",
+			OutputType: "elasticsearch",
+			OutputName: "default",
+			Units: []component.Unit{
+				{
+					ID:       "cel-input",
+					Type:     client.UnitTypeInput,
+					LogLevel: 2,
+					Config: &proto.UnitExpectedConfig{
+						Source: inputSource,
+					},
+				},
+				{
+					ID:       "cel-output",
+					Type:     client.UnitTypeOutput,
+					LogLevel: 2,
+					Config: &proto.UnitExpectedConfig{
+						Source: outputSource,
+					},
+				},
+			},
+		},
+	}
+
+	t.Run("components-expected does not leak secrets from unit config", func(t *testing.T) {
+		coord := &Coordinator{componentModel: componentsModel}
+		hook, ok := diagnosticHooksMap(coord)["components-expected"]
+		require.True(t, ok, "diagnostic hooks should have an entry for components-expected")
+
+		result := string(hook.Hook(context.Background()))
+
+		for _, secret := range secrets {
+			assert.NotContains(t, result, secret,
+				"components-expected diagnostic should not contain secret %q", secret)
+		}
+		assert.Contains(t, result, "test-component")
+		assert.Contains(t, result, "cel-input")
+		assert.Contains(t, result, "cel-output")
+	})
+
+	t.Run("components-actual does not leak secrets from unit config", func(t *testing.T) {
+		state := State{
+			Components: []runtime.ComponentComponentState{
+				{Component: componentsModel[0]},
+			},
+		}
+		coord := &Coordinator{
+			stateBroadcaster: broadcaster.New(state, 0, 0),
+		}
+		hook, ok := diagnosticHooksMap(coord)["components-actual"]
+		require.True(t, ok, "diagnostic hooks should have an entry for components-actual")
+
+		result := string(hook.Hook(context.Background()))
+
+		for _, secret := range secrets {
+			assert.NotContains(t, result, secret,
+				"components-actual diagnostic should not contain secret %q", secret)
+		}
+		assert.Contains(t, result, "test-component")
+		assert.Contains(t, result, "cel-input")
+		assert.Contains(t, result, "cel-output")
+	})
 }
 
 // TestDiagnosticState creates a coordinator with a test state and verify that

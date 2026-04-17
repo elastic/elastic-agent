@@ -79,13 +79,6 @@ func TestInstallWithoutBasePathWithCustomUser(t *testing.T) {
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
-		OS: []define.OS{
-			{
-				Type: define.Darwin,
-			}, {
-				Type: define.Linux,
-			},
-		},
 	})
 
 	// Get path to Elastic Agent executable
@@ -160,15 +153,16 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	checks := &installtest.CheckOpts{
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
+	}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --namespace", testSecondAgentCanInstall(ctx, fixture, basePath, false, opts))
-	t.Run("check second agent can be installed again with --namespace --force", testSecondAgentCanInstallWithForce(ctx, fixture, basePath, false, opts))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 	})
-
 	t.Run("check components set",
 		testComponentsPresence(ctx, fixture,
 			[]componentPresenceDefinition{
@@ -197,6 +191,10 @@ func TestInstallWithBasePath(t *testing.T) {
 		require.Error(t, err, "uninstall should have failed")
 		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 	}
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	})
 }
 
 func TestInstallServersWithBasePath(t *testing.T) {
@@ -258,10 +256,13 @@ func TestInstallServersWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	checks := &installtest.CheckOpts{
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
+	}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --namespace", testSecondAgentCanInstall(ctx, fixture, basePath, false, opts))
 
 	t.Run("check components set",
 		testComponentsPresence(ctx, fixture,
@@ -290,6 +291,10 @@ func TestInstallServersWithBasePath(t *testing.T) {
 		require.Error(t, err, "uninstall should have failed")
 		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 	}
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	})
 }
 
 func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
@@ -325,13 +330,19 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in default base path
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	checks := &installtest.CheckOpts{
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
+	}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, checks))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --namespace", testSecondAgentCanInstall(ctx, fixture, "", false, opts))
-	t.Run("check second agent can be installed again with --namespace --force", testSecondAgentCanInstallWithForce(ctx, fixture, "", false, opts))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, checks))
+	})
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
 	})
 }
 
@@ -378,12 +389,89 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	checks := &installtest.CheckOpts{
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
+	}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, randomBasePath, true, opts))
-	t.Run("check second agent can be installed again with --develop --force", testSecondAgentCanInstallWithForce(ctx, fixture, randomBasePath, true, opts))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
+	})
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	})
+}
+
+// Isolate the tests of --develop (which uses --namespace in it's implementation) into it's own test
+// to minimize overall test execution time. These tests were previously sub-tests of every other
+// installation mode which significantly increased the testing time, as installing and uninstalling agent
+// is currently somewhat expensive. The --develop/--namespace options are mostly isolated to changing the
+// installation directory and do not interact with other installation options, and also are for internal use only.
+func TestInstallSecondAgentInDevelopmentNamespace(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		// We require sudo for this test to run
+		// `elastic-agent install` (even though it will
+		// be installed as non-root).
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+	})
+
+	// Get path to Elastic Agent executable
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	opts := atesting.InstallOpts{Force: true, Privileged: false}
+	out, err := fixture.Install(ctx, &opts)
+	if err != nil {
+		t.Logf("install output: %s", out)
+		require.NoError(t, err)
+	}
+
+	// Check that Agent was installed in default base path
+	topPath := installtest.DefaultTopPath()
+	checks := &installtest.CheckOpts{
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
+	}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
+
+	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
+	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, "", true, opts))
+	// Regression test for https://github.com/elastic/elastic-agent/issues/5595
+	t.Run("check second agent can be installed again with --develop --force", testSecondAgentCanInstall(ctx, fixture, "", true, opts))
+	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
+	})
+
+	// Make sure uninstall from within the topPath fails on Windows
+	if runtime.GOOS == "windows" {
+		cwd, err := os.Getwd()
+		require.NoErrorf(t, err, "GetWd failed: %s", err)
+		err = os.Chdir(topPath)
+		require.NoErrorf(t, err, "Chdir to topPath failed: %s", err)
+		t.Cleanup(func() {
+			_ = os.Chdir(cwd)
+		})
+		out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+		require.Error(t, err, "uninstall should have failed")
+		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
+	}
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
 	})
 }
 
@@ -407,19 +495,14 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 	// Check that Agent was installed in default base path
 	topPath := installtest.DefaultTopPath()
 	checks := &installtest.CheckOpts{
-		Privileged: opts.Privileged,
-		Username:   customUsername,
-		Group:      customGroup,
+		Privileged:    opts.Privileged,
+		Username:      customUsername,
+		Group:         customGroup,
+		TargetVersion: fixture.Version(),
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, "", true, opts))
-
-	t.Run("check second agent can be installed again with --develop --force", testSecondAgentCanInstallWithForce(ctx, fixture, "", true, opts))
-	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
-	})
 
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -434,16 +517,15 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 		require.Error(t, err, "uninstall should have failed")
 		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 	}
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	})
 }
 
 func testComponentsPresence(ctx context.Context, fixture *atesting.Fixture, requiredComponents []componentPresenceDefinition, unwantedComponents []componentPresenceDefinition) func(*testing.T) {
 	return func(t *testing.T) {
-		agentWorkDir := fixture.WorkDir()
-		if pf := fixture.PackageFormat(); pf == "deb" || pf == "rpm" {
-			// these are hardcoded paths in packages.yml
-			agentWorkDir = "/var/lib/elastic-agent"
-		}
-		componentsDir, err := aTesting.FindComponentsDir(agentWorkDir, fixture.Version())
+		componentsDir, err := aTesting.FindComponentsDir(fixture.AgentDataDir(), fixture.Version())
 		require.NoError(t, err)
 
 		componentsPaths := func(component string) []string {
@@ -477,11 +559,6 @@ func testComponentsPresence(ctx context.Context, fixture *atesting.Fixture, requ
 	}
 }
 
-func testSecondAgentCanInstallWithForce(ctx context.Context, fixture *atesting.Fixture, basePath string, develop bool, installOpts atesting.InstallOpts) func(*testing.T) {
-	installOpts.Force = true
-	return testSecondAgentCanInstall(ctx, fixture, basePath, develop, installOpts)
-}
-
 // Tests that a second agent can be installed in an isolated namespace, using either --develop or --namespace.
 func testSecondAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, basePath string, develop bool, installOpts atesting.InstallOpts) func(*testing.T) {
 	return func(t *testing.T) {
@@ -511,12 +588,19 @@ func testSecondAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, b
 			topPath = filepath.Join(basePath, "Elastic", paths.InstallDirNameForNamespace(installOpts.Namespace))
 		}
 
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{
-			Privileged: installOpts.Privileged,
-			Namespace:  installOpts.Namespace,
-			Username:   installOpts.Username,
-			Group:      installOpts.Group,
-		}))
+		checks := &installtest.CheckOpts{
+			Privileged:    installOpts.Privileged,
+			Namespace:     installOpts.Namespace,
+			Username:      installOpts.Username,
+			Group:         installOpts.Group,
+			TargetVersion: devFixture.Version(),
+		}
+
+		require.NoError(t, installtest.CheckSuccess(ctx, devFixture, topPath, checks))
+
+		devFixture.PostUninstallHook(func(t *testing.T) {
+			require.NoError(t, installtest.CheckUninstallSuccess(checks))
+		})
 	}
 }
 

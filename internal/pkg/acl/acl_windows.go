@@ -124,10 +124,15 @@ type ExplicitAccess struct {
 
 // GrantSid creates an ExplicitAccess instance granting permissions to the provided SID.
 func GrantSid(accessPermissions uint32, sid *windows.SID) ExplicitAccess {
+	return GrantSidWithInheritance(accessPermissions, sid, SUB_CONTAINERS_AND_OBJECTS_INHERIT)
+}
+
+// GrantSid creates an ExplicitAccess instance granting permissions to the provided SID.
+func GrantSidWithInheritance(accessPermissions uint32, sid *windows.SID, inheritance uint32) ExplicitAccess {
 	return ExplicitAccess{
 		AccessPermissions: accessPermissions,
 		AccessMode:        GRANT_ACCESS,
-		Inheritance:       SUB_CONTAINERS_AND_OBJECTS_INHERIT,
+		Inheritance:       inheritance,
 		Trustee: Trustee{
 			TrusteeForm: TRUSTEE_IS_SID,
 			Name:        (*uint16)(unsafe.Pointer(sid)),

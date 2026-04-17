@@ -13,8 +13,8 @@ $PSVersionTable.PSVersion
 # There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready
 $packageVersionContent = Get-Content .package-version -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
-if ($packageVersionContent -and $packageVersionContent.version ) {
-    $STACK_VERSION = $packageVersionContent.version
+if ($packageVersionContent -and $packageVersionContent.stack_version ) {
+    $STACK_VERSION = $packageVersionContent.stack_version
 }
 if ($packageVersionContent -and $packageVersionContent.stack_build_id ) {
     $STACK_BUILD_ID = $packageVersionContent.stack_build_id

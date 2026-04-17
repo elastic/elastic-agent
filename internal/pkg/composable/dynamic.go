@@ -79,3 +79,8 @@ func (r *ProviderRegistry) GetDynamicProvider(name string) (DynamicProviderBuild
 	b, ok := r.dynamicProviders[name]
 	return b, ok
 }
+
+func IsDynamic(providerName string) bool {
+	_, found := Providers.GetDynamicProvider(providerName)
+	return found
+}

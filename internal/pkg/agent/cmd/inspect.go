@@ -186,7 +186,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
-		components, err := specs.PolicyToComponents(cfg, agentCfg.Settings.Internal.Runtime, lvl, agentInfo)
+		components, err := specs.PolicyToComponents(cfg, agentCfg.Settings.Internal.Runtime, lvl, agentInfo, map[string]bool{})
 		if err != nil {
 			return fmt.Errorf("failed to get binary mappings: %w", err)
 		}

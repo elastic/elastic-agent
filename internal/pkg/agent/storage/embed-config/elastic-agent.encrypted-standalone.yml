@@ -1,0 +1,3 @@
+# elastic-agent has encrypted the config file.
+# encrypted config will be used unless config file is updated.
+agent.features.encrypted_config.enabled: true

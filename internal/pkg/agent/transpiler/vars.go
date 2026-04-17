@@ -30,30 +30,70 @@ type Vars struct {
 	processors            Processors
 	fetchContextProviders mapstr.M
 	defaultProvider       string
+	dynamicProvider       string
 }
 
 // NewVars returns a new instance of vars.
 func NewVars(id string, mapping map[string]interface{}, fetchContextProviders mapstr.M, defaultProvider string) (*Vars, error) {
-	return NewVarsWithProcessors(id, mapping, "", nil, fetchContextProviders, defaultProvider)
+	return NewVarsWithProcessors(
+		id, mapping, "", nil, fetchContextProviders, defaultProvider, "")
 }
 
 // NewVarsFromAst returns a new instance of vars. It takes the mapping as an *AST.
 func NewVarsFromAst(id string, tree *AST, fetchContextProviders mapstr.M, defaultProvider string) *Vars {
-	return &Vars{id, tree, "", nil, fetchContextProviders, defaultProvider}
+	return &Vars{
+		id:                    id,
+		tree:                  tree,
+		processorsKey:         "",
+		processors:            nil,
+		fetchContextProviders: fetchContextProviders,
+		defaultProvider:       defaultProvider,
+		dynamicProvider:       "",
+	}
 }
 
 // NewVarsWithProcessors returns a new instance of vars with attachment of processors.
-func NewVarsWithProcessors(id string, mapping map[string]interface{}, processorKey string, processors Processors, fetchContextProviders mapstr.M, defaultProvider string) (*Vars, error) {
+func NewVarsWithProcessors(
+	id string,
+	mapping map[string]interface{},
+	processorKey string,
+	processors Processors,
+	fetchContextProviders mapstr.M,
+	defaultProvider, dynamicProvider string,
+) (*Vars, error) {
 	tree, err := NewAST(mapping)
 	if err != nil {
 		return nil, err
 	}
-	return &Vars{id, tree, processorKey, processors, fetchContextProviders, defaultProvider}, nil
+	return NewVarsWithProcessorsFromAst(
+		id,
+		tree,
+		processorKey,
+		processors,
+		fetchContextProviders,
+		defaultProvider,
+		dynamicProvider,
+	), nil
 }
 
 // NewVarsWithProcessorsFromAst returns a new instance of vars with attachment of processors. It takes the mapping as an *AST.
-func NewVarsWithProcessorsFromAst(id string, tree *AST, processorKey string, processors Processors, fetchContextProviders mapstr.M, defaultProvider string) *Vars {
-	return &Vars{id, tree, processorKey, processors, fetchContextProviders, defaultProvider}
+func NewVarsWithProcessorsFromAst(
+	id string,
+	tree *AST,
+	processorKey string,
+	processors Processors,
+	fetchContextProviders mapstr.M,
+	defaultProvider, dynamicProvider string,
+) *Vars {
+	return &Vars{
+		id:                    id,
+		tree:                  tree,
+		processorsKey:         processorKey,
+		processors:            processors,
+		fetchContextProviders: fetchContextProviders,
+		defaultProvider:       defaultProvider,
+		dynamicProvider:       dynamicProvider,
+	}
 }
 
 // Replace returns a new value based on variable replacement.

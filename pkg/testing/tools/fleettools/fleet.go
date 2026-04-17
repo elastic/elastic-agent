@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 
 	"github.com/gofrs/uuid/v5"
 
@@ -61,6 +63,23 @@ func UpgradeAgent(ctx context.Context, client *kibana.Client, agentID, version s
 	return nil
 }
 
+// RollbackAgent requests a rollback for the given agent via the Fleet API.
+// TODO: Replace with a dedicated method once elastic-agent-libs supports
+// the rollback endpoint (https://github.com/elastic/elastic-agent-libs/pull/399).
+func RollbackAgent(ctx context.Context, client *kibana.Client, agentID string) error {
+	apiURL := fmt.Sprintf("/api/fleet/agents/%s/rollback", agentID)
+	resp, err := client.SendWithContext(ctx, http.MethodPost, apiURL, nil, nil, nil)
+	if err != nil {
+		return fmt.Errorf("error calling rollback agent API: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("rollback agent API returned status %d: %s", resp.StatusCode, body)
+	}
+	return nil
+}
+
 func DefaultURL(ctx context.Context, client *kibana.Client) (string, error) {
 	req := kibana.ListFleetServerHostsRequest{}
 	resp, err := client.ListFleetServerHosts(ctx, req)
@@ -78,6 +97,26 @@ func DefaultURL(ctx context.Context, client *kibana.Client) (string, error) {
 	}
 
 	return "", errors.New("unable to determine default fleet server URL")
+}
+
+func SwitchAgentToUnprivileged(ctx context.Context, client *kibana.Client, agentID string) error {
+	userInfo := struct {
+		Groupname string `json:"groupname"`
+		Password  string `json:"password"`
+		Username  string `json:"username"`
+	}{
+		Username:  "",
+		Groupname: "",
+		Password:  "",
+	}
+	privilegeLevelChangeReq := kibana.AgentPrivilegeLevelChangeRequest{
+		UserInfo: &userInfo,
+	}
+	err := client.AgentPrivilegeLevelChange(ctx, agentID, privilegeLevelChangeReq)
+	if err != nil {
+		return fmt.Errorf("unable to change privilege level for agent with ID [%s]: %w", agentID, err)
+	}
+	return nil
 }
 
 // NewEnrollParams creates a new policy with monitoring logs and metrics,

@@ -20,7 +20,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/service"
 
 	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
-	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
@@ -41,7 +40,7 @@ func NewOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 		Short: "Start the Elastic Agent in otel mode",
 		Long:  "This command starts the Elastic Agent in otel mode.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfgFiles, err := GetConfigFiles(cmd, true)
+			cfgFiles, err := GetConfigFiles(cmd.Flags(), true)
 			if err != nil {
 				return err
 			}
@@ -143,13 +142,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		"endpoint": paths.DiagnosticsExtensionSocket(),
 	}
 	if supervised {
-		// add stdin config provider
-		configProvider, err := agentprovider.NewBufferProvider(os.Stdin)
-		if err != nil {
-			return settings, fmt.Errorf("failed to create config provider: %w", err)
-		}
-		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), []string{configProvider.URI()},
-			edotOtelCol.WithConfigProviderFactory(configProvider.NewFactory()),
+		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), configFiles,
 			edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
 		)
 

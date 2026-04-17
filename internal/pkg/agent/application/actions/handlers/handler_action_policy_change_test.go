@@ -1112,6 +1112,56 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 	}
 }
 
+func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *testing.T) {
+	tests := []struct {
+		name          string
+		policyLevel   string
+		expectedLevel logp.Level
+	}{
+		{
+			name:          "error level is persisted to h.config",
+			policyLevel:   "error",
+			expectedLevel: logp.ErrorLevel,
+		},
+		{
+			name:          "debug level is persisted to h.config",
+			policyLevel:   "debug",
+			expectedLevel: logp.DebugLevel,
+		},
+		{
+			name:          "warning level is persisted to h.config",
+			policyLevel:   "warning",
+			expectedLevel: logp.WarnLevel,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log, _ := loggertest.New(tt.name)
+
+			mockLogSetter := newMockLogLevelSetter(t)
+			mockLogSetter.EXPECT().SetLogLevel(mock.Anything, mock.Anything).Return(nil).Once()
+
+			h := &PolicyChangeHandler{
+				log:                  log,
+				agentInfo:            &info.AgentInfo{},
+				config:               configuration.DefaultConfiguration(),
+				store:                &storage.NullStore{},
+				policyLogLevelSetter: mockLogSetter,
+			}
+
+			cfg := config.MustNewConfigFrom(map[string]interface{}{
+				"agent.logging.level": tt.policyLevel,
+			})
+			err := h.handlePolicyChange(context.Background(), cfg)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedLevel, h.config.Settings.LoggingConfig.Level,
+				"h.config.Settings.LoggingConfig.Level should be updated to the policy log level")
+		})
+	}
+}
+
 func nilLogLevelSet(t *testing.T) *mockLogLevelSetter {
 	// nilLogLevel is a variable used to match nil policy log level being set
 	var nilLogLevel *logger.Level = nil

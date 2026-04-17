@@ -111,7 +111,7 @@ func (f FleetBootstrapOpts) toCmdArgs() []string {
 
 // InstallOpts specifies the options for the install command
 type InstallOpts struct {
-	BasePath       string // --base-path
+	BasePath       string // --base-path or --prefix for RPM installs
 	Force          bool   // --force
 	Insecure       bool   // --insecure
 	NonInteractive bool   // --non-interactive
@@ -361,6 +361,10 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 			return
 		}
 		require.NoErrorf(f.t, err, "uninstalling agent failed. Output: %q", out)
+
+		for _, hook := range f.postUninstallHooks {
+			hook(f.t)
+		}
 	})
 
 	return out, nil
@@ -464,6 +468,9 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 
 func (f *Fixture) SetDebRpmClient() error {
 	workDir := "/var/lib/elastic-agent"
+	if f.installOpts != nil && f.installOpts.BasePath != "" {
+		workDir = f.installOpts.BasePath + workDir
+	}
 	socketPath, err := control.AddressFromPath(f.operatingSystem, workDir)
 	if err != nil {
 		return fmt.Errorf("failed to get control protcol address: %w", err)
@@ -584,14 +591,25 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		return nil, fmt.Errorf("failed to prepare: %w", err)
 	}
 
+	installArgs := []string{"-E", "rpm", "-i", "-v"}
+	if installOpts.BasePath != "" {
+		installArgs = append(installArgs, "--prefix", installOpts.BasePath)
+		// Make sure that prefix is available to agentFixture so other agent commands can use it
+		if f.installOpts == nil {
+			f.installOpts = &InstallOpts{}
+		}
+		f.installOpts.BasePath = installOpts.BasePath
+	}
+	installArgs = append(installArgs, f.srcPackage)
 	// sudo rpm -iv elastic-agent rpm
-	cmd := exec.CommandContext(ctx, "sudo", "-E", "rpm", "-i", "-v", f.srcPackage) // #nosec G204 -- Need to pass in name of package
+	f.t.Logf("[test %s] RPM install command: %v", f.t.Name(), installArgs)
+	cmd := exec.CommandContext(ctx, "sudo", installArgs...) // #nosec G204 -- Need to pass in name of package
 	if installOpts.InstallServers {
 		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
 	}
-	out, err := cmd.CombinedOutput()
+	installOut, err := cmd.CombinedOutput()
 	if err != nil {
-		return out, fmt.Errorf("rpm install failed: %w output:%s", err, string(out))
+		return installOut, fmt.Errorf("rpm install failed: %w output:%s", err, string(installOut))
 	}
 
 	f.t.Cleanup(func() {
@@ -614,18 +632,27 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		}
 
 		f.t.Logf("removing installed agent files")
-		out, err = exec.CommandContext(uninstallCtx, "sudo", "rm", "-rf", "/var/lib/elastic-agent", "/var/log/elastic-agent", "/etc/elastic-agent").CombinedOutput()
+		basePath := "/"
+		if installOpts.BasePath != "" {
+			basePath = installOpts.BasePath
+		}
+		rmArgs := []string{"rm", "-rf",
+			filepath.Join(basePath, "var/lib/elastic-agent"),
+			filepath.Join(basePath, "var/log/elastic-agent"),
+			filepath.Join(basePath, "etc/elastic-agent"),
+		}
+		out, err = exec.CommandContext(uninstallCtx, "sudo", rmArgs...).CombinedOutput()
 		if err != nil {
 			f.t.Log(string(out))
-			f.t.Logf("failed to 'sudo rm -rf /var/lib/elastic-agent /var/log/elastic-agent/ /etc/elastic-agent'")
+			f.t.Logf("failed to remove installed agent files: %v", rmArgs)
 			f.t.FailNow()
 		}
 	})
 
 	// start elastic-agent
-	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
+	out, err := exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
 	if err != nil {
-		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
+		return out, fmt.Errorf("systemctl start elastic-agent failed: %w output: %s install output: %s", err, string(out), string(installOut))
 	}
 
 	err = f.SetDebRpmClient()
@@ -639,6 +666,9 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 
 	// rpm install doesn't enroll, so need to do that
 	enrollArgs := []string{"elastic-agent", "enroll"}
+	if installOpts.BasePath != "" {
+		enrollArgs = []string{installOpts.BasePath + "/usr/bin/elastic-agent", "enroll"}
+	}
 	if installOpts.Force {
 		enrollArgs = append(enrollArgs, "--force")
 	}
