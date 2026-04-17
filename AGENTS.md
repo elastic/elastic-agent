@@ -86,7 +86,7 @@ Refer to [architecture.md](./docs/architecture.md).
 
 ## Packaging and delivery
 
-Build artifacts (for example tar, deb, rpm, Docker images) are produced via mage packaging targets; see `magefile.go` for environment variables such as `EXTERNAL`, `SNAPSHOT`, `PLATFORMS`, `PACKAGES`, `DEV`, `DOCKER_VARIANTS`. The `PACKAGES` env var is **required** — use `PACKAGES=all` to build all package types, or specify types (for example `PACKAGES=tar.gz,rpm,deb`). Kubernetes-oriented deployment material lives under `deploy/helm/`.
+Build artifacts (for example tar, deb, rpm, Docker images) are produced via mage packaging targets; see `magefile.go` for environment variables such as `AGENT_CORE_SOURCE`, `EXTERNAL` (defaults to `true`), `SNAPSHOT`, `PLATFORMS`, `PACKAGES`, `DEV`, `DOCKER_VARIANTS`. `PACKAGES` is optional and defaults to `tar.gz` on non-Windows and `zip` on Windows; use `PACKAGES=all` to build all package types. Kubernetes-oriented deployment material lives under `deploy/helm/`.
 Produced artifacts will be placed in the `build` directory.
 
 ## Testing

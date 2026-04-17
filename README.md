@@ -102,12 +102,13 @@ To build a local version of the agent for development, run the command below. Th
 * windows/arm64
 
 ```sh
-# EXTERNAL=true downloads the matching version of the binaries that are packaged with agent, not necessary if only using Beats.
-# SNAPSHOT is true by default (snapshot build); set SNAPSHOT=false to build a release package.
+# EXTERNAL defaults to true (downloads external components such as Beats and osquery).
+# SNAPSHOT state comes from .package-version (snapshot on main, non-snapshot on release branches);
+# override explicitly with SNAPSHOT=true or SNAPSHOT=false if needed.
 # PLATFORMS=linux/amd64 builds an agent that will run on 64 bit X86 Linux systems.
 # PACKAGES selects package types; if unset, defaults to tar.gz for non-Windows platforms and zip for Windows.
 # Use PACKAGES=all to build all package types, or specify types (e.g. tar.gz,rpm,deb,zip,docker).
-EXTERNAL=true PLATFORMS=linux/amd64 mage -v package
+PLATFORMS=linux/amd64 mage -v package
 ```
 
 The resulting package will be produced in the build/distributions directory. The version is controlled by the value in [version.go](version/version.go).
@@ -144,7 +145,7 @@ Running Elastic Agent in a docker container is a common use case. To build the E
 
 ```
 # Use PLATFORMS=linux/arm64 if you are using an ARM based Mac.
-DEV=true EXTERNAL=true PLATFORMS=linux/amd64 PACKAGES=docker mage package
+DEV=true PLATFORMS=linux/amd64 PACKAGES=docker mage package
 ```
 
 If you are in the 7.13 branch, this will create the `docker.elastic.co/beats/elastic-agent:7.13.0-SNAPSHOT` image in your local environment. Now you can use this to for example test this container with the stack in elastic-package:
