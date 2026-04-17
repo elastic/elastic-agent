@@ -345,8 +345,13 @@ func TestFleetManagedUpgradeRollback(t *testing.T) {
 	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	upgradeToVersion, err := upgradetest.PreviousMinor()
-	require.NoError(t, err)
+	// The Fleet rollback API requires the agent to have rollbacks recorded in
+	// its Fleet document, populated from the agent's checkin. That feature is
+	// only present on 9.3.0+ (see elastic-agent PR #11143), so we pin the
+	// upgrade target to 9.3.0 rather than using PreviousMinor() (which would
+	// resolve to 9.2.x on the 9.3 branch and cause the Fleet API to reject
+	// the rollback with "upgrade rollback not available for agent").
+	upgradeToVersion := upgradetest.Version_9_3_0
 	upgradeFixture, err := atesting.NewFixture(
 		t,
 		upgradeToVersion.String(),
