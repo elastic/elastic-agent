@@ -14,17 +14,21 @@ import (
 	"io"
 	"net/http"
 	"net/http/httputil"
+	"runtime"
 	"strings"
 	"testing"
 	"text/template"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/kardianos/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -76,6 +80,120 @@ func TestSetLogLevelFleetManaged(t *testing.T) {
 	require.NoError(t, err, "error getting the agent ID")
 
 	testLogLevelSetViaFleet(ctx, f, agentID, t, info, policyResp)
+}
+
+// TestSetLogLevelFleetManagedSurvivesRestart reproduces the bug where the policy
+// log level reverts to "info" after an agent restart because fleet.enc was
+// persisted with the startup-time level rather than the policy level.
+func TestSetLogLevelFleetManagedSurvivesRestart(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Fleet,
+		Stack: &define.Stack{},
+		Sudo:  true,
+	})
+
+	deadline := time.Now().Add(30 * time.Minute)
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
+	defer cancel()
+
+	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err, "failed creating agent fixture")
+
+	policyResp, enrollmentTokenResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, createBasicPolicy())
+	t.Logf("Created policy %+v", policyResp.AgentPolicy)
+
+	t.Log("Getting default Fleet Server URL...")
+	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	require.NoError(t, err, "failed getting Fleet Server URL")
+
+	installOutput, err := f.Install(ctx, &atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             fleetServerURL,
+			EnrollmentToken: enrollmentTokenResp.APIKey,
+		},
+	})
+	assert.NoErrorf(t, err, "Error installing agent. Install output:\n%s\n", string(installOutput))
+
+	require.Eventuallyf(t, func() bool {
+		return waitForAgentAndFleetHealthy(ctx, t, f)
+	}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
+
+	agentID, err := getAgentID(ctx, f)
+	require.NoError(t, err, "error getting the agent ID")
+
+	// Step 1: set the policy log level to something other than the default "info"
+	policyLogLevel := logp.ErrorLevel
+	require.NotEqualf(t, logger.DefaultLogLevel, policyLogLevel,
+		"policy log level %s must differ from default to exercise the bug", policyLogLevel)
+
+	t.Logf("Setting policy log level to %q", policyLogLevel)
+	err = updatePolicyLogLevel(ctx, t, info.KibanaClient, policyResp.AgentPolicy, policyLogLevel.String())
+	require.NoError(t, err, "error updating policy log level")
+
+	// Wait until Fleet confirms the agent has adopted the policy log level
+	require.Eventuallyf(t, func() bool {
+		fleetLevel, err := getLogLevelFromFleetMetadata(ctx, t, info.KibanaClient, agentID)
+		if err != nil {
+			t.Logf("error getting log level from Fleet metadata: %v", err)
+			return false
+		}
+		t.Logf("Fleet metadata log level: %q (want %q)", fleetLevel, policyLogLevel)
+		return fleetLevel == policyLogLevel.String()
+	}, 6*time.Minute, 30*time.Second, "agent never reported policy log level %q to Fleet", policyLogLevel)
+
+	// Step 2: restart the agent service to reproduce the persistence bug
+	topPath := paths.Top()
+	t.Logf("Restarting agent service (top path: %s)", topPath)
+
+	err = install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
+	if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
+		t.Logf("Ignoring expected Windows error on stop: %s", err)
+		err = nil
+	}
+	require.NoError(t, err, "error stopping agent service")
+
+	var svcStatus service.Status
+	var svcStatusErr error
+	require.Eventuallyf(t, func() bool {
+		svcStatus, svcStatusErr = install.StatusService(topPath)
+		if svcStatusErr != nil {
+			return false
+		}
+		return svcStatus != service.StatusRunning
+	}, 5*time.Minute, 500*time.Millisecond, "service never stopped (status: %v, err: %v)", svcStatus, svcStatusErr)
+
+	err = install.StartService(topPath)
+	require.NoError(t, err, "error starting agent service")
+
+	require.Eventuallyf(t, func() bool {
+		svcStatus, svcStatusErr = install.StatusService(topPath)
+		if svcStatusErr != nil {
+			return false
+		}
+		return svcStatus == service.StatusRunning
+	}, 5*time.Minute, 500*time.Millisecond, "service never started (status: %v, err: %v)", svcStatus, svcStatusErr)
+
+	// Step 3: wait for the agent to reconnect to Fleet and be healthy again
+	require.Eventuallyf(t, func() bool {
+		return waitForAgentAndFleetHealthy(ctx, t, f)
+	}, 5*time.Minute, time.Second, "agent never became healthy again after restart")
+
+	// Step 4: verify the log level reported to Fleet is still the policy level,
+	// not the startup default "info". This is the regression check — before the
+	// fix, fleet.enc held "info" so the agent would restart at "info" and report
+	// "info" on its first checkin.
+	assert.Eventuallyf(t, func() bool {
+		fleetLevel, err := getLogLevelFromFleetMetadata(ctx, t, info.KibanaClient, agentID)
+		if err != nil {
+			t.Logf("error getting log level from Fleet metadata after restart: %v", err)
+			return false
+		}
+		t.Logf("Fleet metadata log level after restart: %q (want %q)", fleetLevel, policyLogLevel)
+		return fleetLevel == policyLogLevel.String()
+	}, 6*time.Minute, 30*time.Second,
+		"agent reported wrong log level to Fleet after restart (expected %q, got \"info\")", policyLogLevel)
 }
 
 func testLogLevelSetViaFleet(ctx context.Context, f *atesting.Fixture, agentID string, t *testing.T, info *define.Info, policyResp kibana.PolicyResponse) {
