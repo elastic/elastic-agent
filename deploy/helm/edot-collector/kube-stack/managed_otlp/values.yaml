@@ -17,7 +17,7 @@ crds:
 defaultCRConfig:
   image:
     repository: "docker.elastic.co/elastic-agent/elastic-agent"
-    tag: "9.4.0-SNAPSHOT"
+    tag: "9.4.0"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
     # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
@@ -276,9 +276,6 @@ collectors:
             - key: cloud.instance.id
               from_attribute: host.id
               action: insert
-        # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
-        k8sattributes:
-          passthrough: true
       receivers:
         # [OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
         otlp:
@@ -607,7 +604,6 @@ collectors:
             receivers: [otlp]
             processors: []
             exporters: [routing/traces]
-          # Infra pipelines (pass-through, already enriched by daemon)
           metrics/infra:
             receivers: [routing]
             processors: [k8sattributes]
@@ -620,7 +616,6 @@ collectors:
             receivers: [routing/traces]
             processors: [k8sattributes]
             exporters: [debug, otlp/ingest_metrics_traces]
-          # APM pipelines (with k8sattributes enrichment for instrumented apps)
           metrics/apm:
             receivers: [routing]
             processors: [k8sattributes, batch]
