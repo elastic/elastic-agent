@@ -13,7 +13,7 @@ kind: enhancement
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: update otel to v1.54.0/v0.148.0
+summary: Add config to suppress 409 conflict errors in elasticsearch exporter
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change

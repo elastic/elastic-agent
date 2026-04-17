@@ -13,7 +13,6 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -65,7 +64,7 @@ type collectorRecoveryTimer interface {
 
 type configUpdate struct {
 	collectorCfg  *confmap.Conf
-	monitoringCfg *monitoringCfg.MonitoringConfig
+	settingsCfg   *configuration.SettingsConfig
 	components    []component.Component
 	agentLogLevel logp.Level
 }
@@ -443,12 +442,17 @@ func (m *OTelManager) buildMergedConfig(
 ) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
 
+	var runtimeCfg *component.RuntimeConfig
+	if cfgUpdate.settingsCfg != nil && cfgUpdate.settingsCfg.Internal != nil {
+		runtimeCfg = cfgUpdate.settingsCfg.Internal.Runtime
+	}
+
 	// Generate component otel config if there are components
 	var componentOtelCfg *confmap.Conf
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, monitoringConfigGetter, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, runtimeCfg, monitoringConfigGetter, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
@@ -461,27 +465,28 @@ func (m *OTelManager) buildMergedConfig(
 
 	// Merge component config if it exists
 	if componentOtelCfg != nil {
-		err := mergedOtelCfg.Merge(componentOtelCfg)
-		if err != nil {
+		if err := mergeWithExtensions(mergedOtelCfg, componentOtelCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 		}
 
-		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil {
-			if mCfg.Enabled && mCfg.MonitorMetrics {
-				// Metrics monitoring is enabled, inject a receiver for the
-				// collector's internal telemetry.
-				err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components)
-				if err != nil {
-					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
+		if cfgUpdate.settingsCfg != nil {
+			if mCfg := cfgUpdate.settingsCfg.MonitoringConfig; mCfg != nil {
+				if mCfg.Enabled && mCfg.MonitorMetrics {
+					// Metrics monitoring is enabled, inject a receiver for the
+					// collector's internal telemetry.
+					if err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components); err != nil {
+						return nil, fmt.Errorf("merging internal telemetry config: %w", err)
+					}
 				}
 			}
 		}
 	}
 
-	// Merge with base collector config if it exists
+	// Merge with base collector config if it exists. mergeWithExtensions unions
+	// the service::extensions lists so that component-generated extensions (e.g.
+	// beatsauth) are not silently overwritten by the collector config's list.
 	if cfgUpdate.collectorCfg != nil {
-		err := mergedOtelCfg.Merge(cfgUpdate.collectorCfg)
-		if err != nil {
+		if err := mergeWithExtensions(mergedOtelCfg, cfgUpdate.collectorCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
 	}
@@ -518,31 +523,23 @@ func maybeInjectLogLevel(config *confmap.Conf, logplevel logp.Level) error {
 	if err != nil {
 		return fmt.Errorf("failed to translate log level: %s", logplevel)
 	}
-	if err := config.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
+	if err := mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
 		return fmt.Errorf("failed to set log level in otel config: %w", err)
 	}
 	return nil
 }
 
 func injectDiagnosticsExtension(config *confmap.Conf) error {
-	extensionCfg := map[string]any{
+	return mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{
 		"extensions": map[string]any{
 			"elastic_diagnostics": map[string]any{
 				"endpoint": paths.DiagnosticsExtensionSocket(),
 			},
 		},
-	}
-	if config.IsSet("service::extensions") {
-		extensionList := config.Get("service::extensions").([]interface{})
-		if slices.Contains(extensionList, "elastic_diagnostics") {
-			// already configured, nothing to do
-			return nil
-		}
-		extensionList = append(extensionList, "elastic_diagnostics")
-		extensionCfg["service::extensions"] = extensionList
-	}
-
-	return config.Merge(confmap.NewFromStringMap(extensionCfg))
+		"service": map[string]any{
+			"extensions": []any{"elastic_diagnostics"},
+		},
+	}))
 }
 
 func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent) map[string]any {
@@ -669,7 +666,7 @@ func injectMonitoringReceiver(
 		pipelineCfg["processors"] = []string{processorID}
 	}
 
-	return config.Merge(confmap.NewFromStringMap(collectorCfg))
+	return mergeWithExtensions(config, confmap.NewFromStringMap(collectorCfg))
 }
 
 func (m *OTelManager) applyMergedConfig(
@@ -719,10 +716,10 @@ func (m *OTelManager) applyMergedConfig(
 }
 
 // Update sends collector configuration and component updates to the manager's run loop.
-func (m *OTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component) {
+func (m *OTelManager) Update(cfg *confmap.Conf, settings *configuration.SettingsConfig, ll logp.Level, components []component.Component) {
 	cfgUpdate := configUpdate{
 		collectorCfg:  cfg,
-		monitoringCfg: monitoring,
+		settingsCfg:   settings,
 		components:    components,
 		agentLogLevel: ll,
 	}

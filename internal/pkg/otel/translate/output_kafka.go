@@ -76,7 +76,8 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		},
 		"timeout": kConfig.BrokerTimeout,
 		"logs": map[string]any{
-			"topic": kConfig.Topic,
+			"topic":    kConfig.Topic,
+			"encoding": "raw",
 		},
 	}
 
@@ -93,6 +94,13 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		}
 	}
 
+	tlsCfg, err := TLSToOTel(kConfig.TLS, logger)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error translating tls config :%w", err)
+	}
+
+	setIfNotNil(kafkaExporter, "tls", tlsCfg)
+
 	// compiles topic and validates against any malformed strings
 	fmtstr, err := fmtstr.CompileEvent(kConfig.Topic)
 	if err != nil {
@@ -101,9 +109,12 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 
 	if !fmtstr.IsConst() {
 		kafkaExporter["topic_from_attribute"] = "topic"
-		processor := dynamicTopicSetterProcessor(kConfig.Topic, outputName)
+		processor, err := dynamicTopicSetterProcessor(kConfig.Topic, outputName)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error translating kafka topic: %w", err)
+		}
 		// delete topic set under logs
-		delete(kafkaExporter, "logs")
+		delete(kafkaExporter["logs"].(map[string]any), "topic")
 		return kafkaExporter, processor, nil
 	}
 	return kafkaExporter, nil, nil
@@ -112,59 +123,60 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 // dynamicTopicSetterProcessor parses topic field with dynamic values such as %{[data_stream.type]}
 // It translates this behavior onto a transform processor defined here
 // More about transform processor https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor
-func dynamicTopicSetterProcessor(topic string, outputName string) map[string]any {
-	content := topic
+func dynamicTopicSetterProcessor(topic string, outputName string) (map[string]any, error) {
 	logStatements := []string{}
 
-	for len(content) > 0 {
-		idxPercent := strings.Index(content, "%")
-		if idxPercent == -1 {
-			break
-		}
+	lexer := fmtstr.MakeLexer(topic)
+	defer lexer.Finish()
 
-		if len(content) <= idxPercent+1 || content[idxPercent+1] != '{' {
-			content = content[idxPercent+1:]
-			continue
-		}
+	tokens, err := fmtstr.ParseRawTokens(lexer)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing token:%w", err)
+	}
 
-		// Require %{...}; find closing }
-		idxClose := strings.Index(content[idxPercent+2:], "}")
+	pendingLiteral := ""
+	fieldExpr := func(v fmtstr.VariableToken) string {
+		return getLogBody(extractField(string(v)))
+	}
 
-		// Found no closing bracket. Ideally this should never happen because CompileEvent() validates against such malforms
-		if idxClose == -1 {
-			break
-		}
-
-		idxClose += idxPercent + 2 // position of '}' in content
-		literalBefore := content[:idxPercent]
-
-		// get field between %{...}
-		field := extractField(content[idxPercent+2 : idxClose])
-
-		// Advance past "%{...}"
-		content = content[idxClose+1:]
-
-		if len(logStatements) == 0 {
-			if literalBefore == "" {
-				// First placeholder: set topic = field
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], %s)`, getLogBody(field)))
+	for _, tok := range tokens {
+		switch t := tok.(type) {
+		case string:
+			pendingLiteral += t
+		case fmtstr.VariableToken:
+			f := fieldExpr(t)
+			if len(logStatements) == 0 {
+				if pendingLiteral != "" {
+					// First placeholder: set topic = literal + field
+					logStatements = append(logStatements, fmt.Sprintf(
+						`set(resource.attributes["topic"], Concat(["%s", %s], ""))`,
+						pendingLiteral, f))
+				} else {
+					// First placeholder: set topic = field
+					logStatements = append(logStatements, fmt.Sprintf(
+						`set(resource.attributes["topic"], %s)`, f))
+				}
 			} else {
-				// First placeholder: set topic =  literal + field
-				logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat(["%s", %s], ""))`, literalBefore, getLogBody(field)))
+				// Subsequent placeholder: set topic = topic + literal + field
+				logStatements = append(logStatements, fmt.Sprintf(
+					`set(resource.attributes["topic"], Concat([resource.attributes["topic"], %s], "%s"))`,
+					f, pendingLiteral))
 			}
-		} else {
-			// Subsequent placeholder: set topic =  topic + literal + field
-			logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], %s], "%s"))`, getLogBody(field), literalBefore))
+			pendingLiteral = ""
+		default:
+			return nil, fmt.Errorf("unexpected token type %T in kafka topic format", tok)
 		}
 	}
 
 	// check if any more content is left after all fields are parsed
-	if len(content) != 0 {
-		logStatements = append(logStatements, fmt.Sprintf(`set(resource.attributes["topic"], Concat([resource.attributes["topic"], "%s"], ""))`, content))
+	if len(logStatements) > 0 && pendingLiteral != "" {
+		logStatements = append(logStatements, fmt.Sprintf(
+			`set(resource.attributes["topic"], Concat([resource.attributes["topic"], "%s"], ""))`,
+			pendingLiteral))
 	}
 
 	if len(logStatements) == 0 {
-		return nil
+		return nil, fmt.Errorf("there are no statements")
 	}
 
 	return map[string]any{
@@ -172,7 +184,7 @@ func dynamicTopicSetterProcessor(topic string, outputName string) map[string]any
 			"error_mode":     "ignore",
 			"log_statements": logStatements,
 		},
-	}
+	}, nil
 }
 
 func extractField(field string) string {
@@ -182,41 +194,14 @@ func extractField(field string) string {
 
 	switch field[0] {
 	case '[':
-		return parseEventPath(field)
+		data, _ := fmtstr.ParseEventPath(field)
+		return data
 	case '+':
 		// TODO parse time stamp
 		return ""
 	}
 
 	return ""
-}
-
-// copied from https://github.com/elastic/beats/blob/main/libbeat/common/fmtstr/formatevents.go#L385-L410
-func parseEventPath(field string) string {
-	field = strings.Trim(field, " \n\r\t")
-	fields := []string{}
-
-	for len(field) > 0 {
-		if field[0] != '[' {
-			return ""
-		}
-
-		idx := strings.IndexByte(field, ']')
-		if idx < 0 {
-			return ""
-		}
-
-		path := field[1:idx]
-		if path == "" {
-			return ""
-		}
-
-		fields = append(fields, path)
-		field = field[idx+1:]
-	}
-
-	path := strings.Join(fields, ".")
-	return path
 }
 
 func getLogBody(field string) string {
@@ -246,9 +231,15 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 		return fmt.Errorf("headers is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("timeout") {
 		return fmt.Errorf("timeout is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("ssl") {
-		return fmt.Errorf("ssl parameters are currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("bulk_flush_frequency") {
+	} else if value, err := cfg.Child("ssl", -1); err == nil {
+		if value.HasField("ca_trusted_fingerprint") {
+			return fmt.Errorf("ca_trusted_fingerprint is currently not supported: %w", errors.ErrUnsupported)
+		} else if value.HasField("ca_sha_256") {
+			return fmt.Errorf("ca_sha_256 is currently not supported: %w", errors.ErrUnsupported)
+		}
+	}
+
+	if cfg.HasField("bulk_flush_frequency") {
 		logger.Warn("bulk_flush_frequency is deprecated")
 	}
 

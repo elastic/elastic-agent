@@ -9,16 +9,18 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: other
+kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: upgrade nodejs to v22.22.2
+summary: Ensure current runtime stops before new runtime starts
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-# description:
+description: |
+  Ensures that the current runtime stops before the new runtime starts, otherwise registry
+  state will not be consistent before the start of the new runtime.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
