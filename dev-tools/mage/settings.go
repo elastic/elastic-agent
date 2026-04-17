@@ -682,6 +682,10 @@ func (s *Settings) setBuildDefaults() {
 	s.Build.GOARCH = build.Default.GOARCH
 	s.Build.MaxParallel = runtime.NumCPU()
 	s.BuildDate = time.Now().UTC()
+	// Default external-component fetching to on so `mage package` works from
+	// a fresh checkout without ceremony. Callers that don't want external
+	// fetches (e.g. a pre-populated AGENT_DROP_PATH flow) set EXTERNAL=false.
+	s.Build.ExternalBuild = true
 }
 
 // setBeatDefaults sets default values for BeatSettings.
@@ -712,9 +716,14 @@ func (s *Settings) setCrossBuildDefaults() {
 }
 
 // setPackagingDefaults sets default values for PackagingSettings.
-// Currently no non-zero defaults.
 func (s *Settings) setPackagingDefaults() {
-	// No non-zero defaults
+	// Default to reading .package-version so `mage package` works from a
+	// fresh checkout without ceremony: the loader below will pull in the
+	// manifest URL, version and snapshot flag for the branch. Flows that
+	// need version.go's version instead (notably the binary-DRA builder
+	// in .buildkite/scripts/steps/build-agent-core.sh) set
+	// USE_PACKAGE_VERSION=false explicitly.
+	s.Packaging.UsePackageVersion = true
 }
 
 // setIntegrationTestDefaults sets default values for IntegrationTestSettings.
@@ -1106,6 +1115,27 @@ type CrossBuildSettings struct {
 	DevArch string
 }
 
+// CoreSource selects where the elastic-agent-core binaries used by Package
+// come from. The choice also determines which commit is authoritative for the
+// resulting artifact's metadata: CoreSourceLocal uses git HEAD (the commit
+// the local compile baked into the binary), CoreSourceManifest uses the
+// manifest's core commit (the commit the already-published binary was built
+// at).
+type CoreSource string
+
+const (
+	// CoreSourceLocal compiles elastic-agent-core from the current repository
+	// checkout via PackageAgentCore. AgentCoreCommitHash() returns git HEAD,
+	// which matches the commit the compiler baked into the binary.
+	CoreSourceLocal CoreSource = "local"
+
+	// CoreSourceManifest downloads a pre-built elastic-agent-core archive
+	// from the manifest. Requires MANIFEST_URL to be set.
+	// AgentCoreCommitHash() returns the manifest's core commit, which matches
+	// the commit the downloaded binary was built at.
+	CoreSourceManifest CoreSource = "manifest"
+)
+
 // PackagingSettings contains packaging-related settings.
 type PackagingSettings struct {
 	// AgentPackageVersion overrides the package version (from AGENT_PACKAGE_VERSION env var)
@@ -1125,6 +1155,10 @@ type PackagingSettings struct {
 
 	// KeepArchive indicates whether to keep the archive after packaging (from KEEP_ARCHIVE env var)
 	KeepArchive bool
+
+	// CoreSource selects where elastic-agent-core comes from when running
+	// Package. Defaults to CoreSourceLocal (from AGENT_CORE_SOURCE env var).
+	CoreSource CoreSource
 }
 
 // IntegrationTestSettings contains integration test related settings.
@@ -1297,7 +1331,9 @@ func LoadSettings() (*Settings, error) {
 		return nil, fmt.Errorf("initializing repo info: %w", err)
 	}
 
-	s.loadPackagingSettingsFromEnv()
+	if err := s.loadPackagingSettingsFromEnv(); err != nil {
+		return nil, fmt.Errorf("loading packaging settings: %w", err)
+	}
 	if err := s.loadIntegrationTestSettingsFromEnv(); err != nil {
 		return nil, fmt.Errorf("loading integration test settings: %w", err)
 	}
@@ -1494,21 +1530,39 @@ func (s *Settings) loadCrossBuildSettingsFromEnv() {
 
 // loadPackagingSettingsFromEnv overrides packaging settings from environment variables.
 // Defaults should already be set via setPackagingDefaults().
-func (s *Settings) loadPackagingSettingsFromEnv() {
+func (s *Settings) loadPackagingSettingsFromEnv() error {
 	if v := os.Getenv("AGENT_PACKAGE_VERSION"); v != "" {
 		s.Packaging.AgentPackageVersion = v
 	}
-	if v := os.Getenv("MANIFEST_URL"); v != "" {
+	manifestURLSet := false
+	if v, ok := os.LookupEnv("MANIFEST_URL"); ok && v != "" {
 		s.Packaging.ManifestURL = v
+		manifestURLSet = true
 	}
-	if os.Getenv("USE_PACKAGE_VERSION") == "true" {
-		s.Packaging.UsePackageVersion = true
+	var err error
+	s.Packaging.UsePackageVersion, err = parseBoolEnv("USE_PACKAGE_VERSION", s.Packaging.UsePackageVersion)
+	if err != nil {
+		return fmt.Errorf("failed to parse USE_PACKAGE_VERSION: %w", err)
+	}
+	if manifestURLSet && s.Packaging.UsePackageVersion {
+		return errors.New("MANIFEST_URL and USE_PACKAGE_VERSION=true are mutually exclusive: " +
+			"USE_PACKAGE_VERSION reads .package-version to set the manifest URL; " +
+			"set USE_PACKAGE_VERSION=false when providing MANIFEST_URL explicitly")
 	}
 	if v := os.Getenv("AGENT_DROP_PATH"); v != "" {
 		s.Packaging.AgentDropPath = v
 	}
 	if _, ok := os.LookupEnv("KEEP_ARCHIVE"); ok {
 		s.Packaging.KeepArchive = true
+	}
+	switch v := os.Getenv("AGENT_CORE_SOURCE"); v {
+	case "", string(CoreSourceLocal):
+		s.Packaging.CoreSource = CoreSourceLocal
+	case string(CoreSourceManifest):
+		s.Packaging.CoreSource = CoreSourceManifest
+	default:
+		log.Printf("Warning: unknown AGENT_CORE_SOURCE=%q; defaulting to %q", v, CoreSourceLocal)
+		s.Packaging.CoreSource = CoreSourceLocal
 	}
 
 	// Apply .package-version overrides when USE_PACKAGE_VERSION is set.
@@ -1535,6 +1589,7 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 			}
 		}
 	}
+	return nil
 }
 
 // loadIntegrationTestSettingsFromEnv overrides integration test settings from environment variables.
@@ -1826,7 +1881,11 @@ func (s *Settings) BuildDateString() string {
 }
 
 // GetPlatforms returns the parsed platform list from PLATFORMS env var.
-// If PLATFORMS is empty, returns the default platform list.
+// If PLATFORMS is empty, returns the host platform (runtime.GOOS/runtime.GOARCH)
+// when that platform is known, or BuildPlatforms.Defaults() as a fallback for
+// exotic hosts. This makes `mage package` produce host-only artifacts by
+// default; callers that want a broader matrix (CI cross-builds) set PLATFORMS
+// explicitly.
 // Platform filters from the settings' PlatformFilters are applied to the result.
 // Note: linux/386 and windows/386 are always filtered out as they are not supported.
 func (s *Settings) GetPlatforms() BuildPlatformList {
@@ -1834,7 +1893,12 @@ func (s *Settings) GetPlatforms() BuildPlatformList {
 	if s.CrossBuild.Platforms != "" {
 		platforms = NewPlatformList(s.CrossBuild.Platforms)
 	} else {
-		platforms = BuildPlatforms.Defaults()
+		hostName := runtime.GOOS + "/" + runtime.GOARCH
+		if bp, ok := BuildPlatforms.Get(hostName); ok {
+			platforms = BuildPlatformList{bp}
+		} else {
+			platforms = BuildPlatforms.Defaults()
+		}
 	}
 
 	// Filter out unsupported platforms
@@ -1852,7 +1916,10 @@ func (s *Settings) GetPlatforms() BuildPlatformList {
 // GetPackageTypes returns the package types to use.
 // If SelectedPackageTypes is set in the settings, returns that.
 // Otherwise parses from PACKAGES env var.
-// If PACKAGES is empty, returns nil (meaning all package types are selected).
+// If neither is set, returns the host-OS-appropriate default: [TarGz] on
+// Linux/Darwin, [Zip] on Windows. This makes `mage package` produce a single
+// natural artifact for local development; callers that want every package
+// type set PACKAGES explicitly (or pass SelectedPackageTypes).
 func (s *Settings) GetPackageTypes() []PackageType {
 	// Check settings override first
 	if s.SelectedPackageTypes != nil {
@@ -1860,7 +1927,10 @@ func (s *Settings) GetPackageTypes() []PackageType {
 	}
 	// Fall back to env var
 	if s.CrossBuild.Packages == "" {
-		return nil
+		if runtime.GOOS == "windows" {
+			return []PackageType{Zip}
+		}
+		return []PackageType{TarGz}
 	}
 	var types []PackageType
 	for _, pkgtype := range strings.Split(s.CrossBuild.Packages, ",") {
