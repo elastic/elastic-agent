@@ -19,7 +19,7 @@ import (
 func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ...string) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	if ctx == nil {
-		cmd = exec.Command(path, arg...)
+		cmd = exec.Command(path, arg...) //nolint:noctx // ctx is intentionally optional for callers that don't need cancellation
 	} else {
 		cmd = exec.CommandContext(ctx, path, arg...)
 	}
@@ -32,8 +32,8 @@ func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ..
 			// then also kill the children (only supported on linux)
 			Pdeathsig: syscall.SIGKILL,
 			Credential: &syscall.Credential{
-				Uid:         uint32(uid),
-				Gid:         uint32(gid),
+				Uid:         uint32(uid), //nolint:gosec // G115 Conversion from int to uint32 is safe, isInt32 check above guarantees range.
+				Gid:         uint32(gid), //nolint:gosec // G115 Conversion from int to uint32 is safe, isInt32 check above guarantees range.
 				NoSetGroups: true,
 			},
 		}
@@ -52,6 +52,8 @@ func killCmd(proc *os.Process) error {
 	return proc.Kill()
 }
 
-func terminateCmd(proc *os.Process) error {
+// terminateCmd sends SIGTERM to the process.
+// The newConsole parameter is only used on Windows and is ignored here.
+func terminateCmd(proc *os.Process, _ bool) error {
 	return proc.Signal(syscall.SIGTERM)
 }
