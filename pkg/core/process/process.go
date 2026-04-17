@@ -26,6 +26,11 @@ type Info struct {
 	Stdin   io.WriteCloser
 	Stderr  io.ReadCloser
 	Cmd     *exec.Cmd
+
+	// newConsole is set when the process was created with its own console
+	// (via WithNewConsole). On Windows this changes how Stop() delivers
+	// the shutdown signal.
+	newConsole bool
 }
 
 // CmdOption is an option func to change the underlying command
@@ -33,10 +38,11 @@ type CmdOption func(c *exec.Cmd) error
 
 // StartConfig configuration for the process start set by the StartOption functions
 type StartConfig struct {
-	ctx       context.Context
-	uid, gid  int
-	args, env []string
-	cmdOpts   []CmdOption
+	ctx        context.Context
+	uid, gid   int
+	args, env  []string
+	cmdOpts    []CmdOption
+	newConsole bool
 }
 
 // StartOption start options function
@@ -54,7 +60,12 @@ func Start(path string, opts ...StartOption) (proc *Info, err error) {
 		opt(&c)
 	}
 
-	return startContext(c.ctx, path, c.uid, c.gid, c.args, c.env, c.cmdOpts...)
+	info, err := startContext(c.ctx, path, c.uid, c.gid, c.args, c.env, c.cmdOpts...)
+	if err != nil {
+		return nil, err
+	}
+	info.newConsole = c.newConsole
+	return info, nil
 }
 
 // WithContext sets an optional context
@@ -100,7 +111,7 @@ func (i *Info) Kill() error {
 
 // Stop stops the process cleanly.
 func (i *Info) Stop() error {
-	return terminateCmd(i.Process)
+	return terminateCmd(i.Process, i.newConsole)
 }
 
 // StopWait stops the process and waits for it to exit.
@@ -182,7 +193,8 @@ func startContext(ctx context.Context, path string, uid, gid int, args []string,
 	}, err
 }
 
-// Terminate is a utility function to gracefully shutdown a process
+// Terminate is a utility function to gracefully shutdown a process.
+// It uses the direct signal path (no console attachment).
 func Terminate(proc *os.Process) error {
-	return terminateCmd(proc)
+	return terminateCmd(proc, false)
 }
