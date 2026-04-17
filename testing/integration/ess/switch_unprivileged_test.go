@@ -208,7 +208,7 @@ func TestSwitchUnprivilegedWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path in privileged mode
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: true}))
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: true, TargetVersion: define.Version()}))
 
 	// Switch to unprivileged mode
 	out, err = fixture.Exec(ctx, []string{"unprivileged", "-f"})
@@ -218,7 +218,7 @@ func TestSwitchUnprivilegedWithBasePath(t *testing.T) {
 	}
 
 	// Check that Agent is running in the custom base path in unprivileged mode
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: false}))
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: false, TargetVersion: define.Version()}))
 }
 
 func TestSwitchToUnprivilegedDeduplication(t *testing.T) {
