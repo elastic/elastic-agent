@@ -23,6 +23,10 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
+func checkUninstallPlatform(_ *CheckOpts) error {
+	return nil
+}
+
 func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opts *CheckOpts) error {
 	if !opts.Privileged {
 		// Check that the elastic-agent user/group exist.
@@ -96,9 +100,9 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		}
 
 		var output []byte
-		err = waitForNoError(ctx, func(_ context.Context) error {
+		err = waitForNoError(ctx, func(ctx context.Context) error {
 			// #nosec G204 -- user cannot inject any parameters to this command
-			cmd := exec.Command("sudo", "-u", username, shellWrapperName, "status")
+			cmd := exec.CommandContext(ctx, "sudo", "-u", username, shellWrapperName, "status")
 			output, err = cmd.CombinedOutput()
 			if err != nil {
 				return fmt.Errorf("elastic-agent status failed: %w (output: %s)", err, output)
@@ -111,7 +115,7 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		originalUser := os.Getenv("SUDO_USER")
 		if originalUser != "" {
 			// #nosec G204 -- user cannot inject any parameters to this command
-			cmd := exec.Command("sudo", "-u", originalUser, shellWrapperName, "status")
+			cmd := exec.CommandContext(ctx, "sudo", "-u", originalUser, shellWrapperName, "status")
 			output, err := cmd.CombinedOutput()
 			if err == nil {
 				return fmt.Errorf("sudo -u %s elastic-agent didn't fail: got output: %s", originalUser, output)
