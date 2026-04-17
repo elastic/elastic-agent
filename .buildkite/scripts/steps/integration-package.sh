@@ -9,9 +9,12 @@ source .buildkite/scripts/common.sh
 #
 # Making a change here can affect the released images to agentless, so be cautious.
 
-export SNAPSHOT="true"
-export EXTERNAL="true"
-export USE_PACKAGE_VERSION="true"
+export USE_PACKAGE_VERSION="true" # loader sets ManifestURL, Snapshot=true, AgentDropPath from .package-version
 export WINDOWS_NPCAP="true" # build Windows/amd64 with npcap bundled
+# Compile elastic-agent-core from the current checkout. Integration tests
+# (and the agentless release builds) are only meaningful if the core being
+# exercised is the one from this commit; pin CoreSource so a pipeline-level
+# env override cannot silently flip us to manifest-downloaded core.
+export AGENT_CORE_SOURCE=local
 
 mage package

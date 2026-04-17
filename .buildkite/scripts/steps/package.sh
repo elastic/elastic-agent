@@ -7,43 +7,25 @@ source "${_SELF}/../common.sh"
 
 mage clean
 
+# Two modes, matching the pre-unification packageUsingDRA behaviour:
+#   - MANIFEST_URL passed in (real DRA packaging of already-published core):
+#     download the core from the manifest, don't rebuild it.
+#   - MANIFEST_URL not passed in (PR/branch build): compile the core from the
+#     current checkout so packaging breakage in the PR is actually caught.
+#     USE_PACKAGE_VERSION=true causes the settings loader to read
+#     .package-version and set both ManifestURL and Snapshot=true.
 if test -z "${MANIFEST_URL:-}"; then
-  echo "No MANIFEST_URL building core packages"
-
-  # Repo manifest is always SNAPSHOT components, force
-  # building in SNAPSHOT mode.
-  export SNAPSHOT=true
-
-  # We want to use the version from .package-version.
-  # If the version defined in version/version.go is different,
-  # the packaging step will expect artifacts with different names
-  # than what the manifest contains
+  export AGENT_CORE_SOURCE=local
   export USE_PACKAGE_VERSION=true
-
-  # No manifest URL build the the core packages.
-  mage packageAgentCore
-
-  # Set manifest to version in repo so downloadManifest target
-  # can download the needed components. This gets unset before
-  # calling packageUsingDRA, so it uses the core built packages.
-  export MANIFEST_URL=$(jq -r .manifest_url .package-version)
-  _UNSET_MANIFEST_URL=true
-
-  echo "Using MANIFEST_URL from .package-version"
+else
+  export AGENT_CORE_SOURCE=manifest
+  export USE_PACKAGE_VERSION=false
 fi
 
 export AGENT_DROP_PATH=build/elastic-agent-drop
-mkdir -p $AGENT_DROP_PATH
+mkdir -p "$AGENT_DROP_PATH"
 
-mage downloadManifest
-
-if [ "${_UNSET_MANIFEST_URL:-}" = "true" ]; then
-  # Unset before calling packageUsingDRA this will have the target
-  # use the built agent core packages from above
-  unset MANIFEST_URL
-fi
-
-MAGE_TARGETS=("packageUsingDRA")
+MAGE_TARGETS=("package")
 if [ "$FIPS" != "true" ]; then
   # Build helm package only on non-FIPS builds
   MAGE_TARGETS+=("helm:package")
@@ -56,11 +38,11 @@ MAGE_TARGETS+=("fixDRADockerArtifacts")
 mage "${MAGE_TARGETS[@]}"
 
 echo  "+++ Generate dependencies report"
-if test -z "${MANIFEST_URL:-}"; then
-  # Ensure MANIFEST_URL is set. Would become unset above.
-  MANIFEST_URL=$(jq -r .manifest_url .package-version)
-fi
-BEAT_VERSION_FULL=$(curl -s -XGET "${MANIFEST_URL}" |jq '.version' -r )
+# The deps-report step needs the manifest URL at shell level. When the
+# pipeline passed it in, we have it; otherwise read it from .package-version
+# ourselves (mage already did the same internally via USE_PACKAGE_VERSION).
+REPORT_MANIFEST_URL="${MANIFEST_URL:-$(jq -r .manifest_url .package-version)}"
+BEAT_VERSION_FULL=$(curl -s -XGET "${REPORT_MANIFEST_URL}" |jq '.version' -r )
 bash "${_SELF}/../../../dev-tools/dependencies-report"
 mkdir -p build/distributions/reports
 mv dependencies.csv "build/distributions/reports/dependencies-${BEAT_VERSION_FULL}.csv"

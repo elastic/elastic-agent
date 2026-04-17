@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -117,12 +118,14 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithExternalBuild", func(t *testing.T) {
+		// DefaultSettings now has ExternalBuild=true so local `mage package`
+		// works without ceremony; verify the setter can still flip it off.
 		original := DefaultSettings()
 
-		modified := original.WithExternalBuild(true)
+		modified := original.WithExternalBuild(false)
 
-		assert.True(t, modified.Build.ExternalBuild)
-		assert.False(t, original.Build.ExternalBuild)
+		assert.False(t, modified.Build.ExternalBuild)
+		assert.True(t, original.Build.ExternalBuild)
 	})
 
 	t.Run("WithFIPSBuild", func(t *testing.T) {
@@ -349,12 +352,18 @@ func TestSettingsGetPackageTypes(t *testing.T) {
 		assert.Equal(t, []PackageType{TarGz, Zip}, types)
 	})
 
-	t.Run("returns nil when both are empty", func(t *testing.T) {
+	t.Run("returns host-default when both are empty", func(t *testing.T) {
+		// With no explicit types configured, GetPackageTypes returns the
+		// natural artifact for the host OS: Zip on Windows, TarGz elsewhere.
 		s := DefaultSettings()
 
 		types := s.GetPackageTypes()
 
-		assert.Nil(t, types)
+		expected := []PackageType{TarGz}
+		if runtime.GOOS == "windows" {
+			expected = []PackageType{Zip}
+		}
+		assert.Equal(t, expected, types)
 	})
 
 	t.Run("returns all package types when PACKAGES is all", func(t *testing.T) {
@@ -406,11 +415,18 @@ func TestSettingsGetDockerVariants(t *testing.T) {
 }
 
 func TestSettingsIsPackageTypeSelected(t *testing.T) {
-	t.Run("returns true when no types selected", func(t *testing.T) {
+	t.Run("returns true only for host-default when no types selected", func(t *testing.T) {
+		// With no explicit types, the host-default (Zip on Windows, TarGz
+		// elsewhere) is the only selected type.
 		s := DefaultSettings()
 
-		assert.True(t, s.IsPackageTypeSelected(TarGz))
-		assert.True(t, s.IsPackageTypeSelected(Zip))
+		if runtime.GOOS == "windows" {
+			assert.False(t, s.IsPackageTypeSelected(TarGz))
+			assert.True(t, s.IsPackageTypeSelected(Zip))
+		} else {
+			assert.True(t, s.IsPackageTypeSelected(TarGz))
+			assert.False(t, s.IsPackageTypeSelected(Zip))
+		}
 	})
 
 	t.Run("returns true when type is in selected list", func(t *testing.T) {
@@ -687,6 +703,9 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads build settings from env vars", func(t *testing.T) {
+		// Disable the USE_PACKAGE_VERSION default so .package-version does
+		// not override BEAT_VERSION etc. during this test.
+		t.Setenv("USE_PACKAGE_VERSION", "false")
 		t.Setenv("SNAPSHOT", "true")
 		t.Setenv("DEV", "true")
 		t.Setenv("EXTERNAL", "true")
@@ -776,6 +795,9 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads packaging settings from env vars", func(t *testing.T) {
+		// Disable the USE_PACKAGE_VERSION default so .package-version does
+		// not override AGENT_PACKAGE_VERSION / MANIFEST_URL during this test.
+		t.Setenv("USE_PACKAGE_VERSION", "false")
 		t.Setenv("AGENT_PACKAGE_VERSION", "2.0.0")
 		t.Setenv("MANIFEST_URL", "https://manifest.url")
 		t.Setenv("AGENT_DROP_PATH", "/drop/path")
