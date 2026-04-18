@@ -534,7 +534,7 @@ func (Check) Changes() error {
 
 // All runs all the tests.
 func (Test) All() {
-	mg.SerialDeps(Test.Unit)
+	mg.SerialDeps(Test.Unit, Otel.UnitTest)
 }
 
 // Unit runs all the unit tests.
@@ -3802,6 +3802,42 @@ func (Otel) Prepare(ctx context.Context) {
 		deps = append(deps, Otel.OsquerybeatFetchOsqueryDistros, Otel.OsquerybeatCrossBuildExt)
 	}
 	mg.Deps(deps...)
+}
+
+// UnitTest runs unit tests for the internal/edot module.
+func (Otel) UnitTest(ctx context.Context) (err error) {
+	mg.Deps(Prepare.Env, Build.TestBinaries)
+
+	// Save current directory
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Change to internal/edot directory
+	edotDir := filepath.Join(wd, "internal", "edot")
+	if err := os.Chdir(edotDir); err != nil {
+		return fmt.Errorf("failed to change to edot directory: %w", err)
+	}
+
+	// Restore original directory
+	defer func() {
+		if chdirErr := os.Chdir(wd); chdirErr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to restore working directory: %w", chdirErr))
+		}
+	}()
+
+	// Configure test parameters similar to Test.Unit
+	cfg := devtools.SettingsFromContext(ctx)
+	params := devtools.DefaultGoTestUnitArgs(cfg)
+
+	// Adjust output file paths to be relative to the root build directory
+	params.OutputFile = filepath.Join(wd, "build", "TEST-edot.out")
+	params.JUnitReportFile = filepath.Join(wd, "build", "TEST-edot.xml")
+	params.CoverageProfileFile = filepath.Join(wd, "build", "TEST-edot.cov")
+
+	// Run tests using devtools.GoTest (same as Test.Unit)
+	return devtools.GoTest(ctx, params)
 }
 
 type Helm mg.Namespace
