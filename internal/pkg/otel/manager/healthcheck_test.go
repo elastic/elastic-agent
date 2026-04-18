@@ -372,7 +372,7 @@ func TestInjectHealthCheckV2Extension(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "merge into service::extensions failed")
-		assert.Contains(t, err.Error(), "expected []interface{}")
+		assert.Contains(t, err.Error(), "expected list, got string")
 	})
 
 	t.Run("multiple existing extensions preserves order and appends", func(t *testing.T) {
