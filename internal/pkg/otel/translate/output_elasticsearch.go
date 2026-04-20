@@ -136,9 +136,10 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 		"logs_dynamic_pipeline": map[string]any{
 			"enabled": true,
 		},
-		"logs_dynamic_id":         map[string]any{"enabled": true},
-		"include_source_on_error": true,
-		"retry":                   getRetryConfig(escfg),
+		"logs_dynamic_id":          map[string]any{"enabled": true},
+		"include_source_on_error":  true,
+		"retry":                    getRetryConfig(escfg),
+		"suppress_conflict_errors": true,
 	}
 
 	// Compression

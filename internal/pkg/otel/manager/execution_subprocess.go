@@ -318,7 +318,7 @@ func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
 	confMap := map[string]any{
 		"service::telemetry::metrics::readers": metricsReadersList,
 	}
-	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
+	if mergeErr := mergeWithExtensions(conf, confmap.NewFromStringMap(confMap)); mergeErr != nil {
 		return fmt.Errorf("failed to merge config: %w", mergeErr)
 	}
 	return nil
