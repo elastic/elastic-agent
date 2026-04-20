@@ -137,7 +137,7 @@ share similar leavers as the packaging process.
 
  - `INSTANCE_PROVISIONER`: Sets the provisioner used to create
    instances, possible values are:
-     - `ogc`: Uses OGC to create VMs on GCP, if not set, that's the default.
+     - `gcloud`: Uses the `gcloud` CLI to create VMs on GCP, if not set, that's the default.
      - `multipass`: Uses [Multipass](https://canonical.com/multipass) to
        create local VMs.
      - `kind`: Uses [Kind](https://kind.sigs.k8s.io/) to run Kubernetes
@@ -266,6 +266,14 @@ We pass a `-test.count` flag along with the name match
 ##### Run specific tests
 We pass a `-test.run` flag along with the names of the tests we want to run in OR
 `GOTEST_FLAGS="-test.run ^(TestStandaloneUpgrade|TestFleetManagedUpgrade)$" mage integration:test`
+
+#### Selecting specific upgrade versions
+
+By default, upgrade tests read the list of versions from `testing/integration/testdata/.upgrade-test-agent-versions.yml`. When developing or debugging upgrade tests it's useful to limit to specific versions using the `TEST_UPGRADE_VERSIONS` environment variable.
+This variable takes a comma-separated list of versions and is passed to the remote test runner.
+
+- `TEST_UPGRADE_VERSIONS="9.3.1" mage integration:single TestStandaloneUpgrade` to test upgrading from `9.3.1` only.
+- `TEST_UPGRADE_VERSIONS="9.3.1,9.2.6" mage integration:single TestStandaloneUpgrade` to test upgrading from `9.3.1` and `9.2.6`.
 
 ##### Run Serverless tests
 The test framework includes a smoke test suite to check elastic-agent in a serverless environment. The suite can be run via the `integration:TestServerless` mage target.
@@ -401,7 +409,7 @@ where:
 - `integration:listInstances` lists all VMs and their connection
   command in a human readable table. It also lists the URL for the
   VM page on GCP, which is helpful to verify if the VM still exists
-  (OGC VMs are automatically deleted)
+  (GCE VMs are automatically deleted)
 - `integration:printState` is a shortcut for running the two commands
   above.
 
@@ -536,7 +544,7 @@ be flaky.
 ## Alternative Providers
 
 ### Multipass Instance Provisioner
-By default the integration testing suite uses OGC with GKE to provision instances. In the case that you
+By default the integration testing suite uses the `gcloud` CLI to provision GCE instances. In the case that you
 want to use a local VM instead of a remote VM, you can use the [Multipass](https://multipass.run/) provisioner.
 
 - `INSTANCE_PROVISIONER="multipass" mage integration:test`
@@ -579,8 +587,8 @@ that can break future runs.
 Run `mage integration:clean` before running `mage integration:test` to ensure the tests are
 being run with fresh instances and stack.
 
-### OGC-related errors
-If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then
+### Provisioner-related errors
+If you encounter any errors during instance provisioning, try running `mage integration:clean` and then
 re-running whatever `mage integration:*` target you were trying to run originally when you
 encountered the error.
 
