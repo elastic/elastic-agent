@@ -21,7 +21,6 @@ steps:
     steps:
     steps:
       - label: "Unit tests - Windows 10 - {{matrix}}"
-        key: "unit-tests-win10"
         command: .buildkite/scripts/steps/unit-tests.ps1
         agents:
           provider: "azure"
@@ -36,7 +35,6 @@ steps:
           - "Standard_D8s_v5"
 
       - label: "Unit tests - Windows 10 - {{matrix}} disk 256"
-        key: "unit-tests-win10"
         command: .buildkite/scripts/steps/unit-tests.ps1
         agents:
           provider: "azure"
