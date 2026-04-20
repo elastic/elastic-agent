@@ -9,10 +9,10 @@ env:
   IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1776432347"
   IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1776432347"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1776432347"
-  #IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1776432347"
-  #IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1776432347"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
+  IMAGE_WIN_10_VERSION: "1.0.1776432347"
+  IMAGE_WIN_11_VERSION: "1.0.1776432347"
 
 steps:
   - label: "check-ci"
@@ -199,7 +199,7 @@ steps:
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_10}"
-          vm_size: "Standard_D4s_v6"
+          imageVersion: "${IMAGE_WIN_10_VERSION}"
         retry:
           automatic:
             limit: 1
@@ -217,6 +217,7 @@ steps:
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_11}"
+          imageVersion: "${IMAGE_WIN_11_VERSION}"
         retry:
           automatic:
             limit: 1

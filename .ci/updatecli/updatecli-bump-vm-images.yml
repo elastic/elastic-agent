@@ -50,7 +50,7 @@ conditions:
 #       to include the new file for the approval and automatic merge
 targets:
   update-buildkite-pipelines:
-    name: "Update all Buildkite pipeline files"
+    name: "Update all Buildkite pipeline files (GCP/AWS)"
     sourceid: latestVersion
     scmid: githubConfig
     kind: file
@@ -58,9 +58,25 @@ targets:
       files:
         - .buildkite/pipeline.yml
         - .buildkite/bk.integration.pipeline.yml
-        - .buildkite/integration.pipeline.yml
         - .buildkite/bk.integration-fips.pipeline.yml
+        - .buildkite/integration.pipeline.yml
         - .buildkite/pipeline.elastic-agent-binary-dra.yml
         - .buildkite/pipeline.elastic-agent-package.yml
       matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-(.+)"'
       replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
+
+  update-azure-buildkite-pipelines:
+    name: "Update all Buildkite pipeline files (Azure)"
+    sourceid: latestVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      files:
+        - .buildkite/pipeline.yml
+        - .buildkite/bk.integration.pipeline.yml
+        - .buildkite/bk.integration-fips.pipeline.yml
+        - .buildkite/integration.pipeline.yml
+        - .buildkite/pipeline.elastic-agent-binary-dra.yml
+        - .buildkite/pipeline.elastic-agent-package.yml
+      matchpattern: '(IMAGE_.+): "1.0.(.+)"'
+      replacepattern: '$1: "1.0.{{ source "latestVersion" }}"'
