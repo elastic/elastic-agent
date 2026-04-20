@@ -39,8 +39,8 @@ steps:
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_10}"
-          vm_size: "{{matrix}}"
-          os_disk_size_gb: "256"
+          vmSize: "{{matrix}}"
+          diskSizeGb: "256"
         matrix:
           - "Standard_D2s_v6"
           - "Standard_D4s_v6"
