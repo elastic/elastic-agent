@@ -122,8 +122,6 @@ var gcloudSupported = []LayoutOS{
 	},
 	{
 		OS: define.OS{
-<<<<<<< HEAD:pkg/testing/ogc/supported.go
-=======
 			Type:    define.Linux,
 			Arch:    define.AMD64,
 			Distro:  supported.Rhel,
@@ -138,7 +136,6 @@ var gcloudSupported = []LayoutOS{
 	// Windows
 	{
 		OS: define.OS{
->>>>>>> df534ab07 (Replace OGC with gcloud CLI for integration tests (#13512)):pkg/testing/gcloud/supported.go
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2022",
