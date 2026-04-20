@@ -48,15 +48,15 @@ echo "~~~ Running integration tests"
 
 if [[ "${GROUP_NAME}" == "kubernetes" ]]; then
   source .buildkite/scripts/install-kubectl.sh
-  .buildkite/scripts/buildkite-k8s-integration-tests.sh $@
+  .buildkite/scripts/buildkite-k8s-integration-tests.sh "$@"
 else
   # test binaries are needed only when running integration tests outside of k8s
   echo "~~~ Building test binaries"
   mage build:testBinaries
 
   if [ "$TEST_SUDO" == "true" ]; then
-    sudo -E .buildkite/scripts/buildkite-integration-tests.sh $@
+    sudo -E .buildkite/scripts/buildkite-integration-tests.sh "$@"
   else
-    .buildkite/scripts/buildkite-integration-tests.sh $@
+    .buildkite/scripts/buildkite-integration-tests.sh "$@"
   fi
 fi
