@@ -97,12 +97,12 @@ func EnrollWithBackoff(
 	enrollFn := func() error {
 		return enroll(ctx, log, persistentConfig, client, options, configStore)
 	}
-	err = retryEnroll(err, maxAttempts, log, enrollFn, client.URI(), backExp)
+	err = retryEnroll(ctx, err, maxAttempts, log, enrollFn, client.URI(), backExp)
 
 	return err
 }
 
-func retryEnroll(err error, maxAttempts int, log *logger.Logger, enrollFn func() error, clientURI string, backExp backoff.Backoff) error {
+func retryEnroll(ctx context.Context, err error, maxAttempts int, log *logger.Logger, enrollFn func() error, clientURI string, backExp backoff.Backoff) error {
 	attemptNo := 1
 
 RETRYLOOP:
@@ -120,8 +120,15 @@ RETRYLOOP:
 		case err != nil:
 			log.Warnf("Error detected: %s, will retry in a moment.", err.Error())
 		}
-		if !backExp.Wait() {
-			break RETRYLOOP
+		waitCh := make(chan bool, 1)
+		go func() { waitCh <- backExp.Wait() }()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case ok := <-waitCh:
+			if !ok {
+				break RETRYLOOP
+			}
 		}
 		log.Infof("Retrying enrollment to URL: %s", clientURI)
 		err = enrollFn()
