@@ -8,6 +8,7 @@ package install
 
 import (
 	"fmt"
+	"strings"
 
 	"golang.org/x/sys/windows/svc/mgr"
 
@@ -18,6 +19,38 @@ import (
 // GetDesiredUser retrieves user and group names as configured in a service file
 // on windows it is a no-op
 func GetDesiredUser() (string, string, error) { return "", "", nil }
+
+// GetServiceUsername returns the username configured for the Elastic Agent Windows service.
+// Returns empty string for privileged (LocalSystem) installs.
+func GetServiceUsername() (string, error) {
+	m, err := mgr.Connect()
+	if err != nil {
+		return "", fmt.Errorf("failed to connect to windows service manager: %w", err)
+	}
+	defer func() { _ = m.Disconnect() }()
+
+	serviceName := paths.ServiceName()
+	svc, err := m.OpenService(serviceName)
+	if err != nil {
+		return "", fmt.Errorf("failed to open windows service %q: %w", serviceName, err)
+	}
+	defer svc.Close()
+
+	cfg, err := svc.Config()
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve service config: %w", err)
+	}
+
+	// strip the ".\" prefix that SCM adds to local accounts to return the raw username
+	username := strings.TrimPrefix(cfg.ServiceStartName, `.\`)
+
+	// LocalSystem is the privileged default; return empty to indicate no specific user
+	if username == "LocalSystem" || username == "" {
+		return "", nil
+	}
+
+	return username, nil
+}
 
 func withPassword(password string) serviceOpt {
 	return func(opts *serviceOpts) {
@@ -61,9 +94,9 @@ func changeUser(topPath string, ownership utils.FileOwner, username string, grou
 		return fmt.Errorf("failed to update config from %v: %w", curCfg, err)
 	}
 
-	err = serviceConfigure(ownership)
+	err = configureServicePermissions(ownership)
 	if err != nil {
-		return fmt.Errorf("failed to configure service (%s) from %v: %w", paths.ServiceName(), curCfg, err)
+		return fmt.Errorf("failed to configure service permissions (%s) from %v: %w", paths.ServiceName(), curCfg, err)
 	}
 
 	return nil
