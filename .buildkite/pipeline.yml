@@ -200,6 +200,8 @@ steps:
           provider: "azure"
           image: "${IMAGE_WIN_10}"
           imageVersion: "${IMAGE_WIN_10_VERSION}"
+          vmSize: "Standard_D8s_v5"
+          diskSizeGb: "256"
         retry:
           automatic:
             limit: 1
@@ -218,6 +220,8 @@ steps:
           provider: "azure"
           image: "${IMAGE_WIN_11}"
           imageVersion: "${IMAGE_WIN_11_VERSION}"
+          vmSize: "Standard_D8s_v5"
+          diskSizeGb: "256"
         retry:
           automatic:
             limit: 1
