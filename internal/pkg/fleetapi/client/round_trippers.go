@@ -7,6 +7,7 @@ package client
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
@@ -87,4 +88,27 @@ func (r *ElasticApiVersionRoundTripper) RoundTrip(req *http.Request) (*http.Resp
 
 func NewElasticApiVersionRoundTripper(inner http.RoundTripper, elasticApiVersion string) http.RoundTripper {
 	return &ElasticApiVersionRoundTripper{elasticApiVersion: elasticApiVersion, rt: inner}
+}
+
+// ElasticAgentVersionRoundTripper adds an Elastic-Agent-Version header on every request.
+type ElasticAgentVersionRoundTripper struct {
+	rt      http.RoundTripper
+	version string
+}
+
+const elasticAgentVersionHeaderKey = "Elastic-Agent-Version"
+
+// RoundTrip adds an Elastic-Agent-Version header on every request.
+func (r *ElasticAgentVersionRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set(elasticAgentVersionHeaderKey, r.version)
+
+	return r.rt.RoundTrip(req)
+}
+
+// NewElasticAgentVersionRoundTripper returns a RoundTripper that sets Elastic-Agent-Version on each request.
+func NewElasticAgentVersionRoundTripper(inner http.RoundTripper, version string) http.RoundTripper {
+	if !strings.HasPrefix(version, "v") {
+		version = "v" + version
+	}
+	return &ElasticAgentVersionRoundTripper{rt: inner, version: version}
 }
