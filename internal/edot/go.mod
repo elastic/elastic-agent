@@ -31,7 +31,7 @@ require (
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.149.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.149.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.149.1-0.20260409092011-bc27a1eb9684
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension v0.149.0
@@ -646,7 +646,7 @@ require (
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80 // indirect
 	github.com/twmb/franz-go v1.20.7 // indirect
 	github.com/twmb/franz-go/pkg/kadm v1.17.2 // indirect
-	github.com/twmb/franz-go/pkg/kmsg v1.12.0 // indirect
+	github.com/twmb/franz-go/pkg/kmsg v1.13.1 // indirect
 	github.com/twmb/franz-go/pkg/sasl/kerberos v1.1.0 // indirect
 	github.com/twmb/franz-go/plugin/kzap v1.1.2 // indirect
 	github.com/twmb/murmur3 v1.1.8 // indirect
@@ -710,7 +710,7 @@ require (
 	go.opentelemetry.io/collector/internal/telemetry v0.149.0 // indirect
 	go.opentelemetry.io/collector/pdata v1.55.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/collector/pdata/pprofile v0.149.1-0.20260408002112-999af6320692 // indirect
-	go.opentelemetry.io/collector/pdata/testdata v0.149.0 // indirect
+	go.opentelemetry.io/collector/pdata/testdata v0.149.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/pdata/xpdata v0.149.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/pipeline v1.55.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/pipeline/xpipeline v0.149.1-0.20260408002112-999af6320692 // indirect
