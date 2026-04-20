@@ -11,11 +11,6 @@
 # Both forms produce the same result. Choose whichever is more readable for your use case.
 
 # Filename strategy for generated changelog files.
-# Controls how files created by 'changelog add' are named.
-#   pr        — use the PR number (e.g., 12345.yaml).
-#   issue     — use the issue number (e.g., 67890.yaml).
-#   timestamp — use a Unix timestamp with a title slug (e.g., 1735689600-fix-search.yaml). Default.
-# Can be overridden per invocation with --use-pr-number or --use-issue-number CLI flags.
 filename: timestamp
 
 # Products configuration (optional)
@@ -33,14 +28,10 @@ products:
 # Controls automatic extraction of information from PR descriptions
 extract:
   # Auto-extract release notes from PR descriptions (default: true)
-  # Can be overridden by CLI --no-extract-release-notes
   release_notes: true
   # Auto-extract issues from PR body (default: true)
-  # Looks for patterns like "Fixes #123", "Closes #456", etc.
   issues: true
   # Remove square-bracket prefixes from PR titles (default: false)
-  # When enabled (true or via --strip-title-prefix), titles like "[ES|QL] Fix bug" become "Fix bug".
-  # Can be overridden by CLI --strip-title-prefix
   strip_title_prefix: true
 
 # Available lifecycle values (strongly typed: preview, beta, ga)
@@ -85,38 +76,52 @@ pivot:
     regression: "regression"
     security:
 
+  # Labels that trigger the highlight flag (accepts string or list)
+  # String form: highlight: ">highlight, >release-highlight"
+  # List form:
+  # highlight:
+  #   - ">highlight"
+  #   - ">release-highlight"
+
   # Area definitions with labels
-  # Keys are area display names, values are label strings
-  # Multiple labels can be comma-separated
+  # Keys are area display names (can contain commas), values are label strings or lists
+  # Each label maps to exactly one area.
+  # String form: "label1, label2" | List form: [label1, label2]
+  # To map one label to multiple areas, repeat the label under each area name.
   # areas:
     # Example mappings - customize based on your label naming conventions
     # Autoscaling: ":Distributed Coordination/Autoscaling"
     # Search: ":Search/Search"
     # Security: ":Security/Security"
     # Watcher: ":Data Management/Watcher"
+    # To map a label to multiple areas (e.g., "Team:Search" to both "Search" and "Observability"):
+    # Search:
+    #   - ":Search/Search"
+    #   - "Team:Search"
+    # Observability:
+    #   - "Team:Search"
+    # List form example:
+    # Search:
+    #   - ":Search/Search"
+    #   - ":Search/Ranking"
+
+  # Product definitions with labels (optional).
+  # products:
+  #   'elasticsearch':
+  #     - ":stack/elasticsearch"
 
 # Rules configuration — controls which PRs create changelogs and which changelogs are published.
 # All list-like fields (exclude, include, exclude_types) accept BOTH forms:
 #   - Comma-separated string: "value1, value2, value3"
 #   - YAML list: [value1, value2, value3]
 #
-# For details and examples, refer to the [rules documentation](https://github.com/elastic/docs-builder/blob/main/docs/contribute/changelog.md#rules-for-creation-and-bundling).
+# For details and examples, refer to the [rules documentation](https://github.com/elastic/docs-builder/blob/main/docs/contribute/changelog.md).
 rules:
   # match: any
 
   # Create — controls which PRs generate changelogs.
   create:
     exclude: "skip-changelog, backport"
-  #   # Or equivalently:
-  #   # exclude:
-  #   #   - ">non-issue"
-  #   #   - ">test"
-  #   # match: any
-  #   products:
-  #     'elasticsearch, kibana':
-  #       exclude: ">test"
-  #     'cloud-serverless':
-  #       exclude: "ILM"
 
   # Bundle — filtering applied during 'changelog bundle' and 'changelog gh-release'.
   # See docs/contribute/changelog.md → "Bundle rule modes" for Mode 1 / 2 / 3 behavior.
@@ -155,27 +160,6 @@ rules:
   #       exclude_types: ["docs"]
 
 # Bundle configuration (profiles and defaults)
-# bundle:
-  # Input directory containing changelog YAML files
-  # directory: docs/changelog
-  # Output directory for bundled changelog files
-  # output_directory: docs/releases
-  # Whether to resolve (copy contents) by default
-  # resolve: true
-
-  # Named bundle profiles for different release scenarios
-  # profiles:
-    # Example: Elasticsearch release profile
-    # elasticsearch-release:
-    #   products: "elasticsearch {version} {lifecycle}"
-    #   output: "elasticsearch-{version}.yaml"
-
-    # Example: Serverless release profile
-    # serverless-release:
-    #   products: "cloud-serverless {version} *"
-    #   output: "serverless-{version}.yaml"
-
-# Bundle configuration (profiles and defaults)
 bundle:
   # Input directory containing changelog YAML files
   directory: changelog/fragments
@@ -200,6 +184,8 @@ bundle:
   repo: elastic-agent
   # Optional: default GitHub owner applied to all profiles that do not specify their own.
   owner: elastic
+  # Optional: control auto-population of release-date for all profiles by default.
+  release_dates: false
 
   # Named bundle profiles for different release scenarios.
   # Profiles can be used with both 'changelog bundle' and 'changelog remove':
@@ -209,45 +195,13 @@ bundle:
   # The 'output', 'output_products', 'repo', 'owner', and 'hide_features' fields are
   # bundle-specific and are ignored for removal.
   profiles:
-    # Example: Elasticsearch release profile (filter by changelog fields)
-    # elasticsearch-release:
-    #   # Filter: which input changelogs to include ({version} and {lifecycle} are substituted at runtime)
-    #   products: "elasticsearch {version} {lifecycle}"
-    #   # Output filename ({version} is substituted at runtime)
-    #   output: "elasticsearch-{version}.yaml"
-    #   # Optional: override the products array written to the bundle output.
-    #   # output_products: "elasticsearch {version}"
-    #   # Optional: profile-specific description (overrides bundle.description)
-    #   # description: |
-    #   #   Elasticsearch {version} includes:
-    #   #   - Performance improvements
-    #   #   - Bug fixes and stability enhancements
-    #   #   
-    #   #   Download the release binaries: https://github.com/{owner}/{repo}/releases/tag/v{version}
     # Example: GitHub release profile (fetches PR list directly from a GitHub release)
     # Use when you want to bundle or remove changelogs based on a published GitHub release.
     # elasticsearch-gh-release:
     #   source: github_release       # Fetch PR list from GitHub release instead of filtering input changelogs
-    #   repo: elasticsearch          # GitHub repository (required if bundle.repo is not set)
-    #   owner: elastic               # GitHub owner (optional; defaults to bundle.owner or "elastic")
     #   output: "elasticsearch-{version}.yaml"
     #   output_products: "elasticsearch {version} {lifecycle}"
-
-    # Example: Serverless release profile (filter by promotion report, PR, or issue list)
-    # serverless-release:
-    #   output: "serverless-{version}.yaml"
-    #   output_products: "cloud-serverless {version}"
-    #   # Optional: profile-specific GitHub repo name (overrides bundle.repo if set).
-    #   # Only needed when this profile's product ID differs from the repository name.
-    #     repo: elasticsearch
-    #     owner: elastic
     #   # Feature IDs to hide when bundling with this profile (accepts string or list)
     #   hide_features:
     #     - feature-flag-1
     #     - feature-flag-2
-
-    # Example: Multi-product profile (Mode 3 rule context = first product alphabetically, e.g. kibana).
-    # For security-only rules, add a separate profile with output_products listing only security.
-    # kibana-security-release:
-    #   output: "kibana-security-{version}.yaml"
-    #   output_products: "kibana {version}, security {version}"
