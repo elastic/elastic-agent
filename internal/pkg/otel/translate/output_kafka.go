@@ -41,6 +41,11 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		requiredAcks = *kConfig.RequiredACKs
 	}
 
+	partitioner, partitionerConfig, err := configurePartitioner(config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error configuring partitioner: %w", err)
+	}
+
 	kafkaExporter := map[string]any{
 		"brokers":          kConfig.Hosts,
 		"client_id":        kConfig.ClientID,
@@ -78,6 +83,9 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		"logs": map[string]any{
 			"topic":    kConfig.Topic,
 			"encoding": "raw",
+		},
+		"record_partitioner": map[string]any{
+			partitioner: partitionerConfig,
 		},
 	}
 
@@ -222,10 +230,7 @@ func getTransformProcessorID(outputName string) otelcomponent.ID {
 
 // log warning for unsupported config
 func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
-
-	if cfg.HasField("partition") {
-		return fmt.Errorf("partition is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("keep_alive") {
+	if cfg.HasField("keep_alive") {
 		return fmt.Errorf("keep_alive is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("headers") {
 		return fmt.Errorf("headers is currently not supported: %w", errors.ErrUnsupported)
@@ -244,4 +249,34 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 	}
 
 	return nil
+}
+
+func configurePartitioner(cfg *config.C) (string, map[string]any, error) {
+	if !cfg.HasField("partition") {
+		return "sticky_key", map[string]any{"hasher": "sarama_compat"}, nil
+	}
+	partitionsCfg, err := cfg.Child("partition", -1)
+	if err != nil {
+		return "", nil, fmt.Errorf("error reading partition config: %w", err)
+	}
+	partitionMap := make(map[string]*config.C)
+	if err := partitionsCfg.Unpack(&partitionMap); err != nil {
+		return "", nil, fmt.Errorf("failed to unpack partition config: %w", err)
+	}
+	if len(partitionMap) > 1 {
+		return "", nil, errors.New("too many partitioners")
+	}
+	// extract partitioner from config
+	var name string
+	for n := range partitionMap {
+		name = n
+	}
+
+	switch name {
+	case "round_robin":
+		return "round_robin", map[string]any{}, nil
+	case "hash":
+		return "sticky_key", map[string]any{"hasher": "sarama_compat"}, nil
+	}
+	return "", nil, fmt.Errorf("partitioner '%s' is not supported", name)
 }

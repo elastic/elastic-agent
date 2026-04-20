@@ -84,8 +84,8 @@ github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/internal/v2 v2.0.0 h1:PTFG
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/internal/v2 v2.0.0/go.mod h1:LRr2FzBTQlONPPa5HREE5+RjSCTXl7BwOvYOaWTqCaI=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/managementgroups/armmanagementgroups v1.0.0 h1:pPvTJ1dY0sA35JOeFq6TsY2xj6Z85Yo23Pj4wCCvu4o=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/managementgroups/armmanagementgroups v1.0.0/go.mod h1:mLfWfj8v3jfWKsL9G4eoBoXVcsqcIUTapmdKy7uGOp0=
-github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.8.0 h1:dKxKBzh+XIEoYNmx/c8HeiwghuRExXf61WmVotWESeA=
-github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.8.0/go.mod h1:kzRLpzzlw6eBUXE7eBw3oqfmKR/kxaHOk4+h9sAe6Yo=
+github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.11.0 h1:Ds0KRF8ggpEGg4Vo42oX1cIt/IfOhHWJBikksZbVxeg=
+github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.11.0/go.mod h1:jj6P8ybImR+5topJ+eH6fgcemSFBmU6/6bFF8KkwuDI=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4 v4.3.0 h1:bXwSugBiSbgtz7rOtbfGf+woewp4f06orW9OP5BjHLA=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4 v4.3.0/go.mod h1:Y/HgrePTmGy9HjdSGTqZNa+apUpTVIEVKXJyARP2lrk=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 h1:Dd+RhdJn0OTtVGaeDLZpcumkIVCtA/3/Fo42+eoYvVM=
@@ -781,8 +781,8 @@ github.com/gomodule/redigo v1.9.3/go.mod h1:KsU3hiK/Ay8U42qpaJk+kuNa3C+spxapWpM+
 github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
 github.com/google/btree v1.1.3 h1:CVpQJjYgC4VbzxeGVHfvZrv1ctoYCAI8vbl07Fcxlyg=
 github.com/google/btree v1.1.3/go.mod h1:qOPhT0dTNdNzV6Z/lhRX0YXUafgPLFUh+gZMl761Gm4=
-github.com/google/cel-go v0.27.0 h1:e7ih85+4qVrBuqQWTW4FKSqZYokVuc3HnhH5keboFTo=
-github.com/google/cel-go v0.27.0/go.mod h1:tTJ11FWqnhw5KKpnWpvW9CJC3Y9GK4EIS0WXnBbebzw=
+github.com/google/cel-go v0.28.0 h1:KjSWstCpz/MN5t4a8gnGJNIYUsJRpdi/r97xWDphIQc=
+github.com/google/cel-go v0.28.0/go.mod h1:X0bD6iVNR8pkROSOoHVdgTkzmRcosof7WQqCD6wcMc8=
 github.com/google/flatbuffers v25.2.10+incompatible h1:F3vclr7C3HpB1k9mxCGRMXq6FdUalZ6H/pNX4FP1v0Q=
 github.com/google/flatbuffers v25.2.10+incompatible/go.mod h1:1AeVuKshWv4vARoZatz6mlQ0JxURH0Kv5+zNeJKJCa8=
 github.com/google/gnostic-models v0.7.0 h1:qwTtogB15McXDaNqTZdzPJRHvaVJlAl+HVQnLmJEJxo=
@@ -1183,8 +1183,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearch
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.149.1-0.20260409063637-ffa805c75b6a/go.mod h1:6g7lGCWZKRsiYNEdZ8SOnsmDYEuwvuuxNz9kWMjy7t8=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.149.0 h1:cxT+JSpkyTFKX+xAxnN+InJl98AgSopiEaS2Ba8f/E4=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.149.0/go.mod h1:hmSNrl2L1ZSBQ7yHDbdNKuKfVKT5SwJdScHOrHbS33Y=
-github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.149.0 h1:xhj+22V8vPhJ3C2qx5y+RSDLieSvoSvQyXFEt9lKMdI=
-github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.149.0/go.mod h1:zak14OEiOUd+394fVBTgr/cbVgLnGGGAg8G7fPgLb7Q=
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.149.1-0.20260409092011-bc27a1eb9684 h1:Y6LHc6Z2YBUCjCocye7PUywBOaewxlU2c2bMYLlSQMs=
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.149.1-0.20260409092011-bc27a1eb9684/go.mod h1:TZKqVsC9DhWUAgULDI+8jro0neujjUsFU64GId04lBk=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.149.0 h1:24qKDKNcSWvT73tJR3qaUaQ/Y95uE5VNAMARsYoAS5A=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.149.0/go.mod h1:+BrQozweVeErO89PD79ZqNzzKPKfgAM4pSv8RvLcvSM=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter v0.149.0 h1:rTIL0dk9Fb9cGSgZm7tpUnPi6FIjMKUFIY6ckWoFr94=
@@ -1631,8 +1631,8 @@ github.com/twmb/franz-go/pkg/kadm v1.17.2/go.mod h1:ST55zUB+sUS+0y+GcKY/Tf1XxgVi
 github.com/twmb/franz-go/pkg/kfake v0.0.0-20251021233722-4ca18825d8c0 h1:2ldj0Fktzd8IhnSZWyCnz/xulcW7zGvTLMOXTDqm7wA=
 github.com/twmb/franz-go/pkg/kfake v0.0.0-20251021233722-4ca18825d8c0/go.mod h1:UmQGDzMTYkAMr3CtNNYz1n0bD6KBI+cSnfQx70vP+c8=
 github.com/twmb/franz-go/pkg/kmsg v1.2.0/go.mod h1:SxG/xJKhgPu25SamAq0rrucfp7lbzCpEXOC+vH/ELrY=
-github.com/twmb/franz-go/pkg/kmsg v1.12.0 h1:CbatD7ers1KzDNgJqPbKOq0Bz/WLBdsTH75wgzeVaPc=
-github.com/twmb/franz-go/pkg/kmsg v1.12.0/go.mod h1:+DPt4NC8RmI6hqb8G09+3giKObE6uD2Eya6CfqBpeJY=
+github.com/twmb/franz-go/pkg/kmsg v1.13.1 h1:fG5kItwysTk5UXqVwb64EpQEy3TydF3vYYK21nUQ+bI=
+github.com/twmb/franz-go/pkg/kmsg v1.13.1/go.mod h1:+DPt4NC8RmI6hqb8G09+3giKObE6uD2Eya6CfqBpeJY=
 github.com/twmb/franz-go/pkg/sasl/kerberos v1.1.0 h1:alKdbddkPw3rDh+AwmUEwh6HNYgTvDSFIe/GWYRR9RM=
 github.com/twmb/franz-go/pkg/sasl/kerberos v1.1.0/go.mod h1:k8BoBjyUbFj34f0rRbn+Ky12sZFAPbmShrg0karAIMo=
 github.com/twmb/franz-go/plugin/kzap v1.1.2 h1:0arX5xJ0soUPX1LlDay6ZZoxuWkWk1lggQ5M/IgRXAE=
@@ -1844,8 +1844,8 @@ go.opentelemetry.io/collector/pdata v1.55.1-0.20260408002112-999af6320692 h1:e4P
 go.opentelemetry.io/collector/pdata v1.55.1-0.20260408002112-999af6320692/go.mod h1:NR252WnN9JxIx/6LBNkOiMzTUeleJ7ZjzuLcMI259dM=
 go.opentelemetry.io/collector/pdata/pprofile v0.149.1-0.20260408002112-999af6320692 h1:Z3LQXiJxaNCjQyDocogn+xz4/A0WUtWHKa4xfU9Js0Y=
 go.opentelemetry.io/collector/pdata/pprofile v0.149.1-0.20260408002112-999af6320692/go.mod h1:LDmtWsP6eZrhNYdYy5U5fMWDiM40X0yVKtl3gFuGKVk=
-go.opentelemetry.io/collector/pdata/testdata v0.149.0 h1:Y9WCJpr9fvpCGmvh6wK0i+QtOn0OyGXnoOkLfq7xtok=
-go.opentelemetry.io/collector/pdata/testdata v0.149.0/go.mod h1:5BscHKM7cy9lzPMpnaIFaTOMI8SI02AsEF4rH3aRJBg=
+go.opentelemetry.io/collector/pdata/testdata v0.149.1-0.20260408002112-999af6320692 h1:8YVE/HLbsqG5UFRiwiMuLZ3ZC7uZXG6CoL/HL7yQ/aU=
+go.opentelemetry.io/collector/pdata/testdata v0.149.1-0.20260408002112-999af6320692/go.mod h1:ds1XwPG5NcpVuNANc+rqlo4xv7VXiG8XqfnZYd0F20U=
 go.opentelemetry.io/collector/pdata/xpdata v0.149.1-0.20260408002112-999af6320692 h1:A0ZZZOg9Xi+lOVrMbttNu012wz25ZnqX+iQKQfGk1rM=
 go.opentelemetry.io/collector/pdata/xpdata v0.149.1-0.20260408002112-999af6320692/go.mod h1:JOksjs6sMdvAfkX6Sp+zI2SUUuk1tcci9TELcN5xVKI=
 go.opentelemetry.io/collector/pipeline v1.55.1-0.20260408002112-999af6320692 h1:3xpJuYkbb/nM2lptHVbuCmNo8/GRbGUFmdKjgojjtbo=

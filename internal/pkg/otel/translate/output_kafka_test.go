@@ -69,6 +69,11 @@ max_message_bytes: 1000000`,
 				"queue_size": 3200,
 			},
 			"timeout": 10 * time.Second,
+			"record_partitioner": map[string]any{
+				"sticky_key": map[string]any{
+					"hasher": "sarama_compat",
+				},
+			},
 		},
 	},
 		{
@@ -126,6 +131,11 @@ max_message_bytes: 1000000`,
 						"mechanism": "PLAIN",
 					},
 				},
+				"record_partitioner": map[string]any{
+					"sticky_key": map[string]any{
+						"hasher": "sarama_compat",
+					},
+				},
 			},
 		},
 		{
@@ -174,6 +184,11 @@ max_message_bytes: 1000000`,
 					"encoding": "raw",
 				},
 				"timeout": 10 * time.Second,
+				"record_partitioner": map[string]any{
+					"sticky_key": map[string]any{
+						"hasher": "sarama_compat",
+					},
+				},
 			},
 		},
 	}
@@ -318,16 +333,6 @@ hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
 topic: static-topic
 ssl:
   ca_sha_256:  sha256
-`,
-		},
-		{
-			"partition is set",
-			`
-hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
-topic: static-topic
-partition: 
-  round_robin: 
-    group_events: 1
 `,
 		},
 	}
