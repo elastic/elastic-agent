@@ -16,7 +16,7 @@ function ess_up() {
       --cluster-name-prefix ea-hosted-it \
       --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$STACK_VERSION\"}" \
       --output-file="${PWD}/cluster-info.json" \
-      --wait 15
+      --wait 30
 
   # Extract the cluster name from the cluster information file
   CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)

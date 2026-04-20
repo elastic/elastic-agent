@@ -15,7 +15,7 @@ function ess_up {
       --cluster-name-prefix ea-hosted-it `
       --parameters="{`"GitOps`":`"true`",`"GitHubRepository`":`"$Env:BUILDKITE_REPO`",`"GitHubCommit`":`"$Env:BUILDKITE_COMMIT`",`"EphemeralCluster`":`"true`",`"StackVersion`":`"$StackVersion`"}" `
       --output-file="cluster-info.json" `
-      --wait 15
+      --wait 30
 
   $ClusterName = (Get-Content -Path "cluster-info.json" | ConvertFrom-Json).ClusterName
   if (-not $ClusterName) {
