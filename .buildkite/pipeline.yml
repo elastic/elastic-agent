@@ -217,7 +217,6 @@ steps:
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_11}"
-          vm_size: "Standard_D4s_v6"
         retry:
           automatic:
             limit: 1
