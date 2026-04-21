@@ -120,6 +120,8 @@ RETRYLOOP:
 		case err != nil:
 			log.Warnf("Error detected: %s, will retry in a moment.", err.Error())
 		}
+		// Context cancellation should be able to interrupt the exponential backoff wait,
+		// otherwise the loop keeps sleeping after context is canceled
 		waitCh := make(chan bool, 1)
 		go func() { waitCh <- backExp.Wait() }()
 		select {
