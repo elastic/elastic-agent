@@ -32,11 +32,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-<<<<<<< HEAD
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
-=======
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
->>>>>>> 307544376 (Correctly merge component and collector extensions (#13639))
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -1319,11 +1316,6 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 	paths.SetTop(tempTopPath)
 	t.Cleanup(func() { paths.SetTop(topPath) })
 
-	m := &OTelManager{
-		healthCheckExtComponentID: "healthcheckv2/test",
-		collectorMetricsPort:      0,
-	}
-
 	agentInfo := &info.AgentInfo{}
 	monitoringGetter := translate.BeatMonitoringConfigGetter(func(_, _ string) map[string]any { return nil })
 
@@ -1353,10 +1345,9 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 		ID:             "filestream-default",
 		InputType:      "filestream",
 		OutputType:     "elasticsearch",
-		OutputName:     "default",
 		RuntimeManager: component.OtelRuntimeManager,
 		InputSpec: &component.InputRuntimeSpec{
-			BinaryName: "elastic-otel-collector",
+			BinaryName: "agentbeat",
 			Spec: component.InputSpec{
 				Command: &component.CommandSpec{
 					Args: []string{"filebeat"},
@@ -1404,7 +1395,7 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 		components:   []component.Component{comp},
 	}
 
-	result, err := m.buildMergedConfig(cfgUpdate, agentInfo, monitoringGetter, logp.NewNopLogger())
+	result, err := buildMergedConfig(cfgUpdate, agentInfo, monitoringGetter, logp.NewNopLogger())
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -1429,11 +1420,6 @@ func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
 	tempTopPath := t.TempDir()
 	paths.SetTop(tempTopPath)
 	t.Cleanup(func() { paths.SetTop(topPath) })
-
-	m := &OTelManager{
-		healthCheckExtComponentID: "healthcheckv2/test",
-		collectorMetricsPort:      0,
-	}
 
 	collectorCfg := confmap.NewFromStringMap(map[string]any{
 		"extensions": map[string]any{
@@ -1461,7 +1447,7 @@ func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
 		// No components: componentOtelCfg will be nil.
 	}
 
-	result, err := m.buildMergedConfig(cfgUpdate, &info.AgentInfo{}, nil, logp.NewNopLogger())
+	result, err := buildMergedConfig(cfgUpdate, &info.AgentInfo{}, nil, logp.NewNopLogger())
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
