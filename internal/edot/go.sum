@@ -1245,8 +1245,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sinventory 
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sinventory v0.149.0/go.mod h1:hmkahc7KM76FLpDuN4B2pnoNyyZ86g3sZoFNqQBNlCY=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sleaderelectortest v0.149.0 h1:LsexpA6UwUss/SbAz3MiLGnUyFtqAGKMS1rrs8i8970=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sleaderelectortest v0.149.0/go.mod h1:euPw6LzHK5i22TK5FRDT9qLCjuMHUY+s3Fj53t7h1Kg=
-github.com/open-telemetry/opentelemetry-collector-contrib/internal/kafka v0.149.0 h1:gFrSFLmpQpTGPBJtv68xNeUYrjZM47SNSaxJ8Nq5TAY=
-github.com/open-telemetry/opentelemetry-collector-contrib/internal/kafka v0.149.0/go.mod h1:n7c4VbmClNqeAqONgTbAsVPiGjn4MWu0x7CSjP6UHHc=
+github.com/open-telemetry/opentelemetry-collector-contrib/internal/kafka v0.149.1-0.20260409092011-bc27a1eb9684 h1:jE8UaczPQw3NoXchVSXqZS6P1NO5SF3Sg0PON8+1itE=
+github.com/open-telemetry/opentelemetry-collector-contrib/internal/kafka v0.149.1-0.20260409092011-bc27a1eb9684/go.mod h1:/D4pCdbmTwZdJvvUmL4XThphyIZ4FUcc8mjpaVXP/SY=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/kubelet v0.149.0 h1:/OAdYRS569FnD/pWXPhLjFdqu3Ac66NI3mycQUvKvMI=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/kubelet v0.149.0/go.mod h1:rLYQaJ8ngposje2pWr6r8bBNJjJxjcoWm4IGHPHtFxs=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/metadataproviders v0.149.0 h1:ADq32VBmokMOBMB0hkQR6RUYwjoBSrcUfvX8jli389s=
