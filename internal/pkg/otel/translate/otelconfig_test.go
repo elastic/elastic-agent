@@ -418,6 +418,7 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 
 	expectedBeatMetricConfig := map[string]any{
+		"include_metadata": true,
 		"metricbeat": map[string]any{
 			"modules": []map[string]any{
 				{
@@ -738,6 +739,7 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": map[string]any{
+						"include_metadata": true,
 						"metricbeat": map[string]any{
 							"modules": []map[string]any{
 								{
