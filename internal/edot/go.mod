@@ -5,7 +5,7 @@ go 1.25.9
 // use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
 
-replace github.com/elastic/beats/v7 => ../../beats
+replace github.com/elastic/beats/v7 => github.com/VihasMakwana/beats/v7 v7.0.0-20260421183756-2c236ded0c06
 
 // Pin the elasticsearchexporter to a specific commit to include changes from
 // https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47309
@@ -31,7 +31,7 @@ require (
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.149.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.149.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.149.1-0.20260409092011-bc27a1eb9684
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension v0.149.0
@@ -259,7 +259,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/costmanagement/armcostmanagement v1.1.1 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.8.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.11.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4 v4.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.3 // indirect
@@ -467,7 +467,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/gomodule/redigo v1.9.3 // indirect
-	github.com/google/cel-go v0.27.0 // indirect
+	github.com/google/cel-go v0.28.0 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0
@@ -580,7 +580,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/gopsutilenv v0.149.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck v0.149.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.149.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/kafka v0.149.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/kafka v0.149.1-0.20260409092011-bc27a1eb9684 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/kubelet v0.149.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/metadataproviders v0.149.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/pdatautil v0.149.0 // indirect
@@ -646,7 +646,7 @@ require (
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80 // indirect
 	github.com/twmb/franz-go v1.20.7 // indirect
 	github.com/twmb/franz-go/pkg/kadm v1.17.2 // indirect
-	github.com/twmb/franz-go/pkg/kmsg v1.12.0 // indirect
+	github.com/twmb/franz-go/pkg/kmsg v1.13.1 // indirect
 	github.com/twmb/franz-go/pkg/sasl/kerberos v1.1.0 // indirect
 	github.com/twmb/franz-go/plugin/kzap v1.1.2 // indirect
 	github.com/twmb/murmur3 v1.1.8 // indirect
@@ -710,7 +710,7 @@ require (
 	go.opentelemetry.io/collector/internal/telemetry v0.149.0 // indirect
 	go.opentelemetry.io/collector/pdata v1.55.1-0.20260408002112-999af6320692
 	go.opentelemetry.io/collector/pdata/pprofile v0.149.1-0.20260408002112-999af6320692 // indirect
-	go.opentelemetry.io/collector/pdata/testdata v0.149.0 // indirect
+	go.opentelemetry.io/collector/pdata/testdata v0.149.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/pdata/xpdata v0.149.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/pipeline v1.55.1-0.20260408002112-999af6320692 // indirect
 	go.opentelemetry.io/collector/pipeline/xpipeline v0.149.1-0.20260408002112-999af6320692 // indirect

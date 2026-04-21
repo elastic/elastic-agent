@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
+	"github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -623,6 +624,15 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 			// We paste the config as is, without any translation.
 			// The state store extension will pick up relevant settings from it and ignore the rest.
 			extensionCfg[elasticsearchStateStoreExtensionName] = unitConfigMap
+		}
+	} else if exporterType.String() == "kafka" {
+		extensionCfg = map[string]any{}
+		partitioner, ok := unitConfigMap["partition"]
+		if ok {
+			extensionCfg[kafkapartitionerextension.Type.String()] = partitioner
+			exporterConfig["record_partitioner"] = map[string]any{
+				"extension": kafkapartitionerextension.Type.String(),
+			}
 		}
 	}
 
