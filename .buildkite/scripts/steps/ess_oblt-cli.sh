@@ -25,9 +25,11 @@ function ess_up() {
     return 1
   fi
 
-  # Store the cluster name as a meta-data
-  METADATA_PREFIX="${METADATA_PREFIX:-""}"
-  buildkite-agent meta-data set "${METADATA_PREFIX}cluster-name" "${CLUSTER_NAME}"
+  # NOTE: the shared `cluster-name` meta-data is only written by the shared
+  # ess_start_oblt-cli.sh wrapper. Per-step retries must not overwrite it,
+  # otherwise the global cleanup step would destroy the retry's cluster and
+  # leak the shared one. `ess_load_secrets` and `ess_down` read the local
+  # cluster-info.json first, so the retry path doesn't need meta-data.
 
   ess_load_secrets
 }
@@ -65,8 +67,20 @@ function ess_load_secrets() {
   echo "~~~ Loading ESS Stack secrets"
 
   METADATA_PREFIX="${METADATA_PREFIX:-""}"
-  # Get the cluster name from the meta-data
-  CLUSTER_NAME="$(buildkite-agent meta-data get "${METADATA_PREFIX}cluster-name")"
+  local CLUSTER_NAME=""
+
+  # Prefer the local cluster-info.json from this step's own ess_up, so we don't
+  # read secrets from a cluster created by a parallel step (the shared
+  # `cluster-name` meta-data is a global key that any ess_up writer can overwrite).
+  if [ -f "${PWD}/cluster-info.json" ]; then
+    CLUSTER_NAME="$(jq -r '.ClusterName' "${PWD}/cluster-info.json" 2>/dev/null || true)"
+    if [ "${CLUSTER_NAME}" = "null" ]; then
+      CLUSTER_NAME=""
+    fi
+  fi
+  if [ -z "${CLUSTER_NAME}" ]; then
+    CLUSTER_NAME="$(buildkite-agent meta-data get "${METADATA_PREFIX}cluster-name")"
+  fi
 
   # Load the ESS stack secrets
   local secrets_file="secrets.env.sh"

@@ -26,6 +26,15 @@ function ess_up {
       --parameters $params `
       --output-file="cluster-info.json" `
       --wait 30
+  if ($LASTEXITCODE -ne 0) {
+      Write-Error "Error: oblt-cli cluster create custom failed (exit=$LASTEXITCODE)"
+      return 1
+  }
+
+  if (-not (Test-Path "cluster-info.json")) {
+      Write-Error "Error: cluster-info.json was not created by oblt-cli"
+      return 1
+  }
 
   $ClusterName = (Get-Content -Path "cluster-info.json" | ConvertFrom-Json).ClusterName
   if (-not $ClusterName) {
@@ -33,8 +42,11 @@ function ess_up {
       return 1
   }
 
-  # Store the cluster name as meta-data
-  & buildkite-agent meta-data set cluster-name $ClusterName
+  # NOTE: the shared `cluster-name` meta-data is only written by the shared
+  # ess_start_* wrapper. Per-step retries must not overwrite it, otherwise the
+  # global cleanup step would destroy the retry's cluster and leak the shared
+  # one. `ess_load_secrets` and `ess_down` read the local cluster-info.json
+  # first, so the retry path doesn't need meta-data.
 
   ess_load_secrets
 }
@@ -65,32 +77,48 @@ function ess_down {
 }
 
 function ess_load_secrets {
-  Write-Output "~~~ Loading ESS Stack secrets"
+  # Use Write-Host for informational output so callers that capture the return
+  # value (e.g. `$rc = ess_load_secrets`) get a scalar exit code, not an array
+  # of strings from the output stream.
+  Write-Host "~~~ Loading ESS Stack secrets"
 
-  $ClusterName = & buildkite-agent meta-data get cluster-name
+  # Prefer the local cluster-info.json from this step's own ess_up,
+  # so we don't read secrets from a cluster created by a parallel step.
+  $ClusterName = $null
+  if (Test-Path "cluster-info.json") {
+    $ClusterName = (Get-Content -Path "cluster-info.json" | ConvertFrom-Json).ClusterName
+  }
+  if (-not $ClusterName) {
+    $ClusterName = & buildkite-agent meta-data get cluster-name
+  }
   & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file="secrets.env"
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "Error: oblt-cli cluster secrets env failed (exit=$LASTEXITCODE)"
+    return 1
+  }
 
   $envFile = "secrets.env"
-  if (Test-Path $envFile) {
-      Get-Content $envFile | ForEach-Object {
-          if ($_ -match '^export\s+(.+?)=(.+)$') {
-              $name = $matches[1].Trim()
-              $value = $matches[2].Trim('"', "'", ' ')
-              [System.Environment]::SetEnvironmentVariable($name, $value)
-              Write-Output "Set environment variable: $name"
-          } elseif ($_ -match '^(.+?)=(.+)$') {
-              $name = $matches[1].Trim()
-              $value = $matches[2].Trim('"', "'", ' ')
-              [System.Environment]::SetEnvironmentVariable($name, $value)
-              Write-Output "Set environment variable: $name"
-          }
-      }
-      Write-Output "Environment variables loaded successfully from $envFile"
-      Remove-Item -Path $envFile -Force -ErrorAction Stop
-  } else {
+  if (-not (Test-Path $envFile)) {
       Write-Error "secrets.env file not found at $envFile"
       return 1
   }
+
+  Get-Content $envFile | ForEach-Object {
+      if ($_ -match '^export\s+(.+?)=(.+)$') {
+          $name = $matches[1].Trim()
+          $value = $matches[2].Trim('"', "'", ' ')
+          [System.Environment]::SetEnvironmentVariable($name, $value)
+          Write-Host "Set environment variable: $name"
+      } elseif ($_ -match '^(.+?)=(.+)$') {
+          $name = $matches[1].Trim()
+          $value = $matches[2].Trim('"', "'", ' ')
+          [System.Environment]::SetEnvironmentVariable($name, $value)
+          Write-Host "Set environment variable: $name"
+      }
+  }
+  Write-Host "Environment variables loaded successfully from $envFile"
+  Remove-Item -Path $envFile -Force -ErrorAction Stop
+  return 0
 }
 
 function Retry-Command {
