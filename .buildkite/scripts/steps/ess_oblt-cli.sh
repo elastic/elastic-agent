@@ -35,11 +35,30 @@ function ess_up() {
 function ess_down() {
   echo "~~~ Tearing down the ESS Stack"
   METADATA_PREFIX="${METADATA_PREFIX:-""}"
-  # Get the cluster name from the meta-data
-  CLUSTER_NAME="$(buildkite-agent meta-data get "${METADATA_PREFIX}cluster-name")"
+  local CLUSTER_NAME=""
 
-  # Destroy the cluster
-  oblt-cli cluster destroy --cluster-name "${CLUSTER_NAME}" --force
+  # Prefer the local cluster-info.json from this step's own ess_up, so we don't
+  # destroy a cluster created by a parallel step (the shared `cluster-name`
+  # meta-data is a global key that any ess_up writer can overwrite).
+  if [ -f "${PWD}/cluster-info.json" ]; then
+    CLUSTER_NAME="$(jq -r '.ClusterName' "${PWD}/cluster-info.json" 2>/dev/null || true)"
+    if [ "${CLUSTER_NAME}" = "null" ]; then
+      CLUSTER_NAME=""
+    fi
+  fi
+  if [ -z "${CLUSTER_NAME}" ]; then
+    CLUSTER_NAME="$(buildkite-agent meta-data get "${METADATA_PREFIX}cluster-name" 2>/dev/null || true)"
+  fi
+  if [ -z "${CLUSTER_NAME}" ]; then
+    echo "No cluster-name found; nothing to destroy."
+    return 0
+  fi
+
+  # Destroy the cluster. Soft-fail: the cluster is ephemeral and will auto-expire.
+  if ! oblt-cli cluster destroy --cluster-name "${CLUSTER_NAME}" --force; then
+    echo "Warning: failed to destroy cluster '${CLUSTER_NAME}' — ephemeral cluster will auto-expire." >&2
+    return 0
+  fi
 }
 
 function ess_load_secrets() {

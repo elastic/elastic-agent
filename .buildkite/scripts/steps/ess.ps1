@@ -10,10 +10,20 @@ function ess_up {
       return 1
   }
 
+  # Build parameters JSON via ConvertTo-Json so PowerShell's native-command
+  # argument marshalling doesn't mangle the embedded quotes.
+  $params = @{
+      GitOps           = "true"
+      GitHubRepository = $Env:BUILDKITE_REPO
+      GitHubCommit     = $Env:BUILDKITE_COMMIT
+      EphemeralCluster = "true"
+      StackVersion     = $StackVersion
+  } | ConvertTo-Json -Compress
+
   & oblt-cli cluster create custom `
       --template ess-ea-it `
       --cluster-name-prefix ea-hosted-it `
-      --parameters="{`"GitOps`":`"true`",`"GitHubRepository`":`"$Env:BUILDKITE_REPO`",`"GitHubCommit`":`"$Env:BUILDKITE_COMMIT`",`"EphemeralCluster`":`"true`",`"StackVersion`":`"$StackVersion`"}" `
+      --parameters $params `
       --output-file="cluster-info.json" `
       --wait 30
 
@@ -32,10 +42,25 @@ function ess_up {
 function ess_down {
   Write-Output "~~~ Tearing down the ESS Stack"
   try {
-    $ClusterName = & buildkite-agent meta-data get cluster-name
+    # Prefer the local cluster-info.json from this step's own ess_up,
+    # so we don't destroy a cluster created by a parallel step.
+    $ClusterName = $null
+    if (Test-Path "cluster-info.json") {
+      $ClusterName = (Get-Content -Path "cluster-info.json" | ConvertFrom-Json).ClusterName
+    }
+    if (-not $ClusterName) {
+      $ClusterName = & buildkite-agent meta-data get cluster-name 2>$null
+    }
+    if (-not $ClusterName) {
+      Write-Output "No cluster-name found; nothing to destroy."
+      return
+    }
     & oblt-cli cluster destroy --cluster-name "$ClusterName" --force
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "Failed to destroy cluster '$ClusterName' (exit=$LASTEXITCODE) — ephemeral cluster will auto-expire."
+    }
   } catch {
-    Write-Output "Error: Failed to destroy ESS stack(it will be auto-deleted later): $_"
+    Write-Warning "Error during ess_down: $_ — ephemeral cluster will auto-expire."
   }
 }
 
