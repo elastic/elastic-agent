@@ -69,6 +69,7 @@ var (
 func GetOtelConfig(
 	model *component.Model,
 	info info.Agent,
+	runtimeCfg *component.RuntimeConfig,
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
@@ -80,7 +81,7 @@ func GetOtelConfig(
 	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
 	for _, comp := range components {
-		componentConfig, compErr := getCollectorConfigForComponent(comp, info, beatMonitoringConfigGetter, logger)
+		componentConfig, compErr := getCollectorConfigForComponent(comp, info, runtimeCfg, beatMonitoringConfigGetter, logger)
 		if compErr != nil {
 			return nil, compErr
 		}
@@ -174,7 +175,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 
 	// check if the actual configuration is supported. We need to actually generate the config and look for
 	// the right kind of error
-	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, func(unitID, binary string) map[string]any {
+	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, &component.RuntimeConfig{}, func(unitID, binary string) map[string]any {
 		return nil
 	}, logp.NewNopLogger())
 	if errors.Is(compErr, errors.ErrUnsupported) {
@@ -263,6 +264,7 @@ func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
 func getCollectorConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
+	runtimeCfg *component.RuntimeConfig,
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
@@ -275,15 +277,22 @@ func getCollectorConfigForComponent(
 	if err != nil {
 		return nil, err
 	}
-	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig, beatMonitoringConfigGetter)
-	if err != nil {
-		return nil, err
+
+	var intakeQueueID string
+	if runtimeCfg != nil && runtimeCfg.SharedReceiverQueues {
+		// Intake queue ID is arbitrary but needs to be consistent for
+		// receivers with the same output, so just use output name.
+		intakeQueueID = comp.OutputName
 	}
-	pipelineID, err := getPipelineID(comp)
+	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig, intakeQueueID, beatMonitoringConfigGetter)
 	if err != nil {
 		return nil, err
 	}
 
+	pipelineID, err := getPipelineID(comp)
+	if err != nil {
+		return nil, err
+	}
 	pipelineConfig := map[string][]string{
 		"exporters": {exporterID.String()},
 		"receivers": maps.Keys(receiversConfig),
@@ -360,6 +369,7 @@ func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
 	outputQueueConfig map[string]any,
+	intakeQueueID string,
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 ) (map[string]any, error) {
 	receiverType, err := getReceiverTypeForComponent(comp)
@@ -434,6 +444,9 @@ func getReceiversConfigForComponent(
 	// add the output queue config if present
 	if outputQueueConfig != nil {
 		receiverConfig["queue"] = outputQueueConfig
+	}
+	if intakeQueueID != "" {
+		receiverConfig["shared_intake_queue"] = intakeQueueID
 	}
 
 	// add monitoring config if necessary
