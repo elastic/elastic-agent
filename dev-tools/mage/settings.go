@@ -1089,7 +1089,7 @@ type IntegrationTestSettings struct {
 	StackProvisioner string
 
 	// InstanceProvisioner specifies the instance provisioner to use (from INSTANCE_PROVISIONER env var)
-	// Valid values: "ogc", "multipass", "kind"
+	// Valid values: "gcloud", "multipass", "kind"
 	InstanceProvisioner string
 
 	// ESSRegion is the ESS region for testing (from TEST_INTEG_AUTH_ESS_REGION env var)
