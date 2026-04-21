@@ -33,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
@@ -832,7 +833,7 @@ func TestOTelManager_Run(t *testing.T) {
 			}
 			factory, testExec := testExecutionFactory(testBinary, innerFactory)
 
-			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory)
+			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, nil, waitTimeForStop, factory)
 			require.NoError(t, err, "could not create otel manager")
 			m.recoveryTimer = tc.restarter
 			if tc.makeExecFactory != nil {
@@ -904,7 +905,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			factory, _ := testExecutionFactory(testBinary, nil)
-			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory)
+			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, nil, waitTimeForStop, factory)
 			require.NoError(t, err, "could not create otel manager")
 
 			go func() {
@@ -993,6 +994,7 @@ func TestOTelManager_Ports(t *testing.T) {
 				base,
 				&info.AgentInfo{},
 				&agentCollectorConfig,
+				nil,
 				waitTimeForStop,
 				factory,
 			)
@@ -1112,6 +1114,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 		base,
 		&info.AgentInfo{},
 		nil,
+		nil,
 		waitTimeForStop,
 		factory,
 	)
@@ -1191,6 +1194,11 @@ func toSerializableStatus(s *status.AggregateStatus) *serializableStatus {
 	return outputStruct
 }
 
+// Mock function for BeatMonitoringConfigGetter
+func mockBeatMonitoringConfigGetter(unitID, binary string) map[string]any {
+	return map[string]any{"test": "config"}
+}
+
 // Helper function to create test logger
 func newTestLogger() *logger.Logger {
 	l, _ := loggertest.New("test")
@@ -1200,11 +1208,12 @@ func newTestLogger() *logger.Logger {
 func TestOTelManager_buildMergedConfig(t *testing.T) {
 	// Common parameters used across all test cases
 	var (
-		commonAgentInfo     = &info.AgentInfo{}
-		testComp            = testComponent("test-component")
-		invalidLogpLevel    = logp.DebugLevel - 1
-		testOtelConfigLevel = logp.InfoLevel
-		configUpdateLevel   = logp.WarnLevel
+		commonAgentInfo                  = &info.AgentInfo{}
+		commonBeatMonitoringConfigGetter = mockBeatMonitoringConfigGetter
+		testComp                         = testComponent("test-component")
+		invalidLogpLevel                 = logp.DebugLevel - 1
+		testOtelConfigLevel              = logp.InfoLevel
+		configUpdateLevel                = logp.WarnLevel
 	)
 
 	tests := []struct {
@@ -1281,7 +1290,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				healthCheckExtComponentID: "healthcheckv2/test-uuid",
 				collectorMetricsPort:      8888,
 			}
-			result, err := mgr.buildMergedConfig(cfgUpdate, commonAgentInfo, logptest.NewTestingLogger(t, ""))
+			result, err := mgr.buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)
@@ -1310,6 +1319,172 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestBuildMergedConfigPreservesComponentExtensions verifies that
+// service::extensions from the component-generated config are not lost when
+// the user-supplied collector config also defines service::extensions.
+// This is the regression test for the merge-list-overwrite bug described in
+// https://github.com/elastic/elastic-agent/issues/13610.
+func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
+	// Set a temp top path so injectDiagnosticsExtension can compute a valid
+	// socket path without side-effects on the real paths.
+	topPath := paths.Top()
+	tempTopPath := t.TempDir()
+	paths.SetTop(tempTopPath)
+	t.Cleanup(func() { paths.SetTop(topPath) })
+
+	m := &OTelManager{
+		healthCheckExtComponentID: "healthcheckv2/test",
+		collectorMetricsPort:      0,
+	}
+
+	agentInfo := &info.AgentInfo{}
+	monitoringGetter := translate.BeatMonitoringConfigGetter(func(_, _ string) map[string]any { return nil })
+
+	// Component with elasticsearch output: translate.GetOtelConfig always
+	// generates a beatsauth extension for elasticsearch outputs.
+	fileStreamInputConfig := map[string]any{
+		"id":         "test",
+		"use_output": "default",
+		"streams": []any{
+			map[string]any{
+				"id": "test-1",
+				"data_stream": map[string]any{
+					"dataset": "generic-1",
+				},
+				"paths": []any{"/var/log/*.log"},
+			},
+		},
+	}
+	esOutputConfig := map[string]any{
+		"type":     "elasticsearch",
+		"hosts":    []any{"localhost:9200"},
+		"username": "elastic",
+		"password": "password",
+		"preset":   "balanced",
+	}
+	comp := component.Component{
+		ID:             "filestream-default",
+		InputType:      "filestream",
+		OutputType:     "elasticsearch",
+		OutputName:     "default",
+		RuntimeManager: component.OtelRuntimeManager,
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:     "filestream-unit",
+				Type:   client.UnitTypeInput,
+				Config: component.MustExpectedConfig(fileStreamInputConfig),
+			},
+			{
+				ID:     "filestream-default",
+				Type:   client.UnitTypeOutput,
+				Config: component.MustExpectedConfig(esOutputConfig),
+			},
+		},
+	}
+
+	// User-supplied collector config that defines its own service::extensions.
+	collectorCfg := confmap.NewFromStringMap(map[string]any{
+		"extensions": map[string]any{
+			"user_extension": map[string]any{},
+		},
+		"receivers": map[string]any{
+			"nop": map[string]any{},
+		},
+		"exporters": map[string]any{
+			"nop": map[string]any{},
+		},
+		"service": map[string]any{
+			"extensions": []any{"user_extension"},
+			"pipelines": map[string]any{
+				"logs": map[string]any{
+					"receivers": []any{"nop"},
+					"exporters": []any{"nop"},
+				},
+			},
+		},
+	})
+
+	cfgUpdate := configUpdate{
+		collectorCfg: collectorCfg,
+		components:   []component.Component{comp},
+	}
+
+	result, err := m.buildMergedConfig(cfgUpdate, agentInfo, monitoringGetter, logp.NewNopLogger())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	list, err := serviceExtensionsList(result)
+	require.NoError(t, err)
+	require.NotNil(t, list, "service::extensions must be set in the merged config")
+
+	// The component-generated beatsauth extension must survive the merge.
+	assert.Contains(t, list, "beatsauth/_agent-component/default",
+		"component-generated beatsauth extension must be present in merged service::extensions")
+
+	// The user-supplied extension must also be present.
+	assert.Contains(t, list, "user_extension",
+		"user-supplied extension must be present in merged service::extensions")
+}
+
+// TestBuildMergedConfigCollectorOnlyExtensions verifies that when there are no
+// components (and therefore no component-generated extensions), the collector
+// config extensions are still preserved in the merged output.
+func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
+	topPath := paths.Top()
+	tempTopPath := t.TempDir()
+	paths.SetTop(tempTopPath)
+	t.Cleanup(func() { paths.SetTop(topPath) })
+
+	m := &OTelManager{
+		healthCheckExtComponentID: "healthcheckv2/test",
+		collectorMetricsPort:      0,
+	}
+
+	collectorCfg := confmap.NewFromStringMap(map[string]any{
+		"extensions": map[string]any{
+			"user_extension": map[string]any{},
+		},
+		"receivers": map[string]any{
+			"nop": map[string]any{},
+		},
+		"exporters": map[string]any{
+			"nop": map[string]any{},
+		},
+		"service": map[string]any{
+			"extensions": []any{"user_extension"},
+			"pipelines": map[string]any{
+				"logs": map[string]any{
+					"receivers": []any{"nop"},
+					"exporters": []any{"nop"},
+				},
+			},
+		},
+	})
+
+	cfgUpdate := configUpdate{
+		collectorCfg: collectorCfg,
+		// No components: componentOtelCfg will be nil.
+	}
+
+	result, err := m.buildMergedConfig(cfgUpdate, &info.AgentInfo{}, nil, logp.NewNopLogger())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	list, err := serviceExtensionsList(result)
+	require.NoError(t, err)
+	require.NotNil(t, list)
+	assert.Contains(t, list, "user_extension",
+		"collector-config extension must be present in merged service::extensions")
 }
 
 func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
@@ -1567,6 +1742,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	// Setup test logger and dependencies
 	testLogger, _ := loggertest.New("test")
 	agentInfo := &info.AgentInfo{}
+	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
 	configUpdated := make(chan struct{}, 1) // buffered to avoid deadlocks in the mock execution
 
@@ -1585,6 +1761,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		testLogger,
 		agentInfo,
 		nil,
+		beatMonitoringConfigGetter,
 		time.Second,
 		mockFactory,
 	)
@@ -1784,7 +1961,7 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	mockFactory := func(string, string, int) (collectorExecution, error) {
 		return execution, nil
 	}
-	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, time.Second, mockFactory)
+	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, nil, time.Second, mockFactory)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
 
@@ -1849,6 +2026,7 @@ func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
 		collectorLogger,
 		&info.AgentInfo{},
 		nil,
+		nil,
 		time.Second,
 		mockFactory,
 	)
@@ -1889,6 +2067,7 @@ func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
 func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	// Setup test logger and dependencies
 	testLogger, _ := loggertest.New("test")
+	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
 
 	execution := &mockExecution{
@@ -1905,6 +2084,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		testLogger,
 		&info.AgentInfo{},
 		nil,
+		beatMonitoringConfigGetter,
 		time.Second,
 		mockFactory,
 	)
@@ -1986,6 +2166,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 	testLogger, _ := loggertest.New("test")
 	agentInfo := &info.AgentInfo{}
+	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
 
 	execution := &mockExecution{
@@ -2002,6 +2183,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		testLogger,
 		agentInfo,
 		nil,
+		beatMonitoringConfigGetter,
 		time.Second,
 		mockFactory,
 	)
