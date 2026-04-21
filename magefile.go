@@ -98,7 +98,6 @@ const (
 
 	baseURLForSnapshotDRA = "https://snapshots.elastic.co/"
 	baseURLForStagingDRA  = "https://staging.elastic.co/"
-	agentCoreProjectName  = "elastic-agent-core"
 
 	helmChartPath      = "./deploy/helm/elastic-agent"
 	helmOtelChartPath  = "./deploy/helm/edot-collector/kube-stack"
@@ -562,17 +561,18 @@ func Package(ctx context.Context) error {
 		return err
 	}
 
-	var manifestResponse *manifest.Build
-	if cfg.Packaging.PackagingFromManifest {
-		var parsedVersion *version.ParsedSemVer
-		manifestResponse, parsedVersion, err = downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
-		if err != nil {
-			return fmt.Errorf("failed downloading manifest: %w", err)
-		}
-		cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
-		ctx = devtools.ContextWithSettings(ctx, cfg)
-		// we need that dependency to essentially download
-		// the components from the given manifest
+	// manifest is not passed into packageAgent below because we want packageAgent to go through the
+	// flow using the elastic-agent-core that was built above. if it was passed in, it would download
+	// elastic-agent-core from the manifest and it would not be the code from this repository in the package
+	cfgWithManifest, err := cfg.WithManifestInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed downloading manifest: %w", err)
+	}
+	// only take the snapshot and version from the manifest, we don't want the commit hash or dependency version
+	cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithBeatVersion(cfgWithManifest.BeatVersion())
+
+	if cfg.Packaging.ManifestURL != "" {
+		// don't download the elastic-agent-core components; built above
 		if err := downloadManifest(ctx, cfg, pkgSpec); err != nil {
 			return fmt.Errorf("failed downloading manifest components: %w", err)
 		}
@@ -588,7 +588,7 @@ func Package(ctx context.Context) error {
 	// add the snapshot suffix if needed
 	dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
 
-	packageAgent(ctx, cfg, pkgSpec, dependenciesVersion, manifestResponse, getAgentBuildTargets(cfg)...)
+	packageAgent(ctx, cfg, pkgSpec, dependenciesVersion, cfgWithManifest.Packaging.Manifest, getAgentBuildTargets(cfg)...)
 	return nil
 }
 
@@ -614,7 +614,7 @@ func downloadManifest(ctx context.Context, cfg *devtools.Settings, pkgSpecs []de
 		return errNoAgentDropPath
 	}
 
-	if !cfg.Packaging.PackagingFromManifest {
+	if cfg.Packaging.ManifestURL == "" {
 		return errNoManifest
 	}
 
@@ -1477,12 +1477,12 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
 	}
-	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(agentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
+	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(mage.AgentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
 
 	if len(elasticAgentCoreComponents) != 1 {
 		return fmt.Errorf(
 			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q, fips: %v]: %v",
-			agentCoreProjectName,
+			mage.AgentCoreProjectName,
 			cfg.Build.FIPSBuild,
 			elasticAgentCoreComponents,
 		)
@@ -1538,22 +1538,19 @@ func PackageUsingDRA(ctx context.Context) error {
 		return err
 	}
 
-	if !cfg.Packaging.PackagingFromManifest {
+	if cfg.Packaging.ManifestURL == "" {
 		return fmt.Errorf("elastic-agent PackageUsingDRA is expected to build from a manifest. Check that %s is set to a manifest URL", devtools.ManifestUrlEnvVar)
 	}
 
-	manifestResponse, parsedVersion, err := downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
+	cfg, err = cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 
-	// Apply manifest version to config
-	cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
-
 	// fix the commit hash independently of the current commit hash on the branch
-	agentCoreProject, ok := manifestResponse.Projects[agentCoreProjectName]
+	agentCoreProject, ok := cfg.Packaging.Manifest.Projects[mage.AgentCoreProjectName]
 	if !ok {
-		return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, cfg.Packaging.ManifestURL)
+		return fmt.Errorf("%q project not found in manifest %q", mage.AgentCoreProjectName, cfg.Packaging.ManifestURL)
 	}
 	cfg = cfg.WithAgentCommitHashOverride(agentCoreProject.CommitHash)
 	ctx = devtools.ContextWithSettings(ctx, cfg)
@@ -1562,9 +1559,9 @@ func PackageUsingDRA(ctx context.Context) error {
 		ctx,
 		cfg,
 		pkgSpec,
-		parsedVersion.VersionWithPrerelease(),
-		manifestResponse,
-		mg.F(useDRAAgentBinaryForPackage, cfg.Packaging.ManifestURL, parsedVersion.VersionWithPrerelease()),
+		cfg.Build.DependenciesVersion,
+		cfg.Packaging.Manifest,
+		mg.F(useDRAAgentBinaryForPackage, cfg.Packaging.ManifestURL, cfg.Build.DependenciesVersion),
 	)
 }
 
@@ -1727,11 +1724,11 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
 	}
-	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(agentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
+	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(mage.AgentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
 	if len(elasticAgentCoreComponents) != 1 {
 		return fmt.Errorf(
 			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q, fips: %v]: %v",
-			agentCoreProjectName,
+			mage.AgentCoreProjectName,
 			cfg.Build.FIPSBuild,
 			elasticAgentCoreComponents,
 		)
@@ -2102,23 +2099,9 @@ func Ironbank(ctx context.Context) error {
 		return nil
 	}
 	cfg := devtools.SettingsFromContext(ctx)
-	// TODO: centralize the manifest loading logic
-	if cfg.Packaging.ManifestURL != "" { // get the version from the manifest
-		var parsedVersion *version.ParsedSemVer
-		manifestResponse, parsedVersion, err := downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
-		if err != nil {
-			return fmt.Errorf("failed downloading manifest: %w", err)
-		}
-
-		// fix the commit hash independently of the current commit hash on the branch
-		agentCoreProject, ok := manifestResponse.Projects[agentCoreProjectName]
-		if !ok {
-			return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, cfg.Packaging.ManifestURL)
-		}
-		cfg = cfg.WithAgentCommitHashOverride(agentCoreProject.CommitHash)
-
-		// Apply manifest version to config
-		cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
+	cfg, err := cfg.WithManifestInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 	if err := prepareIronbankBuild(cfg); err != nil {
 		return fmt.Errorf("failed to prepare the IronBank context: %w", err)
@@ -4062,22 +4045,17 @@ func (h Helm) Package(ctx context.Context) error {
 	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
 	productionPackage := cfg.Build.SnapshotSet && !cfg.Build.Snapshot
 
-	agentVersion := bversion.GetParsedAgentPackageVersion()
-	agentCoreVersion := agentVersion.CoreVersion()
+	cfg, err := cfg.WithManifestInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed downloading manifest: %w", err)
+	}
+	agentCoreVersion := cfg.BeatVersion()
 	agentImageTag := agentCoreVersion
+	agentChartVersion := agentCoreVersion
 	if !productionPackage {
 		// always use the SNAPSHOT version for image tag if not a production package
-		agentImageTag = agentImageTag + "-SNAPSHOT"
-	}
-
-	agentChartVersion := agentCoreVersion + "-SNAPSHOT"
-	switch {
-	case productionPackage && agentVersion.Major() >= 9:
-		// for 9.0.0 and later versions, elastic-agent Helm chart is GA
-		agentChartVersion = agentCoreVersion
-	case productionPackage && agentVersion.Major() >= 8 && agentVersion.Minor() >= 18:
-		// for 8.18.0 and later versions, elastic-agent Helm chart is GA
-		agentChartVersion = agentCoreVersion
+		agentImageTag = agentImageTag + mage.SnapshotSuffix
+		agentChartVersion = agentChartVersion + mage.SnapshotSuffix
 	}
 
 	for yamlFile, keyVals := range map[string][]struct {
@@ -4110,7 +4088,7 @@ func (h Helm) Package(ctx context.Context) error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
+	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
 		func(format string, v ...interface{}) {})
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
