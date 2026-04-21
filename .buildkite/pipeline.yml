@@ -5,12 +5,14 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1772525581"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1772525581"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1772525581"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1772525581"
-  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1772525581"
-  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1774746107"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1776432347"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1776432347"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1776432347"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1776432347"
+  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
+  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
+  IMAGE_WIN_10_VERSION: "1.0.1776432347"
+  IMAGE_WIN_11_VERSION: "1.0.1776432347"
 
 steps:
   - label: "check-ci"
@@ -148,6 +150,7 @@ steps:
 
   - group: "macOS tests"
     key: "macos-unit-tests"
+    skip: "Incident 2968, Orka 3 upgrade. Unskip after it's resolved."
     steps:
       - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -187,7 +190,6 @@ steps:
     key: "extended-windows"
     steps:
       - label: "Unit tests - Windows 10"
-        skip: "See https://github.com/elastic/elastic-agent/issues/13428"
         key: "unit-tests-win10"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
@@ -196,10 +198,11 @@ steps:
           - "build/diagnostics/*"
           - "coverage-*.out"
         agents:
-          provider: "gcp"
+          provider: "azure"
           image: "${IMAGE_WIN_10}"
-          machineType: "n2-standard-8"
-          disk_type: "pd-ssd"
+          imageVersion: "${IMAGE_WIN_10_VERSION}"
+          vmSize: "Standard_D8s_v5"
+          diskSizeGb: "256"
         retry:
           automatic:
             limit: 1
@@ -215,10 +218,11 @@ steps:
           - "build/diagnostics/*"
           - "coverage-*.out"
         agents:
-          provider: "gcp"
+          provider: "azure"
           image: "${IMAGE_WIN_11}"
-          machineType: "n2-standard-8"
-          disk_type: "pd-ssd"
+          imageVersion: "${IMAGE_WIN_11_VERSION}"
+          vmSize: "Standard_D8s_v5"
+          diskSizeGb: "256"
         retry:
           automatic:
             limit: 1
