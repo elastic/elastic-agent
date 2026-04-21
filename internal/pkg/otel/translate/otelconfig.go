@@ -626,9 +626,9 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 			extensionCfg[elasticsearchStateStoreExtensionName] = unitConfigMap
 		}
 	} else if exporterType.String() == "kafka" {
-		extensionCfg = map[string]any{}
 		partitioner, ok := unitConfigMap["partition"]
 		if ok {
+			extensionCfg = map[string]any{}
 			extensionCfg[kafkapartitionerextension.Type.String()] = partitioner
 			exporterConfig["record_partitioner"] = map[string]any{
 				"extension": kafkapartitionerextension.Type.String(),
