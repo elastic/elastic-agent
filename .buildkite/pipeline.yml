@@ -150,6 +150,7 @@ steps:
 
   - group: "macOS tests"
     key: "macos-unit-tests"
+    skip: "Incident 2968, Orka 3 upgrade. Unskip after it's resolved."
     steps:
       - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
