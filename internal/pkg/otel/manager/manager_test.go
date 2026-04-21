@@ -1383,11 +1383,6 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 	paths.SetTop(tempTopPath)
 	t.Cleanup(func() { paths.SetTop(topPath) })
 
-	m := &OTelManager{
-		healthCheckExtComponentID: "healthcheckv2/test",
-		collectorMetricsPort:      0,
-	}
-
 	agentInfo := &info.AgentInfo{}
 	monitoringGetter := translate.BeatMonitoringConfigGetter(func(_, _ string) map[string]any { return nil })
 
@@ -1468,7 +1463,7 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 		components:   []component.Component{comp},
 	}
 
-	result, err := m.buildMergedConfig(cfgUpdate, agentInfo, monitoringGetter, logp.NewNopLogger())
+	result, err := buildMergedConfig(cfgUpdate, agentInfo, monitoringGetter, logp.NewNopLogger())
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -1493,11 +1488,6 @@ func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
 	tempTopPath := t.TempDir()
 	paths.SetTop(tempTopPath)
 	t.Cleanup(func() { paths.SetTop(topPath) })
-
-	m := &OTelManager{
-		healthCheckExtComponentID: "healthcheckv2/test",
-		collectorMetricsPort:      0,
-	}
 
 	collectorCfg := confmap.NewFromStringMap(map[string]any{
 		"extensions": map[string]any{
@@ -1525,7 +1515,7 @@ func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
 		// No components: componentOtelCfg will be nil.
 	}
 
-	result, err := m.buildMergedConfig(cfgUpdate, &info.AgentInfo{}, nil, logp.NewNopLogger())
+	result, err := buildMergedConfig(cfgUpdate, &info.AgentInfo{}, nil, logp.NewNopLogger())
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
