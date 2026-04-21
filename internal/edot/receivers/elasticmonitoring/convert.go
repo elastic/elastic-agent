@@ -7,6 +7,7 @@ package elasticmonitoring
 import (
 	"strings"
 
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
@@ -165,6 +166,10 @@ func componentIDForScope(scope instrumentation.Scope, kind string) string {
 // agentComponentID extracts the agent component ID from an OTel component ID.
 // OTel component IDs follow the pattern "{type}/_agent-component/{compID}".
 // Returns the compID portion, or empty string if the pattern doesn't match.
+//
+// TODO(blakerouse): move the "_agent-component/" naming convention to a shared module so
+// this package does not duplicate knowledge that originates in the agent's
+// config translation layer.
 func agentComponentID(otelComponentID string) string {
 	const prefix = "_agent-component/"
 	idx := strings.Index(otelComponentID, prefix)
@@ -215,15 +220,15 @@ type componentInputData struct {
 }
 
 // beatTypeFromOtelID extracts the beat type from an OTel component ID.
-// OTel component IDs follow the pattern "{type}[/{rest}]", where {type} is
-// e.g. "filebeatreceiver". The "receiver" suffix is stripped to get the beat
-// type (e.g. "filebeat").
+// It parses the ID using component.ID.UnmarshalText to extract the type
+// portion (e.g. "filebeatreceiver"), then strips the "receiver" suffix to
+// get the beat type (e.g. "filebeat").
 func beatTypeFromOtelID(otelComponentID string) string {
-	typePart := otelComponentID
-	if idx := strings.Index(otelComponentID, "/"); idx >= 0 {
-		typePart = otelComponentID[:idx]
+	var id component.ID
+	if err := id.UnmarshalText([]byte(otelComponentID)); err != nil {
+		return ""
 	}
-	return strings.TrimSuffix(typePart, "receiver")
+	return strings.TrimSuffix(id.Type().String(), "receiver")
 }
 
 // collectComponentInputMetrics iterates all scope metrics and aggregates data

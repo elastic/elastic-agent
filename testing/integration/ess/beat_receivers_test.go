@@ -146,7 +146,8 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	// In OTel mode there is no beat/metrics-monitoring component doing unix-socket scraping,
 	// so per-component beat stats are not written to those datasets. Instead the
 	// elasticmonitoringreceiver collects OTel internal telemetry and emits:
-	//   - exporter-level stats into elastic_agent.elastic_agent (component.id: elasticsearch-monitoring)
+	//   - per-exporter stats into elastic_agent.elastic_agent (component.id varies per exporter;
+	//     the test below checks "elasticsearch-monitoring", the default monitoring exporter)
 	//   - per-receiver pipeline metrics into elastic_agent.elastic_agent (component.id: <receiver component>)
 	otelTests := []test{
 		// logs: identical to classic

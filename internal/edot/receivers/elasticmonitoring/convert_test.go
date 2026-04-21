@@ -17,6 +17,11 @@ import (
 	"github.com/elastic/elastic-agent-libs/mapstr"
 )
 
+const (
+	fbreceiverScopeName = "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
+	mbreceiverScopeName = "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
+)
+
 func esExporterScope(exporterID string) instrumentation.Scope {
 	return instrumentation.Scope{
 		Name: "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter",
@@ -27,9 +32,9 @@ func esExporterScope(exporterID string) instrumentation.Scope {
 	}
 }
 
-func receiverScope(receiverID string) instrumentation.Scope {
+func receiverScope(scopeName string, receiverID string) instrumentation.Scope {
 	return instrumentation.Scope{
-		Name: "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver",
+		Name: scopeName,
 		Attributes: attribute.NewSet(
 			attribute.String(otelComponentKindKey, "receiver"),
 			attribute.String(otelComponentIDKey, receiverID),
@@ -174,7 +179,7 @@ func TestConvertAllMetrics(t *testing.T) {
 
 func TestCollectComponentInputMetrics_Basic(t *testing.T) {
 	sm := metricdata.ScopeMetrics{
-		Scope: receiverScope("filebeatreceiver/_agent-component/filebeat-default"),
+		Scope: receiverScope(fbreceiverScopeName, "filebeatreceiver/_agent-component/filebeat-default"),
 		Metrics: []metricdata.Metrics{
 			gaugeMetricWithAttrs("beat.input.events.published", int64(42),
 				attribute.String(otelInputIDKey, "logs.my-input"),
@@ -194,7 +199,7 @@ func TestCollectComponentInputMetrics_Basic(t *testing.T) {
 
 func TestCollectComponentInputMetrics_WithInputType(t *testing.T) {
 	sm := metricdata.ScopeMetrics{
-		Scope: receiverScope("filebeatreceiver/_agent-component/filebeat-default"),
+		Scope: receiverScope(fbreceiverScopeName, "filebeatreceiver/_agent-component/filebeat-default"),
 		Metrics: []metricdata.Metrics{
 			gaugeMetricWithAttrs("beat.input.events.published", int64(10),
 				attribute.String(otelInputIDKey, "my-input"),
@@ -211,7 +216,7 @@ func TestCollectComponentInputMetrics_WithInputType(t *testing.T) {
 
 func TestCollectComponentInputMetrics_DotInInputID(t *testing.T) {
 	sm := metricdata.ScopeMetrics{
-		Scope: receiverScope("filebeatreceiver/_agent-component/filebeat-default"),
+		Scope: receiverScope(fbreceiverScopeName, "filebeatreceiver/_agent-component/filebeat-default"),
 		Metrics: []metricdata.Metrics{
 			gaugeMetricWithAttrs("some.metric", int64(1),
 				attribute.String(otelInputIDKey, "logs.my-input"),
@@ -228,7 +233,7 @@ func TestCollectComponentInputMetrics_DotInInputID(t *testing.T) {
 
 func TestCollectComponentInputMetrics_NoInputID(t *testing.T) {
 	sm := metricdata.ScopeMetrics{
-		Scope: receiverScope("filebeatreceiver/_agent-component/filebeat-default"),
+		Scope: receiverScope(fbreceiverScopeName, "filebeatreceiver/_agent-component/filebeat-default"),
 		Metrics: []metricdata.Metrics{
 			gaugeMetric("beat.input.events.published", int64(5)),
 		},
@@ -242,7 +247,7 @@ func TestCollectComponentInputMetrics_NoInputID(t *testing.T) {
 
 func TestCollectComponentInputMetrics_MultipleInputsSameComponent(t *testing.T) {
 	sm := metricdata.ScopeMetrics{
-		Scope: receiverScope("filebeatreceiver/_agent-component/filebeat-default"),
+		Scope: receiverScope(fbreceiverScopeName, "filebeatreceiver/_agent-component/filebeat-default"),
 		Metrics: []metricdata.Metrics{
 			sumMetricWithAttrs("beat.input.events.published", int64(7),
 				attribute.String(otelInputIDKey, "input-a"),
@@ -264,7 +269,7 @@ func TestCollectComponentInputMetrics_MultipleInputsSameComponent(t *testing.T) 
 
 func TestCollectComponentInputMetrics_AcrossScopes(t *testing.T) {
 	sm1 := metricdata.ScopeMetrics{
-		Scope: receiverScope("filebeatreceiver/_agent-component/filebeat-default"),
+		Scope: receiverScope(fbreceiverScopeName, "filebeatreceiver/_agent-component/filebeat-default"),
 		Metrics: []metricdata.Metrics{
 			gaugeMetricWithAttrs("metric.one", int64(11),
 				attribute.String(otelInputIDKey, "shared-input"),
@@ -272,7 +277,7 @@ func TestCollectComponentInputMetrics_AcrossScopes(t *testing.T) {
 		},
 	}
 	sm2 := metricdata.ScopeMetrics{
-		Scope: receiverScope("filebeatreceiver/_agent-component/filebeat-default"),
+		Scope: receiverScope(fbreceiverScopeName, "filebeatreceiver/_agent-component/filebeat-default"),
 		Metrics: []metricdata.Metrics{
 			gaugeMetricWithAttrs("metric.two", int64(22),
 				attribute.String(otelInputIDKey, "shared-input"),
@@ -288,7 +293,7 @@ func TestCollectComponentInputMetrics_AcrossScopes(t *testing.T) {
 
 func TestCollectComponentInputMetrics_DifferentComponents(t *testing.T) {
 	sm1 := metricdata.ScopeMetrics{
-		Scope: receiverScope("filebeatreceiver/_agent-component/filebeat-default"),
+		Scope: receiverScope(fbreceiverScopeName, "filebeatreceiver/_agent-component/filebeat-default"),
 		Metrics: []metricdata.Metrics{
 			gaugeMetricWithAttrs("beat.input.events.published", int64(10),
 				attribute.String(otelInputIDKey, "input-fb"),
@@ -296,7 +301,7 @@ func TestCollectComponentInputMetrics_DifferentComponents(t *testing.T) {
 		},
 	}
 	sm2 := metricdata.ScopeMetrics{
-		Scope: receiverScope("metricbeatreceiver/_agent-component/metricbeat-default"),
+		Scope: receiverScope(mbreceiverScopeName, "metricbeatreceiver/_agent-component/metricbeat-default"),
 		Metrics: []metricdata.Metrics{
 			gaugeMetricWithAttrs("beat.input.events.published", int64(20),
 				attribute.String(otelInputIDKey, "input-mb"),

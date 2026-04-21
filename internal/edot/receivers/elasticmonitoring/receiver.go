@@ -132,12 +132,6 @@ func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metri
 	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
 	addMetricsToEventFields(mr.logger, metrics, &beatEvent)
 	_, _ = beatEvent.Put("component.id", componentID)
-	// Any Beat running as an OTel receiver uses the otelconsumer output type by
-	// definition. This is a string label, not a numeric metric, so it cannot
-	// arrive via OTel internal telemetry and must be set statically here. The
-	// Agent Metrics dashboard filters on this value to distinguish OTel-mode
-	// output from classic Elasticsearch output.
-	_, _ = beatEvent.Put("beat.stats.libbeat.output.type", "otelconsumer")
 	mr.sendLogRecord(beatEvent, componentID)
 }
 
