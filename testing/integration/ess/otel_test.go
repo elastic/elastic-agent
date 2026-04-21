@@ -2546,7 +2546,7 @@ service:
 		"beat.stats.libbeat.output.events.acked":          float64(1),
 		"beat.stats.libbeat.output.events.dropped":        float64(0),
 		"beat.stats.libbeat.output.events.batches":        float64(1),
-		"component.id":                                    "elasticsearch/1",
+		"component.id": "elasticsearch/1",
 	}
 
 	require.Empty(t, cmp.Diff(expected, ev), "metrics do not match expected values")
