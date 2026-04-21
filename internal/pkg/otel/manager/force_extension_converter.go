@@ -18,18 +18,21 @@ type forceExtension struct {
 }
 
 func (fe *forceExtension) Convert(_ context.Context, conf *confmap.Conf) error {
-	if conf.IsSet("extensions::" + fe.name) {
-		// already defined by the user, nothing to do
-		return nil
-	}
-	err := mergeWithExtensions(conf, confmap.NewFromStringMap(map[string]interface{}{
-		"extensions": map[string]interface{}{
-			fe.name: fe.config,
-		},
+	// Build the map to merge - always include the extension in service::extensions
+	mergeMap := map[string]interface{}{
 		"service": map[string]interface{}{
 			"extensions": []interface{}{fe.name},
 		},
-	}))
+	}
+
+	// Only set the extension config if not already defined by the user
+	if !conf.IsSet("extensions::" + fe.name) {
+		mergeMap["extensions"] = map[string]interface{}{
+			fe.name: fe.config,
+		}
+	}
+
+	err := mergeWithExtensions(conf, confmap.NewFromStringMap(mergeMap))
 	if err != nil {
 		return fmt.Errorf("failed to force enable %s extension: %w", fe.name, err)
 	}
