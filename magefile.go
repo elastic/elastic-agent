@@ -97,11 +97,7 @@ const (
 	cloudImageTmpl = "docker.elastic.co/observability-ci/elastic-agent:%s"
 
 	baseURLForSnapshotDRA = "https://snapshots.elastic.co/"
-<<<<<<< HEAD
 	baseURLForStagingDRA  = "https://staging.elastic.co/"
-	agentCoreProjectName  = "elastic-agent-core"
-=======
->>>>>>> 61a471fe3 ([mage] Centralize MANIFEST_URL handling (#13629))
 
 	helmChartPath      = "./deploy/helm/elastic-agent"
 	helmOtelChartPath  = "./deploy/helm/edot-collector/kube-stack"
@@ -565,20 +561,6 @@ func Package(ctx context.Context) error {
 		return err
 	}
 
-<<<<<<< HEAD
-	var manifestResponse *manifest.Build
-	if cfg.Packaging.PackagingFromManifest {
-		var parsedVersion *version.ParsedSemVer
-		manifestResponse, parsedVersion, err = downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
-		if err != nil {
-			return fmt.Errorf("failed downloading manifest: %w", err)
-		}
-		cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
-		ctx = devtools.ContextWithSettings(ctx, cfg)
-		// we need that dependency to essentially download
-		// the components from the given manifest
-		if err := downloadManifest(ctx, cfg, pkgSpec); err != nil {
-=======
 	// manifest is not passed into packageAgent below because we want packageAgent to go through the
 	// flow using the elastic-agent-core that was built above. if it was passed in, it would download
 	// elastic-agent-core from the manifest and it would not be the code from this repository in the package
@@ -591,8 +573,7 @@ func Package(ctx context.Context) error {
 
 	if cfg.Packaging.ManifestURL != "" {
 		// don't download the elastic-agent-core components; built above
-		if err := downloadManifest(ctx, cfg, pkgSpec, packaging.WithoutProjectName(mage.AgentCoreProjectName)); err != nil {
->>>>>>> 61a471fe3 ([mage] Centralize MANIFEST_URL handling (#13629))
+		if err := downloadManifest(ctx, cfg, pkgSpec); err != nil {
 			return fmt.Errorf("failed downloading manifest components: %w", err)
 		}
 	}
@@ -607,7 +588,7 @@ func Package(ctx context.Context) error {
 	// add the snapshot suffix if needed
 	dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
 
-	packageAgent(ctx, cfg, pkgSpec, dependenciesVersion, manifestResponse, getAgentBuildTargets(cfg)...)
+	packageAgent(ctx, cfg, pkgSpec, dependenciesVersion, cfgWithManifest.Packaging.Manifest, getAgentBuildTargets(cfg)...)
 	return nil
 }
 
@@ -1557,23 +1538,19 @@ func PackageUsingDRA(ctx context.Context) error {
 		return err
 	}
 
-<<<<<<< HEAD
-	if !cfg.Packaging.PackagingFromManifest {
+	if cfg.Packaging.ManifestURL == "" {
 		return fmt.Errorf("elastic-agent PackageUsingDRA is expected to build from a manifest. Check that %s is set to a manifest URL", devtools.ManifestUrlEnvVar)
 	}
 
-	manifestResponse, parsedVersion, err := downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
+	cfg, err = cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 
-	// Apply manifest version to config
-	cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
-
 	// fix the commit hash independently of the current commit hash on the branch
-	agentCoreProject, ok := manifestResponse.Projects[agentCoreProjectName]
+	agentCoreProject, ok := cfg.Packaging.Manifest.Projects[mage.AgentCoreProjectName]
 	if !ok {
-		return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, cfg.Packaging.ManifestURL)
+		return fmt.Errorf("%q project not found in manifest %q", mage.AgentCoreProjectName, cfg.Packaging.ManifestURL)
 	}
 	cfg = cfg.WithAgentCommitHashOverride(agentCoreProject.CommitHash)
 	ctx = devtools.ContextWithSettings(ctx, cfg)
@@ -1582,9 +1559,9 @@ func PackageUsingDRA(ctx context.Context) error {
 		ctx,
 		cfg,
 		pkgSpec,
-		parsedVersion.VersionWithPrerelease(),
-		manifestResponse,
-		mg.F(useDRAAgentBinaryForPackage, cfg.Packaging.ManifestURL, parsedVersion.VersionWithPrerelease()),
+		cfg.Build.DependenciesVersion,
+		cfg.Packaging.Manifest,
+		mg.F(useDRAAgentBinaryForPackage, cfg.Packaging.ManifestURL, cfg.Build.DependenciesVersion),
 	)
 }
 
@@ -1594,20 +1571,16 @@ func PackageUsingDRA(ctx context.Context) error {
 //	cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
 func downloadManifestAndParseVersion(ctx context.Context, url string) (*manifest.Build, *version.ParsedSemVer, error) {
 	resp, err := manifest.DownloadManifest(ctx, url)
-=======
-	// When MANIFEST_URL is not provided in the environment elastic-agent-core packages from build/distributions
-	// will be used instead of pulling from the manifest.
-	if cfg.Packaging.ManifestURL == "" {
-		fmt.Println("NOTICE: No MANIFEST_URL was provided, using elastic-agent-core packages from build/distributions.")
-	}
-	cfg, err = cfg.WithManifestInfo(ctx)
->>>>>>> 61a471fe3 ([mage] Centralize MANIFEST_URL handling (#13629))
 	if err != nil {
-		return fmt.Errorf("failed downloading manifest: %w", err)
+		return nil, nil, fmt.Errorf("downloading manifest: %w", err)
 	}
-	ctx = devtools.ContextWithSettings(ctx, cfg)
 
-	return packageAgent(ctx, cfg, pkgSpec, cfg.Build.DependenciesVersion, cfg.Packaging.Manifest)
+	parsedVersion, err := version.ParseVersion(resp.Version)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing manifest version %s: %w", resp.Version, err)
+	}
+
+	return &resp, parsedVersion, nil
 }
 
 func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string) (*branchInfo, error) {
