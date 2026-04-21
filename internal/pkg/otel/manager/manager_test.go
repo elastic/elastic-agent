@@ -1078,7 +1078,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	netListen = func(network string, address string) (net.Listener, error) {
 		mx.Lock()
 		defer mx.Unlock()
-		l, err := net.Listen(network, address)
+		l, err := (&net.ListenConfig{}).Listen(t.Context(), network, address)
 		if err != nil {
 			return nil, err
 		}
