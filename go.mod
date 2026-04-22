@@ -4,10 +4,6 @@ go 1.25.9
 
 replace github.com/elastic/beats/v7 => ./beats
 
-// Pin the elasticsearchexporter to a specific commit to include changes from
-// https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47309
-replace github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter => github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.149.1-0.20260409063637-ffa805c75b6a
-
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
 	github.com/Microsoft/go-winio v0.6.2
