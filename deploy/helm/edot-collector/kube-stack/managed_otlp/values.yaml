@@ -308,6 +308,7 @@ collectors:
               - "k8s.pod.ip"
               - "k8s.pod.uid"
               - "k8s.pod.start_time"
+              - "container.id"
               # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
               - "service.name"
               - "service.version"
@@ -485,6 +486,7 @@ collectors:
               - otlp
             processors:
               - batch/metrics
+              - k8sattributes
               - resource/hostname
             exporters:
               - otlp/gateway
@@ -493,6 +495,7 @@ collectors:
               - otlp
             processors:
               - batch
+              - k8sattributes
               - resource/hostname
             exporters:
               - otlp/gateway
@@ -501,6 +504,7 @@ collectors:
               - otlp
             processors:
               - batch
+              - k8sattributes
               - resource/hostname
             exporters:
               - otlp/gateway
