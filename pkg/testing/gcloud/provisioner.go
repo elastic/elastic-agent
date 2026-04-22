@@ -416,6 +416,8 @@ func userLabel() string {
 	name = strings.Trim(name, "-")
 	if len(name) > maxGCEInstanceNameLen {
 		name = name[:maxGCEInstanceNameLen]
+		// Truncation can leave a trailing hyphen; GCE labels can't end with one.
+		name = strings.TrimRight(name, "-")
 	}
 	if name == "" {
 		return "unknown"
