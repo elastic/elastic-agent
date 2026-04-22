@@ -65,16 +65,6 @@ var caFilePath = func(t *testing.T) string {
 	return caFilePath
 }
 
-// type options struct {
-// 	Host                 string
-// 	CACertificate        string
-// 	ClientCert           string
-// 	ClientKey            string
-// 	CATrustedFingerPrint string
-// 	VerificationMode     string
-// 	ProxyURL             string
-// }
-
 // tests mutual TLS
 func TestMTLS(t *testing.T) {
 	// create server certificates

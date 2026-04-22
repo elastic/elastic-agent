@@ -6,6 +6,7 @@ package fleetapi
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -20,6 +21,8 @@ import (
 )
 
 const checkingPath = "/api/fleet/agents/%s/checkin"
+const checkinContentEncodingHeader = "Content-Encoding"
+const checkinContentEncodingGzip = "gzip"
 
 // CheckinUnit provides information about a unit during checkin.
 type CheckinUnit struct {
@@ -96,8 +99,9 @@ func (e *CheckinResponse) Validate() error {
 
 // CheckinCmd is a fleet API command.
 type CheckinCmd struct {
-	client client.Sender
-	info   AgentInfo
+	client      client.Sender
+	info        AgentInfo
+	compression string // "gzip" or "none"
 }
 
 type AgentInfo interface {
@@ -105,10 +109,12 @@ type AgentInfo interface {
 }
 
 // NewCheckinCmd creates a new api command.
-func NewCheckinCmd(info AgentInfo, client client.Sender) *CheckinCmd {
+// compression must be either "gzip" (compress request bodies) or "none" (no compression).
+func NewCheckinCmd(info AgentInfo, client client.Sender, compression string) *CheckinCmd {
 	return &CheckinCmd{
-		client: client,
-		info:   info,
+		client:      client,
+		info:        info,
+		compression: compression,
 	}
 }
 
@@ -126,9 +132,21 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 			errors.TypeUnexpected)
 	}
 
+	requestHeaders := http.Header{}
+	requestBody := bytes.NewBuffer(b)
+	if e.compression == "gzip" {
+		requestBody, err = gzipEncodeCheckinRequestBody(b)
+		if err != nil {
+			return nil, 0, errors.New(err,
+				"fail to gzip encode checkin request",
+				errors.TypeUnexpected)
+		}
+		requestHeaders.Set(checkinContentEncodingHeader, checkinContentEncodingGzip)
+	}
+
 	cp := fmt.Sprintf(checkingPath, e.info.AgentID())
 	sendStart := time.Now()
-	resp, err := e.client.Send(ctx, "POST", cp, nil, nil, bytes.NewBuffer(b))
+	resp, err := e.client.Send(ctx, http.MethodPost, cp, nil, requestHeaders, requestBody)
 	sendDuration := time.Since(sendStart)
 	if err != nil {
 		return nil, sendDuration, errors.New(err,
@@ -162,4 +180,18 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 	}
 
 	return checkinResponse, sendDuration, nil
+}
+
+func gzipEncodeCheckinRequestBody(body []byte) (*bytes.Buffer, error) {
+	compressedBody := bytes.NewBuffer(nil)
+	gzipWriter := gzip.NewWriter(compressedBody)
+	if _, err := gzipWriter.Write(body); err != nil {
+		return nil, err
+	}
+
+	if err := gzipWriter.Close(); err != nil {
+		return nil, err
+	}
+
+	return compressedBody, nil
 }

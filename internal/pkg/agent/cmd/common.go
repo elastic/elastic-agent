@@ -93,10 +93,14 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newOtelCommandWithArgs(args, streams))
 	cmd.AddCommand(newApplyFlavorCommandWithArgs(args, streams))
 
-	// windows special hidden sub-command (only added on Windows)
+	// windows special hidden sub-commands (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)
 	if reexec != nil {
 		cmd.AddCommand(reexec)
+	}
+	windows := newWindowsCommandWithArgs(args, streams)
+	if windows != nil {
+		cmd.AddCommand(windows)
 	}
 	cmd.Run = run.Run
 	cmd.RunE = run.RunE

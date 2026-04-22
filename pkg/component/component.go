@@ -15,6 +15,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -37,11 +38,12 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default       string            `yaml:"default" config:"default" json:"default"`
-	Filebeat      BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Metricbeat    BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
-	DynamicInputs string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
-	Output        map[string]string `yaml:"output" config:"output" json:"output"`
+	Default              string            `yaml:"default" config:"default" json:"default"`
+	Filebeat             BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Metricbeat           BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	DynamicInputs        string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	SharedReceiverQueues bool              `yaml:"shared_receiver_queues" config:"shared_receiver_queues"`
+	Output               map[string]string `yaml:"output" config:"output" json:"output"`
 }
 
 type BeatRuntimeConfig struct {
@@ -54,40 +56,14 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 		Default:       string(DefaultRuntimeManager),
 		DynamicInputs: string(ProcessRuntimeManager),
 		Metricbeat: BeatRuntimeConfig{
-			InputType: map[string]string{
-				"activemq/metrics":      string(OtelRuntimeManager),
-				"apache/metrics":        string(OtelRuntimeManager),
-				"beat/metrics":          string(OtelRuntimeManager),
-				"containerd/metrics":    string(OtelRuntimeManager),
-				"docker/metrics":        string(OtelRuntimeManager),
-				"elasticsearch/metrics": string(OtelRuntimeManager),
-				"etcd/metrics":          string(OtelRuntimeManager),
-				"http/metrics":          string(OtelRuntimeManager),
-				"jolokia/metrics":       string(OtelRuntimeManager),
-				"kafka/metrics":         string(OtelRuntimeManager),
-				"kibana/metrics":        string(OtelRuntimeManager),
-				"linux/metrics":         string(OtelRuntimeManager),
-				"logstash/metrics":      string(OtelRuntimeManager),
-				"memcached/metrics":     string(OtelRuntimeManager),
-				"mongodb/metrics":       string(OtelRuntimeManager),
-				"mysql/metrics":         string(OtelRuntimeManager),
-				"nats/metrics":          string(OtelRuntimeManager),
-				"nginx/metrics":         string(OtelRuntimeManager),
-				"rabbitmq/metrics":      string(OtelRuntimeManager),
-				"sql/metrics":           string(OtelRuntimeManager),
-				"stan/metrics":          string(OtelRuntimeManager),
-				"statsd/metrics":        string(OtelRuntimeManager),
-				"system/metrics":        string(OtelRuntimeManager),
-				"vsphere/metrics":       string(OtelRuntimeManager),
-			},
+			Default:   string(OtelRuntimeManager),
+			InputType: map[string]string{},
 		},
 		Filebeat: BeatRuntimeConfig{
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier
 			InputType: make(map[string]string),
 		},
-		Output: map[string]string{
-			"logstash": string(ProcessRuntimeManager), // Force all inputs using the Logstash output to use the process runtime
-		},
+		Output: map[string]string{},
 	}
 }
 
@@ -117,11 +93,9 @@ func (r *RuntimeConfig) Validate() error {
 				return err
 			}
 		}
-		// workaround for https://github.com/elastic/go-ucfg/issues/215
-		delete(beatConfig.InputType, "default")
 	}
 
-	allowedOutput := []string{"elasticsearch", "logstash"}
+	allowedOutput := []string{"elasticsearch", "logstash", "kafka"}
 	for name, runtime := range r.Output {
 		if !slices.Contains(allowedOutput, name) {
 			return fmt.Errorf("%s output is not supported", name)
@@ -324,6 +298,10 @@ type Component struct {
 	Component *proto.Component `yaml:"component,omitempty"`
 
 	OutputStatusReporting *StatusReporting `yaml:"-"`
+
+	// LastConfiguredAt records when the component was last configured.
+	// It resets whenever a new configuration is applied.
+	LastConfiguredAt time.Time `yaml:"-"`
 }
 
 type StatusReporting struct {
@@ -395,6 +373,17 @@ func (c *Component) BeatName() string {
 		return c.InputSpec.BeatName()
 	}
 	return ""
+}
+
+// OutputUnit returns the first output unit among c.Units, if any.
+// Agent-built components normally have at most one output unit; if several are present, the first is returned.
+func (c *Component) OutputUnit() (Unit, bool) {
+	for _, u := range c.Units {
+		if u.Type == client.UnitTypeOutput {
+			return u, true
+		}
+	}
+	return Unit{}, false
 }
 
 // GetBeatInputIDForUnit returns the ID of the corresponding input or module in the beat configuration for the unit.
@@ -663,6 +652,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
+					LastConfiguredAt:      time.Now(),
 				})
 			}
 		}
@@ -709,6 +699,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
+					LastConfiguredAt:      time.Now(),
 				})
 			}
 		}

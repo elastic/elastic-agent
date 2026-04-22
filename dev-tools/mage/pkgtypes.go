@@ -9,6 +9,8 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -300,7 +302,7 @@ func (typ PackageType) PackagingDir(home string, target BuildPlatform, spec Pack
 }
 
 // Build builds a package based on the provided spec.
-func (typ PackageType) Build(spec PackageSpec) error {
+func (typ PackageType) Build(ctx context.Context, spec PackageSpec) error {
 	switch typ {
 	case RPM:
 		return PackageRPM(spec)
@@ -311,7 +313,7 @@ func (typ PackageType) Build(spec PackageSpec) error {
 	case TarGz:
 		return PackageTarGz(spec)
 	case Docker:
-		return PackageDocker(spec)
+		return PackageDocker(ctx, spec)
 	default:
 		return fmt.Errorf("unknown package type: %v", typ)
 	}
@@ -668,27 +670,15 @@ func PackageTarGz(spec PackageSpec) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err := outFile.Close(); err != nil {
-			log.Printf("failed to close output file: %v", err)
-		}
-	}()
+	defer closeOrLog(outFile, "output file")
 
 	// Create a gzip writer to our output file
 	gzWriter := gzip.NewWriter(outFile)
-	defer func() {
-		if err := gzWriter.Close(); err != nil {
-			log.Printf("failed to close gzip writer: %v", err)
-		}
-	}()
+	defer closeOrLog(gzWriter, "gzip writer")
 
 	// Create a new tar archive.
 	w := tar.NewWriter(gzWriter)
-	defer func() {
-		if err := w.Close(); err != nil {
-			log.Printf("failed to close tar writer: %v", err)
-		}
-	}()
+	defer closeOrLog(w, "tar writer")
 
 	// // Replace the darwin-universal by darwin-x86_64 and darwin-arm64. Also
 	// // keep the other files.
@@ -759,6 +749,14 @@ func PackageTarGz(spec PackageSpec) error {
 		return fmt.Errorf("failed to create .sha512 file: %w", err)
 	}
 	return nil
+}
+
+func closeOrLog(closer io.Closer, what string) {
+	err := closer.Close()
+	if err == nil || errors.Is(err, os.ErrClosed) {
+		return
+	}
+	log.Printf("failed to close %s: %v", what, err)
 }
 
 // PackageDeb packages a deb file. This requires Docker to execute FPM.
@@ -957,7 +955,7 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer closeOrLog(file, "zip input file")
 
 		if _, err = io.Copy(w, file); err != nil {
 			return err
@@ -1040,7 +1038,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer closeOrLog(file, "tar input file")
 
 		if _, err = io.Copy(ar, file); err != nil {
 			return err
@@ -1105,7 +1103,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 }
 
 // PackageDocker packages the Beat into a docker image.
-func PackageDocker(spec PackageSpec) error {
+func PackageDocker(ctx context.Context, spec PackageSpec) error {
 	if err := HaveDocker(); err != nil {
 		return fmt.Errorf("docker daemon required to build images: %w", err)
 	}
@@ -1114,7 +1112,7 @@ func PackageDocker(spec PackageSpec) error {
 	if err != nil {
 		return err
 	}
-	return b.Build()
+	return b.Build(ctx)
 }
 
 func mustConvertToUnit32(i int64) uint32 {
