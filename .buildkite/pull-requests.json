@@ -13,7 +13,11 @@
             "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it|extended))|^/test\\W*(?:extended|)",
             "skip_ci_labels": [ "skip-ci" ],
             "skip_target_branches": [ ],
+<<<<<<< HEAD
             "skip_ci_on_only_changed": [ "^.ci/", "^.github/", "^updatecli-compose.yaml", "^changelog", "^docs/", "\\.md$", "^docker-compose.yml", "^.pre-commit-config.yaml", "skaffold.yaml", "^Dockerfile.skaffold", "^Dockerfile"],
+=======
+            "skip_ci_on_only_changed": [ "^.ci/", "^.github/", "catalog-info.yaml", "^updatecli-compose.yaml", "^changelog", "^docs/", "\\.md$", "^.mergify.yml", "^.pre-commit-config.yaml"],
+>>>>>>> 5249975a9 (chore: remove docker, docker-compose and skaffold dead code and docs (#13741))
             "always_require_ci_on_changed": [ ]
         },
         {
