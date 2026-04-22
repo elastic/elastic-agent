@@ -73,10 +73,10 @@ function ess_down {
     }
     & oblt-cli cluster destroy --cluster-name "$ClusterName" --force
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning "Failed to destroy cluster '$ClusterName' (exit=$LASTEXITCODE) — ephemeral cluster will auto-expire."
+      Write-Warning "Failed to destroy cluster '$ClusterName' (exit=$LASTEXITCODE) - ephemeral cluster will auto-expire."
     }
   } catch {
-    Write-Warning "Error during ess_down: $_ — ephemeral cluster will auto-expire."
+    Write-Warning "Error during ess_down: $_ - ephemeral cluster will auto-expire."
   }
 }
 
@@ -101,7 +101,7 @@ function ess_load_secrets {
   }
 
   # Pipe oblt-cli stdout to Out-Host so it's visible in the BK log but NOT
-  # captured into the function's output stream — otherwise `$rc = ess_load_secrets`
+  # captured into the function's output stream - otherwise `$rc = ess_load_secrets`
   # in the caller would receive an array (oblt-cli output + our `return 0`)
   # instead of a scalar exit code.
   & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file="secrets.env" | Out-Host

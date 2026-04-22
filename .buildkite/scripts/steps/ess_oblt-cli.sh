@@ -58,7 +58,7 @@ function ess_down() {
 
   # Destroy the cluster. Soft-fail: the cluster is ephemeral and will auto-expire.
   if ! oblt-cli cluster destroy --cluster-name "${CLUSTER_NAME}" --force; then
-    echo "Warning: failed to destroy cluster '${CLUSTER_NAME}' — ephemeral cluster will auto-expire." >&2
+    echo "Warning: failed to destroy cluster '${CLUSTER_NAME}' - ephemeral cluster will auto-expire." >&2
     return 0
   fi
 }
