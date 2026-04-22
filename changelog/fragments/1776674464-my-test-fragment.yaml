@@ -13,7 +13,7 @@ kind: enhancement
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Update OTel Collector components to v0.150.0
+summary: Update OTel Collector components to v0.150.0/v1.56.0
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change

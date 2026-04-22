@@ -15,19 +15,19 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.4.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260414175739-e9ec484c5a80
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260421135406-316f03466b55
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.36.0
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
-	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.45.0
-	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.42.0
-	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.42.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.42.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.43.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.42.0
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.42.0
-	github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.42.0
-	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.44.0
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.46.0
+	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.46.0
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.46.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.46.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.46.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.46.0
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.46.0
+	github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.46.0
+	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.46.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector v0.150.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.150.0
@@ -106,7 +106,7 @@ require (
 	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
 	github.com/elastic/go-licenser v0.4.2 // indirect
 	github.com/elastic/go-quark v0.3.0 // indirect
-	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.42.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.46.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/tk-btf v0.2.0 // indirect
 	github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb // indirect
@@ -217,7 +217,7 @@ require (
 	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.56.0
 	go.opentelemetry.io/collector/connector v0.150.0
 	go.opentelemetry.io/collector/exporter v1.56.0
-	go.opentelemetry.io/collector/exporter/debugexporter v0.149.0
+	go.opentelemetry.io/collector/exporter/debugexporter v0.150.0
 	go.opentelemetry.io/collector/exporter/nopexporter v0.149.0
 	go.opentelemetry.io/collector/exporter/otlpexporter v0.150.0
 	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.149.0
@@ -263,7 +263,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/costmanagement/armcostmanagement v1.1.1 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.8.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.11.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4 v4.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.3 // indirect
@@ -391,7 +391,7 @@ require (
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.5.1 // indirect
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
-	github.com/elastic/apm-data v1.19.5 // indirect
+	github.com/elastic/apm-data v1.21.0 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/elastic-agent-autodiscover v0.10.2 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.18.1 // indirect
@@ -414,8 +414,8 @@ require (
 	github.com/elastic/gosigar v0.14.4 // indirect
 	github.com/elastic/lunes v0.2.0 // indirect
 	github.com/elastic/mito v1.25.1 // indirect
-	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.43.0 // indirect
-	github.com/elastic/opentelemetry-lib v0.35.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.46.0 // indirect
+	github.com/elastic/opentelemetry-lib v0.37.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.37.0 // indirect
@@ -471,7 +471,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/gomodule/redigo v1.9.3 // indirect
-	github.com/google/cel-go v0.27.0 // indirect
+	github.com/google/cel-go v0.28.0 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0
