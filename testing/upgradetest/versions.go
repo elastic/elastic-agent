@@ -51,6 +51,12 @@ var (
 	// Version_9_2_0_SNAPSHOT is the minimum version for manual rollback and rollback reason
 	Version_9_2_0_SNAPSHOT = version.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")
 
+	// Version_9_3_0 is the minimum version at which the agent reports available
+	// rollbacks in its Fleet checkin (see elastic-agent PR #11143). Fleet's
+	// rollback API rejects agents whose Fleet document has no stored rollbacks,
+	// so the target of a managed rollback test must be at or above this version.
+	Version_9_3_0 = version.NewParsedSemVer(9, 3, 0, "", "")
+
 	// ErrNoSnapshot is returned when a requested snapshot is not on the version list.
 	ErrNoSnapshot = errors.New("failed to find a snapshot on the version list")
 	// ErrNoPreviousMinor is returned when a requested previous minor is not on the version list.
