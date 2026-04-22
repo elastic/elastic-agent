@@ -2052,19 +2052,22 @@ func (Integration) Clean(ctx context.Context) error {
 	defer os.RemoveAll(".integration-cache")
 
 	_, err := os.Stat(".integration-cache")
-	if err == nil {
-		// .integration-cache exists; need to run `Clean` from the runner
-		cfg := devtools.SettingsFromContext(ctx)
-		r, err := createTestRunner(cfg, false, "", "")
-		if err != nil {
-			return fmt.Errorf("error creating test runner: %w", err)
-		}
-		err = r.Clean()
-		if err != nil {
-			return fmt.Errorf("error running clean: %w", err)
-		}
+	if err != nil {
+		fmt.Println(">>> No .integration-cache found; nothing to clean via the runner (orphaned VMs or stacks will not be touched)")
+		return nil
 	}
+	fmt.Println(">>> Found .integration-cache; running runner.Clean")
 
+	cfg := devtools.SettingsFromContext(ctx)
+	r, err := createTestRunner(cfg, false, "", "")
+	if err != nil {
+		return fmt.Errorf("error creating test runner: %w", err)
+	}
+	err = r.Clean()
+	if err != nil {
+		return fmt.Errorf("error running clean: %w", err)
+	}
+	fmt.Println(">>> runner.Clean completed")
 	return nil
 }
 

@@ -23,20 +23,14 @@ type WindowsRunner struct{}
 
 // Prepare the test
 func (WindowsRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, arch string, goVersion string) error {
-	// install chocolatey
-	logger.Logf("Installing chocolatey")
-	chocoInstall := `"[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"`
-	updateCtx, updateCancel := context.WithTimeout(ctx, 3*time.Minute)
-	defer updateCancel()
-	stdOut, errOut, err := sshRunPowershell(updateCtx, sshClient, chocoInstall)
+	// Chocolatey is installed by the startup script before sshd is restarted, so it should be already on PATH when we connect.
+	verifyCtx, verifyCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer verifyCancel()
+	stdOut, errOut, err := sshClient.Exec(verifyCtx, "choco", []string{"--version"}, nil)
 	if err != nil {
-		return fmt.Errorf("failed to install chocolatey: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
+		return fmt.Errorf("chocolatey not found on host: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
-	// reconnect to get updated environment variables (1 minute as it should be quick to reconnect)
-	err = sshClient.ReconnectWithTimeout(ctx, 1*time.Minute)
-	if err != nil {
-		return fmt.Errorf("failed to reconnect: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
-	}
+	logger.Logf("Found chocolatey: version %s", strings.TrimSpace(string(stdOut)))
 
 	// install curl
 	logger.Logf("Installing curl")
@@ -65,14 +59,20 @@ func (WindowsRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logge
 	if err != nil {
 		return fmt.Errorf("failed to download go from %s with curl: %w (stdout: %s, stderr: %s)", downloadURL, err, stdOut, errOut)
 	}
-	stdOut, errOut, err = sshClient.Exec(ctx, "msiexec", []string{"/i", filename, "/qn"}, nil)
+
+	// The msiexec call returns before Go is actually installed, it just starts a helper process that does the real
+	// work. We wait for the whole process tree so Go is actually installed before we continue.
+	// See https://devblogs.microsoft.com/setup/waiting-for-msiexec-exe-to-finish/
+	installGoCmd := fmt.Sprintf(`"$p = Start-Process -Wait -PassThru -FilePath msiexec.exe -ArgumentList '/i','%s','/qn'; exit $p.ExitCode"`, filename)
+	stdOut, errOut, err = sshRunPowershell(ctx, sshClient, installGoCmd)
 	if err != nil {
 		return fmt.Errorf("failed to install go: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
+
 	// reconnect to get updated environment variables (1 minute as it should be quick to reconnect)
 	err = sshClient.ReconnectWithTimeout(ctx, 1*time.Minute)
 	if err != nil {
-		return fmt.Errorf("failed to reconnect: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
+		return fmt.Errorf("failed to reconnect after go install: %w", err)
 	}
 
 	return nil
