@@ -431,13 +431,13 @@ func TestInstallFailureCleanup(t *testing.T) {
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
-	// Force enrollment to fail by pointing at an unreachable URL.
+	// Force enrollment to fail instantly by pointing to a malformed URL, triggering an install failure.
 	opts := atesting.InstallOpts{
 		Force:      true,
 		Privileged: true,
 		Insecure:   true,
 		EnrollOpts: atesting.EnrollOpts{
-			URL:             "https://127.0.0.1:1",
+			URL:             "http://invalid-url-%",
 			EnrollmentToken: "bogus-enrollment-token",
 		},
 	}
@@ -450,7 +450,8 @@ func TestInstallFailureCleanup(t *testing.T) {
 		Privileged: opts.Privileged,
 		TopPath:    installtest.DefaultTopPath(),
 	}
-	require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	err = installtest.CheckUninstallSuccess(checks)
+	require.NoError(t, err)
 }
 
 // Isolate the tests of --develop (which uses --namespace in it's implementation) into it's own test
