@@ -93,9 +93,18 @@ function ess_load_secrets {
     $ClusterName = (Get-Content -Path "cluster-info.json" | ConvertFrom-Json).ClusterName
   }
   if (-not $ClusterName) {
-    $ClusterName = & buildkite-agent meta-data get cluster-name
+    $ClusterName = & buildkite-agent meta-data get cluster-name 2>$null
   }
-  & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file="secrets.env"
+  if (-not $ClusterName) {
+    Write-Error "Error: no cluster-name available (neither cluster-info.json nor meta-data); cannot load secrets."
+    return 1
+  }
+
+  # Pipe oblt-cli stdout to Out-Host so it's visible in the BK log but NOT
+  # captured into the function's output stream — otherwise `$rc = ess_load_secrets`
+  # in the caller would receive an array (oblt-cli output + our `return 0`)
+  # instead of a scalar exit code.
+  & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file="secrets.env" | Out-Host
   if ($LASTEXITCODE -ne 0) {
     Write-Error "Error: oblt-cli cluster secrets env failed (exit=$LASTEXITCODE)"
     return 1
