@@ -48,7 +48,11 @@ function ess_up {
   # one. `ess_load_secrets` and `ess_down` read the local cluster-info.json
   # first, so the retry path doesn't need meta-data.
 
-  ess_load_secrets
+  $rc = ess_load_secrets
+  if ($rc -ne 0) {
+      Write-Error "Error: ess_load_secrets failed (exit=$rc)"
+      return $rc
+  }
 }
 
 function ess_down {
