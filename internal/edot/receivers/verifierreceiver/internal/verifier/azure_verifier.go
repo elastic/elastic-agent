@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +21,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"go.uber.org/zap"
+
+	libbeatazure "github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation/azure"
 )
 
 // AzureVerifier implements permission verification for Azure.
@@ -83,23 +84,13 @@ func NewAzureVerifier(ctx context.Context, logger *zap.Logger, authConfig AzureA
 	switch {
 	case authConfig.IsIdentityFederation():
 		// Identity federation OIDC flow: use the JWT as a federated client assertion.
-		// The callback re-reads the file on each invocation so refreshed tokens
-		// are picked up automatically.
-		idTokenFile := authConfig.IDTokenFile
-		getAssertion := func(_ context.Context) (string, error) {
-			token, readErr := os.ReadFile(idTokenFile)
-			if readErr != nil {
-				return "", readErr
-			}
-			return strings.TrimSpace(string(token)), nil
-		}
-
-		cred, err = azidentity.NewClientAssertionCredential(
-			authConfig.TenantID,
-			authConfig.ClientID,
-			getAssertion,
-			&azidentity.ClientAssertionCredentialOptions{ClientOptions: clientOpts},
-		)
+		// The JWT file is re-read on each token refresh via libbeatazure.NewClientAssertionCredential.
+		cred, err = libbeatazure.NewClientAssertionCredential(libbeatazure.Params{
+			TenantID:    authConfig.TenantID,
+			ClientID:    authConfig.ClientID,
+			JWTFilePath: authConfig.IDTokenFile,
+			Options:     &azidentity.ClientAssertionCredentialOptions{ClientOptions: clientOpts},
+		})
 		if err != nil {
 			logger.Warn("Failed to create Azure client assertion credential", zap.Error(err))
 			closeAll()

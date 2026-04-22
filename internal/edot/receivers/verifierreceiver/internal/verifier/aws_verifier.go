@@ -22,6 +22,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
 	"go.uber.org/zap"
+
+	libbeatidaws "github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation/aws"
 )
 
 const (
@@ -96,70 +98,57 @@ func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthC
 
 	switch {
 	case authConfig.IsIdentityFederation():
+		// ExternalID follows the Cloudbeat/Beats convention: ResourceID-ExternalID.
+		externalID := ""
+		if authConfig.CloudResourceID != "" && authConfig.ExternalID != "" {
+			externalID = libbeatidaws.FormatExternalID(authConfig.CloudResourceID, authConfig.ExternalID)
+		} else if authConfig.ExternalID != "" {
+			externalID = authConfig.ExternalID
+		}
+
+		remoteRoleStep := &libbeatidaws.AssumeRoleStep{
+			RoleARN: authConfig.RoleARN,
+			Options: func(aro *stscreds.AssumeRoleOptions) {
+				aro.RoleSessionName = sessionName
+				aro.Duration = duration
+				if externalID != "" {
+					aro.ExternalID = aws.String(externalID)
+				}
+			},
+		}
+
 		if irsaTokenFile := os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE"); irsaTokenFile != "" {
 			// IRSA flow: LoadDefaultConfig already picked up the pod's service-account
 			// token via AWS_WEB_IDENTITY_TOKEN_FILE, so baseCfg carries IRSA credentials.
-			// Step 1: Assume the Elastic Global Role using those IRSA credentials.
-			assumeGlobalRoleProvider := stscreds.NewAssumeRoleProvider(
-				sts.NewFromConfig(baseCfg),
-				authConfig.GlobalRoleARN,
-				func(aro *stscreds.AssumeRoleOptions) {
-					aro.Duration = defaultIntermediateDuration
+			chain := []libbeatidaws.AWSRoleChainingStep{
+				&libbeatidaws.AssumeRoleStep{
+					RoleARN: authConfig.GlobalRoleARN,
+					Options: func(aro *stscreds.AssumeRoleOptions) {
+						aro.Duration = defaultIntermediateDuration
+					},
 				},
-			)
-			baseCfg.Credentials = aws.NewCredentialsCache(assumeGlobalRoleProvider)
-
-			// Step 2: Assume the customer's role from the global role session.
-			// ExternalID follows the Cloudbeat/Beats convention: ResourceID-ExternalID.
-			assumeRoleProvider := stscreds.NewAssumeRoleProvider(
-				sts.NewFromConfig(baseCfg),
-				authConfig.RoleARN,
-				func(aro *stscreds.AssumeRoleOptions) {
-					aro.RoleSessionName = sessionName
-					aro.Duration = duration
-					if authConfig.CloudResourceID != "" && authConfig.ExternalID != "" {
-						aro.ExternalID = aws.String(authConfig.CloudResourceID + "-" + authConfig.ExternalID)
-					} else if authConfig.ExternalID != "" {
-						aro.ExternalID = aws.String(authConfig.ExternalID)
-					}
-				},
-			)
-			baseCfg.Credentials = aws.NewCredentialsCache(assumeRoleProvider)
-
+				remoteRoleStep,
+			}
+			result := libbeatidaws.AWSConfigRoleChaining(baseCfg, chain)
+			baseCfg = *result
 			logger.Info("AWS identity federation IRSA credential chain configured",
 				zap.String("global_role", authConfig.GlobalRoleARN),
 				zap.String("customer_role", authConfig.RoleARN),
 			)
 		} else {
 			// OIDC flow: two-step credential chain using the JWT token file.
-			// Step 1: Assume Elastic Global Role using the OIDC JWT token.
-			webIdentityProvider := stscreds.NewWebIdentityRoleProvider(
-				sts.NewFromConfig(baseCfg),
-				authConfig.GlobalRoleARN,
-				stscreds.IdentityTokenFile(authConfig.IDTokenFile),
-				func(opt *stscreds.WebIdentityRoleOptions) {
-					opt.Duration = defaultIntermediateDuration
+			chain := []libbeatidaws.AWSRoleChainingStep{
+				&libbeatidaws.WebIdentityRoleStep{
+					RoleARN:              authConfig.GlobalRoleARN,
+					WebIdentityTokenFile: authConfig.IDTokenFile,
+					Options: func(opt *stscreds.WebIdentityRoleOptions) {
+						opt.Duration = defaultIntermediateDuration
+					},
 				},
-			)
-			baseCfg.Credentials = aws.NewCredentialsCache(webIdentityProvider)
-
-			// Step 2: Assume the customer's role from the global role session.
-			// ExternalID follows the Cloudbeat/Beats convention: ResourceID-ExternalID.
-			assumeRoleProvider := stscreds.NewAssumeRoleProvider(
-				sts.NewFromConfig(baseCfg),
-				authConfig.RoleARN,
-				func(aro *stscreds.AssumeRoleOptions) {
-					aro.RoleSessionName = sessionName
-					aro.Duration = duration
-					if authConfig.CloudResourceID != "" && authConfig.ExternalID != "" {
-						aro.ExternalID = aws.String(authConfig.CloudResourceID + "-" + authConfig.ExternalID)
-					} else if authConfig.ExternalID != "" {
-						aro.ExternalID = aws.String(authConfig.ExternalID)
-					}
-				},
-			)
-			baseCfg.Credentials = aws.NewCredentialsCache(assumeRoleProvider)
-
+				remoteRoleStep,
+			}
+			result := libbeatidaws.AWSConfigRoleChaining(baseCfg, chain)
+			baseCfg = *result
 			logger.Info("AWS identity federation OIDC credential chain configured",
 				zap.String("global_role", authConfig.GlobalRoleARN),
 				zap.String("customer_role", authConfig.RoleARN),

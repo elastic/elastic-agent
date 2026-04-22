@@ -12,16 +12,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"golang.org/x/oauth2/google/externalaccount"
 	"google.golang.org/api/cloudresourcemanager/v3"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
+
+	libbeatgcp "github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation/gcp"
 )
 
 // GCPVerifier implements permission verification for GCP.
@@ -62,59 +60,28 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 
 	switch {
 	case authConfig.IsIdentityFederation():
-		// AWS-mediated WIF flow matching Cloudbeat:
+		// AWS-mediated WIF flow:
 		// 1. Assume Elastic global AWS role using the OIDC JWT (via FIPS HTTP client)
 		// 2. Supply AWS credentials to GCP STS for WIF token exchange (via FIPS HTTP client)
 		// 3. Impersonate the target GCP service account
-		sessionName := authConfig.CloudResourceID + "-" + authConfig.IdentityFederationID
-		stsClient := sts.New(sts.Options{
-			Region:     "us-east-1",
-			HTTPClient: httpClient,
+		tokenSource, err := libbeatgcp.NewTokenSource(ctx, libbeatgcp.Params{
+			Audience:            authConfig.Audience,
+			GlobalRoleARN:       authConfig.GlobalRoleARN,
+			JWTFilePath:         authConfig.IDTokenFile,
+			SessionName:         authConfig.CloudResourceID + "-" + authConfig.IdentityFederationID,
+			ServiceAccountEmail: authConfig.ServiceAccountEmail,
+			HTTPClient:          httpClient,
 		})
-		webIdentityProvider := stscreds.NewWebIdentityRoleProvider(
-			stsClient,
-			authConfig.GlobalRoleARN,
-			stscreds.IdentityTokenFile(authConfig.IDTokenFile),
-			func(o *stscreds.WebIdentityRoleOptions) {
-				o.RoleSessionName = sessionName
-			},
-		)
-		credsCache := aws.NewCredentialsCache(webIdentityProvider)
-
-		credSupplier := &awsCredentialsSupplier{
-			region:     "us-east-1",
-			credsCache: credsCache,
-		}
-
-		extCfg := externalaccount.Config{
-			Audience:                       authConfig.Audience,
-			SubjectTokenType:               "urn:ietf:params:aws:token-type:aws4_request",
-			TokenURL:                       "https://sts.googleapis.com/v1/token",
-			Scopes:                         []string{"https://www.googleapis.com/auth/cloud-platform"},
-			AwsSecurityCredentialsSupplier: credSupplier,
-		}
-		if authConfig.ServiceAccountEmail != "" {
-			extCfg.ServiceAccountImpersonationURL = fmt.Sprintf(
-				"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/%s:generateAccessToken",
-				authConfig.ServiceAccountEmail,
-			)
-		}
-
-		// Inject the FIPS HTTP client into the OAuth2 token-source context so
-		// that the GCP STS token exchange uses FIPS-compliant TLS.
-		ctxWithClient := context.WithValue(ctx, oauth2.HTTPClient, httpClient)
-		tokenSource, err := externalaccount.NewTokenSource(ctxWithClient, extCfg)
 		if err != nil {
 			logger.Warn("Failed to create GCP external account token source", zap.Error(err))
 			httpClient.CloseIdleConnections()
 			return &GCPVerifier{logger: logger, configured: false}, nil
 		}
-		// oauth2.NewClient uses the FIPS client from the context as its base
-		// transport and wraps it with oauth2.Transport, which attaches the Bearer
-		// token to every GCP API request. This keeps all traffic FIPS-compliant
-		// while ensuring credentials are not bypassed.
-		// Note: option.WithHTTPClient bypasses credential injection when used
-		// alongside option.WithTokenSource, so we use a single pre-wrapped client.
+		// oauth2.NewClient wraps the FIPS client from httpClient with oauth2.Transport,
+		// attaching the Bearer token to every GCP API request while keeping TLS FIPS-compliant.
+		// Note: option.WithHTTPClient bypasses credential injection when used alongside
+		// option.WithTokenSource, so we use a single pre-wrapped client.
+		ctxWithClient := context.WithValue(ctx, oauth2.HTTPClient, httpClient)
 		opts = append(opts, option.WithHTTPClient(oauth2.NewClient(ctxWithClient, tokenSource)))
 		logger.Info("GCP identity federation AWS-mediated WIF credential configured",
 			zap.String("audience", authConfig.Audience),
@@ -352,25 +319,3 @@ func (v *GCPVerifier) handleGCPError(err error, endpoint string) Result {
 	}
 }
 
-// awsCredentialsSupplier implements externalaccount.AwsSecurityCredentialsSupplier.
-// It provides cached AWS credentials to GCP for Workload Identity Federation.
-type awsCredentialsSupplier struct {
-	region     string
-	credsCache *aws.CredentialsCache
-}
-
-func (s *awsCredentialsSupplier) AwsRegion(_ context.Context, _ externalaccount.SupplierOptions) (string, error) {
-	return s.region, nil
-}
-
-func (s *awsCredentialsSupplier) AwsSecurityCredentials(ctx context.Context, _ externalaccount.SupplierOptions) (*externalaccount.AwsSecurityCredentials, error) {
-	creds, err := s.credsCache.Retrieve(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("retrieving AWS credentials for GCP WIF: %w", err)
-	}
-	return &externalaccount.AwsSecurityCredentials{
-		AccessKeyID:     creds.AccessKeyID,
-		SecretAccessKey: creds.SecretAccessKey,
-		SessionToken:    creds.SessionToken,
-	}, nil
-}
