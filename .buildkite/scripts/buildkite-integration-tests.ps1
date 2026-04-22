@@ -63,6 +63,40 @@ $outputJSON = "build/${fully_qualified_group_name}.integration.out.json"
 
 $TestsExitCode = 0
 
+# Start Process Monitor when PROCMON_CAPTURE=true so the .pml trace is collected
+# as a build artifact alongside the other diagnostics.
+$procmonExe = $null
+$procmonPml = $null
+if ($env:PROCMON_CAPTURE -eq "true")
+{
+    $procmonDir = Join-Path $env:TEMP "procmon"
+    $procmonExe = Join-Path $procmonDir "Procmon64.exe"
+
+    if (-not (Test-Path $procmonExe))
+    {
+        Write-Output "~~~ Downloading Process Monitor"
+        $procmonZip = Join-Path $env:TEMP "ProcessMonitor.zip"
+        try
+        {
+            Invoke-WebRequest -Uri "https://download.sysinternals.com/files/ProcessMonitor.zip" -OutFile $procmonZip -UseBasicParsing
+            Expand-Archive -Path $procmonZip -DestinationPath $procmonDir -Force
+        }
+        catch
+        {
+            Write-Output "WARNING: failed to download Process Monitor (continuing without it): $_"
+            $procmonExe = $null
+        }
+    }
+
+    if ($procmonExe -and (Test-Path $procmonExe))
+    {
+        $null = New-Item -ItemType Directory -Force -Path "build/diagnostics"
+        $procmonPml = "build/diagnostics/procmon-${GROUP_NAME}${root_suffix}.pml"
+        Write-Output "~~~ Starting Process Monitor; backing file: $procmonPml"
+        Start-Process -FilePath $procmonExe -ArgumentList "/AcceptEula", "/Quiet", "/BackingFile", $procmonPml -WindowStyle Hidden
+    }
+}
+
 try
 {
     Write-Output "~~~ Integration tests: $GROUP_NAME as user: $env:USERNAME"
@@ -87,6 +121,21 @@ try
 }
 finally
 {
+    if ($procmonExe -and (Test-Path $procmonExe))
+    {
+        Write-Output "~~~ Stopping Process Monitor"
+        # /Terminate signals the running instance to flush and finalise the .pml file.
+        & $procmonExe /Terminate
+        # Wait for procmon to exit so the file is fully written before the artifact
+        # upload step reads it.
+        $procmonProcess = Get-Process -Name Procmon64 -ErrorAction SilentlyContinue
+        if ($procmonProcess)
+        {
+            $procmonProcess | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
+        }
+        Write-Output "~~~ Process Monitor trace saved to $procmonPml"
+    }
+
     if (Test-Path $outputXML)
     {
         # Install junit2html if not installed
