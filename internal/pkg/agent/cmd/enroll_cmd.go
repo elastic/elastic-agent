@@ -568,8 +568,17 @@ RETRYLOOP:
 		case err != nil:
 			c.log.Warnf("Error detected: %s, will retry in a moment.", err.Error())
 		}
-		if !backExp.Wait() {
-			break RETRYLOOP
+		// Context cancellation should be able to interrupt the exponential backoff wait,
+		// otherwise the loop keeps sleeping after context is canceled
+		waitCh := make(chan bool, 1)
+		go func() { waitCh <- backExp.Wait() }()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case ok := <-waitCh:
+			if !ok {
+				break RETRYLOOP
+			}
 		}
 		c.log.Infof("Retrying enrollment to URL: %s", c.client.URI())
 		err = c.enroll(ctx, persistentConfig)
