@@ -880,7 +880,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
-							"extension": "kafkapartitioner",
+							"extension": "kafkapartitioner/_agent-component/default",
 						},
 					},
 				},
@@ -898,13 +898,13 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"extensions": map[string]any{
-					"kafkapartitioner": map[string]interface{}{},
+					"kafkapartitioner/_agent-component/default": map[string]interface{}{},
 				},
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": expectedBeatMetricConfig,
 				},
 				"service": map[string]any{
-					"extensions": []any{"kafkapartitioner"},
+					"extensions": []any{"kafkapartitioner/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
 							"exporters":  {"kafka/_agent-component/default"},
@@ -1001,12 +1001,12 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
-							"extension": "kafkapartitioner",
+							"extension": "kafkapartitioner/_agent-component/default",
 						},
 					},
 				},
 				"extensions": map[string]any{
-					"kafkapartitioner": map[string]interface{}{
+					"kafkapartitioner/_agent-component/default": map[string]interface{}{
 						"hash": map[string]interface{}{
 							"hash":   "fields",
 							"fields": []interface{}{"log.level"},
@@ -1022,7 +1022,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": expectedBeatMetricConfig,
 				},
 				"service": map[string]any{
-					"extensions": []any{"kafkapartitioner"},
+					"extensions": []any{"kafkapartitioner/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
 							"exporters":  {"kafka/_agent-component/default"},
@@ -1118,12 +1118,12 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
-							"extension": "kafkapartitioner",
+							"extension": "kafkapartitioner/_agent-component/default",
 						},
 					},
 				},
 				"extensions": map[string]any{
-					"kafkapartitioner": map[string]interface{}{
+					"kafkapartitioner/_agent-component/default": map[string]interface{}{
 						"round_robin": map[string]interface{}{
 							"group_events": float64(10),
 						},
@@ -1138,7 +1138,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": expectedBeatMetricConfig,
 				},
 				"service": map[string]any{
-					"extensions": []any{"kafkapartitioner"},
+					"extensions": []any{"kafkapartitioner/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
 							"exporters":  {"kafka/_agent-component/default"},
@@ -2356,12 +2356,12 @@ func TestUnitToExporterConfig(t *testing.T) {
 				},
 				"timeout": 10 * time.Second,
 				"record_partitioner": map[string]any{
-					"extension": "kafkapartitioner",
+					"extension": "kafkapartitioner/_agent-component/default",
 				},
 			},
 			expectedQueueSettings: nil,
 			expectedExtensionCfg: map[string]any{
-				"kafkapartitioner": map[string]interface{}{
+				"kafkapartitioner/_agent-component/default": map[string]interface{}{
 					"hash": map[string]interface{}{
 						"hash":   "fields",
 						"fields": []interface{}{"log.level"},
@@ -2425,12 +2425,12 @@ func TestUnitToExporterConfig(t *testing.T) {
 				},
 				"timeout": 10 * time.Second,
 				"record_partitioner": map[string]any{
-					"extension": "kafkapartitioner",
+					"extension": "kafkapartitioner/_agent-component/default",
 				},
 			},
 			expectedQueueSettings: nil,
 			expectedExtensionCfg: map[string]any{
-				"kafkapartitioner": map[string]interface{}{
+				"kafkapartitioner/_agent-component/default": map[string]interface{}{
 					"round_robin": map[string]interface{}{
 						"group_events": float64(10),
 					},
@@ -2493,12 +2493,12 @@ func TestUnitToExporterConfig(t *testing.T) {
 				},
 				"timeout": 10 * time.Second,
 				"record_partitioner": map[string]any{
-					"extension": "kafkapartitioner",
+					"extension": "kafkapartitioner/_agent-component/default",
 				},
 			},
 			expectedQueueSettings: nil,
 			expectedExtensionCfg: map[string]any{
-				"kafkapartitioner": map[string]interface{}{
+				"kafkapartitioner/_agent-component/default": map[string]interface{}{
 					"random": map[string]interface{}{
 						"group_events": float64(1),
 					},
