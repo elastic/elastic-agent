@@ -258,6 +258,13 @@ func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
 }
 
+// getKafkaPartitionerExtensionID returns the id for kafkapartitioner extension
+// outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
+func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(kafkapartitionerextension.Type.String()), extensionName)
+}
+
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
 // This function returns a full, valid configuration that can then be merged with configurations for other components.
 // Note: Lists are not merged and should be handled by the caller of the method
@@ -618,16 +625,17 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 			extensionCfg[elasticsearchStateStoreExtensionName] = unitConfigMap
 		}
 	} else if exporterType.String() == "kafka" {
-		partitioner, ok := unitConfigMap["partition"]
+		extensionID := getKafkaPartitionerExtensionID(outputName)
 		extensionCfg = map[string]any{}
+		partitioner, ok := unitConfigMap["partition"]
 		if ok {
-			extensionCfg[kafkapartitionerextension.Type.String()] = partitioner
+			extensionCfg[extensionID.String()] = partitioner
 		} else {
 			// Specifying empty map will make the extension use the default hash partitioner.
-			extensionCfg[kafkapartitionerextension.Type.String()] = map[string]any{}
+			extensionCfg[extensionID.String()] = map[string]any{}
 		}
 		exporterConfig["record_partitioner"] = map[string]any{
-			"extension": kafkapartitionerextension.Type.String(),
+			"extension": extensionID.String(),
 		}
 	}
 
