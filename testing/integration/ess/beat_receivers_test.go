@@ -941,7 +941,7 @@ outputs:
 	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
 	require.NoError(t, err)
 
-	// verify we've logged a warning about using the process runtime
+	// verify we've logged a message about using the process runtime
 	var unsupportedLogRecords []map[string]any
 	var monitoringOutputUnsupportedLogRecord map[string]any
 	for _, line := range strings.Split(string(logsBytes), "\n") {
@@ -1400,7 +1400,7 @@ func getBeatStartLogRecords(logs string) []map[string]any {
 			continue
 		}
 
-		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Beat name:") {
+		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Starting metrics logging") {
 			logRecords = append(logRecords, mapstr.M(logRecord).Flatten())
 		}
 	}

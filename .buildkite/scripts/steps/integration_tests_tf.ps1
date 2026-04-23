@@ -18,7 +18,7 @@ if ($packageVersionContent -and $packageVersionContent.stack_version ) {
 }
 
 Write-Output "~~~ Building test binaries"
-& mage build:testBinaries
+& mage build:integrationTestBinaries
 if ($LASTEXITCODE -ne 0) {
     Write-Output "^^^ +++"
     Write-Output "Failed to build test binaries"
