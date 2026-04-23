@@ -3034,9 +3034,6 @@ agent.monitoring:
 			"agent.version",
 		}
 
-		// TODO: @metadata field needs to be be supported
-		delete(agentDoc, "@metadata")
-
 		agentDoc = agentDoc.Flatten()
 		otelDoc = otelDoc.Flatten()
 
@@ -3282,10 +3279,6 @@ agent.monitoring:
 		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 		"agent.version",
 		"metadata.version",
-
-		// TODO: See issue https://github.com/elastic/beats/issues/50085
-		"metadata.input_id",
-		"metadata.raw_index",
 	}
 
 	agentDoc = agentDoc.Flatten()
