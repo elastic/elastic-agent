@@ -2838,15 +2838,15 @@ func (w *ZapWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestSystemMetricsWithKafkaOutput(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: integration.Default,
-		Local: true,
-		OS: []define.OS{
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		},
-		Stack: &define.Stack{},
-	})
+	// define.Require(t, define.Requirements{
+	// 	Group: integration.Default,
+	// 	Local: true,
+	// 	OS: []define.OS{
+	// 		{Type: define.Linux},
+	// 		{Type: define.Darwin},
+	// 	},
+	// 	Stack: &define.Stack{},
+	// })
 
 	_, currentFile, _, ok := runtime.Caller(0)
 	require.True(t, ok, "failed to get current file path")
@@ -3029,9 +3029,11 @@ agent.monitoring:
 			"data_stream.namespace",
 			"event.ingested",
 			"event.duration",
+			"@metadata.raw_index",
 
 			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 			"agent.version",
+			"@metadata.version",
 		}
 
 		agentDoc = agentDoc.Flatten()
@@ -3041,7 +3043,7 @@ agent.monitoring:
 		StripNondeterminism(agentDoc, "cpu")
 		StripNondeterminism(otelDoc, "cpu")
 
-		AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for cpu metricset")
+		AssertMapstrKeysEqual(t, agentDoc, otelDoc, []string{}, "expected documents keys to be equal for cpu metricset")
 		AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for cpu metricset")
 
 	})
@@ -3273,12 +3275,13 @@ agent.monitoring:
 		"data_stream.namespace",
 		"event.ingested",
 		"event.duration",
+		"@metadata.raw_index",
 
 		// testcase is different for both agent and otel
 		"testcase",
 		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 		"agent.version",
-		"metadata.version",
+		"@metadata.version",
 	}
 
 	agentDoc = agentDoc.Flatten()
@@ -3288,7 +3291,7 @@ agent.monitoring:
 	StripNondeterminism(agentDoc, "cpu")
 	StripNondeterminism(otelDoc, "cpu")
 
-	AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for cpu metricset")
+	AssertMapstrKeysEqual(t, agentDoc, otelDoc, []string{}, "expected documents keys to be equal for cpu metricset")
 	AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for cpu metricset")
 
 }
