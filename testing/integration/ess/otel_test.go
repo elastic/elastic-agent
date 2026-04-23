@@ -3033,7 +3033,6 @@ agent.monitoring:
 
 			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 			"agent.version",
-			"@metadata.version",
 		}
 
 		agentDoc = agentDoc.Flatten()
@@ -3275,13 +3274,12 @@ agent.monitoring:
 		"data_stream.namespace",
 		"event.ingested",
 		"event.duration",
-		"@metadata.raw_index",
 
 		// testcase is different for both agent and otel
 		"testcase",
 		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 		"agent.version",
-		"@metadata.version",
+		"metadata.version",
 	}
 
 	agentDoc = agentDoc.Flatten()
