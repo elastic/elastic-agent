@@ -3029,6 +3029,7 @@ agent.monitoring:
 			"data_stream.namespace",
 			"event.ingested",
 			"event.duration",
+			// For Kafka, raw_index contains the destination topic which is different between the two runtimes.
 			"@metadata.raw_index",
 
 			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
