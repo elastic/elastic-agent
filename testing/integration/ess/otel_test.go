@@ -3029,13 +3029,13 @@ agent.monitoring:
 			"data_stream.namespace",
 			"event.ingested",
 			"event.duration",
+			// For Kafka, raw_index contains the destination topic which is different between the two runtimes.
+			"@metadata.raw_index",
 
 			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 			"agent.version",
+			"@metadata.version",
 		}
-
-		// TODO: @metadata field needs to be be supported
-		delete(agentDoc, "@metadata")
 
 		agentDoc = agentDoc.Flatten()
 		otelDoc = otelDoc.Flatten()
@@ -3044,7 +3044,7 @@ agent.monitoring:
 		StripNondeterminism(agentDoc, "cpu")
 		StripNondeterminism(otelDoc, "cpu")
 
-		AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for cpu metricset")
+		AssertMapstrKeysEqual(t, agentDoc, otelDoc, []string{}, "expected documents keys to be equal for cpu metricset")
 		AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for cpu metricset")
 
 	})
@@ -3282,10 +3282,6 @@ agent.monitoring:
 		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 		"agent.version",
 		"metadata.version",
-
-		// TODO: See issue https://github.com/elastic/beats/issues/50085
-		"metadata.input_id",
-		"metadata.raw_index",
 	}
 
 	agentDoc = agentDoc.Flatten()
@@ -3295,7 +3291,7 @@ agent.monitoring:
 	StripNondeterminism(agentDoc, "cpu")
 	StripNondeterminism(otelDoc, "cpu")
 
-	AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for cpu metricset")
+	AssertMapstrKeysEqual(t, agentDoc, otelDoc, []string{}, "expected documents keys to be equal for cpu metricset")
 	AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for cpu metricset")
 
 }
