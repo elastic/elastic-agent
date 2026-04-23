@@ -163,7 +163,7 @@ func (p *provisioner) createInstance(ctx context.Context, batch common.OSBatch, 
 	labels := maps.Clone(instanceLabels)
 	email, err := p.cfg.ClientEmail()
 	if err != nil {
-		return common.Instance{}, fmt.Errorf("failed to read client email for user label: %s", err)
+		return common.Instance{}, fmt.Errorf("failed to read client email for user label: %w", err)
 	}
 	if u := userLabel(email); u != "" {
 		labels["user"] = u

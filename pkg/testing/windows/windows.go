@@ -24,9 +24,10 @@ type WindowsRunner struct{}
 // Prepare the test
 func (WindowsRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, arch string, goVersion string) error {
 	// Some provisioners pre-install chocolatey in the startup script; others don't. Probe first, install if missing.
+	var errOut []byte
 	verifyCtx, verifyCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer verifyCancel()
-	stdOut, errOut, err := sshClient.Exec(verifyCtx, "choco", []string{"--version"}, nil)
+	stdOut, _, err := sshClient.Exec(verifyCtx, "choco", []string{"--version"}, nil)
 	if err == nil {
 		logger.Logf("Found chocolatey: version %s", strings.TrimSpace(string(stdOut)))
 	} else {
