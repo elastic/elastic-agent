@@ -1827,7 +1827,7 @@ func (s *Settings) GetPackageTypes() []PackageType {
 		return nil
 	}
 	if strings.ToLower(s.CrossBuild.Packages) == "all" {
-		return []PackageType{RPM, Deb, Zip, TarGz, Docker}
+		return AllPackageTypes
 	}
 	var types []PackageType
 	for _, pkgtype := range strings.Split(s.CrossBuild.Packages, ",") {

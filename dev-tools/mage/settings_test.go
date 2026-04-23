@@ -365,7 +365,7 @@ func TestSettingsGetPackageTypes(t *testing.T) {
 
 		types := s.GetPackageTypes()
 
-		assert.Equal(t, []PackageType{RPM, Deb, Zip, TarGz, Docker}, types)
+		assert.Equal(t, AllPackageTypes, types)
 	})
 
 	t.Run("returns all package types when PACKAGES is ALL (case-insensitive)", func(t *testing.T) {
@@ -374,7 +374,7 @@ func TestSettingsGetPackageTypes(t *testing.T) {
 
 		types := s.GetPackageTypes()
 
-		assert.Equal(t, []PackageType{RPM, Deb, Zip, TarGz, Docker}, types)
+		assert.Equal(t, AllPackageTypes, types)
 	})
 }
 
