@@ -23,14 +23,25 @@ type WindowsRunner struct{}
 
 // Prepare the test
 func (WindowsRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, arch string, goVersion string) error {
-	// Chocolatey is installed by the startup script before sshd is restarted, so it should be already on PATH when we connect.
+	// Some provisioners pre-install chocolatey in the startup script; others don't. Probe first, install if missing.
 	verifyCtx, verifyCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer verifyCancel()
 	stdOut, errOut, err := sshClient.Exec(verifyCtx, "choco", []string{"--version"}, nil)
-	if err != nil {
-		return fmt.Errorf("chocolatey not found on host: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
+	if err == nil {
+		logger.Logf("Found chocolatey: version %s", strings.TrimSpace(string(stdOut)))
+	} else {
+		logger.Logf("Installing chocolatey")
+		chocoInstall := `"[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"`
+		installCtx, installCancel := context.WithTimeout(ctx, 3*time.Minute)
+		defer installCancel()
+		stdOut, errOut, err = sshRunPowershell(installCtx, sshClient, chocoInstall)
+		if err != nil {
+			return fmt.Errorf("failed to install chocolatey: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
+		}
+		if err = sshClient.ReconnectWithTimeout(ctx, 1*time.Minute); err != nil {
+			return fmt.Errorf("failed to reconnect after chocolatey install: %w", err)
+		}
 	}
-	logger.Logf("Found chocolatey: version %s", strings.TrimSpace(string(stdOut)))
 
 	// install curl
 	logger.Logf("Installing curl")
