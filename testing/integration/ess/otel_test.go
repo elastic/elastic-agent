@@ -2925,9 +2925,9 @@ outputs:
     broker_timeout: 30s
     queue.mem.flush.timeout: 1s
     ssl:
-      certificate_authorities: 
+      certificate_authorities:
         - {{.CaCert}}
-      supported_protocols: 
+      supported_protocols:
        - TLSv1.3
       verification_mode: full
     username: beats
@@ -3033,6 +3033,7 @@ agent.monitoring:
 
 			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 			"agent.version",
+			"@metadata.version",
 		}
 
 		agentDoc = agentDoc.Flatten()
@@ -3274,7 +3275,6 @@ agent.monitoring:
 		"data_stream.namespace",
 		"event.ingested",
 		"event.duration",
-		// "metadata.raw_index",
 
 		// testcase is different for both agent and otel
 		"testcase",
