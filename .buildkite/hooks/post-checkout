@@ -13,7 +13,18 @@ checkout_merge() {
     fi
 
     git fetch -v origin "${target_branch}"
-    git checkout FETCH_HEAD
+    local fetched_sha
+    fetched_sha=$(git rev-parse FETCH_HEAD)
+
+    # Pin the base branch SHA in build metadata so all parallel jobs merge against
+    # the same base, preventing flakiness when the target branch advances mid-build
+    # (e.g. an automated NOTICE.txt update landing between packaging and testing jobs).
+    local metadata_key="base_sha_${target_branch//\//_}"
+    buildkite-agent meta-data set "${metadata_key}" "${fetched_sha}" --if-not-exists 2>/dev/null || true
+    local pinned_sha
+    pinned_sha=$(buildkite-agent meta-data get "${metadata_key}" 2>/dev/null || echo "${fetched_sha}")
+
+    git checkout "${pinned_sha}"
     echo "Current branch: $(git rev-parse --abbrev-ref HEAD)"
 
     # create temporal branch to merge the PR with the target branch
