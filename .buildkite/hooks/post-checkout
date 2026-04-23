@@ -20,9 +20,11 @@ checkout_merge() {
     # the same base, preventing flakiness when the target branch advances mid-build
     # (e.g. an automated NOTICE.txt update landing between packaging and testing jobs).
     local metadata_key="base_sha_${target_branch//\//_}"
-    buildkite-agent meta-data set "${metadata_key}" "${fetched_sha}" --if-not-exists 2>/dev/null || true
     local pinned_sha
-    pinned_sha=$(buildkite-agent meta-data get "${metadata_key}" 2>/dev/null || echo "${fetched_sha}")
+    pinned_sha=$(buildkite-agent meta-data get "${metadata_key}" 2>/dev/null || {
+        buildkite-agent meta-data set "${metadata_key}" "${fetched_sha}"
+        echo "${fetched_sha}"
+    })
 
     git checkout "${pinned_sha}"
     echo "Current branch: $(git rev-parse --abbrev-ref HEAD)"
