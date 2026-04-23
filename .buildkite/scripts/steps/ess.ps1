@@ -10,22 +10,30 @@ function ess_up {
       return 1
   }
 
-  # Build parameters JSON via ConvertTo-Json so PowerShell's native-command
-  # argument marshalling doesn't mangle the embedded quotes.
-  $params = @{
+  # Write parameters to a JSON file and pass via --parameters-file.
+  # Windows PowerShell 5.1 mangles native-command arguments that contain
+  # embedded double quotes (even when passed as a separate argument), so
+  # the inline --parameters form produced "invalid character 'G'" errors
+  # from oblt-cli. A file bypasses PS arg marshalling entirely.
+  $paramsPath = Join-Path $PWD "params.json"
+  @{
       GitOps           = "true"
       GitHubRepository = $Env:BUILDKITE_REPO
       GitHubCommit     = $Env:BUILDKITE_COMMIT
       EphemeralCluster = "true"
       StackVersion     = $StackVersion
-  } | ConvertTo-Json -Compress
+  } | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
 
-  & oblt-cli cluster create custom `
-      --template ess-ea-it `
-      --cluster-name-prefix ea-hosted-it `
-      --parameters $params `
-      --output-file="cluster-info.json" `
-      --wait 30
+  try {
+    & oblt-cli cluster create custom `
+        --template ess-ea-it `
+        --cluster-name-prefix ea-hosted-it `
+        --parameters-file $paramsPath `
+        --output-file="cluster-info.json" `
+        --wait 30
+  } finally {
+    Remove-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue
+  }
   if ($LASTEXITCODE -ne 0) {
       Write-Error "Error: oblt-cli cluster create custom failed (exit=$LASTEXITCODE)"
       return 1
