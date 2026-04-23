@@ -16,8 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/client"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/pkg/testing/common"
@@ -134,7 +133,7 @@ func AddK8STestsToImage(ctx context.Context, logger common.Logger, baseImage str
 	outputImage := baseImage + "-tests"
 
 	// Build the image
-	imageBuildResponse, err := cli.ImageBuild(ctx, &buf, types.ImageBuildOptions{
+	imageBuildResponse, err := cli.ImageBuild(ctx, &buf, client.ImageBuildOptions{
 		Tags:       []string{outputImage},
 		Dockerfile: "Dockerfile",
 		Remove:     true,
@@ -173,7 +172,7 @@ func AddK8STestsToImage(ctx context.Context, logger common.Logger, baseImage str
 func getDockerClient() (*client.Client, error) {
 
 	envClient := func() (*client.Client, error) {
-		return client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		return client.New(client.FromEnv)
 	}
 
 	type DockerConfig struct {
@@ -234,9 +233,8 @@ func getDockerClient() (*client.Client, error) {
 					return nil, fmt.Errorf("docker endpoint not found in context")
 				}
 
-				return client.NewClientWithOpts(
+				return client.New(
 					client.WithHost(endpoint.Host),
-					client.WithAPIVersionNegotiation(),
 				)
 			}
 		}
