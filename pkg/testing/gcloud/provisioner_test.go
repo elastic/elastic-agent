@@ -96,3 +96,71 @@ func TestSanitizeInstanceName(t *testing.T) {
 		}
 	})
 }
+
+func TestUserLabel(t *testing.T) {
+	tests := []struct {
+		name  string
+		email string
+		want  string
+	}{
+		{
+			name:  "service account email",
+			email: "test-runner@example.iam.gserviceaccount.com",
+			want:  "test-runner",
+		},
+		{
+			name:  "human email with dots",
+			email: "first.last@example.com",
+			want:  "first-last",
+		},
+		{
+			name:  "mixed case lowered",
+			email: "First.Last@Example.com",
+			want:  "first-last",
+		},
+		{
+			name:  "local part only",
+			email: "alice",
+			want:  "alice",
+		},
+		{
+			name:  "empty string",
+			email: "",
+			want:  "",
+		},
+		{
+			name:  "just at-sign",
+			email: "@example.com",
+			want:  "",
+		},
+		{
+			name:  "local part sanitizes to empty",
+			email: "..@example.com",
+			want:  "",
+		},
+		{
+			name:  "truncation cutting into a hyphen is trimmed back",
+			email: strings.Repeat("a", 62) + "!b!@example.com",
+			want:  strings.Repeat("a", 62),
+		},
+		{
+			name:  "very long local part truncates and trims trailing hyphen",
+			email: strings.Repeat("a", 70) + "_" + strings.Repeat("b", 5) + "@example.com",
+			want:  strings.Repeat("a", 63),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := userLabel(tt.email)
+			if got != tt.want {
+				t.Errorf("userLabel(%q) = %q, want %q", tt.email, got, tt.want)
+			}
+			if len(got) > 63 {
+				t.Errorf("userLabel(%q) length = %d, exceeds 63 char label limit", tt.email, len(got))
+			}
+			if got != "" && strings.HasSuffix(got, "-") {
+				t.Errorf("userLabel(%q) = %q, ends with a hyphen", tt.email, got)
+			}
+		})
+	}
+}

@@ -11,8 +11,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
-	"os/user"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -38,7 +38,6 @@ var instanceLabels = map[string]string{
 	"project":   "elastic-agent",
 	"purpose":   "integration-test",
 	"ephemeral": "true",
-	"user":      userLabel(),
 }
 
 type provisioner struct {
@@ -161,9 +160,16 @@ func (p *provisioner) createInstance(ctx context.Context, batch common.OSBatch, 
 	}
 	sshMeta := fmt.Sprintf("%s:%s", layout.Username, publicKey)
 
-	// Build labels string
+	labels := maps.Clone(instanceLabels)
+	email, err := p.cfg.ClientEmail()
+	if err != nil {
+		return common.Instance{}, fmt.Errorf("failed to read client email for user label: %s", err)
+	}
+	if u := userLabel(email); u != "" {
+		labels["user"] = u
+	}
 	var labelParts []string
-	for k, v := range instanceLabels {
+	for k, v := range labels {
 		labelParts = append(labelParts, fmt.Sprintf("%s=%s", k, v))
 	}
 
@@ -401,26 +407,18 @@ func randomHexSuffix(hexLen int) (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// userLabel returns a GCE-label-safe identifier for the current OS user.
-func userLabel() string {
-	u, err := user.Current()
-	if err != nil || u.Username == "" {
-		return "unknown"
+// userLabel returns a GCE-label-safe identifier derived from a service account email.
+func userLabel(email string) string {
+	if idx := strings.IndexByte(email, '@'); idx >= 0 {
+		email = email[:idx]
 	}
-	name := strings.ToLower(u.Username)
-	// On Windows, user.Current().Username is "DOMAIN\name"; strip the domain.
-	if idx := strings.LastIndexAny(name, `\/`); idx >= 0 {
-		name = name[idx+1:]
-	}
+	name := strings.ToLower(email)
 	name = invalidGCEChars.ReplaceAllString(name, "-")
 	name = strings.Trim(name, "-")
 	if len(name) > maxGCEInstanceNameLen {
 		name = name[:maxGCEInstanceNameLen]
 		// Truncation can leave a trailing hyphen; GCE labels can't end with one.
 		name = strings.TrimRight(name, "-")
-	}
-	if name == "" {
-		return "unknown"
 	}
 	return name
 }
