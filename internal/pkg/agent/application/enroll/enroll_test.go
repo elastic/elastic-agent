@@ -14,11 +14,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-<<<<<<< HEAD
-=======
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
->>>>>>> 80cd031bc (fix: interrupt retry backoff on ctx cancellation for fleet enroll (#13698))
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
