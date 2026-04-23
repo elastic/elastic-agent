@@ -1533,6 +1533,9 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 							"extension:healthcheckv2/uuid": {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
+							"extension:kafkapartitioner/test": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
 						},
 					},
 				},

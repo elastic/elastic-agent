@@ -3050,6 +3050,273 @@ agent.monitoring:
 	})
 }
 
+func TestKafkaOutputPartitioningWithOtelRuntime(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok, "failed to get current file path")
+	kafkaPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "beats", "testing", "environments", "docker", "kafka")
+
+	composeContent := fmt.Sprintf(`
+services:
+  kafka:
+    build: %s
+    ports:
+      - 9092:9092
+      - 9093:9093
+      - 9094:9094
+      - 2181:2181
+    environment:
+      - KAFKA_ADVERTISED_HOST=localhost
+`, kafkaPath)
+
+	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = stack.Down(
+			context.Background(),
+			compose.RemoveOrphans(true),
+			compose.RemoveVolumes(true),
+			compose.RemoveImagesLocal,
+		)
+	})
+
+	err = stack.Up(t.Context(), compose.Wait(true))
+	require.NoError(t, err)
+
+	// Each strategy gets its own topic.
+	// The kafka server is configured with num.partitions=3 so every new topic has 3 partitions.
+	tableTests := []struct {
+		name            string
+		topic           string
+		partitionConfig string
+		validate        func(*testing.T, []sarama.PartitionConsumer, map[int32]int)
+	}{
+		{
+			name:  "random",
+			topic: "metrics-e2e-partition-random",
+			partitionConfig: `
+    partition:
+      random:
+        group_events: 1`,
+			validate: func(t *testing.T, partitionConsumers []sarama.PartitionConsumer, msgsByPartition map[int32]int) {
+				require.Eventually(t,
+					func() bool {
+						for _, pc := range partitionConsumers {
+							select {
+							case msg := <-pc.Messages():
+								msgsByPartition[msg.Partition]++
+								return true
+							default:
+							}
+						}
+						return false
+					},
+					2*time.Minute, 5*time.Second,
+					"expected at least 1 message with random partition strategy")
+			},
+		},
+		{
+			name:  "round_robin",
+			topic: "metrics-e2e-partition-round-robin",
+			partitionConfig: `
+    partition:
+      round_robin:
+        group_events: 1`,
+			validate: func(t *testing.T, partitionConsumers []sarama.PartitionConsumer, msgsByPartition map[int32]int) {
+				require.Eventually(t,
+					func() bool {
+						for _, pc := range partitionConsumers {
+							// Non-blocking drain of all currently buffered messages.
+							for {
+								select {
+								case msg := <-pc.Messages():
+									msgsByPartition[msg.Partition]++
+								default:
+									goto nextPC
+								}
+							}
+						nextPC:
+						}
+						return len(msgsByPartition) >= 2
+					},
+					2*time.Minute, 5*time.Second,
+					"expected round_robin to distribute messages across at least 2 of 3 partitions")
+			},
+		},
+		{
+			name:  "hash",
+			topic: "metrics-e2e-partition-hash",
+			partitionConfig: `
+    partition:
+      hash:
+        random: true`,
+			validate: func(t *testing.T, partitionConsumers []sarama.PartitionConsumer, msgsByPartition map[int32]int) {
+				require.Eventually(t,
+					func() bool {
+						for _, pc := range partitionConsumers {
+							select {
+							case msg := <-pc.Messages():
+								msgsByPartition[msg.Partition]++
+								return true
+							default:
+							}
+						}
+						return false
+					},
+					2*time.Minute, 5*time.Second,
+					"expected at least 1 message with hash partition strategy")
+			},
+		},
+	}
+
+	for _, tt := range tableTests {
+		t.Run(tt.name, func(t *testing.T) {
+			type configOptions struct {
+				Topic           string
+				PartitionConfig string
+				CaCert          string
+			}
+
+			configTemplate := `
+agent.internal.runtime.output:
+  kafka: otel
+agent.grpc.port: 6799
+inputs:
+  - type: system/metrics
+    id: system-metrics-test
+    use_output: default
+    streams:
+    - metricsets:
+       - cpu
+      period: 1s
+      data_stream:
+        dataset: e2e
+        namespace: partitioning
+outputs:
+  default:
+    type: kafka
+    hosts: ["localhost:9093"]
+    topic: '{{.Topic}}'
+    max_message_bytes: 1000000
+    required_acks: 1
+    broker_timeout: 30s
+    queue.mem.flush.timeout: 1s{{.PartitionConfig}}
+    ssl:
+      certificate_authorities:
+        - {{.CaCert}}
+      supported_protocols:
+       - TLSv1.3
+      verification_mode: full
+    username: beats
+    password: KafkaTest
+    protocol: https
+    sasl.mechanism: SCRAM-SHA-256
+agent.monitoring:
+  metrics: false
+  logs: false
+  http:
+    enabled: true
+    port: 6790
+`
+
+			var configBuffer bytes.Buffer
+			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, configOptions{
+				Topic:           tt.topic,
+				PartitionConfig: tt.partitionConfig,
+				CaCert:          filepath.Join(kafkaPath, "certs", "ca-cert"),
+			})
+
+			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+			require.NoError(t, err)
+
+			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+			defer cancel()
+
+			err = fixture.Prepare(ctx)
+			require.NoError(t, err)
+
+			err = fixture.Configure(ctx, configBuffer.Bytes())
+			require.NoError(t, err)
+
+			cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+			require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+			agentOutput := strings.Builder{}
+			cmd.Stderr = &agentOutput
+			cmd.Stdout = &agentOutput
+
+			err = cmd.Start()
+			require.NoError(t, err)
+
+			t.Cleanup(func() {
+				if t.Failed() {
+					t.Logf("Elastic-Agent output for %s partition strategy:", tt.name)
+					t.Log(agentOutput.String())
+				}
+			})
+
+			require.Eventually(t, func() bool {
+				err = fixture.IsHealthy(ctx)
+				if err != nil {
+					t.Logf("waiting for agent healthy: %s", err.Error())
+					return false
+				}
+				return true
+			}, 30*time.Second, 1*time.Second)
+
+			// Connect to the unauthenticated plaintext listener (port 9094) for consuming.
+			consumer, err := sarama.NewConsumer([]string{"localhost:9094"}, sarama.NewConfig())
+			require.NoError(t, err)
+			defer consumer.Close()
+
+			// Wait for the agent to create the topic, then open partition consumers.
+			// The server default num.partitions=3 means every auto-created topic has 3 partitions.
+			var partitionConsumers []sarama.PartitionConsumer
+			require.Eventually(t, func() bool {
+				if len(partitionConsumers) > 0 {
+					return true
+				}
+				pcs := make([]sarama.PartitionConsumer, 0, 3)
+				for p := int32(0); p < 3; p++ {
+					// OffsetOldest so we pick up messages already published while the agent was starting.
+					pc, createErr := consumer.ConsumePartition(tt.topic, p, sarama.OffsetOldest)
+					if createErr != nil {
+						for _, existing := range pcs {
+							existing.Close()
+						}
+						t.Logf("waiting for topic %s partition %d: %v", tt.topic, p, createErr)
+						return false
+					}
+					pcs = append(pcs, pc)
+				}
+				partitionConsumers = pcs
+				return true
+			}, 2*time.Minute, 5*time.Second, "topic %s should be created by the agent", tt.topic)
+
+			defer func() {
+				for _, pc := range partitionConsumers {
+					pc.Close()
+				}
+			}()
+
+			tt.validate(t, partitionConsumers, make(map[int32]int))
+
+			cancel()
+			cmd.Wait()
+		})
+	}
+}
+
 //go:embed testdata/pipelines.yml
 var pipelineTemplate string
 
