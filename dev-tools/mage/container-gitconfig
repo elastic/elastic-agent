@@ -1,0 +1,9 @@
+# Mounted into /etc/gitconfig inside the golang-crossbuild container by
+# crossbuild.go. Marks the mounted repo path as trusted so git can operate
+# on it regardless of ownership mismatches between the container process and
+# files within the repository tree. Without this, git's dubious-ownership
+# check can fire and break build-time git calls (e.g. `git rev-parse HEAD`
+# during ldflags template expansion).
+[safe]
+	directory = /go/src/github.com/elastic/elastic-agent
+	directory = /go/src/github.com/elastic/elastic-agent/beats

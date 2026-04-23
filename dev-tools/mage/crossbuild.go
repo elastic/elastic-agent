@@ -317,6 +317,11 @@ func (b GolangCrossBuilder) Build() error {
 		"-v", repoInfo.RootDir+":"+mountPoint,
 	)
 
+	// Trust the mounted repo path so git works despite the host/container UID
+	// mismatch under rootful Docker.
+	containerGitConfig := filepath.Join(repoInfo.RootDir, "dev-tools", "mage", "container-gitconfig")
+	args = append(args, "-v", containerGitConfig+":/etc/gitconfig:ro")
+
 	// If in a git worktree, mount the main repo's .git directory into the
 	// container so git can resolve the worktree reference.
 	if commonDir, err := sh.Output("git", "-C", repoInfo.RootDir, "rev-parse", "--git-common-dir"); err == nil {
