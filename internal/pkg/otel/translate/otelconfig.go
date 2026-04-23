@@ -437,6 +437,11 @@ func getReceiversConfigForComponent(
 			"modules": inputs,
 		}
 	}
+
+	if comp.OutputType == "kafka" || comp.OutputType == "logstash" {
+		receiverConfig["include_metadata"] = true
+	}
+
 	// add the output queue config if present
 	if outputQueueConfig != nil {
 		receiverConfig["queue"] = outputQueueConfig
