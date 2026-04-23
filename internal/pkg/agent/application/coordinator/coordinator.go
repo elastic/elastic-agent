@@ -656,7 +656,15 @@ func (c *Coordinator) Migrate(
 		return ErrFleetServer
 	}
 
-	// Keeping all enrollment options that are not overridden via action
+	// Build enrollment options solely from the migration action.
+	// The source cluster's configuration is not inherited — fields not provided
+	// in the action fall back to system defaults (e.g., OS trust store for TLS).
+	options, err := enroll.OptionsFromMigrateAction(action)
+	if err != nil {
+		return fmt.Errorf("failed to build options from migrate action: %w", err)
+	}
+
+	// Original options are only needed for unenrolling from the source cluster later.
 	originalOptions, err := computeEnrollOptions(ctx, paths.ConfigFile(), paths.AgentConfigFile())
 	if err != nil {
 		return fmt.Errorf("failed to compute enroll options: %w", err)
@@ -665,12 +673,6 @@ func (c *Coordinator) Migrate(
 	persistentConfig, err := enroll.LoadPersistentConfig(paths.ConfigFile())
 	if err != nil {
 		return err
-	}
-
-	// merge with options coming from action
-	options, err := enroll.MergeOptionsWithMigrateAction(action, originalOptions)
-	if err != nil {
-		return fmt.Errorf("failed to merge options with migrate action: %w", err)
 	}
 
 	newRemoteConfig, err := options.RemoteConfig(true)
