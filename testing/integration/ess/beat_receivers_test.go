@@ -1400,7 +1400,7 @@ func getBeatStartLogRecords(logs string) []map[string]any {
 			continue
 		}
 
-		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Beat name:") {
+		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Starting metrics logging") {
 			logRecords = append(logRecords, mapstr.M(logRecord).Flatten())
 		}
 	}
