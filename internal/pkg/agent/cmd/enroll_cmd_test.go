@@ -15,12 +15,14 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -35,6 +37,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -759,6 +762,73 @@ func TestDaemonReloadWithBackoff(t *testing.T) {
 			assert.ErrorIs(t, err, tc.wantErr)
 		})
 	}
+}
+
+// failingSender implements fleetclient.Sender and always returns an error
+// from Send, so the enrollment retry loop engages.
+type failingSender struct{}
+
+func (failingSender) Send(context.Context, string, string, url.Values, http.Header, io.Reader) (*http.Response, error) {
+	return nil, errors.New("boom")
+}
+
+func (failingSender) URI() string { return "http://localhost" }
+
+// fakeBackoff allows controlling the sequence of Wait() return values for tests.
+type fakeBackoff struct {
+	results []bool
+	block   chan struct{}
+}
+
+// Wait returns values from results (FIFO), or true when results is empty.
+// If block is non-nil, it simulates an infinite backoff.
+func (f *fakeBackoff) Wait() bool {
+	if f.block != nil {
+		<-f.block
+	}
+	if len(f.results) > 0 {
+		r := f.results[0]
+		f.results = f.results[1:]
+		return r
+	}
+	return true
+}
+
+func (f *fakeBackoff) NextWait() (d time.Duration) { return 0 }
+func (f *fakeBackoff) Reset()                      {}
+
+func TestEnrollWithBackoff_InterruptsBackoffWaitOnCtxCancel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		log := logger.NewWithoutConfig("")
+
+		fb := &fakeBackoff{block: make(chan struct{})}
+		defer close(fb.block)
+
+		cmd := enrollCmd{
+			log:     log,
+			client:  failingSender{},
+			options: &enrollCmdOption{},
+			backoffFactory: func(done <-chan struct{}) backoff.Backoff {
+				return fb
+			},
+		}
+
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- cmd.enrollWithBackoff(ctx, map[string]interface{}{})
+		}()
+
+		// enrollWithBackoff should return when the caller's context is canceled, even if the retry
+		// loop is currently blocked in backoff.Wait()
+		synctest.Wait()
+		cancel()
+
+		err := <-errCh
+		require.ErrorIs(t, err, context.Canceled)
+	})
 }
 
 func TestWaitForFleetServer_timeout(t *testing.T) {
