@@ -374,9 +374,6 @@ func (Build) Clean() error {
 	return nil
 }
 
-<<<<<<< HEAD
-func getTestBinariesPath() ([]string, error) {
-=======
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
 	mg.SerialDeps(Build.UnitTestBinaries, Build.IntegrationTestBinaries)
@@ -401,13 +398,7 @@ func (Build) IntegrationTestBinaries() error {
 	return buildTestBinaries(testBinaryPkgs)
 }
 
-// TestFakeComponent build just the test fake component.
-func (Build) TestFakeComponent() error {
-	return Build{}.IntegrationTestBinaries()
-}
-
 func getUnitTestBinariesPath() ([]string, error) {
->>>>>>> 216e1d26c (Only build the necessary test binaries (#12987))
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("could not get working directory: %w", err)
@@ -422,11 +413,6 @@ func getUnitTestBinariesPath() ([]string, error) {
 	return testBinaryPkgs, nil
 }
 
-<<<<<<< HEAD
-// TestBinaries build the required binaries for the test suite.
-func (Build) TestBinaries() error {
-	testBinaryPkgs, err := getTestBinariesPath()
-=======
 func getIntegrationTestBinariesPath() ([]string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -440,12 +426,6 @@ func getIntegrationTestBinariesPath() ([]string, error) {
 }
 
 func buildTestBinaries(testBinaryPkgs []string) error {
-	wd, err := os.Getwd()
->>>>>>> 216e1d26c (Only build the necessary test binaries (#12987))
-	if err != nil {
-		fmt.Errorf("cannot build test binaries: %w", err)
-	}
-
 	args := []string{"build", "-v"}
 	if runtime.GOOS == "darwin" {
 		osMajorVer, err := getMacOSMajorVersion()
