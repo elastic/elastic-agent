@@ -879,6 +879,9 @@ func TestGetOtelConfig(t *testing.T) {
 							"encoding": "raw",
 						},
 						"timeout": 10 * time.Second,
+						"record_partitioner": map[string]any{
+							"extension": "kafkapartitioner",
+						},
 					},
 				},
 				"processors": map[string]any{
@@ -894,10 +897,14 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 					},
 				},
+				"extensions": map[string]any{
+					"kafkapartitioner": map[string]interface{}{},
+				},
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": expectedBeatMetricConfig,
 				},
 				"service": map[string]any{
+					"extensions": []any{"kafkapartitioner"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
 							"exporters":  {"kafka/_agent-component/default"},

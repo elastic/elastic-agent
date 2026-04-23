@@ -632,12 +632,15 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 		}
 	} else if exporterType.String() == "kafka" {
 		partitioner, ok := unitConfigMap["partition"]
+		extensionCfg = map[string]any{}
 		if ok {
-			extensionCfg = map[string]any{}
 			extensionCfg[kafkapartitionerextension.Type.String()] = partitioner
-			exporterConfig["record_partitioner"] = map[string]any{
-				"extension": kafkapartitionerextension.Type.String(),
-			}
+		} else {
+			// Specifying empty map will make the extension use the default hash partitioner.
+			extensionCfg[kafkapartitionerextension.Type.String()] = map[string]any{}
+		}
+		exporterConfig["record_partitioner"] = map[string]any{
+			"extension": kafkapartitionerextension.Type.String(),
 		}
 	}
 
