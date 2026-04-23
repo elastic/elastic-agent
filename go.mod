@@ -11,7 +11,6 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/cespare/xxhash/v2 v2.3.0
-	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260422170424-7ed4fd9573f4
@@ -42,6 +41,7 @@ require (
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
 	github.com/knadh/koanf/maps v0.1.2
 	github.com/magefile/mage v1.15.0
+	github.com/moby/moby/client v0.4.0
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.149.0
 	github.com/otiai10/copy v1.14.1
@@ -273,6 +273,14 @@ require (
 	github.com/digitalocean/godo v1.173.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
+<<<<<<< HEAD
+=======
+	github.com/docker/buildx v0.33.0 // indirect
+	github.com/docker/cli v29.4.0+incompatible // indirect
+	github.com/docker/compose/v5 v5.1.2 // indirect
+	github.com/docker/docker v28.5.2+incompatible // indirect
+	github.com/docker/docker-credential-helpers v0.9.5 // indirect
+>>>>>>> 675d48a5f (Migrate from deprecated docker/docker to moby/moby client library (#13727))
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/dop251/goja v0.0.0-20250630131328-58d95d85e994 // indirect
 	github.com/dop251/goja_nodejs v0.0.0-20250409162600-f7acab6894b0 // indirect
@@ -479,6 +487,13 @@ require (
 	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
+<<<<<<< HEAD
+=======
+	github.com/moby/go-archive v0.2.0 // indirect
+	github.com/moby/locker v1.0.1 // indirect
+	github.com/moby/moby/api v1.54.1 // indirect
+	github.com/moby/patternmatcher v0.6.1 // indirect
+>>>>>>> 675d48a5f (Migrate from deprecated docker/docker to moby/moby client library (#13727))
 	github.com/moby/spdystream v0.5.0 // indirect
 	github.com/moby/term v0.5.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
