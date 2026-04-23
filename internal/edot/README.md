@@ -71,7 +71,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlserverreceiver/v0.150.0/receiver/sqlserverreceiver/README.md) | v0.150.0 |
 | [statsdreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/statsdreceiver/v0.150.0/receiver/statsdreceiver/README.md) | v0.150.0 |
 | [vcenterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/vcenterreceiver/v0.150.0/receiver/vcenterreceiver/README.md) | v0.150.0 |
-| [windowseventlogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowseventlogreceiver/v0.150.0/receiver/windowseventlogreceiver/README.md) | v0.150.0 |
+| [windowseventlogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowseventlogreceiver/v0.149.0/receiver/windowseventlogreceiver/README.md) | v0.149.0 |
 | [windowsperfcountersreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowsperfcountersreceiver/v0.150.0/receiver/windowsperfcountersreceiver/README.md) | v0.150.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.150.0/receiver/zipkinreceiver/README.md) | v0.150.0 |
 | [zookeeperreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zookeeperreceiver/v0.150.0/receiver/zookeeperreceiver/README.md) | v0.150.0 |
