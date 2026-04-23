@@ -15,7 +15,8 @@ function ess_up {
   # embedded double quotes (even when passed as a separate argument), so
   # the inline --parameters form produced "invalid character 'G'" errors
   # from oblt-cli. A file bypasses PS arg marshalling entirely.
-  $paramsPath = Join-Path $PWD "params.json"
+  $paramsPath      = Join-Path $PWD "params.json"
+  $clusterInfoPath = Join-Path $PWD "cluster-info.json"
   @{
       GitOps           = "true"
       GitHubRepository = $Env:BUILDKITE_REPO
@@ -25,11 +26,13 @@ function ess_up {
   } | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
 
   try {
+    # --output-file must be an absolute path; oblt-cli resolves relative
+    # paths against its own config dir (~/.oblt-cli), not CWD.
     & oblt-cli cluster create custom `
         --template ess-ea-it `
         --cluster-name-prefix ea-hosted-it `
         --parameters-file $paramsPath `
-        --output-file="cluster-info.json" `
+        --output-file $clusterInfoPath `
         --wait 30
   } finally {
     Remove-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue
@@ -39,12 +42,12 @@ function ess_up {
       return 1
   }
 
-  if (-not (Test-Path "cluster-info.json")) {
-      Write-Error "Error: cluster-info.json was not created by oblt-cli"
+  if (-not (Test-Path $clusterInfoPath)) {
+      Write-Error "Error: cluster-info.json was not created by oblt-cli at $clusterInfoPath"
       return 1
   }
 
-  $ClusterName = (Get-Content -Path "cluster-info.json" | ConvertFrom-Json).ClusterName
+  $ClusterName = (Get-Content -Path $clusterInfoPath | ConvertFrom-Json).ClusterName
   if (-not $ClusterName) {
       Write-Error "Error: Failed to retrieve cluster name from cluster-info.json"
       return 1
@@ -69,8 +72,9 @@ function ess_down {
     # Prefer the local cluster-info.json from this step's own ess_up,
     # so we don't destroy a cluster created by a parallel step.
     $ClusterName = $null
-    if (Test-Path "cluster-info.json") {
-      $ClusterName = (Get-Content -Path "cluster-info.json" | ConvertFrom-Json).ClusterName
+    $clusterInfoPath = Join-Path $PWD "cluster-info.json"
+    if (Test-Path $clusterInfoPath) {
+      $ClusterName = (Get-Content -Path $clusterInfoPath | ConvertFrom-Json).ClusterName
     }
     if (-not $ClusterName) {
       $ClusterName = & buildkite-agent meta-data get cluster-name 2>$null
@@ -97,8 +101,9 @@ function ess_load_secrets {
   # Prefer the local cluster-info.json from this step's own ess_up,
   # so we don't read secrets from a cluster created by a parallel step.
   $ClusterName = $null
-  if (Test-Path "cluster-info.json") {
-    $ClusterName = (Get-Content -Path "cluster-info.json" | ConvertFrom-Json).ClusterName
+  $clusterInfoPath = Join-Path $PWD "cluster-info.json"
+  if (Test-Path $clusterInfoPath) {
+    $ClusterName = (Get-Content -Path $clusterInfoPath | ConvertFrom-Json).ClusterName
   }
   if (-not $ClusterName) {
     $ClusterName = & buildkite-agent meta-data get cluster-name 2>$null
@@ -108,17 +113,17 @@ function ess_load_secrets {
     return 1
   }
 
-  # Pipe oblt-cli stdout to Out-Host so it's visible in the BK log but NOT
-  # captured into the function's output stream - otherwise `$rc = ess_load_secrets`
-  # in the caller would receive an array (oblt-cli output + our `return 0`)
-  # instead of a scalar exit code.
-  & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file="secrets.env" | Out-Host
+  # --output-file must be absolute (oblt-cli resolves relative paths against
+  # its own config dir). Pipe stdout to Out-Host so it's visible in logs but
+  # doesn't pollute the function's return value captured by `$rc =
+  # ess_load_secrets` in the caller.
+  $envFile = Join-Path $PWD "secrets.env"
+  & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file $envFile | Out-Host
   if ($LASTEXITCODE -ne 0) {
     Write-Error "Error: oblt-cli cluster secrets env failed (exit=$LASTEXITCODE)"
     return 1
   }
 
-  $envFile = "secrets.env"
   if (-not (Test-Path $envFile)) {
       Write-Error "secrets.env file not found at $envFile"
       return 1
