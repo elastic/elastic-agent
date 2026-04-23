@@ -283,7 +283,7 @@ func getESClient() (*elasticsearch.Client, error) {
 	esUser := os.Getenv("ELASTICSEARCH_USERNAME")
 	esPass := os.Getenv("ELASTICSEARCH_PASSWORD")
 	if esHost == "" || esUser == "" || esPass == "" {
-		return nil, fmt.Errorf("ELASTICSEARCH_* must be defined by the test runner: %s %s %s", esHost, esUser, esPass)
+		return nil, errors.New("ELASTICSEARCH_* must be defined by the test runner")
 	}
 	c, err := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{esHost},
