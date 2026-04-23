@@ -615,6 +615,147 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 	c.reexecMgr.ReExec(callback, argOverrides...)
 }
 
+<<<<<<< HEAD
+=======
+// Migrate migrates agent to a new cluster and ACKs success to the old one.
+// In case of failure no ack is performed and error is returned.
+func (c *Coordinator) Migrate(
+	ctx context.Context,
+	action *fleetapi.ActionMigrate,
+	backoffFactory func(done <-chan struct{}) backoff.Backoff,
+	notifyFn func(context.Context, *fleetapi.ActionMigrate) error,
+) error {
+	if c.isContainerizedEnvironment() {
+		return ErrContainerNotSupported
+	}
+	if !c.isManaged {
+		return ErrNotManaged
+	}
+
+	// check if agent is FS, fail if so
+	if c.isFleetServer() {
+		return ErrFleetServer
+	}
+
+	// Build enrollment options solely from the migration action.
+	// The source cluster's configuration is not inherited — fields not provided
+	// in the action fall back to system defaults (e.g., OS trust store for TLS).
+	options, err := enroll.OptionsFromMigrateAction(action)
+	if err != nil {
+		return fmt.Errorf("failed to build options from migrate action: %w", err)
+	}
+
+	// Original options are only needed for unenrolling from the source cluster later.
+	originalOptions, err := computeEnrollOptions(ctx, paths.ConfigFile(), paths.AgentConfigFile())
+	if err != nil {
+		return fmt.Errorf("failed to compute enroll options: %w", err)
+	}
+
+	persistentConfig, err := enroll.LoadPersistentConfig(paths.ConfigFile())
+	if err != nil {
+		return err
+	}
+
+	newRemoteConfig, err := options.RemoteConfig(true)
+	if err != nil {
+		return fmt.Errorf("failed to construct new remote config: %w", err)
+	}
+	newFleetClient, err := fleetapiClient.NewAuthWithConfig(
+		c.logger, options.EnrollAPIKey, newRemoteConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create new fleet client: %w", err)
+	}
+
+	// Target is checked prior to enroll
+	if err := fleetapiClient.CheckRemote(ctx, newFleetClient); err != nil {
+		return err
+	}
+
+	// Backing up config
+	if err := backupConfig(); err != nil {
+		return err
+	}
+
+	encStore, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+	if err != nil {
+		return fmt.Errorf("failed to create encrypted disk store: %w", err)
+	}
+	store := storage.NewReplaceOnSuccessStore(
+		paths.ConfigFile(),
+		info.DefaultAgentFleetConfig,
+		encStore,
+	)
+
+	// Agent enrolls to target cluster
+	err = enroll.EnrollWithBackoff(ctx, c.logger,
+		persistentConfig,
+		enrollDelay,
+		options,
+		store,
+		backoffFactory,
+		3, // try enrollment for 3 times and fail
+	)
+	if err != nil {
+		restoreErr := RestoreConfig()
+		return errors.Join(fmt.Errorf("failed to enroll: %w", err), restoreErr)
+	}
+
+	// lock processing of new config before notifying components
+	// hold lock until notification failure or reexec
+	c.migrationProgressWg.Add(1)
+	if notifyFn != nil {
+		// notify before completing migration
+		// components such endpoint are crucial to work even though it's on stale cluster
+		// error on component side is returned as part of Action response
+		if err := notifyFn(ctx, action); err != nil {
+			restoreErr := RestoreConfig()
+
+			// in case of failure no need to lock processing
+			// safe to forward policy from source cluster
+			c.migrationProgressWg.Done()
+
+			return errors.Join(fmt.Errorf("failed to notify components: %w", err), restoreErr)
+		}
+	}
+
+	// ACK success to source fleet server
+	if err := c.ackMigration(ctx, action, c.fleetAcker); err != nil {
+		c.logger.Warnf("failed to ACK success: %v", err)
+	}
+
+	if err := cleanBackupConfig(); err != nil {
+		// when backup is present, it will be restored on next start.
+		// do not ack success
+		return fmt.Errorf("failed to clean backup config: %w", err)
+	}
+
+	c.bestEffortUnenroll(ctx, originalOptions)
+
+	return nil
+}
+
+func (c *Coordinator) bestEffortUnenroll(ctx context.Context, originalOptions enroll.EnrollOptions) {
+	originalRemoteConfig, err := originalOptions.RemoteConfig(false)
+	if err != nil {
+		c.logger.Warnf("failed to construct original remote config: %v", err)
+		return
+	}
+
+	originalClient, err := fleetapiClient.NewAuthWithConfig(
+		c.logger, originalOptions.EnrollAPIKey, originalRemoteConfig)
+	if err != nil {
+		c.logger.Warnf("failed to create original fleet client: %v", err)
+		return
+	}
+
+	// Best effort: call unenroll on source cluster once done
+	if err := c.unenroll(ctx, originalClient); err != nil {
+		c.logger.Warnf("failed to unenroll from original cluster: %v", err)
+		return
+	}
+}
+
+>>>>>>> e67aed639 (Fix migrate action to not merge options (#13756))
 type upgradeOpts struct {
 	skipVerifyOverride bool
 	skipDefaultPgp     bool
