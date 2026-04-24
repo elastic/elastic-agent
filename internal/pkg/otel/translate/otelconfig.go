@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
+	"github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -256,6 +257,13 @@ func GetProcessorID() otelcomponent.ID {
 func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
+}
+
+// getKafkaPartitionerExtensionID returns the id for kafkapartitioner extension
+// outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
+func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(kafkapartitionerextension.Type.String()), extensionName)
 }
 
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
@@ -628,6 +636,19 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 			// We paste the config as is, without any translation.
 			// The state store extension will pick up relevant settings from it and ignore the rest.
 			extensionCfg[elasticsearchStateStoreExtensionName] = unitConfigMap
+		}
+	} else if exporterType.String() == "kafka" {
+		extensionID := getKafkaPartitionerExtensionID(outputName)
+		extensionCfg = map[string]any{}
+		partitioner, ok := unitConfigMap["partition"]
+		if ok {
+			extensionCfg[extensionID.String()] = partitioner
+		} else {
+			// Specifying empty map will make the extension use the default hash partitioner.
+			extensionCfg[extensionID.String()] = map[string]any{}
+		}
+		exporterConfig["record_partitioner"] = map[string]any{
+			"extension": extensionID.String(),
 		}
 	}
 
