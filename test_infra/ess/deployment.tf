@@ -119,7 +119,6 @@ resource "ec_deployment" "integration-testing" {
     }
   }
   kibana = {
-    size                      = "2g"
     zone_count                = 1
     config = {
       user_settings_json = jsonencode({
