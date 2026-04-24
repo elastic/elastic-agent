@@ -271,20 +271,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			customPass, _ = cmd.Flags().GetString(flagInstallCustomPass)
 		}
 
-<<<<<<< HEAD
-		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, customUser, customGroup, customPass)
-		if err != nil {
-			return fmt.Errorf("error installing package: %w", err)
-		}
-
-=======
-		flavor := install.DefaultFlavor
-		if installServers, _ := cmd.Flags().GetBool(flagInstallServers); installServers {
-			flavor = install.FlavorServers
-		}
-
 		// Registered before install.Install so partial-install failures are also rolled back.
->>>>>>> f8df6d454 (fix: clean up leftover artifacts when install fails (#13705))
 		defer func() {
 			if err != nil {
 				progBar.Describe("Uninstalling")
@@ -297,7 +284,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			}
 		}()
 
-		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, customUser, customGroup, customPass, flavor)
+		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, customUser, customGroup, customPass)
 		if err != nil {
 			return fmt.Errorf("error installing package: %w", err)
 		}
