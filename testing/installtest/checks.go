@@ -50,6 +50,8 @@ type CheckOpts struct {
 	TargetVersion string
 	// StartVersion is the version the agent was upgraded from.
 	StartVersion string
+	// TopPath is the agent install directory.
+	TopPath string
 }
 
 func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts *CheckOpts) error {
@@ -86,6 +88,15 @@ func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts
 }
 
 func CheckUninstallSuccess(opts *CheckOpts) error {
+	if opts.TopPath != "" {
+		if _, err := os.Stat(opts.TopPath); !os.IsNotExist(err) {
+			if err == nil {
+				return fmt.Errorf("%s still exists after uninstall", opts.TopPath)
+			}
+			return fmt.Errorf("unexpected error checking %s: %w", opts.TopPath, err)
+		}
+	}
+
 	return checkUninstallPlatform(opts)
 }
 
