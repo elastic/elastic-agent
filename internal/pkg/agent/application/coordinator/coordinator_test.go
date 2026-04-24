@@ -625,9 +625,15 @@ func TestReplayedRollbackActionAcked(t *testing.T) {
 
 	// Replayed rollback should report UpgradeDetails with StateRollback so that
 	// Fleet knows the agent completed the rollback (not empty/nil details).
-	state := coord.State()
-	require.NotNil(t, state.UpgradeDetails, "upgrade details should be present after replayed rollback is handled")
-	assert.Equal(t, details.StateRollback, state.UpgradeDetails.State, "upgrade details state should be rollback")
+	// State propagation from Upgrade() to the stateBroadcaster happens on the
+	// coordinator goroutine, so poll until the update is visible.
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		state := coord.State()
+		if !assert.NotNil(ct, state.UpgradeDetails, "upgrade details should be present after replayed rollback is handled") {
+			return
+		}
+		assert.Equal(ct, details.StateRollback, state.UpgradeDetails.State, "upgrade details state should be rollback")
+	}, 3*time.Second, 10*time.Millisecond)
 
 	cancel()
 	require.NoError(t, <-coordCh)
