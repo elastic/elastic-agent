@@ -39,6 +39,7 @@ func newSubscriptionAll(ctx context.Context) *SubscriptionAll {
 	}
 }
 
+<<<<<<< HEAD
 // NewSubscriptionAllWithChannel creates a SubscriptionAll using an existing channel
 // For Test purposes ONLY.
 func NewSubscriptionAllWithChannel(ctx context.Context, evtChan chan ComponentComponentState) *SubscriptionAll {
@@ -46,6 +47,12 @@ func NewSubscriptionAllWithChannel(ctx context.Context, evtChan chan ComponentCo
 		ctx: ctx,
 		ch:  evtChan,
 	}
+=======
+// NewSubscriptionAll returns a SubscriptionAll whose channel is never written to.
+// Intended for use in tests that provide a fake runtime manager.
+func NewSubscriptionAll(ctx context.Context) *SubscriptionAll {
+	return newSubscriptionAll(ctx)
+>>>>>>> 2d7074665 (Fix flaky coordinator test (#13830))
 }
 
 // Ch provides the channel to get state changes.
