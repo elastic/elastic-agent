@@ -15,6 +15,8 @@ ESS_REGION="${ESS_REGION:-gcp-us-west2}"
 
 ess_up "$STACK_VERSION" "$STACK_BUILD_ID" "$ESS_REGION"
 
+wait_for_stack
+
 preinstall_fleet_packages
 
 echo "ES_HOST: ${ELASTICSEARCH_HOST}"
