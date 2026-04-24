@@ -104,6 +104,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.42.0/extension/apikeyauthextension/README.md) | v0.42.0 |
 | [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.42.0/extension/apmconfigextension/README.md) | v0.42.0 |
 | [awslogsencodingextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/encoding/awslogsencodingextension/v0.149.0/extension/encoding/awslogsencodingextension/README.md) | v0.149.0 |
@@ -114,6 +115,20 @@ This section provides a summary of components included in the Elastic Distributi
 | [healthcheckv2extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckv2extension/v0.149.0/extension/healthcheckv2extension/README.md) | v0.149.0 |
 | [k8sleaderelector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/k8sleaderelector/v0.149.0/extension/k8sleaderelector/README.md) | v0.149.0 |
 | [k8sobserver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/observer/k8sobserver/v0.149.0/extension/observer/k8sobserver/README.md) | v0.149.0 |
+=======
+| [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.46.0/extension/apikeyauthextension/README.md) | v0.46.0 |
+| [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.46.0/extension/apmconfigextension/README.md) | v0.46.0 |
+| [awslogsencodingextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/encoding/awslogsencodingextension/v0.150.0/extension/encoding/awslogsencodingextension/README.md) | v0.150.0 |
+| [azureencodingextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/encoding/azureencodingextension/v0.150.0/extension/encoding/azureencodingextension/README.md) | v0.150.0 |
+| [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.150.0/extension/bearertokenauthextension/README.md) | v0.150.0 |
+| [cgroupruntimeextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/cgroupruntimeextension/v0.150.0/extension/cgroupruntimeextension/README.md) | v0.150.0 |
+| [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.150.0/extension/storage/filestorage/README.md) | v0.150.0 |
+| [headerssetterextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/headerssetterextension/v0.150.0/extension/headerssetterextension/README.md) | v0.150.0 |
+| [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.150.0/extension/healthcheckextension/README.md) | v0.150.0 |
+| [healthcheckv2extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckv2extension/v0.150.0/extension/healthcheckv2extension/README.md) | v0.150.0 |
+| [k8sleaderelector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/k8sleaderelector/v0.150.0/extension/k8sleaderelector/README.md) | v0.150.0 |
+| [k8sobserver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/observer/k8sobserver/v0.150.0/extension/observer/k8sobserver/README.md) | v0.150.0 |
+>>>>>>> e16ef499b (Add Azure encoding extension to EDOT Collector (#13583))
 | [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.149.0/extension/memorylimiterextension/README.md) | v0.149.0 |
 | [opampextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/opampextension/v0.149.0/extension/opampextension/README.md) | v0.149.0 |
 | [pprofextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/pprofextension/v0.149.0/extension/pprofextension/README.md) | v0.149.0 |
