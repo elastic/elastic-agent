@@ -141,6 +141,10 @@ resource "ec_deployment" "integration-testing" {
     }
   }
 
+  observability = {
+    deployment_id = "self"
+  }
+
   tags = {
     "provisioner"  = "elastic-agent-integration-tests"
     "creator"      = var.creator
