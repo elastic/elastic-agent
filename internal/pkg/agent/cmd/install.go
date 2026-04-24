@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -247,7 +248,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		// Uninstall the agent
 		progBar.Describe(fmt.Sprintf("Uninstalling current %s", paths.ServiceDisplayName()))
 		if !runUninstallBinary {
-			err := execUninstall(streams, topPath, paths.BinaryName)
+			err := execUninstall(cmd.Context(), streams, topPath, paths.BinaryName)
 			if err != nil {
 				progBar.Describe("Uninstall failed")
 				return err
@@ -270,11 +271,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			customPass, _ = cmd.Flags().GetString(flagInstallCustomPass)
 		}
 
-		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, customUser, customGroup, customPass)
-		if err != nil {
-			return fmt.Errorf("error installing package: %w", err)
-		}
-
+		// Registered before install.Install so partial-install failures are also rolled back.
 		defer func() {
 			if err != nil {
 				progBar.Describe("Uninstalling")
@@ -286,6 +283,11 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 				}
 			}
 		}()
+
+		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, customUser, customGroup, customPass)
+		if err != nil {
+			return fmt.Errorf("error installing package: %w", err)
+		}
 
 		if !delayEnroll {
 			progBar.Describe("Starting Service")
@@ -316,7 +318,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if enroll {
 		enrollArgs := []string{"enroll", "--from-install"}
 		enrollArgs = append(enrollArgs, buildEnrollmentFlags(cmd, url, token)...)
-		enrollCmd := exec.Command(install.ExecutablePath(topPath), enrollArgs...) //nolint:gosec // it's not tainted
+		enrollCmd := exec.CommandContext(cmd.Context(), install.ExecutablePath(topPath), enrollArgs...) //nolint:gosec // it's not tainted
 		enrollCmd.Stdin = os.Stdin
 		enrollCmd.Stdout = os.Stdout
 		enrollCmd.Stderr = os.Stderr
@@ -350,7 +352,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 }
 
 // execUninstall execs "elastic-agent uninstall --force" from the elastic agent installed on the system (found in PATH)
-func execUninstall(streams *cli.IOStreams, topPath string, binName string) error {
+func execUninstall(ctx context.Context, streams *cli.IOStreams, topPath string, binName string) error {
 	args := []string{
 		"uninstall",
 		"--force",
@@ -369,7 +371,7 @@ func execUninstall(streams *cli.IOStreams, topPath string, binName string) error
 		return fmt.Errorf("expected file, found a directory at %s", binPath)
 	}
 
-	uninstall := exec.Command(binPath, args...)
+	uninstall := exec.CommandContext(ctx, binPath, args...)
 	uninstall.Stdout = streams.Out
 	uninstall.Stderr = streams.Err
 	if err := uninstall.Start(); err != nil {
