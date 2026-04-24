@@ -1214,6 +1214,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding v0.
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding v0.150.0/go.mod h1:Oc3rxNyhbdD71I9gTKpGnTDwGs2KZr9QBTvKVK9qXjE=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension v0.150.0 h1:vmMVORZJFv4mAp6QIpoK2vhbh73MPdDgFu16e1nGMmE=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension v0.150.0/go.mod h1:/OWxfogcXkWargF6W8iSxp7k+P/rwwNxp4AvSYDWJ7I=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension v0.150.0 h1:WfHfpwkehWZMT30FySC3FsUbTrVbJazElC+yWPrPcsE=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension v0.150.0/go.mod h1:4D/8ppHHLK+3r+lyctndWCp8SNKp/0SUX75lfUwE9e4=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otlpencodingextension v0.150.0 h1:S4B8EK8a9ZlsFDuhNW7q9W0BtMiagMUWl6r7UB3HldI=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otlpencodingextension v0.150.0/go.mod h1:V6HT0vnBjRr9DVYkohdvEkndn1Lvyln0j4vtvH/bHf8=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension v0.150.0 h1:KLQv93WapOZK9pDA4cL/usMQxVcTu6WlG0EPwA0zgUs=
