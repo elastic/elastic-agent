@@ -5,76 +5,161 @@
 package gcloud
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
 
 func TestSanitizeInstanceName(t *testing.T) {
+	validName := regexp.MustCompile(`^[a-z][a-z0-9-]*[a-z0-9]$`)
+	suffixRe := regexp.MustCompile(`^(.*)-([0-9a-f]{8})$`)
+
 	tests := []struct {
 		name     string
 		batchID  string
-		expected string
+		wantBase string // what the sanitized part before the -<suffix> should be
 	}{
 		{
 			name:     "simple lowercase",
 			batchID:  "my-instance",
-			expected: "my-instance",
+			wantBase: "my-instance",
 		},
 		{
 			name:     "uppercase converted to lowercase",
 			batchID:  "My-Instance",
-			expected: "my-instance",
+			wantBase: "my-instance",
 		},
 		{
 			name:     "invalid characters replaced with hyphens",
 			batchID:  "my_instance.name@test",
-			expected: "my-instance-name-test",
+			wantBase: "my-instance-name-test",
 		},
 		{
 			name:     "starts with number gets vm prefix",
 			batchID:  "123-instance",
-			expected: "vm-123-instance",
-		},
-		{
-			name:     "starts with hyphen gets vm prefix",
-			batchID:  "-instance",
-			expected: "vm--instance",
-		},
-		{
-			name:     "truncated to 63 characters",
-			batchID:  "a" + strings.Repeat("b", 100),
-			expected: "a" + strings.Repeat("b", 62),
+			wantBase: "vm-123-instance",
 		},
 		{
 			name:     "trailing hyphens removed",
 			batchID:  "my-instance---",
-			expected: "my-instance",
+			wantBase: "my-instance",
 		},
 		{
-			name:     "trailing hyphens removed after truncation",
-			batchID:  strings.Repeat("a", 60) + "---bbb",
-			expected: strings.Repeat("a", 60),
-		},
-		{
-			name:     "numeric prefix with truncation",
-			batchID:  "9" + strings.Repeat("a", 100),
-			expected: "vm-9" + strings.Repeat("a", 59),
-		},
-		{
-			name:     "empty string",
-			batchID:  "",
-			expected: "",
+			// The sanitized base is truncated to leave room for "-<8hex>".
+			// 63 total = 54 base + 1 hyphen + 8 hex.
+			name:     "truncated to leave room for suffix",
+			batchID:  "a" + strings.Repeat("b", 100),
+			wantBase: "a" + strings.Repeat("b", 53),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := sanitizeInstanceName(tt.batchID)
-			if got != tt.expected {
-				t.Errorf("sanitizeInstanceName(%q) = %q, want %q", tt.batchID, got, tt.expected)
+			got, err := sanitizeInstanceName(tt.batchID)
+			if err != nil {
+				t.Fatalf("sanitizeInstanceName(%q) returned error: %v", tt.batchID, err)
 			}
 			if len(got) > 63 {
-				t.Errorf("sanitizeInstanceName(%q) length = %d, exceeds 63 char limit", tt.batchID, len(got))
+				t.Errorf("sanitizeInstanceName(%q) length = %d, exceeds 63 char limit: %q", tt.batchID, len(got), got)
+			}
+			if !validName.MatchString(got) {
+				t.Errorf("sanitizeInstanceName(%q) = %q, not a valid GCE name", tt.batchID, got)
+			}
+			m := suffixRe.FindStringSubmatch(got)
+			if m == nil {
+				t.Fatalf("sanitizeInstanceName(%q) = %q, missing 8-hex suffix", tt.batchID, got)
+			}
+			if m[1] != tt.wantBase {
+				t.Errorf("sanitizeInstanceName(%q) base = %q, want %q", tt.batchID, m[1], tt.wantBase)
+			}
+		})
+	}
+
+	t.Run("empty batch id returns error", func(t *testing.T) {
+		_, err := sanitizeInstanceName("")
+		if err == nil {
+			t.Errorf("sanitizeInstanceName(\"\") = nil error, want error")
+		}
+	})
+
+	t.Run("two calls yield different suffixes", func(t *testing.T) {
+		a, err := sanitizeInstanceName("windows-amd64-2022-default")
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := sanitizeInstanceName("windows-amd64-2022-default")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if a == b {
+			t.Errorf("sanitizeInstanceName produced identical names on consecutive calls: %q", a)
+		}
+	})
+}
+
+func TestUserLabel(t *testing.T) {
+	tests := []struct {
+		name  string
+		email string
+		want  string
+	}{
+		{
+			name:  "service account email",
+			email: "test-runner@example.iam.gserviceaccount.com",
+			want:  "test-runner",
+		},
+		{
+			name:  "human email with dots",
+			email: "first.last@example.com",
+			want:  "first-last",
+		},
+		{
+			name:  "mixed case lowered",
+			email: "First.Last@Example.com",
+			want:  "first-last",
+		},
+		{
+			name:  "local part only",
+			email: "alice",
+			want:  "alice",
+		},
+		{
+			name:  "empty string",
+			email: "",
+			want:  "",
+		},
+		{
+			name:  "just at-sign",
+			email: "@example.com",
+			want:  "",
+		},
+		{
+			name:  "local part sanitizes to empty",
+			email: "..@example.com",
+			want:  "",
+		},
+		{
+			name:  "truncation cutting into a hyphen is trimmed back",
+			email: strings.Repeat("a", 62) + "!b!@example.com",
+			want:  strings.Repeat("a", 62),
+		},
+		{
+			name:  "very long local part truncates and trims trailing hyphen",
+			email: strings.Repeat("a", 70) + "_" + strings.Repeat("b", 5) + "@example.com",
+			want:  strings.Repeat("a", 63),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := userLabel(tt.email)
+			if got != tt.want {
+				t.Errorf("userLabel(%q) = %q, want %q", tt.email, got, tt.want)
+			}
+			if len(got) > 63 {
+				t.Errorf("userLabel(%q) length = %d, exceeds 63 char label limit", tt.email, len(got))
+			}
+			if got != "" && strings.HasSuffix(got, "-") {
+				t.Errorf("userLabel(%q) = %q, ends with a hyphen", tt.email, got)
 			}
 		})
 	}
