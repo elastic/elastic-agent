@@ -20,11 +20,7 @@ require (
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.2
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.36.0
-=======
 	github.com/elastic/elastic-agent-libs v0.39.0
->>>>>>> 8d3f43154 (Add retries to the test Kibana client (#13784))
 	github.com/elastic/elastic-agent-system-metrics v0.14.3
 	github.com/elastic/elastic-transport-go/v8 v8.10.0
 	github.com/elastic/go-elasticsearch/v8 v8.19.3
