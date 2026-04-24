@@ -60,6 +60,12 @@ import (
 
 	// Extensions
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
+<<<<<<< HEAD
+=======
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/cgroupruntimeextension"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension"
+>>>>>>> e16ef499b (Add Azure encoding extension to EDOT Collector (#13583))
 	headersetterextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
 	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
@@ -179,6 +185,14 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			beatsauthextension.NewFactory(),
 			headersetterextension.NewFactory(),
 			elasticdiagnostics.NewFactory(),
+<<<<<<< HEAD
+=======
+			elasticsearchstorage.NewFactory(),
+			kafkapartitionerextension.NewFactory(),
+			awslogsencodingextension.NewFactory(),
+			azureencodingextension.NewFactory(),
+			opampextension.NewFactory(),
+>>>>>>> e16ef499b (Add Azure encoding extension to EDOT Collector (#13583))
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
