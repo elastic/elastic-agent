@@ -17,7 +17,7 @@ crds:
 defaultCRConfig:
   image:
     repository: "docker.elastic.co/elastic-agent/elastic-agent"
-    tag: "9.4.0"
+    tag: "9.5.0"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
     # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
@@ -245,10 +245,12 @@ collectors:
                 enabled: false
               host.arch:
                 enabled: true
-              host.ip:
-                enabled: true
-              host.mac:
-                enabled: true
+              # Disabling host.ip and host.mac due to high cardinality
+              # See issue: https://github.com/elastic/elastic-agent/issues/13575
+              # host.ip:
+              #   enabled: true
+              # host.mac:
+              #   enabled: true
               host.cpu.vendor.id:
                 enabled: true
               host.cpu.family:
@@ -306,6 +308,7 @@ collectors:
               - "k8s.pod.ip"
               - "k8s.pod.uid"
               - "k8s.pod.start_time"
+              - "container.id"
               # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
               - "service.name"
               - "service.version"
@@ -483,6 +486,7 @@ collectors:
               - otlp
             processors:
               - batch/metrics
+              - k8sattributes
               - resource/hostname
             exporters:
               - otlp/gateway
@@ -491,6 +495,7 @@ collectors:
               - otlp
             processors:
               - batch
+              - k8sattributes
               - resource/hostname
             exporters:
               - otlp/gateway
@@ -499,6 +504,7 @@ collectors:
               - otlp
             processors:
               - batch
+              - k8sattributes
               - resource/hostname
             exporters:
               - otlp/gateway

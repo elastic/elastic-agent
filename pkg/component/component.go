@@ -38,11 +38,12 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default       string            `yaml:"default" config:"default" json:"default"`
-	Filebeat      BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Metricbeat    BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
-	DynamicInputs string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
-	Output        map[string]string `yaml:"output" config:"output" json:"output"`
+	Default              string            `yaml:"default" config:"default" json:"default"`
+	Filebeat             BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Metricbeat           BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	DynamicInputs        string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	SharedReceiverQueues bool              `yaml:"shared_receiver_queues" config:"shared_receiver_queues"`
+	Output               map[string]string `yaml:"output" config:"output" json:"output"`
 }
 
 type BeatRuntimeConfig struct {
@@ -62,10 +63,7 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier
 			InputType: make(map[string]string),
 		},
-		Output: map[string]string{
-			"logstash": string(ProcessRuntimeManager), // Force all inputs using the Logstash output to use the process runtime
-			"kafka":    string(ProcessRuntimeManager), // Force all inputs using the kafka output to use the process runtime
-		},
+		Output: map[string]string{},
 	}
 }
 
@@ -375,6 +373,17 @@ func (c *Component) BeatName() string {
 		return c.InputSpec.BeatName()
 	}
 	return ""
+}
+
+// OutputUnit returns the first output unit among c.Units, if any.
+// Agent-built components normally have at most one output unit; if several are present, the first is returned.
+func (c *Component) OutputUnit() (Unit, bool) {
+	for _, u := range c.Units {
+		if u.Type == client.UnitTypeOutput {
+			return u, true
+		}
+	}
+	return Unit{}, false
 }
 
 // GetBeatInputIDForUnit returns the ID of the corresponding input or module in the beat configuration for the unit.

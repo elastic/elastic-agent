@@ -32,6 +32,9 @@ case "$1" in
     if test -L /lib/systemd/system/elastic-agent.service; then
         echo "Found elastic-agent.service link, unlink"
         unlink /lib/systemd/system/elastic-agent.service
+    elif [[ ${PREFIX} != "" ]] && test -f /lib/systemd/system/elastic-agent.service; then
+        echo "Found /lib/systemd/system/elastic-agent.service, removing"
+        rm -f /lib/systemd/system/elastic-agent.service
     fi
     if test -L /etc/systemd/system/elastic-agent.service; then
         echo "Found /etc/systemd/system/elastic-agent.service link, unlink"

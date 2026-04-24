@@ -13,7 +13,6 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -65,7 +64,7 @@ type collectorRecoveryTimer interface {
 
 type configUpdate struct {
 	collectorCfg  *confmap.Conf
-	monitoringCfg *monitoringCfg.MonitoringConfig
+	settingsCfg   *configuration.SettingsConfig
 	components    []component.Component
 	agentLogLevel logp.Level
 }
@@ -85,9 +84,10 @@ type OTelManager struct {
 	agentInfo                  info.Agent
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter
 
-	healthCheckExtID string
-	collectorCfg     *confmap.Conf
-	components       []component.Component
+	healthCheckExtComponentID string
+	collectorMetricsPort      int
+	collectorCfg              *confmap.Conf
+	components                []component.Component
 
 	// The current configuration that the OTel collector is using. In the case that
 	// the mergedCollectorCfg is nil then the collector is not running.
@@ -135,6 +135,7 @@ type OTelManager struct {
 }
 
 // NewOTelManager returns a OTelManager.
+// If execFactory is nil, the default subprocess execution is used.
 func NewOTelManager(
 	logger *logger.Logger,
 	collectorLogLevel logp.Level,
@@ -143,6 +144,7 @@ func NewOTelManager(
 	agentCollectorConfig *configuration.CollectorConfig,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
+	execFactory ExecutionFactory,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
@@ -154,8 +156,9 @@ func NewOTelManager(
 	}
 	hcUUIDStr := hcUUID.String()
 
-	// determine the otel collector ports
-	collectorMetricsPort, collectorHealthCheckPort := 0, 0
+	// determine the otel collector metrics port
+	collectorMetricsPort := 0
+	collectorHealthCheckPort := 0
 	if agentCollectorConfig != nil {
 		if agentCollectorConfig.HealthCheckConfig.Endpoint != "" {
 			collectorHealthCheckPort, err = agentCollectorConfig.HealthCheckConfig.Port()
@@ -171,11 +174,22 @@ func NewOTelManager(
 		}
 	}
 
+	componentType, err := otelcomponent.NewType(healthCheckExtensionName)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create component type: %w", err)
+	}
+	healthCheckExtComponentID := otelcomponent.NewIDWithName(componentType, hcUUIDStr).String()
+
 	executable := filepath.Join(paths.Components(), collectorBinaryName)
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-	exec, err = newSubprocessExecution(executable, hcUUIDStr, collectorMetricsPort, collectorHealthCheckPort)
+	if execFactory == nil {
+		execFactory = func(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (collectorExecution, error) {
+			return newSubprocessExecution(collectorPath, healthCheckExtensionID, healthCheckPort)
+		}
+	}
+	exec, err = execFactory(executable, healthCheckExtComponentID, collectorHealthCheckPort)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
+		return nil, fmt.Errorf("failed to create execution: %w", err)
 	}
 
 	return &OTelManager{
@@ -183,7 +197,8 @@ func NewOTelManager(
 		collectorLogger:            collectorLogger,
 		agentInfo:                  agentInfo,
 		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
-		healthCheckExtID:           fmt.Sprintf("extension:healthcheckv2/%s", hcUUIDStr),
+		healthCheckExtComponentID:  healthCheckExtComponentID,
+		collectorMetricsPort:       collectorMetricsPort,
 		errCh:                      make(chan error, 1), // holds at most one error
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
 		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
@@ -287,7 +302,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.managerLogger)
+			mergedCfg, err := m.buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.managerLogger)
 			if err != nil {
 				// critical error, merging the configuration should always work
 				reportErr(ctx, m.errCh, err)
@@ -419,7 +434,7 @@ func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Con
 }
 
 // buildMergedConfig combines collector configuration with component-derived configuration.
-func buildMergedConfig(
+func (m *OTelManager) buildMergedConfig(
 	cfgUpdate configUpdate,
 	agentInfo info.Agent,
 	monitoringConfigGetter translate.BeatMonitoringConfigGetter,
@@ -427,12 +442,17 @@ func buildMergedConfig(
 ) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
 
+	var runtimeCfg *component.RuntimeConfig
+	if cfgUpdate.settingsCfg != nil && cfgUpdate.settingsCfg.Internal != nil {
+		runtimeCfg = cfgUpdate.settingsCfg.Internal.Runtime
+	}
+
 	// Generate component otel config if there are components
 	var componentOtelCfg *confmap.Conf
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, monitoringConfigGetter, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, runtimeCfg, monitoringConfigGetter, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
@@ -445,27 +465,28 @@ func buildMergedConfig(
 
 	// Merge component config if it exists
 	if componentOtelCfg != nil {
-		err := mergedOtelCfg.Merge(componentOtelCfg)
-		if err != nil {
+		if err := mergeWithExtensions(mergedOtelCfg, componentOtelCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 		}
 
-		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil {
-			if mCfg.Enabled && mCfg.MonitorMetrics {
-				// Metrics monitoring is enabled, inject a receiver for the
-				// collector's internal telemetry.
-				err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components)
-				if err != nil {
-					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
+		if cfgUpdate.settingsCfg != nil {
+			if mCfg := cfgUpdate.settingsCfg.MonitoringConfig; mCfg != nil {
+				if mCfg.Enabled && mCfg.MonitorMetrics {
+					// Metrics monitoring is enabled, inject a receiver for the
+					// collector's internal telemetry.
+					if err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components); err != nil {
+						return nil, fmt.Errorf("merging internal telemetry config: %w", err)
+					}
 				}
 			}
 		}
 	}
 
-	// Merge with base collector config if it exists
+	// Merge with base collector config if it exists. mergeWithExtensions unions
+	// the service::extensions lists so that component-generated extensions (e.g.
+	// beatsauth) are not silently overwritten by the collector config's list.
 	if cfgUpdate.collectorCfg != nil {
-		err := mergedOtelCfg.Merge(cfgUpdate.collectorCfg)
-		if err != nil {
+		if err := mergeWithExtensions(mergedOtelCfg, cfgUpdate.collectorCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
 	}
@@ -477,6 +498,17 @@ func buildMergedConfig(
 	// if the otel log level is unset, use the agent log level
 	if err := maybeInjectLogLevel(mergedOtelCfg, cfgUpdate.agentLogLevel); err != nil {
 		return nil, err
+	}
+
+	// Inject health check extension with port 0 as a placeholder. The actual port is resolved
+	// per-start by the execution layer and passed to the collector via a CLI flag, where a
+	// confmap converter overrides the placeholder with the real port.
+	if err := injectHealthCheckV2Extension(mergedOtelCfg, m.healthCheckExtComponentID, 0); err != nil {
+		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
+	}
+
+	if err := addCollectorMetricsReader(mergedOtelCfg, m.collectorMetricsPort); err != nil {
+		return nil, fmt.Errorf("failed to add collector metrics reader: %w", err)
 	}
 
 	return mergedOtelCfg, nil
@@ -491,31 +523,23 @@ func maybeInjectLogLevel(config *confmap.Conf, logplevel logp.Level) error {
 	if err != nil {
 		return fmt.Errorf("failed to translate log level: %s", logplevel)
 	}
-	if err := config.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
+	if err := mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
 		return fmt.Errorf("failed to set log level in otel config: %w", err)
 	}
 	return nil
 }
 
 func injectDiagnosticsExtension(config *confmap.Conf) error {
-	extensionCfg := map[string]any{
+	return mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{
 		"extensions": map[string]any{
 			"elastic_diagnostics": map[string]any{
 				"endpoint": paths.DiagnosticsExtensionSocket(),
 			},
 		},
-	}
-	if config.IsSet("service::extensions") {
-		extensionList := config.Get("service::extensions").([]interface{})
-		if slices.Contains(extensionList, "elastic_diagnostics") {
-			// already configured, nothing to do
-			return nil
-		}
-		extensionList = append(extensionList, "elastic_diagnostics")
-		extensionCfg["service::extensions"] = extensionList
-	}
-
-	return config.Merge(confmap.NewFromStringMap(extensionCfg))
+		"service": map[string]any{
+			"extensions": []any{"elastic_diagnostics"},
+		},
+	}))
 }
 
 func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent) map[string]any {
@@ -642,7 +666,7 @@ func injectMonitoringReceiver(
 		pipelineCfg["processors"] = []string{processorID}
 	}
 
-	return config.Merge(confmap.NewFromStringMap(collectorCfg))
+	return mergeWithExtensions(config, confmap.NewFromStringMap(collectorCfg))
 }
 
 func (m *OTelManager) applyMergedConfig(
@@ -692,10 +716,10 @@ func (m *OTelManager) applyMergedConfig(
 }
 
 // Update sends collector configuration and component updates to the manager's run loop.
-func (m *OTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component) {
+func (m *OTelManager) Update(cfg *confmap.Conf, settings *configuration.SettingsConfig, ll logp.Level, components []component.Component) {
 	cfgUpdate := configUpdate{
 		collectorCfg:  cfg,
-		monitoringCfg: monitoring,
+		settingsCfg:   settings,
 		components:    components,
 		agentLogLevel: ll,
 	}
@@ -745,7 +769,7 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
-				case extensionKey == m.healthCheckExtID:
+				case extensionKey == "extension:"+m.healthCheckExtComponentID:
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}

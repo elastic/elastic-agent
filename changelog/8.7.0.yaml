@@ -89,7 +89,7 @@ entries:
         checksum: 92674250f10b32d7912621e2483ae5a385016d13
     - kind: bug-fix
       summary: Fix the first checkin incorrectly reporting the agent as unhealthy.
-      description: The agent would sometimes report its intial state as "starting" which was incorrectly translated to "degraded".
+      description: The agent would sometimes report its initial state as "starting", which was incorrectly translated to "degraded".
       component: agent
       pr:
         - https://github.com/elastic/elastic-agent/pull/2325

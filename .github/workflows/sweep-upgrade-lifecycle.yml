@@ -1,0 +1,126 @@
+name: "Sweeper: Upgrade and Rollback Lifecycle"
+on:
+  schedule:
+    - cron: "0 9 * * 2"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  run:
+    uses: elastic/ai-github-actions/.github/workflows/gh-aw-code-quality-audit.lock.yml@v0
+    with:
+      title-prefix: "[upgrade-lifecycle]"
+      severity-threshold: "high"
+      setup-commands: |
+        sudo apt-get update && sudo apt-get install -y libpcap-dev librpm-dev python3-venv
+        export GOTOOLCHAIN=auto
+        make mage
+      additional-instructions: |
+        You are an **upgrade and rollback lifecycle sweeper** for Elastic Agent. Your goal is to
+        find every code path where an upgrade can leave the agent in a broken state, a rollback
+        can fail silently, or platform-specific behavior causes the upgrade to diverge from the
+        expected sequence — and write a failing test for each confirmed issue.
+
+        ## The component
+
+        The upgrade system lives under `internal/pkg/agent/application/upgrade/`. Key files:
+
+        - `upgrade.go` — Core upgrade orchestration: download, unpack, marker handling, re-exec
+        - `rollback.go` (+ platform variants `rollback_linux.go`, `rollback_darwin.go`,
+          `rollback_windows.go`) — Platform-specific rollback execution
+        - `watcher.go` (+ `watcher_windows.go`, `watcher_other.go`) — Post-upgrade watcher
+          process that monitors health and triggers rollback
+        - `step_mark.go` — Writes/reads the `.update-marker` file
+        - `marker_watcher.go` — Watches marker state on disk
+        - `step_download.go`, `step_unpack.go`, `step_relink.go` — Discrete upgrade pipeline steps
+        - `cleanup.go` — Post-upgrade/rollback cleanup
+        - `details/` — Structured upgrade progress reporting to Fleet
+        - `ttl/` — TTL markers for rollback window expiry
+        - `artifact/download/` — Artifact resolution, HTTP/FS downloaders, verifiers
+
+        Related code:
+        - `internal/pkg/agent/cmd/watch.go` / `watch_impl.go` — Watcher CLI entry point
+        - `internal/pkg/agent/application/reexec/manager.go` — In-process re-exec after upgrade
+        - `internal/pkg/agent/application/actions/handlers/handler_action_upgrade.go` — Fleet
+          action handler for managed upgrades
+
+        ## The bug class
+
+        Upgrade/rollback is the #1 source of bugs in this repository (~80+ historical issues).
+        The recurring failure modes are:
+
+        **Marker corruption or stale markers**: The `.update-marker` file is the source of truth
+        for whether an upgrade is in progress, succeeded, or needs rollback. If the marker is not
+        written atomically, is left behind after a completed upgrade, or is unreadable after a
+        crash, the agent can enter an undefined state on next startup. On Windows, file locking
+        and permission inheritance add additional failure modes.
+
+        **Watcher/agent PID race**: The upgrade watcher monitors the new agent process. If the
+        watcher reads the wrong PID (stale PID file, systemd reporting the old process), it may
+        incorrectly conclude the upgrade failed and trigger a rollback of a healthy upgrade. This
+        has happened specifically with systemd and Windows service manager.
+
+        **Platform-specific rollback failures**: Rollback involves restoring the previous binary,
+        symlinks, and service configuration. On DEB/RPM, the package manager's symlinks may
+        conflict with the agent's own symlink management. On Windows, the watcher may fail to
+        kill processes that hold file locks. On macOS, the service plist may not be restored
+        correctly.
+
+        **Upgrade retry storms**: When an artifact download fails, the retry logic should use
+        exponential backoff. Historical bugs show the agent retrying thousands of times per
+        second when the backoff duration computes to zero or negative (e.g. after clock skew
+        or NTP adjustment).
+
+        **Version migration gaps**: Upgrading across major versions (7.17 → 8.x, 8.x → 9.x)
+        requires migrating persisted state (fleet.enc, action store, run directories). Missing
+        migration steps cause the upgraded agent to fail on startup and roll back.
+
+        ## How to investigate
+
+        Trace the upgrade flow end-to-end: from the Fleet action or CLI command, through
+        download, verification, unpack, marker write, re-exec, watcher startup, health check,
+        and marker cleanup. At each step ask:
+
+        1. What happens if the process is killed (SIGKILL, power loss) right now?
+        2. What happens if the filesystem operation fails (disk full, permission denied)?
+        3. What happens on each platform (Linux systemd, Windows service, macOS launchd)?
+        4. What state is left on disk, and can the next startup recover from it?
+
+        For the watcher, ask: how does it determine the new agent is healthy? What PID does it
+        monitor, and how does it get that PID? What happens if the new agent starts, reports
+        healthy, then crashes 30 seconds later — does the watcher catch that?
+
+        For rollback, ask: after rollback completes, is the agent in exactly the same state as
+        before the upgrade started? Are there any files, symlinks, or service registrations
+        that are not restored?
+
+        ## For each risk you confirm
+
+        Write a Go test in the appropriate `*_test.go` file. For marker issues, create a marker
+        in a specific state and verify the upgrade/rollback logic handles it correctly. For
+        watcher issues, simulate the health check sequence. Run:
+        `go test ./internal/pkg/agent/application/upgrade/...`
+
+        ## The bar for filing
+
+        Only report findings that a real user could encounter during a normal upgrade operation:
+        upgrading via Fleet, upgrading via CLI, upgrading across versions, upgrading on each
+        platform. The failure must be triggerable through user-observable events (power loss
+        during upgrade, disk full, service restart, clock skew). Do not file findings that
+        require manually corrupting internal files in ways that cannot happen during normal
+        operation.
+
+        ## Output
+
+        File a single issue containing:
+        - Confirmed issues with test code, the exact failure scenario, and the fix direction
+        - A priority ranking: which issues affect the most common upgrade paths vs edge cases
+        - Platform-specific findings clearly labeled (Windows, macOS, Linux)
+        - A summary of upgrade paths you audited and found safe
+    secrets:
+      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

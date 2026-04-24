@@ -80,6 +80,7 @@ sending_queue:
   num_consumers: 60
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 user: elastic
 headers:
   X-Header-1: foo
@@ -94,7 +95,7 @@ logs_dynamic_pipeline:
   enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ESToOTelConfig(cfg, logger)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -143,6 +144,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
@@ -155,7 +157,7 @@ logs_dynamic_pipeline:
   enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ESToOTelConfig(cfg, logger)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -205,6 +207,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
@@ -217,7 +220,7 @@ logs_dynamic_pipeline:
   enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ESToOTelConfig(cfg, logger)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -269,6 +272,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
@@ -281,7 +285,7 @@ logs_dynamic_pipeline:
   enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ESToOTelConfig(cfg, logger)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -355,6 +359,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
  `,
 			},
 			{
@@ -372,6 +377,7 @@ sending_queue:
   num_consumers: 4
   queue_size: 12800
   wait_for_result: true
+suppress_conflict_errors: true
  `,
 			},
 			{
@@ -414,6 +420,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 compression: gzip
 compression_params:
   level: 1
@@ -439,6 +446,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 4100
   wait_for_result: true
+suppress_conflict_errors: true
  `,
 			},
 			{
@@ -456,6 +464,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
  `,
 			},
 		}
@@ -463,7 +472,7 @@ sending_queue:
 		for _, test := range tests {
 			t.Run("config translation w/"+test.presetName, func(t *testing.T) {
 				cfg := config.MustNewConfigFrom(fmt.Sprintf(commonBeatCfg, test.presetName))
-				got, err := ESToOTelConfig(cfg, logger)
+				got, _, err := ESToOTelConfig(cfg, "", logger)
 				require.NoError(t, err, "error translating elasticsearch output to OTel ES exporter type")
 				expOutput := newFromYamlString(t, test.output)
 				compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -528,6 +537,7 @@ sending_queue:
   num_consumers: 60
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 user: elastic
 headers:
   X-Header-1: foo
@@ -542,7 +552,7 @@ logs_dynamic_pipeline:
   enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ESToOTelConfig(cfg, logger)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -589,6 +599,7 @@ sending_queue:
   num_consumers: 60
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 user: elastic
 headers:
   X-Header-1: foo
@@ -603,7 +614,7 @@ logs_dynamic_pipeline:
   enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ESToOTelConfig(cfg, logger)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -661,6 +672,7 @@ sending_queue:
   num_consumers: 2
   queue_size: 3200
   wait_for_result: true
+suppress_conflict_errors: true
 {{ if gt . 0 }}
 compression: gzip
 compression_params:
@@ -678,7 +690,7 @@ logs_dynamic_pipeline:
 	for level := range 9 {
 		t.Run(fmt.Sprintf("compression-level-%d", level), func(t *testing.T) {
 			cfg := config.MustNewConfigFrom(fmt.Sprintf(compressionConfig, level))
-			got, err := ESToOTelConfig(cfg, logp.NewNopLogger())
+			got, _, err := ESToOTelConfig(cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 			var otelBuffer bytes.Buffer
 			require.NoError(t, template.Must(template.New("config").Parse(otelConfig)).Execute(&otelBuffer, level))
@@ -698,7 +710,7 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 	}{
 		{"indices", map[string]any{"indices": []any{"i"}}, "indices is currently not supported"},
 		{"allow_older_versions_false", map[string]any{"allow_older_versions": false}, "allow_older_versions:false is currently not supported"},
-		{"loadbalance_false", map[string]any{"loadbalance": false}, "ladbalance:false is currently not supported"},
+		{"loadbalance_false", map[string]any{"loadbalance": false}, "loadbalance:false is currently not supported"},
 		{"non_indexable_policy", map[string]any{"non_indexable_policy": "x"}, "non_indexable_policy is currently not supported"},
 		{"max_retries_negative", map[string]any{"max_retries": -5}, "max_retries should be non-negative"},
 	}
@@ -708,7 +720,7 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 			cfg, err := config.NewConfigFrom(c.cfg)
 			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 
-			_, err = ESToOTelConfig(cfg, logger)
+			_, _, err = ESToOTelConfig(cfg, "", logger)
 			require.ErrorContains(t, err, c.wantErrContains)
 		})
 	}

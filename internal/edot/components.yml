@@ -55,6 +55,7 @@ core_components:
 
 # Connectors
   - elasticapmconnector
+  - otlpjsonconnector
   - routingconnector
 
 # Extensions
@@ -127,4 +128,4 @@ annotations:
       - Partitioning configuration (i.e. `partition_*` options).
   jmxreceiver:
     comment: |
-      Deprecated in 9.3.1. JMX Scraper is recommened to run as a standalone Java program. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
+      Deprecated in 9.3.1. JMX Scraper is recommended to run as a standalone Java program. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.

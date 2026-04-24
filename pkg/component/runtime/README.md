@@ -5,7 +5,7 @@
 
 This part of the documentation describes how the Agent ```service runtime``` works. The design is not new and was inherited from V1, just was not documented anywhere.
 
-The service runtime is currently used to support integration with the Endpoint service and is very much customized to the expected behavior of the service. The Endpoint service can not be stopped (protected on windows) and the Agent runtime component is not expected to manage the lifetime of the service. The Endpoint service is expected to be always running.
+The service runtime is currently used to support integration with the Endpoint service and is very much customized to the expected behavior of the service. The Endpoint service cannot be stopped (protected on Windows), and the Agent runtime component is not expected to manage the lifetime of the service. The Endpoint service is expected to be always running.
 
 In order for the Endpoint to connect to the Agent, the Agent starts up the gRPC "connection info" server on the local port specified in the endpoint specification file. The "connection info" service sends the connection parameters/credentials to the agent upon the connection, the Endpoint uses to establish primary connection to the Agent
 

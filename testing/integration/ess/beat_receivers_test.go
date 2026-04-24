@@ -630,22 +630,6 @@ outputs:
 			"agent.version",
 		}
 
-		stripNondeterminism := func(m mapstr.M, mset string) {
-			// These metrics will change from run to run
-			prefixes := []string{
-				fmt.Sprintf("system.%s", mset),
-				fmt.Sprintf("host.%s", mset),
-			}
-
-			for k := range m {
-				for _, prefix := range prefixes {
-					if strings.HasPrefix(k, prefix) {
-						m[k] = nil
-					}
-				}
-			}
-		}
-
 		testCases := []struct {
 			metricset     string
 			yieldDocsFunc func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M)
@@ -708,14 +692,31 @@ outputs:
 					}
 				})
 
-				stripNondeterminism(agentDoc, tt.metricset)
-				stripNondeterminism(otelDoc, tt.metricset)
+				StripNondeterminism(agentDoc, tt.metricset)
+				StripNondeterminism(otelDoc, tt.metricset)
 
 				AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for metricset "+tt.metricset)
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+tt.metricset)
 			})
 		}
 	})
+}
+
+// stripNondeterminism strips fields that are expected to change for system/metrics documents
+func StripNondeterminism(m mapstr.M, mset string) {
+	// These metrics will change from run to run
+	prefixes := []string{
+		fmt.Sprintf("system.%s", mset),
+		fmt.Sprintf("host.%s", mset),
+	}
+
+	for k := range m {
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(k, prefix) {
+				m[k] = nil
+			}
+		}
+	}
 }
 
 // TestBeatsReceiverLogs is a test that compares logs emitted by beats processes to those emitted by beats receivers.
@@ -940,7 +941,7 @@ outputs:
 	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
 	require.NoError(t, err)
 
-	// verify we've logged a warning about using the process runtime
+	// verify we've logged a message about using the process runtime
 	var unsupportedLogRecords []map[string]any
 	var monitoringOutputUnsupportedLogRecord map[string]any
 	for _, line := range strings.Split(string(logsBytes), "\n") {
@@ -1399,7 +1400,7 @@ func getBeatStartLogRecords(logs string) []map[string]any {
 			continue
 		}
 
-		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Beat name:") {
+		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Starting metrics logging") {
 			logRecords = append(logRecords, mapstr.M(logRecord).Flatten())
 		}
 	}
