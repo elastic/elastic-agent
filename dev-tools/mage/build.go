@@ -84,7 +84,7 @@ func DefaultBuildArgs(cfg *Settings) BuildArgs {
 		Env:  map[string]string{},
 		Vars: map[string]string{
 			elasticAgentModulePath + "/version.buildTime": "{{ date }}",
-			elasticAgentModulePath + "/version.commit":    "{{ commit }}",
+			elasticAgentModulePath + "/version.commit":    cfg.Build.CommitHash(),
 		},
 		WinMetadata: true,
 	}
@@ -301,10 +301,7 @@ func Run(ctx context.Context, env map[string]string, stdout, stderr io.Writer, c
 func MakeWindowsSysoFile(cfg *Settings) (string, error) {
 	version := cfg.BeatQualifiedVersion()
 
-	commit, err := cfg.Build.CommitHash()
-	if err != nil {
-		return "", err
-	}
+	commit := cfg.Build.CommitHash()
 
 	major, minor, patch, err := ParseVersion(version)
 	if err != nil {

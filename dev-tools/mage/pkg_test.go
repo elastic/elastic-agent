@@ -75,8 +75,7 @@ func testPackage(t testing.TB, pack func(PackageSpec) error) {
 	assert.True(t, strings.HasPrefix(readmePath, packageStagingDir))
 
 	commit := spec.ExtraTags[0]
-	expectedCommitHash, err := spec.cfg.Build.CommitHash()
-	require.NoError(t, err)
+	expectedCommitHash := spec.cfg.Build.CommitHash()
 	expected := "git-" + expectedCommitHash[:12]
 	assert.Equal(t, expected, commit)
 

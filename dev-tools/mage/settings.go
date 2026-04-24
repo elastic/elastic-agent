@@ -78,8 +78,8 @@ func FuncMap(cfg *Settings) map[string]interface{} {
 	return map[string]interface{}{
 		"beat_doc_branch":                func() string { return cfg.DocBranch() },
 		"beat_version":                   func() string { return cfg.BeatQualifiedVersion() },
-		"commit":                         func() (string, error) { return cfg.Build.CommitHash() },
-		"commit_short":                   func() (string, error) { return cfg.Build.CommitHashShort() },
+		"commit":                         func() string { return cfg.AgentPackageCommitHash() },
+		"commit_short":                   func() string { return cfg.AgentPackageCommitHashShort() },
 		"date":                           func() string { return cfg.BuildDateString() },
 		"elastic_beats_dir":              func() string { return cfg.ElasticBeatsDir },
 		"go_version":                     func() string { return cfg.GoVersion() },
@@ -223,16 +223,8 @@ func (s *Settings) AgentPackageVersion() string {
 // PackageManifest generates the package manifest using the provided config.
 func PackageManifest(cfg *Settings, fips bool) (string, error) {
 	packageVersion := cfg.AgentPackageVersion()
-
-	hash, err := cfg.Build.CommitHash()
-	if err != nil {
-		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
-	}
-
-	commitHashShort, err := cfg.Build.CommitHashShort()
-	if err != nil {
-		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
-	}
+	hash := cfg.AgentPackageCommitHash()
+	commitHashShort := cfg.AgentPackageCommitHashShort()
 
 	return GeneratePackageManifest(cfg.Beat.Name, packageVersion, cfg.Build.Snapshot, hash, commitHashShort, fips, cfg.FlavorsRegistry)
 }
@@ -856,15 +848,15 @@ func (s *Settings) WithBeatVersion(version string) *Settings {
 	return clone
 }
 
-// WithAgentCommitHashOverride returns a copy of the settings with the specified commit hash override.
-func (s *Settings) WithAgentCommitHashOverride(hash string) *Settings {
+// WithAgentPackageCommitHashOverride returns a copy of the settings with the specified package commit hash override.
+func (s *Settings) WithAgentPackageCommitHashOverride(hash string) *Settings {
 	clone := s.Clone()
-	clone.Build.AgentCommitHashOverride = hash
+	clone.Build.AgentPackageCommitHashOverride = hash
 	return clone
 }
 
 // WithManifestInfo downloads the manifest at ManifestURL and applies version information to a copy of
-// the settings. It sets Build.Snapshot, Build.BeatVersion, Build.AgentCommitHashOverride,
+// the settings. It sets Build.Snapshot, Build.BeatVersion, Build.AgentPackageCommitHashOverride,
 // Build.DependenciesVersion, and Packaging.Manifest. It is a no-op if ManifestURL is empty.
 func (s *Settings) WithManifestInfo(ctx context.Context) (*Settings, error) {
 	if s.Packaging.ManifestURL == "" {
@@ -890,7 +882,7 @@ func (s *Settings) WithManifestInfo(ctx context.Context) (*Settings, error) {
 	clone.Packaging.Manifest = &resp
 	clone.Build.Snapshot = parsedVersion.IsSnapshot()
 	clone.Build.BeatVersion = parsedVersion.CoreVersion()
-	clone.Build.AgentCommitHashOverride = agentCoreProject.CommitHash
+	clone.Build.AgentPackageCommitHashOverride = agentCoreProject.CommitHash
 	clone.Build.DependenciesVersion = parsedVersion.VersionWithPrerelease()
 	return clone, nil
 }
@@ -980,15 +972,17 @@ type BuildSettings struct {
 	// BeatVersion overrides the beat version (from BEAT_VERSION or set programmatically)
 	BeatVersion string
 
-	// AgentCommitHashOverride overrides the commit hash for packaging (from AGENT_COMMIT_HASH_OVERRIDE or set programmatically)
-	AgentCommitHashOverride string
+	// AgentPackageCommitHashOverride overrides the commit hash used for packaging (from AGENT_COMMIT_HASH_OVERRIDE
+	// env var or set programmatically via WithManifestInfo). It is intentionally separate from the git commit hash
+	// used when building binaries from source. Use Settings.AgentPackageCommitHash() to read it.
+	AgentPackageCommitHashOverride string
 
 	// DependenciesVersion is the version string used when resolving manifest dependency packages (VersionWithPrerelease).
 	// Populated by WithManifestInfo when ManifestURL is set.
 	DependenciesVersion string
 
-	// commitHash is the commit hash of the current build. Can be overridden via the AGENT_COMMIT_HASH_OVERRIDE env var.
-	// We lazy load this value, because inside crossbuild containers, fetching it can fail.
+	// commitHash is the git commit hash of the current source tree.
+	// Populated by Settings.initCommitHash() during LoadSettings().
 	commitHash string
 
 	// GolangCrossBuild indicates we're inside a golang-crossbuild container (from GOLANG_CROSSBUILD env var)
@@ -1001,29 +995,40 @@ type BuildSettings struct {
 	BeatDocBranch string
 }
 
-func (bs *BuildSettings) CommitHash() (string, error) {
-	if bs.AgentCommitHashOverride != "" {
-		return bs.AgentCommitHashOverride, nil
-	}
-	if bs.commitHash == "" {
-		var err error
-		bs.commitHash, err = sh.Output("git", "rev-parse", "HEAD")
-		if err != nil {
-			return "", fmt.Errorf("failed to get commit hash: %w", err)
-		}
-	}
-	return bs.commitHash, nil
+// CommitHash returns the git commit hash of the current source tree. It does not respect
+// AgentPackageCommitHashOverride — use Settings.AgentPackageCommitHash() for packaging contexts.
+// The hash is populated during LoadSettings(); returns an empty string on a zero-value BuildSettings.
+func (bs *BuildSettings) CommitHash() string {
+	return bs.commitHash
 }
 
-func (bs *BuildSettings) CommitHashShort() (string, error) {
-	shortHash, err := bs.CommitHash()
-	if err != nil {
-		return "", err
+// CommitHashShort returns the first 6 characters of the git commit hash.
+// It does not respect AgentPackageCommitHashOverride — use Settings.AgentPackageCommitHashShort() for packaging.
+func (bs *BuildSettings) CommitHashShort() string {
+	h := bs.commitHash
+	if len(h) > 6 {
+		return h[:6]
 	}
-	if len(shortHash) > 6 {
-		shortHash = shortHash[:6]
+	return h
+}
+
+// AgentPackageCommitHash returns the commit hash to use for packaging. When
+// AgentPackageCommitHashOverride is set (e.g. from a DRA manifest), that value is returned;
+// otherwise the current git commit hash is returned.
+func (s *Settings) AgentPackageCommitHash() string {
+	if s.Build.AgentPackageCommitHashOverride != "" {
+		return s.Build.AgentPackageCommitHashOverride
 	}
-	return shortHash, nil
+	return s.Build.CommitHash()
+}
+
+// AgentPackageCommitHashShort returns the first 6 characters of AgentPackageCommitHash.
+func (s *Settings) AgentPackageCommitHashShort() string {
+	h := s.AgentPackageCommitHash()
+	if len(h) > 6 {
+		return h[:6]
+	}
+	return h
 }
 
 // BeatSettings contains Beat metadata settings.
@@ -1300,8 +1305,31 @@ func LoadSettings() (*Settings, error) {
 	if err := s.initBuildVariables(); err != nil {
 		return nil, fmt.Errorf("initializing build variables: %w", err)
 	}
+	if err := s.initCommitHash(); err != nil {
+		return nil, fmt.Errorf("initializing commit hash: %w", err)
+	}
 
 	return s, nil
+}
+
+// initCommitHash loads the current git commit hash into Build.commitHash.
+func (s *Settings) initCommitHash() error {
+	hash, err := sh.Output("git", "rev-parse", "HEAD")
+	if err != nil && s.Build.GolangCrossBuild {
+		// Inside golang-crossbuild containers, git refuses to operate in directories owned
+		// by a different user until safe.directory is configured. Configure it now so we
+		// can read the commit hash. devtools.GolangCrossBuild() also does this before Build(),
+		// but that is too late since initCommitHash runs during LoadSettings().
+		if configErr := sh.Run("git", "config", "--global", "--add", "safe.directory", s.ElasticBeatsDir); configErr != nil {
+			return fmt.Errorf("failed to configure git safe.directory in crossbuild context: %w", configErr)
+		}
+		hash, err = sh.Output("git", "rev-parse", "HEAD")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get commit hash: %w", err)
+	}
+	s.Build.commitHash = strings.TrimSpace(hash)
+	return nil
 }
 
 // loadBuildSettingsFromEnv overrides build settings from environment variables.
@@ -1352,7 +1380,7 @@ func (s *Settings) loadBuildSettingsFromEnv() error {
 	}
 
 	if v := os.Getenv("AGENT_COMMIT_HASH_OVERRIDE"); v != "" {
-		s.Build.AgentCommitHashOverride = v
+		s.Build.AgentPackageCommitHashOverride = v
 	}
 
 	s.Build.GolangCrossBuild = os.Getenv("GOLANG_CROSSBUILD") == "1"
