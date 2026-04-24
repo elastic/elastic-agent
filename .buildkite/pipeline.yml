@@ -242,7 +242,7 @@ steps:
           provider: "azure"
           image: "${IMAGE_WIN_11_ARM64}"
           imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
-          vmSize: "Standard_D2ps_v6"
+          vmSize: "Standard_D8ps_v6"
           diskSizeGb: "256"
         retry:
           automatic:
