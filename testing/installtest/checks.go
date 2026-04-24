@@ -46,10 +46,6 @@ type CheckOpts struct {
 	Username string
 	// Group is the custom group for the agent service.
 	Group string
-	// TargetVersion is the expected version after install or upgrade.
-	TargetVersion string
-	// StartVersion is the version the agent was upgraded from.
-	StartVersion string
 	// TopPath is the agent install directory.
 	TopPath string
 }

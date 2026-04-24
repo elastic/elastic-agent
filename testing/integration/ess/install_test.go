@@ -160,16 +160,11 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-<<<<<<< HEAD
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
-=======
 	checks := &installtest.CheckOpts{
-		Privileged:    opts.Privileged,
-		TargetVersion: fixture.Version(),
-		TopPath:       topPath,
+		Privileged: opts.Privileged,
+		TopPath:    topPath,
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
->>>>>>> f8df6d454 (fix: clean up leftover artifacts when install fails (#13705))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
@@ -264,16 +259,11 @@ func TestInstallServersWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-<<<<<<< HEAD
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
-=======
 	checks := &installtest.CheckOpts{
-		Privileged:    opts.Privileged,
-		TargetVersion: fixture.Version(),
-		TopPath:       topPath,
+		Privileged: opts.Privileged,
+		TopPath:    topPath,
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
->>>>>>> f8df6d454 (fix: clean up leftover artifacts when install fails (#13705))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 
@@ -339,16 +329,11 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	}
 
 	// Check that Agent was installed in default base path
-<<<<<<< HEAD
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
-=======
 	checks := &installtest.CheckOpts{
-		Privileged:    opts.Privileged,
-		TargetVersion: fixture.Version(),
-		TopPath:       installtest.DefaultTopPath(),
+		Privileged: opts.Privileged,
+		TopPath:    installtest.DefaultTopPath(),
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, checks))
->>>>>>> f8df6d454 (fix: clean up leftover artifacts when install fails (#13705))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
@@ -399,16 +384,11 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
-<<<<<<< HEAD
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
-=======
 	checks := &installtest.CheckOpts{
-		Privileged:    opts.Privileged,
-		TargetVersion: fixture.Version(),
-		TopPath:       topPath,
+		Privileged: opts.Privileged,
+		TopPath:    topPath,
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
->>>>>>> f8df6d454 (fix: clean up leftover artifacts when install fails (#13705))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
 		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
@@ -500,13 +480,8 @@ func TestInstallSecondAgentInDevelopmentNamespace(t *testing.T) {
 	// Check that Agent was installed in default base path
 	topPath := installtest.DefaultTopPath()
 	checks := &installtest.CheckOpts{
-<<<<<<< HEAD
 		Privileged: opts.Privileged,
-=======
-		Privileged:    opts.Privileged,
-		TargetVersion: fixture.Version(),
-		TopPath:       topPath,
->>>>>>> f8df6d454 (fix: clean up leftover artifacts when install fails (#13705))
+		TopPath:    topPath,
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
@@ -553,17 +528,10 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 	// Check that Agent was installed in default base path
 	topPath := installtest.DefaultTopPath()
 	checks := &installtest.CheckOpts{
-<<<<<<< HEAD
 		Privileged: opts.Privileged,
 		Username:   customUsername,
 		Group:      customGroup,
-=======
-		Privileged:    opts.Privileged,
-		Username:      customUsername,
-		Group:         customGroup,
-		TargetVersion: fixture.Version(),
-		TopPath:       topPath,
->>>>>>> f8df6d454 (fix: clean up leftover artifacts when install fails (#13705))
+		TopPath:    topPath,
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
@@ -649,29 +617,15 @@ func testSecondAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, b
 			topPath = filepath.Join(basePath, "Elastic", paths.InstallDirNameForNamespace(installOpts.Namespace))
 		}
 
-<<<<<<< HEAD
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{
+		checks := &installtest.CheckOpts{
 			Privileged: installOpts.Privileged,
 			Namespace:  installOpts.Namespace,
 			Username:   installOpts.Username,
 			Group:      installOpts.Group,
-		}))
-=======
-		checks := &installtest.CheckOpts{
-			Privileged:    installOpts.Privileged,
-			Namespace:     installOpts.Namespace,
-			Username:      installOpts.Username,
-			Group:         installOpts.Group,
-			TargetVersion: devFixture.Version(),
-			TopPath:       topPath,
+			TopPath:    topPath,
 		}
 
 		require.NoError(t, installtest.CheckSuccess(ctx, devFixture, topPath, checks))
-
-		devFixture.PostUninstallHook(func(t *testing.T) {
-			require.NoError(t, installtest.CheckUninstallSuccess(checks))
-		})
->>>>>>> f8df6d454 (fix: clean up leftover artifacts when install fails (#13705))
 	}
 }
 
