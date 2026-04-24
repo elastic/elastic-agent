@@ -205,6 +205,13 @@ func (r *Runner) Clean() error {
 	stacks := make([]common.Stack, len(r.state.Stacks))
 	copy(stacks, r.state.Stacks)
 	r.state.Stacks = nil
+	r.logger.Logf("Cleaning up %d instance(s) and %d stack(s) from state", len(instances), len(stacks))
+	for _, inst := range instances {
+		r.logger.Logf("  - instance: name=%s provisioner=%s ip=%s", inst.Name, inst.Provisioner, inst.IP)
+	}
+	for _, st := range stacks {
+		r.logger.Logf("  - stack: id=%s provisioner=%s", st.ID, st.Provisioner)
+	}
 	err := r.writeState()
 	if err != nil {
 		return err
