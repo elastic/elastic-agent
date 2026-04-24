@@ -20,9 +20,7 @@ summary: Clean up leftover artifacts when `elastic-agent install` fails
 # this field accommodate a description without length limits.
 description: |
   When `elastic-agent install` failed, some artifacts could be left on the
-  system. On Windows, the agent could also still show up in "Add or Remove
-  Programs" even though it was not installed. These leftovers are now
-  removed when the install fails.
+  system. These leftovers are now removed when the install fails.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:

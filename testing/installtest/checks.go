@@ -38,25 +38,16 @@ func NamespaceTopPath(namespace string) string {
 }
 
 type CheckOpts struct {
+	// Privileged indicates the agent was installed with root/administrator privileges.
 	Privileged bool
-<<<<<<< HEAD
-	Namespace  string
-	Username   string
-	Group      string
-=======
 	// Namespace is the install namespace (e.g. "Development").
 	Namespace string
 	// Username is the custom user for the agent service.
 	Username string
 	// Group is the custom group for the agent service.
 	Group string
-	// TargetVersion is the expected version after install or upgrade.
-	TargetVersion string
-	// StartVersion is the version the agent was upgraded from.
-	StartVersion string
 	// TopPath is the agent install directory.
 	TopPath string
->>>>>>> f8df6d454 (fix: clean up leftover artifacts when install fails (#13705))
 }
 
 func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts *CheckOpts) error {
@@ -92,8 +83,6 @@ func CheckSuccess(ctx context.Context, f *atesting.Fixture, topPath string, opts
 	return checkPlatform(ctx, f, topPath, opts)
 }
 
-<<<<<<< HEAD
-=======
 func CheckUninstallSuccess(opts *CheckOpts) error {
 	if opts.TopPath != "" {
 		if _, err := os.Stat(opts.TopPath); !os.IsNotExist(err) {
@@ -103,11 +92,9 @@ func CheckUninstallSuccess(opts *CheckOpts) error {
 			return fmt.Errorf("unexpected error checking %s: %w", opts.TopPath, err)
 		}
 	}
-
-	return checkUninstallPlatform(opts)
+	return nil
 }
 
->>>>>>> f8df6d454 (fix: clean up leftover artifacts when install fails (#13705))
 func exeOnWindows(filename string) string {
 	if runtime.GOOS == define.Windows {
 		return filename + ".exe"
