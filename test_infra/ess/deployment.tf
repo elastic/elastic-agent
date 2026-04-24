@@ -119,6 +119,7 @@ resource "ec_deployment" "integration-testing" {
     }
   }
   kibana = {
+    size                      = "8g" # we've got enough memory on the host
     zone_count                = 1
     config = {
       user_settings_json = jsonencode({
