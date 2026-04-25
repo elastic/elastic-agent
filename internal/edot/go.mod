@@ -7,27 +7,13 @@ replace github.com/elastic/elastic-agent => ../../
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260422170424-7ed4fd9573f4
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.36.0
+	github.com/elastic/elastic-agent-libs v0.39.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.45.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.42.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.42.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.43.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.42.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.42.0
-=======
-	github.com/elastic/elastic-agent-libs v0.39.0
-	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
-	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.46.0
-	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.46.0
-	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.46.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.46.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.46.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.46.0
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.46.0
-	github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.46.0
-	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.46.0
->>>>>>> 8d3f43154 (Add retries to the test Kibana client (#13784))
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.149.0
