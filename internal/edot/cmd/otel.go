@@ -141,7 +141,6 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 	conf := map[string]any{
 		"endpoint": paths.DiagnosticsExtensionSocket(),
 	}
-
 	if supervised {
 		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), configFiles,
 			edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
