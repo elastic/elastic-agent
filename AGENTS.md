@@ -172,6 +172,5 @@ Unless instructed otherwise, always add the `backport-active-all` label to the p
 - [docs/architecture.md](./docs/architecture.md) — architecture overview
 - [docs/component-specs.md](./docs/component-specs.md) — component spec format
 - [docs/test-framework-dev-guide.md](./docs/test-framework-dev-guide.md) — integration tests
-- [docs/local-k8s-testing.md](./docs/local-k8s-testing.md) — Kubernetes testing
 - [Elastic Agent docs](https://www.elastic.co/docs) — product documentation
 - [Fleet Server](https://github.com/elastic/fleet-server) - Control protocol server for managed agents
