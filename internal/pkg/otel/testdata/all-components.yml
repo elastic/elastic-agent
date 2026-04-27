@@ -22,12 +22,7 @@ extensions:
         key: X-Scope-OrgID
         from_context: tenant_id
         default_value: Org-ID
-<<<<<<< HEAD
-=======
-  awslogs_encoding/elbaccess:
-    format: elbaccess
   azure_encoding:
->>>>>>> e16ef499b (Add Azure encoding extension to EDOT Collector (#13583))
 
 processors:
   attributes:
@@ -111,11 +106,7 @@ service:
     - memory_limiter
     - health_check
     - headers_setter
-<<<<<<< HEAD
-=======
-    - awslogs_encoding/elbaccess
     - azure_encoding
->>>>>>> e16ef499b (Add Azure encoding extension to EDOT Collector (#13583))
   pipelines:
     logs:
       exporters:
