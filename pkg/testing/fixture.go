@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -52,6 +53,7 @@ type Fixture struct {
 	runLength       time.Duration
 	additionalArgs  []string
 	fipsArtifact    bool
+	cmdOutput       io.Writer
 
 	srcPackage string
 	workDir    string
@@ -117,6 +119,16 @@ func WithPackageFormat(packageFormat string) FixtureOpt {
 func WithLogOutput() FixtureOpt {
 	return func(f *Fixture) {
 		f.logOutput = true
+	}
+}
+
+// WithCmdOutput configures a writer that receives a combined copy of stdout and
+// stderr from the spawned process started by Run/RunOtelWithClient/RunBeat.
+// Writes from the stdout and stderr goroutines are serialized internally so the
+// supplied writer does not need to be safe for concurrent use.
+func WithCmdOutput(w io.Writer) FixtureOpt {
+	return func(f *Fixture) {
+		f.cmdOutput = w
 	}
 }
 
@@ -454,7 +466,7 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 		f.binaryPath(),
 		process.WithContext(ctx),
 		process.WithArgs(args),
-		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+		process.WithCmdOptions(attachOutErr(stdOut, stdErr, f.cmdOutput)))
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
@@ -527,7 +539,7 @@ func RunProcess(t *testing.T,
 		processPath,
 		process.WithContext(ctx),
 		process.WithArgs(args),
-		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+		process.WithCmdOptions(attachOutErr(stdOut, stdErr, nil)))
 	if err != nil {
 		return fmt.Errorf("failed to spawn %q: %w", processPath, err)
 	}
@@ -592,8 +604,8 @@ func RunProcess(t *testing.T,
 // when `Run` is called.
 //
 // if shouldWatchState is set to false, communicating state does not happen.
-func (f *Fixture) RunOtelWithClient(ctx context.Context, states ...State) error {
-	return f.executeWithClient(ctx, "otel", false, false, false, states...)
+func (f *Fixture) RunOtelWithClient(ctx context.Context) error {
+	return f.executeWithClient(ctx, "otel", false, false, false)
 }
 
 // Stop gracefully stops the Elastic Agent process that has been started
@@ -685,7 +697,7 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		f.binaryPath(),
 		process.WithContext(ctx),
 		process.WithArgs(args),
-		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+		process.WithCmdOptions(attachOutErr(stdOut, stdErr, f.cmdOutput)))
 	f.procMutex.Unlock()
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
@@ -720,6 +732,11 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 			return ctx.Err()
 		case ps := <-procWaitCh:
 			if f.stopping {
+				// Log the exit code (decimal + hex) so callers can distinguish
+				// clean exits from Windows status codes (e.g. 0xC000013A =
+				// STATUS_CONTROL_C_EXIT) when the process was supposed to
+				// shut down gracefully but appears to have been terminated.
+				f.t.Logf("agent exited (after Stop): code=%d (0x%x)", ps.ExitCode(), uint32(ps.ExitCode())) //nolint:gosec // exit-code-to-uint32 is intentional for hex formatting
 				return nil
 			}
 			return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
@@ -1555,12 +1572,32 @@ func writeSpecFile(dest string, spec *component.Spec) error {
 }
 
 // attachOutErr attaches the logWatcher to std out and std error of the spawned process.
-func attachOutErr(stdOut *logWatcher, stdErr *logWatcher) process.CmdOption {
+// If extra is non-nil it receives a combined copy of stdout and stderr; writes from
+// the two streams are serialized so extra does not need to be safe for concurrent use.
+func attachOutErr(stdOut *logWatcher, stdErr *logWatcher, extra io.Writer) process.CmdOption {
 	return func(cmd *exec.Cmd) error {
 		cmd.Stdout = stdOut
 		cmd.Stderr = stdErr
+		if extra != nil {
+			synced := &syncWriter{w: extra}
+			cmd.Stdout = io.MultiWriter(stdOut, synced)
+			cmd.Stderr = io.MultiWriter(stdErr, synced)
+		}
 		return nil
 	}
+}
+
+// syncWriter serializes Write calls so the wrapped writer can be shared
+// between the stdout and stderr copy goroutines.
+type syncWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (s *syncWriter) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.w.Write(p)
 }
 
 func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time.Duration) (chan *client.AgentState, chan error) {
