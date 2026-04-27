@@ -147,7 +147,7 @@ Running Elastic Agent in a docker container is a common use case. To build the E
 
 ```
 # Use PLATFORMS=linux/arm64 if you are using an ARM based Mac.
-DEV=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=docker mage package
+DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=docker mage package
 ```
 
 If you are in the 7.13 branch, this will create the `docker.elastic.co/beats/elastic-agent:7.13.0-SNAPSHOT` image in your local environment. Now you can use this to for example test this container with the stack in elastic-package:

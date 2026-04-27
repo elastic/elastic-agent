@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -425,16 +424,16 @@ func buildMergedConfig(
 
 	// Merge component config if it exists
 	if componentOtelCfg != nil {
-		err := mergedOtelCfg.Merge(componentOtelCfg)
-		if err != nil {
+		if err := mergeWithExtensions(mergedOtelCfg, componentOtelCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 		}
 	}
 
-	// Merge with base collector config if it exists
+	// Merge with base collector config if it exists. mergeWithExtensions unions
+	// the service::extensions lists so that component-generated extensions (e.g.
+	// beatsauth) are not silently overwritten by the collector config's list.
 	if cfgUpdate.collectorCfg != nil {
-		err := mergedOtelCfg.Merge(cfgUpdate.collectorCfg)
-		if err != nil {
+		if err := mergeWithExtensions(mergedOtelCfg, cfgUpdate.collectorCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
 	}
@@ -451,27 +450,20 @@ func buildMergedConfig(
 }
 
 func injectDiagnosticsExtension(config *confmap.Conf) error {
-	extensionCfg := map[string]any{
+	return mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{
 		"extensions": map[string]any{
 			"elastic_diagnostics": map[string]any{
 				"endpoint": paths.DiagnosticsExtensionSocket(),
 			},
 		},
-	}
-	if config.IsSet("service::extensions") {
-		extensionList := config.Get("service::extensions").([]interface{})
-		if slices.Contains(extensionList, "elastic_diagnostics") {
-			// already configured, nothing to do
-			return nil
-		}
-		extensionList = append(extensionList, "elastic_diagnostics")
-		extensionCfg["service::extensions"] = extensionList
-	}
-
-	return config.Merge(confmap.NewFromStringMap(extensionCfg))
+		"service": map[string]any{
+			"extensions": []any{"elastic_diagnostics"},
+		},
+	}))
 }
 
-func (m *OTelManager) applyMergedConfig(ctx context.Context,
+func (m *OTelManager) applyMergedConfig(
+	ctx context.Context,
 	collectorStatusCh chan *status.AggregateStatus,
 	collectorRunErr chan error,
 	forceFetchStatusCh chan struct{},
