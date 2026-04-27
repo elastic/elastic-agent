@@ -46,14 +46,9 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13436
-        - https://github.com/elastic/elastic-agent/pull/13764
-        - https://github.com/elastic/elastic-agent/pull/13756
-        - https://github.com/elastic/elastic-agent/pull/13820
-        - https://github.com/elastic/elastic-agent/pull/13821
-        - https://github.com/elastic/elastic-agent/pull/13583
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/13752
+        - https://github.com/elastic/elastic-agent/pull/13581
+        - https://github.com/elastic/elastic-agent/pull/13612
+      issue: []
       impact: ""
       action: ""
       timestamp: 1775838969
@@ -65,14 +60,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13436
-        - https://github.com/elastic/elastic-agent/pull/13764
-        - https://github.com/elastic/elastic-agent/pull/13756
-        - https://github.com/elastic/elastic-agent/pull/13820
-        - https://github.com/elastic/elastic-agent/pull/13821
-        - https://github.com/elastic/elastic-agent/pull/13583
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/13752
+        - https://github.com/elastic/elastic-agent/pull/13602
+      issue: []
       impact: ""
       action: ""
       timestamp: 1776088801
@@ -84,14 +73,9 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13436
-        - https://github.com/elastic/elastic-agent/pull/13764
-        - https://github.com/elastic/elastic-agent/pull/13756
-        - https://github.com/elastic/elastic-agent/pull/13820
-        - https://github.com/elastic/elastic-agent/pull/13821
-        - https://github.com/elastic/elastic-agent/pull/13583
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/13752
+        - https://github.com/elastic/elastic-agent/pull/13639
+        - https://github.com/elastic/elastic-agent/pull/13661
+      issue: []
       impact: ""
       action: ""
       timestamp: 1776251957
