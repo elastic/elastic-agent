@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agentless"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -376,12 +377,22 @@ func (c *commandRuntime) start(comm Communicator) error {
 		return nil
 	}
 	cmdSpec := c.getCommandSpec()
-	env := make([]string, 0, len(cmdSpec.Env)+2)
+	env := make([]string, 0, len(cmdSpec.Env)+4)
 	for _, e := range cmdSpec.Env {
 		env = append(env, fmt.Sprintf("%s=%s", e.Name, e.Value))
 	}
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentID, c.current.ID))
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentType, c.getSpecType()))
+
+	// in case of agentless mode, propagate the agentless environment variables
+	if v, ok := os.LookupEnv(agentless.IsAgentlessEnvName); ok {
+		env = append(env, fmt.Sprintf("%s=%s", agentless.IsAgentlessEnvName, v))
+	}
+
+	if v, ok := os.LookupEnv(agentless.StateStoreInputTypesEnvName); ok {
+		env = append(env, fmt.Sprintf("%s=%s", agentless.StateStoreInputTypesEnvName, v))
+	}
+
 	workDir := c.current.WorkDirPath(paths.Run())
 	path, err := filepath.Abs(c.getSpecBinaryPath())
 	if err != nil {

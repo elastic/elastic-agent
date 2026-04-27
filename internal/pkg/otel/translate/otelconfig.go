@@ -23,7 +23,7 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 	"golang.org/x/exp/maps"
 
-	fbfeatures "github.com/elastic/beats/v7/filebeat/features"
+	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"

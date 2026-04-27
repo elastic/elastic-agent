@@ -21,6 +21,7 @@ import (
 
 	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agentless"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
@@ -32,6 +33,9 @@ import (
 const (
 	agentBaseDirectory    = "/usr/share/elastic-agent"    // directory that holds all elastic-agent related files
 	defaultStateDirectory = agentBaseDirectory + "/state" // directory that will hold the state data
+
+	// AgentlessBuildDescription is used for component.BuildInfo.Description in agentless mode.
+	agentlessBuildDescription = "Elastic Agentless opentelemetry-collector distribution"
 )
 
 func NewOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
@@ -141,8 +145,9 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 	conf := map[string]any{
 		"endpoint": paths.DiagnosticsExtensionSocket(),
 	}
+	buildDesc := customBuildDescriptionFromEnv()
 	if supervised {
-		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), configFiles,
+		settings.otelSettings = edotOtelCol.NewSettingsWithCustomBuildDescription(release.Version(), buildDesc, configFiles,
 			edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
 		)
 
@@ -181,7 +186,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 
 		settings.otelSettings.DisableGracefulShutdown = false
 	} else {
-		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), configFiles, edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)))
+		settings.otelSettings = edotOtelCol.NewSettingsWithCustomBuildDescription(release.Version(), buildDesc, configFiles, edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)))
 	}
 	return settings, nil
 }
@@ -199,4 +204,14 @@ func prepareEnv() error {
 		}
 	}
 	return nil
+}
+
+// customBuildDescriptionFromEnv returns AgentlessBuildDescription when agentless
+// mode is enabled (see internal/pkg/agentless), otherwise an empty string so that
+// NewSettings applies defaultBuildDescription.
+func customBuildDescriptionFromEnv() string {
+	if agentless.IsAgentless() {
+		return agentlessBuildDescription
+	}
+	return ""
 }
