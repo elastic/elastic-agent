@@ -171,7 +171,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt Pr
 	}
 
 	// post install (per platform)
-	err = postInstall(topPath)
+	err = postInstall(topPath, ownership)
 	if err != nil {
 		return ownership, fmt.Errorf("error running post-install steps: %w", err)
 	}
@@ -451,11 +451,11 @@ func InstallService(topPath string, ownership utils.FileOwner, username string, 
 	if err != nil {
 		return fmt.Errorf("failed to install service (%s): %w", paths.ServiceName(), err)
 	}
-	err = serviceConfigure(ownership)
+	err = configureServicePermissions(ownership)
 	if err != nil {
 		// ignore error
 		_ = svc.Uninstall()
-		return fmt.Errorf("failed to configure service (%s): %w", paths.ServiceName(), err)
+		return fmt.Errorf("failed to configure service permissions (%s): %w", paths.ServiceName(), err)
 	}
 	return nil
 }

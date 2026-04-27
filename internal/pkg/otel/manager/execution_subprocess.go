@@ -78,7 +78,7 @@ type subprocessExecution struct {
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
 func (r *subprocessExecution) startCollector(
-	ctx context.Context,
+	_ context.Context,
 	lvl logp.Level,
 	collectorLogger *logger.Logger,
 	logger *logger.Logger,
@@ -119,7 +119,6 @@ func (r *subprocessExecution) startCollector(
 	stdErrLast := newZapLast(collectorLogger.Core())
 	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
 
-	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
 
 	// set collector args and add --config flag with the stdingob:stdin URI
@@ -143,125 +142,21 @@ func (r *subprocessExecution) startCollector(
 		if err == nil {
 			err = errors.New("process is nil")
 		}
-		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
 
 	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
 
-	processDoneCh := make(chan struct{})
-	reportPipeErrFn := func(err error) {
-		r.reportErrFn(ctx, processErrCh, err)
-	}
-
-	ctl := newProcHandle(processInfo, logger, lvl, processDoneCh, reportPipeErrFn)
-	healthCheckDone := make(chan struct{})
-	ctl.wg.Add(3)
-	go func() {
-		defer func() {
-			close(healthCheckDone)
-			ctl.wg.Done()
-		}()
-		currentStatus := status.AggregateStatus(componentstatus.StatusStarting, nil)
-		r.reportSubprocessCollectorStatus(ctx, statusCh, currentStatus)
-
-		// specify a max duration of not being able to get the status from the collector
-		const maxFailuresDuration = 130 * time.Second
-		maxFailuresTimer := time.NewTimer(maxFailuresDuration)
-		defer maxFailuresTimer.Stop()
-
-		// check the health of the collector every 1 second
-		const healthCheckPollDuration = 1 * time.Second
-		healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
-		defer healthCheckPollTimer.Stop()
-		client := http.Client{}
-		for {
-			statuses, err := AllComponentsStatuses(procCtx, client, httpHealthCheckPort)
-			if err != nil {
-				switch {
-				case errors.Is(err, context.Canceled):
-					// after the collector exits, we need to report a nil status
-					r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
-					return
-				default:
-					// if we face any other error (most likely, connection refused), log the error.
-					logger.Debugf("Received an unexpected error while fetching component status: %v", err)
-				}
-			} else {
-				maxFailuresTimer.Reset(maxFailuresDuration)
-				removeManagedHealthCheckExtensionStatus(statuses, r.healthCheckExtensionID)
-				if !status.CompareStatuses(currentStatus, statuses) {
-					currentStatus = statuses
-					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
-				}
-			}
-
-			select {
-			case <-procCtx.Done():
-				// after the collector exits, we need to report a nil status
-				r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
-				return
-			case <-forceFetchStatusCh:
-				r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
-			case <-healthCheckPollTimer.C:
-				healthCheckPollTimer.Reset(healthCheckPollDuration)
-			case <-maxFailuresTimer.C:
-				failedToConnectStatuses := status.AggregateStatus(
-					componentstatus.StatusRecoverableError,
-					errors.New("failed to connect to collector"),
-				)
-				if !status.CompareStatuses(currentStatus, failedToConnectStatuses) {
-					currentStatus = statuses
-					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
-				}
-			}
-		}
-	}()
-
-	go func() {
-		defer ctl.wg.Done()
-		procState, procErr := processInfo.Process.Wait()
-		logger.Debugf("wait for pid %d returned", processInfo.PID)
-		procCtxCancel()
-		<-healthCheckDone
-		close(ctl.processDoneCh)
-		// using ctx instead of procCtx in the reportErr functions below is intentional. This allows us to report
-		// errors to the caller through processErrCh and essentially discard any other errors that occurred because
-		// the process exited.
-		if procErr == nil {
-			if procState.Success() {
-				// report nil error so that the caller can be notified that the process has exited without error
-				r.reportErrFn(ctx, processErrCh, nil)
-			} else {
-				var procReportErr error
-				stderrMsg := stdErrLast.LastMessage()
-				stdoutMsg := stdOutLast.LastMessage()
-				if stderrMsg != "" {
-					// use stderr messages as the error
-					procReportErr = errors.New(stderrMsg)
-				} else if stdoutMsg != "" {
-					// use stdout messages as the error
-					procReportErr = errors.New(stdoutMsg)
-				} else {
-					// neither case use standard process error
-					procReportErr = fmt.Errorf("supervised collector (pid: %d) exited with error: %s", procState.Pid(), procState.String())
-				}
-				r.reportErrFn(ctx, processErrCh, procReportErr)
-			}
-			return
-		}
-
-		r.reportErrFn(ctx, processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
-	}()
-
-	// The pipeWriter goroutine writes the initial config and subsequent updates asynchronously to the pipe.
-	// Any errors are reported directly to processErrCh via reportErrFn.
-	go func() {
-		defer ctl.wg.Done()
-		ctl.writeToPipe(processInfo.Stdin)
-	}()
+	ctl := newProcHandle(processInfo, logger, lvl, r.healthCheckExtensionID, httpHealthCheckPort,
+		forceFetchStatusCh,
+		func(ctx context.Context, st *otelstatus.AggregateStatus) {
+			reportCollectorStatus(ctx, statusCh, cloneCollectorStatus(st))
+		},
+		func(ctx context.Context, err error) { r.reportErrFn(ctx, processErrCh, err) },
+		stdOutLast, stdErrLast,
+	)
+	ctl.startBackgroundWorkers()
 	ctl.updateConfigYamlBytes(cfgYamlBytes)
-
 	return ctl, nil
 }
 
@@ -283,13 +178,6 @@ func cloneCollectorStatus(aStatus *otelstatus.AggregateStatus) *otelstatus.Aggre
 	}
 
 	return st
-}
-
-func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Context, statusCh chan *otelstatus.AggregateStatus, collectorStatus *otelstatus.AggregateStatus) {
-	// we need to clone the status to prevent any mutation on the receiver side
-	// affecting the original ref
-	clonedStatus := cloneCollectorStatus(collectorStatus)
-	reportCollectorStatus(ctx, statusCh, clonedStatus)
 }
 
 func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
@@ -318,7 +206,7 @@ func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
 	confMap := map[string]any{
 		"service::telemetry::metrics::readers": metricsReadersList,
 	}
-	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
+	if mergeErr := mergeWithExtensions(conf, confmap.NewFromStringMap(confMap)); mergeErr != nil {
 		return fmt.Errorf("failed to merge config: %w", mergeErr)
 	}
 	return nil
@@ -347,36 +235,226 @@ func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus,
 	delete(extensions.ComponentStatusMap, extensionID)
 }
 
+// procHandle manages a running collector subprocess and its health monitoring.
 type procHandle struct {
-	processDoneCh     chan struct{}
-	processInfo       *process.Info
-	log               *logger.Logger
+	// processInfo holds info about the running subprocess.
+	processInfo *process.Info
+	// processDoneCh is closed when the subprocess exits.
+	processDoneCh chan struct{}
+	logger        *logger.Logger
+
+	// wg covers all goroutines: health monitoring, process wait, and pipe writing.
+	wg sync.WaitGroup
+
+	// healthCheckExtensionID is the OTel extension ID used for health checks.
+	healthCheckExtensionID string
+	// httpHealthCheckPort is the port the collector's health check endpoint listens on.
+	httpHealthCheckPort int
+	// forceFetchStatusCh signals an immediate status fetch.
+	// This is used when the manager wants the current status to be re-emitted.
+	forceFetchStatusCh chan struct{}
+
+	// reportStatusFn reports a collector status update upstream.
+	reportStatusFn func(ctx context.Context, status *otelstatus.AggregateStatus)
+	// reportErrFn reports a subprocess error upstream.
+	reportErrFn func(ctx context.Context, err error)
+	// stdOutLast captures the last stdout logger line for error reporting.
+	stdOutLast *zapLast
+	// stdErrLast captures the last stderr logger line for error reporting.
+	stdErrLast *zapLast
+
+	// collectorLogLevel is the logger level of the running collector.
 	collectorLogLevel logp.Level
-	configCh          chan []byte    // buffered(1), latest-config-wins
-	reportErrFn       func(error)    // reports pipe write errors to processErrCh
-	wg                sync.WaitGroup // covers process monitoring and config submission
+	// configCh is a buffered(1) channel for latest-config-wins config updates.
+	configCh chan []byte
+
+	// fetchStatus retrieves the status from the collector health check endpoint.
+	// Defaults to AllComponentsStatuses; overridable for testing.
+	fetchStatus func(ctx context.Context, client http.Client, httpHealthCheckPort int) (*otelstatus.AggregateStatus, error)
+	// waitProcess waits for the subprocess to exit and returns its state.
+	// Defaults to processInfo.Process.Wait(); overridable for testing.
+	waitProcess func() (processExitState, error)
+}
+
+// processExitState is the subset of os.ProcessState that reportProcessExitErr needs.
+// *os.ProcessState satisfies this interface; tests can supply a lightweight fake.
+type processExitState interface {
+	Success() bool
+	Pid() int
+	String() string
 }
 
 func newProcHandle(
 	processInfo *process.Info,
 	log *logger.Logger,
 	collectorLogLevel logp.Level,
-	processDoneCh chan struct{},
-	reportErrFn func(error),
+	healthCheckExtensionID string,
+	httpHealthCheckPort int,
+	forceFetchStatusCh chan struct{},
+	reportStatusFn func(ctx context.Context, status *otelstatus.AggregateStatus),
+	reportErrFn func(ctx context.Context, err error),
+	stdOutLast *zapLast,
+	stdErrLast *zapLast,
 ) *procHandle {
 	return &procHandle{
-		processDoneCh:     processDoneCh,
-		processInfo:       processInfo,
-		log:               log,
-		collectorLogLevel: collectorLogLevel,
-		configCh:          make(chan []byte, 1),
-		reportErrFn:       reportErrFn,
+		processDoneCh:          make(chan struct{}),
+		processInfo:            processInfo,
+		logger:                 log,
+		collectorLogLevel:      collectorLogLevel,
+		configCh:               make(chan []byte, 1),
+		healthCheckExtensionID: healthCheckExtensionID,
+		httpHealthCheckPort:    httpHealthCheckPort,
+		forceFetchStatusCh:     forceFetchStatusCh,
+		reportStatusFn:         reportStatusFn,
+		reportErrFn:            reportErrFn,
+		stdOutLast:             stdOutLast,
+		stdErrLast:             stdErrLast,
+		fetchStatus:            AllComponentsStatuses,
+		waitProcess: func() (processExitState, error) {
+			return processInfo.Process.Wait()
+		},
 	}
 }
 
+func (s *procHandle) startBackgroundWorkers() {
+	ctx, cancel := context.WithCancel(context.Background())
+	s.startMonitoring(ctx, cancel)
+	s.startPipeWriter(ctx)
+}
+
+func (s *procHandle) startMonitoring(ctx context.Context, cancel context.CancelFunc) {
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.monitorHealth(ctx, cancel)
+	}()
+}
+
+// The pipeWriter goroutine writes the initial config and subsequent updates asynchronously to the pipe.
+// Any errors are reported via reportErrFn.
+func (s *procHandle) startPipeWriter(ctx context.Context) {
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.writeToPipe(ctx, s.processInfo.Stdin)
+	}()
+}
+
+// monitorHealth polls the collector's health check endpoint and reports status changes.
+func (s *procHandle) monitorHealth(ctx context.Context, cancel context.CancelFunc) {
+	var procState processExitState
+	var procErr error
+
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		procState, procErr = s.waitProcess()
+		s.logger.Debugf("wait for pid %d returned", s.processInfo.PID)
+		cancel()
+		close(s.processDoneCh)
+	}()
+
+	currentStatus := status.AggregateStatus(componentstatus.StatusStarting, nil)
+	s.reportStatusFn(ctx, currentStatus)
+
+	// specify a max duration of not being able to get the status from the collector
+	const maxFailuresDuration = 130 * time.Second
+	maxFailuresTimer := time.NewTimer(maxFailuresDuration)
+	defer maxFailuresTimer.Stop()
+
+	// check the health of the collector every 1 second
+	const healthCheckPollDuration = 1 * time.Second
+	healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
+	defer healthCheckPollTimer.Stop()
+	client := http.Client{}
+loop:
+	for ctx.Err() == nil {
+		statuses, err := s.fetchStatus(ctx, client, s.httpHealthCheckPort)
+		if err != nil {
+			switch {
+			case errors.Is(err, context.Canceled):
+				break loop
+			default:
+				// if we face any other error (most likely, connection refused), log the error.
+				s.logger.Debugf("Received an unexpected error while fetching component status: %v", err)
+			}
+		} else {
+			maxFailuresTimer.Reset(maxFailuresDuration)
+			removeManagedHealthCheckExtensionStatus(statuses, s.healthCheckExtensionID)
+			if !status.CompareStatuses(currentStatus, statuses) {
+				currentStatus = statuses
+				s.reportStatusFn(ctx, statuses)
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			break loop
+		case <-s.forceFetchStatusCh:
+			s.reportStatusFn(ctx, currentStatus)
+		case <-healthCheckPollTimer.C:
+			healthCheckPollTimer.Reset(healthCheckPollDuration)
+		case <-maxFailuresTimer.C:
+			failedToConnectStatuses := status.AggregateStatus(
+				componentstatus.StatusRecoverableError,
+				errors.New("failed to connect to collector"),
+			)
+			if !status.CompareStatuses(currentStatus, failedToConnectStatuses) {
+				currentStatus = failedToConnectStatuses
+				s.reportStatusFn(ctx, failedToConnectStatuses)
+			}
+		}
+	}
+
+	// wait until process actually exits
+	<-s.processDoneCh
+
+	// the finalization process involves some operations that take a context
+	// realistically, none of them can block here, but just in case
+	exitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	// after the collector exits, we need to report a nil status
+	s.reportStatusFn(exitCtx, nil)
+
+	// report the process exit error if necessary
+	s.reportProcessExitErr(exitCtx, procState, procErr)
+}
+
+// reportProcessExitErr waits for the collector process to exit and reports the exit status.
+func (s *procHandle) reportProcessExitErr(ctx context.Context, procState processExitState, procErr error) {
+	var allErrors []error
+
+	// if we got an error, report it
+	if procErr != nil {
+		allErrors = append(allErrors, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
+	}
+
+	// if the process exited with an error, get the information from logs
+	if procState != nil && !procState.Success() {
+		var procReportErr error
+		stderrMsg := s.stdErrLast.LastMessage()
+		stdoutMsg := s.stdOutLast.LastMessage()
+		if stderrMsg != "" {
+			// use stderr messages as the error
+			procReportErr = errors.New(stderrMsg)
+		} else if stdoutMsg != "" {
+			// use stdout messages as the error
+			procReportErr = errors.New(stdoutMsg)
+		} else {
+			// neither case use standard process error
+			procReportErr = fmt.Errorf("supervised collector (pid: %d) exited with error: %s", procState.Pid(), procState.String())
+		}
+		allErrors = append(allErrors, procReportErr)
+	}
+
+	// report all the encountered errors
+	s.reportErrFn(ctx, errors.Join(allErrors...))
+}
+
 // writeToPipe owns the pipe lifecycle. It loops writing configs queued via configCh until the process
-// exits. Errors are reported via reportErrFn.
-func (s *procHandle) writeToPipe(pipeWriter io.WriteCloser) {
+// exits. Errors are reported via reportErrFn using a context tied to the process lifetime.
+func (s *procHandle) writeToPipe(ctx context.Context, pipeWriter io.WriteCloser) {
 	encoder := gob.NewEncoder(pipeWriter)
 
 	// Loop: write configs until the process exits.
@@ -392,7 +470,7 @@ func (s *procHandle) writeToPipe(pipeWriter io.WriteCloser) {
 				case <-s.processDoneCh:
 				default:
 					if !errors.Is(err, io.ErrClosedPipe) {
-						s.reportErrFn(fmt.Errorf("failed to write config update: %w", err))
+						s.reportErrFn(ctx, fmt.Errorf("failed to write config update: %w", err))
 					}
 				}
 
@@ -406,6 +484,7 @@ func (s *procHandle) writeToPipe(pipeWriter io.WriteCloser) {
 // processKillAfter or due to an error, it will be killed.
 func (s *procHandle) Stop(waitTime time.Duration) {
 	defer s.wg.Wait()
+
 	select {
 	case <-s.processDoneCh:
 		// process has already exited
@@ -413,14 +492,14 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 	default:
 	}
 
-	s.log.Debugf("gracefully stopping pid %d", s.processInfo.PID)
+	s.logger.Debugf("gracefully stopping pid %d", s.processInfo.PID)
 	if err := s.processInfo.Stop(); err != nil {
-		s.log.Warnf("failed to send stop signal to the supervised collector: %v", err)
+		s.logger.Warnf("failed to send stop signal to the supervised collector: %v", err)
 		// we failed to stop the process just kill it and return
 	} else {
 		select {
 		case <-time.After(waitTime):
-			s.log.Warnf("timeout waiting (%s) for the supervised collector to stop, killing it", waitTime.String())
+			s.logger.Warnf("timeout waiting (%s) for the supervised collector to stop, killing it", waitTime.String())
 		case <-s.processDoneCh:
 			// process has already exited
 			return
@@ -432,9 +511,9 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 	_ = s.processInfo.Kill()
 	select {
 	case <-time.After(process.KillReapTime):
-		s.log.Errorf("timed out waiting for supervised collector process %d to be reaped after SIGKILL", s.processInfo.PID)
+		s.logger.Errorf("timed out waiting for supervised collector process %d to be reaped after SIGKILL", s.processInfo.PID)
 	case <-s.processDoneCh:
-		s.log.Debugf("supervised collector process %d reaped successfully after SIGKILL", s.processInfo.PID)
+		s.logger.Debugf("supervised collector process %d reaped successfully after SIGKILL", s.processInfo.PID)
 	}
 }
 
