@@ -93,6 +93,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/cgroupruntimeextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension"
 	headersetterextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
 	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
@@ -104,6 +105,7 @@ import (
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
 	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
+	kafkapartitionerextension "github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
 	verifierreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
@@ -261,7 +263,9 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			beatsauthextension.NewFactory(),
 			elasticdiagnostics.NewFactory(),
 			elasticsearchstorage.NewFactory(),
+			kafkapartitionerextension.NewFactory(),
 			awslogsencodingextension.NewFactory(),
+			azureencodingextension.NewFactory(),
 			opampextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)

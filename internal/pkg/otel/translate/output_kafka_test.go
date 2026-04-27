@@ -320,16 +320,6 @@ ssl:
   ca_sha_256:  sha256
 `,
 		},
-		{
-			"partition is set",
-			`
-hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
-topic: static-topic
-partition: 
-  round_robin: 
-    group_events: 1
-`,
-		},
 	}
 
 	for _, test := range testCases {
