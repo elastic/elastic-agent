@@ -620,4 +620,4 @@ instrumentation:
   python:
     image: docker.elastic.co/observability/elastic-otel-python:1.12.0
   go:
-    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.23.0
+    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.24.0
