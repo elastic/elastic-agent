@@ -848,6 +848,28 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	det := details.NewDetails(version, details.StateRequested, actionID)
 	det.RegisterObserver(c.SetUpgradeDetails)
 
+	// Detect replayed rollback actions: if this is a rollback request and the
+	// agent is already running the target version, the rollback was already
+	// performed. Ack the action and return without processing.
+	// Upgrade details are not set at this point so the checkin will not send any,
+	// indicating a successful rollback.
+	// This can happen when the rolled-back agent starts with an ackToken from
+	// before the rollback action was received and Fleet Server re-sends it.
+	if uOpts.rollback && release.VersionWithSnapshot() == version {
+		c.logger.Infow(
+			"Received a rollback action targeting the current version, "+
+				"likely a replayed action; acking without processing",
+			"action_id", actionID,
+			"version", version,
+		)
+		c.ClearOverrideState()
+		det.SetState(details.StateRollback)
+		if action != nil {
+			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
+		}
+		return nil
+	}
+
 	// early check outside of upgrader before overriding the state
 	if !c.upgradeMgr.Upgradeable() {
 		c.ClearOverrideState()
@@ -879,22 +901,6 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
 			// Set upgrade state to completed so update no longer shows in-progress.
 			det.SetState(details.StateCompleted)
-			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
-		}
-
-		if errors.Is(err, upgrade.ErrNoRollbacksAvailable) && action != nil && release.VersionWithSnapshot() == action.Data.Version {
-			// when manually rolling back the action store is not copied back, so it's likely that the rolled back agent
-			// will receive (again) the rollback action because it's using an ackToken from before the rollback action
-			// was received by the "upgraded" elastic-agent.
-			// This block here is to avoid setting an error state because the rollback requested no longer exist after
-			// having performed the rollback once.
-			// A better test would be to compare actionIDs but there's no way to persist the actionID of the rollback action
-			// from the upgraded agent to the rolled back agent (upgrade details is reset when the upgrade marker is deleted)
-			c.logger.Infow(
-				"Received a rollback action with the same version as current and no rollbacks available, ignoring the likely replayed action",
-				"action_id", action.ID())
-			c.ClearOverrideState()
-			det.SetState(details.StateRollback)
 			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
 		}
 
@@ -1283,11 +1289,11 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current expected components model of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				comps := c.componentModel
+				redacted := stripComponentUnitsConfig(c.componentModel)
 				o, err := yaml.Marshal(struct {
 					Components []component.Component `yaml:"components"`
 				}{
-					Components: comps,
+					Components: redacted,
 				})
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
@@ -1307,10 +1313,11 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				for i := 0; i < len(components); i++ {
 					componentConfigs[i] = components[i].Component
 				}
+				redacted := stripComponentUnitsConfig(componentConfigs)
 				o, err := yaml.Marshal(struct {
 					Components []component.Component `yaml:"components"`
 				}{
-					Components: componentConfigs,
+					Components: redacted,
 				})
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
@@ -1429,6 +1436,22 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 		},
 	}
 	return hooks
+}
+
+// stripComponentUnitsConfig returns a copy of the components with Unit.Config
+// removed to prevent secret leakage in diagnostics.
+func stripComponentUnitsConfig(comps []component.Component) []component.Component {
+	result := make([]component.Component, len(comps))
+	copy(result, comps)
+	for i := range result {
+		units := make([]component.Unit, len(result[i].Units))
+		copy(units, result[i].Units)
+		for j := range units {
+			units[j].Config = nil
+		}
+		result[i].Units = units
+	}
+	return result
 }
 
 // runner performs the actual work of running all the managers.
@@ -1975,7 +1998,7 @@ func maybeOverrideRuntimeForComponent(logger *logger.Logger, runtimeCfg *compone
 		// check if the component is actually supported
 		err := translate.VerifyComponentIsOtelSupported(comp)
 		if err != nil {
-			logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
+			logger.Infof("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
 			comp.RuntimeManager = component.ProcessRuntimeManager
 		}
 
