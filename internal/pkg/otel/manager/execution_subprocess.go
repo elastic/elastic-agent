@@ -391,7 +391,7 @@ loop:
 		case <-ctx.Done():
 			break loop
 		case <-s.forceFetchStatusCh:
-			s.reportStatusFn(ctx, statuses)
+			s.reportStatusFn(ctx, currentStatus)
 		case <-healthCheckPollTimer.C:
 			healthCheckPollTimer.Reset(healthCheckPollDuration)
 		case <-maxFailuresTimer.C:
