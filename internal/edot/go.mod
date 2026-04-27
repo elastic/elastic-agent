@@ -5,9 +5,9 @@ go 1.25.9
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260416203429-2727e452a0fd
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260422170424-7ed4fd9573f4
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.36.0
+	github.com/elastic/elastic-agent-libs v0.39.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.45.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.42.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.42.0
@@ -46,6 +46,7 @@ require (
 
 require (
 	cloud.google.com/go/pubsub/v2 v2.0.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs/v2 v2.0.2 // indirect
 	github.com/DeRuina/timberjack v1.4.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.71.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/kafka v1.46.7 // indirect
@@ -58,16 +59,16 @@ require (
 	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.42.0 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.4 // indirect
-	github.com/go-openapi/swag/conv v0.25.4 // indirect
-	github.com/go-openapi/swag/fileutils v0.25.4 // indirect
-	github.com/go-openapi/swag/jsonname v0.25.4 // indirect
-	github.com/go-openapi/swag/jsonutils v0.25.4 // indirect
-	github.com/go-openapi/swag/loading v0.25.4 // indirect
-	github.com/go-openapi/swag/mangling v0.25.4 // indirect
+	github.com/go-openapi/swag/conv v0.25.5 // indirect
+	github.com/go-openapi/swag/fileutils v0.25.5 // indirect
+	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
+	github.com/go-openapi/swag/jsonutils v0.25.5 // indirect
+	github.com/go-openapi/swag/loading v0.25.5 // indirect
+	github.com/go-openapi/swag/mangling v0.25.5 // indirect
 	github.com/go-openapi/swag/netutils v0.25.4 // indirect
-	github.com/go-openapi/swag/stringutils v0.25.4 // indirect
-	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
-	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
+	github.com/go-openapi/swag/stringutils v0.25.5 // indirect
+	github.com/go-openapi/swag/typeutils v0.25.5 // indirect
+	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
 	github.com/google/pprof v0.0.0-20260202012954-cb029daf43ef // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/internal/credentialsfile v0.149.0 // indirect
@@ -163,18 +164,17 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.21.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs v1.3.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics v1.1.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5 v5.7.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/costmanagement/armcostmanagement v1.1.1 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.8.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.11.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4 v4.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.3 // indirect
 	github.com/Azure/azure-storage-blob-go v0.15.0 // indirect
-	github.com/Azure/go-amqp v1.4.0 // indirect
+	github.com/Azure/go-amqp v1.5.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.29 // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.24 // indirect
@@ -295,7 +295,7 @@ require (
 	github.com/elastic/elastic-agent-autodiscover v0.10.2 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.18.1 // indirect
 	github.com/elastic/elastic-agent-system-metrics v0.14.3 // indirect
-	github.com/elastic/elastic-transport-go/v8 v8.10.0 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.14.0 // indirect
 	github.com/elastic/go-elasticsearch/v8 v8.19.3 // indirect
@@ -338,15 +338,15 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
-	github.com/go-openapi/analysis v0.24.2 // indirect
-	github.com/go-openapi/errors v0.22.6 // indirect
-	github.com/go-openapi/jsonpointer v0.22.4 // indirect
-	github.com/go-openapi/jsonreference v0.21.4 // indirect
-	github.com/go-openapi/loads v0.23.2 // indirect
-	github.com/go-openapi/spec v0.22.3 // indirect
-	github.com/go-openapi/strfmt v0.25.0 // indirect
+	github.com/go-openapi/analysis v0.24.3 // indirect
+	github.com/go-openapi/errors v0.22.7 // indirect
+	github.com/go-openapi/jsonpointer v0.22.5 // indirect
+	github.com/go-openapi/jsonreference v0.21.5 // indirect
+	github.com/go-openapi/loads v0.23.3 // indirect
+	github.com/go-openapi/spec v0.22.4 // indirect
+	github.com/go-openapi/strfmt v0.26.1 // indirect
 	github.com/go-openapi/swag v0.25.4 // indirect
-	github.com/go-openapi/validate v0.25.1 // indirect
+	github.com/go-openapi/validate v0.25.2 // indirect
 	github.com/go-resty/resty/v2 v2.17.1 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
@@ -371,7 +371,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/gomodule/redigo v1.9.3 // indirect
-	github.com/google/cel-go v0.26.1 // indirect
+	github.com/google/cel-go v0.28.0 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
@@ -468,7 +468,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/nginx/nginx-prometheus-exporter v1.5.1 // indirect; indirectgoogle.golang.org/protobuf
-	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/oklog/ulid/v2 v2.1.1 // indirect
 	github.com/open-telemetry/opamp-go v0.23.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.149.0 // indirect
@@ -535,7 +534,6 @@ require (
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/stackitcloud/stackit-sdk-go/core v0.21.1 // indirect
-	github.com/stoewer/go-strcase v1.3.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -652,7 +650,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
-	go.uber.org/mock v0.5.0 // indirect
+	go.uber.org/mock v0.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/ratelimit v0.3.1 // indirect
 	go.uber.org/zap/exp v0.3.0 // indirect
@@ -676,7 +674,7 @@ require (
 	google.golang.org/api v0.270.0 // indirect
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260319201613-d00831a3d3e7 // indirect
 	google.golang.org/grpc v1.80.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
@@ -700,7 +698,7 @@ require (
 )
 
 require (
-	github.com/hashicorp/go-version v1.8.0 // indirect
+	github.com/hashicorp/go-version v1.9.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect; indirecthttps://github.com/elastic/ingest-dev/issues/3253
 	k8s.io/klog/v2 v2.130.1 // indirect
 )
