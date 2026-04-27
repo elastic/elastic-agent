@@ -22,9 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
 )
 
-const (
-	buildDescription = "Elastic opentelemetry-collector distribution"
-)
+const buildDescription = "Elastic opentelemetry-collector distribution"
 
 func Run(ctx context.Context, stop chan bool, settings *otelcol.CollectorSettings) error {
 	svc, err := otelcol.NewCollector(*settings)
@@ -69,9 +67,6 @@ func WithExtensionFactory(factory extension.Factory) SettingOpt {
 	}
 }
 
-// NewSettingsWithCustomBuildDescription builds collector settings. If customBuildDescription is empty,
-// defaultBuildDescription is used. Use CustomBuildDescriptionFromEnv() for the
-// agentless-specific descrip
 func NewSettings(version string, configPaths []string, opts ...SettingOpt) *otelcol.CollectorSettings {
 	buildInfo := component.BuildInfo{
 		Command:     os.Args[0],
