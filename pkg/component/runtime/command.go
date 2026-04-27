@@ -20,7 +20,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agentless"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -38,6 +37,12 @@ const (
 	envAgentComponentType = "AGENT_COMPONENT_TYPE"
 
 	stateUnknownMessage = "Unknown"
+)
+
+// Environment variables for agentless mode
+const (
+	IsAgentlessEnvName          = "ELASTIC_AGENT_IS_AGENTLESS"
+	StateStoreInputTypesEnvName = "AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES"
 )
 
 func (m actionMode) String() string {
@@ -385,12 +390,12 @@ func (c *commandRuntime) start(comm Communicator) error {
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentType, c.getSpecType()))
 
 	// in case of agentless mode, propagate the agentless environment variables
-	if v, ok := os.LookupEnv(agentless.IsAgentlessEnvName); ok {
-		env = append(env, fmt.Sprintf("%s=%s", agentless.IsAgentlessEnvName, v))
+	if v, ok := os.LookupEnv(IsAgentlessEnvName); ok {
+		env = append(env, fmt.Sprintf("%s=%s", IsAgentlessEnvName, v))
 	}
 
-	if v, ok := os.LookupEnv(agentless.StateStoreInputTypesEnvName); ok {
-		env = append(env, fmt.Sprintf("%s=%s", agentless.StateStoreInputTypesEnvName, v))
+	if v, ok := os.LookupEnv(StateStoreInputTypesEnvName); ok {
+		env = append(env, fmt.Sprintf("%s=%s", StateStoreInputTypesEnvName, v))
 	}
 
 	workDir := c.current.WorkDirPath(paths.Run())
