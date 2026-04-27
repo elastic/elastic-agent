@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -308,6 +309,16 @@ func getKibanaClient() (*kibana.Client, error) {
 		Username:      kibanaUser,
 		Password:      kibanaPass,
 		IgnoreVersion: false,
+		Retry: kibana.RetryConfig{
+			MaxRetries:    5,
+			RetryOnStatus: []int{429, 500, 502, 503, 504},
+			RetryBackoff: func(attempt int) time.Duration {
+				base := time.Second
+				maxWait := 10 * time.Second
+				wait := (1 << (attempt - 1)) * base
+				return min(wait, maxWait)
+			},
+		},
 	}, 0, "Elastic-Agent-Test-Define", version.GetDefaultVersion(), version.Commit(), version.BuildTime().String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kibana client: %w", err)
