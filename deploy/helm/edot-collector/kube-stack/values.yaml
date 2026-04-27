@@ -246,10 +246,12 @@ collectors:
                 enabled: false
               host.arch:
                 enabled: true
-              host.ip:
-                enabled: true
-              host.mac:
-                enabled: true
+              # Disabling host.ip host.mac due to high cardinality
+              # See issue: https://github.com/elastic/elastic-agent/issues/13575
+              # host.ip:
+              #   enabled: true
+              # host.mac:
+              #   enabled: true
               host.cpu.vendor.id:
                 enabled: true
               host.cpu.family:
