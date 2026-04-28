@@ -56,7 +56,20 @@ var (
 	}
 )
 
+// dumpGoroutines is a diagnostic helper for #13796. It prints the count and
+// full stack of all live goroutines so we can correlate the
+// "Unlock of unlocked RWMutex" panic with what state was alive at the time.
+// REVERT THIS WHEN THE FLAKE IS RESOLVED.
+func dumpGoroutines(t *testing.T, label string) {
+	buf := make([]byte, 1<<20)
+	n := runtime.Stack(buf, true)
+	t.Logf("=== [%s] num_goroutines=%d ===\n%s", label, runtime.NumGoroutine(), buf[:n])
+}
+
 func TestCleanup(t *testing.T) {
+	dumpGoroutines(t, "TestCleanup start")
+	t.Cleanup(func() { dumpGoroutines(t, "TestCleanup cleanup (pre tRunner unlock)") })
+
 	type args struct {
 		currentVersionedHome string
 		currentHash          string
