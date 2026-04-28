@@ -150,7 +150,6 @@ steps:
 
   - group: "macOS tests"
     key: "macos-unit-tests"
-    skip: "Incident 2968, Orka 3 upgrade. Unskip after it's resolved."
     steps:
       - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -171,6 +170,7 @@ steps:
       # Runs only on main and release branches
       - label: "Unit tests - macOS 13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
+        skip: "Ongoing issues with MacOS 13 CI runners. Unskip after resolved."
         branches: "main 8.* 9.*"
         artifact_paths:
           - "build/TEST-*.html"
