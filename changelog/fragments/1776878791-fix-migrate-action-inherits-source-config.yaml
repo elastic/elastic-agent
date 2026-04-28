@@ -1,0 +1,16 @@
+kind: bug-fix
+
+summary: Stop MIGRATE action from inheriting source cluster configuration
+
+description: |
+  The MIGRATE action previously merged the source cluster's fleet
+  configuration (TLS CAs, proxy settings, etc.) with the migration
+  action's settings. This caused agents enrolled with a custom CA to
+  fail when migrating to a cluster with a different trust chain (e.g.,
+  from self-managed with a custom CA to Elastic Cloud with a public CA)
+  with "certificate signed by unknown authority". The migrate action now
+  builds enrollment options solely from what the action provides,
+  falling back to system defaults (e.g., OS trust store) for any fields
+  not specified.
+
+component: elastic-agent
