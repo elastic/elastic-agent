@@ -236,7 +236,13 @@ details:
 				updateCh:       updateCh,
 			}
 
+			// Close `done` on test exit so the reader goroutine terminates on
+			// every return path. The happy-path branch below previously returned
+			// without signaling, leaking one goroutine per subtest; accumulated
+			// leaks corrupted testing.T state in later tests (see #13796).
 			done := make(chan struct{})
+			defer close(done)
+
 			var markerRead bool
 			var actualMarker UpdateMarker
 			var markerMu sync.Mutex
@@ -274,7 +280,6 @@ details:
 
 			// error loading marker
 			if test.expectedErrLogMsg {
-				done <- struct{}{}
 				logs := obs.FilterLevelExact(zapcore.ErrorLevel).TakeAll()
 				require.NotEmpty(t, logs)
 
@@ -287,8 +292,6 @@ details:
 
 			// no marker
 			if test.markerFileContents == "" {
-				done <- struct{}{}
-
 				markerMu.Lock()
 				defer markerMu.Unlock()
 				require.False(t, markerRead)
