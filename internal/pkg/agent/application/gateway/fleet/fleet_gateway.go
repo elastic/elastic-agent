@@ -7,6 +7,7 @@ package fleet
 import (
 	"context"
 	stderrors "errors"
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -93,6 +94,7 @@ type FleetGateway struct {
 	acker              acker.Acker
 	unauthCounter      int
 	checkinFailCounter int
+	wasConnected       bool
 	stateStore         stateStore
 	stateFetcher       StateFetcher
 	errCh              chan error
@@ -192,6 +194,7 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 			if err != nil {
 				continue
 			}
+			f.wasConnected = true
 
 			actions := make([]fleetapi.Action, len(resp.Actions))
 			copy(actions, resp.Actions)
@@ -216,6 +219,20 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 		f.log.Debugf("Checking started")
 		resp, took, err := f.execute(ctx)
 		if err != nil {
+			// On first failure after being connected, apply random jitter to prevent
+			// thundering herd on mass reconnection.
+			if f.wasConnected {
+				f.wasConnected = false
+				jitter := rand.N(2 * time.Minute)
+				f.log.Infow("First reconnect attempt after connection loss, applying jitter",
+					"jitter_ns", jitter, "error.message", err)
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case <-time.After(jitter):
+				}
+			}
+
 			becauseOfStateChanged := errors.Is(err, errComponentStateChanged)
 
 			// don't count that as failed attempt
