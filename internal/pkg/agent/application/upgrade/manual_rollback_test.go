@@ -354,7 +354,7 @@ func TestManualRollback(t *testing.T) {
 
 				expectedUpdateMarker := &UpdateMarker{
 					Version:           release.VersionWithSnapshot(),
-					Hash:              release.Commit(),
+					Hash:              release.ShortCommit(),
 					VersionedHome:     filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())),
 					UpdatedOn:         aMomentInTime,
 					PrevVersion:       "1.2.3",
