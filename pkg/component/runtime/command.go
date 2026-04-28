@@ -41,8 +41,8 @@ const (
 
 // Environment variables for agentless mode
 const (
-	IsAgentlessEnvName          = "ELASTIC_AGENT_IS_AGENTLESS"
-	StateStoreInputTypesEnvName = "AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES"
+	isAgentlessEnvName          = "ELASTIC_AGENT_IS_AGENTLESS"
+	stateStoreInputTypesEnvName = "AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES"
 )
 
 func (m actionMode) String() string {
@@ -390,12 +390,12 @@ func (c *commandRuntime) start(comm Communicator) error {
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentType, c.getSpecType()))
 
 	// in case of agentless mode, propagate the agentless environment variables
-	if v, ok := os.LookupEnv(IsAgentlessEnvName); ok {
-		env = append(env, fmt.Sprintf("%s=%s", IsAgentlessEnvName, v))
+	if v, ok := os.LookupEnv(isAgentlessEnvName); ok {
+		env = append(env, fmt.Sprintf("%s=%s", isAgentlessEnvName, v))
 	}
 
-	if v, ok := os.LookupEnv(StateStoreInputTypesEnvName); ok {
-		env = append(env, fmt.Sprintf("%s=%s", StateStoreInputTypesEnvName, v))
+	if v, ok := os.LookupEnv(stateStoreInputTypesEnvName); ok {
+		env = append(env, fmt.Sprintf("%s=%s", stateStoreInputTypesEnvName, v))
 	}
 
 	workDir := c.current.WorkDirPath(paths.Run())
