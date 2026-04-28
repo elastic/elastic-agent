@@ -56,15 +56,19 @@ var NoResolveOptions = []ucfg.Option{
 	ucfg.ResolveNOOP,
 }
 
-// DefaultOptions defaults options used to read the configuration
-var DefaultOptions = []interface{}{
-	ucfg.PathSep("."),
-	ucfg.IgnoreCommas,
-	ucfg.ResolveEnv,
-	ucfg.VarExp,
-	ucfg.FieldMergeValues("agent"),
-	VarSkipKeys("inputs", "outputs"),
-	OTelKeys("connectors", "receivers", "processors", "exporters", "extensions", "service"),
+// newDefaultOptions returns a fresh options slice on each call. ucfg.FieldMergeValues("agent")
+// captures an internal map in its closure; sharing a single instance across concurrent callers
+// causes "concurrent map iteration and map write" panics with Go 1.24+ swiss maps.
+func newDefaultOptions() []interface{} {
+	return []interface{}{
+		ucfg.PathSep("."),
+		ucfg.IgnoreCommas,
+		ucfg.ResolveEnv,
+		ucfg.VarExp,
+		ucfg.FieldMergeValues("agent"),
+		VarSkipKeys("inputs", "outputs"),
+		OTelKeys("connectors", "receivers", "processors", "exporters", "extensions", "service"),
+	}
 }
 
 // Config custom type that can provide both an Agent configuration alongside of an optional OTel configuration.
@@ -83,7 +87,7 @@ func New() *Config {
 // NewConfigFrom takes a interface and read the configuration like it was YAML.
 func NewConfigFrom(from interface{}, opts ...interface{}) (*Config, error) {
 	if len(opts) == 0 {
-		opts = DefaultOptions
+		opts = newDefaultOptions()
 	}
 	ucfgOpts, local, err := getOptions(opts...)
 	if err != nil {
@@ -225,7 +229,7 @@ func (c *Config) Merge(from interface{}, opts ...interface{}) error {
 // ToMapStr takes the config and transform it into a map[string]interface{}
 func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
 	if len(opts) == 0 {
-		opts = DefaultOptions
+		opts = newDefaultOptions()
 	}
 	ucfgOpts, local, err := getOptions(opts...)
 	if err != nil {
@@ -326,7 +330,7 @@ func LoadFiles(paths ...string) (*Config, error) {
 
 func getOptions(opts ...interface{}) ([]ucfg.Option, options, error) {
 	if len(opts) == 0 {
-		opts = DefaultOptions
+		opts = newDefaultOptions()
 	}
 	var ucfgOpts []ucfg.Option
 	var localOpts []Option
