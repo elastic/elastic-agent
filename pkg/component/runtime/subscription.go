@@ -39,6 +39,12 @@ func newSubscriptionAll(ctx context.Context) *SubscriptionAll {
 	}
 }
 
+// NewSubscriptionAll returns a SubscriptionAll whose channel is never written to.
+// Intended for use in tests that provide a fake runtime manager.
+func NewSubscriptionAll(ctx context.Context) *SubscriptionAll {
+	return newSubscriptionAll(ctx)
+}
+
 // Ch provides the channel to get state changes.
 func (s *SubscriptionAll) Ch() <-chan ComponentComponentState {
 	return s.ch
