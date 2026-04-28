@@ -349,14 +349,21 @@ func (Build) Clean() error {
 		return fmt.Errorf("cannot remove build dir '%s': %w", absBuildDir, err)
 	}
 
-	testBinariesPath, err := getTestBinariesPath()
+	unitBinariesPath, err := getUnitTestBinariesPath()
 	if err != nil {
-		return fmt.Errorf("cannot remove test binaries: %w", err)
+		return fmt.Errorf("cannot remove unit test binaries: %w", err)
+	}
+	integrationBinariesPath, err := getIntegrationTestBinariesPath()
+	if err != nil {
+		return fmt.Errorf("cannot remove integration test binaries: %w", err)
 	}
 
 	if mg.Verbose() {
 		fmt.Println("removed", absBuildDir)
-		for _, b := range testBinariesPath {
+		for _, b := range unitBinariesPath {
+			fmt.Println("removed", b)
+		}
+		for _, b := range integrationBinariesPath {
 			fmt.Println("removed", b)
 		}
 	}
@@ -366,26 +373,34 @@ func (Build) Clean() error {
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
-	testBinaryPkgs, err := getTestBinariesPath()
+	mg.SerialDeps(Build.UnitTestBinaries, Build.IntegrationTestBinaries)
+	return nil
+}
+
+// UnitTestBinaries builds only the binaries needed for unit tests.
+func (Build) UnitTestBinaries() error {
+	testBinaryPkgs, err := getUnitTestBinariesPath()
 	if err != nil {
-		return fmt.Errorf("cannot build test binaries: %w", err)
+		return fmt.Errorf("cannot build unit test binaries: %w", err)
+	}
+	return buildTestBinaries(testBinaryPkgs)
+}
+
+// IntegrationTestBinaries builds only the binaries needed for integration tests.
+func (Build) IntegrationTestBinaries() error {
+	testBinaryPkgs, err := getIntegrationTestBinariesPath()
+	if err != nil {
+		return fmt.Errorf("cannot build integration test binaries: %w", err)
 	}
 	return buildTestBinaries(testBinaryPkgs)
 }
 
 // TestFakeComponent build just the test fake component.
 func (Build) TestFakeComponent() error {
-	wd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("could not get working directory: %w", err)
-	}
-	testBinaryPkgs := []string{
-		filepath.Join(wd, "pkg", "component", "fake", "component"),
-	}
-	return buildTestBinaries(testBinaryPkgs)
+	return Build{}.IntegrationTestBinaries()
 }
 
-func getTestBinariesPath() ([]string, error) {
+func getUnitTestBinariesPath() ([]string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("could not get working directory: %w", err)
@@ -397,6 +412,18 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
 		filepath.Join(wd, "internal", "pkg", "agent", "application", "filelock", "testlocker"),
 		filepath.Join(wd, "internal", "edot", "testing"),
+	}
+	return testBinaryPkgs, nil
+}
+
+func getIntegrationTestBinariesPath() ([]string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("could not get working directory: %w", err)
+	}
+
+	testBinaryPkgs := []string{
+		filepath.Join(wd, "pkg", "component", "fake", "component"),
 	}
 	return testBinaryPkgs, nil
 }
@@ -538,7 +565,7 @@ func (Test) All() {
 
 // Unit runs all the unit tests.
 func (Test) Unit(ctx context.Context) error {
-	mg.Deps(Prepare.Env, Build.TestBinaries)
+	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 	cfg := devtools.SettingsFromContext(ctx)
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	return devtools.GoTest(ctx, params)
@@ -546,7 +573,7 @@ func (Test) Unit(ctx context.Context) error {
 
 // FIPSOnlyUnit runs all the unit tests with GODEBUG=fips140=only.
 func (Test) FIPSOnlyUnit(ctx context.Context) error {
-	mg.Deps(Prepare.Env, Build.TestBinaries)
+	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 
 	cfg := devtools.SettingsFromContext(ctx)
 	params := devtools.DefaultGoTestUnitArgs(cfg)
@@ -564,7 +591,7 @@ func (Test) FIPSOnlyUnit(ctx context.Context) error {
 
 // Coverage takes the coverages report from running all the tests and display the results in the browser.
 func (Test) Coverage() error {
-	mg.Deps(Prepare.Env, Build.TestBinaries)
+	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 	return RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
 }
 
@@ -2051,19 +2078,22 @@ func (Integration) Clean(ctx context.Context) error {
 	defer os.RemoveAll(".integration-cache")
 
 	_, err := os.Stat(".integration-cache")
-	if err == nil {
-		// .integration-cache exists; need to run `Clean` from the runner
-		cfg := devtools.SettingsFromContext(ctx)
-		r, err := createTestRunner(cfg, false, "", "")
-		if err != nil {
-			return fmt.Errorf("error creating test runner: %w", err)
-		}
-		err = r.Clean()
-		if err != nil {
-			return fmt.Errorf("error running clean: %w", err)
-		}
+	if err != nil {
+		fmt.Println(">>> No .integration-cache found; nothing to clean via the runner (orphaned VMs or stacks will not be touched)")
+		return nil
 	}
+	fmt.Println(">>> Found .integration-cache; running runner.Clean")
 
+	cfg := devtools.SettingsFromContext(ctx)
+	r, err := createTestRunner(cfg, false, "", "")
+	if err != nil {
+		return fmt.Errorf("error creating test runner: %w", err)
+	}
+	err = r.Clean()
+	if err != nil {
+		return fmt.Errorf("error running clean: %w", err)
+	}
+	fmt.Println(">>> runner.Clean completed")
 	return nil
 }
 
