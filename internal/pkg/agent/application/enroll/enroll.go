@@ -89,11 +89,12 @@ func EnrollWithBackoff(
 		return nil
 	}
 
-	log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff (init %s, max %s)", client.URI(), EnrollBackoffInit, EnrollBackoffMax)
-
 	signal := make(chan struct{})
 	defer close(signal)
 	backExp := backoffFactory(signal)
+	log.Infow("1st enrollment attempt failed, retrying with exponential backoff",
+		"url", client.URI(), "retry_after_ns", backExp.NextWait())
+
 	enrollFn := func() error {
 		return enroll(ctx, log, persistentConfig, client, options, configStore)
 	}
@@ -110,15 +111,19 @@ RETRYLOOP:
 		attemptNo++
 		switch {
 		case errors.Is(err, fleetapi.ErrTooManyRequests):
-			log.Warn("Too many requests on the remote server, will retry in a moment.")
+			log.Warnw("Too many requests on the remote server, retrying",
+				"retry_after_ns", backExp.NextWait(), "attempt_number", attemptNo)
 		case errors.Is(err, fleetapi.ErrConnRefused):
-			log.Warn("Remote server is not ready to accept connections(Connection Refused), will retry in a moment.")
+			log.Warnw("Remote server is not ready to accept connections (Connection Refused), retrying",
+				"retry_after_ns", backExp.NextWait(), "attempt_number", attemptNo)
 		case errors.Is(err, fleetapi.ErrTemporaryServerError):
-			log.Warnf("Remote server failed to handle the request(%s), will retry in a moment.", err.Error())
-		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), errors.Is(err, fleetapi.ErrInvalidToken) && !retryOnInvalidToken, err == nil, (maxAttempts != EnrollInfiniteAttempts && attemptNo > maxAttempts):
+			log.Warnw("Remote server failed to handle the request, retrying",
+				"error.message", err.Error(), "retry_after_ns", backExp.NextWait(), "attempt_number", attemptNo)
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), errors.Is(err, fleetapi.ErrInvalidToken) || !retryOnInvalidToken, err == nil, (maxAttempts != EnrollInfiniteAttempts && attemptNo > maxAttempts):
 			break RETRYLOOP
 		case err != nil:
-			log.Warnf("Error detected: %s, will retry in a moment.", err.Error())
+			log.Warnw("Error detected during enrollment, retrying",
+				"error.message", err.Error(), "retry_after_ns", backExp.NextWait(), "attempt_number", attemptNo)
 		}
 		// Context cancellation should be able to interrupt the exponential backoff wait,
 		// otherwise the loop keeps sleeping after context is canceled
@@ -132,7 +137,7 @@ RETRYLOOP:
 				break RETRYLOOP
 			}
 		}
-		log.Infof("Retrying enrollment to URL: %s", clientURI)
+		log.Infow("Retrying enrollment", "url", clientURI, "attempt_number", attemptNo)
 		err = enrollFn()
 	}
 
