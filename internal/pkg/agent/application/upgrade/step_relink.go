@@ -61,9 +61,15 @@ func prevSymlinkPath(topDirPath string) string {
 // (target = current install).
 func AlignActiveInstall(log *logger.Logger, topDir, versionedHome, hash string) error {
 	symlinkPath := filepath.Join(topDir, AgentName)
+
+	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 	target := paths.BinaryPath(filepath.Join(topDir, versionedHome), AgentName)
+	
+	// change symlink
 	if err := changeSymlink(log, topDir, symlinkPath, target); err != nil {
 		return err
 	}
+
+	// revert active commit
 	return UpdateActiveCommit(log, topDir, hash, os.WriteFile)
 }
