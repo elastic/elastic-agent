@@ -60,6 +60,7 @@ import (
 
 	// Extensions
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension"
 	headersetterextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
 	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
@@ -179,6 +180,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			beatsauthextension.NewFactory(),
 			headersetterextension.NewFactory(),
 			elasticdiagnostics.NewFactory(),
+			azureencodingextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
