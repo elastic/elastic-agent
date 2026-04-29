@@ -2,6 +2,15 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
+// This file consolidates upgrade-marker reconciliation logic — both the
+// standalone functions (ReconcileMismatchedUpgrade, DiscardStaleMarker) used
+// from cmd.handleUpgrade on the next-boot path, and the (Upgrader)-method
+// helpers (abortUpgrade, reconcileFailedUpgrade) used from upgrade.Upgrade()'s
+// error paths. The methods on Upgrader live here rather than in upgrade.go
+// because they are exclusively about reconciliation; cohesion of the
+// reconciliation surface in one file is preferred over having all methods
+// of a type in the file where the type is declared.
+
 package upgrade
 
 import (
@@ -112,11 +121,15 @@ func DiscardStaleMarker(ctx context.Context, log *logger.Logger, helper WatcherH
 // the physical-undo error; reconcile failures are logged best-effort and
 // don't shadow the original failure.
 //
+// newHomeRelPath is the partial new install (relative to topDir) being undone.
+// currentHomeRelPath is the running agent's home (relative to topDir) — i.e.
+// the install we want to keep.
+//
 // Used by every error path in Upgrade() that occurs after the symlink has
 // been flipped, so callers don't need to remember to combine the two steps.
-func (u *Upgrader) abortUpgrade(ctx context.Context, newVersionedHome, currentVersionedHome string) error {
-	rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
-	u.reconcileFailedUpgrade(ctx, currentVersionedHome)
+func (u *Upgrader) abortUpgrade(ctx context.Context, newHomeRelPath, currentHomeRelPath string) error {
+	rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newHomeRelPath, currentHomeRelPath, u.availableRollbacksSource)
+	u.reconcileFailedUpgrade(ctx, currentHomeRelPath)
 	return rollbackErr
 }
 
@@ -126,11 +139,13 @@ func (u *Upgrader) abortUpgrade(ctx context.Context, newVersionedHome, currentVe
 // running agent so the failure is reportable to Fleet via the existing
 // upgrade-details path. Best-effort: errors are logged, never returned.
 //
+// currentHomeRelPath is the running agent's home (relative to topDir).
+//
 // Called from Upgrade()'s rollback paths after rollbackInstall has done the
 // physical undo. Composes with the next-boot reconcile in handleUpgrade so
 // that residual cases (SIGKILL between marker write and this call,
 // LoadMarker failures, etc.) still get caught later.
-func (u *Upgrader) reconcileFailedUpgrade(ctx context.Context, currentVersionedHome string) {
+func (u *Upgrader) reconcileFailedUpgrade(ctx context.Context, currentHomeRelPath string) {
 	marker, err := LoadMarker(paths.Data())
 	if err != nil {
 		u.log.Warnw("could not load marker after upgrade failure; reconcile deferred to next boot",
@@ -142,7 +157,7 @@ func (u *Upgrader) reconcileFailedUpgrade(ctx context.Context, currentVersionedH
 	}
 	if reconcileErr := ReconcileMismatchedUpgrade(
 		ctx, u.log, u.watcherHelper,
-		paths.Top(), currentVersionedHome, release.Commit(),
+		paths.Top(), currentHomeRelPath, release.Commit(),
 		marker,
 	); reconcileErr != nil {
 		u.log.Warnw("failed to reconcile upgrade marker after failure",

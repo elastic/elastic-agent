@@ -84,6 +84,8 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		prevVersionedHome = filepath.Join("data", hashedDir)
 	}
 
+	// Repoint the top-level symlink at the previous install and revert
+	// active.commit to its hash.
 	if err := AlignActiveInstall(log, topDirPath, prevVersionedHome, prevHash); err != nil {
 		return err
 	}

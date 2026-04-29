@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
@@ -245,4 +246,93 @@ func TestReconcileMismatchedUpgrade_TakeoverFailureProceeds(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, saved.Details)
 	assert.Equal(t, details.StateFailed, saved.Details.State)
+}
+
+// TestUpgrader_reconcileFailedUpgrade exercises the source-side wrapper used
+// by Upgrade()'s error paths after rollbackInstall. Confirms that a marker
+// left on disk in a non-terminal state by an aborted upgrade ends up
+// rewritten as state=Failed so the failure is reportable to Fleet without
+// waiting for the next-boot reconcile.
+func TestUpgrader_reconcileFailedUpgrade(t *testing.T) {
+	const (
+		liveHash   = "aaaaaa"
+		failedHash = "bbbbbb"
+	)
+
+	topDir := t.TempDir()
+	dataDir := filepath.Join(topDir, "data")
+	require.NoError(t, os.MkdirAll(dataDir, 0o755))
+
+	// Set the global top path so paths.Top() / paths.Data() return our temp dir.
+	originalTop := paths.Top()
+	paths.SetTop(topDir)
+	t.Cleanup(func() { paths.SetTop(originalTop) })
+
+	// Live install — backs the symlink.
+	liveHomeRel := filepath.Join("data", "elastic-agent-"+liveHash)
+	liveHomeAbs := filepath.Join(topDir, liveHomeRel)
+	require.NoError(t, os.MkdirAll(liveHomeAbs, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(liveHomeAbs, AgentName), []byte("live"), 0o755))
+	require.NoError(t, os.Symlink(filepath.Join(liveHomeAbs, AgentName), filepath.Join(topDir, AgentName)))
+
+	// Marker left on disk by an aborted Upgrade(): non-terminal state.
+	marker := &UpdateMarker{
+		Version:           "9.9.9",
+		Hash:              failedHash,
+		VersionedHome:     filepath.Join("data", "elastic-agent-"+failedHash),
+		PrevVersion:       "9.0.0",
+		PrevHash:          liveHash,
+		PrevVersionedHome: liveHomeRel,
+		Details:           details.NewDetails("9.9.9", details.StateReplacing, "test-action"),
+	}
+	require.NoError(t, SaveMarker(dataDir, marker, true))
+
+	helper := NewMockWatcherHelper(t)
+	locker := filelock.NewAppLocker(topDir, watcherApplockerFileName)
+	helper.EXPECT().TakeOverWatcher(mock.Anything, mock.Anything, topDir).Return(locker, nil)
+
+	log, _ := loggertest.New(t.Name())
+	u := &Upgrader{
+		log:           log,
+		watcherHelper: helper,
+	}
+
+	u.reconcileFailedUpgrade(t.Context(), liveHomeRel)
+
+	// Marker on disk is now terminal.
+	saved, err := LoadMarker(dataDir)
+	require.NoError(t, err)
+	require.NotNil(t, saved.Details)
+	assert.Equal(t, details.StateFailed, saved.Details.State)
+	// Original action is preserved so it can still be acked.
+	assert.Equal(t, "test-action", saved.Details.ActionID)
+}
+
+// TestUpgrader_reconcileFailedUpgrade_NoMarker confirms the wrapper is a
+// no-op when no marker is on disk — covers the changeSymlink/Set-TTL error
+// paths in Upgrade() that fail before markUpgrade has had a chance to write.
+func TestUpgrader_reconcileFailedUpgrade_NoMarker(t *testing.T) {
+	topDir := t.TempDir()
+	dataDir := filepath.Join(topDir, "data")
+	require.NoError(t, os.MkdirAll(dataDir, 0o755))
+
+	originalTop := paths.Top()
+	paths.SetTop(topDir)
+	t.Cleanup(func() { paths.SetTop(originalTop) })
+
+	// No marker on disk; the helper must not be invoked.
+	helper := NewMockWatcherHelper(t)
+
+	log, _ := loggertest.New(t.Name())
+	u := &Upgrader{
+		log:           log,
+		watcherHelper: helper,
+	}
+
+	// Should be a silent no-op.
+	u.reconcileFailedUpgrade(t.Context(), filepath.Join("data", "elastic-agent-aaaaaa"))
+
+	// And no marker should magically appear.
+	_, err := os.Stat(filepath.Join(dataDir, markerFilename))
+	assert.ErrorIs(t, err, os.ErrNotExist)
 }

@@ -18,6 +18,7 @@ import (
 
 const (
 	windowsOSName = "windows"
+	darwinOSName  = "darwin"
 	exe           = ".exe"
 )
 
@@ -77,7 +78,7 @@ func liveVersionedHome(topDirPath string) (string, error) {
 	}
 	// target is the binary path; strip down to the versioned home.
 	home := filepath.Dir(target)
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == darwinOSName {
 		// macOS BinaryPath: <versionedHome>/elastic-agent.app/Contents/MacOS/elastic-agent
 		home = filepath.Dir(filepath.Dir(filepath.Dir(home)))
 	}
