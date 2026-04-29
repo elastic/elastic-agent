@@ -25,7 +25,7 @@ func testPackageSpec(t testing.TB) PackageSpec {
 		OS:       "windows",
 		Arch:     "x86_64",
 		ExtraTags: []string{
-			"git-{{ substring commit 0 12 }}",
+			"git-{{ substring core_commit 0 12 }}",
 		},
 		Files: map[string]PackageFile{
 			"brewbeat.yml": PackageFile{
