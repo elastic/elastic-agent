@@ -36,6 +36,7 @@ import (
 	comprt "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -211,7 +212,7 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt Progres
 			// Do not retry if it was a context error, or an error with the request.
 			if errors.Is(err, context.Canceled) {
 				return ctx.Err()
-			} else if errors.Is(err, fleetclient.ErrInvalidAPIKey) {
+			} else if errors.Is(err, fleetcontract.ErrInvalidAPIKey) {
 				pt.Describe("API key is invalid (normal if already unenrolled), notification dropped.")
 				return nil
 			} else if errors.As(err, &reqErr) {

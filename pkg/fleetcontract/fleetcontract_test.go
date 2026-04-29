@@ -104,7 +104,7 @@ func TestEnrollRequestJSON(t *testing.T) {
 func TestSentinelErrors(t *testing.T) {
 	assert.True(t, errors.Is(ErrTooManyRequests, ErrTooManyRequests))
 	assert.True(t, errors.Is(ErrConnRefused, ErrConnRefused))
-	assert.True(t, errors.Is(ErrTemporaryServerErr, ErrTemporaryServerErr))
+	assert.True(t, errors.Is(ErrTemporaryServerError, ErrTemporaryServerError))
 	assert.True(t, errors.Is(ErrInvalidToken, ErrInvalidToken))
 	assert.True(t, errors.Is(ErrInvalidAPIKey, ErrInvalidAPIKey))
 	assert.False(t, errors.Is(ErrInvalidToken, ErrInvalidAPIKey))

@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 // fakeBackoff allows controlling the sequence of Wait() return values for tests.
@@ -106,7 +106,7 @@ func TestRetryEnroll_ExitsOnTerminalEnrollError(t *testing.T) {
 	}{
 		{"context canceled", context.Canceled},
 		{"deadline exceeded", context.DeadlineExceeded},
-		{"invalid token", fleetapi.ErrInvalidToken},
+		{"invalid token", fleetcontract.ErrInvalidToken},
 	}
 
 	for _, tc := range tests {

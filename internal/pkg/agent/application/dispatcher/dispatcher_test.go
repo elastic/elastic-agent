@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 type mockHandler struct {
@@ -61,9 +62,9 @@ func (m *mockAction) String() string {
 	args := m.Called()
 	return args.String(0)
 }
-func (m *mockAction) AckEvent() fleetapi.AckEvent {
+func (m *mockAction) AckEvent() fleetcontract.AckEvent {
 	args := m.Called()
-	return args.Get(0).(fleetapi.AckEvent)
+	return args.Get(0).(fleetcontract.AckEvent)
 }
 func (m *mockScheduledAction) StartTime() (time.Time, error) {
 	args := m.Called()
@@ -244,7 +245,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		upgradeAction := &fleetapi.ActionUpgrade{
 			ActionID:         "upgrade-action-id",
-			ActionType:       fleetapi.ActionTypeUpgrade,
+			ActionType:       fleetcontract.ActionTypeUpgrade,
 			ActionStartTime:  time.Now().Add(2 * time.Minute).Format(time.RFC3339),
 			ActionExpiration: time.Now().Add(3 * time.Minute).Format(time.RFC3339),
 			Data: fleetapi.ActionUpgradeData{
@@ -256,7 +257,7 @@ func TestActionDispatcher(t *testing.T) {
 		require.NoError(t, err)
 
 		action := &fleetapi.ActionCancel{
-			ActionType: fleetapi.ActionTypeCancel,
+			ActionType: fleetcontract.ActionTypeCancel,
 			ActionID:   "id",
 			Data: fleetapi.ActionCancelData{
 				TargetID: "upgrade-action-id",
@@ -298,7 +299,7 @@ func TestActionDispatcher(t *testing.T) {
 		action1 := &mockScheduledAction{}
 		action1.On("StartTime").Return(time.Time{}, fleetapi.ErrNoStartTime)
 		action1.On("Expiration").Return(time.Now().Add(time.Hour), fleetapi.ErrNoExpiration)
-		action1.On("Type").Return(fleetapi.ActionTypeCancel)
+		action1.On("Type").Return(fleetcontract.ActionTypeCancel)
 		action1.On("ID").Return("id")
 
 		saver := &mockSaver{}
@@ -315,7 +316,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		action2 := &fleetapi.ActionCancel{
 			ActionID:   "id",
-			ActionType: fleetapi.ActionTypeCancel,
+			ActionType: fleetcontract.ActionTypeCancel,
 		}
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
@@ -503,7 +504,7 @@ func TestActionDispatcher(t *testing.T) {
 			Return(nil).Twice()
 		action := &fleetapi.ActionUpgrade{
 			ActionID:         "id",
-			ActionType:       fleetapi.ActionTypeUpgrade,
+			ActionType:       fleetcontract.ActionTypeUpgrade,
 			ActionStartTime:  time.Now().Add(2 * time.Minute).Format(time.RFC3339),
 			ActionExpiration: time.Now().Add(3 * time.Minute).Format(time.RFC3339),
 			Data: fleetapi.ActionUpgradeData{
@@ -547,7 +548,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		expiredAction := &fleetapi.ActionUpgrade{
 			ActionID:         "id-expired",
-			ActionType:       fleetapi.ActionTypeUpgrade,
+			ActionType:       fleetcontract.ActionTypeUpgrade,
 			ActionStartTime:  time.Now().Add(-5 * time.Minute).Format(time.RFC3339),
 			ActionExpiration: time.Now().Add(-3 * time.Minute).Format(time.RFC3339),
 		}
@@ -568,7 +569,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		action := &fleetapi.ActionUpgrade{
 			ActionID:         "id",
-			ActionType:       fleetapi.ActionTypeUpgrade,
+			ActionType:       fleetcontract.ActionTypeUpgrade,
 			ActionStartTime:  time.Now().Add(2 * time.Minute).Format(time.RFC3339),
 			ActionExpiration: time.Now().Add(3 * time.Minute).Format(time.RFC3339),
 		}
@@ -603,7 +604,7 @@ func TestActionDispatcher(t *testing.T) {
 		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{
 			&fleetapi.ActionUpgrade{
 				ActionID:         "my action ID",
-				ActionType:       fleetapi.ActionTypeUpgrade,
+				ActionType:       fleetcontract.ActionTypeUpgrade,
 				ActionStartTime:  actionStartTime.Format(time.RFC3339),
 				ActionExpiration: actionExpiration.Format(time.RFC3339),
 			},
@@ -637,7 +638,7 @@ func TestActionDispatcher(t *testing.T) {
 			Return(nil).Twice()
 		expired := &fleetapi.ActionUpgrade{
 			ActionID:         "id-expired",
-			ActionType:       fleetapi.ActionTypeUpgrade,
+			ActionType:       fleetcontract.ActionTypeUpgrade,
 			ActionStartTime:  time.Now().Add(-5 * time.Minute).Format(time.RFC3339),
 			ActionExpiration: time.Now().Add(-3 * time.Minute).Format(time.RFC3339),
 		}
@@ -717,7 +718,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		initialScheduledUpgradeAction := &fleetapi.ActionUpgrade{
 			ActionID:        "scheduled-action-id",
-			ActionType:      fleetapi.ActionTypeUpgrade,
+			ActionType:      fleetcontract.ActionTypeUpgrade,
 			ActionStartTime: time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 			Data: fleetapi.ActionUpgradeData{
 				Version:   "9.3.0",
@@ -767,7 +768,7 @@ func TestActionDispatcher(t *testing.T) {
 		// issue a brand-new upgrade action
 		newUpgradeAction := &fleetapi.ActionUpgrade{
 			ActionID:   "upgrade-action-id",
-			ActionType: fleetapi.ActionTypeUpgrade,
+			ActionType: fleetcontract.ActionTypeUpgrade,
 			Data: fleetapi.ActionUpgradeData{
 				Version:   "9.3.0",
 				SourceURI: "https://test-uri.test.com",
@@ -812,7 +813,7 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 		action.On("ID").Return("id")
 		action.On("RetryAttempt").Return(len(d.rt.steps)).Once()
 		action.On("SetRetryAttempt", mock.Anything).Once()
-		action.On("Type").Return(fleetapi.ActionTypeUpgrade).Once()
+		action.On("Type").Return(fleetcontract.ActionTypeUpgrade).Once()
 		action.On("GetError").Return(nil).Once()
 
 		upgradeDetailsNeedUpdate := false
@@ -839,7 +840,7 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 		action.On("RetryAttempt").Return(0).Once()
 		action.On("SetRetryAttempt", 1).Once()
 		action.On("SetStartTime", mock.Anything).Once()
-		action.On("Type").Return(fleetapi.ActionTypeUpgrade).Twice()
+		action.On("Type").Return(fleetcontract.ActionTypeUpgrade).Twice()
 		action.On("GetError").Return(nil).Once()
 
 		upgradeDetailsNeedUpdate := false

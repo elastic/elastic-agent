@@ -53,6 +53,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -566,7 +567,7 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 
 	coordWait.Wait()
 
-	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
+	action := fleetapi.NewAction(fleetcontract.ActionTypeUpgrade)
 	actionUpgrade, ok := action.(*fleetapi.ActionUpgrade)
 	require.True(t, ok)
 
@@ -608,7 +609,7 @@ func TestReplayedRollbackActionAcked(t *testing.T) {
 		// Wait for the coordinator goroutine to be durably blocked in its run loop.
 		synctest.Wait()
 
-		action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
+		action := fleetapi.NewAction(fleetcontract.ActionTypeUpgrade)
 		actionUpgrade, ok := action.(*fleetapi.ActionUpgrade)
 		require.True(t, ok)
 		actionUpgrade.Data.Rollback = true
@@ -663,7 +664,7 @@ func TestPreUpgradeCallback(t *testing.T) {
 		coordCh <- err
 	}()
 
-	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
+	action := fleetapi.NewAction(fleetcontract.ActionTypeUpgrade)
 	actionUpgrade, ok := action.(*fleetapi.ActionUpgrade)
 	require.True(t, ok)
 
@@ -1613,7 +1614,7 @@ func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, rollba
 
 func (f *fakeUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
 	if acker != nil {
-		return acker.Ack(ctx, fleetapi.NewAction(fleetapi.ActionTypeUnknown))
+		return acker.Ack(ctx, fleetapi.NewAction(fleetcontract.ActionTypeUnknown))
 	}
 	return nil
 }

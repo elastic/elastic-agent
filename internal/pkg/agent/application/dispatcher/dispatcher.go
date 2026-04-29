@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 type actionHandlers map[reflect.Type]actions.Handler
@@ -302,7 +303,7 @@ func (ad *ActionDispatcher) mergeWithQueuedActions(ts time.Time, actions []fleet
 			continue
 		}
 		if ts.After(exp) {
-			if action.Type() == fleetapi.ActionTypeUpgrade {
+			if action.Type() == fleetcontract.ActionTypeUpgrade {
 				// this is an expired upgrade action thus we need to recalculate the upgrade details
 				*upgradeDetailsNeedUpdate = true
 				expiredUpgradeActions = append(expiredUpgradeActions, action)
@@ -337,7 +338,7 @@ func (ad *ActionDispatcher) mergeWithQueuedActions(ts time.Time, actions []fleet
 	// if an upgrade action is included in the immediate dispatchable actions
 	// mark upgradeDetailsNeedUpdate as true
 	if slices.ContainsFunc(actions, func(action fleetapi.Action) bool {
-		return action.Type() == fleetapi.ActionTypeUpgrade
+		return action.Type() == fleetcontract.ActionTypeUpgrade
 	}) {
 		*upgradeDetailsNeedUpdate = true
 	}
@@ -353,14 +354,14 @@ func (ad *ActionDispatcher) compactAndRemoveQueuedUpgrades(input []fleetapi.Acti
 	var actions []fleetapi.Action
 	var upgradeAction fleetapi.Action
 	for _, action := range input {
-		if action.Type() == fleetapi.ActionTypeUpgrade {
+		if action.Type() == fleetcontract.ActionTypeUpgrade {
 			if upgradeAction == nil {
 				upgradeAction = action
 			} else {
 				ad.log.Warnf("Found extra upgrade action in fleetgateway actions [id = %s]", action.ID())
 				continue
 			}
-			if n := ad.queue.CancelType(fleetapi.ActionTypeUpgrade); n > 0 {
+			if n := ad.queue.CancelType(fleetcontract.ActionTypeUpgrade); n > 0 {
 				ad.log.Debugw("New upgrade action retrieved from gateway, removing queued upgrade actions", "actions_found", n)
 				// upgrade action(s) got removed from the queue so upgrade actions changed
 				*upgradeDetailsNeedUpdate = true
@@ -418,7 +419,7 @@ func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.R
 		ad.log.Errorf("retry action id %s attempt %d failed to persist action_queue: %v", action.ID(), attempt, err)
 	}
 
-	if action.Type() == fleetapi.ActionTypeUpgrade {
+	if action.Type() == fleetcontract.ActionTypeUpgrade {
 		*upgradeDetailsNeedUpdate = true
 	}
 

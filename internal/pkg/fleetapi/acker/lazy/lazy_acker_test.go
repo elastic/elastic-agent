@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 var (
@@ -31,14 +32,14 @@ func (r *testRetrier) Enqueue(actions []fleetapi.Action) {
 }
 
 type testAcker struct {
-	ackResponse *fleetapi.AckResponse
+	ackResponse *fleetcontract.AckResponse
 	errResponse error
 
 	receivedActions []fleetapi.Action
 	isCalled        bool
 }
 
-func (a *testAcker) AckBatch(ctx context.Context, actions []fleetapi.Action) (*fleetapi.AckResponse, error) {
+func (a *testAcker) AckBatch(ctx context.Context, actions []fleetapi.Action) (*fleetcontract.AckResponse, error) {
 	a.isCalled = true
 	a.receivedActions = actions
 	return a.ackResponse, a.errResponse
@@ -118,7 +119,7 @@ func TestLazyAcker(t *testing.T) {
 		{
 			name:    "with retrier, no error",
 			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}},
-			acker:   &testAcker{ackResponse: &fleetapi.AckResponse{Items: []fleetapi.AckResponseItem{{Status: http.StatusOK}}}},
+			acker:   &testAcker{ackResponse: &fleetcontract.AckResponse{Items: []fleetcontract.AckResponseItem{{Status: http.StatusOK}}}},
 			retrier: &testRetrier{},
 		},
 		{
@@ -130,13 +131,13 @@ func TestLazyAcker(t *testing.T) {
 		{
 			name:    "with retrier, item not found",
 			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}},
-			acker:   &testAcker{ackResponse: &fleetapi.AckResponse{Errors: true, Items: []fleetapi.AckResponseItem{{Status: http.StatusNotFound}}}},
+			acker:   &testAcker{ackResponse: &fleetcontract.AckResponse{Errors: true, Items: []fleetcontract.AckResponseItem{{Status: http.StatusNotFound}}}},
 			retrier: &testRetrier{expectedActions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}}},
 		},
 		{
 			name:    "with retrier, one item not found",
 			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}, &fleetapi.ActionUnknown{ActionID: "2"}, &fleetapi.ActionUnknown{ActionID: "3"}},
-			acker: &testAcker{ackResponse: &fleetapi.AckResponse{Errors: true, Items: []fleetapi.AckResponseItem{
+			acker: &testAcker{ackResponse: &fleetcontract.AckResponse{Errors: true, Items: []fleetcontract.AckResponseItem{
 				{Status: http.StatusOK},
 				{Status: http.StatusNotFound},
 				{Status: http.StatusOK},
@@ -146,7 +147,7 @@ func TestLazyAcker(t *testing.T) {
 		{
 			name:    "with retrier, duplicated item with item not found",
 			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}, &fleetapi.ActionUnknown{ActionID: "1"}, &fleetapi.ActionUnknown{ActionID: "2"}, &fleetapi.ActionUnknown{ActionID: "3"}},
-			acker: &testAcker{ackResponse: &fleetapi.AckResponse{Errors: true, Items: []fleetapi.AckResponseItem{
+			acker: &testAcker{ackResponse: &fleetcontract.AckResponse{Errors: true, Items: []fleetcontract.AckResponseItem{
 				{Status: http.StatusOK},
 				{Status: http.StatusNotFound},
 				{Status: http.StatusOK},

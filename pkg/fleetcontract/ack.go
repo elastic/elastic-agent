@@ -41,3 +41,9 @@ type AckResponse struct {
 	Errors bool              `json:"errors,omitempty"`
 	Items  []AckResponseItem `json:"items,omitempty"`
 }
+
+// Validate validates the AckRequest. Currently a no-op.
+func (r *AckRequest) Validate() error { return nil }
+
+// Validate validates the AckResponse. Currently a no-op.
+func (r *AckResponse) Validate() error { return nil }

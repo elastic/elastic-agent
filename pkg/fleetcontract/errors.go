@@ -12,7 +12,7 @@ import (
 var (
 	ErrTooManyRequests    = errors.New("too many requests received (429)")
 	ErrConnRefused        = errors.New("connection refused")
-	ErrTemporaryServerErr = errors.New("temporary server error, please retry later")
+	ErrTemporaryServerError = errors.New("temporary server error, please retry later")
 	ErrInvalidToken       = errors.New("invalid enrollment token")
 	ErrInvalidAPIKey      = errors.New("invalid api key to authenticate with fleet")
 )

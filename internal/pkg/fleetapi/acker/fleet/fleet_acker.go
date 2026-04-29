@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 const fleetTimeFormat = "2006-01-02T15:04:05.99999-07:00"
@@ -62,8 +63,8 @@ func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
 	event := action.AckEvent()
 	event.AgentID = agentID
 	event.Timestamp = time.Now().Format(fleetTimeFormat)
-	req := &fleetapi.AckRequest{
-		Events: []fleetapi.AckEvent{event},
+	req := &fleetcontract.AckRequest{
+		Events: []fleetcontract.AckEvent{event},
 	}
 
 	_, err = cmd.Execute(ctx, req)
@@ -77,7 +78,7 @@ func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
 }
 
 // AckBatch acknowledges multiple actions at once.
-func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *fleetapi.AckResponse, err error) {
+func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *fleetcontract.AckResponse, err error) {
 	f.log.Debugf("fleet acker: ackbatch, actions: %#v", actions)
 	span, ctx := apm.StartSpan(ctx, "ackBatch", "app.internal")
 	defer func() {
@@ -86,7 +87,7 @@ func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *f
 	}()
 	// checkin
 	agentID := f.agentInfo.AgentID()
-	events := make([]fleetapi.AckEvent, 0, len(actions))
+	events := make([]fleetcontract.AckEvent, 0, len(actions))
 	ids := make([]string, 0, len(actions))
 	for _, action := range actions {
 		event := action.AckEvent()
@@ -99,11 +100,11 @@ func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *f
 	f.log.Debugf("fleet acker: ackbatch, events: %#v", events)
 	if len(events) == 0 {
 		// no events to send (nothing to do)
-		return &fleetapi.AckResponse{}, nil
+		return &fleetcontract.AckResponse{}, nil
 	}
 
 	cmd := fleetapi.NewAckCmd(f.agentInfo, f.client)
-	req := &fleetapi.AckRequest{
+	req := &fleetcontract.AckRequest{
 		Events: events,
 	}
 

@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 func TestSettings_SetLogLevel(t *testing.T) {
@@ -132,7 +133,7 @@ func TestSettings_handleLogLevel(t *testing.T) {
 				logLevel: "debug",
 				action: &fleetapi.ActionSettings{
 					ActionID:   "someactionid",
-					ActionType: fleetapi.ActionTypeSettings,
+					ActionType: fleetcontract.ActionTypeSettings,
 					Data:       fleetapi.ActionSettingsData{LogLevel: "debug"},
 				},
 			},
@@ -153,7 +154,7 @@ func TestSettings_handleLogLevel(t *testing.T) {
 				logLevel: clearLogLevelValue,
 				action: &fleetapi.ActionSettings{
 					ActionID:   "someactionid",
-					ActionType: fleetapi.ActionTypeSettings,
+					ActionType: fleetcontract.ActionTypeSettings,
 					Data: fleetapi.ActionSettingsData{
 						LogLevel: clearLogLevelValue},
 				},
@@ -175,7 +176,7 @@ func TestSettings_handleLogLevel(t *testing.T) {
 				logLevel: clearLogLevelValue,
 				action: &fleetapi.ActionSettings{
 					ActionID:   "someactionid",
-					ActionType: fleetapi.ActionTypeSettings,
+					ActionType: fleetcontract.ActionTypeSettings,
 					Data: fleetapi.ActionSettingsData{
 						LogLevel: clearLogLevelValue},
 				},

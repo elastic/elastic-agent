@@ -43,6 +43,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 type clientCallbackFunc func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error)
@@ -377,7 +378,7 @@ func TestFleetGateway(t *testing.T) {
 		stateStore := newStateStore(t, log)
 		stateStore.SetAction(&fleetapi.ActionPolicyChange{
 			ActionID:   "test-action-id",
-			ActionType: fleetapi.ActionTypePolicyChange,
+			ActionType: fleetcontract.ActionTypePolicyChange,
 			Data: fleetapi.ActionPolicyChangeData{
 				Policy: map[string]interface{}{
 					"policy_id":           "test-policy-id",
@@ -725,7 +726,7 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		defer cancel()
 
 		unauth := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
-			return nil, client.ErrInvalidAPIKey
+			return nil, fleetcontract.ErrInvalidAPIKey
 		}
 
 		clientWaitFn := c.Answer(unauth)

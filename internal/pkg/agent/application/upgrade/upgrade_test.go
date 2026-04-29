@@ -42,6 +42,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -293,7 +294,7 @@ func TestUpgraderAckAction(t *testing.T) {
 		settings: artifact.DefaultConfig(),
 	}
 
-	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
+	action := fleetapi.NewAction(fleetcontract.ActionTypeUpgrade)
 	t.Run("AckAction without acker", func(t *testing.T) {
 		require.Nil(t, u.AckAction(t.Context(), nil, action))
 	})

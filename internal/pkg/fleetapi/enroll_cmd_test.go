@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 func TestEnroll(t *testing.T) {
@@ -38,18 +38,17 @@ func TestEnroll(t *testing.T) {
 				err := decoder.Decode(req)
 				require.NoError(t, err)
 
-				require.Equal(t, PermanentEnroll, req.Type)
+				require.Equal(t, fleetcontract.PermanentEnroll, req.Type)
 				require.Equal(t, make(map[string]interface{}), req.Metadata.UserProvided)
 				require.Equal(t, "linux", req.Metadata.Local.OS.Name)
 
-				response := &EnrollResponse{
+				response := &fleetcontract.EnrollResponse{
 					Action: "created",
-					Item: EnrollItemResponse{
+					Item: fleetcontract.EnrollItemResponse{
 						ID:                   "a4937110-e53e-11e9-934f-47a8e38a522c",
 						Active:               true,
 						PolicyID:             "default",
-						Type:                 PermanentEnroll,
-						EnrolledAt:           time.Now(),
+						Type:                 fleetcontract.PermanentEnroll,
 						UserProvidedMetadata: make(map[string]interface{}),
 						LocalMetadata:        make(map[string]interface{}),
 						AccessAPIKey:         "my-access-api-key",
@@ -72,7 +71,7 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			req := &EnrollRequest{
-				Type:         PermanentEnroll,
+				Type:         fleetcontract.PermanentEnroll,
 				EnrollAPIKey: "my-enrollment-api-key",
 				Metadata: Metadata{
 					Local:        testMetadata(),
@@ -108,7 +107,7 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			req := &EnrollRequest{
-				Type:         PermanentEnroll,
+				Type:         fleetcontract.PermanentEnroll,
 				EnrollAPIKey: "my-enrollment-api-key",
 				Metadata: Metadata{
 					Local:        testMetadata(),
@@ -144,7 +143,7 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			req := &EnrollRequest{
-				Type:         PermanentEnroll,
+				Type:         fleetcontract.PermanentEnroll,
 				EnrollAPIKey: "my-enrollment-api-key",
 				Metadata: Metadata{
 					Local:        testMetadata(),
@@ -155,7 +154,7 @@ func TestEnroll(t *testing.T) {
 			cmd := &EnrollCmd{client: client}
 			_, err = cmd.Execute(context.Background(), req)
 			require.Error(t, err)
-			require.ErrorIs(t, err, ErrTemporaryServerError)
+			require.ErrorIs(t, err, fleetcontract.ErrTemporaryServerError)
 			require.Contains(t, err.Error(), "code 503")
 		},
 	))

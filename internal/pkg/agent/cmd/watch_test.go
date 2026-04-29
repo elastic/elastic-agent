@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 )
@@ -344,7 +345,7 @@ func Test_watchCmd(t *testing.T) {
 						Acked:             false,
 						Action: &fleetapi.ActionUpgrade{
 							ActionID:   "action-id",
-							ActionType: fleetapi.ActionTypeUpgrade,
+							ActionType: fleetcontract.ActionTypeUpgrade,
 							Data:       fleetapi.ActionUpgradeData{Version: "4.5.6"},
 						},
 						Details: nil,

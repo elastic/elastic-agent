@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 const (
@@ -24,7 +25,7 @@ const (
 
 // BatchAcker provider interface, implemented by fleet acker
 type BatchAcker interface {
-	AckBatch(ctx context.Context, actions []fleetapi.Action) (*fleetapi.AckResponse, error)
+	AckBatch(ctx context.Context, actions []fleetapi.Action) (*fleetcontract.AckResponse, error)
 }
 
 // Option Retrier option function
@@ -175,7 +176,7 @@ func (r *Retrier) runRetries(ctx context.Context) {
 	r.log.Debug("ack retrier: exit retry loop")
 }
 
-func (r *Retrier) updateRetriesMap(retries map[string]int, actions []fleetapi.Action, resp *fleetapi.AckResponse) (failed []fleetapi.Action) {
+func (r *Retrier) updateRetriesMap(retries map[string]int, actions []fleetapi.Action, resp *fleetcontract.AckResponse) (failed []fleetapi.Action) {
 	isFailed := func(pos int) bool {
 		// Response is nil when all actions fail, still need to update attempts bookkeeping
 		if resp == nil {
