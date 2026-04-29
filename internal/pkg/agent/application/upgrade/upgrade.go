@@ -502,8 +502,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		previous, // old agent version data
 		action, det, availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
-		return nil, goerrors.Join(err, rollbackErr)
+		abortErr := u.abortUpgrade(ctx, hashedDir, currentVersionedHome)
+		return nil, goerrors.Join(err, abortErr)
 	}
 
 	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(paths.Top(), previous, current)
@@ -511,15 +511,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	var watcherCmd *exec.Cmd
 	if watcherCmd, err = u.watcherHelper.InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
-		return nil, goerrors.Join(err, rollbackErr)
+		abortErr := u.abortUpgrade(ctx, hashedDir, currentVersionedHome)
+		return nil, goerrors.Join(err, abortErr)
 	}
 
 	watcherWaitErr := u.watcherHelper.WaitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
 	if watcherWaitErr != nil {
 		killWatcherErr := watcherCmd.Process.Kill()
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
-		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, rollbackErr)
+		abortErr := u.abortUpgrade(ctx, hashedDir, currentVersionedHome)
+		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, abortErr)
 	}
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, filepath.Join(paths.Top(), unpackRes.VersionedHome))
@@ -609,6 +609,51 @@ func extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentV
 func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVersion) bool {
 	log.Debugw("Comparing current and new agent version", "current_version", current, "new_version", newVersion)
 	return current == newVersion
+}
+
+// abortUpgrade undoes an in-progress upgrade and reconciles any on-disk
+// marker so the failure is reportable to Fleet. Combines the physical undo
+// (rollbackInstall: symlink revert, new home removal, TTL clear) with the
+// marker reconcile (rewrite as state=Failed, align active.commit). Returns
+// the physical-undo error; reconcile failures are logged best-effort and
+// don't shadow the original failure.
+//
+// Used by every error path in Upgrade() that occurs after the symlink has
+// been flipped, so callers don't need to remember to combine the two steps.
+func (u *Upgrader) abortUpgrade(ctx context.Context, newVersionedHome, currentVersionedHome string) error {
+	rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
+	u.reconcileFailedUpgrade(ctx, currentVersionedHome)
+	return rollbackErr
+}
+
+// reconcileFailedUpgrade reconciles any on-disk upgrade marker after an
+// aborted upgrade. If a marker is present, it is rewritten as state=Failed
+// and the on-disk state (symlink, active.commit) is realigned with the
+// running agent so the failure is reportable to Fleet via the existing
+// upgrade-details path. Best-effort: errors are logged, never returned.
+//
+// Called from Upgrade()'s rollback paths after rollbackInstall has done the
+// physical undo. Composes with the next-boot reconcile in handleUpgrade so
+// that residual cases (SIGKILL between marker write and this call,
+// LoadMarker failures, etc.) still get caught later.
+func (u *Upgrader) reconcileFailedUpgrade(ctx context.Context, currentVersionedHome string) {
+	marker, err := LoadMarker(paths.Data())
+	if err != nil {
+		u.log.Warnw("could not load marker after upgrade failure; reconcile deferred to next boot",
+			"error.message", err.Error())
+		return
+	}
+	if marker == nil {
+		return
+	}
+	if reconcileErr := ReconcileMismatchedUpgrade(
+		ctx, u.log, u.watcherHelper,
+		paths.Top(), currentVersionedHome, release.Commit(),
+		marker,
+	); reconcileErr != nil {
+		u.log.Warnw("failed to reconcile upgrade marker after failure",
+			"error.message", reconcileErr.Error())
+	}
 }
 
 func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource availableRollbacksSource) error {
