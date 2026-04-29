@@ -625,15 +625,6 @@ instrumentation:
     type: parentbased_traceidratio # Sampler type
     argument: "1.0" # Sampling rate set to 100% (all traces are sampled).
   java:
-<<<<<<< HEAD
-    image: docker.elastic.co/observability/elastic-otel-javaagent:1.6.0
-  nodejs:
-    image: docker.elastic.co/observability/elastic-otel-node:1.5.0
-  dotnet:
-    image: docker.elastic.co/observability/elastic-otel-dotnet:1.0.2
-  python:
-    image: docker.elastic.co/observability/elastic-otel-python:1.9.0
-=======
     image: docker.elastic.co/observability/elastic-otel-javaagent:1.11.0
   nodejs:
     image: docker.elastic.co/observability/elastic-otel-node:1.11.0
@@ -641,6 +632,5 @@ instrumentation:
     image: docker.elastic.co/observability/elastic-otel-dotnet:1.4.0
   python:
     image: docker.elastic.co/observability/elastic-otel-python:1.12.0
->>>>>>> ead1a1431 ([otel/kube-stack] Update EDOT SDK k8s auto-instrumentation images to their latest versions (#12685))
   go:
     image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.24.0
