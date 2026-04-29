@@ -67,45 +67,11 @@ func TestRemovePath(t *testing.T) {
 //
 // NOTE: This test is quite similar to TestRemovePath, but looks at the returned
 // error codes in detail and verifies that the disposeHandle call actually succeeds.
+// The intent is to verify what exact effect removeBlockingExe has on the file
+// it removes.
 //
-// Background:
-//
-// When the project bumped to Go 1.25 (e653b4f1d2) RemovePath had to switch
-// from os.RemoveAll to a re-implementation of Go 1.24's path-based RemoveAll
-// (see removeAll in uninstall.go), because Go 1.25 rewrote removeall_at.go to
-// use NtCreateFile + FileDispositionInformationEx with
-// FILE_DISPOSITION_FORCE_IMAGE_SECTION_CHECK -- a flag that makes the syscall
-// fail with STATUS_CANNOT_DELETE / ERROR_ACCESS_DENIED for any file currently
-// mapped as a running image. removeBlockingExe is what lets the path-based
-// Go 1.24 implementation recover from those failures, by renaming the
-// running binary out of the directory via the NTFS "ADS rename trick" so
-// the next iteration's directory walk no longer sees it.
-//
-// The previous implementation of removeBlockingExe split the work across two
-// distinct file handles:
-//
-//  1. open with DELETE access  -> rename primary stream to ":agentrm"  -> close
-//  2. open with DELETE access  -> SetFileInformationByHandle(FileDispositionInfo, DeleteFile=true)  -> close
-//
-// That sequence works only as long as the kernel never re-evaluates the image
-// section between the two NtSetInformationFile calls. Empirically, on
-// Windows 11 with Go 1.25 the dispose call (step 2) returns
-// STATUS_CANNOT_DELETE / ERROR_ACCESS_DENIED whenever it is performed on a
-// freshly-opened handle, even after the rename succeeded. The same dispose
-// call performed on the SAME handle that did the rename succeeds.
-//
-// This test reproduces the failure by:
-//   - starting the test binary so the kernel installs an image section,
-//   - calling os.RemoveAll to obtain the canonical *fs.PathError that
-//     RemovePath would observe in production once we drop the Go 1.24
-//     re-implementation,
-//   - invoking removeBlockingExe with that error,
-//   - asserting the file is actually gone afterwards.
-//
-// With the old close+reopen implementation the rename succeeds, the dispose
-// fails with access-denied, and the file remains. With the
-// keep-handle-open implementation the dispose succeeds and the file is gone
-// once the handle is closed.
+// For more background, see https://github.com/elastic/elastic-agent/issues/13156.
+// This test reproduces integration test failures encountered in that issue.
 func TestRemoveBlockingExe_DeletesRunningExecutable(t *testing.T) {
 	const (
 		pkgName    = "testblocking"
@@ -153,12 +119,8 @@ func TestRemoveBlockingExe_DeletesRunningExecutable(t *testing.T) {
 
 	// Reproduce, step by step, the call sequence that Go 1.25's
 	// removefileat (used by os.RemoveAll during its per-entry directory
-	// walk) issues for this file, and assert each step. This is the
-	// "exact state" verification: the load-bearing post-condition of
-	// removeBlockingExe is that the FORCE_IMAGE_SECTION_CHECK dispose
-	// below stops failing -- without that, RemovePath's recovery loop
-	// would never make progress on Go 1.25.
-	//
+	// walk) issues for this file, and assert each step.
+
 	// (1) NtCreateFile (FILE_OPEN with DELETE access). The rename trick
 	// moves the file's primary stream to an alternate data stream, but
 	// the directory entry itself is preserved on NTFS, so this open
@@ -166,11 +128,8 @@ func TestRemoveBlockingExe_DeletesRunningExecutable(t *testing.T) {
 	// NtOpenFile call.
 	h, openStatus := openExeLikeRemoveAll(t, destpath)
 	require.NoError(t, openStatus, "NtCreateFile after removeBlockingExe failed")
-	hClosed := false
 	t.Cleanup(func() {
-		if !hClosed {
-			_ = windows.CloseHandle(h)
-		}
+		_ = windows.CloseHandle(h)
 	})
 
 	// (2) NtSetInformationFile with FileDispositionInformationEx and
@@ -189,7 +148,6 @@ func TestRemoveBlockingExe_DeletesRunningExecutable(t *testing.T) {
 	// removes the directory entry now even though the loader still
 	// has the image section mapped.
 	require.NoError(t, windows.CloseHandle(h), "CloseHandle")
-	hClosed = true
 
 	// And the delete must actually take effect: a follow-up
 	// os.RemoveAll on the file path returns nil because the entry is
