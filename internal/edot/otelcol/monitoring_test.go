@@ -22,7 +22,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/mock-es/pkg/api"
 )
 
@@ -86,7 +85,7 @@ service:
 		return http.StatusTooManyRequests
 	}
 
-	esURL := integration.StartMockESDeterministic(t, deterministicHandler)
+	esURL := startMockESDeterministic(t, deterministicHandler)
 
 	configParams := struct {
 		ESEndpoint string

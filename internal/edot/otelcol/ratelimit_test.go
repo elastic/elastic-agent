@@ -31,8 +31,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	mockes "github.com/elastic/mock-es/pkg/api"
-
-	"github.com/elastic/elastic-agent/testing/integration"
 )
 
 // newLogExportRequest creates a minimal log export request with a
@@ -136,7 +134,7 @@ func TestRatelimitProcessor(t *testing.T) {
 			eventsReceived.Add(1)
 			return http.StatusOK
 		}
-		esURL := integration.StartMockESDeterministic(t, handler)
+		esURL := startMockESDeterministic(t, handler)
 
 		client, cleanup := startCollectorWithRatelimit(t, esURL, `processors:
   ratelimit:
@@ -179,7 +177,7 @@ func TestRatelimitProcessor(t *testing.T) {
 			arrivals <- time.Now()
 			return http.StatusOK
 		}
-		esURL := integration.StartMockESDeterministic(t, handler)
+		esURL := startMockESDeterministic(t, handler)
 
 		client, cleanup := startCollectorWithRatelimit(t, esURL, `processors:
   ratelimit:
