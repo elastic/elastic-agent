@@ -45,7 +45,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -858,7 +857,13 @@ func handleUpgrade(ctx context.Context, log *logger.Logger) (*upgrade.UpdateMark
 			"marker.version", upgradeMarker.Version, "marker.prev_version", upgradeMarker.PrevVersion,
 			"running.hash", runningHash)
 
-		return upgradeMarker, reconcileMismatchedUpgrade(ctx, log, upgradeMarker)
+		homeRelPath, relErr := filepath.Rel(paths.Top(), paths.Home())
+		if relErr != nil {
+			return upgradeMarker, fmt.Errorf("computing relative home path: %w", relErr)
+		}
+		return upgradeMarker, upgrade.ReconcileMismatchedUpgrade(
+			ctx, log, &upgrade.AgentWatcherHelper{},
+			paths.Top(), homeRelPath, runningHash, upgradeMarker)
 
 	default:
 		log.Errorw("upgrade marker references neither the running agent nor a known previous version; discarding",
@@ -905,71 +910,6 @@ func postUpgradeHousekeeping(log *logger.Logger, upgradeMarker *upgrade.UpdateMa
 	return nil
 }
 
-// reconcileMismatchedUpgrade brings on-disk state in line with the running
-// agent when the marker says the running agent should be the upgrade target
-// but it isn't. Operations are idempotent and best-effort: take over any
-// orphan watcher, point the symlink at the running install, drop the
-// versioned home referenced by the marker, write our hash to active.commit,
-// and rewrite the marker as state=Failed.
-//
-// The marker is rewritten (not deleted) so the coordinator can report the
-// failure to Fleet via the normal upgrade-details path. It will be removed
-// on a subsequent boot once Fleet acks it (see the IsTerminalState && Acked
-// branch in handleUpgrade).
-func reconcileMismatchedUpgrade(ctx context.Context, log *logger.Logger, marker *upgrade.UpdateMarker) error {
-	// Take over (terminate + lock) any running watcher so it doesn't act on
-	// the marker we're about to rewrite. If takeover fails, an orphan watcher
-	// may still operate on its in-memory snapshot of the marker — including
-	// running Cleanup against marker.VersionedHome, which can delete the
-	// active install. There is no defense from the daemon side once the
-	// watcher is past its terminal-state check; the structural fix is in the
-	// watcher's cleanup path (see https://github.com/elastic/elastic-agent/issues/13505).
-	helper := upgrade.AgentWatcherHelper{}
-	if lock, err := helper.TakeOverWatcher(ctx, log, paths.Top()); err == nil {
-		defer func() {
-			if unlockErr := lock.Unlock(); unlockErr != nil {
-				log.Warnw("failed releasing watcher lock", "error.message", unlockErr.Error())
-			}
-		}()
-	} else {
-		log.Warnw("could not take over watcher; proceeding best-effort",
-			"error.message", err.Error())
-	}
-
-	var errs []error
-
-	// 1. Point the symlink at the running install.
-	symlinkPath := filepath.Join(paths.Top(), agentName)
-	target := paths.BinaryPath(paths.Home(), agentName)
-	if err := restoreSymlink(symlinkPath, target); err != nil {
-		errs = append(errs, fmt.Errorf("restoring symlink: %w", err))
-	}
-
-	// 2. Remove the versioned home referenced by the marker if it still exists.
-	if marker.VersionedHome != "" {
-		markerHome := filepath.Join(paths.Top(), marker.VersionedHome)
-		if err := os.RemoveAll(markerHome); err != nil {
-			errs = append(errs, fmt.Errorf("removing versioned home %q: %w", markerHome, err))
-		}
-	}
-
-	// 3. Write our hash to active.commit so it agrees with the running binary.
-	if err := upgrade.UpdateActiveCommit(log, paths.Top(), release.Commit(), os.WriteFile); err != nil {
-		errs = append(errs, fmt.Errorf("writing active commit: %w", err))
-	}
-
-	// 4. Mark the upgrade as failed so the coordinator reports it to Fleet.
-	if marker.Details == nil {
-		marker.Details = details.NewDetails(marker.Version, details.StateFailed, marker.GetActionID())
-	}
-	marker.Details.SetStateWithReason(details.StateFailed, "running agent does not match upgrade marker target")
-	if err := upgrade.SaveMarker(paths.Data(), marker, true); err != nil {
-		errs = append(errs, fmt.Errorf("saving failed-state marker: %w", err))
-	}
-
-	return goerrors.Join(errs...)
-}
-
 // discardStaleMarker handles a marker that references neither the running
 // version nor the previous one. Be conservative: don't touch versioned homes
 // we don't understand, just remove the misleading metadata so we don't keep
@@ -987,16 +927,6 @@ func discardStaleMarker(ctx context.Context, log *logger.Logger) error {
 		return fmt.Errorf("clearing stale marker: %w", err)
 	}
 	return nil
-}
-
-// restoreSymlink atomically points symlinkPath at target.
-func restoreSymlink(symlinkPath, target string) error {
-	tmp := symlinkPath + ".tmp"
-	_ = os.Remove(tmp)
-	if err := os.Symlink(target, tmp); err != nil {
-		return err
-	}
-	return os.Rename(tmp, symlinkPath)
 }
 
 func ensureInstallMarkerPresent() error {

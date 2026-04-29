@@ -78,24 +78,13 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 
 	settings := NewRollbackSettings(opts...)
 
-	symlinkPath := filepath.Join(topDirPath, AgentName)
-
 	if prevVersionedHome == "" {
 		// fallback for upgrades that didn't use the manifest and path remapping
 		hashedDir := fmt.Sprintf("%s-%s", AgentName, prevHash)
 		prevVersionedHome = filepath.Join("data", hashedDir)
 	}
 
-	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
-	symlinkTarget := paths.BinaryPath(filepath.Join(topDirPath, prevVersionedHome), AgentName)
-
-	// change symlink
-	if err := changeSymlink(log, topDirPath, symlinkPath, symlinkTarget); err != nil {
-		return err
-	}
-
-	// revert active commit
-	if err := UpdateActiveCommit(log, topDirPath, prevHash, os.WriteFile); err != nil {
+	if err := AlignActiveInstall(log, topDirPath, prevVersionedHome, prevHash); err != nil {
 		return err
 	}
 

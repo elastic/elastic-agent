@@ -10,6 +10,7 @@ import (
 	"runtime"
 
 	"github.com/elastic/elastic-agent-libs/file"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -52,4 +53,17 @@ func prevSymlinkPath(topDirPath string) string {
 	}
 
 	return filepath.Join(topDirPath, agentPrevName)
+}
+
+// AlignActiveInstall points the top-level agent symlink at the binary inside
+// versionedHome (relative to topDir) and writes hash to active.commit. Used
+// by both the rollback path (target = previous install) and reconcile
+// (target = current install).
+func AlignActiveInstall(log *logger.Logger, topDir, versionedHome, hash string) error {
+	symlinkPath := filepath.Join(topDir, AgentName)
+	target := paths.BinaryPath(filepath.Join(topDir, versionedHome), AgentName)
+	if err := changeSymlink(log, topDir, symlinkPath, target); err != nil {
+		return err
+	}
+	return UpdateActiveCommit(log, topDir, hash, os.WriteFile)
 }
