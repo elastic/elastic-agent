@@ -37,12 +37,13 @@ func ReconcileMismatchedUpgrade(
 	marker *UpdateMarker,
 ) error {
 	// Take over (terminate + lock) any running watcher so it doesn't act on
-	// the marker we're about to rewrite. If takeover fails, an orphan watcher
-	// may still operate on its in-memory snapshot of the marker — including
-	// running Cleanup against marker.VersionedHome, which can delete the
-	// active install. There is no defense from the daemon side once the
-	// watcher is past its terminal-state check; the structural fix is in the
-	// watcher's cleanup path (see https://github.com/elastic/elastic-agent/issues/13505).
+	// the marker we're about to rewrite. The data-loss hazard if takeover
+	// fails (orphan watcher running Cleanup against a stale
+	// marker.VersionedHome) is covered structurally by the keep-list guard
+	// in upgrade.cleanup, which always preserves the directory backing the
+	// live agent symlink. Takeover here is still preferable so the orphan
+	// doesn't observe the in-flight reconcile and report misleading state
+	// to Fleet — but it is best-effort, not load-bearing.
 	if lock, err := helper.TakeOverWatcher(ctx, log, topDir); err == nil {
 		defer func() {
 			if unlockErr := lock.Unlock(); unlockErr != nil {

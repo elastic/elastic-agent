@@ -177,6 +177,33 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 		relativeHomePaths = append(relativeHomePaths, relHomePath)
 	}
 
+	// Always preserve the versioned home that the top-level agent symlink
+	// resolves to, regardless of what the caller passed in
+	// versionedHomesToKeep. This closes the data-loss hazard described in
+	// https://github.com/elastic/elastic-agent/issues/13505: if a caller's
+	// keep list is built from a stale marker.VersionedHome that no longer
+	// exists on disk, cleanup would otherwise treat the live install as
+	// "not in keep" and delete it.
+	//
+	// The TTL-based rollback retention (marker.RollbacksAvailable) covers
+	// the homes operators explicitly want to keep across an upgrade. This
+	// guard is the structural backstop on top of that — the symlink is the
+	// single source of truth for "the binary the daemon will launch on
+	// next start," and that directory must always survive cleanup.
+	if liveHome, err := liveVersionedHome(topDirPath); err == nil {
+		liveBasename, basenameErr := filepath.Rel(dataDirPath, filepath.Join(topDirPath, liveHome))
+		if basenameErr != nil {
+			log.Warnw("could not compute live versioned home basename; cleanup proceeds without protection",
+				"error.message", basenameErr.Error())
+		} else if !slices.Contains(relativeHomePaths, liveBasename) {
+			log.Infof("adding live versioned home %q to keep list", liveBasename)
+			relativeHomePaths = append(relativeHomePaths, liveBasename)
+		}
+	} else {
+		log.Warnw("could not derive live versioned home; cleanup proceeds without protection",
+			"error.message", err.Error())
+	}
+
 	log.Infof("Starting cleanup of versioned homes. Keeping: %v", relativeHomePaths)
 
 	for _, dir := range subdirs {

@@ -136,22 +136,21 @@ func TestReconcileMismatchedUpgrade_NoMarkerVersionedHome(t *testing.T) {
 	assert.Equal(t, details.StateFailed, saved.Details.State)
 }
 
-// TestCleanup_DeletesLiveInstallWhenKeepTargetIsMissing demonstrates the
-// hazard described in https://github.com/elastic/elastic-agent/issues/13505.
+// TestCleanup_PreservesLiveInstallEvenWithStaleKeep is the regression test
+// for the structural fix described in
+// https://github.com/elastic/elastic-agent/issues/13505.
 //
-// When a watcher (or any other caller) builds the cleanup keep list from
-// marker.VersionedHome and that path has already been removed from disk
-// (for example by an aborted upgrade's rollbackInstall), cleanup happily
-// "keeps" the missing directory and deletes every other versioned home —
-// including the one backing the live symlink. The result is that the running
-// install is wiped from disk while still in memory; on the next service
-// restart there is no binary to launch.
+// Without the cleanup guard, when a watcher (or any other caller) builds the
+// cleanup keep list from marker.VersionedHome and that path has already been
+// removed from disk (for example by an aborted upgrade's rollbackInstall),
+// cleanup "kept" the missing directory and deleted every other versioned
+// home — including the one backing the live symlink, wiping the running
+// install from disk while still in memory.
 //
-// This test crafts that exact situation against the cleanup function
-// directly. It is the failure mode that ReconcileMismatchedUpgrade prevents
-// by transitioning the marker to a terminal state and pointing the symlink
-// at the running install before any future cleanup runs.
-func TestCleanup_DeletesLiveInstallWhenKeepTargetIsMissing(t *testing.T) {
+// The cleanup guard now resolves the live symlink and unconditionally adds
+// its versioned home to the keep list, so a stale caller-supplied keep list
+// can no longer cause data loss.
+func TestCleanup_PreservesLiveInstallEvenWithStaleKeep(t *testing.T) {
 	const (
 		liveHash = "aaaaaa"
 		// staleHash names a versioned home that was already removed from
@@ -171,41 +170,39 @@ func TestCleanup_DeletesLiveInstallWhenKeepTargetIsMissing(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(liveHomeAbs, AgentName), []byte("live-binary"), 0o755))
 	require.NoError(t, os.Symlink(filepath.Join(liveHomeAbs, AgentName), filepath.Join(topDir, AgentName)))
 
-	// A second versioned home that survived from some prior boot; presence
-	// is irrelevant to the bug, only included to show the deletion sweeps
-	// everything that isn't in the keep list.
+	// A second versioned home that survived from some prior boot; not in
+	// the keep list, so the guard should NOT preserve it. Only the live
+	// symlink target is unconditionally protected.
 	otherHomeRel := filepath.Join("data", "elastic-agent-cccccc")
 	require.NoError(t, os.MkdirAll(filepath.Join(topDir, otherHomeRel), 0o755))
 
-	// The keep list points at staleHash, which was never created (or was
-	// already deleted). This is what marker.VersionedHome would say after
-	// an aborted upgrade left the marker behind.
+	// The caller-supplied keep list points at staleHash, which was never
+	// created (or was already deleted). Without the guard, cleanup would
+	// trust this and delete everything else.
 	staleKeep := filepath.Join("data", "elastic-agent-"+staleHash)
 
 	log, _ := loggertest.New(t.Name())
-	// keepLogs=false so RemoveBut treats the whole versioned home as removable
-	// and we observe the dir disappearing rather than just being emptied.
 	require.NoError(t, cleanup(log, topDir, false, false, 0, staleKeep))
 
-	// The smoking gun: the directory backing the live symlink is gone,
-	// because cleanup trusted the keep list and treated liveHomeRel as
-	// "not in keep, delete it."
-	_, err := os.Stat(liveHomeAbs)
-	assert.ErrorIs(t, err, os.ErrNotExist, "live install should have been deleted by stale-keep cleanup (the #13505 hazard)")
+	// Guard kicked in: the live install survives even though it wasn't in
+	// the caller's keep list.
+	_, err := os.Stat(filepath.Join(liveHomeAbs, AgentName))
+	require.NoError(t, err, "live install must survive cleanup with stale keep list (#13505 guard)")
 
-	// The symlink still points at a now-missing target; on the next service
-	// restart there is no binary to launch.
-	target, _ := os.Readlink(filepath.Join(topDir, AgentName))
+	// Symlink still resolves.
+	target, err := os.Readlink(filepath.Join(topDir, AgentName))
+	require.NoError(t, err)
 	_, err = os.Stat(target)
-	assert.ErrorIs(t, err, os.ErrNotExist, "symlink target gone — agent cannot restart")
+	assert.NoError(t, err, "symlink target must still exist")
 
 	// The "kept" directory was missing to begin with and is still missing.
 	_, err = os.Stat(filepath.Join(topDir, staleKeep))
 	assert.ErrorIs(t, err, os.ErrNotExist)
 
-	// Any other versioned home is also gone.
+	// The unrelated versioned home was correctly cleaned up — only the
+	// live install gets the guard's protection.
 	_, err = os.Stat(filepath.Join(topDir, otherHomeRel))
-	assert.ErrorIs(t, err, os.ErrNotExist)
+	assert.ErrorIs(t, err, os.ErrNotExist, "non-live, non-keep home should be cleaned")
 }
 
 // TestReconcileMismatchedUpgrade_TakeoverFailureProceeds confirms that a
