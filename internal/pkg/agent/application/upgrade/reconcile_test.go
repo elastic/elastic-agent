@@ -92,6 +92,12 @@ func TestReconcileMismatchedUpgrade(t *testing.T) {
 	assert.Equal(t, details.StateFailed, saved.Details.State)
 	assert.Equal(t, otherHash, saved.Hash, "current hash unchanged so the action keeps describing the original target")
 	assert.Equal(t, myHash, saved.PrevHash, "prev hash unchanged")
+	// Failure metadata is populated by Fail() — guards against regressing to
+	// the SetStateWithReason(StateFailed, ...) anti-pattern.
+	assert.Equal(t, details.StateReplacing, saved.Details.Metadata.FailedState,
+		"FailedState should record the state we were in when failing")
+	assert.NotEmpty(t, saved.Details.Metadata.ErrorMsg,
+		"ErrorMsg should describe the failure")
 }
 
 // TestReconcileMismatchedUpgrade_NoMarkerVersionedHome covers the marker.VersionedHome=""

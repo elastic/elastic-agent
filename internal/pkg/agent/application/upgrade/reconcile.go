@@ -84,10 +84,17 @@ func ReconcileMismatchedUpgrade(
 	// Rewrite the marker as state=Failed so the coordinator reports the
 	// failure to Fleet. The marker is removed on a subsequent boot once
 	// Fleet acks it.
+	//
+	// Use Fail() rather than SetStateWithReason(StateFailed, ...): the latter
+	// is documented as an anti-pattern because it doesn't populate
+	// FailedState (the state we were in when failing) or ErrorMsg. If
+	// Details is nil we initialize with StateReplacing as a placeholder for
+	// "an upgrade was in progress" — Fail() then records that as the
+	// failed-from state.
 	if marker.Details == nil {
-		marker.Details = details.NewDetails(marker.Version, details.StateFailed, marker.GetActionID())
+		marker.Details = details.NewDetails(marker.Version, details.StateReplacing, marker.GetActionID())
 	}
-	marker.Details.SetStateWithReason(details.StateFailed, "running agent does not match upgrade marker target")
+	marker.Details.Fail(goerrors.New("running agent does not match upgrade marker target"))
 	if err := SaveMarker(paths.DataFrom(topDir), marker, true); err != nil {
 		errs = append(errs, fmt.Errorf("saving failed-state marker: %w", err))
 	}
