@@ -202,13 +202,13 @@ func TestSettingsWithMethods(t *testing.T) {
 		assert.Empty(t, original.Build.BeatVersion)
 	})
 
-	t.Run("WithAgentPackageCommitHashOverride", func(t *testing.T) {
+	t.Run("WithAgentCoreCommitHash", func(t *testing.T) {
 		original := DefaultSettings()
 
-		modified := original.WithAgentPackageCommitHashOverride("abc123")
+		modified := original.WithAgentCoreCommitHash("abc123")
 
-		assert.Equal(t, "abc123", modified.Build.AgentPackageCommitHashOverride)
-		assert.Empty(t, original.Build.AgentPackageCommitHashOverride)
+		assert.Equal(t, "abc123", modified.Build.AgentCoreCommitHash)
+		assert.Empty(t, original.Build.AgentCoreCommitHash)
 	})
 
 	t.Run("WithAgentDropPath", func(t *testing.T) {
@@ -541,12 +541,12 @@ func TestBuildSettingsCommitHash(t *testing.T) {
 		assert.NotEmpty(t, s.Build.CommitHash())
 	})
 
-	t.Run("ignores package commit hash override", func(t *testing.T) {
+	t.Run("ignores agent core commit hash", func(t *testing.T) {
 		s, err := LoadSettings()
 		require.NoError(t, err)
-		s.Build.AgentPackageCommitHashOverride = "abc123def456"
+		s.Build.AgentCoreCommitHash = "abc123def456"
 
-		// CommitHash must return the actual git hash, not the packaging override.
+		// CommitHash must return the actual git hash of the source tree, not the agent-core override.
 		assert.NotEqual(t, "abc123def456", s.Build.CommitHash())
 	})
 }
@@ -562,35 +562,35 @@ func TestBuildSettingsCommitHashShort(t *testing.T) {
 	})
 }
 
-func TestSettingsAgentPackageCommitHash(t *testing.T) {
-	t.Run("returns override when set", func(t *testing.T) {
+func TestSettingsAgentCoreCommitHash(t *testing.T) {
+	t.Run("returns AgentCoreCommitHash when set", func(t *testing.T) {
 		s := DefaultSettings()
-		s.Build.AgentPackageCommitHashOverride = "abc123def456"
+		s.Build.AgentCoreCommitHash = "abc123def456"
 
-		assert.Equal(t, "abc123def456", s.AgentPackageCommitHash())
+		assert.Equal(t, "abc123def456", s.AgentCoreCommitHash())
 	})
 
-	t.Run("returns git hash when override not set", func(t *testing.T) {
+	t.Run("returns repo git hash when AgentCoreCommitHash not set", func(t *testing.T) {
 		s, err := LoadSettings()
 		require.NoError(t, err)
 
-		assert.Equal(t, s.Build.CommitHash(), s.AgentPackageCommitHash())
+		assert.Equal(t, s.Build.CommitHash(), s.AgentCoreCommitHash())
 	})
 }
 
-func TestSettingsAgentPackageCommitHashShort(t *testing.T) {
-	t.Run("returns first 6 characters of override", func(t *testing.T) {
+func TestSettingsAgentCoreCommitHashShort(t *testing.T) {
+	t.Run("returns first 6 characters of AgentCoreCommitHash", func(t *testing.T) {
 		s := DefaultSettings()
-		s.Build.AgentPackageCommitHashOverride = "abc123def456789"
+		s.Build.AgentCoreCommitHash = "abc123def456789"
 
-		assert.Equal(t, "abc123", s.AgentPackageCommitHashShort())
+		assert.Equal(t, "abc123", s.AgentCoreCommitHashShort())
 	})
 
-	t.Run("returns full override when shorter than 6 chars", func(t *testing.T) {
+	t.Run("returns full value when shorter than 6 chars", func(t *testing.T) {
 		s := DefaultSettings()
-		s.Build.AgentPackageCommitHashOverride = "abc"
+		s.Build.AgentCoreCommitHash = "abc"
 
-		assert.Equal(t, "abc", s.AgentPackageCommitHashShort())
+		assert.Equal(t, "abc", s.AgentCoreCommitHashShort())
 	})
 }
 
@@ -698,7 +698,7 @@ func TestLoadSettings(t *testing.T) {
 		assert.Equal(t, "true", settings.Build.CI)
 		assert.Equal(t, 8, settings.Build.MaxParallel)
 		assert.Equal(t, "1.2.3", settings.Build.BeatVersion)
-		assert.Equal(t, "abc123", settings.Build.AgentPackageCommitHashOverride)
+		assert.Equal(t, "abc123", settings.Build.AgentCoreCommitHash)
 		assert.True(t, settings.Build.GolangCrossBuild)
 		assert.Equal(t, "1.21.0", settings.Build.BeatGoVersion)
 		assert.Equal(t, "main", settings.Build.BeatDocBranch)
