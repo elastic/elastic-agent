@@ -869,7 +869,7 @@ func handleUpgrade(ctx context.Context, log *logger.Logger) (*upgrade.UpdateMark
 		log.Errorw("upgrade marker references neither the running agent nor a known previous version; discarding",
 			"marker.hash", upgradeMarker.Hash, "marker.prev_hash", upgradeMarker.PrevHash,
 			"running.hash", runningHash)
-		return nil, discardStaleMarker(ctx, log)
+		return nil, upgrade.DiscardStaleMarker(ctx, log, &upgrade.AgentWatcherHelper{}, paths.Top())
 	}
 }
 
@@ -907,25 +907,6 @@ func postUpgradeHousekeeping(log *logger.Logger, upgradeMarker *upgrade.UpdateMa
 		}
 	}
 
-	return nil
-}
-
-// discardStaleMarker handles a marker that references neither the running
-// version nor the previous one. Be conservative: don't touch versioned homes
-// we don't understand, just remove the misleading metadata so we don't keep
-// tripping over it on reboots.
-func discardStaleMarker(ctx context.Context, log *logger.Logger) error {
-	helper := upgrade.AgentWatcherHelper{}
-	if lock, err := helper.TakeOverWatcher(ctx, log, paths.Top()); err == nil {
-		defer func() { _ = lock.Unlock() }()
-	} else {
-		log.Warnw("could not take over watcher when discarding stale marker",
-			"error.message", err.Error())
-	}
-
-	if err := upgrade.CleanMarker(log, paths.Data()); err != nil {
-		return fmt.Errorf("clearing stale marker: %w", err)
-	}
 	return nil
 }
 

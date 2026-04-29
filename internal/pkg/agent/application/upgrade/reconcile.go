@@ -13,6 +13,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -83,4 +84,68 @@ func ReconcileMismatchedUpgrade(
 	}
 
 	return goerrors.Join(errs...)
+}
+
+// DiscardStaleMarker removes an upgrade marker that doesn't describe the
+// running agent or any version we recognize. Conservative: takes the watcher
+// lock so an orphan can't act on the marker, but doesn't touch versioned
+// homes since we don't know what they refer to. Just removes the misleading
+// metadata so it doesn't keep tripping startup logic.
+func DiscardStaleMarker(ctx context.Context, log *logger.Logger, helper WatcherHelper, topDir string) error {
+	if lock, err := helper.TakeOverWatcher(ctx, log, topDir); err == nil {
+		defer func() { _ = lock.Unlock() }()
+	} else {
+		log.Warnw("could not take over watcher when discarding stale marker",
+			"error.message", err.Error())
+	}
+
+	if err := CleanMarker(log, paths.DataFrom(topDir)); err != nil {
+		return fmt.Errorf("clearing stale marker: %w", err)
+	}
+	return nil
+}
+
+// abortUpgrade undoes an in-progress upgrade and reconciles any on-disk
+// marker so the failure is reportable to Fleet. Combines the physical undo
+// (rollbackInstall: symlink revert, new home removal, TTL clear) with the
+// marker reconcile (rewrite as state=Failed, align active.commit). Returns
+// the physical-undo error; reconcile failures are logged best-effort and
+// don't shadow the original failure.
+//
+// Used by every error path in Upgrade() that occurs after the symlink has
+// been flipped, so callers don't need to remember to combine the two steps.
+func (u *Upgrader) abortUpgrade(ctx context.Context, newVersionedHome, currentVersionedHome string) error {
+	rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
+	u.reconcileFailedUpgrade(ctx, currentVersionedHome)
+	return rollbackErr
+}
+
+// reconcileFailedUpgrade reconciles any on-disk upgrade marker after an
+// aborted upgrade. If a marker is present, it is rewritten as state=Failed
+// and the on-disk state (symlink, active.commit) is realigned with the
+// running agent so the failure is reportable to Fleet via the existing
+// upgrade-details path. Best-effort: errors are logged, never returned.
+//
+// Called from Upgrade()'s rollback paths after rollbackInstall has done the
+// physical undo. Composes with the next-boot reconcile in handleUpgrade so
+// that residual cases (SIGKILL between marker write and this call,
+// LoadMarker failures, etc.) still get caught later.
+func (u *Upgrader) reconcileFailedUpgrade(ctx context.Context, currentVersionedHome string) {
+	marker, err := LoadMarker(paths.Data())
+	if err != nil {
+		u.log.Warnw("could not load marker after upgrade failure; reconcile deferred to next boot",
+			"error.message", err.Error())
+		return
+	}
+	if marker == nil {
+		return
+	}
+	if reconcileErr := ReconcileMismatchedUpgrade(
+		ctx, u.log, u.watcherHelper,
+		paths.Top(), currentVersionedHome, release.Commit(),
+		marker,
+	); reconcileErr != nil {
+		u.log.Warnw("failed to reconcile upgrade marker after failure",
+			"error.message", reconcileErr.Error())
+	}
 }
