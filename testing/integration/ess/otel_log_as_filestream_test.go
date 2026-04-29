@@ -113,6 +113,11 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 
 	// Start Elastic Agent/Filebeat receiver running the Log input
 	wg.Add(1)
+	// Guarantee the goroutine joins before the test returns even if a later
+	// require.X triggers t.Fatal. Otherwise the goroutine outlives the test
+	// and its require.NoError(t, ...) panics with "Fail in goroutine after
+	// TestFilebeatReceiverLogAsFilestream has completed".
+	t.Cleanup(wg.Wait)
 	go func() {
 		defer wg.Done()
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(3*time.Minute))
@@ -152,6 +157,7 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	require.NoError(t, fixture.ConfigureOtel(t.Context(), yamlCfg), "cannot configure Otel")
 
 	wg.Add(1)
+	t.Cleanup(wg.Wait)
 	go func() {
 		defer wg.Done()
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -197,6 +203,7 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	wg.Wait()
 
 	wg.Add(1)
+	t.Cleanup(wg.Wait)
 	go func() {
 		defer wg.Done()
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(3*
