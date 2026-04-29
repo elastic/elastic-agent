@@ -815,10 +815,10 @@ func setupMetrics(
 //     housekeeping.
 //  3. Running agent matches marker.PrevHash:
 //     a. Marker in terminal state: return it so the coordinator can finish
-//        reporting; no physical work to do.
+//     reporting; no physical work to do.
 //     b. Marker not yet terminal: on-disk state is inconsistent with the
-//        running agent; reconcile it and rewrite the marker with
-//        state=Failed so the mismatch is reported to Fleet.
+//     running agent; reconcile it and rewrite the marker with
+//     state=Failed so the mismatch is reported to Fleet.
 //  4. Running agent matches neither: discard the marker.
 func handleUpgrade(ctx context.Context, log *logger.Logger) (*upgrade.UpdateMarker, error) {
 	upgradeMarker, err := upgrade.LoadMarker(paths.Data())
