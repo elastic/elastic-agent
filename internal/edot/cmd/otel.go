@@ -147,7 +147,6 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		edotOtelCol.WithComponents(componentsFn),
 	}
 	if supervised {
-<<<<<<< HEAD
 		// add stdin config provider
 		configProvider, err := agentprovider.NewBufferProvider(os.Stdin)
 		if err != nil {
@@ -156,10 +155,8 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), []string{configProvider.URI()},
 			edotOtelCol.WithConfigProviderFactory(configProvider.NewFactory()),
 			edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
+			edotOtelCol.WithComponents(componentsFn),
 		)
-=======
-		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), configFiles, baseOpts...)
->>>>>>> a2ff291fb (Refactor edot commands to allow component factory injection (#13906))
 
 		// setup logger
 		defaultCfg := logger.DefaultLoggingConfig()

@@ -14,12 +14,7 @@ import (
 )
 
 func main() {
-<<<<<<< HEAD
-	cmd := edotCmd.NewOtelCommandWithArgs(os.Args, cli.NewIOStreams())
-=======
 	cmd := edotCmd.NewOtelCommandWithArgs(os.Args, cli.NewIOStreams(), components.Default())
-	beats.AddCommands(cmd)
->>>>>>> a2ff291fb (Refactor edot commands to allow component factory injection (#13906))
 	err := cmd.Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
