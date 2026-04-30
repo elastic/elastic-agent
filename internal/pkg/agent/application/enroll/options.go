@@ -40,6 +40,7 @@ type EnrollOptions struct {
 	UserProvidedMetadata map[string]interface{}     `yaml:"-" json:"-"`
 	FixPermissions       *utils.FileOwner           `yaml:"-" json:"-"`
 	DelayEnroll          bool                       `yaml:"-" json:"-"`
+	RetryOnInvalidToken  bool                       `yaml:"-" json:"-"`
 	FleetServer          EnrollCmdFleetServerOption `yaml:"-" json:"-"`
 	SkipCreateSecret     bool                       `yaml:"-" json:"-"`
 	SkipDaemonRestart    bool                       `yaml:"-" json:"-"`

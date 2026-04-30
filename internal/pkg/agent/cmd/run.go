@@ -664,6 +664,10 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	}
 	options.DelayEnroll = false
 	options.FleetServer.SpawnAgent = false
+	// Daemon mode: the enrollment token may be fixed externally (e.g. rotated
+	// secret) without restarting the agent, so we keep retrying instead of
+	// failing fast like the interactive `enroll` CLI does.
+	options.RetryOnInvalidToken = true
 	// enrollCmd daemonReloadWithBackoff is broken
 	// see https://github.com/elastic/elastic-agent/issues/4043
 	// SkipDaemonRestart to true avoids running that code.
@@ -688,19 +692,20 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	if err != nil {
 		return nil, err
 	}
-	// perform the enrollment in a loop, it should keep trying to enroll no matter what
-	// the enrollCmd has built in backoff so no need to wrap this in its own backoff as well
-	for {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		err = c.Execute(ctx, cli.NewIOStreams())
-		if err == nil {
-			// enrollment was successful
-			break
-		}
-		logger.Error(fmt.Errorf("failed to perform delayed enrollment (will try again): %w", err))
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
+
+	err = c.Execute(ctx, cli.NewIOStreams())
+	if err != nil {
+		return nil, errors.New(
+			err,
+			"failed to execute delayed enrollment",
+			errors.TypeApplication,
+			errors.M("path", enrollPath))
+	}
+
 	err = os.Remove(enrollPath)
 	if err != nil {
 		logger.Warn(errors.New(
