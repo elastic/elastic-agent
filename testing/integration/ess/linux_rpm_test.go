@@ -292,6 +292,10 @@ func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 		// RPM scriptlets do not restart the service for prefix installs; do it explicitly.
 		out, err = exec.CommandContext(ctx, "sudo", "systemctl", "restart", "elastic-agent").CombinedOutput()
 		require.NoError(t, err, string(out))
+
+		t.Run("service file is not a symlink into prefix after upgrade", func(t *testing.T) {
+			checkServiceFileNotSymlinkInPrefix(t, prefix)
+		})
 	}
 
 	newRunDir, err := atesting.FindRunDir(endFixture)
@@ -352,6 +356,29 @@ func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 	}
 }
 
+// checkServiceFileNotSymlinkInPrefix asserts that the systemd service file at
+// /lib/systemd/system/elastic-agent.service is a regular file (not a symlink into
+// the prefix mount), and that /etc/systemd/system/elastic-agent.service (if present)
+// does not point into the prefix. A symlink into the prefix breaks service startup
+// at boot when the prefix mount is not yet available.
+func checkServiceFileNotSymlinkInPrefix(t *testing.T, prefix string) {
+	t.Helper()
+
+	libService := "/lib/systemd/system/elastic-agent.service"
+	fi, err := os.Lstat(libService)
+	require.NoError(t, err, "%s should exist after prefix installation", libService)
+	require.Zero(t, fi.Mode()&os.ModeSymlink, "%s must be a regular file, not a symlink into the prefix mount", libService)
+
+	etcService := "/etc/systemd/system/elastic-agent.service"
+	fi, err = os.Lstat(etcService)
+	if err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		target, err := os.Readlink(etcService)
+		require.NoError(t, err)
+		require.False(t, strings.HasPrefix(target, prefix),
+			"%s symlink target %q must not point into prefix %s", etcService, target, prefix)
+	}
+}
+
 func TestRpmWithPrefix(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.RPM,
@@ -379,6 +406,10 @@ func TestRpmWithPrefix(t *testing.T) {
 		InstallServers: false,
 	}
 	testRpmLogIngestFleetManagedWithCheck(ctx, t, agentFixture, info, installOpts, nil)
+
+	t.Run("service file is not a symlink into prefix after install", func(t *testing.T) {
+		checkServiceFileNotSymlinkInPrefix(t, installOpts.BasePath)
+	})
 
 	t.Run("upgrade to latest snapshot", func(t *testing.T) {
 		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
@@ -423,10 +454,18 @@ func TestRpmWithPrefix(t *testing.T) {
 			_ = f.Close()
 		}
 
+		// Remove the copied service file before upgrading to the snapshot so the
+		// snapshot's (unfixed) postinstall can create its symlink without hitting
+		// "File exists" on ln -s. Without this, set -e aborts the postinstall
+		// before apply-flavor runs, leaving all components on disk.
+		// This is a transitional workaround until the snapshot includes the copy fix.
+		out, err := exec.CommandContext(ctx, "sudo", "rm", "-f", "/lib/systemd/system/elastic-agent.service").CombinedOutput()
+		require.NoError(t, err, string(out))
+
 		// --force is needed because the latest snapshot version may match the
 		// locally built version (same patch), causing RPM to reject the upgrade
 		// with "already installed" errors.
-		out, err := exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", "--force", "--prefix", "/opt/elastic-agent", snapshotPackage).CombinedOutput()
+		out, err = exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", "--force", "--prefix", "/opt/elastic-agent", snapshotPackage).CombinedOutput()
 		require.NoError(t, err, string(out))
 
 		// RPM scriptlets do not restart the service for prefix installs; do it explicitly.
