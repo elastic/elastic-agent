@@ -33,7 +33,6 @@ import (
 	mockes "github.com/elastic/mock-es/pkg/api"
 
 	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
-
 )
 
 // newLogExportRequest creates a minimal log export request with a
