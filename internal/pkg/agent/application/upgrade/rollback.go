@@ -189,7 +189,7 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	log.Infof("versioned homes to keep: %v", versionedHomesToKeep)
 
 	var cumulativeError error
-	relativeHomePaths := make([]string, 0, len(versionedHomesToKeep))
+	relativeHomePaths := make([]string, 0, len(versionedHomesToKeep)+1)
 	for _, h := range versionedHomesToKeep {
 		relHomePath, err := filepath.Rel(dataDirPath, filepath.Join(topDirPath, h))
 		if err != nil {
@@ -226,6 +226,23 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 		log.Warnw("could not derive live versioned home; cleanup proceeds without protection",
 			"error.message", err.Error())
 	}
+
+	// Drop keep-list entries that no longer exist on disk so the "Keeping"
+	// log line below reflects what is actually being preserved rather than a
+	// phantom path. A stale entry is harmless to leave in (the cleanup loop
+	// only iterates real subdirs) but misleading on triage. Each dropped
+	// entry is surfaced as a Warn so the cause — usually a stale
+	// marker.VersionedHome — is visible in logs.
+	existingHomePaths := relativeHomePaths[:0]
+	for _, p := range relativeHomePaths {
+		if _, err := os.Stat(filepath.Join(dataDirPath, p)); err != nil {
+			log.Warnw("dropping non-existent keep-list entry from cleanup",
+				"path", p, "error.message", err.Error())
+			continue
+		}
+		existingHomePaths = append(existingHomePaths, p)
+	}
+	relativeHomePaths = existingHomePaths
 
 	log.Infof("Starting cleanup of versioned homes. Keeping: %v", relativeHomePaths)
 

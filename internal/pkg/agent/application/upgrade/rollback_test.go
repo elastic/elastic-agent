@@ -254,6 +254,39 @@ func TestCleanup_PreservesLiveVersionedHome(t *testing.T) {
 	assert.DirExists(t, filepath.Join(topDir, otherHome))
 }
 
+// TestCleanup_DropsPhantomKeepListEntry ensures cleanup() drops keep-list
+// entries that don't exist on disk so the "Keeping" log line truthfully
+// reflects what is being preserved. The dropped entry must be reported via
+// a Warn log so triage can see why a stale marker.VersionedHome is gone.
+func TestCleanup_DropsPhantomKeepListEntry(t *testing.T) {
+	testLogger, obs := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	// One real install + symlink, plus a phantom path the caller insists on.
+	liveHome := createFakeAgentInstall(t, topDir, version123Snapshot.version, version123Snapshot.hash, true)
+	createLink(t, topDir, liveHome)
+	phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
+
+	err := cleanup(testLogger, topDir, false, false, 0, phantomHome)
+	require.NoError(t, err)
+
+	// Live install is still present (cleanup guard kicked in).
+	assert.DirExists(t, filepath.Join(topDir, liveHome))
+
+	// Phantom entry was reported as dropped.
+	dropLogs := obs.FilterMessageSnippet("dropping non-existent keep-list entry").All()
+	if assert.Len(t, dropLogs, 1, "expected exactly one drop warning") {
+		assert.Equal(t, zapcore.WarnLevel, dropLogs[0].Level)
+	}
+
+	// "Keeping" log line must NOT mention the phantom entry.
+	keepLogs := obs.FilterMessageSnippet("Starting cleanup of versioned homes. Keeping:").All()
+	if assert.Len(t, keepLogs, 1) {
+		assert.NotContains(t, keepLogs[0].Message, "deadbeef",
+			"keep-list log must not contain phantom entry")
+	}
+}
+
 func TestRollback(t *testing.T) {
 	tests := map[string]struct {
 		agentInstallsSetup setupAgentInstallations
