@@ -107,6 +107,26 @@ var (
 		},
 		Runner: linux.RhelRunner{},
 	}
+	// RhelARM64_8 - RedHat Enterprise Linux (arm64) 8
+	RhelARM64_8 = common.SupportedOS{
+		OS: define.OS{
+			Type:    define.Linux,
+			Arch:    define.ARM64,
+			Distro:  Rhel,
+			Version: "8",
+		},
+		Runner: linux.RhelRunner{},
+	}
+	// RhelARM64_10 - RedHat Enterprise Linux (arm64) 10
+	RhelARM64_10 = common.SupportedOS{
+		OS: define.OS{
+			Type:    define.Linux,
+			Arch:    define.ARM64,
+			Distro:  Rhel,
+			Version: "10",
+		},
+		Runner: linux.RhelRunner{},
+	}
 	// WindowsAMD64_2022 - Windows (amd64) Server 2022
 	WindowsAMD64_2022 = common.SupportedOS{
 		OS: define.OS{
@@ -178,8 +198,10 @@ var supported = []common.SupportedOS{
 	UbuntuARM64_2404,
 	UbuntuARM64_2204,
 	UbuntuARM64_2004,
-	RhelAMD64_8,
 	RhelAMD64_10,
+	RhelAMD64_8,
+	RhelARM64_10,
+	RhelARM64_8,
 	WindowsAMD64_2022,
 	WindowsAMD64_2022_Core,
 	WindowsAMD64_2019,

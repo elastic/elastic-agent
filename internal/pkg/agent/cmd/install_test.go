@@ -86,7 +86,7 @@ func TestExecUninstall(t *testing.T) {
 			Err: &stderr,
 		}
 
-		err = execUninstall(streams, tmpDir, "elastic-agent")
+		err = execUninstall(t.Context(), streams, tmpDir, "elastic-agent")
 		assert.NoError(t, err)
 	})
 
@@ -96,7 +96,7 @@ func TestExecUninstall(t *testing.T) {
 			Err: &bytes.Buffer{},
 		}
 
-		err := execUninstall(streams, tmpDir, "non-existent-binary")
+		err := execUninstall(t.Context(), streams, tmpDir, "non-existent-binary")
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, fs.ErrNotExist))
 	})
@@ -111,7 +111,7 @@ func TestExecUninstall(t *testing.T) {
 			Err: &bytes.Buffer{},
 		}
 
-		err = execUninstall(streams, tmpDir, "elastic-agent-dir")
+		err = execUninstall(t.Context(), streams, tmpDir, "elastic-agent-dir")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "expected file, found a directory")
 	})
@@ -126,7 +126,7 @@ func TestExecUninstall(t *testing.T) {
 			Err: &bytes.Buffer{},
 		}
 
-		err = execUninstall(streams, tmpDir, "failing-agent")
+		err = execUninstall(t.Context(), streams, tmpDir, "failing-agent")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to uninstall elastic-agent")
 	})
