@@ -1,0 +1,7 @@
+kind: bug-fix
+
+summary: Persist applied policy change in state store regardless of ack flag
+
+component: "elastic-agent"
+
+issue: https://github.com/elastic/kibana/issues/264983

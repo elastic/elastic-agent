@@ -32,12 +32,20 @@ import (
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
+// actionSaver is a more limited version of the stateStore
+// It is used to ensure that all POLICY_CHANGE actions saved even when they are not acked.
+type actionSaver interface {
+	SetAction(fleetapi.Action)
+	Save() error
+}
+
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
 type PolicyChangeHandler struct {
 	log                  *logger.Logger
 	agentInfo            info.Agent
 	config               *configuration.Configuration
 	store                storage.Store
+	actionSaver          actionSaver
 	ch                   chan coordinator.ConfigChange
 	setters              []actions.ClientSetter
 	policyLogLevelSetter logLevelSetter
@@ -55,6 +63,7 @@ func NewPolicyChangeHandler(
 	agentInfo info.Agent,
 	config *configuration.Configuration,
 	store storage.Store,
+	actionSaver actionSaver,
 	ch chan coordinator.ConfigChange,
 	policyLogLevelSetter logLevelSetter,
 	coordinator *coordinator.Coordinator,
@@ -65,6 +74,7 @@ func NewPolicyChangeHandler(
 		agentInfo:            agentInfo,
 		config:               config,
 		store:                store,
+		actionSaver:          actionSaver,
 		ch:                   ch,
 		setters:              setters,
 		coordinator:          coordinator,
@@ -112,6 +122,12 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 	err = h.handlePolicyChange(ctx, c)
 	if err != nil {
 		return err
+	}
+
+	// Persist the POLICY_CHANGE so that the next checkin reports the correct id/revision even if acks are disabled.
+	h.actionSaver.SetAction(a)
+	if err := h.actionSaver.Save(); err != nil {
+		h.log.Warnw("failed to persist policy change action to state store", "error.message", err)
 	}
 
 	h.ch <- newPolicyChange(ctx, c, a, acker, false, h.disableAckFn())
