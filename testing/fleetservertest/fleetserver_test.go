@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 // TestRunFleetServer shows how to configure and run a fleet-server capable of
@@ -345,7 +346,7 @@ func ExampleNewServer_ack() {
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathAgentAcks(agentID)})
 
 	respAck, err := cmdAck.Execute(context.Background(),
-		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{
+		&fleetcontract.AckRequest{Events: []fleetcontract.AckEvent{
 			{
 				EventType: "ACTION_RESULT",
 				SubType:   "ACKNOWLEDGED",
@@ -370,7 +371,7 @@ func ExampleNewServer_ack() {
 	fmt.Printf("%#v\n", respAck)
 
 	// Output:
-	// &fleetapi.AckResponse{Action:"acks", Errors:false, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}, fleetapi.AckResponseItem{Status:200, Message:"OK"}}}
+	// &fleetcontract.AckResponse{Action:"acks", Errors:false, Items:[]fleetcontract.AckResponseItem{fleetcontract.AckResponseItem{Status:200, Message:"OK"}, fleetcontract.AckResponseItem{Status:200, Message:"OK"}}}
 }
 
 func ExampleNewServer_enroll() {
@@ -623,7 +624,7 @@ func ExampleNewServer_ackWithAcker() {
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathAgentAcks(agentID)})
 
 	respAck, err := cmdAck.Execute(context.Background(),
-		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{
+		&fleetcontract.AckRequest{Events: []fleetcontract.AckEvent{
 			{
 				EventType: "ACTION_RESULT",
 				SubType:   "ACKNOWLEDGED",
@@ -648,7 +649,7 @@ func ExampleNewServer_ackWithAcker() {
 	fmt.Printf("%#v\n", respAck)
 
 	// Output:
-	// &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}, fleetapi.AckResponseItem{Status:404, Message:"action not-received-on-checkin not found"}}}
+	// &fleetcontract.AckResponse{Action:"acks", Errors:true, Items:[]fleetcontract.AckResponseItem{fleetcontract.AckResponseItem{Status:200, Message:"OK"}, fleetcontract.AckResponseItem{Status:404, Message:"action not-received-on-checkin not found"}}}
 }
 
 // ExampleNewServer_checkin_and_ackWithAcker demonstrates how to assemble a
@@ -751,7 +752,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	// 5th - Simulate the checkin -> ack flow by calling the checkin and ack
 	// commands in order
 
-	ackEventPolicyChange := fleetapi.AckEvent{
+	ackEventPolicyChange := fleetcontract.AckEvent{
 		EventType: "ACTION_RESULT",
 		SubType:   "ACKNOWLEDGED",
 		Timestamp: "2022-12-01T01:02:03.00004-07:00",
@@ -763,7 +764,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 	// 1st ack: acking an action that haven't been sent
 	respAck, err := cmdAck.Execute(context.Background(),
-		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{ackEventPolicyChange}})
+		&fleetcontract.AckRequest{Events: []fleetcontract.AckEvent{ackEventPolicyChange}})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing checkin: %v", err))
 	}
@@ -779,7 +780,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 	// 2dn ack: acking the POLICY_CHANGE
 	respAck, err = cmdAck.Execute(context.Background(),
-		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{ackEventPolicyChange}})
+		&fleetcontract.AckRequest{Events: []fleetcontract.AckEvent{ackEventPolicyChange}})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing checkin: %v", err))
 	}
@@ -794,7 +795,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 	// 3rd ack: acking an action not received during checkin
 	respAck, err = cmdAck.Execute(context.Background(),
-		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{
+		&fleetcontract.AckRequest{Events: []fleetcontract.AckEvent{
 			{
 				EventType: "ACTION_RESULT",
 				SubType:   "ACKNOWLEDGED",
@@ -810,11 +811,11 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	fmt.Printf("[3rd ack] %#v\n", respAck)
 
 	// Output:
-	// [1st ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action anActionID not found"}}}
+	// [1st ack] &fleetcontract.AckResponse{Action:"acks", Errors:true, Items:[]fleetcontract.AckResponseItem{fleetcontract.AckResponseItem{Status:404, Message:"action anActionID not found"}}}
 	// [1st checkin] [id: anActionID, type: POLICY_CHANGE]
-	// [2nd ack] &fleetapi.AckResponse{Action:"acks", Errors:false, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}}}
+	// [2nd ack] &fleetcontract.AckResponse{Action:"acks", Errors:false, Items:[]fleetcontract.AckResponseItem{fleetcontract.AckResponseItem{Status:200, Message:"OK"}}}
 	// [2nd checkin] Error: status code: 418, fleet-server returned an error: I'm a teapot
-	// [3rd ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action not-received-on-checkin not found"}}}
+	// [3rd ack] &fleetcontract.AckResponse{Action:"acks", Errors:true, Items:[]fleetcontract.AckResponseItem{fleetcontract.AckResponseItem{Status:404, Message:"action not-received-on-checkin not found"}}}
 }
 
 type agentInfo string
