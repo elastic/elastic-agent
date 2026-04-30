@@ -28,7 +28,7 @@ Known issues are significant defects or limitations that may impact your impleme
 
 A performance optimization in Elastic Agent 9.3.4 causes timestamp fields sent from Beats based inputs and integrations to be incorrectly serialized to an empty `{}` JSON object. This does not affect the primary `@timestamp` field, only other timestamps fields in the event body.
 
-The most notable field affected is `event.created` which when missing prevents some features like SentinalOne response actions from functioning as described in [Issue #2663559](https://github.com/elastic/kibana/issues/2663559). Documents affected will have timestamps like `event.created` set to empty JSON objects as shown in the example below:
+The most notable field affected is `event.created` which when missing prevents some features like SentinelOne response actions from functioning as described in [Issue #266355](https://github.com/elastic/kibana/issues/266355). Documents affected will have timestamps like `event.created` set to empty JSON objects as shown in the example below:
 
 ```json
   "event": {
