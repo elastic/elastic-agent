@@ -5,10 +5,6 @@ go 1.26.2
 // use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
 
-replace github.com/elastic/elastic-agent/pkg/backoff => ../../pkg/backoff
-
-replace github.com/elastic/elastic-agent/pkg/fleetcontract => ../../pkg/fleetcontract
-
 replace github.com/elastic/beats/v7 => ../../beats
 
 // Pin the elasticsearchexporter to a specific commit to include changes from

@@ -471,8 +471,6 @@ require (
 )
 
 require (
-	github.com/elastic/elastic-agent/pkg/backoff v0.0.0
-	github.com/elastic/elastic-agent/pkg/fleetcontract v0.0.0
 	github.com/hashicorp/go-version v1.9.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect; indirecthttps://github.com/elastic/ingest-dev/issues/3253
 	k8s.io/klog/v2 v2.140.0 // indirect
@@ -497,7 +495,3 @@ replace (
 )
 
 tool golang.org/x/tools/cmd/deadcode
-
-replace github.com/elastic/elastic-agent/pkg/backoff => ./pkg/backoff
-
-replace github.com/elastic/elastic-agent/pkg/fleetcontract => ./pkg/fleetcontract
