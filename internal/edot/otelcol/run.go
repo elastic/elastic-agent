@@ -15,7 +15,6 @@ import (
 	"go.opentelemetry.io/collector/confmap/provider/httpprovider"
 	"go.opentelemetry.io/collector/confmap/provider/httpsprovider"
 	"go.opentelemetry.io/collector/confmap/provider/yamlprovider"
-	"go.opentelemetry.io/collector/extension"
 
 	"go.opentelemetry.io/collector/otelcol"
 )
@@ -42,7 +41,7 @@ func Run(ctx context.Context, stop chan bool, settings *otelcol.CollectorSetting
 type options struct {
 	resolverConfigProviders    []confmap.ProviderFactory
 	resolverConverterFactories []confmap.ConverterFactory
-	extensionFactories         []extension.Factory
+	componentsFn               func() (otelcol.Factories, error)
 }
 
 type SettingOpt func(o *options)
@@ -59,9 +58,13 @@ func WithConfigConvertorFactory(converter confmap.ConverterFactory) SettingOpt {
 	}
 }
 
-func WithExtensionFactory(factory extension.Factory) SettingOpt {
+// WithComponents sets the OTel component factory function. Callers must
+// provide one — the otelcol package no longer ships a built-in default so
+// that consumers (e.g. the manager unit-test binary) can avoid pulling in
+// the full set of EDOT receivers, processors, exporters, and extensions.
+func WithComponents(fn func() (otelcol.Factories, error)) SettingOpt {
 	return func(o *options) {
-		o.extensionFactories = append(o.extensionFactories, factory)
+		o.componentsFn = fn
 	}
 }
 
@@ -97,7 +100,7 @@ func NewSettings(version string, configPaths []string, opts ...SettingOpt) *otel
 	}
 
 	return &otelcol.CollectorSettings{
-		Factories:              components(o.extensionFactories...),
+		Factories:              o.componentsFn,
 		BuildInfo:              buildInfo,
 		ConfigProviderSettings: configProviderSettings,
 		// we're handling DisableGracefulShutdown via the cancelCtx being passed
