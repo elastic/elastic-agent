@@ -133,6 +133,32 @@ var gcloudSupported = []LayoutOS{
 		Username:     "rhel",
 		RemotePath:   "/home/rhel/agent",
 	},
+	{
+		OS: define.OS{
+			Type:    define.Linux,
+			Arch:    define.ARM64,
+			Distro:  supported.Rhel,
+			Version: "8",
+		},
+		InstanceSize: "t2a-standard-2",
+		ImageFamily:  "rhel-8-arm64",
+		ImageProject: "rhel-cloud",
+		Username:     "rhel",
+		RemotePath:   "/home/rhel/agent",
+	},
+	{
+		OS: define.OS{
+			Type:    define.Linux,
+			Arch:    define.ARM64,
+			Distro:  supported.Rhel,
+			Version: "10",
+		},
+		InstanceSize: "t2a-standard-2",
+		ImageFamily:  "rhel-10-arm64",
+		ImageProject: "rhel-cloud",
+		Username:     "rhel",
+		RemotePath:   "/home/rhel/agent",
+	},
 	// Windows
 	{
 		OS: define.OS{
