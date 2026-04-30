@@ -31,6 +31,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	mockes "github.com/elastic/mock-es/pkg/api"
+
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
+
 )
 
 // newLogExportRequest creates a minimal log export request with a
@@ -84,7 +87,7 @@ service:
       exporters: [elasticsearch]
 `, port, processorsBlock, esURL)
 
-	settings := NewSettings("test", []string{"yaml:" + cfg})
+	settings := NewSettings("test", []string{"yaml:" + cfg}, WithComponents(components.Default()))
 	collector, err := otelcol.NewCollector(*settings)
 	require.NoError(t, err)
 

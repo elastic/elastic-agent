@@ -22,6 +22,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
 	"github.com/elastic/mock-es/pkg/api"
 )
 
@@ -98,7 +99,7 @@ service:
 		template.Must(template.New("config").Parse(cfg)).Execute(&configBuffer, configParams),
 	)
 
-	settings := NewSettings("test", []string{"yaml:" + configBuffer.String()})
+	settings := NewSettings("test", []string{"yaml:" + configBuffer.String()}, WithComponents(components.Default()))
 
 	featuregate.GlobalRegistry().Set("telemetry.newPipelineTelemetry", true)
 	collector, err := otelcol.NewCollector(*settings)
@@ -247,7 +248,7 @@ service:
 		template.Must(template.New("config").Parse(cfg)).Execute(&configBuffer, configParams),
 	)
 
-	settings := NewSettings("test", []string{"yaml:" + configBuffer.String()})
+	settings := NewSettings("test", []string{"yaml:" + configBuffer.String()}, WithComponents(components.Default()))
 
 	featuregate.GlobalRegistry().Set("telemetry.newPipelineTelemetry", true)
 	collector, err := otelcol.NewCollector(*settings)
