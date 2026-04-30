@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/service"
 
 	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
@@ -146,7 +147,16 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		edotOtelCol.WithComponents(componentsFn),
 	}
 	if supervised {
-		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), configFiles, baseOpts...)
+		// add stdin config provider
+		configProvider, err := agentprovider.NewBufferProvider(os.Stdin)
+		if err != nil {
+			return settings, fmt.Errorf("failed to create config provider: %w", err)
+		}
+		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), []string{configProvider.URI()},
+			edotOtelCol.WithConfigProviderFactory(configProvider.NewFactory()),
+			edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
+			edotOtelCol.WithComponents(componentsFn),
+		)
 
 		// setup logger
 		defaultCfg := logger.DefaultLoggingConfig()
