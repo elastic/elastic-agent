@@ -15,9 +15,11 @@ import (
 
 // This is a test binary used by the OTEL manager unit tests.
 // It mirrors the behavior of the real EDOT binary (internal/edot/main.go)
-// but can be configured via env vars to simulate different scenarios:
+// but registers only the minimal OTel components required by the tests
+// (see components.go) instead of the full EDOT component set.
+// It can be configured via env vars to simulate different scenarios:
 //   - TEST_SUPERVISED_COLLECTOR_PANIC: triggers a panic after the given delay,
-//     allowing tests to verify the manager’s panic/restart behavior.
+//     allowing tests to verify the manager's panic/restart behavior.
 //   - TEST_SUPERVISED_COLLECTOR_DELAY: delays process shutdown by the given
 //     duration, letting tests observe graceful termination handling.
 //
@@ -42,7 +44,7 @@ func main() {
 		})
 	}
 
-	collectorCmd := cmd.NewOtelCommandWithArgs(os.Args, cli.NewIOStreams())
+	collectorCmd := cmd.NewOtelCommandWithArgs(os.Args, cli.NewIOStreams(), testComponents)
 	err = collectorCmd.Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)

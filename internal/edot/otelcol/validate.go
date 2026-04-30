@@ -12,8 +12,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
-func Validate(ctx context.Context, configPaths []string) error {
-	settings := NewSettings(release.Version(), configPaths)
+func Validate(ctx context.Context, configPaths []string, componentsFn func() (otelcol.Factories, error)) error {
+	settings := NewSettings(release.Version(), configPaths, WithComponents(componentsFn))
 	col, err := otelcol.NewCollector(*settings)
 	if err != nil {
 		return err

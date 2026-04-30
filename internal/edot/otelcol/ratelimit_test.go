@@ -32,6 +32,7 @@ import (
 
 	mockes "github.com/elastic/mock-es/pkg/api"
 
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
@@ -86,7 +87,7 @@ service:
       exporters: [elasticsearch]
 `, port, processorsBlock, esURL)
 
-	settings := NewSettings("test", []string{"yaml:" + cfg})
+	settings := NewSettings("test", []string{"yaml:" + cfg}, WithComponents(components.Default()))
 	collector, err := otelcol.NewCollector(*settings)
 	require.NoError(t, err)
 
