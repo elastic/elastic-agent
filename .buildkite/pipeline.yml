@@ -1,8 +1,6 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
 env:
-  VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
-
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
   IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1776780011"
@@ -172,6 +170,7 @@ steps:
       # Runs only on main and release branches
       - label: "Unit tests - macOS 13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
+        skip: "Ongoing issues with MacOS 13 CI runners. Unskip after resolved."
         branches: "main 8.* 9.*"
         artifact_paths:
           - "build/TEST-*.html"
