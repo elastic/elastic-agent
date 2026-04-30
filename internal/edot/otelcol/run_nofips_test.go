@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/otelcol"
+
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
 )
 
 func TestStartCollector(t *testing.T) {
@@ -34,7 +36,7 @@ func TestStartCollector(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.configFile, func(t *testing.T) {
 			configFiles := getConfigFiles(tc.configFile)
-			settings := NewSettings("test", configFiles)
+			settings := NewSettings("test", configFiles, WithComponents(components.Default()))
 
 			collector, err := otelcol.NewCollector(*settings)
 			require.NoError(t, err)
