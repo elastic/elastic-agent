@@ -59,6 +59,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -166,13 +167,11 @@ func runElasticAgentCritical(
 	fleetInitTimeout time.Duration,
 	modifiers ...component.PlatformModifier,
 ) error {
-	var errs []error
-
-	// early handleUpgrade, but don't error yet
-	initialUpdateMarker, err := handleUpgrade()
-	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to handle upgrade: %w", err))
-	}
+	var (
+		errs                []error
+		err                 error
+		initialUpdateMarker *upgrade.UpdateMarker
+	)
 
 	// single run, but don't error yet
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
@@ -226,6 +225,12 @@ func runElasticAgentCritical(
 	defer baseLogger.Sync() //nolint:errcheck // flushing buffered logs is best effort.
 
 	l := baseLogger.With("log.source", agentName)
+
+	// handleUpgrade, but don't error yet
+	initialUpdateMarker, err = handleUpgrade(l)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to handle upgrade: %w", err))
+	}
 
 	// at this point the logger is working, so any errors that we hit can now be logged and returned
 	if len(errs) > 0 {
@@ -664,6 +669,10 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	}
 	options.DelayEnroll = false
 	options.FleetServer.SpawnAgent = false
+	// Daemon mode: the enrollment token may be fixed externally (e.g. rotated
+	// secret) without restarting the agent, so we keep retrying instead of
+	// failing fast like the interactive `enroll` CLI does.
+	options.RetryOnInvalidToken = true
 	// enrollCmd daemonReloadWithBackoff is broken
 	// see https://github.com/elastic/elastic-agent/issues/4043
 	// SkipDaemonRestart to true avoids running that code.
@@ -688,19 +697,20 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	if err != nil {
 		return nil, err
 	}
-	// perform the enrollment in a loop, it should keep trying to enroll no matter what
-	// the enrollCmd has built in backoff so no need to wrap this in its own backoff as well
-	for {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		err = c.Execute(ctx, cli.NewIOStreams())
-		if err == nil {
-			// enrollment was successful
-			break
-		}
-		logger.Error(fmt.Errorf("failed to perform delayed enrollment (will try again): %w", err))
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
+
+	err = c.Execute(ctx, cli.NewIOStreams())
+	if err != nil {
+		return nil, errors.New(
+			err,
+			"failed to execute delayed enrollment",
+			errors.TypeApplication,
+			errors.M("path", enrollPath))
+	}
+
 	err = os.Remove(enrollPath)
 	if err != nil {
 		logger.Warn(errors.New(
@@ -802,7 +812,7 @@ func setupMetrics(
 // handleUpgrade checks if agent is being run as part of an
 // ongoing upgrade operation, i.e. being re-exec'd and performs
 // any upgrade-specific work, if needed.
-func handleUpgrade() (*upgrade.UpdateMarker, error) {
+func handleUpgrade(log *logger.Logger) (*upgrade.UpdateMarker, error) {
 	upgradeMarker, err := upgrade.LoadMarker(paths.Data())
 	if err != nil {
 		return nil, fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
@@ -819,6 +829,27 @@ func handleUpgrade() (*upgrade.UpdateMarker, error) {
 
 	if err := upgrade.EnsureServiceConfigUpToDate(); err != nil {
 		return nil, err
+	}
+
+	// Update the Add/Remove Programs registry entry with the running version.
+	if err := install.UpsertUninstallEntry(paths.Top(), release.VersionWithSnapshot()); err != nil {
+		// Unprivileged upgrades from versions that predate the registry ACL change
+		// lack write access to HKLM. This is expected and can be resolved by
+		// running 'elastic-agent windows registry update'.
+		if goerrors.Is(err, os.ErrPermission) || strings.Contains(err.Error(), "Access is denied") {
+			log.Infof("insufficient permissions to update uninstall registry entry, can be fixed by running 'elastic-agent windows registry update'")
+		} else {
+			log.Warnf("failed to update uninstall registry entry: %v", err)
+		}
+	} else {
+		// MSI installations create their own entry with a version-specific ProductCode GUID,
+		// remove it to avoid a duplicate in Add/Remove Programs after upgrading from pre-9.4.0
+		prevVersion, parseErr := agtversion.ParseVersion(upgradeMarker.PrevVersion)
+		if parseErr == nil && prevVersion.Less(*upgrade.Version_9_4_0_SNAPSHOT) {
+			if err := install.RemoveMSIUninstallEntries(); err != nil {
+				log.Warnf("failed to remove MSI uninstall registry entries: %v", err)
+			}
+		}
 	}
 
 	return upgradeMarker, nil

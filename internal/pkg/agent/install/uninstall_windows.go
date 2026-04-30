@@ -45,29 +45,20 @@ func removeBlockingExe(blockingErr error) error {
 		return nil
 	}
 
-	// open handle for delete only
 	h, err := openDeleteHandle(path)
 	if err != nil {
 		return fmt.Errorf("failed to open handle for %q: %w", path, err)
 	}
+	// Rename and dispose must be issued on the same handle: closing the
+	// handle in between makes the dispose call fail with ACCESS DENIED on
+	// Go 1.25's os.RemoveAll because the kernel re-applies the image-section
+	// check on a freshly-opened handle.
+	defer windows.CloseHandle(h) //nolint:errcheck // best-effort close
 
-	// rename handle
-	err = renameHandle(h)
-	_ = windows.CloseHandle(h)
-	if err != nil {
+	if err := renameHandle(h); err != nil {
 		return fmt.Errorf("failed to rename handle for %q: %w", path, err)
 	}
-
-	// re-open handle
-	h, err = openDeleteHandle(path)
-	if err != nil {
-		return fmt.Errorf("failed to open handle after rename for %q: %w", path, err)
-	}
-
-	// dispose of the handle
-	err = disposeHandle(h)
-	_ = windows.CloseHandle(h)
-	if err != nil {
+	if err := disposeHandle(h); err != nil {
 		return fmt.Errorf("failed to dispose handle for %q: %w", path, err)
 	}
 	return nil
@@ -162,6 +153,11 @@ type fileRenameInfo struct {
 
 type fileDispositionInfo struct {
 	DeleteFile bool
+}
+
+// postUninstall performs post-uninstall tasks for Windows systems.
+func postUninstall() error {
+	return RemoveUninstallEntry()
 }
 
 // killNoneChildProcess provides a way of killing a process that is not started as a child of this process.

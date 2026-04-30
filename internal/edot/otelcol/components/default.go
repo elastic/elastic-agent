@@ -2,7 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package otelcol
+// Package components hosts the default EDOT collector component registry. It
+// is intentionally split out of the otelcol package so that callers (such as
+// the manager unit-test binary) can wire up a smaller component set without
+// dragging the full set of receivers, processors, exporters, and extensions
+// into their build.
+package components
 
 import (
 	"go.opentelemetry.io/collector/connector"
@@ -93,6 +98,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/cgroupruntimeextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension"
 	headersetterextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
 	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
@@ -104,6 +110,7 @@ import (
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
 	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
+	kafkapartitionerextension "github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
 	verifierreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
@@ -125,7 +132,9 @@ import (
 	elasticmonitoringreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/elasticmonitoring"
 )
 
-func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
+// Default returns the factory function for the full EDOT collector component
+// set. Pass extra extension factories to register them alongside the defaults.
+func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
 	return func() (otelcol.Factories, error) {
 		var err error
 		factories := otelcol.Factories{
@@ -261,7 +270,9 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			beatsauthextension.NewFactory(),
 			elasticdiagnostics.NewFactory(),
 			elasticsearchstorage.NewFactory(),
+			kafkapartitionerextension.NewFactory(),
 			awslogsencodingextension.NewFactory(),
+			azureencodingextension.NewFactory(),
 			opampextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)

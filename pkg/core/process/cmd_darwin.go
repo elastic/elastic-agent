@@ -19,7 +19,7 @@ import (
 func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ...string) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	if ctx == nil {
-		cmd = exec.Command(path, arg...)
+		cmd = exec.Command(path, arg...) //nolint:noctx // ctx is intentionally optional for callers that don't need cancellation
 	} else {
 		cmd = exec.CommandContext(ctx, path, arg...)
 	}
@@ -50,7 +50,8 @@ func killCmd(proc *os.Process) error {
 	return proc.Kill()
 }
 
-// terminateCmd sends SIGTERM to the process
-func terminateCmd(proc *os.Process) error {
+// terminateCmd sends SIGTERM to the process.
+// The newConsole parameter is only used on Windows and is ignored here.
+func terminateCmd(proc *os.Process, _ bool) error {
 	return proc.Signal(syscall.SIGTERM)
 }

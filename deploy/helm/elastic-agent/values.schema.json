@@ -592,9 +592,17 @@
                             "type": "string",
                             "description": "Fleet server URL."
                         },
+                        "urlFromSecret": {
+                            "$ref": "#/definitions/SecretKeyRef",
+                            "description": "Reference to a Kubernetes secret containing the Fleet server URL."
+                        },
                         "token": {
                             "type": "string",
                             "description": "Fleet enrollment token."
+                        },
+                        "tokenFromSecret": {
+                            "$ref": "#/definitions/SecretKeyRef",
+                            "description": "Reference to a Kubernetes secret containing the Fleet enrollment token."
                         },
                         "insecure": {
                             "type": "boolean",
@@ -628,66 +636,85 @@
                         }
                     },
                     "then": {
-                        "anyOf": [
+                        "required": ["preset"],
+                        "properties": {
+                            "preset": {
+                                "type": "string"
+                            }
+                        },
+                        "allOf": [
                             {
-                                "required": [
-                                    "preset",
-                                    "url",
-                                    "token"
-                                ],
-                                "properties": {
-                                    "preset": {
-                                        "type": "string"
+                                "anyOf": [
+                                    {
+                                        "required": ["url"],
+                                        "properties": {
+                                            "url": {
+                                                "type": "string",
+                                                "format": "uri"
+                                            }
+                                        }
                                     },
-                                    "url": {
-                                        "type": "string",
-                                        "format": "uri"
-                                    },
-                                    "token": {
-                                        "type": "string",
-                                        "minLength": 1
+                                    {
+                                        "required": ["urlFromSecret"],
+                                        "properties": {
+                                            "urlFromSecret": {
+                                                "$ref": "#/definitions/SecretKeyRef"
+                                            }
+                                        }
                                     }
-                                }
+                                ]
                             },
                             {
-                                "required": [
-                                    "preset",
-                                    "url",
-                                    "tokenName",
-                                    "policyName",
-                                    "kibanaHost",
-                                    "kibanaUser",
-                                    "kibanaPassword"
-                                ],
-                                "properties": {
-                                    "preset": {
-                                        "type": "string"
+                                "anyOf": [
+                                    {
+                                        "required": ["token"],
+                                        "properties": {
+                                            "token": {
+                                                "type": "string",
+                                                "minLength": 1
+                                            }
+                                        }
                                     },
-                                    "url": {
-                                        "type": "string",
-                                        "format": "uri"
+                                    {
+                                        "required": ["tokenFromSecret"],
+                                        "properties": {
+                                            "tokenFromSecret": {
+                                                "$ref": "#/definitions/SecretKeyRef"
+                                            }
+                                        }
                                     },
-                                    "tokenName":  {
-                                        "type": "string",
-                                        "minLength": 1
-                                    },
-                                    "policyName":  {
-                                        "type": "string",
-                                        "minLength": 1
-                                    },
-                                    "kibanaHost": {
-                                        "type": "string",
-                                        "format": "uri"
-                                    },
-                                    "kibanaUser": {
-                                        "type": "string",
-                                        "minLength": 1
-                                    },
-                                    "kibanaPassword": {
-                                        "type": "string",
-                                        "minLength": 1
+                                    {
+                                        "required": [
+                                            "tokenName",
+                                            "policyName",
+                                            "kibanaHost",
+                                            "kibanaUser",
+                                            "kibanaPassword"
+                                        ],
+                                        "properties": {
+                                            "tokenName": {
+                                                "type": "string",
+                                                "minLength": 1
+                                            },
+                                            "policyName": {
+                                                "type": "string",
+                                                "minLength": 1
+                                            },
+                                            "kibanaHost": {
+                                                "type": "string",
+                                                "format": "uri"
+                                            },
+                                            "kibanaUser": {
+                                                "type": "string",
+                                                "minLength": 1
+                                            },
+                                            "kibanaPassword": {
+                                                "type": "string",
+                                                "minLength": 1
+                                            }
+                                        }
                                     }
-                                }
+                                ]
                             }
                         ]
                     }
@@ -1448,9 +1475,17 @@
                     "type": "string",
                     "description": "Fleet server URL."
                 },
+                "urlFromSecret": {
+                    "$ref": "#/definitions/SecretKeyRef",
+                    "description": "Reference to a Kubernetes secret containing the Fleet server URL."
+                },
                 "token": {
                     "type": "string",
                     "description": "Fleet enrollment token."
+                },
+                "tokenFromSecret": {
+                    "$ref": "#/definitions/SecretKeyRef",
+                    "description": "Reference to a Kubernetes secret containing the Fleet enrollment token."
                 },
                 "insecure": {
                     "type": "boolean",
@@ -1484,59 +1519,96 @@
                 }
             },
             "then": {
-                "anyOf": [
+                "required": ["preset"],
+                "properties": {
+                    "preset": {
+                        "type": "string"
+                    }
+                },
+                "allOf": [
                     {
-                        "required": [
-                            "preset",
-                            "url",
-                            "token"
-                        ],
-                        "properties": {
-                            "preset": {
-                                "type": "string"
+                        "anyOf": [
+                            {
+                                "required": ["url"],
+                                "properties": {
+                                    "url": {
+                                        "type": "string",
+                                        "format": "uri"
+                                    }
+                                }
                             },
-                            "url": {
-                                "type": "string",
-                                "format": "uri"
-                            },
-                            "token": {
-                                "type": "string",
-                                "minLength": 1
+                            {
+                                "required": ["urlFromSecret"],
+                                "properties": {
+                                    "urlFromSecret": {
+                                        "$ref": "#/definitions/SecretKeyRef"
+                                    }
+                                }
                             }
-                        }
+                        ]
                     },
                     {
-                        "required": [
-                            "preset",
-                            "url",
-                            "kibanaHost",
-                            "kibanaUser",
-                            "kibanaPassword"
-                        ],
-                        "properties": {
-                            "preset": {
-                                "type": "string"
+                        "anyOf": [
+                            {
+                                "required": ["token"],
+                                "properties": {
+                                    "token": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                }
                             },
-                            "url": {
-                                "type": "string",
-                                "format": "uri"
+                            {
+                                "required": ["tokenFromSecret"],
+                                "properties": {
+                                    "tokenFromSecret": {
+                                        "$ref": "#/definitions/SecretKeyRef"
+                                    }
+                                }
                             },
-                            "kibanaHost": {
-                                "type": "string",
-                                "format": "uri"
-                            },
-                            "kibanaUser": {
-                                "type": "string",
-                                "minLength": 1
-                            },
-                            "kibanaPassword": {
-                                "type": "string",
-                                "minLength": 1
+                            {
+                                "required": [
+                                    "kibanaHost",
+                                    "kibanaUser",
+                                    "kibanaPassword"
+                                ],
+                                "properties": {
+                                    "kibanaHost": {
+                                        "type": "string",
+                                        "format": "uri"
+                                    },
+                                    "kibanaUser": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    "kibanaPassword": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                }
                             }
-                        }
+                        ]
                     }
                 ]
             }
+        },
+        "SecretKeyRef": {
+            "type": "object",
+            "description": "Reference to a key within a Kubernetes Secret.",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the Kubernetes Secret."
+                },
+                "key": {
+                    "type": "string",
+                    "description": "Key within the Kubernetes Secret."
+                }
+            },
+            "required": [
+                "name",
+                "key"
+            ]
         },
         "ValueFrom": {
             "type": "object",
@@ -1545,19 +1617,7 @@
                     "type": "string"
                 },
                 "valueFromSecret": {
-                    "type": "object",
-                    "properties": {
-                        "name": {
-                            "type": "string"
-                        },
-                        "key": {
-                            "type": "string"
-                        }
-                    },
-                    "required": [
-                        "name",
-                        "key"
-                    ]
+                    "$ref": "#/definitions/SecretKeyRef"
                 }
             },
             "allOf": [
