@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	goerrors "errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -264,4 +265,54 @@ func TestMarkUpgrade(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMarkUpgradeFailed(t *testing.T) {
+	cause := goerrors.New("upgrade boom")
+
+	t.Run("no marker on disk: det is failed and no error", func(t *testing.T) {
+		dataDir := t.TempDir()
+		det := details.NewDetails("8.5.0", details.StateReplacing, "action-1")
+
+		err := markUpgradeFailed(dataDir, det, cause)
+		require.NoError(t, err)
+		require.Equal(t, details.StateFailed, det.State, "in-memory details must reflect failure")
+		require.NoFileExists(t, filepath.Join(dataDir, markerFilename))
+	})
+
+	t.Run("marker on disk is rewritten with state=Failed", func(t *testing.T) {
+		dataDir := t.TempDir()
+		det := details.NewDetails("8.5.0", details.StateReplacing, "action-2")
+		original := &UpdateMarker{
+			Version:       "8.5.0",
+			Hash:          "abc123",
+			VersionedHome: "data/elastic-agent-abc123",
+			UpdatedOn:     time.Now(),
+			Details:       det,
+		}
+		require.NoError(t, SaveMarker(dataDir, original, true), "seed marker")
+
+		err := markUpgradeFailed(dataDir, det, cause)
+		require.NoError(t, err)
+		require.Equal(t, details.StateFailed, det.State)
+
+		loaded, err := LoadMarker(dataDir)
+		require.NoError(t, err)
+		require.NotNil(t, loaded)
+		require.NotNil(t, loaded.Details)
+		require.Equal(t, details.StateFailed, loaded.Details.State,
+			"on-disk marker must carry the failed state")
+	})
+
+	t.Run("LoadMarker error: still fails det in memory", func(t *testing.T) {
+		// markerFilename as a directory makes LoadMarker fail with a read error.
+		dataDir := t.TempDir()
+		require.NoError(t, os.Mkdir(filepath.Join(dataDir, markerFilename), 0o755))
+
+		det := details.NewDetails("8.5.0", details.StateReplacing, "action-3")
+		err := markUpgradeFailed(dataDir, det, cause)
+		require.Error(t, err, "load failure must be surfaced")
+		require.Equal(t, details.StateFailed, det.State,
+			"det must still reflect failure even when persistence fails")
+	})
 }

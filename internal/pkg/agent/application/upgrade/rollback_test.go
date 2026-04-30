@@ -230,6 +230,30 @@ func TestCleanup(t *testing.T) {
 	}
 }
 
+// TestCleanup_PreservesLiveVersionedHome ensures cleanup() always keeps the
+// directory backing the live agent symlink, even when the caller's keep list
+// does not reference it. Closes the data-loss path described in
+// https://github.com/elastic/elastic-agent/issues/13505.
+func TestCleanup_PreservesLiveVersionedHome(t *testing.T) {
+	testLogger, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	// Two installs; the symlink points at the older one (the live install).
+	liveHome := createFakeAgentInstall(t, topDir, version123Snapshot.version, version123Snapshot.hash, true)
+	otherHome := createFakeAgentInstall(t, topDir, version456Snapshot.version, version456Snapshot.hash, true)
+	createLink(t, topDir, liveHome)
+
+	// Caller passes a keep list that omits the live install.
+	err := cleanup(testLogger, topDir, false, false, 0, otherHome)
+	require.NoError(t, err)
+
+	// Both installs must remain: otherHome because it's in the keep list,
+	// liveHome because the symlink-based guard added it.
+	assert.DirExists(t, filepath.Join(topDir, liveHome),
+		"live versioned home must be preserved by the cleanup guard")
+	assert.DirExists(t, filepath.Join(topDir, otherHome))
+}
+
 func TestRollback(t *testing.T) {
 	tests := map[string]struct {
 		agentInstallsSetup setupAgentInstallations
