@@ -1201,11 +1201,11 @@ func newTestLogger() *logger.Logger {
 func TestOTelManager_buildMergedConfig(t *testing.T) {
 	// Common parameters used across all test cases
 	var (
-		commonAgentInfo = &info.AgentInfo{}
-		testComp        = testComponent("test-component")
-		invalidLogpLevel                 = logp.DebugLevel - 1
-		testOtelConfigLevel              = logp.InfoLevel
-		configUpdateLevel                = logp.WarnLevel
+		commonAgentInfo     = &info.AgentInfo{}
+		testComp            = testComponent("test-component")
+		invalidLogpLevel    = logp.DebugLevel - 1
+		testOtelConfigLevel = logp.InfoLevel
+		configUpdateLevel   = logp.WarnLevel
 	)
 
 	tests := []struct {

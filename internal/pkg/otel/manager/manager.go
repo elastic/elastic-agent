@@ -192,13 +192,13 @@ func NewOTelManager(
 	}
 
 	return &OTelManager{
-		managerLogger:              logger,
-		collectorLogger:            collectorLogger,
-		agentInfo: agentInfo,
-		healthCheckExtComponentID:  healthCheckExtComponentID,
-		collectorMetricsPort:       collectorMetricsPort,
-		errCh:                      make(chan error, 1), // holds at most one error
-		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
+		managerLogger:             logger,
+		collectorLogger:           collectorLogger,
+		agentInfo:                 agentInfo,
+		healthCheckExtComponentID: healthCheckExtComponentID,
+		collectorMetricsPort:      collectorMetricsPort,
+		errCh:                     make(chan error, 1), // holds at most one error
+		collectorStatusCh:         make(chan *status.AggregateStatus, 1),
 		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
 		// any possible case of deadlock, 5 is used just to give a small buffer.
 		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
