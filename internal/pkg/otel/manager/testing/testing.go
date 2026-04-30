@@ -12,7 +12,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/edot/cmd"
-	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
 )
 
 // This is a test binary used by the OTEL manager unit tests.
@@ -49,7 +48,7 @@ func main() {
 
 	monitoringURL := os.Getenv("TEST_SUPERVISED_COLLECTOR_MONITORING_URL")
 
-	err = cmd.RunCollector(ctx, nil, true, "debug", monitoringURL, components.Default())
+	err = cmd.RunCollector(ctx, nil, true, "debug", monitoringURL, testComponents)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		logp.NewLogger("").Fatal("collector server run finished with error: %v", err)
 	}
