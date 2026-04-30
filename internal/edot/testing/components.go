@@ -5,6 +5,7 @@
 package main
 
 import (
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/exporter/nopexporter"
 	"go.opentelemetry.io/collector/extension"
@@ -14,10 +15,8 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 	"go.opentelemetry.io/collector/receiver/nopreceiver"
 
-	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
-
-	internaltelemetry "github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
-	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
+	"github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 )
 
 // testComponents returns the minimal set of OTel factories needed by the
