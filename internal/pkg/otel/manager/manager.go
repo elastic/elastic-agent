@@ -80,9 +80,8 @@ type OTelManager struct {
 	// they should be reported as failed components to the elastic-agent
 	errCh chan error
 
-	// Agent info and monitoring config getter for otel config generation
-	agentInfo                  info.Agent
-	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter
+	// Agent info for otel config generation
+	agentInfo info.Agent
 
 	healthCheckExtComponentID string
 	collectorMetricsPort      int
@@ -142,7 +141,6 @@ func NewOTelManager(
 	collectorLogger *logger.Logger,
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
-	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
 	execFactory ExecutionFactory,
 ) (*OTelManager, error) {
@@ -195,8 +193,7 @@ func NewOTelManager(
 	return &OTelManager{
 		managerLogger:              logger,
 		collectorLogger:            collectorLogger,
-		agentInfo:                  agentInfo,
-		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
+		agentInfo: agentInfo,
 		healthCheckExtComponentID:  healthCheckExtComponentID,
 		collectorMetricsPort:       collectorMetricsPort,
 		errCh:                      make(chan error, 1), // holds at most one error
@@ -302,7 +299,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := m.buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.managerLogger)
+			mergedCfg, err := m.buildMergedConfig(cfgUpdate, m.agentInfo, m.managerLogger)
 			if err != nil {
 				// critical error, merging the configuration should always work
 				reportErr(ctx, m.errCh, err)
@@ -437,7 +434,6 @@ func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Con
 func (m *OTelManager) buildMergedConfig(
 	cfgUpdate configUpdate,
 	agentInfo info.Agent,
-	monitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
@@ -452,7 +448,7 @@ func (m *OTelManager) buildMergedConfig(
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, runtimeCfg, monitoringConfigGetter, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, runtimeCfg, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
