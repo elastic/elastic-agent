@@ -68,6 +68,7 @@ wait that amount of time before using the variables for the configuration.
 	cmd.Flags().Duration("variables-wait", time.Duration(0), "wait this amount of time for variables before performing substitution (implies --variables)")
 
 	cmd.AddCommand(newInspectComponentsCommandWithArgs(s, streams))
+	cmd.AddCommand(newInspectOtelCommandWithArgs(s, streams))
 
 	return cmd
 }
@@ -120,6 +121,24 @@ variables for the configuration.
 	cmd.Flags().Bool("show-spec", false, "show the runtime specification for a component")
 	cmd.Flags().Duration("variables-wait", time.Duration(0), "wait this amount of time for variables before performing substitution")
 
+	return cmd
+}
+
+func newInspectOtelCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "otel",
+		Short: "Show OpenTelemetry components in the configuration",
+		Long:  `This command shows the OpenTelemetry components in the configuration. `,
+		Args:  cobra.ExactArgs(0),
+		Run: func(c *cobra.Command, args []string) {
+			ctx, cancel := context.WithCancel(context.Background())
+			service.HandleSignals(func() {}, cancel)
+			if err := inspectOtelCmd(ctx, paths.ConfigFile(), streams); err != nil {
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
+				os.Exit(1)
+			}
+		},
+	}
 	return cmd
 }
 
