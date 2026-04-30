@@ -23,7 +23,7 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
-:::{dropdown} Events from Beats based integrations in Elastic Agent 9.3.4 incorrectly convert timestamps to an empty `{}` JSON object.
+:::{dropdown} Events from Beats based integrations in Elastic Agent 9.3.4 incorrectly convert timestamps to an empty {} JSON object.
 **Applies to: {{agent}} 9.3.4**
 
 A performance optimization in Elastic Agent 9.3.4 causes timestamp fields sent from Beats based inputs and integrations to be incorrectly serialized to an empty `{}` JSON object. This does not affect the primary `@timestamp` field, only other timestamps fields in the event body.
