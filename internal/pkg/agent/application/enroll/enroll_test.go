@@ -130,20 +130,20 @@ func TestRetryEnroll_RetriesOnInvalidTokenWhenEnabled(t *testing.T) {
 	called := 0
 	enrollFn := func() error {
 		called++
-		return fleetapi.ErrInvalidToken
+		return fleetcontract.ErrInvalidToken
 	}
 	// Allow two waits, then stop the loop so the test terminates.
 	fb := &fakeBackoff{results: []bool{true, true, false}}
 	l := logger.NewWithoutConfig("")
 
 	err := retryEnroll(
-		t.Context(), fleetapi.ErrInvalidToken, -1, l, enrollFn, "http://localhost", fb,
+		t.Context(), fleetcontract.ErrInvalidToken, -1, l, enrollFn, "http://localhost", fb,
 		true,
 	)
 	// With RetryOnInvalidToken=true, ErrInvalidToken must not short-circuit the loop;
 	// we should see retries happen until the backoff itself signals stop.
 	require.Equal(t, 2, called)
-	require.ErrorIs(t, err, fleetapi.ErrInvalidToken)
+	require.ErrorIs(t, err, fleetcontract.ErrInvalidToken)
 }
 
 func TestRetryEnroll_InterruptsBackoffWaitOnCtxCancel(t *testing.T) {
