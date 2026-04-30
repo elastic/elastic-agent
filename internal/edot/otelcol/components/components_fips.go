@@ -4,7 +4,7 @@
 
 //go:build requirefips
 
-package otelcol
+package components
 
 import (
 	"go.opentelemetry.io/collector/exporter"

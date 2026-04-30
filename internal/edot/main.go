@@ -10,11 +10,12 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/edot/beats"
 	edotCmd "github.com/elastic/elastic-agent/internal/edot/cmd"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 func main() {
-	cmd := edotCmd.NewOtelCommandWithArgs(os.Args, cli.NewIOStreams())
+	cmd := edotCmd.NewOtelCommandWithArgs(os.Args, cli.NewIOStreams(), components.Default())
 	beats.AddCommands(cmd)
 	err := cmd.Execute()
 	if err != nil {
