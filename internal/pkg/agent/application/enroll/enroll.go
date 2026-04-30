@@ -97,12 +97,12 @@ func EnrollWithBackoff(
 	enrollFn := func() error {
 		return enroll(ctx, log, persistentConfig, client, options, configStore)
 	}
-	err = retryEnroll(ctx, err, maxAttempts, log, enrollFn, client.URI(), backExp)
+	err = retryEnroll(ctx, err, maxAttempts, log, enrollFn, client.URI(), backExp, options.RetryOnInvalidToken)
 
 	return err
 }
 
-func retryEnroll(ctx context.Context, err error, maxAttempts int, log *logger.Logger, enrollFn func() error, clientURI string, backExp backoff.Backoff) error {
+func retryEnroll(ctx context.Context, err error, maxAttempts int, log *logger.Logger, enrollFn func() error, clientURI string, backExp backoff.Backoff, retryOnInvalidToken bool) error {
 	attemptNo := 1
 
 RETRYLOOP:
@@ -115,7 +115,7 @@ RETRYLOOP:
 			log.Warn("Remote server is not ready to accept connections(Connection Refused), will retry in a moment.")
 		case errors.Is(err, fleetapi.ErrTemporaryServerError):
 			log.Warnf("Remote server failed to handle the request(%s), will retry in a moment.", err.Error())
-		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), errors.Is(err, fleetapi.ErrInvalidToken), err == nil, (maxAttempts != EnrollInfiniteAttempts && attemptNo > maxAttempts):
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), errors.Is(err, fleetapi.ErrInvalidToken) && !retryOnInvalidToken, err == nil, (maxAttempts != EnrollInfiniteAttempts && attemptNo > maxAttempts):
 			break RETRYLOOP
 		case err != nil:
 			log.Warnf("Error detected: %s, will retry in a moment.", err.Error())
