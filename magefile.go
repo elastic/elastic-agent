@@ -2707,6 +2707,67 @@ func askForStack() (tcommon.Stack, error) {
 }
 
 func generateEnvFile(stack tcommon.Stack) error {
+<<<<<<< HEAD
+=======
+	if err := writeEnvFile("./env.sh", func(w io.Writer) error {
+		if _, err := fmt.Fprintf(w, "export ELASTICSEARCH_HOST=\"%s\"\n", stack.Elasticsearch); err != nil {
+			return fmt.Errorf("write ELASTICSEARCH_HOST: %w", err)
+		}
+		if _, err := fmt.Fprintf(w, "export ELASTICSEARCH_USERNAME=\"%s\"\n", stack.Username); err != nil {
+			return fmt.Errorf("write ELASTICSEARCH_USERNAME: %w", err)
+		}
+		if _, err := fmt.Fprintf(w, "export ELASTICSEARCH_PASSWORD=\"%s\"\n", stack.Password); err != nil {
+			return fmt.Errorf("write ELASTICSEARCH_PASSWORD: %w", err)
+		}
+
+		if _, err := fmt.Fprintf(w, "export KIBANA_HOST=\"%s\"\n", stack.Kibana); err != nil {
+			return fmt.Errorf("write KIBANA_HOST: %w", err)
+		}
+		if _, err := fmt.Fprintf(w, "export KIBANA_USERNAME=\"%s\"\n", stack.Username); err != nil {
+			return fmt.Errorf("write KIBANA_USERNAME: %w", err)
+		}
+		if _, err := fmt.Fprintf(w, "export KIBANA_PASSWORD=\"%s\"\n", stack.Password); err != nil {
+			return fmt.Errorf("write KIBANA_PASSWORD: %w", err)
+		}
+
+		if _, err := fmt.Fprintf(w, "export ELASTIC_APM_SERVER_URL=\"%s\"\n", stack.IntegrationsServer); err != nil {
+			return fmt.Errorf("write ELASTIC_APM_SERVER_URL: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return writeEnvFile("./env.ps1", func(w io.Writer) error {
+		if _, err := fmt.Fprintf(w, "$env:ELASTICSEARCH_HOST=\"%s\"\n", stack.Elasticsearch); err != nil {
+			return fmt.Errorf("write ELASTICSEARCH_HOST: %w", err)
+		}
+		if _, err := fmt.Fprintf(w, "$env:ELASTICSEARCH_USERNAME=\"%s\"\n", stack.Username); err != nil {
+			return fmt.Errorf("write ELASTICSEARCH_USERNAME: %w", err)
+		}
+		if _, err := fmt.Fprintf(w, "$env:ELASTICSEARCH_PASSWORD=\"%s\"\n", stack.Password); err != nil {
+			return fmt.Errorf("write ELASTICSEARCH_PASSWORD: %w", err)
+		}
+
+		if _, err := fmt.Fprintf(w, "$env:KIBANA_HOST=\"%s\"\n", stack.Kibana); err != nil {
+			return fmt.Errorf("write KIBANA_HOST: %w", err)
+		}
+		if _, err := fmt.Fprintf(w, "$env:KIBANA_USERNAME=\"%s\"\n", stack.Username); err != nil {
+			return fmt.Errorf("write KIBANA_USERNAME: %w", err)
+		}
+		if _, err := fmt.Fprintf(w, "$env:KIBANA_PASSWORD=\"%s\"\n", stack.Password); err != nil {
+			return fmt.Errorf("write KIBANA_PASSWORD: %w", err)
+		}
+
+		if _, err := fmt.Fprintf(w, "$env:ELASTIC_APM_SERVER_URL=\"%s\"\n", stack.IntegrationsServer); err != nil {
+			return fmt.Errorf("write ELASTIC_APM_SERVER_URL: %w", err)
+		}
+		return nil
+	})
+}
+
+func writeEnvFile(path string, write func(io.Writer) error) error {
+>>>>>>> b572c2525 (Replace Terraform ESS provisioning with oblt-cli for Windows and Linux but no FIPS (#13642))
 	fileExists := true
 	stat, err := os.Stat("./env.sh")
 	if err != nil {
