@@ -7,6 +7,8 @@ package fleet
 import (
 	"context"
 	stderrors "errors"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -533,44 +535,75 @@ func RequestBackoff(done <-chan struct{}) backoff.Backoff {
 	)
 }
 
-// getPolicyID will check that the passed action is a POLICY_CHANGE action and return the policy_id attribute of the policy as a string.
+// getPolicyID returns the policy ID associated with a POLICY_CHANGE action. It
+// reads the policy_id attribute from the action's policy data when present
+// (used by tests/fixtures) and otherwise parses it from the action ID, which
+// fleet-server emits in the form "policy:<policy_id>:<revision_idx>" (an
+// optional fourth ":<coordinator_idx>" segment is accepted for legacy
+// compatibility).
 func getPolicyID(action fleetapi.Action) string {
 	policyChange, ok := action.(*fleetapi.ActionPolicyChange)
 	if !ok {
 		return ""
 	}
-	v, ok := policyChange.Data.Policy["policy_id"]
+	if v, ok := policyChange.Data.Policy["policy_id"]; ok {
+		if vv, ok := v.(string); ok && vv != "" {
+			return vv
+		}
+	}
+	id, _, ok := parsePolicyActionID(policyChange.ActionID)
 	if !ok {
 		return ""
 	}
-	vv, ok := v.(string)
-	if !ok {
-		return ""
-	}
-	return vv
+	return id
 }
 
-// getPolicyRevisionIDX will check that the passed action is a POLICY_CHANGE action and return the policy_revision_idx attribute of the policy as an int64.
-// The function will attempt to convert the attribute to int64 if int or float64 is used in order to prevent issues from serialization.
+// getPolicyRevisionIDX returns the policy revision index associated with a
+// POLICY_CHANGE action. It reads the policy_revision_idx attribute from the
+// action's policy data when present (used by tests/fixtures) and otherwise
+// parses it from the action ID. See getPolicyID for the action ID format.
 func getPolicyRevisionIDX(action fleetapi.Action) int64 {
 	policyChange, ok := action.(*fleetapi.ActionPolicyChange)
 	if !ok {
 		return 0
 	}
-	v, ok := policyChange.Data.Policy["policy_revision_idx"]
+	if v, ok := policyChange.Data.Policy["policy_revision_idx"]; ok {
+		switch vv := v.(type) {
+		case int64:
+			if vv != 0 {
+				return vv
+			}
+		case int:
+			if vv != 0 {
+				return int64(vv)
+			}
+		case float64:
+			if vv != 0 {
+				return int64(vv)
+			}
+		}
+	}
+	_, rev, ok := parsePolicyActionID(policyChange.ActionID)
 	if !ok {
 		return 0
 	}
-	switch vv := v.(type) {
-	case int64:
-		return vv
-	case int:
-		return int64(vv)
-	case float64:
-		return int64(vv)
-	default:
-		return 0
+	return rev
+}
+
+// parsePolicyActionID parses a fleet-server policy change action ID with the
+// shape "policy:<policy_id>:<revision_idx>" (a trailing ":<coordinator_idx>"
+// segment is tolerated for backward compatibility with fleet-server <8.15).
+// Returns ok=false for any other shape.
+func parsePolicyActionID(actionID string) (string, int64, bool) {
+	parts := strings.Split(actionID, ":")
+	if len(parts) < 3 || len(parts) > 4 || parts[0] != "policy" {
+		return "", 0, false
 	}
+	rev, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		return "", 0, false
+	}
+	return parts[1], rev, true
 }
 
 var errComponentStateChanged = errors.New("error component state changed")

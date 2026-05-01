@@ -1224,3 +1224,122 @@ func TestAvailableRollbacks(t *testing.T) {
 		})
 	}
 }
+
+func TestGetPolicyIDAndRevisionIDX(t *testing.T) {
+	const fleetActionID = "policy:cb5a31a5-c4f6-4a4a-9b80-3d70e6c3a1f0:7"
+	const legacyActionID = "policy:cb5a31a5-c4f6-4a4a-9b80-3d70e6c3a1f0:7:42"
+	const policyID = "cb5a31a5-c4f6-4a4a-9b80-3d70e6c3a1f0"
+
+	testcases := []struct {
+		name        string
+		action      fleetapi.Action
+		wantID      string
+		wantRevIdx  int64
+	}{
+		{
+			name: "fleet-server action ID with empty policy data",
+			action: &fleetapi.ActionPolicyChange{
+				ActionID:   fleetActionID,
+				ActionType: fleetapi.ActionTypePolicyChange,
+				Data:       fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{}},
+			},
+			wantID:     policyID,
+			wantRevIdx: 7,
+		},
+		{
+			name: "legacy fleet-server action ID with coordinator_idx segment",
+			action: &fleetapi.ActionPolicyChange{
+				ActionID:   legacyActionID,
+				ActionType: fleetapi.ActionTypePolicyChange,
+				Data:       fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{}},
+			},
+			wantID:     policyID,
+			wantRevIdx: 7,
+		},
+		{
+			name: "explicit policy data takes precedence over action ID",
+			action: &fleetapi.ActionPolicyChange{
+				ActionID:   fleetActionID,
+				ActionType: fleetapi.ActionTypePolicyChange,
+				Data: fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{
+					"policy_id":           "explicit-policy-id",
+					"policy_revision_idx": int64(99),
+				}},
+			},
+			wantID:     "explicit-policy-id",
+			wantRevIdx: 99,
+		},
+		{
+			name: "empty policy_id falls back to action ID parse",
+			action: &fleetapi.ActionPolicyChange{
+				ActionID:   fleetActionID,
+				ActionType: fleetapi.ActionTypePolicyChange,
+				Data: fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{
+					"policy_id": "",
+				}},
+			},
+			wantID:     policyID,
+			wantRevIdx: 7,
+		},
+		{
+			name: "zero policy_revision_idx falls back to action ID parse",
+			action: &fleetapi.ActionPolicyChange{
+				ActionID:   fleetActionID,
+				ActionType: fleetapi.ActionTypePolicyChange,
+				Data: fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{
+					"policy_revision_idx": int64(0),
+				}},
+			},
+			wantID:     policyID,
+			wantRevIdx: 7,
+		},
+		{
+			name: "non-policy action ID returns zero values",
+			action: &fleetapi.ActionPolicyChange{
+				ActionID:   "test-action-id",
+				ActionType: fleetapi.ActionTypePolicyChange,
+				Data:       fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{}},
+			},
+			wantID:     "",
+			wantRevIdx: 0,
+		},
+		{
+			name:       "non-POLICY_CHANGE action returns zero values",
+			action:     &fleetapi.ActionUnenroll{ActionID: "policy:foo:1"},
+			wantID:     "",
+			wantRevIdx: 0,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.wantID, getPolicyID(tc.action))
+			assert.Equal(t, tc.wantRevIdx, getPolicyRevisionIDX(tc.action))
+		})
+	}
+}
+
+func TestParsePolicyActionID(t *testing.T) {
+	testcases := []struct {
+		actionID string
+		wantID   string
+		wantRev  int64
+		wantOK   bool
+	}{
+		{actionID: "policy:abc-123:5", wantID: "abc-123", wantRev: 5, wantOK: true},
+		{actionID: "policy:abc-123:5:9", wantID: "abc-123", wantRev: 5, wantOK: true},
+		{actionID: "policy:abc-123", wantOK: false},
+		{actionID: "policy:abc-123:5:9:extra", wantOK: false},
+		{actionID: "upgrade:abc-123:5", wantOK: false},
+		{actionID: "policy:abc-123:notanumber", wantOK: false},
+		{actionID: "", wantOK: false},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.actionID, func(t *testing.T) {
+			id, rev, ok := parsePolicyActionID(tc.actionID)
+			assert.Equal(t, tc.wantOK, ok)
+			assert.Equal(t, tc.wantID, id)
+			assert.Equal(t, tc.wantRev, rev)
+		})
+	}
+}
