@@ -475,11 +475,6 @@ func (m *OTelManager) buildMergedConfig(
 						return nil, fmt.Errorf("merging internal telemetry config: %w", err)
 					}
 				}
-				// Inject the beat telemetry pipeline that bridges beat internal
-				// metrics into logs via the beatmetrics connector.
-				if err := injectBeatTelemetryPipeline(mergedOtelCfg); err != nil {
-					return nil, fmt.Errorf("merging beat telemetry pipeline config: %w", err)
-				}
 			}
 		}
 	}
@@ -683,119 +678,6 @@ func injectMonitoringReceiver(
 	}
 
 	return mergeWithExtensions(config, confmap.NewFromStringMap(collectorCfg))
-}
-
-// injectBeatTelemetryPipeline injects the beat internal telemetry pipeline into the
-// collector configuration. This pipeline collects metrics from the beat receivers via
-// the OTel SDK's internal telemetry, routes them through the beatmetrics connector to
-// convert them into logs, and sends them to the monitoring Elasticsearch exporter.
-//
-// The pipeline structure is:
-//
-//	service.telemetry.metrics.readers → periodic OTLP exporter (localhost:PORT)
-//	otlp receiver (localhost:PORT) → beatmetrics connector → ES monitoring exporter
-func injectBeatTelemetryPipeline(config *confmap.Conf) error {
-	// Find the monitoring exporter
-	exporterType := otelcomponent.MustNewType("elasticsearch")
-	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
-	monitoringExporterFound := false
-	if config.IsSet("exporters") {
-		for exporter := range config.Get("exporters").(map[string]any) {
-			if exporter == exporterID {
-				monitoringExporterFound = true
-			}
-		}
-	}
-	if !monitoringExporterFound {
-		// No monitoring exporter available, skip beat telemetry
-		return nil
-	}
-
-	// Find a free port for the OTLP loopback
-	ports, err := findRandomTCPPorts(1)
-	if err != nil {
-		return fmt.Errorf("failed to find random port for beat telemetry OTLP receiver: %w", err)
-	}
-	otlpPort := ports[0]
-	otlpEndpoint := fmt.Sprintf("localhost:%d", otlpPort)
-
-	// OTLP receiver for the beat telemetry loopback
-	otlpReceiverID := "otlp/" + translate.OtelNamePrefix + "beat-telemetry"
-	beatmetricsConnectorID := "beatmetrics/" + translate.OtelNamePrefix + "beat-telemetry"
-	metricsPipelineID := "metrics/" + translate.OtelNamePrefix + "beat-telemetry"
-	logsPipelineID := "logs/" + translate.OtelNamePrefix + "beat-telemetry"
-
-	collectorCfg := map[string]any{
-		"receivers": map[string]any{
-			otlpReceiverID: map[string]any{
-				"protocols": map[string]any{
-					"grpc": map[string]any{
-						"endpoint": otlpEndpoint,
-					},
-				},
-			},
-		},
-		"connectors": map[string]any{
-			beatmetricsConnectorID: map[string]any{},
-		},
-		"service": map[string]any{
-			"pipelines": map[string]any{
-				metricsPipelineID: map[string]any{
-					"receivers": []string{otlpReceiverID},
-					"exporters": []string{beatmetricsConnectorID},
-				},
-				logsPipelineID: map[string]any{
-					"receivers": []string{beatmetricsConnectorID},
-					"exporters": []string{exporterID},
-				},
-			},
-		},
-	}
-
-	if err := config.Merge(confmap.NewFromStringMap(collectorCfg)); err != nil {
-		return fmt.Errorf("failed to merge beat telemetry pipeline config: %w", err)
-	}
-
-	// Add the periodic OTLP reader to service.telemetry.metrics
-	return addBeatTelemetryReader(config, otlpEndpoint)
-}
-
-// addBeatTelemetryReader injects a periodic OTLP reader into the service telemetry
-// configuration that exports beat internal metrics every 30 seconds to the loopback
-// OTLP receiver.
-func addBeatTelemetryReader(conf *confmap.Conf, otlpEndpoint string) error {
-	metricReadersUntyped := conf.Get("service::telemetry::metrics::readers")
-	if metricReadersUntyped == nil {
-		metricReadersUntyped = []any{}
-	}
-	metricsReadersList, ok := metricReadersUntyped.([]any)
-	if !ok {
-		return fmt.Errorf("couldn't convert value of service::telemetry::metrics::readers to a list: %v", metricReadersUntyped)
-	}
-
-	metricsReader := map[string]any{
-		"periodic": map[string]any{
-			"interval": 30000,
-			"exporter": map[string]any{
-				"otlp": map[string]any{
-					"protocol": "grpc",
-					"endpoint": otlpEndpoint,
-					"insecure": true,
-				},
-			},
-		},
-	}
-	metricsReadersList = append(metricsReadersList, metricsReader)
-
-	// Ensure the telemetry metrics level is detailed so beat bridge metrics are collected
-	confMap := map[string]any{
-		"service::telemetry::metrics::readers": metricsReadersList,
-		"service::telemetry::metrics::level":   "detailed",
-	}
-	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
-		return fmt.Errorf("failed to merge beat telemetry reader config: %w", mergeErr)
-	}
-	return nil
 }
 
 func (m *OTelManager) applyMergedConfig(
