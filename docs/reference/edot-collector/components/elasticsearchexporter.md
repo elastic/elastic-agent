@@ -2,11 +2,9 @@
 navigation_title: Elasticsearch exporter
 description: The Elasticsearch exporter is an OpenTelemetry Collector component that sends telemetry data to Elasticsearch.
 applies_to:
-  stack:
+  stack: ga
   serverless:
-    observability:
-  product:
-    edot_collector:
+    observability: ga
 products:
   - id: cloud-serverless
   - id: observability
@@ -146,7 +144,7 @@ exporters:
 ### Deprecated batcher configuration
 
 ```{applies_to}
-stack: ga 9.0-9.1, deprecated =9.2, removed 9.3+
+stack: ga 9.0-9.1, deprecated =9.2, removed 9.3
 ```
 
 :::{warning}

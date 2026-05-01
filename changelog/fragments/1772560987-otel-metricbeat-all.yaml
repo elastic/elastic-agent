@@ -1,0 +1,64 @@
+# Kind can be one of:
+# - breaking-change: a change to previously-documented behavior
+# - deprecation: functionality that is being removed in a later release
+# - bug-fix: fixes a problem in a previous version
+# - enhancement: extends functionality but does not break or fix existing behavior
+# - feature: new functionality
+# - known-issue: problems that we are aware of in a given version
+# - security: impacts on the security of a product or a user’s deployment.
+# - upgrade: important information for someone upgrading from a prior version
+# - other: does not fit into any of the other categories
+kind: enhancement
+
+# Change summary; a 80ish characters long description of the change.
+summary: Run all metricbeat inputs in an otel collector
+
+# Long description; in case the summary is not enough to describe the change
+# this field accommodate a description without length limits.
+# NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
+description: >-
+  The following metricbeat inputs will now use the otel runtime by
+  default, relative to 9.3:
+
+    - "aerospike/metrics"
+    - "autoops_es/metrics"
+    - "aws/metrics"
+    - "awsfargate/metrics"
+    - "azure/metrics"
+    - "cloudfoundry/metrics"
+    - "gcp/metrics"
+    - "haproxy/metrics"
+    - "iis/metrics"
+    - "kubernetes/metrics"
+    - "meraki/metrics"
+    - "mssql/metrics"
+    - "openai/metrics"
+    - "oracle/metrics"
+    - "panw/metrics"
+    - "postgresql/metrics"
+    - "prometheus/metrics"
+    - "redis/metrics"
+    - "syncgateway/metrics"
+    - "traefik/metrics"
+    - "uwsgi/metrics"
+    - "windows/metrics"
+    - "zookeeper/metrics"
+
+
+  This will result in a memory reduction since fewer agentbeat
+  processes are started, because the otel runtime runs within the
+  collector process. If the policy is not compatible with the otel
+  runtime, it will fall back to the process runtime.
+
+# Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
+component: elastic-agent
+
+# PR URL; optional; the PR number that added the changeset.
+# If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
+# NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
+# Please provide it if you are adding a fragment for a different PR.
+#pr: https://github.com/owner/repo/1234
+
+# Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
+# If not present is automatically filled by the tooling with the issue linked to the PR number.
+#issue: https://github.com/owner/repo/1234

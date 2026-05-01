@@ -91,17 +91,6 @@ targets:
       content: ':go-version: {{ source "latestGoVersion" }}'
       file: version/docs/version.asciidoc
       matchpattern: ':go-version: \d+.\d+.\d+'
-  update-dockerfiles:
-    name: "Update from dockerfiles"
-    sourceid: latestGoVersion
-    scmid: githubConfig
-    kind: file
-    spec:
-      content: 'ARG GO_VERSION={{ source "latestGoVersion" }}'
-      files:
-        - Dockerfile
-        - Dockerfile.skaffold
-      matchpattern: 'ARG GO_VERSION=\d+.\d+.\d+'
   update-gomod-full-version:
     name: "Update go.mod version"
     sourceid: latestGoVersion

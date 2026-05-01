@@ -103,13 +103,15 @@ The minimum supported versions of each interpreter are:
 - PHP: 7.3
 - Ruby: 2.5
 - .Net: 6
-- Erlang/OTP 27.2.4 
+- Erlang/OTP 27.2.4
 
 ## Generate metrics from profiles
 
-You can configure the components to generate and report metrics exclusively from profile information. This method contributes to a reduction in ingest traffic and storage costs.
+The `profilingmetrics` connector transforms profiling data into OpenTelemetry metrics. It walks each sample's stack trace and produces per-resource delta metrics that break down CPU time by frame type (kernel, native, JVM, Go, Python, etc.), shared library, kernel subsystem, and system call. This reduces ingest traffic and storage costs compared to sending raw profiling data, while still providing actionable insight into where your application spends its time.
 
-The following example generates profiling metrics by frame, frame type, and classification:
+The generated metrics power the [Elastic OTel Profiling Metrics integration](integration-docs://reference/profilingmetrics_otel.md) dashboards.
+
+The following example sends profiling data through the connector and exports the resulting metrics to {{es}}:
 
 ::::{applies-switch}
 
@@ -117,9 +119,11 @@ The following example generates profiling metrics by frame, frame type, and clas
 ```yaml
 connectors:
   profilingmetrics:
-    by_frame: true
-    by_frametype: true
-    by_classification: true
+    metrics:
+      samples.frame_type:
+        enabled: true
+      samples.classification:
+        enabled: true
 
 receivers:
   profiling:
@@ -156,6 +160,27 @@ service:
 :::
 
 ::::
+
+### Connector configuration
+
+The connector supports the following settings:
+
+| Setting | Type | Default | Description |
+| --- | --- | --- | --- |
+| `flush_interval` | `duration` | `30s` | Time window for aggregating delta metrics in memory before flushing. Set to `0s` to disable aggregation and forward metrics on every received profile. |
+| `metrics` | `object` | — | Per-metric toggle. Each key is a metric name with an `enabled` boolean. |
+| `aggregations` | `list` | `[]` | List of custom aggregation rules. Each entry has a `match` (regex applied to function names) and a `label` (value used in the output metric attribute). |
+
+By default, the connector emits per-runtime sample count metrics (`samples.kernel.count`, `samples.native.count`, `samples.go.count`, `samples.jvm.count`, etc.) with attributes for shared library names (`shlib_name`), kernel subsystem classification (`kernel_area`, `kernel_proto`, `kernel_io`), and system call names (`syscall_name`).
+
+Two additional metrics are available but disabled by default:
+
+- `samples.frame_type` — frame counts grouped by frame type.
+- `samples.classification` — language-specific classification (Go package, JVM class).
+
+:::{important}
+`samples.kernel.count` and `samples.user.count` must both be enabled. Their sum is the only reliable way to compute the total sample count.
+:::
 
 ## Kubernetes deployments
 

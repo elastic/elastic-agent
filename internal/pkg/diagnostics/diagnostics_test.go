@@ -34,6 +34,8 @@ import (
 	"github.com/elastic/elastic-agent/version"
 )
 
+const REDACTED_URL_USERNAME_PASSWORD = REDACTED_URL_SAFE + ":" + REDACTED_URL_SAFE
+
 func TestRedactResults(t *testing.T) {
 	privKey := `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAACFwAAAAdzc2gtcn
@@ -89,6 +91,7 @@ i4EFZLWrFRsAAAARYWxleGtAZ3JlbWluLm5lc3QBAg==
 		"root": mapstr.M{
 			"passphrase": "unredacted",
 			"nested1": mapstr.M{
+				"url":         "https://unredacted:unredacted@my-url1",
 				"certificate": "unredacted",
 				"nested2": mapstr.M{
 					"X-Authentication": "unredacted",
@@ -98,6 +101,11 @@ i4EFZLWrFRsAAAARYWxleGtAZ3JlbWluLm5lc3QBAg==
 					"nested3": mapstr.M{
 						"token": "unredacted",
 						"key":   "unredacted",
+						"urls": []any{
+							"https://unredacted:unredacted@nested3-my-url1",
+							"https://unredacted:unredacted@nested3-my-url2",
+							"https://nested3-my-url-no-user",
+						},
 					},
 					"ssl": mapstr.M{ // ssh-keygen -f ~/test-key -t rsa -b 4096
 						"key": privKey,
@@ -170,6 +178,11 @@ func TestRedactWithMarkers(t *testing.T) {
 					map[string]any{
 						"type":      "test_input",
 						"redactKey": "secretValue",
+						"urls": []any{
+							"https://username1:password1@my-url1",
+							"https://username2:password2@my-url2",
+							"https://my-url3",
+						},
 					},
 				},
 				"outputs": map[string]any{
@@ -184,7 +197,12 @@ func TestRedactWithMarkers(t *testing.T) {
 				"inputs": []any{
 					map[string]any{
 						"type":      "test_input",
-						"redactKey": "secretValue",
+						"redactKey": REDACTED,
+						"urls": []any{
+							"https://" + REDACTED_URL_USERNAME_PASSWORD + "@my-url1",
+							"https://" + REDACTED_URL_USERNAME_PASSWORD + "@my-url2",
+							"https://my-url3",
+						},
 					},
 				},
 				"outputs": map[string]any{
@@ -206,6 +224,8 @@ func TestRedactWithMarkers(t *testing.T) {
 				"outputs": map[string]any{
 					"default": map[string]any{
 						"type":        "elasticsearch",
+						"url":         "https://username:password@my-url",
+						"other_url":   "https://my-unredacted-url",
 						"api_key":     "secretKey",
 						"Certificate": "secretCert",
 						"PassPhrase":  "secretPassphrase",
@@ -223,6 +243,8 @@ func TestRedactWithMarkers(t *testing.T) {
 				"outputs": map[string]any{
 					"default": map[string]any{
 						"type":        "elasticsearch",
+						"url":         "https://" + REDACTED_URL_USERNAME_PASSWORD + "@my-url",
+						"other_url":   "https://my-unredacted-url",
 						"api_key":     REDACTED,
 						"Certificate": REDACTED,
 						"PassPhrase":  REDACTED,
@@ -888,6 +910,24 @@ func TestRedactEnv(t *testing.T) {
 			"VAL1":          "a,b,c",
 			"API_KEY":       REDACTED,
 			"SERVICE_TOKEN": REDACTED,
+		},
+	}, {
+		name: "Redacts value based on key and URL",
+		env: map[string]string{
+			"TEST_LEVEL":    "test-val",
+			"VAL1":          "a,b,c",
+			"API_KEY":       "secret-value",
+			"SECRET_URL":    "https://username:password@my-secret-url",
+			"SERVICE_TOKEN": "secret-token",
+			"HTTPS_PROXY":   "https://username:password@my-proxy",
+		},
+		expect: map[string]any{
+			"TEST_LEVEL":    "test-val",
+			"VAL1":          "a,b,c",
+			"API_KEY":       REDACTED,
+			"SECRET_URL":    REDACTED, // key name wins
+			"SERVICE_TOKEN": REDACTED,
+			"HTTPS_PROXY":   "https://" + REDACTED_URL_USERNAME_PASSWORD + "@my-proxy",
 		},
 	}}
 

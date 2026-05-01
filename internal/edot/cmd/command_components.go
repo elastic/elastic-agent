@@ -6,12 +6,13 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/collector/otelcol"
 
-	"github.com/elastic/elastic-agent/internal/edot/otelcol"
+	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
-func newComponentsCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
+func newComponentsCommandWithArgs(_ []string, _ *cli.IOStreams, componentsFn func() (otelcol.Factories, error)) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "components",
 		Short:         "Outputs available components in this collector distribution",
@@ -19,7 +20,7 @@ func newComponentsCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 		SilenceUsage:  true, // do not display usage on error
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return otelcol.Components(cmd)
+			return edotOtelCol.Components(cmd, componentsFn)
 		},
 	}
 

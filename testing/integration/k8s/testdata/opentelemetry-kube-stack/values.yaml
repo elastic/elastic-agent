@@ -176,6 +176,14 @@ defaultCRConfig:
   nodeSelector: {}
   #   nodeType: worker
 
+  # Command to override the collector's entrypoint
+  command: []
+  #   - /bin/sh
+  #   - -c
+  #   - |
+  #     . /node-env/env.sh
+  #     exec /otelcol-contrib --config=/conf/collector.yaml
+
   # Arguments for the collector
   args: {}
   #   arg1: value1
@@ -485,7 +493,15 @@ defaultCRConfig:
         enabled: false
       metrics:
         enabled: false
-
+    resourceDetection:
+      # Each detector can be enabled individually. Base detectors 'env' and 'k8snode' are always included when any detector is enabled.
+      # Typically used to resolve the 'k8s.cluster.name' resource attribute.
+      eks:
+        enabled: false
+      aks:
+        enabled: false
+      gcp:
+        enabled: false
 # Collectors is a map of collector configurations of the form:
 # collectors:
 #   collectorName:
@@ -528,6 +544,13 @@ collectors:
         logs:
           enabled: false
         metrics:
+          enabled: false
+      resourceDetection:
+        aks:
+          enabled: false
+        gcp:
+          enabled: false
+        eks:
           enabled: false
     config:
       receivers:

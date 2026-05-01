@@ -111,7 +111,7 @@ Deploy following manifests:
 **Pros/Cons**:
 
 - [+] Simplicity
-- [-] You can not prevent execution of deployments in nodes where agents already running.
+- [-] You cannot prevent execution of deployments on nodes where agents are already running.
 
 ### 3. Elastic Agents with taint/tolerations
 

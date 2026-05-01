@@ -316,61 +316,26 @@ func TestGetOtelConfig(t *testing.T) {
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,
 			},
+			"suppress_conflict_errors": true,
 		}
 	}
 
 	defaultInputProcessors := func(streamId, dataset string, namespace string) []any {
 		return []any{
 			mapstr.M{
-				"add_fields": mapstr.M{
-					"fields": mapstr.M{
-						"input_id": "test",
-					},
-					"target": "@metadata",
-				},
-			},
-			mapstr.M{
-				"add_fields": mapstr.M{
-					"fields": mapstr.M{
+				"add_agent_metadata": mapstr.M{
+					"data_stream": mapstr.M{
 						"dataset":   dataset,
 						"namespace": "default",
 						"type":      namespace,
 					},
-					"target": "data_stream",
-				},
-			},
-			mapstr.M{
-				"add_fields": mapstr.M{
-					"fields": mapstr.M{
-						"dataset": dataset,
-					},
-					"target": "event",
-				},
-			},
-			mapstr.M{
-				"add_fields": mapstr.M{
-					"fields": mapstr.M{
-						"stream_id": streamId,
-					},
-					"target": "@metadata",
-				},
-			},
-			mapstr.M{
-				"add_fields": mapstr.M{
-					"fields": mapstr.M{
+					"elastic_agent": mapstr.M{
 						"id":       agentInfo.AgentID(),
 						"snapshot": agentInfo.Snapshot(),
 						"version":  agentInfo.Version(),
 					},
-					"target": "elastic_agent",
-				},
-			},
-			mapstr.M{
-				"add_fields": mapstr.M{
-					"fields": mapstr.M{
-						"id": agentInfo.AgentID(),
-					},
-					"target": "agent",
+					"input_id":  "test",
+					"stream_id": streamId,
 				},
 			},
 		}
@@ -432,13 +397,64 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 			},
+			"http": map[string]any{
+				"enabled": false,
+			},
 			"management.otel.enabled": true,
 		}
+	}
+
+	expectedBeatMetricConfig := map[string]any{
+		"metricbeat": map[string]any{
+			"modules": []map[string]any{
+				{
+					"data_stream": map[string]any{"dataset": "generic-1"},
+					"hosts":       "http://localhost:5066",
+					"id":          "test-1",
+					"index":       "metrics-generic-1-default",
+					"metricsets":  []interface{}{"stats"},
+					"period":      "60s",
+					"processors":  defaultInputProcessors("test-1", "generic-1", "metrics"),
+					"module":      "beat",
+				},
+			},
+		},
+		"path": map[string]any{
+			"home": paths.Components(),
+			"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+		},
+		"queue": map[string]any{
+			"mem": map[string]any{
+				"events": float64(3200),
+				"flush": map[string]any{
+					"min_events": float64(1600),
+					"timeout":    "10s",
+				},
+			},
+		},
+		"logging": map[string]any{
+			"with_fields": map[string]any{
+				"component": map[string]any{
+					"binary":  "metricbeat",
+					"dataset": "elastic_agent.metricbeat",
+					"type":    "beat/metrics",
+					"id":      "beat-metrics-monitoring",
+				},
+				"log": map[string]any{
+					"source": "beat-metrics-monitoring",
+				},
+			},
+		},
+		"http": map[string]any{
+			"enabled": false,
+		},
+		"management.otel.enabled": true,
 	}
 
 	tests := []struct {
 		name              string
 		model             *component.Model
+		runtimeConfig     *component.RuntimeConfig
 		expectedConfig    *confmap.Conf
 		expectedError     error
 		defaultProcessors *bool // value of the default_processors feature flag
@@ -635,6 +651,735 @@ func TestGetOtelConfig(t *testing.T) {
 			}),
 		},
 		{
+			name: "metricbeat with logstash output",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "beat-metrics-monitoring",
+						InputType:  "beat/metrics",
+						OutputType: "logstash",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"metricbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "beat/metrics-monitoring",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(beatMetricsConfig),
+							},
+							{
+								ID:   "beat/metrics-default",
+								Type: client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"type":                       "logstash",
+									"hosts":                      []any{"localhost:5044"},
+									"queue.mem.events":           3200,
+									"queue.mem.flush.min_events": 1600,
+									"queue.mem.flush.timeout":    "10s",
+								}),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"logstash/_agent-component/default": map[string]any{
+						"hosts": []any{"localhost:5044"},
+						"backoff": map[string]any{
+							"init": "1s",
+							"max":  "1m0s",
+						},
+						"bulk_max_size":            uint64(2048),
+						"compression_level":        uint64(3),
+						"escape_html":              false,
+						"index":                    "",
+						"loadbalance":              false,
+						"max_retries":              uint64(3),
+						"pipelining":               uint64(2),
+						"proxy_url":                "",
+						"proxy_use_local_resolver": false,
+						"slow_start":               false,
+						"timeout":                  "30s",
+						"ttl":                      "0s",
+						"worker":                   int64(0),
+						"workers":                  int64(0),
+					},
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": map[string]any{
+						"metricbeat": map[string]any{
+							"modules": []map[string]any{
+								{
+									"data_stream": map[string]any{"dataset": "generic-1"},
+									"hosts":       "http://localhost:5066",
+									"id":          "test-1",
+									"index":       "metrics-generic-1-default",
+									"metricsets":  []interface{}{"stats"},
+									"period":      "60s",
+									"processors":  defaultInputProcessors("test-1", "generic-1", "metrics"),
+									"module":      "beat",
+								},
+							},
+						},
+						"path": map[string]any{
+							"home": paths.Components(),
+							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+						},
+						"queue": map[string]any{
+							"mem": map[string]any{
+								"events": float64(3200),
+								"flush": map[string]any{
+									"min_events": float64(1600),
+									"timeout":    "10s",
+								},
+							},
+						},
+						"logging": map[string]any{
+							"with_fields": map[string]any{
+								"component": map[string]any{
+									"binary":  "metricbeat",
+									"dataset": "elastic_agent.metricbeat",
+									"type":    "beat/metrics",
+									"id":      "beat-metrics-monitoring",
+								},
+								"log": map[string]any{
+									"source": "beat-metrics-monitoring",
+								},
+							},
+						},
+						"http": map[string]any{
+							"enabled": false,
+						},
+						"management.otel.enabled": true,
+					},
+				},
+				"service": map[string]any{
+					"pipelines": map[string]any{
+						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
+							"exporters":  {"logstash/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "metricbeat with kafka output",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "beat-metrics-monitoring",
+						InputType:  "beat/metrics",
+						OutputType: "kafka",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"metricbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "beat/metrics-monitoring",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(beatMetricsConfig),
+							},
+							{
+								ID:   "beat/metrics-default",
+								Type: client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"type":                       "kafka",
+									"hosts":                      []any{"127.0.0.1:9022"},
+									"topic":                      "%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}",
+									"queue.mem.events":           3200,
+									"queue.mem.flush.min_events": 1600,
+									"queue.mem.flush.timeout":    "10s",
+								}),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"kafka/_agent-component/default": map[string]any{
+						"brokers":              []string{"127.0.0.1:9022"},
+						"topic_from_attribute": "topic",
+						"client_id":            "beats",
+						"metadata": map[string]any{
+							"full":             false,
+							"refresh_interval": 10 * time.Minute,
+							"retry": map[string]any{
+								"backoff": 250 * time.Millisecond,
+								"max":     3,
+							},
+						},
+						"producer": map[string]any{
+							"compression": "gzip",
+							"compression_params": map[string]any{
+								"level": 4,
+							},
+							"max_message_bytes": 1000000,
+							"required_acks":     1,
+						},
+						"protocol_version": "2.1.0",
+						"retry_on_failure": map[string]any{
+							"initial_interval": 1 * time.Second,
+							"max_interval":     60 * time.Second,
+						},
+						"sending_queue": map[string]any{
+							"batch": map[string]any{
+								"flush_timeout": "10s",
+								"max_size":      2048,
+								"sizer":         "items",
+								"min_size":      0,
+							},
+							"queue_size": 3200,
+						},
+						"logs": map[string]any{
+							"encoding": "raw",
+						},
+						"timeout": 10 * time.Second,
+						"record_partitioner": map[string]any{
+							"extension": "kafkapartitioner/_agent-component/default",
+						},
+					},
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+					"transform/_agent-component/default": map[string]any{
+						"error_mode": "ignore",
+						"log_statements": []string{
+							`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
+							`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["dataset"]], "-"))`,
+							`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-"))`,
+						},
+					},
+				},
+				"extensions": map[string]any{
+					"kafkapartitioner/_agent-component/default": map[string]interface{}{},
+				},
+				"receivers": map[string]any{
+					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": expectedBeatMetricConfig,
+				},
+				"service": map[string]any{
+					"extensions": []any{"kafkapartitioner/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
+							"exporters":  {"kafka/_agent-component/default"},
+							"processors": {"beat/_agent-component", "transform/_agent-component/default"},
+							"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "metricbeat with kafka output and hash partition",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "beat-metrics-monitoring",
+						InputType:  "beat/metrics",
+						OutputType: "kafka",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"metricbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "beat/metrics-monitoring",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(beatMetricsConfig),
+							},
+							{
+								ID:   "beat/metrics-default",
+								Type: client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"type":                       "kafka",
+									"hosts":                      []any{"127.0.0.1:9022"},
+									"topic":                      "static-topic",
+									"queue.mem.events":           3200,
+									"queue.mem.flush.min_events": 1600,
+									"queue.mem.flush.timeout":    "10s",
+									"partition": map[string]any{
+										"hash": map[string]any{
+											"hash":   "fields",
+											"fields": []any{"log.level"},
+										},
+									},
+								}),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"kafka/_agent-component/default": map[string]any{
+						"brokers":   []string{"127.0.0.1:9022"},
+						"client_id": "beats",
+						"logs": map[string]any{
+							"topic":    "static-topic",
+							"encoding": "raw",
+						},
+						"metadata": map[string]any{
+							"full":             false,
+							"refresh_interval": 10 * time.Minute,
+							"retry": map[string]any{
+								"backoff": 250 * time.Millisecond,
+								"max":     3,
+							},
+						},
+						"producer": map[string]any{
+							"compression": "gzip",
+							"compression_params": map[string]any{
+								"level": 4,
+							},
+							"max_message_bytes": 1000000,
+							"required_acks":     1,
+						},
+						"protocol_version": "2.1.0",
+						"retry_on_failure": map[string]any{
+							"initial_interval": 1 * time.Second,
+							"max_interval":     60 * time.Second,
+						},
+						"sending_queue": map[string]any{
+							"batch": map[string]any{
+								"flush_timeout": "10s",
+								"max_size":      2048,
+								"sizer":         "items",
+								"min_size":      0,
+							},
+							"queue_size": 3200,
+						},
+						"timeout": 10 * time.Second,
+						"record_partitioner": map[string]any{
+							"extension": "kafkapartitioner/_agent-component/default",
+						},
+					},
+				},
+				"extensions": map[string]any{
+					"kafkapartitioner/_agent-component/default": map[string]interface{}{
+						"hash": map[string]interface{}{
+							"hash":   "fields",
+							"fields": []interface{}{"log.level"},
+						},
+					},
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": expectedBeatMetricConfig,
+				},
+				"service": map[string]any{
+					"extensions": []any{"kafkapartitioner/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
+							"exporters":  {"kafka/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "metricbeat with kafka output and round_robin partition",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "beat-metrics-monitoring",
+						InputType:  "beat/metrics",
+						OutputType: "kafka",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"metricbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "beat/metrics-monitoring",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(beatMetricsConfig),
+							},
+							{
+								ID:   "beat/metrics-default",
+								Type: client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"type":                       "kafka",
+									"hosts":                      []any{"127.0.0.1:9022"},
+									"topic":                      "static-topic",
+									"queue.mem.events":           3200,
+									"queue.mem.flush.min_events": 1600,
+									"queue.mem.flush.timeout":    "10s",
+									"partition": map[string]any{
+										"round_robin": map[string]any{
+											"group_events": 10,
+										},
+									},
+								}),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"kafka/_agent-component/default": map[string]any{
+						"brokers":   []string{"127.0.0.1:9022"},
+						"client_id": "beats",
+						"logs": map[string]any{
+							"topic":    "static-topic",
+							"encoding": "raw",
+						},
+						"metadata": map[string]any{
+							"full":             false,
+							"refresh_interval": 10 * time.Minute,
+							"retry": map[string]any{
+								"backoff": 250 * time.Millisecond,
+								"max":     3,
+							},
+						},
+						"producer": map[string]any{
+							"compression": "gzip",
+							"compression_params": map[string]any{
+								"level": 4,
+							},
+							"max_message_bytes": 1000000,
+							"required_acks":     1,
+						},
+						"protocol_version": "2.1.0",
+						"retry_on_failure": map[string]any{
+							"initial_interval": 1 * time.Second,
+							"max_interval":     60 * time.Second,
+						},
+						"sending_queue": map[string]any{
+							"batch": map[string]any{
+								"flush_timeout": "10s",
+								"max_size":      2048,
+								"sizer":         "items",
+								"min_size":      0,
+							},
+							"queue_size": 3200,
+						},
+						"timeout": 10 * time.Second,
+						"record_partitioner": map[string]any{
+							"extension": "kafkapartitioner/_agent-component/default",
+						},
+					},
+				},
+				"extensions": map[string]any{
+					"kafkapartitioner/_agent-component/default": map[string]interface{}{
+						"round_robin": map[string]interface{}{
+							"group_events": float64(10),
+						},
+					},
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": expectedBeatMetricConfig,
+				},
+				"service": map[string]any{
+					"extensions": []any{"kafkapartitioner/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
+							"exporters":  {"kafka/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "two kafka outputs with different partitioners",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "beat-metrics-monitoring",
+						InputType:  "beat/metrics",
+						OutputType: "kafka",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"metricbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "beat/metrics-monitoring",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(beatMetricsConfig),
+							},
+							{
+								ID:   "beat/metrics-default",
+								Type: client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"type":                       "kafka",
+									"hosts":                      []any{"127.0.0.1:9022"},
+									"topic":                      "static-topic",
+									"queue.mem.events":           3200,
+									"queue.mem.flush.min_events": 1600,
+									"queue.mem.flush.timeout":    "10s",
+									"partition": map[string]any{
+										"hash": map[string]any{
+											"hash":   "fields",
+											"fields": []any{"log.level"},
+										},
+									},
+								}),
+							},
+						},
+					},
+					{
+						ID:         "beat-metrics-monitoring2",
+						InputType:  "beat/metrics",
+						OutputType: "kafka",
+						OutputName: "monitoring",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"metricbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "beat/metrics-monitoring2",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(beatMetricsConfig),
+							},
+							{
+								ID:   "beat/metrics-monitoring",
+								Type: client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"type":                       "kafka",
+									"hosts":                      []any{"127.0.0.1:9023"},
+									"topic":                      "monitoring-topic",
+									"queue.mem.events":           3200,
+									"queue.mem.flush.min_events": 1600,
+									"queue.mem.flush.timeout":    "10s",
+									"partition": map[string]any{
+										"round_robin": map[string]any{
+											"group_events": 10,
+										},
+									},
+								}),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"kafka/_agent-component/default": map[string]any{
+						"brokers":   []string{"127.0.0.1:9022"},
+						"client_id": "beats",
+						"logs": map[string]any{
+							"topic":    "static-topic",
+							"encoding": "raw",
+						},
+						"metadata": map[string]any{
+							"full":             false,
+							"refresh_interval": 10 * time.Minute,
+							"retry": map[string]any{
+								"backoff": 250 * time.Millisecond,
+								"max":     3,
+							},
+						},
+						"producer": map[string]any{
+							"compression": "gzip",
+							"compression_params": map[string]any{
+								"level": 4,
+							},
+							"max_message_bytes": 1000000,
+							"required_acks":     1,
+						},
+						"protocol_version": "2.1.0",
+						"retry_on_failure": map[string]any{
+							"initial_interval": 1 * time.Second,
+							"max_interval":     60 * time.Second,
+						},
+						"sending_queue": map[string]any{
+							"batch": map[string]any{
+								"flush_timeout": "10s",
+								"max_size":      2048,
+								"sizer":         "items",
+								"min_size":      0,
+							},
+							"queue_size": 3200,
+						},
+						"timeout": 10 * time.Second,
+						"record_partitioner": map[string]any{
+							"extension": "kafkapartitioner/_agent-component/default",
+						},
+					},
+					"kafka/_agent-component/monitoring": map[string]any{
+						"brokers":   []string{"127.0.0.1:9023"},
+						"client_id": "beats",
+						"logs": map[string]any{
+							"topic":    "monitoring-topic",
+							"encoding": "raw",
+						},
+						"metadata": map[string]any{
+							"full":             false,
+							"refresh_interval": 10 * time.Minute,
+							"retry": map[string]any{
+								"backoff": 250 * time.Millisecond,
+								"max":     3,
+							},
+						},
+						"producer": map[string]any{
+							"compression": "gzip",
+							"compression_params": map[string]any{
+								"level": 4,
+							},
+							"max_message_bytes": 1000000,
+							"required_acks":     1,
+						},
+						"protocol_version": "2.1.0",
+						"retry_on_failure": map[string]any{
+							"initial_interval": 1 * time.Second,
+							"max_interval":     60 * time.Second,
+						},
+						"sending_queue": map[string]any{
+							"batch": map[string]any{
+								"flush_timeout": "10s",
+								"max_size":      2048,
+								"sizer":         "items",
+								"min_size":      0,
+							},
+							"queue_size": 3200,
+						},
+						"timeout": 10 * time.Second,
+						"record_partitioner": map[string]any{
+							"extension": "kafkapartitioner/_agent-component/monitoring",
+						},
+					},
+				},
+				"extensions": map[string]any{
+					"kafkapartitioner/_agent-component/default": map[string]interface{}{
+						"hash": map[string]interface{}{
+							"hash":   "fields",
+							"fields": []interface{}{"log.level"},
+						},
+					},
+					"kafkapartitioner/_agent-component/monitoring": map[string]interface{}{
+						"round_robin": map[string]interface{}{
+							"group_events": float64(10),
+						},
+					},
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": expectedBeatMetricConfig,
+					"metricbeatreceiver/_agent-component/beat-metrics-monitoring2/test-1": map[string]any{
+						"metricbeat": map[string]any{
+							"modules": []map[string]any{
+								{
+									"data_stream": map[string]any{"dataset": "generic-1"},
+									"hosts":       "http://localhost:5066",
+									"id":          "test-1",
+									"index":       "metrics-generic-1-default",
+									"metricsets":  []interface{}{"stats"},
+									"period":      "60s",
+									"processors":  defaultInputProcessors("test-1", "generic-1", "metrics"),
+									"module":      "beat",
+								},
+							},
+						},
+						"path": map[string]any{
+							"home": paths.Components(),
+							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring2"),
+						},
+						"queue": map[string]any{
+							"mem": map[string]any{
+								"events": float64(3200),
+								"flush": map[string]any{
+									"min_events": float64(1600),
+									"timeout":    "10s",
+								},
+							},
+						},
+						"logging": map[string]any{
+							"with_fields": map[string]any{
+								"component": map[string]any{
+									"binary":  "metricbeat",
+									"dataset": "elastic_agent.metricbeat",
+									"type":    "beat/metrics",
+									"id":      "beat-metrics-monitoring2",
+								},
+								"log": map[string]any{
+									"source": "beat-metrics-monitoring2",
+								},
+							},
+						},
+						"http": map[string]any{
+							"enabled": false,
+						},
+						"management.otel.enabled": true,
+					},
+				},
+				"service": map[string]any{
+					"extensions": []any{"kafkapartitioner/_agent-component/default", "kafkapartitioner/_agent-component/monitoring"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
+							"exporters":  {"kafka/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1"},
+						},
+						"logs/_agent-component/beat-metrics-monitoring2": map[string][]string{
+							"exporters":  {"kafka/_agent-component/monitoring"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring2/test-1"},
+						},
+					},
+				},
+			}),
+		},
+		{
 			name: "multiple filestream inputs and one output",
 			model: &component.Model{
 				Components: []component.Component{
@@ -813,6 +1558,9 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
+						"http": map[string]any{
+							"enabled": false,
+						},
 						"management.otel.enabled": true,
 					},
 				},
@@ -925,7 +1673,129 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
+						"http": map[string]any{
+							"enabled": false,
+						},
 						"management.otel.enabled": true,
+					},
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/system-metrics": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"metricbeatreceiver/_agent-component/system-metrics/test-1"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "system/metrics with shared intake queue enabled",
+			runtimeConfig: &component.RuntimeConfig{
+				SharedReceiverQueues: true,
+			},
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "system-metrics",
+						InputType:  "system/metrics",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"metricbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "system/metrics",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(systemMetricsConfig),
+							},
+							{
+								ID:     "system/metrics-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"metricbeatreceiver/_agent-component/system-metrics/test-1": map[string]any{
+						"metricbeat": map[string]any{
+							"modules": []map[string]any{
+								{
+									"module":      "system",
+									"data_stream": map[string]any{"dataset": "generic-1"},
+									"id":          "test-1",
+									"index":       "metrics-generic-1-default",
+									"metricsets": map[string]any{
+										"cpu": map[string]any{
+											"data_stream.dataset": "system.cpu",
+										},
+										"memory": map[string]any{
+											"data_stream.dataset": "system.memory",
+										},
+										"network": map[string]any{
+											"data_stream.dataset": "system.network",
+										},
+										"filesystem": map[string]any{
+											"data_stream.dataset": "system.filesystem",
+										},
+									},
+									"processors": defaultInputProcessors("test-1", "generic-1", "metrics"),
+								},
+							},
+						},
+						"path": map[string]any{
+							"home": paths.Components(),
+							"data": filepath.Join(paths.Run(), "system-metrics"),
+						},
+						"queue": map[string]any{
+							"mem": map[string]any{
+								"events": uint64(3200),
+								"flush": map[string]any{
+									"min_events": uint64(1600),
+									"timeout":    "10s",
+								},
+							},
+						},
+						"logging": map[string]any{
+							"with_fields": map[string]any{
+								"component": map[string]any{
+									"binary":  "metricbeat",
+									"dataset": "elastic_agent.metricbeat",
+									"type":    "system/metrics",
+									"id":      "system-metrics",
+								},
+								"log": map[string]any{
+									"source": "system-metrics",
+								},
+							},
+						},
+						"http": map[string]any{
+							"enabled": false,
+						},
+						"management.otel.enabled": true,
+						"shared_intake_queue":     "default",
 					},
 				},
 				"service": map[string]any{
@@ -956,7 +1826,11 @@ func TestGetOtelConfig(t *testing.T) {
 				}))
 				require.NoError(t, err)
 			}
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, logp.NewNopLogger())
+			runtimeCfg := &component.RuntimeConfig{}
+			if tt.runtimeConfig != nil {
+				runtimeCfg = tt.runtimeConfig
+			}
+			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, runtimeCfg, logp.NewNopLogger())
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff
@@ -1119,6 +1993,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				tt.component,
 				testAgentInfo,
 				tt.outputQueueConfig,
+				"",
 			)
 
 			if tt.expectedError != "" {
@@ -1154,6 +2029,12 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			} else {
 				assert.NotContains(t, receiverConfig, "queue", "queue config should not be present")
 			}
+
+			// Verify HTTP monitoring is disabled for OTel-managed beat receivers
+			assert.Contains(t, receiverConfig, "http", "http monitoring config should be present")
+			httpConfig, ok := receiverConfig["http"].(map[string]any)
+			require.True(t, ok, "http config should be a map")
+			assert.Equal(t, false, httpConfig["enabled"], "http monitoring should be disabled for OTel-managed components")
 		})
 	}
 }
@@ -1203,24 +2084,13 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			name: "unsupported output type - kafka",
+			name: "supported output type - kafka",
 			component: &component.Component{
 				ID:         "unsupported-output",
 				InputType:  "filestream",
-				OutputType: "kafka", // unsupported
+				OutputType: "kafka",
 				OutputName: "default",
 			},
-			expectedError: "unsupported output type: kafka",
-		},
-		{
-			name: "unsupported output type - logstash",
-			component: &component.Component{
-				ID:         "unsupported-output",
-				InputType:  "filestream",
-				OutputType: "logstash", // unsupported
-				OutputName: "default",
-			},
-			expectedError: "unsupported output type: logstash",
 		},
 		{
 			name: "unsupported configuration",
@@ -1363,36 +2233,6 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 				"timeout": "1m30s",
 			},
 		},
-		{
-			name: "with kerberos is enabled",
-			outputCfg: map[string]any{
-				"kerberos": map[string]any{
-					"enabled":     true,
-					"auth_type":   "password",
-					"config_path": "temp/krb5.conf",
-					"username":    "beats",
-					"password":    "testing",
-					"realm":       "elastic",
-				},
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"timeout":                 "1m30s",
-				"kerberos": map[string]any{
-					"enabled":          true,
-					"auth_type":        "password",
-					"config_path":      "temp/krb5.conf",
-					"username":         "beats",
-					"password":         "testing",
-					"realm":            "elastic",
-					"enable_krb5_fast": false,
-					"service_name":     "",
-					"keytab":           "",
-				},
-				"proxy_disable": false,
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -1428,16 +2268,9 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			name:          "unsupported output type - kafka",
-			outputType:    "kafka",
-			outputCfg:     map[string]any{},
-			expectedError: "unsupported output type: kafka",
-		},
-		{
-			name:          "unsupported output type - logstash",
-			outputType:    "logstash",
-			outputCfg:     map[string]any{},
-			expectedError: "unsupported output type: logstash",
+			name:       "supported output type - kafka",
+			outputType: "kafka",
+			outputCfg:  map[string]any{},
 		},
 		{
 			name:       "unsupported configuration - indices field",
@@ -1486,24 +2319,26 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 func TestUnitToExporterConfig(t *testing.T) {
 	logger := logp.NewNopLogger()
 	esExporterType := otelcomponent.MustNewType("elasticsearch")
+	kafkaExporterType := otelcomponent.MustNewType("kafka")
 	unsupportedExporterType := otelcomponent.MustNewType("unsupported")
 
 	// Mock translation function
 	originalConfigTranslationFuncForExporter := configTranslationFuncForExporter
 	defer func() { configTranslationFuncForExporter = originalConfigTranslationFuncForExporter }()
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
-		esExporterType: func(c *config.C, l *logp.Logger) (map[string]any, error) {
+		esExporterType: func(c *config.C, _ string, l *logp.Logger) (map[string]any, map[string]any, error) {
 			if c.HasField("unsupported") {
-				return nil, errors.New("unsupported config")
+				return nil, nil, errors.New("unsupported config")
 			}
 			// Simple translation for testing purposes
 			cfgMap := make(map[string]any)
 			if err := c.Unpack(&cfgMap); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			cfgMap["translated"] = true
-			return cfgMap, nil
+			return cfgMap, nil, nil
 		},
+		kafkaExporterType: KafkaToOTelConfig,
 	}
 
 	tests := []struct {
@@ -1578,20 +2413,29 @@ func TestUnitToExporterConfig(t *testing.T) {
 				Type: client.UnitTypeOutput,
 				Config: component.MustExpectedConfig(map[string]any{
 					"hosts": []any{"es:9200"},
-					"queue": map[string]any{"mem": map[string]any{"events": 100}},
+					"queue": map[string]any{"mem": map[string]any{"events": 100, "flush": map[string]any{
+						"timeout": "20s",
+					}}},
 				}),
 			},
 			exporterType: esExporterType,
 			outputName:   "default",
 			expectedExporterCfg: map[string]any{
-				"hosts":      []interface{}{"es:9200"},
-				"queue":      map[string]any{"mem": map[string]any{"events": float64(100)}},
+				"hosts": []interface{}{"es:9200"},
+				"queue": map[string]any{"mem": map[string]any{
+					"events": float64(100),
+					"flush": map[string]any{
+						"timeout": "20s",
+					},
+				}},
 				"translated": true,
 				"auth": map[string]any{
 					"authenticator": "beatsauth/_agent-component/default",
 				},
 			},
-			expectedQueueSettings: map[string]any{"mem": map[string]any{"events": float64(100)}},
+			expectedQueueSettings: map[string]any{"mem": map[string]any{"events": float64(100), "flush": map[string]any{
+				"timeout": "20s",
+			}}},
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
@@ -1667,11 +2511,217 @@ func TestUnitToExporterConfig(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "kafka output with hash partition adds kafkapartitioner extension",
+			unit: component.Unit{
+				ID:   "kafka-default",
+				Type: client.UnitTypeOutput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"hosts": []any{"127.0.0.1:9092"},
+					"topic": "my-topic",
+					"partition": map[string]any{
+						"hash": map[string]any{
+							"hash":   "fields",
+							"fields": []any{"log.level"},
+						},
+					},
+				}),
+			},
+			exporterType: kafkaExporterType,
+			outputName:   "default",
+			expectedExporterCfg: map[string]any{
+				"brokers":   []string{"127.0.0.1:9092"},
+				"client_id": "beats",
+				"logs": map[string]any{
+					"topic":    "my-topic",
+					"encoding": "raw",
+				},
+				"metadata": map[string]any{
+					"full":             false,
+					"refresh_interval": 10 * time.Minute,
+					"retry": map[string]any{
+						"backoff": 250 * time.Millisecond,
+						"max":     3,
+					},
+				},
+				"producer": map[string]any{
+					"compression": "gzip",
+					"compression_params": map[string]any{
+						"level": 4,
+					},
+					"max_message_bytes": 1000000,
+					"required_acks":     1,
+				},
+				"protocol_version": "2.1.0",
+				"retry_on_failure": map[string]any{
+					"initial_interval": 1 * time.Second,
+					"max_interval":     60 * time.Second,
+				},
+				"sending_queue": map[string]any{
+					"batch": map[string]any{
+						"flush_timeout": "10s",
+						"max_size":      2048,
+						"min_size":      0,
+						"sizer":         "items",
+					},
+					"queue_size": 3200,
+				},
+				"timeout": 10 * time.Second,
+				"record_partitioner": map[string]any{
+					"extension": "kafkapartitioner/_agent-component/default",
+				},
+			},
+			expectedQueueSettings: nil,
+			expectedExtensionCfg: map[string]any{
+				"kafkapartitioner/_agent-component/default": map[string]interface{}{
+					"hash": map[string]interface{}{
+						"hash":   "fields",
+						"fields": []interface{}{"log.level"},
+					},
+				},
+			},
+		},
+		{
+			name: "kafka output with round_robin partition adds kafkapartitioner extension",
+			unit: component.Unit{
+				ID:   "kafka-default",
+				Type: client.UnitTypeOutput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"hosts": []any{"127.0.0.1:9092"},
+					"topic": "my-topic",
+					"partition": map[string]any{
+						"round_robin": map[string]any{
+							"group_events": 10,
+						},
+					},
+				}),
+			},
+			exporterType: kafkaExporterType,
+			outputName:   "default",
+			expectedExporterCfg: map[string]any{
+				"brokers":   []string{"127.0.0.1:9092"},
+				"client_id": "beats",
+				"logs": map[string]any{
+					"topic":    "my-topic",
+					"encoding": "raw",
+				},
+				"metadata": map[string]any{
+					"full":             false,
+					"refresh_interval": 10 * time.Minute,
+					"retry": map[string]any{
+						"backoff": 250 * time.Millisecond,
+						"max":     3,
+					},
+				},
+				"producer": map[string]any{
+					"compression": "gzip",
+					"compression_params": map[string]any{
+						"level": 4,
+					},
+					"max_message_bytes": 1000000,
+					"required_acks":     1,
+				},
+				"protocol_version": "2.1.0",
+				"retry_on_failure": map[string]any{
+					"initial_interval": 1 * time.Second,
+					"max_interval":     60 * time.Second,
+				},
+				"sending_queue": map[string]any{
+					"batch": map[string]any{
+						"flush_timeout": "10s",
+						"max_size":      2048,
+						"min_size":      0,
+						"sizer":         "items",
+					},
+					"queue_size": 3200,
+				},
+				"timeout": 10 * time.Second,
+				"record_partitioner": map[string]any{
+					"extension": "kafkapartitioner/_agent-component/default",
+				},
+			},
+			expectedQueueSettings: nil,
+			expectedExtensionCfg: map[string]any{
+				"kafkapartitioner/_agent-component/default": map[string]interface{}{
+					"round_robin": map[string]interface{}{
+						"group_events": float64(10),
+					},
+				},
+			},
+		},
+		{
+			name: "kafka output with random partition adds kafkapartitioner extension",
+			unit: component.Unit{
+				ID:   "kafka-default",
+				Type: client.UnitTypeOutput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"hosts": []any{"127.0.0.1:9092"},
+					"topic": "my-topic",
+					"partition": map[string]any{
+						"random": map[string]any{
+							"group_events": 1,
+						},
+					},
+				}),
+			},
+			exporterType: kafkaExporterType,
+			outputName:   "default",
+			expectedExporterCfg: map[string]any{
+				"brokers":   []string{"127.0.0.1:9092"},
+				"client_id": "beats",
+				"logs": map[string]any{
+					"topic":    "my-topic",
+					"encoding": "raw",
+				},
+				"metadata": map[string]any{
+					"full":             false,
+					"refresh_interval": 10 * time.Minute,
+					"retry": map[string]any{
+						"backoff": 250 * time.Millisecond,
+						"max":     3,
+					},
+				},
+				"producer": map[string]any{
+					"compression": "gzip",
+					"compression_params": map[string]any{
+						"level": 4,
+					},
+					"max_message_bytes": 1000000,
+					"required_acks":     1,
+				},
+				"protocol_version": "2.1.0",
+				"retry_on_failure": map[string]any{
+					"initial_interval": 1 * time.Second,
+					"max_interval":     60 * time.Second,
+				},
+				"sending_queue": map[string]any{
+					"batch": map[string]any{
+						"flush_timeout": "10s",
+						"max_size":      2048,
+						"min_size":      0,
+						"sizer":         "items",
+					},
+					"queue_size": 3200,
+				},
+				"timeout": 10 * time.Second,
+				"record_partitioner": map[string]any{
+					"extension": "kafkapartitioner/_agent-component/default",
+				},
+			},
+			expectedQueueSettings: nil,
+			expectedExtensionCfg: map[string]any{
+				"kafkapartitioner/_agent-component/default": map[string]interface{}{
+					"random": map[string]interface{}{
+						"group_events": float64(1),
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			exportersCfg, queueSettings, extensionCfg, _, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
+			exportersCfg, queueSettings, extensionCfg, processorConfig, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
 
 			if tt.expectedError != "" {
 				require.Error(t, err)
@@ -1683,6 +2733,9 @@ func TestUnitToExporterConfig(t *testing.T) {
 			assert.Equal(t, tt.expectedExporterCfg, exportersCfg)
 			assert.Equal(t, tt.expectedQueueSettings, queueSettings)
 			assert.Equal(t, tt.expectedExtensionCfg, extensionCfg)
+			if processorConfig != nil {
+				assert.Equal(t, 1, len(processorConfig))
+			}
 		})
 	}
 }

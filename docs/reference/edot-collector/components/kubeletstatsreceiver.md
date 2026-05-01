@@ -2,11 +2,9 @@
 navigation_title: Kubelet stats receiver
 description: The Kubelet stats receiver is an OpenTelemetry Collector component that collects node, pod, container, and volume resource metrics from the Kubernetes Kubelet.
 applies_to:
-  stack:
+  stack: ga
   serverless:
-    observability:
-  product:
-    edot_collector:
+    observability: ga
 products:
   - id: cloud-serverless
   - id: observability
