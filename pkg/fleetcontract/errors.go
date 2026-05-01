@@ -10,11 +10,11 @@ import (
 )
 
 var (
-	ErrTooManyRequests    = errors.New("too many requests received (429)")
-	ErrConnRefused        = errors.New("connection refused")
+	ErrTooManyRequests      = errors.New("too many requests received (429)")
+	ErrConnRefused          = errors.New("connection refused")
 	ErrTemporaryServerError = errors.New("temporary server error, please retry later")
-	ErrInvalidToken       = errors.New("invalid enrollment token")
-	ErrInvalidAPIKey      = errors.New("invalid api key to authenticate with fleet")
+	ErrInvalidToken         = errors.New("invalid enrollment token")
+	ErrInvalidAPIKey        = errors.New("invalid api key to authenticate with fleet")
 )
 
 // TemporaryServerErrorCodes maps HTTP status codes that indicate a transient
