@@ -43,6 +43,9 @@ func inspectOtelCmd(ctx context.Context, cfgPath string, streams *cli.IOStreams)
 	}
 
 	components, err := componentvalidation.GetComponentsFromPolicy(ctx, l, cfgPath, 0)
+	if err != nil {
+		return fmt.Errorf("error getting components from policy: %w", err)
+	}
 
 	otelComponents := make([]component.Component, 0, len(components))
 	for _, c := range components {
