@@ -13,6 +13,7 @@ env:
   IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1776780011"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1776780011"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1776780011"
+  IMAGE_WIN_11_ARM: "platform-ingest-elastic-agent-windows-11-pro-arm64/1.0.1777597312"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
@@ -316,6 +317,63 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          - default
+
+      - label: "Win11ARM64:sudo:{{matrix}}"
+        depends_on:
+          - packaging-arm64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-arm64* . --step 'packaging-arm64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        agents:
+          provider: "azure"
+          machineType: "D8s_v3"
+          image: "${IMAGE_WIN_11_ARM}"
+        retry:
+          automatic:
+            limit: 1
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          - default
+          - fleet
+          - fleet-endpoint-security
+          - fleet-privileged
+          - standalone-upgrade
+          - upgrade
+          - upgrade-flavor
+          - install-uninstall
+
+      - label: "Win11ARM64:non-sudo:{{matrix}}"
+        depends_on:
+          - packaging-arm64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-arm64* . --step 'packaging-arm64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        agents:
+          provider: "azure"
+          machineType: "D8s_v3"
+          image: "${IMAGE_WIN_11_ARM}"
+        retry:
+          automatic:
+            limit: 1
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
