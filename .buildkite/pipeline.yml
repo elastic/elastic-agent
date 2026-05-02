@@ -9,8 +9,8 @@ env:
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1776780011"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
-  IMAGE_WIN_10_VERSION: "1.0.1776780011"
-  IMAGE_WIN_11_VERSION: "1.0.1776780011"
+  IMAGE_WIN_10_VERSION: "1.0.1777597312"
+  IMAGE_WIN_11_VERSION: "1.0.1777597312"
 
 steps:
   - label: "check-ci"
