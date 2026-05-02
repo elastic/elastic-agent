@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/collector/connector"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/extension"
+	"go.opentelemetry.io/collector/otelcol"
 	"go.opentelemetry.io/collector/processor"
 	"go.opentelemetry.io/collector/receiver"
 
@@ -35,8 +36,8 @@ type componentsOutput struct {
 	Extensions []componentWithStability
 }
 
-func Components(cmd *cobra.Command) error {
-	set := NewSettings(release.Version(), []string{})
+func Components(cmd *cobra.Command, componentsFn func() (otelcol.Factories, error)) error {
+	set := NewSettings(release.Version(), []string{}, WithComponents(componentsFn))
 	factories, err := set.Factories()
 	if err != nil {
 		return fmt.Errorf("failed to initialize factories: %w", err)

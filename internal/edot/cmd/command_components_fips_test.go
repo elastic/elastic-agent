@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/edot/otelcol"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
 )
 
 type componentsOutput struct {
@@ -50,7 +51,7 @@ func TestComponentsCommand(t *testing.T) {
 
 	b := bytes.NewBufferString("")
 	cmd.SetOut(b)
-	err = otelcol.Components(cmd)
+	err = otelcol.Components(cmd, components.Default())
 	require.NoError(t, err)
 	outputComponents := &componentsOutput{}
 	err = yaml.Unmarshal(b.Bytes(), outputComponents)
