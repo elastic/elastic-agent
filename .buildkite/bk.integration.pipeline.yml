@@ -13,7 +13,8 @@ env:
   IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1776780011"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1776780011"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1776780011"
-  IMAGE_WIN_11_ARM: "platform-ingest-elastic-agent-windows-11-pro-arm64/1.0.1777597312"
+  IMAGE_WIN_11_ARM: "platform-ingest-elastic-agent-windows-11-pro-arm64"
+  IMAGE_WIN_11_ARM_VERSION: "1.0.1777597312"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
@@ -337,8 +338,10 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "azure"
-          machineType: "D8s_v3"
-          image: "${IMAGE_WIN_11_ARM}"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
         retry:
           automatic:
             limit: 1
@@ -369,8 +372,10 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "azure"
-          machineType: "D8s_v3"
-          image: "${IMAGE_WIN_11_ARM}"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
         retry:
           automatic:
             limit: 1
