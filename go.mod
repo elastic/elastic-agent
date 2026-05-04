@@ -499,4 +499,6 @@ replace (
 
 tool golang.org/x/tools/cmd/deadcode
 
+// TODO: Remove this replace directive once https://github.com/elastic/fleet-server/pull/6956 is merged,
+// and update the require directive to point to the upstream commit.
 replace github.com/elastic/fleet-server/pkg/api => github.com/ycombinator/fleet-server/pkg/api v0.0.0-20260504200157-08641022ab7c
