@@ -1,9 +1,0 @@
-kind: bug-fix
-
-summary: Fix potential panic when process state is nil on exit
-
-description: |
-  Added a nil check for ProcessState before calling ExitCode() in the executeWithClient
-  function. This prevents a potential panic when Wait() returns a nil ProcessState.
-
-component: elastic-agent
