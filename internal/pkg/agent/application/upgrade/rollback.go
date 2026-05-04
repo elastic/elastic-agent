@@ -205,7 +205,7 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 		if keepLogs {
 			ignoredDirs = append(ignoredDirs, "logs")
 		}
-		if cleanupErr := install.RemoveBut(hashedDir, true, ignoredDirs...); cleanupErr != nil {
+		if cleanupErr := install.RemoveBut(log, hashedDir, true, ignoredDirs...); cleanupErr != nil {
 			cumulativeError = goerrors.Join(cumulativeError, cleanupErr)
 		}
 	}

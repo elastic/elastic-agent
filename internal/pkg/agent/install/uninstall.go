@@ -163,7 +163,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 
 	// remove existing directory
 	pt.Describe("Removing install directory")
-	err = RemovePath(topPath)
+	err = RemovePath(log, topPath)
 	if err != nil {
 		pt.Describe("Failed to remove install directory")
 		return aerrors.New(
@@ -281,27 +281,31 @@ func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (b
 	return false, nil
 }
 
-// RemovePath helps with removal path where there is a probability
-// of running into an executable running that might prevent removal
-// on Windows.
+// RemovePath helps with removal of a path where there is a probability of
+// running into a running executable that might prevent removal on Windows.
 //
-// On Windows it is possible that a removal can spuriously error due
-// to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
-// seconds if it keeps getting that error.
-func RemovePath(path string) error {
+// On Windows a removal can spuriously error with ERROR_SHARING_VIOLATION
+// or ERROR_ACCESS_DENIED; RemovePath retries for up to 60 seconds. When
+// the failure is caused by a running executable, removeBlockingExe
+// applies the ADS trick to remove the file before the next retry. A
+// failure inside removeBlockingExe (e.g. ERROR_OBJECT_NAME_COLLISION on
+// the rename) is logged and the loop continues, since each retry of
+// os.RemoveAll re-enters removeBlockingExe with a fresh handle.
+func RemovePath(log *logger.Logger, path string) error {
 	const arbitraryTimeout = 60 * time.Second
 	start := time.Now()
 	var lastErr error
 	for time.Since(start) <= arbitraryTimeout {
-		lastErr = removeAll(path)
+		lastErr = os.RemoveAll(path)
 
 		if lastErr == nil || !isRetryableError(lastErr) {
 			return lastErr
 		}
 
 		if isBlockingOnExe(lastErr) {
-			// try to remove the blocking exe and try again to clean up the path
-			_ = removeBlockingExe(lastErr)
+			if err := removeBlockingExe(lastErr); err != nil {
+				log.Warnf("failed to remove blocking executable while removing %q: %v", path, err)
+			}
 		}
 
 		time.Sleep(500 * time.Millisecond)
@@ -310,9 +314,9 @@ func RemovePath(path string) error {
 	return fmt.Errorf("timed out while removing %q. Last error: %w", path, lastErr)
 }
 
-func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
+func RemoveBut(log *logger.Logger, path string, bestEffort bool, exceptions ...string) error {
 	if len(exceptions) == 0 {
-		return RemovePath(path)
+		return RemovePath(log, path)
 	}
 
 	files, err := os.ReadDir(path)
@@ -325,77 +329,13 @@ func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
 			continue
 		}
 
-		err = RemovePath(filepath.Join(path, f.Name()))
+		err = RemovePath(log, filepath.Join(path, f.Name()))
 		if !bestEffort && err != nil {
 			return fmt.Errorf("error removing path %s: %w", f.Name(), err)
 		}
 	}
 
 	return err
-}
-
-// TODO: Replace this with a more robust and less mysterious approach.
-// removeAll is a reimplementation of Go 1.24's os.RemoveAll. Go 1.25 switched
-// to directory-relative unlinkat/openat syscalls (removeall_at.go) which on
-// Windows use NtCreateFile with DELETE access — these are stricter about file
-// state and fail on files that have been ADS-renamed. The simple path-based
-// approach using os.Remove works correctly with the ADS rename trick that
-// RemovePath uses to delete running executables on Windows.
-// Taken from: https://cs.opensource.google/go/go/+/refs/tags/go1.24.13:src/os/removeall_noat.go;drc=a2baae6851a157d662dff7cc508659f66249698a;l=15
-// The implementation which breaks our install is here:
-// https://cs.opensource.google/go/go/+/refs/tags/go1.25.8:src/os/removeall_at.go;drc=e81c624656e415626c7ac3a97768f5c2717979a4;l=15
-func removeAll(path string) error {
-	// Try simple remove first (handles files and empty directories).
-	err := os.Remove(path)
-	if err == nil || errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
-
-	// Check if it's a directory.
-	info, serr := os.Lstat(path)
-	if serr != nil {
-		if errors.Is(serr, fs.ErrNotExist) {
-			return nil
-		}
-		return serr
-	}
-	if !info.IsDir() {
-		// Not a directory — return the original Remove error.
-		return err
-	}
-
-	// Remove directory contents recursively.
-	err = removeAllChildren(path)
-	if err != nil {
-		return err
-	}
-
-	// Remove the now-empty directory.
-	err = os.Remove(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
-	return err
-}
-
-func removeAllChildren(path string) error {
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil
-		}
-		return err
-	}
-
-	var firstErr error
-	for _, entry := range entries {
-		child := filepath.Join(path, entry.Name())
-		err := removeAll(child)
-		if err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return firstErr
 }
 
 func containsString(str string, a []string, caseSensitive bool) bool {
