@@ -385,7 +385,7 @@ func getReceiversConfigForComponent(
 	}
 
 	// get inputs for all the units
-	var inputs []map[string]any
+	var inputs []receiverInput
 	for _, unit := range comp.Units {
 		if unit.Type == client.UnitTypeInput {
 			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp.InputType)
@@ -444,14 +444,11 @@ func getReceiversConfigForComponent(
 
 	// Create one receiver per input
 	receiversConfig := make(map[string]any, len(inputs))
-	for _, input := range inputs {
-		// input["id"] is always a string set by getInputsForUnit, but guard against
-		// unexpected types to avoid generating a receiver with an empty suffix.
-		inputID, ok := input["id"].(string)
-		if !ok || inputID == "" {
-			return nil, fmt.Errorf("input missing required string \"id\" field in component %s", comp.ID)
+	for _, ri := range inputs {
+		if ri.streamID == "" {
+			return nil, fmt.Errorf("input missing stream ID in component %s", comp.ID)
 		}
-		receiverID := GetReceiverID(receiverType, comp.ID+"/"+inputID)
+		receiverID := GetReceiverID(receiverType, comp.ID+"/"+ri.streamID)
 
 		// Create a new config map for this receiver, copying shared config entries.
 		// This is a shallow copy — nested map values (path, logging, http) are shared
@@ -463,11 +460,11 @@ func getReceiversConfigForComponent(
 		switch beatName {
 		case "filebeat":
 			receiverConfig[beatName] = map[string]any{
-				"inputs": []map[string]any{input},
+				"inputs": []map[string]any{ri.config},
 			}
 		case "metricbeat":
 			receiverConfig[beatName] = map[string]any{
-				"modules": []map[string]any{input},
+				"modules": []map[string]any{ri.config},
 			}
 		}
 		receiversConfig[receiverID.String()] = receiverConfig
@@ -650,7 +647,16 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 
 // getInputsForUnit returns the beat inputs for a unit. These can directly be plugged into a beats receiver config.
 // It mainly calls a conversion function from the control protocol client.
-func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, inputType string) ([]map[string]any, error) {
+// receiverInput pairs a beat input config with its authoritative stream ID.
+// The stream ID comes from the proto Stream.Id field and is used as the receiver
+// name suffix. It is kept separate from the input map because not all input types
+// (e.g. metricbeat modules) carry "id" in their source config.
+type receiverInput struct {
+	streamID string
+	config   map[string]any
+}
+
+func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, inputType string) ([]receiverInput, error) {
 	agentInfo := &client.AgentInfo{
 		ID:           info.AgentID(),
 		Version:      info.Version(),
@@ -662,19 +668,39 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 	if err != nil {
 		return nil, err
 	}
+
+	// Build the stream ID list from the proto. CreateInputsFromStreamsForReceiver
+	// returns one input per stream in order, so we can zip them together.
+	streams := unit.Config.GetStreams()
+
 	// Add the type to each input. CreateInputsFromStreams doesn't do this, each beat does it on its own in a transform
 	// function. For filebeat, see: https://github.com/elastic/beats/blob/main/x-pack/filebeat/cmd/agent.go
-
-	for _, input := range inputs {
+	result := make([]receiverInput, len(inputs))
+	for i, input := range inputs {
 		// If inputType contains /metrics, use modules to create inputs
 		if strings.Contains(inputType, "/metrics") {
 			input["module"] = strings.TrimSuffix(inputType, "/metrics")
 		} else if _, ok := input["type"]; !ok {
 			input["type"] = inputType
 		}
+
+		var streamID string
+		if i < len(streams) {
+			streamID = streams[i].GetId()
+		}
+		// Fall back to the input map's "id" field if the proto stream ID is empty.
+		if streamID == "" {
+			streamID, _ = input["id"].(string)
+		}
+		// If still empty (e.g. standalone config with no stream IDs), generate
+		// a deterministic ID from the unit ID and stream index.
+		if streamID == "" {
+			streamID = fmt.Sprintf("%s-%d", unit.ID, i)
+		}
+		result[i] = receiverInput{streamID: streamID, config: input}
 	}
 
-	return inputs, nil
+	return result, nil
 }
 
 // extractOtelProcessors extracts the processor IDs from the output configuration.
