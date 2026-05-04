@@ -139,6 +139,9 @@ func run(override application.CfgOverrider, testingMode bool, fleetInitTimeout t
 	stop := make(chan bool)
 	ctx, cancel := context.WithCancel(context.Background())
 	stopBeat := func() {
+		// Cancel ctx so any ctx-aware work running before the main select
+		// loop on `stop` is reached returns promptly.
+		cancel()
 		close(stop)
 	}
 
