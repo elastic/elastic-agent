@@ -7,6 +7,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 // binaryName is the name of the executable to run
@@ -48,26 +48,20 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 				}
 			}()
 
-			info, err := process.Start(executable,
-				process.WithArgs(cmdArgs),
-				process.WithCmdOptions(func(c *exec.Cmd) error {
-					c.Stdout = os.Stdout
-					c.Stderr = os.Stderr
-					c.Stdin = os.Stdin
-					return nil
-				}),
-			)
+			cmd := exec.Command(executable, cmdArgs...) //nolint:noctx // signal handling is via os.Signal, not ctx
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Stdin = os.Stdin
 
-			if err != nil {
-
-				return fmt.Errorf("failed to start %s: %w", executable, err)
+			err := cmd.Run()
+			if err == nil {
+				return nil
 			}
-			processState, err := info.Process.Wait()
-			if err != nil {
-				return fmt.Errorf("failed to wait for %s: %w", executable, err)
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) {
+				os.Exit(exitErr.ExitCode())
 			}
-			os.Exit(processState.ExitCode())
-			return nil
+			return fmt.Errorf("failed to run %s: %w", executable, err)
 		},
 	}
 }
