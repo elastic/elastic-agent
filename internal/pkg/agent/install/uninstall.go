@@ -163,7 +163,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 
 	// remove existing directory
 	pt.Describe("Removing install directory")
-	err = RemovePath(topPath)
+	err = RemovePath(log, topPath)
 	if err != nil {
 		pt.Describe("Failed to remove install directory")
 		return aerrors.New(
@@ -281,14 +281,17 @@ func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (b
 	return false, nil
 }
 
-// RemovePath helps with removal path where there is a probability
-// of running into an executable running that might prevent removal
-// on Windows.
+// RemovePath helps with removal of a path where there is a probability of
+// running into a running executable that might prevent removal on Windows.
 //
-// On Windows it is possible that a removal can spuriously error due
-// to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
-// seconds if it keeps getting that error.
-func RemovePath(path string) error {
+// On Windows a removal can spuriously error with ERROR_SHARING_VIOLATION
+// or ERROR_ACCESS_DENIED; RemovePath retries for up to 60 seconds. When
+// the failure is caused by a running executable, removeBlockingExe
+// applies the ADS trick to remove the file before the next retry. A
+// failure inside removeBlockingExe (e.g. ERROR_OBJECT_NAME_COLLISION on
+// the rename) is logged and the loop continues, since each retry of
+// os.RemoveAll re-enters removeBlockingExe with a fresh handle.
+func RemovePath(log *logger.Logger, path string) error {
 	const arbitraryTimeout = 60 * time.Second
 	start := time.Now()
 	var lastErr error
@@ -300,8 +303,9 @@ func RemovePath(path string) error {
 		}
 
 		if isBlockingOnExe(lastErr) {
-			// try to remove the blocking exe and try again to clean up the path
-			_ = removeBlockingExe(lastErr)
+			if err := removeBlockingExe(lastErr); err != nil {
+				log.Warnf("failed to remove blocking executable while removing %q: %v", path, err)
+			}
 		}
 
 		time.Sleep(500 * time.Millisecond)
@@ -310,9 +314,9 @@ func RemovePath(path string) error {
 	return fmt.Errorf("timed out while removing %q. Last error: %w", path, lastErr)
 }
 
-func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
+func RemoveBut(log *logger.Logger, path string, bestEffort bool, exceptions ...string) error {
 	if len(exceptions) == 0 {
-		return RemovePath(path)
+		return RemovePath(log, path)
 	}
 
 	files, err := os.ReadDir(path)
@@ -325,7 +329,7 @@ func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
 			continue
 		}
 
-		err = RemovePath(filepath.Join(path, f.Name()))
+		err = RemovePath(log, filepath.Join(path, f.Name()))
 		if !bestEffort && err != nil {
 			return fmt.Errorf("error removing path %s: %w", f.Name(), err)
 		}
