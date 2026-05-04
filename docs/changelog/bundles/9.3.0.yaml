@@ -1,0 +1,228 @@
+﻿products:
+- product: elastic-agent
+  target: 9.3.0
+  repo: elastic-agent
+  owner: elastic
+entries:
+- file:
+    name: 11795.yaml
+    checksum: 160a12742041a9b903f5e88f25e07201e299d24d
+  type: enhancement
+  title: Reintroduce cloud defend to agent container images
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/11795
+- file:
+    name: 11998.yaml
+    checksum: 549a44e7d0296a5c4f0722463b779630fad55fca
+  type: bug-fix
+  title: Fix reloading agent.logging.level for standalone Elastic Agent.
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/11998
+- file:
+    name: 12225.yaml
+    checksum: 163b0ec5b2a71169be6f6e7d469455e1e4c5d537
+  type: bug-fix
+  title: Report app lock errors correctly
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/12225
+- file:
+    name: 11825.yaml
+    checksum: 4851a00ba521d9727b2afbaa4119351422bcf395
+  type: enhancement
+  title: Improve input not supported error to mention installation flavors.
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/11825
+  issues:
+  - https://github.com/elastic/elastic-agent/issues/11746
+- file:
+    name: 12073.yaml
+    checksum: ccbe958e4f59e4072dee0e967a80185a3fb66db7
+  type: bug-fix
+  title: Container entrypoint retrieves policy and enrollment token when more than 20 are present
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/12073
+  issues:
+  - https://github.com/elastic/elastic-agent/issues/12069
+- file:
+    name: 10644.yaml
+    checksum: 45a3e931b9f0dad0441c444eca0d7ed63cea2cfc
+  type: enhancement
+  title: Add Logstash Output to Elastic Agent Standalone
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/10644
+- file:
+    name: 11813.yaml
+    checksum: b1bd5bef72a484c5dcf99c7c1b2febc37b5fdb6d
+  type: enhancement
+  title: Ingest collector internal telemetry via in-process hooks
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/11813
+  issues:
+  - https://github.com/elastic/elastic-agent/issues/10220
+- file:
+    name: 12205.yaml
+    checksum: 123e78ed5a33dd937d9efc7923977fff64c42d4b
+  type: bug-fix
+  title: 'kube-stack: Update OTel collector gateway to use OTEL_K8S_POD_IP instead of MY_POD_IP'
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/12205
+  issues:
+  - https://github.com/elastic/elastic-agent/issues/123
+  - https://github.com/elastic/elastic-agent/issues/11597
+- file:
+    name: 11619.yaml
+    checksum: cb7a6908432004f34e9113631ab03bc29ef08c82
+  type: bug-fix
+  title: Add default option to allow merging multiple agent config keys
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/11619
+  issues:
+  - https://github.com/elastic/elastic-agent/issues/3717
+- file:
+    name: 11418.yaml
+    checksum: 71de6fb4875e804544e50aa44dc5de0784c34ebc
+  type: feature
+  title: add windowsperfcounters receiver
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/11418
+- file:
+    name: 11300.yaml
+    checksum: b1e1de9d3e04abc58f83a2ab3c7601299ad6df97
+  type: bug-fix
+  title: Ensure the self-monitoring configuration knows the actual component runtime
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/11300
+  issues:
+  - https://github.com/elastic/ingest-dev/issues/6422
+- file:
+    name: 12239.yaml
+    checksum: f8492f334d7d25763954c367bec40bffca3b52e8
+  type: enhancement
+  title: 'feat: add SNMP receiver to EDOT Collector'
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/12239
+- file:
+    name: 10231.yaml
+    checksum: 4be94ba61b50b8030ca4a664b3a33d9e90126984
+  type: enhancement
+  title: Handle `PRIVILEGE_LEVEL_CHANGE` action
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/10231
+- file:
+    name: 12312.yaml
+    checksum: d005ffa619de26e6e81cbbf1883b40d195e667c1
+  type: bug-fix
+  title: Fix diagnostics socket path for read-only container filesystems.
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/12312
+- file:
+    name: 12187.yaml
+    checksum: dd962e004ccd4ddb4687ec93f847434a7cfacccf
+  type: breaking-change
+  title: Remove Elastic Agent global CLI flags from `otel` subcommand.
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  description: 'The `elastic-agent otel` subcommand no longer accepts global CLI flags that had no effect: `-c`, `--path.home`, `--path.home.unversioned`, `--path.config`, `--path.logs`, `--path.socket` and `--path.downloads`.'
+  impact: Removal of these flags can result in otel subcommand failure, if they being are used. These flags had no effect on the otel subcommand behavior.
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/12187
+- file:
+    name: 12364.yaml
+    checksum: 6e65ae5df78163251b35b7ce4395641d7bb8d472
+  type: enhancement
+  title: Replace elastic-agent/collector component name with elastic-otel-collector in self-monitoring.
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  description: Make self-monitoring metrics consistently use the name of the new elastic-otel-collector binary executing the EDOT collector and beats receivers.
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/12364
+- file:
+    name: 11955.yaml
+    checksum: 526d82008fc416b227691c644ba366eebeb0402b
+  type: enhancement
+  title: Set manual rollback default window to 7 days
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/11955
+  issues:
+  - https://github.com/elastic/elastic-agent/issues/6881
+- file:
+    name: 11484.yaml
+    checksum: 22cf432b518da7602d68a466a945aa15b0c5701d
+  type: bug-fix
+  title: Add environment.yml file to diagnostics
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/11484
+  issues:
+  - https://github.com/elastic/elastic-agent/issues/10966
+- file:
+    name: 11826.yaml
+    checksum: beb05473242da38df5567f2939dac9e993f63b23
+  type: bug-fix
+  title: Fix signature verification using the upgrade command with the --source-uri flag for fleet-managed agents
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/11826
+  issues:
+  - https://github.com/elastic/elastic-agent/issues/11152
+- file:
+    name: 11186.yaml
+    checksum: a1739c0bae6bd8240d4aaa8489b574f45c86f2a0
+  type: enhancement
+  title: Allow setting the otel runtime per input type
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  prs:
+  - https://github.com/elastic/elastic-agent/pull/11186

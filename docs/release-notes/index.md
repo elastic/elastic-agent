@@ -22,5 +22,12 @@ To check for security updates, go to [Security announcements for the Elastic Sta
 {{agent}} integrates and manages {{beats}} for data collection, and Beats changes may impact {{agent}} functionality. To check for {{agent}} changes in {{beats}}, go to [{{beats}} release notes](beats://release-notes/index.md).
 :::
 
+## New content
+
+:::{changelog} /changelog/bundles
+:::
+
+## Old content
+
 :::{include} /release-notes/_snippets/index.md
 :::

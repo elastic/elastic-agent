@@ -1,0 +1,174 @@
+# Changelog Configuration
+# This file configures the valid values for changelog fields using the pivot structure.
+# Place this file as `changelog.yml` in the `docs/` directory
+
+# Products configuration (optional)
+# If not specified, all products from products.yml are allowed
+products:
+  # List of available product IDs (empty = all from products.yml)
+  available:
+    - elastic-agent
+  # Default products when --products not specified
+  # default:
+  #   - product: elasticsearch
+  #     lifecycle: ga
+
+# Extraction configuration
+# Controls automatic extraction of information from PR descriptions
+extract:
+  # Auto-extract release notes from PR descriptions (default: true)
+  # Can be overridden by CLI --no-extract-release-notes
+  release_notes: true
+  # Auto-extract issues from PR body (default: true)
+  # Looks for patterns like "Fixes #123", "Closes #456", etc.
+  issues: true
+
+# Available lifecycle values (strongly typed: preview, beta, ga)
+lifecycles:
+  - preview
+  - beta
+  - ga
+
+# Pivot configuration for types, subtypes, and areas with label mappings.
+# By default we render entries grouped by type > subtype > area.
+# NOTE: subtype and area are optional and either may be omitted.
+# Labels are specified in a "label -> value" format
+pivot:
+  # Type definitions with optional labels
+  # At a minimum, feature, bug-fix, and breaking-change must be configured.
+  # Keys are type names, values can be:
+  #   - simple string: comma-separated label list (e.g., ">bug, >fix")
+  #   - empty/null: no labels for this type
+  #   - object: { labels: "...", subtypes: {...} } for breaking-change type only
+  types:
+    # Complex object form with subtypes (ONLY allowed for breaking-change)
+    # Subtypes help categorize breaking changes by their nature
+    breaking-change:
+      labels: "breaking change"
+      # subtypes:
+      #   api: ">api-breaking"
+      #   behavioral: ">behavioral-breaking"
+      #   configuration: ">config-breaking"
+      #   dependency: ">dependency-breaking"
+      #   subscription: ">subscription-breaking"
+      #   plugin: ">plugin-breaking"
+      #   security: ">security-breaking"
+      #   other:
+    # Simple string form: labels as comma-separated string
+    bug-fix: ">bug, bug"
+    deprecation: "Deprecation"
+    feature:
+    enhancement: "enhancement"
+    docs: "docs, documentation"
+    known-issue:
+    other:
+    regression: "regression"
+    security:
+
+  # Area definitions with labels
+  # Keys are area display names, values are label strings
+  # Multiple labels can be comma-separated
+  # areas:
+    # Example mappings - customize based on your label naming conventions
+    # Autoscaling: ":Distributed Coordination/Autoscaling"
+    # Search: ":Search/Search"
+    # Security: ":Security/Security"
+    # Watcher: ":Data Management/Watcher"
+
+# Rules configuration — controls which PRs create changelogs and which entries are published.
+# All list-like fields (exclude, include, exclude_types, etc.) accept BOTH forms:
+#   - Comma-separated string: "value1, value2, value3"
+#   - YAML list: [value1, value2, value3]
+#
+# Global match default for multi-valued fields (labels, areas).
+#   any (default) = match if ANY item matches the list
+#   all           = match only if ALL items match the list
+# Inherited by create, publish, and all product overrides.
+rules:
+  match: any
+
+  # Create — controls which PRs generate changelog entries.
+  #   exclude: block PRs with these labels (string or list)
+  #   include: only create changelogs for PRs with these labels (string or list)
+  # Cannot specify both.
+  #
+  create:
+    exclude:  "skip-changelog, backport"
+  #   # Or equivalently:
+  #   # exclude:
+  #   #   - ">non-issue"
+  #   #   - ">test"
+  #   # match: any
+  #   products:
+  #     'elasticsearch, kibana':
+  #       exclude: ">test"
+  #     'cloud-serverless':
+  #       exclude: "ILM"
+
+  # Publish — controls which entries appear in rendered output.
+  #   exclude_types / include_types (string or list)
+  #   exclude_areas / include_areas (string or list)
+  # Cannot mix exclude_ and include_ for the same field.
+  #
+  # match_areas inherits from rules.match if not specified.
+  #
+  # publish:
+  #   # match_areas: any
+  #   exclude_types: "deprecation, known-issue"
+  #   # Or equivalently:
+  #   # exclude_types:
+  #   #   - deprecation
+  #   #   - known-issue
+  #   exclude_areas:
+  #     - "Internal"
+  #   products:
+  #     'elasticsearch, kibana':
+  #       exclude_types:
+  #         - docs
+  #     'cloud-serverless':
+  #       # match_areas: any
+  #       include_areas:
+  #         - "Search"
+  #         - "Monitoring"
+
+# Bundle configuration (profiles and defaults)
+bundle:
+  # Input directory containing changelog YAML files
+  directory: changelog/new
+  # Output directory for bundled changelog files
+  output_directory: docs/changelog/bundles
+  # Whether to resolve (copy contents) by default
+  resolve: true
+  # Optional: default GitHub repo name applied to all profiles that do not specify their own.
+  # Used by the {changelog} directive to generate correct PR/issue links when the product ID
+  # differs from the GitHub repository name. Can be overridden per profile.
+  repo: elastic-agent
+  # Optional: default GitHub owner applied to all profiles that do not specify their own.
+  owner: elastic
+
+  # Named bundle profiles for different release scenarios.
+  # Profiles can be used with both 'changelog bundle' and 'changelog remove':
+  #   docs-builder changelog bundle elasticsearch-release 9.2.0
+  #   docs-builder changelog remove elasticsearch-release 9.2.0
+  # When used with 'changelog remove', only the 'products' field is applied.
+  # The 'output', 'output_products', 'repo', 'owner', and 'hide_features' fields are
+  # bundle-specific and are ignored for removal.
+  profiles:
+    # Example: Elasticsearch release profile
+    elastic-agent-release:
+    #   # Filter: which input changelogs to include ({version} and {lifecycle} are substituted at runtime)
+      # products: "elasticsearch {version} {lifecycle}"
+    #   # Output filename ({version} is substituted at runtime)
+      output: "{version}.yaml"
+    #   # Optional: override the products array written to the bundle output.
+    #   # Useful when the bundle should advertise a different lifecycle than was used for filtering.
+      output_products: "elastic-agent {version}"
+    #   # Optional: profile-specific GitHub repo name (overrides bundle.repo if set).
+    #   # Only needed when this profile's product ID differs from the repository name.
+    #   # repo: elasticsearch
+    #   # Optional: profile-specific GitHub owner (overrides bundle.owner if set).
+    #   # owner: elastic
+    #   # Feature IDs to hide when bundling with this profile (accepts string or list)
+    #   hide_features:
+    #     - feature-flag-1
+    #     - feature-flag-2
