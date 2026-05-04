@@ -9,6 +9,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -16,6 +17,8 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
+
+	"github.com/elastic/elastic-agent/pkg/core/process"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -48,20 +51,48 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 				}
 			}()
 
+			g, err := process.CreateJobObject()
+			if err != nil {
+				log.Fatalf("Unable to create job object: %v\n", err)
+			}
+			defer func() {
+				_ = g.Close()
+			}()
+
 			cmd := exec.Command(executable, cmdArgs...) //nolint:noctx // signal handling is via os.Signal, not ctx
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			cmd.Stdin = os.Stdin
 
-			err := cmd.Run()
-			if err == nil {
-				return nil
+			// Pass the environment
+			cmd.Env = os.Environ()
+
+			err = cmd.Start()
+			if err != nil {
+				return fmt.Errorf("Error running command: %v\n", err)
 			}
-			var exitErr *exec.ExitError
-			if errors.As(err, &exitErr) {
-				os.Exit(exitErr.ExitCode())
+
+			// Add the process to the job object
+			if err := g.Assign(cmd.Process); err != nil {
+				return fmt.Errorf("Error adding job object: %v\n", err)
 			}
-			return fmt.Errorf("failed to run %s: %w", executable, err)
+
+			err = cmd.Wait()
+			var exitError *exec.ExitError
+			switch {
+			case errors.As(err, &exitError):
+				exitCode := exitError.ExitCode()
+				if exitCode == 0 {
+					// Exit with non-zero exit code since we did get an error
+					os.Exit(1)
+				}
+				// Exit with the same exit code
+				os.Exit(exitCode)
+			case err != nil:
+				// Exit with a non-zero exit code
+				return fmt.Errorf("Command failed: %v\n", err)
+			}
+			return nil
 		},
 	}
 }
