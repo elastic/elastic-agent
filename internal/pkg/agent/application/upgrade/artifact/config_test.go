@@ -310,3 +310,59 @@ func TestConfig_Unpack(t *testing.T) {
 	require.NoError(t, err, "UnpackTo failed")
 	assert.Equal(t, DefaultConfig(), defaultcfg)
 }
+
+// TestConfig_Unpack_RetrySleepInitDuration covers the validation of
+// retry_sleep_init_duration during YAML unpack. A non-positive value would feed
+// directly into cenkalti/backoff's InitialInterval and produce a 0-duration
+// retry loop on transient download failures (see #13505), so the unpack must
+// clamp it back to the default. Positive values must pass through unchanged.
+func TestConfig_Unpack_RetrySleepInitDuration(t *testing.T) {
+	defaultRetry := DefaultConfig().RetrySleepInitDuration
+
+	tcs := []struct {
+		name     string
+		yaml     string
+		expected time.Duration
+	}{
+		{
+			name:     "zero is clamped to default",
+			yaml:     "retry_sleep_init_duration: 0s",
+			expected: defaultRetry,
+		},
+		{
+			name:     "negative is clamped to default",
+			yaml:     "retry_sleep_init_duration: -5s",
+			expected: defaultRetry,
+		},
+		{
+			name:     "sub-nanosecond negative is clamped to default",
+			yaml:     "retry_sleep_init_duration: -1ns",
+			expected: defaultRetry,
+		},
+		{
+			name:     "positive value is preserved",
+			yaml:     "retry_sleep_init_duration: 5s",
+			expected: 5 * time.Second,
+		},
+		{
+			name:     "absent key keeps default",
+			yaml:     "",
+			expected: defaultRetry,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+
+			raw, err := agentlibsconfig.NewConfigFrom(tc.yaml)
+			require.NoError(t, err, "could not create config from yaml")
+
+			err = cfg.Unpack(raw)
+			require.NoError(t, err, "Unpack failed")
+
+			assert.Equal(t, tc.expected, cfg.RetrySleepInitDuration,
+				"RetrySleepInitDuration was not clamped/preserved as expected")
+		})
+	}
+}
