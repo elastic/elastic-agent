@@ -445,10 +445,17 @@ func getReceiversConfigForComponent(
 	// Create one receiver per input
 	receiversConfig := make(map[string]any, len(inputs))
 	for _, input := range inputs {
-		inputID, _ := input["id"].(string)
+		// input["id"] is always a string set by getInputsForUnit, but guard against
+		// unexpected types to avoid generating a receiver with an empty suffix.
+		inputID, ok := input["id"].(string)
+		if !ok || inputID == "" {
+			return nil, fmt.Errorf("input missing required string \"id\" field in component %s", comp.ID)
+		}
 		receiverID := GetReceiverID(receiverType, comp.ID+"/"+inputID)
 
-		// Create a new config map for this receiver, copying shared config entries
+		// Create a new config map for this receiver, copying shared config entries.
+		// This is a shallow copy — nested map values (path, logging, http) are shared
+		// across receivers. This is safe because nothing mutates them after construction.
 		receiverConfig := make(map[string]any, len(sharedConfig)+1)
 		for k, v := range sharedConfig {
 			receiverConfig[k] = v

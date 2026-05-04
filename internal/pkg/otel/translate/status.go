@@ -333,6 +333,10 @@ func getStreamStatusFromReceiver(rs *status.AggregateStatus, streamID string) *s
 	if !ok {
 		return nil
 	}
+	// Decode may fail if the receiver hasn't populated its attributes yet or the
+	// structure doesn't match expectations. This is not an error — it just means
+	// per-stream status isn't available, so we return nil and the caller falls
+	// back to the receiver's top-level status.
 	var inputStatusMap map[string]*serializablestatus.SerializableEvent
 	if err := mapstructure.Decode(inputStatuses, &inputStatusMap); err != nil {
 		return nil
@@ -404,10 +408,10 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.
 
 // getComponentUnitState extracts component unit state from otel status.
 // For input units with streams, receiverByInputID maps each stream/input ID to its dedicated receiver status.
-// For output units or starting state, otelUnitStatus provides a single status and receiverByInputID is nil.
-func getComponentUnitState(otelUnitStatus *status.AggregateStatus, receiverByInputID map[string]*status.AggregateStatus, unit component.Unit, comp *component.Component) runtime.ComponentUnitState {
+// For output units or starting state, outputUnitStatus provides a single fallback status and receiverByInputID is nil.
+func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByInputID map[string]*status.AggregateStatus, unit component.Unit, comp *component.Component) runtime.ComponentUnitState {
 	if unit.Config == nil || unit.Type == client.UnitTypeOutput {
-		topLevelState, topLevelMessage := StateWithMessage(otelUnitStatus)
+		topLevelState, topLevelMessage := StateWithMessage(outputUnitStatus)
 		return runtime.ComponentUnitState{
 			State:   topLevelState,
 			Message: topLevelMessage,
@@ -447,7 +451,11 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, receiverByInp
 			} else {
 				// No per-stream attributes, use the receiver's top-level status
 				topState, topMsg := StateWithMessage(rs)
-				if topState > worstReceiverState {
+				// Ignore STOPPING/STOPPED for worst-state aggregation — a single stream
+				// shutting down is normal and should not override the health states of
+				// other active streams.
+				if topState != client.UnitStateStopping && topState != client.UnitStateStopped &&
+					topState > worstReceiverState {
 					worstReceiverState = topState
 					worstReceiverMessage = topMsg
 				}
@@ -460,10 +468,10 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, receiverByInp
 					"status": topState.String(),
 				}
 			}
-		} else if otelUnitStatus != nil {
+		} else if outputUnitStatus != nil {
 			// No per-stream receiver, fall back to the single unit status (starting state)
-			topState, topMsg := StateWithMessage(otelUnitStatus)
-			isError := otelUnitStatus.Err() != nil
+			topState, topMsg := StateWithMessage(outputUnitStatus)
+			isError := outputUnitStatus.Err() != nil
 			if !isError {
 				topMsg = ""
 			}
@@ -530,8 +538,8 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, receiverByInp
 	}
 
 	// Fall back to single unit status (starting state or no receivers)
-	if otelUnitStatus != nil {
-		topLevelState, topLevelMessage := StateWithMessage(otelUnitStatus)
+	if outputUnitStatus != nil {
+		topLevelState, topLevelMessage := StateWithMessage(outputUnitStatus)
 		return runtime.ComponentUnitState{
 			State:   topLevelState,
 			Message: topLevelMessage,
