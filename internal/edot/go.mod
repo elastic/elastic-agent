@@ -17,7 +17,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260507213829-7bbe8ee6dcfb
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.41.1
+	github.com/elastic/elastic-agent-libs v0.42.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.46.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.46.0
@@ -83,7 +83,7 @@ require (
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.149.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.149.0
 	go.opentelemetry.io/ebpf-profiler v0.0.202614
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -529,7 +529,7 @@ require (
 	github.com/linode/go-metadata v0.2.4 // indirect
 	github.com/linode/linodego v1.66.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20251013123823-9fd1530e3ec3 // indirect
-	github.com/magefile/mage v1.15.0 // indirect
+	github.com/magefile/mage v1.17.2 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-ieproxy v0.0.1 // indirect

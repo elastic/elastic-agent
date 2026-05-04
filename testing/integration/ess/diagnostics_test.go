@@ -294,7 +294,7 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		case map[string]any:
 			for rootKey, value := range root {
 				if rootKey == "custom_attr" {
-					if value != "<REDACTED>" {
+					if value != "REDACTED" {
 						return fmt.Errorf("found non-redacted value in %q", rootKey)
 					}
 				}
