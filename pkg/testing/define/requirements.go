@@ -105,6 +105,17 @@ type Requirements struct {
 	// combination.
 	OS []OS `json:"os,omitempty"`
 
+	// SkipOS defines operating system / architecture combinations on which
+	// this test must be skipped, even when the runtime would otherwise satisfy
+	// OS. It is the negative counterpart of OS and is intended for tests that
+	// are generally portable but cannot run on a specific OS+arch combination
+	// (for example because a required component has no build for that
+	// platform).
+	//
+	// Matching follows the same semantics as OS: an empty Arch matches any
+	// architecture, an empty Version matches any version, etc.
+	SkipOS []OS `json:"skip_os,omitempty"`
+
 	// Stack defines the stack required for the test.
 	Stack *Stack `json:"stack,omitempty"`
 
@@ -134,7 +145,36 @@ func (r Requirements) Validate() error {
 			return fmt.Errorf("invalid os %d: %w", i, err)
 		}
 	}
+	for i, o := range r.SkipOS {
+		if err := o.Validate(); err != nil {
+			return fmt.Errorf("invalid skip_os %d: %w", i, err)
+		}
+	}
 	return nil
+}
+
+// runtimeSkipped returns the matching SkipOS entry (and true) when the runtime
+// matches any SkipOS entry, signalling that the test should be skipped.
+func (r Requirements) runtimeSkipped(os string, arch string, version string, distro string, dockerVariant string) (OS, bool) {
+	for _, o := range r.SkipOS {
+		if o.Type != Kubernetes && o.Type != os {
+			continue
+		}
+		if o.Arch != "" && o.Arch != arch {
+			continue
+		}
+		if o.Version != "" && o.Version != version {
+			continue
+		}
+		if o.Distro != "" && o.Distro != distro {
+			continue
+		}
+		if o.Type == Kubernetes && dockerVariant != "" && o.DockerVariant != "" && o.DockerVariant != dockerVariant {
+			continue
+		}
+		return o, true
+	}
+	return OS{}, false
 }
 
 // runtimeAllowed returns true if the runtime matches a valid OS.
