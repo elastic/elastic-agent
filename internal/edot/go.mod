@@ -5,9 +5,9 @@ go 1.25.9
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260427222608-c8d50dbe273e
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260502174325-531ae9c87639
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.39.0
+	github.com/elastic/elastic-agent-libs v0.40.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.45.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.42.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.42.0
@@ -19,6 +19,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.149.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.149.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.149.0
@@ -71,6 +72,7 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
 	github.com/google/pprof v0.0.0-20260202012954-cb029daf43ef // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding v0.149.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/internal/credentialsfile v0.149.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sinventory v0.149.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.149.0 // indirect
@@ -223,7 +225,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/apigateway v1.31.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/apigatewayv2 v1.28.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.45.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.50.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.65.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.51.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.296.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.45.4 // indirect

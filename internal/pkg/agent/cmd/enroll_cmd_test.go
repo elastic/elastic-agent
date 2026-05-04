@@ -38,6 +38,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -774,6 +775,21 @@ func (failingSender) Send(context.Context, string, string, url.Values, http.Head
 
 func (failingSender) URI() string { return "http://localhost" }
 
+// invalidAPIKeySender implements fleetclient.Sender and always returns
+// fleetclient.ErrInvalidAPIKey, mimicking a 401 from fleet-server. It tracks
+// the number of Send calls so tests can assert how often the retry loop
+// re-attempted enrollment.
+type invalidAPIKeySender struct {
+	calls atomic.Int32
+}
+
+func (s *invalidAPIKeySender) Send(context.Context, string, string, url.Values, http.Header, io.Reader) (*http.Response, error) {
+	s.calls.Add(1)
+	return nil, fleetclient.ErrInvalidAPIKey
+}
+
+func (*invalidAPIKeySender) URI() string { return "http://localhost" }
+
 // fakeBackoff allows controlling the sequence of Wait() return values for tests.
 type fakeBackoff struct {
 	results []bool
@@ -829,6 +845,43 @@ func TestEnrollWithBackoff_InterruptsBackoffWaitOnCtxCancel(t *testing.T) {
 		err := <-errCh
 		require.ErrorIs(t, err, context.Canceled)
 	})
+}
+
+// TestEnrollWithBackoff_RetriesOnInvalidAPIKey documents that on this branch
+// the retry loop in enrollWithBackoff does NOT short-circuit when fleet-server
+// rejects the enrollment token (returns 401). The delayed-enrollment path
+// (tryDelayEnroll, called by `agent run`) depends on this behavior so the
+// daemon keeps waiting for the operator to rotate the enrollment token
+// instead of giving up. See PR #13861 (main) for the equivalent fix in the
+// extracted enroll package.
+func TestEnrollWithBackoff_RetriesOnInvalidAPIKey(t *testing.T) {
+	testutils.InitStorage(t)
+
+	log := logger.NewWithoutConfig("")
+
+	sender := &invalidAPIKeySender{}
+	// Allow two backoff waits, then signal stop so the loop terminates and
+	// the test does not hang.
+	fb := &fakeBackoff{results: []bool{true, true, false}}
+
+	cmd := enrollCmd{
+		log:    log,
+		client: sender,
+		options: &enrollCmdOption{
+			EnrollAPIKey: "stub-enrollment-token",
+		},
+		backoffFactory: func(done <-chan struct{}) backoff.Backoff {
+			return fb
+		},
+	}
+
+	err := cmd.enrollWithBackoff(t.Context(), map[string]interface{}{})
+
+	// 1 initial attempt + 2 retries before the fake backoff signals stop.
+	require.Equal(t, int32(3), sender.calls.Load(),
+		"expected the retry loop to keep retrying on ErrInvalidAPIKey")
+	require.Error(t, err)
+	require.ErrorIs(t, err, fleetclient.ErrInvalidAPIKey)
 }
 
 func TestWaitForFleetServer_timeout(t *testing.T) {
