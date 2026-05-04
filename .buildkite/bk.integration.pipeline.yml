@@ -13,7 +13,7 @@ env:
   IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1777597312"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1777597312"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1777597312"
-  IMAGE_WIN_11_ARM: "platform-ingest-elastic-agent-windows-11-pro-arm64"
+  IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
   IMAGE_WIN_11_ARM64_VERSION: "1.0.1777597312"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
