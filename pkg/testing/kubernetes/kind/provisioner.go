@@ -49,8 +49,8 @@ nodes:
         secure-port: "10257"
 `
 
-func NewProvisioner() common.InstanceProvisioner {
-	return &provisioner{}
+func NewProvisioner(log common.Logger) common.InstanceProvisioner {
+	return &provisioner{logger: log}
 }
 
 type provisioner struct {
@@ -63,10 +63,6 @@ func (p *provisioner) Name() string {
 
 func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeK8SCluster
-}
-
-func (p *provisioner) SetLogger(l common.Logger) {
-	p.logger = l
 }
 
 func (p *provisioner) Supported(batch define.OS) bool {

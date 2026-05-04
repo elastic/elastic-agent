@@ -20,19 +20,16 @@ type Client struct {
 	logger common.Logger
 }
 
-func NewClient(config Config) *Client {
+func NewClient(logger common.Logger, config Config) *Client {
 	cfg := defaultConfig()
 	cfg.Merge(config)
 
 	c := new(Client)
 	c.client = http.DefaultClient
 	c.config = cfg
+	c.logger = logger
 
 	return c
-}
-
-func (c *Client) SetLogger(logger common.Logger) {
-	c.logger = logger
 }
 
 func (c *Client) doGet(ctx context.Context, relativeUrl string) (*http.Response, error) {

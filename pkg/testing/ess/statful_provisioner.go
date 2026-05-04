@@ -48,15 +48,16 @@ type StatefulProvisioner struct {
 }
 
 // NewProvisioner creates the ESS stateful Provisioner
-func NewProvisioner(cfg ProvisionerConfig) (common.StackProvisioner, error) {
+func NewProvisioner(log common.Logger, cfg ProvisionerConfig) (common.StackProvisioner, error) {
 	err := cfg.Validate()
 	if err != nil {
 		return nil, err
 	}
-	essClient := NewClient(Config{
+	essClient := NewClient(log, Config{
 		ApiKey: cfg.APIKey,
 	})
 	return &StatefulProvisioner{
+		logger: log,
 		cfg:    cfg,
 		client: essClient,
 	}, nil
@@ -64,11 +65,6 @@ func NewProvisioner(cfg ProvisionerConfig) (common.StackProvisioner, error) {
 
 func (p *StatefulProvisioner) Name() string {
 	return ProvisionerStateful
-}
-
-func (p *StatefulProvisioner) SetLogger(l common.Logger) {
-	p.logger = l
-	p.client.SetLogger(l)
 }
 
 // Create creates a stack.

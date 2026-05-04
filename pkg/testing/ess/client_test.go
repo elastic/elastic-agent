@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 func TestClient_CreateAndShutdownDeployment(t *testing.T) {
@@ -20,8 +22,11 @@ func TestClient_CreateAndShutdownDeployment(t *testing.T) {
 		t.Skip("ESS_API_KEY (for QA) environment variable not set")
 	}
 
+	logger, err := logp.NewDevelopmentLogger("ess-test")
+	require.NoError(t, err)
+
 	cfg := Config{ApiKey: essApiKey}
-	client := NewClient(cfg)
+	client := NewClient(&defaultLogger{wrapped: logger}, cfg)
 
 	// Create deployment
 	resp, err := client.CreateDeployment(context.Background(), CreateDeploymentRequest{

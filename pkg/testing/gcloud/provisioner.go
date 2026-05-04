@@ -46,20 +46,16 @@ type provisioner struct {
 }
 
 // NewProvisioner creates the gcloud provisioner.
-func NewProvisioner(cfg Config) (common.InstanceProvisioner, error) {
+func NewProvisioner(log common.Logger, cfg Config) (common.InstanceProvisioner, error) {
 	err := cfg.Validate()
 	if err != nil {
 		return nil, err
 	}
-	return &provisioner{cfg: cfg}, nil
+	return &provisioner{logger: log, cfg: cfg}, nil
 }
 
 func (p *provisioner) Name() string {
 	return Name
-}
-
-func (p *provisioner) SetLogger(l common.Logger) {
-	p.logger = l
 }
 
 func (p *provisioner) Type() common.ProvisionerType {

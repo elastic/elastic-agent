@@ -48,10 +48,10 @@ type ServerlessRegions struct {
 }
 
 // NewServerlessProvisioner creates a new StackProvisioner instance for serverless
-func NewServerlessProvisioner(ctx context.Context, cfg ProvisionerConfig) (common.StackProvisioner, error) {
+func NewServerlessProvisioner(ctx context.Context, log common.Logger, cfg ProvisionerConfig) (common.StackProvisioner, error) {
 	prov := &ServerlessProvisioner{
 		cfg: cfg,
-		log: &defaultLogger{wrapped: logp.L()},
+		log: log,
 	}
 	err := prov.CheckCloudRegion(ctx)
 	if err != nil {
@@ -62,11 +62,6 @@ func NewServerlessProvisioner(ctx context.Context, cfg ProvisionerConfig) (commo
 
 func (prov *ServerlessProvisioner) Name() string {
 	return ProvisionerServerless
-}
-
-// SetLogger sets the logger for the
-func (prov *ServerlessProvisioner) SetLogger(l common.Logger) {
-	prov.log = l
 }
 
 // Create creates a stack.

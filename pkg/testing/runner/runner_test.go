@@ -40,7 +40,7 @@ func TestNewRunner_Clean(t *testing.T) {
 	}
 	ip := &fakeInstanceProvisioner{}
 	sp := &fakeStackProvisioner{}
-	r, err := NewRunner(cfg, ip, sp)
+	r, err := NewRunner(cfg, NewLogger(false), ip, sp)
 	require.NoError(t, err)
 
 	i1 := common.Instance{
@@ -89,7 +89,7 @@ func TestNewRunner_Clean(t *testing.T) {
 	require.NoError(t, err)
 
 	// create the runner again ensuring that it loads the saved state
-	r, err = NewRunner(cfg, ip, sp)
+	r, err = NewRunner(cfg, NewLogger(false), ip, sp)
 	require.NoError(t, err)
 
 	// clean should use the stored state
@@ -111,9 +111,6 @@ func (p *fakeInstanceProvisioner) Name() string {
 
 func (p *fakeInstanceProvisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeVM
-}
-
-func (p *fakeInstanceProvisioner) SetLogger(_ common.Logger) {
 }
 
 func (p *fakeInstanceProvisioner) Supported(_ define.OS) bool {
@@ -149,9 +146,6 @@ type fakeStackProvisioner struct {
 
 func (p *fakeStackProvisioner) Name() string {
 	return "fake"
-}
-
-func (p *fakeStackProvisioner) SetLogger(_ common.Logger) {
 }
 
 func (p *fakeStackProvisioner) Create(_ context.Context, request common.StackRequest) (common.Stack, error) {

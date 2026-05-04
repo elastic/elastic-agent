@@ -170,6 +170,14 @@ type Otel mg.Namespace
 // Devmachine namespace contains tasks related to remote development machines.
 type Devmachine mg.Namespace
 
+// magefileLogger satisfies common.Logger for test-framework helpers (like
+// ess.NewClient) that magefile targets construct directly outside the runner.
+type magefileLogger struct{}
+
+func (magefileLogger) Logf(format string, args ...any) {
+	fmt.Fprintf(os.Stdout, ">>> "+format+"\n", args...)
+}
+
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
 	err := sh.RunV("go", "mod", "tidy", "-v")
@@ -3045,6 +3053,9 @@ func getTestRunnerVersions(cfg *devtools.Settings) (string, string, error) {
 func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
 	goVersion := cfg.GoVersion()
 
+	timestamp := cfg.IntegrationTest.TimestampEnabled
+	logger := runner.NewLogger(timestamp)
+
 	agentVersion, agentStackVersion, err := getTestRunnerVersions(cfg)
 	if err != nil {
 		return nil, err
@@ -3093,11 +3104,11 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	switch instanceProvisionerMode {
 	case "", gcloud.Name:
 		instanceProvisionerMode = gcloud.Name
-		instanceProvisioner, err = gcloud.NewProvisioner(gcloudCfg)
+		instanceProvisioner, err = gcloud.NewProvisioner(logger, gcloudCfg)
 	case multipass.Name:
-		instanceProvisioner = multipass.NewProvisioner()
+		instanceProvisioner = multipass.NewProvisioner(logger)
 	case kind.Name:
-		instanceProvisioner = kind.NewProvisioner()
+		instanceProvisioner = kind.NewProvisioner(logger)
 	default:
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud' or 'multipass', not %s", instanceProvisionerMode)
 	}
@@ -3118,14 +3129,14 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	switch stackProvisionerMode {
 	case "", ess.ProvisionerStateful:
 		stackProvisionerMode = ess.ProvisionerStateful
-		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
+		stackProvisioner, err = ess.NewProvisioner(logger, provisionCfg)
 		if err != nil {
 			return nil, err
 		}
 	case ess.ProvisionerServerless:
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
-		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
+		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, logger, provisionCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -3135,8 +3146,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 			ess.ProvisionerServerless,
 			stackProvisionerMode)
 	}
-
-	timestamp := cfg.IntegrationTest.TimestampEnabled
 
 	extraEnv := map[string]string{}
 	if cfg.IntegrationTest.CollectDiag != "" {
@@ -3185,7 +3194,7 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		BinaryName:     binaryName,
 	}
 
-	r, err := runner.NewRunner(runnerCfg, instanceProvisioner, stackProvisioner, batches...)
+	r, err := runner.NewRunner(runnerCfg, logger, instanceProvisioner, stackProvisioner, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)
 	}
@@ -3450,7 +3459,7 @@ func authESS(ctx context.Context) error {
 
 	// Attempt to use API key to check if it's valid
 	for authSuccess := false; !authSuccess; {
-		client := ess.NewClient(ess.Config{ApiKey: essAPIKey})
+		client := ess.NewClient(magefileLogger{}, ess.Config{ApiKey: essAPIKey})
 		u, err := client.GetAccount(ctx, ess.GetAccountRequest{})
 		if err != nil {
 			return fmt.Errorf("unable to successfully connect to ESS API: %w", err)

@@ -51,9 +51,6 @@ type InstanceProvisioner interface {
 	// Type returns the type of the provisioner.
 	Type() ProvisionerType
 
-	// SetLogger sets the logger for it to use.
-	SetLogger(l Logger)
-
 	// Supported returns true of false if the provisioner supports the given batch.
 	Supported(batch define.OS) bool
 

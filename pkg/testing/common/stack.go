@@ -68,9 +68,6 @@ type StackProvisioner interface {
 	// Name returns the name of the stack provisioner.
 	Name() string
 
-	// SetLogger sets the logger for it to use.
-	SetLogger(l Logger)
-
 	// Create creates a stack.
 	Create(ctx context.Context, request StackRequest) (Stack, error)
 
