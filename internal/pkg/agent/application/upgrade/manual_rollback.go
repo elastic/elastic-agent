@@ -347,7 +347,7 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 
 		if filter(log, now, versionedHome, ttlMarker) {
 			log.Debugf("cleaning up rollback in %q", versionedHome)
-			if cleanupErr := install.RemoveBut(versionedHomeAbsPath, true); cleanupErr != nil {
+			if cleanupErr := install.RemoveBut(log, versionedHomeAbsPath, true); cleanupErr != nil {
 				aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing directory %q: %w", versionedHomeAbsPath, cleanupErr))
 			} else {
 				if removeErr := source.Remove(versionedHome); removeErr != nil {
