@@ -3,6 +3,11 @@ name: bump-vm-images
 
 on:
   workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Run in dry-run mode (diff instead of apply). Useful for testing without creating PRs.'
+        type: boolean
+        default: false
   schedule:
     # Since the CI Agent images are produced weekly on Saturday at 0am UTC
     # and we can only bump the version after the images are available
@@ -40,20 +45,28 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
     steps:
+      # First: checkout the default branch (main) to get the latest updatecli config.
+      # This ensures we always use the most up-to-date config, even when bumping older branches
+      # that may have stale or incorrect updatecli configurations.
+      - uses: actions/checkout@v6
+
+      - name: Save updatecli config from default branch
+        run: cp .ci/updatecli/updatecli-bump-vm-images.yml /tmp/updatecli-bump-vm-images.yml
+
+      # Second: checkout the target branch so the condition check (grep on pipeline.yml)
+      # and any other local file reads use the branch's actual state.
       - uses: actions/checkout@v6
         with:
-        # NOTE: no need for submodules here.
-        #  submodules: true
-          # NOTE: as long as the updatecli bump differs between branches, we need to
-          # checkout the branch that we are going to bump that we are going to bump
-          # this is needed to ensure that the updatecli bump is done against the correct updatecli
-          # pipeline. For instance, https://github.com/elastic/elastic-agent/pull/8035 was not
-          # backported to the short lived branches.
           ref: ${{ matrix.branch }}
+
+      # Restore the updatecli config from the default branch (main) to avoid failures
+      # caused by stale configs on older branches (e.g. listing files that don't have Azure patterns).
+      - name: Restore updatecli config from default branch
+        run: cp /tmp/updatecli-bump-vm-images.yml .ci/updatecli/updatecli-bump-vm-images.yml
 
       - uses: elastic/oblt-actions/updatecli/run@v1
         with:
-          command: apply --config .ci/updatecli/updatecli-bump-vm-images.yml --values .ci/updatecli/values.d/scm.yml
+          command: ${{ inputs.dry-run && 'diff' || 'apply' }} --config .ci/updatecli/updatecli-bump-vm-images.yml --values .ci/updatecli/values.d/scm.yml
           version-file: .updatecli-version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
