@@ -732,14 +732,21 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 			return ctx.Err()
 		case ps := <-procWaitCh:
 			if f.stopping {
-				// Log the exit code (decimal + hex) so callers can distinguish
-				// clean exits from Windows status codes (e.g. 0xC000013A =
-				// STATUS_CONTROL_C_EXIT) when the process was supposed to
-				// shut down gracefully but appears to have been terminated.
-				f.t.Logf("agent exited (after Stop): code=%d (0x%x)", ps.ExitCode(), uint32(ps.ExitCode())) //nolint:gosec // exit-code-to-uint32 is intentional for hex formatting
+				if ps != nil {
+					// Log the exit code (decimal + hex) so callers can distinguish
+					// clean exits from Windows status codes (e.g. 0xC000013A =
+					// STATUS_CONTROL_C_EXIT) when the process was supposed to
+					// shut down gracefully but appears to have been terminated.
+					f.t.Logf("agent exited (after Stop): code=%d (0x%x)", ps.ExitCode(), uint32(ps.ExitCode())) //nolint:gosec // exit-code-to-uint32 is intentional for hex formatting
+				} else {
+					f.t.Logf("agent exited (after Stop): exit code unavailable")
+				}
 				return nil
 			}
-			return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
+			if ps != nil {
+				return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
+			}
+			return fmt.Errorf("elastic-agent exited unexpectedly: exit code unavailable")
 		case err := <-stdOut.Watch():
 			if !f.allowErrs {
 				// no errors allowed
