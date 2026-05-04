@@ -22,6 +22,7 @@ require (
 	github.com/elastic/elastic-agent-libs v0.42.2
 	github.com/elastic/elastic-agent-system-metrics v0.14.3
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
+	github.com/elastic/fleet-server/pkg/api v0.0.0-20260504180621-045c0b2bd73e
 	github.com/elastic/go-elasticsearch/v8 v8.19.6
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.4
@@ -134,6 +135,7 @@ require (
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/akavel/rsrc v0.10.2 // indirect
 	github.com/apache/thrift v0.22.0 // indirect
+	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-msk-iam-sasl-signer-go v1.0.4 // indirect
@@ -307,6 +309,7 @@ require (
 	github.com/morikuni/aec v1.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
+	github.com/oapi-codegen/runtime v1.4.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.151.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.151.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.151.0 // indirect
@@ -495,3 +498,5 @@ replace (
 )
 
 tool golang.org/x/tools/cmd/deadcode
+
+replace github.com/elastic/fleet-server/pkg/api => github.com/ycombinator/fleet-server/pkg/api v0.0.0-20260504200157-08641022ab7c
