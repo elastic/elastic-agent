@@ -1,14 +1,10 @@
 kind: bug-fix
 
-summary: Forward shutdown signals to the EDOT collector on Windows so it can exit gracefully
+summary: Fix handling of console events on Windows
 
 description: |
-  When ``elastic-agent.exe otel`` received CTRL+C/CTRL+BREAK on Windows the
-  parent process exited immediately, closing its JobObject and forcefully
-  terminating the EDOT collector before it could flush in-flight events or
-  update receiver registries. The parent now installs its own signal
-  handler, forwards a graceful shutdown to the collector, and waits for it
-  to exit (with a force-kill fallback after a grace period).
+  When Elastic Agent runs in a console on Windows and receives an event like CTRL+C/CTRL+BREAK, it now
+  exits gracefully.
 
 component: "elastic-agent"
 
