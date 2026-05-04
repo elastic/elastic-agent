@@ -23,8 +23,6 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
-<<<<<<< HEAD
-=======
 :::{dropdown} Elastic Agent reports policy is outdated when agent.features.disable_policy_change_acks is enabled.
 **Applies to: {{agent}} 9.4.0, 9.3.4, 9.3.3, 9.3.2, 9.3.1, 9.3.0, 9.2.7, 9.2.6, 9.2.5, 9.2.4, 9.2.3, 9.2.2, 9.2.1, 9.2.0**
 
@@ -56,7 +54,6 @@ The most notable field affected is `event.created` which when missing prevents s
 The performance optimization has been removed and a fix will be available in the next 9.3.5 release. This issue does not affect version 9.4.0.
 :::
 
->>>>>>> c76b757ea (Add known issue for disable_policy_change_acks feature (#13950))
 :::{dropdown} Elastic Agent 9.3.x fails to start on MacOS when OSQuery Manager integration is used
 **Applies to: {{agent}} 9.3.0, 9.3.1**
 
