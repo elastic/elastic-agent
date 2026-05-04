@@ -11,8 +11,10 @@ env:
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1777597312"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
+  IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
   IMAGE_WIN_10_VERSION: "1.0.1777597312"
   IMAGE_WIN_11_VERSION: "1.0.1777597312"
+  IMAGE_WIN_11_ARM64_VERSION: "1.0.1777597312"
 
 steps:
   - label: "check-ci"
@@ -229,6 +231,26 @@ steps:
           manual:
             allowed: true
 
+      - label: "Unit tests - Windows 11 arm64"
+        key: "unit-tests-win11-arm64"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "azure"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+
   - label: ":junit: Junit annotate"
     agents:
       # requires at least "bash", "curl" and "git"
@@ -256,6 +278,8 @@ steps:
       - step: "unit-tests-win10"
         allow_failure: true
       - step: "unit-tests-win11"
+        allow_failure: true
+      - step: "unit-tests-win11-arm64"
         allow_failure: true
 
   - group: "K8s tests"
