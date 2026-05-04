@@ -72,10 +72,5 @@ targets:
     spec:
       files:
         - .buildkite/pipeline.yml
-        - .buildkite/bk.integration.pipeline.yml
-        - .buildkite/bk.integration-fips.pipeline.yml
-        - .buildkite/integration.pipeline.yml
-        - .buildkite/pipeline.elastic-agent-binary-dra.yml
-        - .buildkite/pipeline.elastic-agent-package.yml
-      matchpattern: '(IMAGE_.+): "1.0.(.+)"'
+      matchpattern: '(IMAGE_.+): "1.0.([\d]+)"'
       replacepattern: '$1: "1.0.{{ source "latestVersion" }}"'
