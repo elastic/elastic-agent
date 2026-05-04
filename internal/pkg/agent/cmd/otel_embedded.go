@@ -10,10 +10,11 @@ import (
 	"github.com/spf13/cobra"
 
 	edotCmd "github.com/elastic/elastic-agent/internal/edot/cmd"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	// embedded into the agent build
-	return edotCmd.NewOtelCommandWithArgs(args, streams)
+	return edotCmd.NewOtelCommandWithArgs(args, streams, components.Default())
 }

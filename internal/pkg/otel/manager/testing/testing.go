@@ -18,7 +18,7 @@ import (
 // It launches a supervised collector using cmd.RunCollector, and can be
 // configured via env vars to simulate different scenarios:
 //   - TEST_SUPERVISED_COLLECTOR_PANIC: triggers a panic after the given delay,
-//     allowing tests to verify the manager’s panic/restart behavior.
+//     allowing tests to verify the manager's panic/restart behavior.
 //   - TEST_SUPERVISED_COLLECTOR_DELAY: delays process shutdown by the given
 //     duration, letting tests observe graceful termination handling.
 //
@@ -48,7 +48,7 @@ func main() {
 
 	monitoringURL := os.Getenv("TEST_SUPERVISED_COLLECTOR_MONITORING_URL")
 
-	err = cmd.RunCollector(ctx, nil, true, "debug", monitoringURL)
+	err = cmd.RunCollector(ctx, nil, true, "debug", monitoringURL, testComponents)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		logp.NewLogger("").Fatal("collector server run finished with error: %v", err)
 	}
