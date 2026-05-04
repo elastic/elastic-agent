@@ -1000,6 +1000,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 				"darwin/amd64",
 				"darwin/arm64",
 				"windows/amd64",
+				"windows/arm64",
 				"container/amd64",
 				"container/arm64",
 			},
