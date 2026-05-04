@@ -6,6 +6,13 @@ on:
   #    - 8.*
   #    - 7.17
   pull_request:
+    paths:
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '.golangci.yml'
+      - '.golangci-lint-version'
+      - '.github/workflows/golangci-lint.yml'
 permissions:
   contents: read
   # Optional: allow read access to pull request. Use with `only-new-issues` option.
