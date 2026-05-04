@@ -24,7 +24,7 @@ Known issues are significant defects or limitations that may impact your impleme
 % :::
 
 :::{dropdown} Elastic Agent reports policy is outdated when agent.features.disable_policy_change_acks is enabled.
-**Applies to: {{agent}} 9.4.0, 9.3.0, 9.2.0**
+**Applies to: {{agent}} 9.4.0, 9.3.4, 9.3.3, 9.3.2, 9.3.1, 9.3.0, 9.2.7, 9.2.6, 9.2.5, 9.2.5, 9.2.4, 9.2.3, 9.2.2, 9.2.1, 9.2.0**
 
 On April 22, 2026 a known issue was discovered that prevents {{fleet}}-managed {{agents}} from correctly reporting their policy information when policy change acknowledgements are disabled.
 
