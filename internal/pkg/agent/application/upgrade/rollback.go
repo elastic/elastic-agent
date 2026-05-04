@@ -134,13 +134,8 @@ func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 		if keepLogs {
 			ignoredDirs = append(ignoredDirs, "logs")
 		}
-<<<<<<< HEAD
-		if cleanupErr := install.RemoveBut(hashedDir, true, ignoredDirs...); cleanupErr != nil {
-			errs = append(errs, cleanupErr)
-=======
 		if cleanupErr := install.RemoveBut(log, hashedDir, true, ignoredDirs...); cleanupErr != nil {
-			cumulativeError = goerrors.Join(cumulativeError, cleanupErr)
->>>>>>> 32f4e5fe4 (Clean up windows uninstall (#13606))
+			errs = append(errs, cleanupErr)
 		}
 	}
 
