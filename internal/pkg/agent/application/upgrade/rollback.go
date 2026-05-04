@@ -134,7 +134,7 @@ func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 		if keepLogs {
 			ignoredDirs = append(ignoredDirs, "logs")
 		}
-		if cleanupErr := install.RemoveBut(hashedDir, true, ignoredDirs...); cleanupErr != nil {
+		if cleanupErr := install.RemoveBut(log, hashedDir, true, ignoredDirs...); cleanupErr != nil {
 			errs = append(errs, cleanupErr)
 		}
 	}

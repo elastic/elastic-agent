@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
 )
 
 func TestValidateCommand(t *testing.T) {
@@ -32,7 +34,7 @@ func TestValidateCommand(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.Name, func(t *testing.T) {
-			err := validateOtelConfig(context.Background(), tc.ConfigPaths)
+			err := validateOtelConfig(context.Background(), tc.ConfigPaths, components.Default())
 			require.Equal(t, tc.ExpectingErr, err != nil)
 		})
 	}

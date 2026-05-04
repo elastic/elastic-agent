@@ -9,11 +9,12 @@ import (
 	"os"
 
 	edotCmd "github.com/elastic/elastic-agent/internal/edot/cmd"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 func main() {
-	cmd := edotCmd.NewOtelCommandWithArgs(os.Args, cli.NewIOStreams())
+	cmd := edotCmd.NewOtelCommandWithArgs(os.Args, cli.NewIOStreams(), components.Default())
 	err := cmd.Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
