@@ -48,18 +48,44 @@ require (
 require (
 	cloud.google.com/go/pubsub/v2 v2.0.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs/v2 v2.0.2 // indirect
+<<<<<<< HEAD
 	github.com/DeRuina/timberjack v1.4.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.71.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/kafka v1.46.7 // indirect
+=======
+	github.com/DeRuina/timberjack v1.4.1 // indirect
+	github.com/KimMachineGun/automemlimit v0.7.5 // indirect
+	github.com/alexbrainman/sspi v0.0.0-20250919150558-7d374ff0d59e // indirect
+	github.com/aws/aws-sdk-go v1.55.8 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ecs v1.74.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/elasticache v1.51.12 // indirect
+	github.com/aws/aws-sdk-go-v2/service/kafka v1.49.1 // indirect
+>>>>>>> 6189a1c76 (Create local copy of `StartMockESDeterministic` for `internal/edot` testing (#13917))
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.9 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/basgys/goxml2json v1.1.1-0.20231018121955-e66ee54ceaad // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
+<<<<<<< HEAD
 	github.com/elastic/apm-data v1.19.5 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.42.0 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.4 // indirect
+=======
+	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
+	github.com/elastic/ebpfevents v0.8.0 // indirect
+	github.com/elastic/entcollect v0.0.0-20260501012805-5fd94422b104 // indirect
+	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
+	github.com/elastic/go-licenser v0.4.2 // indirect
+	github.com/elastic/go-quark v0.3.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.46.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
+	github.com/elastic/tk-btf v0.2.0 // indirect
+	github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb // indirect
+	github.com/felixge/fgprof v0.9.5 // indirect
+	github.com/fsnotify/fsevents v0.2.0 // indirect
+	github.com/go-openapi/swag/cmdutils v0.25.5 // indirect
+>>>>>>> 6189a1c76 (Create local copy of `StartMockESDeterministic` for `internal/edot` testing (#13917))
 	github.com/go-openapi/swag/conv v0.25.5 // indirect
 	github.com/go-openapi/swag/fileutils v0.25.5 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
@@ -70,6 +96,7 @@ require (
 	github.com/go-openapi/swag/stringutils v0.25.5 // indirect
 	github.com/go-openapi/swag/typeutils v0.25.5 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
+<<<<<<< HEAD
 	github.com/google/pprof v0.0.0-20260202012954-cb029daf43ef // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding v0.149.0 // indirect
@@ -92,6 +119,53 @@ require (
 	go.opentelemetry.io/collector/internal/componentalias v0.149.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper v0.149.0 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.4 // indirect
+=======
+	github.com/google/gopacket v1.1.19 // indirect
+	github.com/google/pprof v0.0.0-20260302011040-a15ffb7f9dcc // indirect
+	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
+	github.com/gosnmp/gosnmp v1.43.2 // indirect
+	github.com/grobie/gomemcache v0.0.0-20230213081705-239240bbc445 // indirect
+	github.com/insomniacslk/dhcp v0.0.0-20251020182700-175e84fbb167 // indirect
+	github.com/itchyny/timefmt-go v0.1.8 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
+	github.com/michel-laterman/proxy-connect-dialer-go v0.1.0 // indirect
+	github.com/mileusna/useragent v1.3.5 // indirect
+	github.com/moby/moby/api v1.54.1 // indirect
+	github.com/moby/moby/client v0.4.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/internal/credentialsfile v0.150.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sinventory v0.150.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.150.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.150.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/xstreamencoding v0.150.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/scraper/zookeeperscraper v0.150.0 // indirect
+	github.com/oschwald/geoip2-golang/v2 v2.1.0 // indirect
+	github.com/oschwald/maxminddb-golang/v2 v2.1.1 // indirect
+	github.com/osquery/osquery-go v0.0.0-20260226222546-0cc22f415e57 // indirect
+	github.com/outscale/osc-sdk-go/v2 v2.32.0 // indirect
+	github.com/pb33f/jsonpath v0.8.2 // indirect
+	github.com/pb33f/libopenapi v0.34.4 // indirect
+	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
+	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
+	github.com/pkg/xattr v0.4.9 // indirect
+	github.com/prometheus/client_golang/exp v0.0.0-20260325093428-d8591d0db856 // indirect
+	github.com/puzpuzpuz/xsync/v4 v4.4.0 // indirect
+	github.com/rdforte/gomaxecs v1.1.2 // indirect
+	github.com/samuel/go-parser v0.0.0-20130731160455-ca8abbf65d0e // indirect
+	github.com/samuel/go-thrift v0.0.0-20140522043831-2187045faa54 // indirect
+	github.com/sijms/go-ora/v2 v2.9.0 // indirect
+	github.com/teambition/rrule-go v1.8.2 // indirect
+	github.com/u-root/uio v0.0.0-20230220225925-ffce2a382923 // indirect
+	github.com/vultr/govultr/v3 v3.28.1 // indirect
+	go.mongodb.org/mongo-driver/v2 v2.3.1 // indirect
+	go.opentelemetry.io/collector/component/componentstatus v0.150.0 // indirect
+	go.opentelemetry.io/collector/config/confighttp v0.150.0 // indirect
+	go.opentelemetry.io/collector/internal/componentalias v0.150.0 // indirect
+	go.opentelemetry.io/collector/processor/processorhelper v0.150.0 // indirect
+	go.uber.org/automaxprocs v1.6.0 // indirect
+	go.yaml.in/yaml/v4 v4.0.0-rc.4 // indirect
+	mvdan.cc/garble v0.12.1 // indirect
+>>>>>>> 6189a1c76 (Create local copy of `StartMockESDeterministic` for `internal/edot` testing (#13917))
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 )
