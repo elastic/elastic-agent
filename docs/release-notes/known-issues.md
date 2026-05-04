@@ -26,14 +26,15 @@ Known issues are significant defects or limitations that may impact your impleme
 :::{dropdown} Elastic Agent reports policy is outdated when agent.features.disable_policy_change_acks is enabled.
 **Applies to: {{agent}} 9.4.0, 9.3.0, 9.2.0**
 
-On April 22, 2026 a known issue was discovered that prevents fleet managed {{agents}} from correctly reporting their policy information when acks are disabled.
+On April 22, 2026 a known issue was discovered that prevents {{fleet}}-managed {{agents}} from correctly reporting their policy information when policy change acknowledgements are disabled.
 
-Users will see an outdated policy warning on the fleet UI when the option is enabled and a policy update is sent.
+Users see an outdated policy warning on the {{fleet}} UI when policy change acknowledgments are disabled and a policy update is sent.
 
 **Workaround:**
-Affected users can uncheck the option within the policy settings on the UI.
 
-For more information see [Kibana #264983](https://github.com/elastic/kibana/issues/264983).
+Affected users can uncheck the **Disable policy change acknowledgments** option within the agent policy settings in the Fleet UI.
+
+For more information check [Issue #264983](https://github.com/elastic/kibana/issues/264983).
 :::
 
 :::{dropdown} Events from Beats based integrations in Elastic Agent 9.3.4 incorrectly convert timestamps to an empty {} JSON object.
