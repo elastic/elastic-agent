@@ -133,12 +133,15 @@ func newInspectOtelCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Co
 		Run: func(c *cobra.Command, args []string) {
 			ctx, cancel := context.WithCancel(context.Background())
 			service.HandleSignals(func() {}, cancel)
-			if err := inspectOtelCmd(ctx, paths.ConfigFile(), streams); err != nil {
+			var opts inspectConfigOpts
+			opts.includeMonitoring, _ = c.Flags().GetBool("monitoring")
+			if err := inspectOtelCmd(ctx, paths.ConfigFile(), streams, opts); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				os.Exit(1)
 			}
 		},
 	}
+	cmd.Flags().Bool("monitoring", false, "includes monitoring configuration (implies --variables)")
 	return cmd
 }
 
@@ -230,7 +233,6 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		}
 
 		if monitorCfg != nil {
-
 			// see above comment; because we don't know endpoint's actual PID, we need to make a fake one. Warn the user.
 			if serviceUnitExists {
 				keys := make([]string, 0, len(fakeServicePids))
@@ -278,7 +280,7 @@ func printMapStringConfig(mapStr map[string]interface{}, streams *cli.IOStreams)
 	return err
 }
 
-// convert the config object to a mapstr and print to the stream specified in in streams.Out
+// convert the config object to a mapstr and print to the stream specified in streams.Out
 func printConfig(cfg *config.Config, streams *cli.IOStreams) error {
 	mapStr, err := cfg.ToMapStr()
 	if err != nil {

@@ -387,6 +387,22 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}) map[K
 	for rootKey, rootValue := range inputMap {
 		if rootValue != nil {
 			switch cast := rootValue.(type) {
+			case map[string][]string:
+				var newMap map[string]any = make(map[string]any, len(cast))
+				for k, v := range cast {
+					newSlice := make([]interface{}, len(v))
+					for i, s := range v {
+						newSlice[i] = s
+					}
+					newMap[k] = newSlice
+				}
+				rootValue = redactMap(errOut, newMap)
+			case []map[string]interface{}:
+				updatedRootValue := make([]map[string]interface{}, len(cast))
+				for i, item := range cast {
+					updatedRootValue[i] = redactMap(errOut, item)
+				}
+				rootValue = updatedRootValue
 			case map[string]interface{}:
 				rootValue = redactMap(errOut, cast)
 			case map[interface{}]interface{}:
