@@ -15,6 +15,7 @@ function ess_up {
       return 1
   }
 
+<<<<<<< HEAD
   $BuildkiteBuildCreator = if ($Env:BUILDKITE_BUILD_CREATOR) { $Env:BUILDKITE_BUILD_CREATOR } else { get_git_user_email }
   $BuildkiteBuildNumber = if ($Env:BUILDKITE_BUILD_NUMBER) { $Env:BUILDKITE_BUILD_NUMBER } else { "0" }
   $BuildkitePipelineSlug = if ($Env:BUILDKITE_PIPELINE_SLUG) { $Env:BUILDKITE_PIPELINE_SLUG } else { "elastic-agent-integration-tests" }
@@ -28,6 +29,36 @@ function ess_up {
       -var="creator=$BuildkiteBuildCreator" `
       -var="buildkite_id=$BuildkiteBuildNumber" `
       -var="pipeline=$BuildkitePipelineSlug"
+=======
+  # Write parameters to a JSON file and pass via --parameters-file.
+  # Windows PowerShell 5.1 mangles native-command arguments that contain
+  # embedded double quotes (even when passed as a separate argument), so
+  # the inline --parameters form produced "invalid character 'G'" errors
+  # from oblt-cli. A file bypasses PS arg marshalling entirely.
+  $paramsPath      = Join-Path $PWD "params.json"
+  $clusterInfoPath = Join-Path $PWD "cluster-info.json"
+  @{
+      StackVersion     = $StackVersion
+  } | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
+
+  try {
+    # --output-file must be an absolute path; oblt-cli resolves relative
+    # paths against its own config dir (~/.oblt-cli), not CWD.
+    & oblt-cli cluster create custom `
+        --template ess-ea-it `
+        --cluster-name-prefix ea-hosted-it `
+        --parameters-file $paramsPath `
+        --parameter "ExpireInHours=6" `
+        --output-file $clusterInfoPath `
+        --wait 30
+  } finally {
+    Remove-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue
+  }
+  if ($LASTEXITCODE -ne 0) {
+      Write-Error "Error: oblt-cli cluster create custom failed (exit=$LASTEXITCODE)"
+      return 1
+  }
+>>>>>>> 63240ee76 (its: expiry date 6 hours after creation (#14020))
 
   $Env:ELASTICSEARCH_HOST = & terraform output -raw es_host
   $Env:ELASTICSEARCH_USERNAME = & terraform output -raw es_username
