@@ -32,6 +32,7 @@ function ess_up {
         --template ess-ea-it `
         --cluster-name-prefix ea-hosted-it `
         --parameters-file $paramsPath `
+        --expiry-date "$(Get-Date (Get-Date).AddHours(6).ToUniversalTime() -Format 'yyyy-MM-ddTHH:mm:ss+00:00')" `
         --output-file $clusterInfoPath `
         --wait 30
   } finally {
