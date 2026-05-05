@@ -17,10 +17,6 @@ function ess_up() {
     --cluster-name-prefix ea-hosted-it
     --output-file="${PWD}/cluster-info.json"
     --wait 30
-    --parameter GitOps=true
-    --parameter "GitHubRepository=${BUILDKITE_REPO}"
-    --parameter "GitHubCommit=${BUILDKITE_COMMIT}"
-    --parameter EphemeralCluster=true
     --parameter "StackVersion=$STACK_VERSION"
   )
 
