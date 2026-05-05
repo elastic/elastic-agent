@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -132,11 +133,12 @@ func (runner *NetworkTrafficRunner) switchToOtelRuntime() {
 	}
 }
 
-func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Context, agentID string) {
+func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Context, agentID string) mapstr.M {
 	t := runner.T()
 
 	now := time.Now()
 	var query map[string]any
+	var doc mapstr.M
 	defer func() {
 		if t.Failed() {
 			bs, err := json.Marshal(query)
@@ -162,8 +164,10 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Con
 		if res.Hits.Total.Value < 1 {
 			return false
 		}
+		doc = res.Hits.Hits[0].Source
 		return true
 	}, time.Minute*10, time.Second*10, "could not fetch events for network_traffic")
+	return doc
 }
 
 func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
@@ -176,11 +180,13 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	require.NoError(t, err, "could not get agent status")
 
 	// Validate process mode
+	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
-		runner.validateNetworkTrafficEvents(ctx, agentStatus.Info.ID)
+		processDoc = runner.validateNetworkTrafficEvents(ctx, agentStatus.Info.ID)
 	})
 
 	// Switch to OTel runtime and validate the same data
+	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
 		runner.switchToOtelRuntime()
 
@@ -194,6 +200,14 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 			return true
 		}, 2*time.Minute, 5*time.Second)
 
-		runner.validateNetworkTrafficEvents(ctx, agentStatus.Info.ID)
+		otelDoc = runner.validateNetworkTrafficEvents(ctx, agentStatus.Info.ID)
+	})
+
+	// Compare documents from process and otel modes have the same keys
+	t.Run("compare", func(t *testing.T) {
+		if processDoc == nil || otelDoc == nil {
+			t.Skip("skipping comparison because a previous subtest failed")
+		}
+		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields, "expected network_traffic document keys to be equal between process and otel modes")
 	})
 }

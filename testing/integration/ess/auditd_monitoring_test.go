@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -133,11 +134,12 @@ func (runner *AuditDRunner) switchToOtelRuntime() {
 	}
 }
 
-func (runner *AuditDRunner) validateAuditdEvents(ctx context.Context, agentID string) {
+func (runner *AuditDRunner) validateAuditdEvents(ctx context.Context, agentID string) mapstr.M {
 	t := runner.T()
 
 	now := time.Now()
 	var query map[string]any
+	var doc mapstr.M
 	defer func() {
 		if t.Failed() {
 			bs, err := json.Marshal(query)
@@ -163,8 +165,10 @@ func (runner *AuditDRunner) validateAuditdEvents(ctx context.Context, agentID st
 		if res.Hits.Total.Value < 1 {
 			return false
 		}
+		doc = res.Hits.Hits[0].Source
 		return true
 	}, time.Minute*10, time.Second*10, "could not fetch events for auditd_manager")
+	return doc
 }
 
 func (runner *AuditDRunner) TestBeatsMetrics() {
@@ -177,11 +181,13 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 	require.NoError(t, err, "could not get agent status")
 
 	// Validate process mode
+	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
-		runner.validateAuditdEvents(ctx, agentStatus.Info.ID)
+		processDoc = runner.validateAuditdEvents(ctx, agentStatus.Info.ID)
 	})
 
 	// Switch to OTel runtime and validate the same data
+	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
 		runner.switchToOtelRuntime()
 
@@ -195,6 +201,14 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 			return true
 		}, 2*time.Minute, 5*time.Second)
 
-		runner.validateAuditdEvents(ctx, agentStatus.Info.ID)
+		otelDoc = runner.validateAuditdEvents(ctx, agentStatus.Info.ID)
+	})
+
+	// Compare documents from process and otel modes have the same keys
+	t.Run("compare", func(t *testing.T) {
+		if processDoc == nil || otelDoc == nil {
+			t.Skip("skipping comparison because a previous subtest failed")
+		}
+		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields, "expected auditd document keys to be equal between process and otel modes")
 	})
 }
