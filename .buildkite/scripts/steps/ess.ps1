@@ -18,10 +18,6 @@ function ess_up {
   $paramsPath      = Join-Path $PWD "params.json"
   $clusterInfoPath = Join-Path $PWD "cluster-info.json"
   $params = @{
-      GitOps           = "true"
-      GitHubRepository = $Env:BUILDKITE_REPO
-      GitHubCommit     = $Env:BUILDKITE_COMMIT
-      EphemeralCluster = "true"
       StackVersion     = $StackVersion
   }
 
