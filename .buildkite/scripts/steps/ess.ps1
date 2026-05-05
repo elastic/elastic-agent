@@ -18,10 +18,6 @@ function ess_up {
   $paramsPath      = Join-Path $PWD "params.json"
   $clusterInfoPath = Join-Path $PWD "cluster-info.json"
   @{
-      GitOps           = "true"
-      GitHubRepository = $Env:BUILDKITE_REPO
-      GitHubCommit     = $Env:BUILDKITE_COMMIT
-      EphemeralCluster = "true"
       StackVersion     = $StackVersion
   } | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
 
@@ -32,6 +28,7 @@ function ess_up {
         --template ess-ea-it `
         --cluster-name-prefix ea-hosted-it `
         --parameters-file $paramsPath `
+        --parameter "ExpireInHours=6" `
         --output-file $clusterInfoPath `
         --wait 30
   } finally {
