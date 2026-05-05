@@ -850,14 +850,6 @@ func (s *Settings) WithBeatVersion(version string) *Settings {
 	return clone
 }
 
-// WithAgentCoreCommitHash returns a copy of the settings with the specified agent core commit hash set.
-// See BuildSettings.AgentCoreCommitHash for what this value means.
-func (s *Settings) WithAgentCoreCommitHash(hash string) *Settings {
-	clone := s.Clone()
-	clone.Build.AgentCoreCommitHash = hash
-	return clone
-}
-
 // WithManifestInfo downloads the manifest at ManifestURL and applies version information to a copy of
 // the settings. It sets Build.Snapshot, Build.BeatVersion, Build.AgentCoreCommitHash,
 // Build.DependenciesVersion, and Packaging.Manifest. It is a no-op if ManifestURL is empty.
@@ -988,8 +980,7 @@ type BuildSettings struct {
 	// This value is consumed only by the packaging code paths (templates and manifest generation). Binary
 	// builds always embed the actual repository git commit via BuildSettings.CommitHash().
 	//
-	// Sourced from the AGENT_COMMIT_HASH_OVERRIDE env var, or set programmatically via
-	// WithAgentCoreCommitHash or WithManifestInfo.
+	// Set programmatically via WithManifestInfo, read from MANIFEST_URL.
 	AgentCoreCommitHash string
 
 	// DependenciesVersion is the version string used when resolving manifest dependency packages (VersionWithPrerelease).
@@ -1399,10 +1390,6 @@ func (s *Settings) loadBuildSettingsFromEnv() error {
 
 	if v := os.Getenv("BEAT_VERSION"); v != "" {
 		s.Build.BeatVersion = v
-	}
-
-	if v := os.Getenv("AGENT_COMMIT_HASH_OVERRIDE"); v != "" {
-		s.Build.AgentCoreCommitHash = v
 	}
 
 	s.Build.GolangCrossBuild = os.Getenv("GOLANG_CROSSBUILD") == "1"

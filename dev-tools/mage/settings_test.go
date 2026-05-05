@@ -202,15 +202,6 @@ func TestSettingsWithMethods(t *testing.T) {
 		assert.Empty(t, original.Build.BeatVersion)
 	})
 
-	t.Run("WithAgentCoreCommitHash", func(t *testing.T) {
-		original := DefaultSettings()
-
-		modified := original.WithAgentCoreCommitHash("abc123")
-
-		assert.Equal(t, "abc123", modified.Build.AgentCoreCommitHash)
-		assert.Empty(t, original.Build.AgentCoreCommitHash)
-	})
-
 	t.Run("WithAgentDropPath", func(t *testing.T) {
 		original := DefaultSettings()
 
@@ -679,7 +670,6 @@ func TestLoadSettings(t *testing.T) {
 		t.Setenv("CI", "true")
 		t.Setenv("MAX_PARALLEL", "8")
 		t.Setenv("BEAT_VERSION", "1.2.3")
-		t.Setenv("AGENT_COMMIT_HASH_OVERRIDE", "abc123")
 		t.Setenv("GOLANG_CROSSBUILD", "1")
 		t.Setenv("BEAT_GO_VERSION", "1.21.0")
 		t.Setenv("BEAT_DOC_BRANCH", "main")
@@ -698,7 +688,6 @@ func TestLoadSettings(t *testing.T) {
 		assert.Equal(t, "true", settings.Build.CI)
 		assert.Equal(t, 8, settings.Build.MaxParallel)
 		assert.Equal(t, "1.2.3", settings.Build.BeatVersion)
-		assert.Equal(t, "abc123", settings.Build.AgentCoreCommitHash)
 		assert.True(t, settings.Build.GolangCrossBuild)
 		assert.Equal(t, "1.21.0", settings.Build.BeatGoVersion)
 		assert.Equal(t, "main", settings.Build.BeatDocBranch)
