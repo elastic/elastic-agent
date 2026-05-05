@@ -21,7 +21,6 @@ function ess_up {
       GitOps           = "true"
       GitHubRepository = $Env:BUILDKITE_REPO
       GitHubCommit     = $Env:BUILDKITE_COMMIT
-      EphemeralCluster = "true"
       StackVersion     = $StackVersion
   } | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
 
