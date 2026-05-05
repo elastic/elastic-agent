@@ -127,8 +127,21 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return nil
 	}
 
-	// cleanup everything except version we're rolling back into
-	return Cleanup(log, topDirPath, settings.RemoveMarker, true, prevVersionedHome)
+	// cleanup everything except the version we're rolling back into and any
+	// in-TTL rollback targets recorded in the marker. The marker load is
+	// best-effort: if it fails or the marker is absent we fall back to
+	// preserving only prevVersionedHome rather than aborting the rollback.
+	versionedHomesToKeep := []string{prevVersionedHome}
+	marker, markerErr := LoadMarker(paths.DataFrom(topDirPath))
+	if markerErr != nil {
+		log.Warnw("could not load update marker; cleanup will only preserve the rollback target",
+			"error.message", markerErr.Error())
+	}
+
+	if marker != nil {
+		versionedHomesToKeep = AppendAvailableRollbacks(log, marker, versionedHomesToKeep)
+	}
+	return Cleanup(log, topDirPath, settings.RemoveMarker, true, versionedHomesToKeep...)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
