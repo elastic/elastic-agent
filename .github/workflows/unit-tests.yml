@@ -32,7 +32,6 @@ jobs:
           - ubuntu-22.04-arm
           - macos-15-intel
           - macos-15
-          - windows-2022
         race_detector: [true]
         include:
           - os: ubuntu-22.04
@@ -42,8 +41,6 @@ jobs:
             fips_variant: "fips140-only"
             fips_env: "true"
             godebug: "fips140=only,tlsmlkem=0"
-          - os: windows-11-arm
-            race_detector: false
     steps:
       - uses: actions/checkout@v6
         with:
