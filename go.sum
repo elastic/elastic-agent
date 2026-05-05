@@ -523,6 +523,8 @@ github.com/onsi/ginkgo/v2 v2.27.2 h1:LzwLj0b89qtIy6SSASkzlNvX6WktqurSHwkk2ipF/Ns
 github.com/onsi/ginkgo/v2 v2.27.2/go.mod h1:ArE1D/XhNXBXCBkKOLkbsb2c81dQHCRcF5zwn/ykDRo=
 github.com/onsi/gomega v1.38.2 h1:eZCjf2xjZAqe+LeWvKb5weQ+NcPwX84kqJ0cZNxok2A=
 github.com/onsi/gomega v1.38.2/go.mod h1:W2MJcYxRGV63b418Ai34Ud0hEdTVXq9NW9+Sx6uXf3k=
+github.com/open-telemetry/opamp-go v0.23.0 h1:k7h7w/muprut9/DAhUC4anX4v7hIdgO02gIsSjV4uq0=
+github.com/open-telemetry/opamp-go v0.23.0/go.mod h1:DIIVdkLefdqPW5L+4I2twmAicVrTB0Bp5XJAfedZzAM=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.157.0 h1:0YtMB2KNw7e1xvEK21jFWdYKQEHVEsjOkgdau4CZ+2Y=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.157.0/go.mod h1:IYZigztY1e75GBJ077HM68k+ctisFRdM5yItsd/t5GM=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.157.0 h1:aQVvm4iiT1DUx2CzeDLEWETDKgbBvWAPJgancj6SQXY=
