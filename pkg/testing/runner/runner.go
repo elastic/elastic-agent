@@ -268,7 +268,7 @@ func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance)
 			env["KIBANA_HOST"] = stack.Kibana
 			env["KIBANA_USERNAME"] = stack.Username
 			env["KIBANA_PASSWORD"] = stack.Password
-			env["ELASTIC_APM_SERVER_URL"] = stack.IntegrationsServer
+			env["INTEGRATIONS_SERVER_HOST"] = stack.IntegrationsServer
 			logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
 		}
 
@@ -394,7 +394,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		env["KIBANA_HOST"] = stack.Kibana
 		env["KIBANA_USERNAME"] = stack.Username
 		env["KIBANA_PASSWORD"] = stack.Password
-		env["ELASTIC_APM_SERVER_URL"] = stack.IntegrationsServer
+		env["INTEGRATIONS_SERVER_HOST"] = stack.IntegrationsServer
 		logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
 	}
 

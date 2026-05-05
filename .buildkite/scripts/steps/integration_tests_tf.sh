@@ -54,7 +54,7 @@ else
   export KIBANA_HOST=$(buildkite-agent meta-data get "${METADATA_PREFIX}kibana.host")
   export KIBANA_USERNAME=$(buildkite-agent meta-data get "${METADATA_PREFIX}kibana.username")
   export KIBANA_PASSWORD=$(buildkite-agent meta-data get "${METADATA_PREFIX}kibana.pwd")
-  export ELASTIC_APM_SERVER_URL=$(buildkite-agent meta-data get "${METADATA_PREFIX}integrations_server.host")
+  export INTEGRATIONS_SERVER_HOST=$(buildkite-agent meta-data get "${METADATA_PREFIX}integrations_server.host")
   echo "Elasticsearch Host: ${ELASTICSEARCH_HOST}"
 fi
 
