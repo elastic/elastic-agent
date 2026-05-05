@@ -34,6 +34,7 @@ jobs:
           - macos-15
           - windows-2022
           - windows-11-arm
+        race_detector: [true]
         include:
           - os: ubuntu-22.04
             fips_variant: "requirefips"
@@ -42,6 +43,8 @@ jobs:
             fips_variant: "fips140-only"
             fips_env: "true"
             godebug: "fips140=only,tlsmlkem=0"
+          - os: windows-11-arm
+            race_detector: false
     steps:
       - uses: actions/checkout@v6
         with:
@@ -65,7 +68,7 @@ jobs:
       - name: mage unitTest
         run: mage unitTest
         env:
-          RACE_DETECTOR: true
+          RACE_DETECTOR: ${{ matrix.race_detector }}
           TEST_COVERAGE: true
           FIPS: ${{ matrix.fips_env }}
           GODEBUG: ${{ matrix.godebug }}
