@@ -26,6 +26,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm, macos-15-intel, macos-15 ]
+        include:
+          - os: ubuntu-22.04
+            fips_variant: "requirefips"
+            fips_env: "true"
+          - os: ubuntu-22.04
+            fips_variant: "fips140-only"
+            fips_env: "true"
+            godebug: "fips140=only,tlsmlkem=0"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -48,3 +56,6 @@ jobs:
 
       - name: mage unitTest
         run: RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
+        env:
+          FIPS: ${{ matrix.fips_env }}
+          GODEBUG: ${{ matrix.godebug }}

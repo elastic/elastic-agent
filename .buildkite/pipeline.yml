@@ -28,49 +28,6 @@ steps:
   - group: "Unit tests"
     key: "unit-tests"
     steps:
-      - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
-        key: "unit-tests-2204-fips-tag"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-          machineType: "n2-standard-8"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
-      - label: "Unit tests - fips140=only Ubuntu 22.04"
-        key: "unit-tests-2204-fips140-only"
-        # Note: The GODEBUG=fips140=only environment variable must be set in the command itself (as opposed to
-        # in the env block) so that it is applied *only* to the 'go' command invoked by the script, and
-        # not to any other Go code executed as part of the Buildkite agent itself.
-        command: 'GODEBUG="fips140=only,tlsmlkem=0" .buildkite/scripts/steps/unit-tests.sh'
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-          machineType: "n2-standard-8"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
         command: .buildkite/scripts/steps/unit-tests.ps1
