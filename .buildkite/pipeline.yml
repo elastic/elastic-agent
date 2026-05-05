@@ -28,26 +28,6 @@ steps:
   - group: "Unit tests"
     key: "unit-tests"
     steps:
-      - label: "Unit tests - Windows 2022"
-        key: "unit-tests-win2022"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_WIN_2022}"
-          machineType: "n2-standard-8"
-          disk_size: 200
-          disk_type: "pd-ssd"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
         command: .buildkite/scripts/steps/unit-tests.ps1
@@ -141,14 +121,6 @@ steps:
           always-annotate: true
           run-in-docker: false
     depends_on:
-      - step: "unit-tests-2204"
-        allow_failure: true
-      - step: "unit-tests-2204-fips-tag"
-        allow_failure: true
-      - step: "unit-tests-2204-fips140-only"
-        allow_failure: true
-      - step: "unit-tests-win2022"
-        allow_failure: true
       - step: "unit-tests-win2016"
         allow_failure: true
       - step: "unit-tests-win10"
