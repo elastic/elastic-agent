@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/josephspurrier/goversioninfo"
@@ -98,13 +99,17 @@ func DefaultBuildArgs(cfg *Settings) BuildArgs {
 
 	if cfg.Build.FIPSBuild {
 		fipsConfig := packaging.Settings().FIPS
-
-		for _, tag := range fipsConfig.Compile.Tags {
-			args.ExtraFlags = append(args.ExtraFlags, "-tags="+tag)
-		}
-		args.CGO = args.CGO || fipsConfig.Compile.CGO
-		for varName, value := range fipsConfig.Compile.Env {
-			args.Env[varName] = value
+		platform := cfg.Platform()
+		if slices.ContainsFunc(fipsConfig.Compile.Platforms, func(p packaging.Platform) bool {
+			return p.Platform() == platform.Name
+		}) {
+			for _, tag := range fipsConfig.Compile.Tags {
+				args.ExtraFlags = append(args.ExtraFlags, "-tags="+tag)
+			}
+			args.CGO = args.CGO || fipsConfig.Compile.CGO
+			for varName, value := range fipsConfig.Compile.Env {
+				args.Env[varName] = value
+			}
 		}
 	}
 

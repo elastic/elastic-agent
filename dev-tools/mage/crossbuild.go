@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 const defaultCrossBuildTarget = "golangCrossBuild"
@@ -151,6 +153,18 @@ func CrossBuild(ctx context.Context, cfg *Settings, options ...CrossBuildOption)
 		if !buildPlatform.Flags.CanCrossBuild() {
 			return fmt.Errorf("unsupported cross build platform %v", buildPlatform.Name)
 		}
+
+		if cfg.Build.FIPSBuild {
+			fipsConfig := packaging.Settings().FIPS
+			if !slices.ContainsFunc(fipsConfig.Compile.Platforms, func(p packaging.Platform) bool {
+				return p.Platform() == buildPlatform.Name
+			}) {
+				log.Printf("Skipping crossbuild of %q for platform %q since it's not listed in FIPS supported platforms",
+					params.Name, buildPlatform.Name)
+				continue
+			}
+		}
+
 		builder := GolangCrossBuilder{Platform: buildPlatform.Name, Target: params.Target, InDir: params.InDir, ImageSelector: params.ImageSelector, Config: cfg}
 		if params.Serial {
 			if err := builder.Build(); err != nil {
