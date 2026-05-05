@@ -10,6 +10,11 @@ function ess_up {
       return 1
   }
 
+  if (-not $Env:INTEGRATION_SERVER_DOCKER_IMAGE) {
+      Write-Error "Error: Specify integration server docker image: ess_up [stack_version]"
+      return 1
+  }
+
   # Write parameters to a JSON file and pass via --parameters-file.
   # Windows PowerShell 5.1 mangles native-command arguments that contain
   # embedded double quotes (even when passed as a separate argument), so
