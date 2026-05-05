@@ -34,6 +34,7 @@ function ess_up {
         --template ess-ea-it `
         --cluster-name-prefix ea-hosted-it `
         --parameters-file $paramsPath `
+        --parameter "ExpireInHours=6" `
         --output-file $clusterInfoPath `
         --wait 30
   } finally {
