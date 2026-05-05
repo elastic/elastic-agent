@@ -23,6 +23,37 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} Elastic Agent reports policy is outdated when agent.features.disable_policy_change_acks is enabled.
+**Applies to: {{agent}} 9.4.0, 9.3.4, 9.3.3, 9.3.2, 9.3.1, 9.3.0, 9.2.7, 9.2.6, 9.2.5, 9.2.4, 9.2.3, 9.2.2, 9.2.1, 9.2.0**
+
+On April 22, 2026 a known issue was discovered that prevents {{fleet}}-managed {{agents}} from correctly reporting their policy information when policy change acknowledgements are disabled.
+
+Users see an outdated policy warning on the {{fleet}} UI when policy change acknowledgments are disabled and a policy update is sent.
+
+**Workaround:**
+
+Affected users can uncheck the **Disable policy change acknowledgments** option within the agent policy settings in the Fleet UI.
+
+For more information check [Issue #264983](https://github.com/elastic/kibana/issues/264983).
+:::
+
+:::{dropdown} Events from Beats based integrations in Elastic Agent 9.3.4 incorrectly convert timestamps to an empty {} JSON object.
+**Applies to: {{agent}} 9.3.4**
+
+A performance optimization in Elastic Agent 9.3.4 causes timestamp fields sent from Beats based inputs and integrations to be incorrectly serialized to an empty `{}` JSON object. This does not affect the primary `@timestamp` field, only other timestamps fields in the event body.
+
+The most notable field affected is `event.created` which when missing prevents some features like SentinelOne response actions from functioning as described in [Issue #266355](https://github.com/elastic/kibana/issues/266355). Documents affected will have timestamps like `event.created` set to empty JSON objects as shown in the example below:
+
+```json
+  "event": {
+    "dataset": "sentinel_one.agent",
+    "created": {}
+  }
+```
+
+The performance optimization has been removed and a fix will be available in the next 9.3.5 release. This issue does not affect version 9.4.0.
+:::
+
 :::{dropdown} Elastic Agent 9.3.x fails to start on MacOS when OSQuery Manager integration is used
 **Applies to: {{agent}} 9.3.0, 9.3.1**
 
