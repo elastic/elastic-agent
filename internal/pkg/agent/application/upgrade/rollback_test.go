@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -775,4 +776,87 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		oldAgentInstall,
 		nil, nil, nil)
 	require.NoError(t, err, "error writing fake update marker")
+}
+
+// TestRollbackWithOpts_PreservesInTTLRollbacksAvailable encodes the
+// multi-rollback retention contract for RollbackWithOpts: in-TTL entries in
+// marker.RollbacksAvailable must survive a rollback regardless of which one is
+// chosen as the rollback target.
+//
+// Setup:
+//   - Three on-disk installs A, B, C.
+//   - Symlink points at C (the failing upgrade).
+//   - Update marker records C as new, A as previous, with both A and B listed
+//     in RollbacksAvailable with future TTLs.
+//
+// We roll back to A. B (also unexpired) must survive. On `main` it does not,
+// because RollbackWithOpts hard-codes the cleanup keep list to
+// [prevVersionedHome] — see
+// build/rollback-cleanup-deletes-other-rollback-targets.md. The
+// "other in-TTL rollback target B is preserved" subtest is the failing
+// demonstrator and will pass once the keep list is widened to union
+// marker.RollbacksAvailable.
+func TestRollbackWithOpts_PreservesInTTLRollbacksAvailable(t *testing.T) {
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+
+	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"}
+	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"}
+	versionC := testAgentVersion{version: "3.0.0", hash: "cccccc"}
+
+	testLogger, _ := loggertest.New(t.Name())
+	testTop := t.TempDir()
+
+	relA := createFakeAgentInstall(t, testTop, versionA.version, versionA.hash, true)
+	relB := createFakeAgentInstall(t, testTop, versionB.version, versionB.hash, true)
+	relC := createFakeAgentInstall(t, testTop, versionC.version, versionC.hash, true)
+
+	createLink(t, testTop, relC)
+
+	validUntil := time.Now().Add(24 * time.Hour)
+	availableRollbacks := map[string]ttl.TTLMarker{
+		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: validUntil},
+		relB: {Version: versionB.version, Hash: versionB.hash, ValidUntil: validUntil},
+	}
+
+	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
+	err := markUpgrade(
+		testLogger,
+		paths.DataFrom(testTop),
+		time.Now(),
+		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
+		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
+		nil, nil, availableRollbacks,
+	)
+	require.NoError(t, err, "writing update marker with two RollbacksAvailable entries")
+
+	mockClient := client.NewMockClient(t)
+	mockClient.EXPECT().Connect(
+		mock.AnythingOfType("*context.timerCtx"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+	).Return(nil)
+	mockClient.EXPECT().Disconnect().Return()
+	mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+
+	err = RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, relA, versionA.hash)
+	require.NoError(t, err, "RollbackWithOpts to A")
+
+	t.Run("rollback target A is preserved", func(t *testing.T) {
+		assertAgentInstallExists(t, filepath.Join(testTop, relA), agentExecutableName)
+	})
+
+	t.Run("failing upgrade C is cleaned up", func(t *testing.T) {
+		assertAgentInstallCleaned(t, filepath.Join(testTop, relC), agentExecutableName)
+	})
+
+	t.Run("other in-TTL rollback target B is preserved", func(t *testing.T) {
+		// EXPECTED: B's directory should survive — its TTL has not expired and
+		// it is listed in marker.RollbacksAvailable. Currently FAILS on main:
+		// RollbackWithOpts -> Cleanup is invoked with keep list [A], so B is
+		// removed despite its retention contract.
+		assertAgentInstallExists(t, filepath.Join(testTop, relB), agentExecutableName)
+	})
 }
