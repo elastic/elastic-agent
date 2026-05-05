@@ -10,15 +10,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
 	"time"
 
-	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
-	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v3"
@@ -28,7 +25,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
@@ -47,9 +43,7 @@ const (
 )
 
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
-// healthCheckExtensionID is the pre-constructed component ID string (e.g. "healthcheckv2/<uuid>").
-// A healthCheckPort of 0 will result in a random port being selected on each start.
-func newSubprocessExecution(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (*subprocessExecution, error) {
+func newSubprocessExecution(collectorPath string) (*subprocessExecution, error) {
 	return &subprocessExecution{
 		collectorPath: collectorPath,
 		collectorArgs: []string{
@@ -60,23 +54,22 @@ func newSubprocessExecution(collectorPath string, healthCheckExtensionID string,
 			// matching the behavior of other Collector telemetry metrics like queue state.
 			fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelElasticsearchExporterTelemetryFeature),
 		},
-		healthCheckExtensionID:   healthCheckExtensionID,
-		collectorHealthCheckPort: healthCheckPort,
-		reportErrFn:              reportErr,
+		reportErrFn: reportErr,
 	}, nil
 }
 
 // subprocessExecution implements collectorExecution by running the collector in a subprocess.
 type subprocessExecution struct {
-	collectorPath            string
-	collectorArgs            []string
-	healthCheckExtensionID   string
-	collectorHealthCheckPort int                                                    // user-configured port; 0 means pick a random port per-start
-	reportErrFn              func(ctx context.Context, errCh chan error, err error) // required for testing
+	collectorPath string
+	collectorArgs []string
+	reportErrFn   func(ctx context.Context, errCh chan error, err error) // required for testing
 }
 
-// startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
-// processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
+// startCollector starts a supervised collector. The collector reports its
+// status to the manager's OpAMP server via the opampextension injected into
+// its config; the execution layer only manages the subprocess lifecycle and
+// pipes the merged config in over stdin. Process exit errors are sent to the
+// processErrCh channel.
 func (r *subprocessExecution) startCollector(
 	_ context.Context,
 	lvl logp.Level,
@@ -84,8 +77,6 @@ func (r *subprocessExecution) startCollector(
 	logger *logger.Logger,
 	cfg *confmap.Conf,
 	processErrCh chan error,
-	statusCh chan *otelstatus.AggregateStatus,
-	forceFetchStatusCh chan struct{},
 ) (collectorHandle, error) {
 	if cfg == nil {
 		// configuration is required
@@ -100,11 +91,6 @@ func (r *subprocessExecution) startCollector(
 	if _, err := os.Stat(r.collectorPath); err != nil {
 		// we cannot access the collector path
 		return nil, fmt.Errorf("cannot access collector path: %w", err)
-	}
-
-	httpHealthCheckPort, err := r.getCollectorHealthCheckPort()
-	if err != nil {
-		return nil, fmt.Errorf("could not find port for collector: %w", err)
 	}
 
 	// prepare and serialize config first so we can exit early if there's a problem
@@ -124,9 +110,6 @@ func (r *subprocessExecution) startCollector(
 	// set collector args and add --config flag with the stdingob:stdin URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
 	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:", stdinGobProviderScheme))
-	// Override the health check endpoint placeholder (port 0) with the actual resolved port.
-	// Uses the OTel collector --set flag to override a specific config value after all config sources are merged.
-	collectorArgs = append(collectorArgs, fmt.Sprintf("--set=extensions::%s::http::endpoint=localhost:%d", r.healthCheckExtensionID, httpHealthCheckPort))
 
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(collectorArgs),
@@ -145,39 +128,15 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
 
-	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
+	logger.Infof("supervised collector started with pid: %d", processInfo.Process.Pid)
 
-	ctl := newProcHandle(processInfo, logger, lvl, r.healthCheckExtensionID, httpHealthCheckPort,
-		forceFetchStatusCh,
-		func(ctx context.Context, st *otelstatus.AggregateStatus) {
-			reportCollectorStatus(ctx, statusCh, cloneCollectorStatus(st))
-		},
+	ctl := newProcHandle(processInfo, logger, lvl,
 		func(ctx context.Context, err error) { r.reportErrFn(ctx, processErrCh, err) },
 		stdOutLast, stdErrLast,
 	)
 	ctl.startBackgroundWorkers()
 	ctl.updateConfigYamlBytes(cfgYamlBytes)
 	return ctl, nil
-}
-
-// cloneCollectorStatus creates a deep copy of the provided AggregateStatus.
-func cloneCollectorStatus(aStatus *otelstatus.AggregateStatus) *otelstatus.AggregateStatus {
-	if aStatus == nil {
-		return nil
-	}
-
-	st := &otelstatus.AggregateStatus{
-		Event: aStatus.Event,
-	}
-
-	if len(aStatus.ComponentStatusMap) > 0 {
-		st.ComponentStatusMap = make(map[string]*otelstatus.AggregateStatus, len(aStatus.ComponentStatusMap))
-		for k, cs := range aStatus.ComponentStatusMap {
-			st.ComponentStatusMap[k] = cloneCollectorStatus(cs)
-		}
-	}
-
-	return st
 }
 
 func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
@@ -212,30 +171,9 @@ func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
 	return nil
 }
 
-// getCollectorHealthCheckPort returns the health check port used by the OTel collector.
-// If the port set in the execution struct is 0, a random port is returned instead.
-func (r *subprocessExecution) getCollectorHealthCheckPort() (int, error) {
-	if r.collectorHealthCheckPort != 0 {
-		return r.collectorHealthCheckPort, nil
-	}
-	ports, err := findRandomTCPPorts(1)
-	if err != nil {
-		return 0, err
-	}
-	return ports[0], nil
-}
-
-func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus, healthCheckExtensionID string) {
-	extensions, exists := status.ComponentStatusMap["extensions"]
-	if !exists {
-		return
-	}
-
-	extensionID := "extension:" + healthCheckExtensionID
-	delete(extensions.ComponentStatusMap, extensionID)
-}
-
-// procHandle manages a running collector subprocess and its health monitoring.
+// procHandle manages a running collector subprocess. Status reporting is
+// owned by the manager's OpAMP server; this struct only deals with process
+// lifecycle.
 type procHandle struct {
 	// processInfo holds info about the running subprocess.
 	processInfo *process.Info
@@ -243,19 +181,9 @@ type procHandle struct {
 	processDoneCh chan struct{}
 	logger        *logger.Logger
 
-	// wg covers all goroutines: health monitoring, process wait, and pipe writing.
+	// wg covers all goroutines: process wait and pipe writing.
 	wg sync.WaitGroup
 
-	// healthCheckExtensionID is the OTel extension ID used for health checks.
-	healthCheckExtensionID string
-	// httpHealthCheckPort is the port the collector's health check endpoint listens on.
-	httpHealthCheckPort int
-	// forceFetchStatusCh signals an immediate status fetch.
-	// This is used when the manager wants the current status to be re-emitted.
-	forceFetchStatusCh chan struct{}
-
-	// reportStatusFn reports a collector status update upstream.
-	reportStatusFn func(ctx context.Context, status *otelstatus.AggregateStatus)
 	// reportErrFn reports a subprocess error upstream.
 	reportErrFn func(ctx context.Context, err error)
 	// stdOutLast captures the last stdout logger line for error reporting.
@@ -268,9 +196,6 @@ type procHandle struct {
 	// configCh is a buffered(1) channel for latest-config-wins config updates.
 	configCh chan []byte
 
-	// fetchStatus retrieves the status from the collector health check endpoint.
-	// Defaults to AllComponentsStatuses; overridable for testing.
-	fetchStatus func(ctx context.Context, client http.Client, httpHealthCheckPort int) (*otelstatus.AggregateStatus, error)
 	// waitProcess waits for the subprocess to exit and returns its state.
 	// Defaults to processInfo.Process.Wait(); overridable for testing.
 	waitProcess func() (processExitState, error)
@@ -288,28 +213,19 @@ func newProcHandle(
 	processInfo *process.Info,
 	log *logger.Logger,
 	collectorLogLevel logp.Level,
-	healthCheckExtensionID string,
-	httpHealthCheckPort int,
-	forceFetchStatusCh chan struct{},
-	reportStatusFn func(ctx context.Context, status *otelstatus.AggregateStatus),
 	reportErrFn func(ctx context.Context, err error),
 	stdOutLast *zapLast,
 	stdErrLast *zapLast,
 ) *procHandle {
 	return &procHandle{
-		processDoneCh:          make(chan struct{}),
-		processInfo:            processInfo,
-		logger:                 log,
-		collectorLogLevel:      collectorLogLevel,
-		configCh:               make(chan []byte, 1),
-		healthCheckExtensionID: healthCheckExtensionID,
-		httpHealthCheckPort:    httpHealthCheckPort,
-		forceFetchStatusCh:     forceFetchStatusCh,
-		reportStatusFn:         reportStatusFn,
-		reportErrFn:            reportErrFn,
-		stdOutLast:             stdOutLast,
-		stdErrLast:             stdErrLast,
-		fetchStatus:            AllComponentsStatuses,
+		processDoneCh:     make(chan struct{}),
+		processInfo:       processInfo,
+		logger:            log,
+		collectorLogLevel: collectorLogLevel,
+		configCh:          make(chan []byte, 1),
+		reportErrFn:       reportErrFn,
+		stdOutLast:        stdOutLast,
+		stdErrLast:        stdErrLast,
 		waitProcess: func() (processExitState, error) {
 			return processInfo.Process.Wait()
 		},
@@ -318,15 +234,15 @@ func newProcHandle(
 
 func (s *procHandle) startBackgroundWorkers() {
 	ctx, cancel := context.WithCancel(context.Background())
-	s.startMonitoring(ctx, cancel)
+	s.startProcessMonitor(ctx, cancel)
 	s.startPipeWriter(ctx)
 }
 
-func (s *procHandle) startMonitoring(ctx context.Context, cancel context.CancelFunc) {
+func (s *procHandle) startProcessMonitor(ctx context.Context, cancel context.CancelFunc) {
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		s.monitorHealth(ctx, cancel)
+		s.monitorProcess(ctx, cancel)
 	}()
 }
 
@@ -340,88 +256,22 @@ func (s *procHandle) startPipeWriter(ctx context.Context) {
 	}()
 }
 
-// monitorHealth polls the collector's health check endpoint and reports status changes.
-func (s *procHandle) monitorHealth(ctx context.Context, cancel context.CancelFunc) {
-	var procState processExitState
-	var procErr error
-
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		procState, procErr = s.waitProcess()
-		s.logger.Debugf("wait for pid %d returned", s.processInfo.PID)
-		cancel()
-		close(s.processDoneCh)
-	}()
-
-	currentStatus := status.AggregateStatus(componentstatus.StatusStarting, nil)
-	s.reportStatusFn(ctx, currentStatus)
-
-	// specify a max duration of not being able to get the status from the collector
-	const maxFailuresDuration = 130 * time.Second
-	maxFailuresTimer := time.NewTimer(maxFailuresDuration)
-	defer maxFailuresTimer.Stop()
-
-	// check the health of the collector every 1 second
-	const healthCheckPollDuration = 1 * time.Second
-	healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
-	defer healthCheckPollTimer.Stop()
-	client := http.Client{}
-loop:
-	for ctx.Err() == nil {
-		statuses, err := s.fetchStatus(ctx, client, s.httpHealthCheckPort)
-		if err != nil {
-			switch {
-			case errors.Is(err, context.Canceled):
-				break loop
-			default:
-				// if we face any other error (most likely, connection refused), log the error.
-				s.logger.Debugf("Received an unexpected error while fetching component status: %v", err)
-			}
-		} else {
-			maxFailuresTimer.Reset(maxFailuresDuration)
-			removeManagedHealthCheckExtensionStatus(statuses, s.healthCheckExtensionID)
-			if !status.CompareStatuses(currentStatus, statuses) {
-				currentStatus = statuses
-				s.reportStatusFn(ctx, statuses)
-			}
-		}
-
-		select {
-		case <-ctx.Done():
-			break loop
-		case <-s.forceFetchStatusCh:
-			s.reportStatusFn(ctx, currentStatus)
-		case <-healthCheckPollTimer.C:
-			healthCheckPollTimer.Reset(healthCheckPollDuration)
-		case <-maxFailuresTimer.C:
-			failedToConnectStatuses := status.AggregateStatus(
-				componentstatus.StatusRecoverableError,
-				errors.New("failed to connect to collector"),
-			)
-			if !status.CompareStatuses(currentStatus, failedToConnectStatuses) {
-				currentStatus = failedToConnectStatuses
-				s.reportStatusFn(ctx, failedToConnectStatuses)
-			}
-		}
-	}
-
-	// wait until process actually exits
-	<-s.processDoneCh
+// monitorProcess waits for the subprocess to exit, then reports the exit status.
+func (s *procHandle) monitorProcess(_ context.Context, cancel context.CancelFunc) {
+	procState, procErr := s.waitProcess()
+	s.logger.Debugf("wait for pid %d returned", s.processInfo.PID)
+	cancel()
+	close(s.processDoneCh)
 
 	// the finalization process involves some operations that take a context
 	// realistically, none of them can block here, but just in case
-	exitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	exitCtx, exitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer exitCancel()
 
-	// after the collector exits, we need to report a nil status
-	s.reportStatusFn(exitCtx, nil)
-
-	// report the process exit error if necessary
 	s.reportProcessExitErr(exitCtx, procState, procErr)
 }
 
-// reportProcessExitErr waits for the collector process to exit and reports the exit status.
+// reportProcessExitErr reports the exit status of the collector process.
 func (s *procHandle) reportProcessExitErr(ctx context.Context, procState processExitState, procErr error) {
 	var allErrors []error
 
