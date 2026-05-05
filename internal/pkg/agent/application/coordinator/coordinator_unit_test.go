@@ -590,7 +590,7 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 	// and produces a valid AST, but can't be converted into a valid
 	// component model (which we trigger with invalid conditional
 	// expressions). In this case the resulting error should be stored
-	// in Coordinator.componentGenErr, and reported by Coordinator.State.
+	// in Coordinator.componentModelErr, and reported by Coordinator.State.
 
 	// Set a one-second timeout -- nothing here should block, but if it
 	// does let's report a failure instead of timing out the test runner.
@@ -630,7 +630,7 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 	}
 
 	// This configuration produces a valid AST but its EQL condition is
-	// invalid, so its failure should be reported in componentGenErr.
+	// invalid, so its failure should be reported in componentModelErr.
 	cfg := config.MustNewConfigFrom(`
 inputs:
   - type: filestream
@@ -640,8 +640,8 @@ inputs:
 	configChan <- cfgChange
 	coord.runLoopIteration(ctx)
 
-	require.Error(t, coord.componentGenErr)
-	require.Contains(t, coord.componentGenErr.Error(), "rendering inputs failed:")
+	require.Error(t, coord.componentModelErr)
+	require.Contains(t, coord.componentModelErr.Error(), "rendering inputs failed:")
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "Failed component generation should cause failed state")
@@ -659,7 +659,7 @@ inputs:
 	varsChan <- emptyVars(t)
 	coord.runLoopIteration(ctx)
 
-	assert.Error(t, coord.componentGenErr, "Vars update shouldn't affect componentGenErr")
+	assert.Error(t, coord.componentModelErr, "Vars update shouldn't affect componentModelErr")
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "Variable update should not overwrite component generation error")
@@ -676,6 +676,7 @@ inputs:
 	coord.runLoopIteration(ctx)
 
 	assert.NoError(t, coord.configErr, "Valid policy change should clear configErr")
+	assert.NoError(t, coord.componentModelErr, "Valid component model rebuild should clear componentModelErr")
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Healthy, state.State, "Valid policy change should produce healthy state")

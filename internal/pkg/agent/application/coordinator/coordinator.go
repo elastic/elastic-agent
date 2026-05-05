@@ -408,10 +408,10 @@ type Coordinator struct {
 	// failures immediately https://github.com/elastic/elastic-agent/issues/2887.
 	// For now, we track three distinct errors for those three failure types,
 	// and merge them into a readable error in generateReportableState.
-	configErr        error
-	componentGenErr  error
-	runtimeUpdateErr error
-	otelErr          error
+	configErr         error
+	componentModelErr error
+	runtimeUpdateErr  error
+	otelErr           error
 
 	// The raw policy before spec lookup or variable substitution
 	ast *transpiler.AST
@@ -1656,7 +1656,6 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 			err := c.refreshComponentModel(ctx)
 			if err != nil {
 				err = fmt.Errorf("error refreshing component model for PID update: %w", err)
-				c.setConfigManagerError(err)
 				c.logger.Errorf("%s", err)
 			}
 		}
@@ -1968,6 +1967,11 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		// Nothing to process yet
 		return nil
 	}
+
+	defer func() {
+		// Update componentModelErr with the results.
+		c.setComponentModelError(err)
+	}()
 
 	span, ctx := apm.StartSpan(ctx, "refreshComponentModel", "app.internal")
 	defer func() {
@@ -2285,11 +2289,6 @@ func (c *Coordinator) ackMigration(ctx context.Context, action *fleetapi.ActionM
 // Called from both the main Coordinator goroutine and from external
 // goroutines via diagnostics hooks.
 func (c *Coordinator) generateComponentModel() (err error) {
-	defer func() {
-		// Update componentGenErr with the results.
-		c.setComponentGenError(err)
-	}()
-
 	ast := c.ast.ShallowClone()
 
 	// perform variable substitution for inputs
