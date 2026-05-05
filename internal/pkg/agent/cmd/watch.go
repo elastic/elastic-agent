@@ -215,7 +215,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			versionedHomesToKeep = append(versionedHomesToKeep, currentVersionedHome)
 		}
 
-		versionedHomesToKeep = appendAvailableRollbacks(log, marker, versionedHomesToKeep)
+		versionedHomesToKeep = upgrade.AppendAvailableRollbacks(log, marker, versionedHomesToKeep)
 		log.Infof("About to clean up upgrade. Keeping versioned homes: %v", versionedHomesToKeep)
 		if err := installModifier.Cleanup(log, paths.Top(), true, false, versionedHomesToKeep...); err != nil {
 			log.Error("clean up of prior watcher run failed", err)
@@ -291,22 +291,13 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	}
 	versionedHomesToKeep := make([]string, 0, len(marker.RollbacksAvailable)+1)
 	versionedHomesToKeep = append(versionedHomesToKeep, newVersionedHome)
-	versionedHomesToKeep = appendAvailableRollbacks(log, marker, versionedHomesToKeep)
+	versionedHomesToKeep = upgrade.AppendAvailableRollbacks(log, marker, versionedHomesToKeep)
 
 	err = installModifier.Cleanup(log, topDir, removeMarker, false, versionedHomesToKeep...)
 	if err != nil {
 		log.Error("cleanup after successful watch failed", err)
 	}
 	return err
-}
-
-func appendAvailableRollbacks(log *logp.Logger, marker *upgrade.UpdateMarker, versionedHomesToKeep []string) []string {
-	// add any available rollbacks
-	for versionedHome, ra := range marker.RollbacksAvailable {
-		log.Debugf("Adding available rollback %s:%+v to the directories to keep during cleanup", versionedHome, ra)
-		versionedHomesToKeep = append(versionedHomesToKeep, versionedHome)
-	}
-	return versionedHomesToKeep
 }
 
 func rollback(log *logp.Logger, topDir string, client client.Client, installModifier installationModifier, versionedHome string) error {

@@ -213,6 +213,18 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	return cumulativeError
 }
 
+// AppendAvailableRollbacks appends every versioned home listed in
+// marker.RollbacksAvailable to versionedHomesToKeep and returns the result.
+// It is the canonical way to fold TTL-tracked rollback targets into a Cleanup
+// keep list so callers stay consistent.
+func AppendAvailableRollbacks(log *logger.Logger, marker *UpdateMarker, versionedHomesToKeep []string) []string {
+	for versionedHome, ra := range marker.RollbacksAvailable {
+		log.Debugf("Adding available rollback %s:%+v to the directories to keep during cleanup", versionedHome, ra)
+		versionedHomesToKeep = append(versionedHomesToKeep, versionedHome)
+	}
+	return versionedHomesToKeep
+}
+
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of
 // agent during upgrade period.
 func InvokeWatcher(log *logger.Logger, agentExecutable string, additionalWatchArgs ...string) (*exec.Cmd, error) {
