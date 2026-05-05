@@ -410,11 +410,17 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.
 // For input units with streams, receiverByInputID maps each stream/input ID to its dedicated receiver status.
 // For output units or starting state, outputUnitStatus provides a single fallback status and receiverByInputID is nil.
 func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByInputID map[string]*status.AggregateStatus, unit component.Unit, comp *component.Component) runtime.ComponentUnitState {
-	if unit.Config == nil || unit.Type == client.UnitTypeOutput {
+	if unit.Type == client.UnitTypeOutput {
 		topLevelState, topLevelMessage := StateWithMessage(outputUnitStatus)
 		return runtime.ComponentUnitState{
 			State:   topLevelState,
 			Message: topLevelMessage,
+		}
+	}
+	if unit.Config == nil {
+		return runtime.ComponentUnitState{
+			State:   client.UnitStateDegraded,
+			Message: "unit configuration is nil",
 		}
 	}
 

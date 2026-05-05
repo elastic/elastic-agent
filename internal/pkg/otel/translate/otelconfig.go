@@ -439,6 +439,13 @@ func getReceiversConfigForComponent(
 		"enabled": false,
 	}
 
+	if comp.OutputType == "kafka" || comp.OutputType == "logstash" {
+		sharedConfig["include_metadata"] = true
+	}
+	if beatName == "filebeat" && fbfeatures.IsElasticsearchStateStoreEnabled() {
+		sharedConfig["storage"] = elasticsearchStateStoreExtensionName
+	}
+
 	// indicate that beat receivers are managed by the elastic-agent
 	sharedConfig["management.otel.enabled"] = true
 
