@@ -513,7 +513,7 @@ metadata:
       url: https://buildkite.com/elastic/elastic-agent-pipeline-scheduler
 spec:
   type: buildkite-pipeline
-  owner: group:logstash
+  owner: group:ingest-fp
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
