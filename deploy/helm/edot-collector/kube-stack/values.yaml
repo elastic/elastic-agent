@@ -41,7 +41,7 @@ collectors:
     fullnameOverride: "opentelemetry-kube-stack-cluster-stats"
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: '"true"'
+        value: "true"
     config:
       exporters:
         # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
@@ -181,7 +181,7 @@ collectors:
     fullnameOverride: "opentelemetry-kube-stack-daemon"
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: '"true"'
+        value: "true"
     presets:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
@@ -523,7 +523,7 @@ collectors:
     enabled: true
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: '"true"'
+        value: "true"
       - name: ELASTIC_ENDPOINT
         valueFrom:
           secretKeyRef:
