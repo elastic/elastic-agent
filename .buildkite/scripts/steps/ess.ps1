@@ -18,11 +18,12 @@ function ess_up {
   $paramsPath      = Join-Path $PWD "params.json"
   $clusterInfoPath = Join-Path $PWD "cluster-info.json"
   @{
-      GitOps           = "true"
-      GitHubRepository = $Env:BUILDKITE_REPO
-      GitHubCommit     = $Env:BUILDKITE_COMMIT
-      EphemeralCluster = "true"
-      StackVersion     = $StackVersion
+      GitOps                   = "true"
+      GitHubRepository         = $Env:BUILDKITE_REPO
+      GitHubCommit             = $Env:BUILDKITE_COMMIT
+      EphemeralCluster         = "true"
+      StackVersion             = $StackVersion
+      ElasticAgentDockerImage  = $Env:INTEGRATION_SERVER_DOCKER_IMAGE
   } | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
 
   try {

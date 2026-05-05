@@ -10,11 +10,21 @@ function ess_up() {
     return 1
   fi
 
+  if [ -z "$INTEGRATION_SERVER_DOCKER_IMAGE" ]; then
+    echo "Error: Specify integration server docker image: ess_up [stack_version]" >&2
+    return 1
+  fi
+
   # Create a cluster with the specified stack version and store the cluster information in a file
   oblt-cli cluster create custom \
       --template ess-ea-it \
       --cluster-name-prefix ea-hosted-it \
-      --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$STACK_VERSION\"}" \
+      --parameter GitOps=true \
+      --parameter GitHubRepository="${BUILDKITE_REPO}" \
+      --parameter GitHubCommit="${BUILDKITE_COMMIT}" \
+      --parameter EphemeralCluster=true \
+      --parameter StackVersion="$STACK_VERSION" \
+      --parameter ElasticAgentDockerImage="${INTEGRATION_SERVER_DOCKER_IMAGE}" \
       --output-file="${PWD}/cluster-info.json" \
       --wait 30
 
