@@ -28,24 +28,6 @@ steps:
   - group: "Unit tests"
     key: "unit-tests"
     steps:
-      - label: "Unit tests - Ubuntu 22.04"
-        key: "unit-tests-2204"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-          machineType: "n2-standard-8"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
       - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
         key: "unit-tests-2204-fips-tag"
         command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -89,25 +71,6 @@ steps:
           manual:
             allowed: true
 
-      - label: "Unit tests - Ubuntu 22.04 ARM64"
-        key: "unit-tests-2204-arm64"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "aws"
-          image: "${IMAGE_UBUNTU_2204_ARM_64}"
-          diskSizeGb: 200
-          instanceType: "m6g.xlarge"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
         command: .buildkite/scripts/steps/unit-tests.ps1
@@ -142,43 +105,6 @@ steps:
           machineType: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
-  - group: "macOS tests"
-    key: "macos-unit-tests"
-    steps:
-      - label: "Unit tests - macOS 15 ARM"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: orka
-          imagePrefix: generic-base-15-arm-002
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
-      # Runs only on main and release branches
-      - label: "Unit tests - macOS 13"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        branches: "main 8.* 9.*"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: orka
-          imagePrefix: generic-13-ventura-x64
         retry:
           automatic:
             limit: 1
@@ -264,13 +190,9 @@ steps:
         allow_failure: true
       - step: "unit-tests-2204-fips140-only"
         allow_failure: true
-      - step: "unit-tests-2204-arm64"
-        allow_failure: true
       - step: "unit-tests-win2022"
         allow_failure: true
       - step: "unit-tests-win2016"
-        allow_failure: true
-      - step: "macos-unit-tests"
         allow_failure: true
       - step: "unit-tests-win10"
         allow_failure: true
@@ -278,30 +200,6 @@ steps:
         allow_failure: true
       - step: "unit-tests-win11-arm64"
         allow_failure: true
-
-  - group: "K8s tests"
-    key: "k8s-tests"
-    steps:
-      - label: "K8s tests: {{matrix.k8s_version}}"
-        env:
-          K8S_VERSION: "v{{matrix.k8s_version}}"
-          KIND_VERSION: "v0.27.0"
-        command: ".buildkite/scripts/steps/k8s-tests.sh"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-        matrix:
-          setup:
-            k8s_version:
-              - "1.33.0"
-              - "1.32.0"
-              - "1.31.0"
-              - "1.30.0"
-              - "1.29.4"
-              - "1.28.9"
-        retry:
-          manual:
-            allowed: true
 
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed

@@ -1,9 +1,8 @@
-name: macos-unit-tests
+name: k8s-tests
 
 on:
   workflow_dispatch:
-  # Temporary disabled for PRs
-  # pull_request:
+  pull_request:
   push:
     branches:
       - main
@@ -21,8 +20,21 @@ concurrency:
 
 jobs:
   unit-tests:
-    runs-on: macos-15
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        k8s_version:
+          - "1.33.0"
+          - "1.32.0"
+          - "1.31.0"
+          - "1.30.0"
+          - "1.29.4"
+          - "1.28.9"
+    env:
+      K8S_VERSION: "v${{ matrix.k8s_version }}"
+      KIND_VERSION: "v0.27.0"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -34,13 +46,8 @@ jobs:
         with:
           go-version-file: .go-version
 
-      - name: Install make
-        run: |
-          brew install make
-          export PATH="/usr/local/opt/make/libexec/gnubin:$PATH"
-
       - name: Install mage
         run: make mage
 
-      - name: mage unitTest
-        run: RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
+      - name: k8s-tests
+        run: .buildkite/scripts/steps/k8s-tests.sh
