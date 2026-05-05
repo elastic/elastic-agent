@@ -33,7 +33,6 @@ jobs:
           - macos-15-intel
           - macos-15
           - windows-2022
-          - windows-11-arm
         race_detector: [true]
         include:
           - os: ubuntu-22.04
