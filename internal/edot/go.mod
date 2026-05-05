@@ -15,7 +15,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.4.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260503210945-68f364621b3b
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260504192524-4c84b12ede47
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.41.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -91,7 +91,6 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs/v2 v2.0.2 // indirect
 	github.com/DeRuina/timberjack v1.4.1 // indirect
 	github.com/KimMachineGun/automemlimit v0.7.5 // indirect
-	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/alexbrainman/sspi v0.0.0-20250919150558-7d374ff0d59e // indirect
 	github.com/aws/aws-sdk-go v1.55.8 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.74.0 // indirect
@@ -112,10 +111,8 @@ require (
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/tk-btf v0.2.0 // indirect
 	github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb // indirect
-	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/fsnotify/fsevents v0.2.0 // indirect
-	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.5 // indirect
 	github.com/go-openapi/swag/conv v0.25.5 // indirect
 	github.com/go-openapi/swag/fileutils v0.25.5 // indirect
@@ -134,18 +131,12 @@ require (
 	github.com/grobie/gomemcache v0.0.0-20230213081705-239240bbc445 // indirect
 	github.com/insomniacslk/dhcp v0.0.0-20251020182700-175e84fbb167 // indirect
 	github.com/itchyny/timefmt-go v0.1.8 // indirect
-	github.com/jaypipes/ghw v0.12.0 // indirect
-	github.com/jaypipes/pcidb v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/michel-laterman/proxy-connect-dialer-go v0.1.0 // indirect
 	github.com/mileusna/useragent v1.3.5 // indirect
-	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
-	github.com/moby/moby/api v1.54.1 // indirect
-	github.com/moby/moby/client v0.4.0 // indirect
-	github.com/moby/spdystream v0.5.0 // indirect
-	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
+	github.com/moby/moby/api v1.54.2 // indirect
+	github.com/moby/moby/client v0.4.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/internal/credentialsfile v0.150.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sinventory v0.150.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.150.0 // indirect
@@ -155,8 +146,6 @@ require (
 	github.com/oschwald/geoip2-golang/v2 v2.1.0 // indirect
 	github.com/oschwald/maxminddb-golang/v2 v2.1.1 // indirect
 	github.com/osquery/osquery-go v0.0.0-20260226222546-0cc22f415e57 // indirect
-	github.com/otiai10/copy v1.14.1 // indirect
-	github.com/otiai10/mint v1.6.3 // indirect
 	github.com/outscale/osc-sdk-go/v2 v2.32.0 // indirect
 	github.com/pb33f/jsonpath v0.8.2 // indirect
 	github.com/pb33f/libopenapi v0.34.4 // indirect
@@ -166,16 +155,12 @@ require (
 	github.com/prometheus/client_golang/exp v0.0.0-20260325093428-d8591d0db856 // indirect
 	github.com/puzpuzpuz/xsync/v4 v4.4.0 // indirect
 	github.com/rdforte/gomaxecs v1.1.2 // indirect
-	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/sajari/regression v1.0.1 // indirect
 	github.com/samuel/go-parser v0.0.0-20130731160455-ca8abbf65d0e // indirect
 	github.com/samuel/go-thrift v0.0.0-20140522043831-2187045faa54 // indirect
-	github.com/schollz/progressbar/v3 v3.13.1 // indirect
 	github.com/sijms/go-ora/v2 v2.9.0 // indirect
 	github.com/teambition/rrule-go v1.8.2 // indirect
 	github.com/u-root/uio v0.0.0-20230220225925-ffce2a382923 // indirect
 	github.com/vultr/govultr/v3 v3.28.1 // indirect
-	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.3.1 // indirect
 	go.opentelemetry.io/collector/component/componentstatus v0.150.0 // indirect
 	go.opentelemetry.io/collector/config/confighttp v0.150.0 // indirect
@@ -184,7 +169,6 @@ require (
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.4 // indirect
 	mvdan.cc/garble v0.12.1 // indirect
-	sigs.k8s.io/e2e-framework v0.4.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect
 )
@@ -380,8 +364,7 @@ require (
 	github.com/digitalocean/go-metadata v0.0.0-20250129100319-e3650a3df44b // indirect
 	github.com/digitalocean/godo v1.178.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
-	github.com/docker/docker v28.5.2+incompatible // indirect
-	github.com/docker/go-connections v0.6.0 // indirect
+	github.com/docker/go-connections v0.7.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5 // indirect
 	github.com/dop251/goja v0.0.0-20250630131328-58d95d85e994 // indirect
@@ -395,7 +378,7 @@ require (
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
 	github.com/elastic/apm-data v1.21.0 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
-	github.com/elastic/elastic-agent-autodiscover v0.10.2 // indirect
+	github.com/elastic/elastic-agent-autodiscover v0.10.3-0.20260423154939-e990715f9426 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.18.1 // indirect
 	github.com/elastic/elastic-agent-system-metrics v0.14.3 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
