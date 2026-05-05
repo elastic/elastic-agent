@@ -432,11 +432,16 @@ func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByI
 	var worstReceiverState client.UnitState
 	var worstReceiverMessage string
 
-	for _, stream := range unit.Config.Streams {
+	for i, stream := range unit.Config.Streams {
 		var rs *status.AggregateStatus
 		if receiverByInputID != nil {
-			// Each stream has its own dedicated receiver
-			rs = receiverByInputID[stream.Id]
+			// Each stream has its own dedicated receiver. Use resolveStreamID
+			// to match the same fallback logic used when naming receivers.
+			var streamSource map[string]any
+			if src := stream.GetSource(); src != nil {
+				streamSource = src.AsMap()
+			}
+			rs = receiverByInputID[resolveStreamID(stream.Id, streamSource, unit.ID, i)]
 		}
 
 		if rs != nil {

@@ -663,6 +663,21 @@ type receiverInput struct {
 	config   map[string]any
 }
 
+// resolveStreamID returns the canonical stream ID for a given proto stream, unit ID,
+// and stream index. It follows the same fallback chain used when naming per-stream
+// receivers: proto Stream.Id → stream source "id" field → generated ID from unit ID
+// and index. Both the receiver naming (otelconfig.go) and status lookup (status.go)
+// must use this function to stay in sync.
+func resolveStreamID(streamID string, streamSource map[string]any, unitID string, index int) string {
+	if streamID != "" {
+		return streamID
+	}
+	if id, ok := streamSource["id"].(string); ok && id != "" {
+		return id
+	}
+	return fmt.Sprintf("%s-%d", unitID, index)
+}
+
 func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, inputType string) ([]receiverInput, error) {
 	agentInfo := &client.AgentInfo{
 		ID:           info.AgentID(),
@@ -691,19 +706,11 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 			input["type"] = inputType
 		}
 
-		var streamID string
+		var protoStreamID string
 		if i < len(streams) {
-			streamID = streams[i].GetId()
+			protoStreamID = streams[i].GetId()
 		}
-		// Fall back to the input map's "id" field if the proto stream ID is empty.
-		if streamID == "" {
-			streamID, _ = input["id"].(string)
-		}
-		// If still empty (e.g. standalone config with no stream IDs), generate
-		// a deterministic ID from the unit ID and stream index.
-		if streamID == "" {
-			streamID = fmt.Sprintf("%s-%d", unit.ID, i)
-		}
+		streamID := resolveStreamID(protoStreamID, input, unit.ID, i)
 		result[i] = receiverInput{streamID: streamID, config: input}
 	}
 

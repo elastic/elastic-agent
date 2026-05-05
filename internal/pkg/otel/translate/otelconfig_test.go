@@ -2788,3 +2788,52 @@ func TestLogLevelConversion(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveStreamID(t *testing.T) {
+	tests := []struct {
+		name         string
+		streamID     string
+		streamSource map[string]any
+		unitID       string
+		index        int
+		expected     string
+	}{
+		{
+			name:     "uses proto stream ID when set",
+			streamID: "my-stream-id",
+			unitID:   "my-unit",
+			index:    0,
+			expected: "my-stream-id",
+		},
+		{
+			name:         "falls back to source id when proto stream ID is empty",
+			streamID:     "",
+			streamSource: map[string]any{"id": "source-id"},
+			unitID:       "my-unit",
+			index:        0,
+			expected:     "source-id",
+		},
+		{
+			name:         "generates ID when both proto and source are empty",
+			streamID:     "",
+			streamSource: map[string]any{},
+			unitID:       "system/metrics-default-unique-system-metrics-input",
+			index:        0,
+			expected:     "system/metrics-default-unique-system-metrics-input-0",
+		},
+		{
+			name:     "generates ID when source is nil",
+			streamID: "",
+			unitID:   "my-unit",
+			index:    2,
+			expected: "my-unit-2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resolveStreamID(tt.streamID, tt.streamSource, tt.unitID, tt.index)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
