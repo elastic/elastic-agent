@@ -9,7 +9,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -53,7 +52,7 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 
 			g, err := process.CreateJobObject()
 			if err != nil {
-				log.Fatalf("Unable to create job object: %v\n", err)
+				return fmt.Errorf("Unable to create job object: %w\n", err)
 			}
 			defer func() {
 				_ = g.Close()
@@ -69,12 +68,12 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 
 			err = cmd.Start()
 			if err != nil {
-				return fmt.Errorf("Error running command: %v\n", err)
+				return fmt.Errorf("Error running command: %w\n", err)
 			}
 
 			// Add the process to the job object
 			if err := g.Assign(cmd.Process); err != nil {
-				return fmt.Errorf("Error adding job object: %v\n", err)
+				return fmt.Errorf("Error adding job object: %w\n", err)
 			}
 
 			err = cmd.Wait()
@@ -90,7 +89,7 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 				os.Exit(exitCode)
 			case err != nil:
 				// Exit with a non-zero exit code
-				return fmt.Errorf("Command failed: %v\n", err)
+				return fmt.Errorf("Command failed: %w\n", err)
 			}
 			return nil
 		},
