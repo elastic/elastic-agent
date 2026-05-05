@@ -20,7 +20,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -181,11 +180,16 @@ func TestTryDelayEnroll_ExitsOnCtxCancel(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	enrollContents, err := yaml.Marshal(&enroll.EnrollOptions{
+	enrollOpts := struct {
+		URL          string `yaml:"url"`
+		EnrollAPIKey string `yaml:"enrollment_key"`
+		Insecure     bool   `yaml:"insecure"`
+	}{
 		URL:          server.URL,
 		EnrollAPIKey: "fake-token",
 		Insecure:     true,
-	})
+	}
+	enrollContents, err := yaml.Marshal(&enrollOpts)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(paths.AgentEnrollFile(), enrollContents, 0o600))
 
