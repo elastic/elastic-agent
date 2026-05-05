@@ -39,7 +39,7 @@ collectors:
     fullnameOverride: "opentelemetry-kube-stack-daemon"
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: '"true"'
+        value: "true"
     presets:
       kubeletMetrics:
         enabled: false
@@ -220,7 +220,7 @@ collectors:
     enabled: true
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: '"true"'
+        value: "true"
       - name: ELASTIC_OTLP_ENDPOINT
         valueFrom:
           secretKeyRef:
