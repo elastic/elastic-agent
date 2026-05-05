@@ -8,12 +8,13 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/collector/otelcol"
 
-	"github.com/elastic/elastic-agent/internal/edot/otelcol"
+	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
-func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
+func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams, componentsFn func() (otelcol.Factories, error)) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "validate",
 		Short:         "Validates the OpenTelemetry collector configuration without running the collector",
@@ -25,7 +26,7 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return validateOtelConfig(cmd.Context(), cfgFiles)
+			return validateOtelConfig(cmd.Context(), cfgFiles, componentsFn)
 		},
 	}
 
@@ -39,6 +40,6 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func validateOtelConfig(ctx context.Context, cfgFiles []string) error {
-	return otelcol.Validate(ctx, cfgFiles)
+func validateOtelConfig(ctx context.Context, cfgFiles []string, componentsFn func() (otelcol.Factories, error)) error {
+	return edotOtelCol.Validate(ctx, cfgFiles, componentsFn)
 }
