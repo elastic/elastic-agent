@@ -33,13 +33,31 @@ function ess_up {
         --cluster-name-prefix ea-hosted-it `
         --parameters-file $paramsPath `
         --output-file $clusterInfoPath `
-        --wait 30
+        --wait 20
   } finally {
     Remove-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue
   }
+  # fallback to check if secrets are available in case the cluster was created
+  # but wait timed out (e.g. due to slow cluster creation or transient oblt-cli issues)
   if ($LASTEXITCODE -ne 0) {
-      Write-Error "Error: oblt-cli cluster create custom failed (exit=$LASTEXITCODE)"
-      return 1
+      if (Test-Path $clusterInfoPath) {
+          $ClusterName = (Get-Content -Path $clusterInfoPath | ConvertFrom-Json).ClusterName
+          if ($ClusterName) {
+              & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file "nul"
+              if ($LASTEXITCODE -eq 0) {
+                  Write-Output "Cluster creation wait timed out, but secrets are available - continuing"
+              } else {
+                  Write-Error "Error: oblt-cli cluster create custom failed (exit=$LASTEXITCODE) and secrets check failed"
+                  return 1
+              }
+          } else {
+              Write-Error "Error: oblt-cli cluster create custom failed (exit=$LASTEXITCODE) and no cluster name found"
+              return 1
+          }
+      } else {
+          Write-Error "Error: oblt-cli cluster create custom failed (exit=$LASTEXITCODE)"
+          return 1
+      }
   }
 
   if (-not (Test-Path $clusterInfoPath)) {

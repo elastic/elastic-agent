@@ -11,12 +11,18 @@ function ess_up() {
   fi
 
   # Create a cluster with the specified stack version and store the cluster information in a file
-  oblt-cli cluster create custom \
+  if ! oblt-cli cluster create custom \
       --template ess-ea-it \
       --cluster-name-prefix ea-hosted-it \
       --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$STACK_VERSION\"}" \
       --output-file="${PWD}/cluster-info.json" \
-      --wait 30
+      --wait 20 ; then
+
+    # fallback to check if secrets are available in case the cluster was created
+    # but wait timed out (e.g. due to slow cluster creation or transient oblt-cli issues)
+    CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
+    oblt-cli cluster secrets env --cluster-name "$CLUSTER_NAME" --output-file="/dev/null"
+  fi
 
   # Extract the cluster name from the cluster information file
   CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
