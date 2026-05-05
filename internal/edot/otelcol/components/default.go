@@ -19,6 +19,14 @@ import (
 	"go.opentelemetry.io/collector/service/telemetry/otelconftelemetry"
 
 	// Receivers:
+<<<<<<< HEAD
+=======
+	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
+	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
+	azuremonitorreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver"
+	couchdbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver"
+	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
+>>>>>>> fd9699b70 (Add Azure Monitor receiver to EDOT Collector (#12919))
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
@@ -116,6 +124,30 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			mbreceiver.NewFactory(),
 			jmxreceiver.NewFactory(),
 			nopreceiver.NewFactory(),
+<<<<<<< HEAD
+=======
+			apachereceiver.NewFactory(),
+			azuremonitorreceiver.NewFactory(),
+			couchdbreceiver.NewFactory(),
+			haproxyreceiver.NewFactory(),
+			iisreceiver.NewFactory(),
+			memcachedreceiver.NewFactory(),
+			mongodbreceiver.NewFactory(),
+			mysqlreceiver.NewFactory(),
+			oracledbreceiver.NewFactory(),
+			postgresqlreceiver.NewFactory(),
+			rabbitmqreceiver.NewFactory(),
+			snmpreceiver.NewFactory(),
+			kafkametricsreceiver.NewFactory(),
+			sqlserverreceiver.NewFactory(),
+			statsdreceiver.NewFactory(),
+			vcenterreceiver.NewFactory(),
+			zookeeperreceiver.NewFactory(),
+			windowseventlogreceiver.NewFactory(),
+			awss3receiver.NewFactory(),
+			windowsperfcountersreceiver.NewFactory(),
+			prometheusremotewritereceiver.NewFactory(),
+>>>>>>> fd9699b70 (Add Azure Monitor receiver to EDOT Collector (#12919))
 		}
 		// some receivers should only be available when
 		// not in fips mode due to restrictions on crypto usage
