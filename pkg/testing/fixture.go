@@ -581,6 +581,33 @@ func (f *Fixture) RunOtelWithClient(ctx context.Context, states ...State) error 
 	return f.executeWithClient(ctx, "otel", false, false, false, states...)
 }
 
+<<<<<<< HEAD
+=======
+// Stop gracefully stops the Elastic Agent process that has been started
+// by [RunOtelWithCliet] or [Run].
+// If the Elastic Agent has been installed, or the process
+// has not been started by [RunOtelWithClient] or [Run],
+// Stop fails the test by calling t.Fatal
+func (f *Fixture) Stop() {
+	f.procMutex.Lock()
+	defer f.procMutex.Unlock()
+
+	if f.installed {
+		f.t.Fatal("an installed Elastic Agent cannot be stopped")
+	}
+
+	if f.proc == nil {
+		f.t.Fatal("Elastic Agent has not been started")
+	}
+
+	f.stopping = true
+
+	if err := f.proc.Stop(); err != nil {
+		f.t.Errorf("Elastic Agent returned an error when stopping: %s", err)
+	}
+}
+
+>>>>>>> 3c3e0dd9f (Use t.Fatal instead of t.Error to stop test execution on error (#14036))
 func (f *Fixture) executeWithClient(ctx context.Context, command string, disableEncryptedStore bool, shouldWatchState bool, enableTestingMode bool, states ...State) error {
 	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
 		f.t.Fatal("Context passed to Fixture.Run() has no deadline set.")
