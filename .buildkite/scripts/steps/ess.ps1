@@ -10,11 +10,6 @@ function ess_up {
       return 1
   }
 
-  if (-not $Env:INTEGRATION_SERVER_DOCKER_IMAGE) {
-      Write-Error "Error: Specify integration server docker image: ess_up [stack_version]"
-      return 1
-  }
-
   # Write parameters to a JSON file and pass via --parameters-file.
   # Windows PowerShell 5.1 mangles native-command arguments that contain
   # embedded double quotes (even when passed as a separate argument), so
@@ -22,14 +17,19 @@ function ess_up {
   # from oblt-cli. A file bypasses PS arg marshalling entirely.
   $paramsPath      = Join-Path $PWD "params.json"
   $clusterInfoPath = Join-Path $PWD "cluster-info.json"
-  @{
-      GitOps                   = "true"
-      GitHubRepository         = $Env:BUILDKITE_REPO
-      GitHubCommit             = $Env:BUILDKITE_COMMIT
-      EphemeralCluster         = "true"
-      StackVersion             = $StackVersion
-      ElasticAgentDockerImage  = $Env:INTEGRATION_SERVER_DOCKER_IMAGE
-  } | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
+  $params = @{
+      GitOps           = "true"
+      GitHubRepository = $Env:BUILDKITE_REPO
+      GitHubCommit     = $Env:BUILDKITE_COMMIT
+      EphemeralCluster = "true"
+      StackVersion     = $StackVersion
+  }
+
+  if ($Env:INTEGRATION_SERVER_DOCKER_IMAGE) {
+      $params.ElasticAgentDockerImage = $Env:INTEGRATION_SERVER_DOCKER_IMAGE
+  }
+
+  $params | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
 
   try {
     # --output-file must be an absolute path; oblt-cli resolves relative

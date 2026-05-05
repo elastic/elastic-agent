@@ -2,7 +2,6 @@
 
 env:
   ASDF_MAGE_VERSION: 1.14.0
-  INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
@@ -89,6 +88,7 @@ steps:
     env:
       TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
       FORCE_ESS_CREATE: "true"
+      INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
     command: |
       #!/usr/bin/env bash
       buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
