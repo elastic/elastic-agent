@@ -27,19 +27,6 @@ entries:
         name: 1767042279-Change-control-protocol-time-format-to-RFC3339Nano.yaml
         checksum: af1688847082c87bc7b06f3e089788f4204db33f
     - kind: enhancement
-      summary: Update OTel Collector components to v0.144.0
-      description: ""
-      component: elastic-agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/12449
-      issue: []
-      impact: ""
-      action: ""
-      timestamp: 1769520430
-      file:
-        name: 1769520430-update-otel-components-to-v0.144.0.yaml
-        checksum: ce46c0b2fd9fc33488570c232b2a86b8a7996f06
-    - kind: enhancement
       summary: add support for elasticsearch.parameters for beatreceiver
       description: ""
       component: elastic-agent
@@ -85,19 +72,6 @@ entries:
       file:
         name: 1770700000-add-kafka-metrics-receiver-to-edot-collector.yaml
         checksum: a4e9bd76ff84259c1850b1d76485e33d97a5fbda
-    - kind: enhancement
-      summary: Update OTel Collector components to v0.145.0
-      description: ""
-      component: elastic-agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/12705
-      issue: []
-      impact: ""
-      action: ""
-      timestamp: 1770821590
-      file:
-        name: 1770821590-update-otel-components-to-v0.145.0.yaml
-        checksum: bec6be5a9448b1139cdddbc3c6fcbe2ade461cbd
     - kind: feature
       summary: Support logstash output for otel runtime
       description: ""
@@ -299,19 +273,6 @@ entries:
       file:
         name: 1773766154-Use-NewGCMWithRandomNonce-for-encrypted-state-storage.yaml
         checksum: ebe98aa9bb375e1acaad436e331daeeff1e99d2d
-    - kind: enhancement
-      summary: Update OTel Collector components to v0.147.0
-      description: ""
-      component: elastic-agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/13201
-      issue: []
-      impact: ""
-      action: ""
-      timestamp: 1773836790
-      file:
-        name: 1773836790-update-otel-components-to-v0.147.0.yaml
-        checksum: c1de490693c252bf60bdb7df8e812aa18002498a
     - kind: feature
       summary: Add OTLP JSON connector to EDOT Collector
       description: ""
@@ -372,19 +333,6 @@ entries:
       file:
         name: 1774366699-windows-add-remove-programs-registry.yaml
         checksum: 44557a4341def64ada8dc6341a1b869c9ee9a08e
-    - kind: enhancement
-      summary: Update OTel Collector components to v0.148.0
-      description: ""
-      component: elastic-agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/13317
-      issue: []
-      impact: ""
-      action: ""
-      timestamp: 1774449001
-      file:
-        name: 1774449001-update-otel-components-to-v0.148.0.yaml
-        checksum: 93ec81845d7a7ddac2f4a383399ce41f3320f731
     - kind: bug-fix
       summary: Persist logging level after agent restart
       description: |-
@@ -510,19 +458,6 @@ entries:
       file:
         name: 1775846688-add-azure-encoding-extension-to-edot-collector.yaml
         checksum: 167a439379bd61e3e6db7c46c7a9732fd7cd23e9
-    - kind: enhancement
-      summary: Update OTel Collector components to v0.149.0
-      description: ""
-      component: elastic-agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/13599
-      issue: []
-      impact: ""
-      action: ""
-      timestamp: 1776085327
-      file:
-        name: 1776085327-update-otel-components-to-v0.149.0.yaml
-        checksum: 2cbc6932c8d60c701ffa5ceab37d11d420262f64
     - kind: enhancement
       summary: Add config to suppress 409 conflict errors in elasticsearch exporter
       description: ""

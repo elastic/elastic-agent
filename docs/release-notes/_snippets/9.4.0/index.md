@@ -56,9 +56,7 @@ _This release also includes: [Breaking changes](/release-notes/breaking-changes.
 * Inputs using kafka or logstash output are now supported in OTel runtime. [#13514](https://github.com/elastic/elastic-agent/pull/13514) 
 * Add Azure encoding extension to EDOT Collector. [#13583](https://github.com/elastic/elastic-agent/pull/13583) 
 * Change control protocol time format to RFC3339Nano. [#11923](https://github.com/elastic/elastic-agent/pull/11923) 
-* Update OTel Collector components to v0.144.0. [#12449](https://github.com/elastic/elastic-agent/pull/12449) 
 * Add support for elasticsearch.parameters for beatreceiver. [#12510](https://github.com/elastic/elastic-agent/pull/12510) 
-* Update OTel Collector components to v0.145.0. [#12705](https://github.com/elastic/elastic-agent/pull/12705) 
 * Add support for agent download auth headers. [#12962](https://github.com/elastic/elastic-agent/pull/12962) 
 * Run all metricbeat inputs in an otel collector. [#13016](https://github.com/elastic/elastic-agent/pull/13016) 
 
@@ -91,9 +89,6 @@ _This release also includes: [Breaking changes](/release-notes/breaking-changes.
   
   This will result in a memory reduction since fewer agentbeat processes are started, because the otel runtime runs within the collector process. If the policy is not compatible with the otel runtime, it will fall back to the process runtime.
 * Use NewGCMWithRandomNonce for encrypted state storage. [#12599](https://github.com/elastic/elastic-agent/pull/12599) [#8926](https://github.com/elastic/elastic-agent/issues/8926)
-* Update OTel Collector components to v0.147.0. [#13201](https://github.com/elastic/elastic-agent/pull/13201) 
-* Update OTel Collector components to v0.148.0. [#13317](https://github.com/elastic/elastic-agent/pull/13317) 
-* Update OTel Collector components to v0.149.0. [#13599](https://github.com/elastic/elastic-agent/pull/13599) 
 * Add config to suppress 409 conflict errors in elasticsearch exporter. [#13623](https://github.com/elastic/elastic-agent/pull/13623) 
 * Update OTel Collector components to v0.150.0. [#13696](https://github.com/elastic/elastic-agent/pull/13696) 
 * Add support for partitioning kafka records in OTEL mode. [#13720](https://github.com/elastic/elastic-agent/pull/13720) 
