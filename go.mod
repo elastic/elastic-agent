@@ -22,7 +22,7 @@ require (
 	github.com/elastic/elastic-agent-libs v0.42.2
 	github.com/elastic/elastic-agent-system-metrics v0.14.3
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
-	github.com/elastic/fleet-server/pkg/api v0.0.0-20260504180621-045c0b2bd73e
+	github.com/elastic/fleet-server/pkg/api v0.0.0-20260505183448-c8b2bf643e32
 	github.com/elastic/go-elasticsearch/v8 v8.19.6
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.4
@@ -498,7 +498,3 @@ replace (
 )
 
 tool golang.org/x/tools/cmd/deadcode
-
-// TODO: Remove this replace directive once https://github.com/elastic/fleet-server/pull/6956 is merged,
-// and update the require directive to point to the upstream commit.
-replace github.com/elastic/fleet-server/pkg/api => github.com/ycombinator/fleet-server/pkg/api v0.0.0-20260504200157-08641022ab7c
