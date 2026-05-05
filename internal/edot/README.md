@@ -35,6 +35,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | [apachereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/apachereceiver/v0.152.0/receiver/apachereceiver/README.md) | v0.152.0 |
 | [awss3receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awss3receiver/v0.152.0/receiver/awss3receiver/README.md) | v0.152.0 |
 | [dockerstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/dockerstatsreceiver/v0.152.0/receiver/dockerstatsreceiver/README.md) | v0.152.0 |
@@ -66,6 +67,49 @@ This section provides a summary of components included in the Elastic Distributi
 | [windowseventlogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowseventlogreceiver/v0.152.0/receiver/windowseventlogreceiver/README.md) | v0.152.0 |
 | [windowsperfcountersreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowsperfcountersreceiver/v0.152.0/receiver/windowsperfcountersreceiver/README.md) | v0.152.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.152.0/receiver/zipkinreceiver/README.md) | v0.152.0 |
+=======
+| [apachereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/apachereceiver/v0.150.0/receiver/apachereceiver/README.md) | v0.150.0 |
+| [awss3receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awss3receiver/v0.150.0/receiver/awss3receiver/README.md) | v0.150.0 |
+| [azuremonitorreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/azuremonitorreceiver/v0.150.0/receiver/azuremonitorreceiver/README.md) | v0.150.0 |
+| [couchdbreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/couchdbreceiver/v0.150.0/receiver/couchdbreceiver/README.md) | v0.150.0 |
+| [dockerstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/dockerstatsreceiver/v0.150.0/receiver/dockerstatsreceiver/README.md) | v0.150.0 |
+| [elasticapmintakereceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/elasticapmintakereceiver/v0.46.0/receiver/elasticapmintakereceiver/README.md) | v0.46.0 |
+| [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.150.0/receiver/filelogreceiver/README.md) | v0.150.0 |
+| [haproxyreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/haproxyreceiver/v0.150.0/receiver/haproxyreceiver/README.md) | v0.150.0 |
+| [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.150.0/receiver/hostmetricsreceiver/README.md) | v0.150.0 |
+| [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.150.0/receiver/httpcheckreceiver/README.md) | v0.150.0 |
+| [iisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/iisreceiver/v0.150.0/receiver/iisreceiver/README.md) | v0.150.0 |
+| [jaegerreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/jaegerreceiver/v0.150.0/receiver/jaegerreceiver/README.md) | v0.150.0 |
+| [k8sclusterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sclusterreceiver/v0.150.0/receiver/k8sclusterreceiver/README.md) | v0.150.0 |
+| [k8seventsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8seventsreceiver/v0.150.0/receiver/k8seventsreceiver/README.md) | v0.150.0 |
+| [k8sobjectsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sobjectsreceiver/v0.150.0/receiver/k8sobjectsreceiver/README.md) | v0.150.0 |
+| [kafkametricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kafkametricsreceiver/v0.150.0/receiver/kafkametricsreceiver/README.md) | v0.150.0 |
+| [kafkareceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kafkareceiver/v0.150.0/receiver/kafkareceiver/README.md) | v0.150.0 |
+| [kubeletstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kubeletstatsreceiver/v0.150.0/receiver/kubeletstatsreceiver/README.md) | v0.150.0 |
+| [memcachedreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/memcachedreceiver/v0.150.0/receiver/memcachedreceiver/README.md) | v0.150.0 |
+| [mongodbreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/mongodbreceiver/v0.150.0/receiver/mongodbreceiver/README.md) | v0.150.0 |
+| [mysqlreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/mysqlreceiver/v0.150.0/receiver/mysqlreceiver/README.md) | v0.150.0 |
+| [nginxreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/nginxreceiver/v0.150.0/receiver/nginxreceiver/README.md) | v0.150.0 |
+| [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.149.0/receiver/nopreceiver/README.md) | v0.149.0 |
+| [oracledbreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/oracledbreceiver/v0.150.0/receiver/oracledbreceiver/README.md) | v0.150.0 |
+| [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.150.0/receiver/otlpreceiver/README.md) | v0.150.0 |
+| [postgresqlreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/postgresqlreceiver/v0.150.0/receiver/postgresqlreceiver/README.md) | v0.150.0 |
+| [profiling](https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/v0.0.202614/README.md) | v0.0.202614 |
+| [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.150.0/receiver/prometheusreceiver/README.md) | v0.150.0 |
+| [prometheusremotewritereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusremotewritereceiver/v0.150.0/receiver/prometheusremotewritereceiver/README.md) | v0.150.0 |
+| [rabbitmqreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/rabbitmqreceiver/v0.150.0/receiver/rabbitmqreceiver/README.md) | v0.150.0 |
+| [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.150.0/receiver/receivercreator/README.md) | v0.150.0 |
+| [receivertest](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/receivertest/v0.150.0/receiver/receivertest/README.md) | v0.150.0 |
+| [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.150.0/receiver/redisreceiver/README.md) | v0.150.0 |
+| [snmpreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/snmpreceiver/v0.150.0/receiver/snmpreceiver/README.md) | v0.150.0 |
+| [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlserverreceiver/v0.150.0/receiver/sqlserverreceiver/README.md) | v0.150.0 |
+| [statsdreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/statsdreceiver/v0.150.0/receiver/statsdreceiver/README.md) | v0.150.0 |
+| [vcenterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/vcenterreceiver/v0.150.0/receiver/vcenterreceiver/README.md) | v0.150.0 |
+| [windowseventlogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowseventlogreceiver/v0.149.0/receiver/windowseventlogreceiver/README.md) | v0.149.0 |
+| [windowsperfcountersreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowsperfcountersreceiver/v0.150.0/receiver/windowsperfcountersreceiver/README.md) | v0.150.0 |
+| [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.150.0/receiver/zipkinreceiver/README.md) | v0.150.0 |
+| [zookeeperreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zookeeperreceiver/v0.150.0/receiver/zookeeperreceiver/README.md) | v0.150.0 |
+>>>>>>> fd9699b70 (Add Azure Monitor receiver to EDOT Collector (#12919))
 
 ### Exporters
 
