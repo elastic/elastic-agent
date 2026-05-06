@@ -105,13 +105,7 @@ type Requirements struct {
 	// combination.
 	OS []OS `json:"os,omitempty"`
 
-	// SkipOS defines operating system / architecture combinations on which
-	// this test must be skipped, even when the runtime would otherwise satisfy
-	// OS. It is the negative counterpart of OS and is intended for tests that
-	// are generally portable but cannot run on a specific OS+arch combination
-	// (for example because a required component has no build for that
-	// platform).
-	//
+	// SkipOS takes precedence over OS: if a runtime matches both, it is skipped.
 	// Matching follows the same semantics as OS: an empty Arch matches any
 	// architecture, an empty Version matches any version, etc.
 	SkipOS []OS `json:"skip_os,omitempty"`
@@ -157,7 +151,7 @@ func (r Requirements) Validate() error {
 // matches any SkipOS entry, signalling that the test should be skipped.
 func (r Requirements) runtimeSkipped(os string, arch string, version string, distro string, dockerVariant string) (OS, bool) {
 	for _, o := range r.SkipOS {
-		if o.Type != Kubernetes && o.Type != os {
+		if o.Type != os {
 			continue
 		}
 		if o.Arch != "" && o.Arch != arch {
