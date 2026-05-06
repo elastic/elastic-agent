@@ -215,7 +215,11 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			versionedHomesToKeep = append(versionedHomesToKeep, currentVersionedHome)
 		}
 
-		versionedHomesToKeep = upgrade.AppendAvailableRollbacks(log, marker, versionedHomesToKeep)
+		if inTTL, err := upgrade.InTTLRollbacks(log, topDir, time.Now()); err != nil {
+			log.Infow("could not read TTL registry; cleanup will only preserve the current versioned home", "error.message", err.Error())
+		} else {
+			versionedHomesToKeep = append(versionedHomesToKeep, inTTL...)
+		}
 		log.Infof("About to clean up upgrade. Keeping versioned homes: %v", versionedHomesToKeep)
 		if err := installModifier.Cleanup(log, paths.Top(), true, false, versionedHomesToKeep...); err != nil {
 			log.Error("clean up of prior watcher run failed", err)
@@ -291,7 +295,11 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	}
 	versionedHomesToKeep := make([]string, 0, len(marker.RollbacksAvailable)+1)
 	versionedHomesToKeep = append(versionedHomesToKeep, newVersionedHome)
-	versionedHomesToKeep = upgrade.AppendAvailableRollbacks(log, marker, versionedHomesToKeep)
+	if inTTL, keepErr := upgrade.InTTLRollbacks(log, topDir, time.Now()); keepErr != nil {
+		log.Infow("could not read TTL registry; cleanup will only preserve the new versioned home", "error.message", keepErr.Error())
+	} else {
+		versionedHomesToKeep = append(versionedHomesToKeep, inTTL...)
+	}
 
 	err = installModifier.Cleanup(log, topDir, removeMarker, false, versionedHomesToKeep...)
 	if err != nil {

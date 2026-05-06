@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/pkg/backoff"
@@ -128,18 +129,16 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 	}
 
 	// cleanup everything except the version we're rolling back into and any
-	// in-TTL rollback targets recorded in the marker. The marker load is
-	// best-effort: if it fails or the marker is absent we fall back to
-	// preserving only prevVersionedHome rather than aborting the rollback.
+	// in-TTL rollback targets recorded in the live TTL registry. The registry
+	// read is best-effort: if it fails we fall back to preserving only
+	// prevVersionedHome rather than aborting the rollback.
 	versionedHomesToKeep := []string{prevVersionedHome}
-	marker, markerErr := LoadMarker(paths.DataFrom(topDirPath))
-	if markerErr != nil {
-		log.Warnw("could not load update marker; cleanup will only preserve the rollback target",
-			"error.message", markerErr.Error())
-	}
-
-	if marker != nil {
-		versionedHomesToKeep = AppendAvailableRollbacks(log, marker, versionedHomesToKeep)
+	inTTL, err := InTTLRollbacks(log, topDirPath, time.Now())
+	if err != nil {
+		log.Infow("could not read TTL registry; cleanup will only preserve the rollback target",
+			"error.message", err.Error())
+	} else {
+		versionedHomesToKeep = append(versionedHomesToKeep, inTTL...)
 	}
 	return Cleanup(log, topDirPath, settings.RemoveMarker, true, versionedHomesToKeep...)
 }
@@ -226,16 +225,38 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	return cumulativeError
 }
 
-// AppendAvailableRollbacks appends every versioned home listed in
-// marker.RollbacksAvailable to versionedHomesToKeep and returns the result.
-// It is the canonical way to fold TTL-tracked rollback targets into a Cleanup
-// keep list so callers stay consistent.
-func AppendAvailableRollbacks(log *logger.Logger, marker *UpdateMarker, versionedHomesToKeep []string) []string {
-	for versionedHome, ra := range marker.RollbacksAvailable {
-		log.Debugf("Adding available rollback %s:%+v to the directories to keep during cleanup", versionedHome, ra)
-		versionedHomesToKeep = append(versionedHomesToKeep, versionedHome)
+// InTTLRollbacks reads the live TTL registry under topDir and returns the
+// versioned homes whose .ttl is parseable AND not expired (i.e. that
+// CleanupExpiredRollbacks would NOT remove). Reusing the cleanup predicate
+// keeps the keep-list and the periodic cleanup in lock-step.
+//
+// Directories whose .ttl is unparseable are deliberately NOT included: under
+// the current registry contract a parseable TTL is the only proof an install
+// is a valid rollback target, so a malformed entry is treated like a missing
+// one — the directory is unprotected and will be swept by Cleanup. This
+// preserves the self-healing property that a corrupt .ttl outside the active
+// install gets reaped at the next rollback.
+//
+// GetAll (vs. Get) is used so that one corrupt .ttl file does not prevent the
+// other in-TTL entries from being preserved.
+func InTTLRollbacks(log *logger.Logger, topDir string, now time.Time) ([]string, error) {
+	markers, malformed, err := ttl.NewTTLMarkerRegistry(log, topDir).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("getting available rollbacks: %w", err)
 	}
-	return versionedHomesToKeep
+	var inTTL []string
+	for versionedHome, ttlMarker := range markers {
+		if CleanupExpiredRollbacks(log, now, versionedHome, ttlMarker) {
+			continue
+		}
+		log.Debugf("Adding rollback %s:%+v to the directories to keep during cleanup", versionedHome, ttlMarker)
+		inTTL = append(inTTL, versionedHome)
+	}
+	for versionedHome, parseErr := range malformed {
+		log.Infow("rollback directory has unparseable TTL marker; not protecting it from cleanup",
+			"versionedHome", versionedHome, "error.message", parseErr.Error())
+	}
+	return inTTL, nil
 }
 
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of
