@@ -15,15 +15,16 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
 
 var (
-	kernel32             = windows.NewLazySystemDLL("kernel32.dll")
-	procAttachConsole    = kernel32.NewProc("AttachConsole")
-	procFreeConsole      = kernel32.NewProc("FreeConsole")
-	procGetConsoleWindow = kernel32.NewProc("GetConsoleWindow")
+	kernel32                  = windows.NewLazySystemDLL("kernel32.dll")
+	procAttachConsole         = kernel32.NewProc("AttachConsole")
+	procFreeConsole           = kernel32.NewProc("FreeConsole")
+	procGetConsoleProcessList = kernel32.NewProc("GetConsoleProcessList")
 
 	// consoleMu serializes console operations. A Windows process can only be
 	// attached to one console at a time, so concurrent attachAndBreak calls
@@ -61,8 +62,16 @@ func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ..
 // HasConsole returns true if the current process has a console attached.
 // When running as a Windows service there is no console. Use this to
 // decide whether child processes need their own console via WithNewConsole.
+//
+// We use GetConsoleProcessList rather than GetConsoleWindow: the latter only
+// reports whether there is a console *window*, and returns NULL for processes
+// that inherited a windowless console (for example, when launched from a test
+// runner under PowerShell). GetConsoleProcessList returns the count of
+// processes attached to the console regardless of whether it has a window.
+// See https://learn.microsoft.com/en-us/windows/console/getconsoleprocesslist
 func HasConsole() bool {
-	r1, _, _ := procGetConsoleWindow.Call()
+	var pids [1]uint32
+	r1, _, _ := procGetConsoleProcessList.Call(uintptr(unsafe.Pointer(&pids[0])), uintptr(len(pids)))
 	return r1 != 0
 }
 
