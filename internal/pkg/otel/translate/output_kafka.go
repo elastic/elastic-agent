@@ -76,11 +76,6 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		},
 		"metadata": map[string]any{
 			"refresh_interval": kConfig.Metadata.RefreshFreq,
-			"full":             kConfig.Metadata.Full,
-			"retry": map[string]any{
-				"max":     kConfig.Metadata.Retry.Max,
-				"backoff": kConfig.Metadata.Retry.Backoff,
-			},
 		},
 		"timeout": kConfig.BrokerTimeout,
 		"logs": map[string]any{
