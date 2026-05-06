@@ -21,7 +21,7 @@ function ess_up() {
     --parameter "ExpireInHours=6"
   )
 
-  if [ -n "$INTEGRATION_SERVER_DOCKER_IMAGE" ]; then
+  if [ -n "${INTEGRATION_SERVER_DOCKER_IMAGE:-}" ]; then
     oblt_cmd+=(--parameter "ElasticAgentDockerImage=${INTEGRATION_SERVER_DOCKER_IMAGE}")
   fi
 
