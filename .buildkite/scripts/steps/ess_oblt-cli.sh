@@ -10,7 +10,23 @@ function ess_up() {
     return 1
   fi
 
+  # Build the oblt-cli command with conditional ElasticAgentDockerImage parameter
+  local oblt_cmd=(
+    oblt-cli cluster create custom
+    --template ess-ea-it
+    --cluster-name-prefix ea-hosted-it
+    --output-file="${PWD}/cluster-info.json"
+    --wait 30
+    --parameter "StackVersion=$STACK_VERSION"
+    --parameter "ExpireInHours=6"
+  )
+
+  if [ -n "${INTEGRATION_SERVER_DOCKER_IMAGE:-}" ]; then
+    oblt_cmd+=(--parameter "ElasticAgentDockerImage=${INTEGRATION_SERVER_DOCKER_IMAGE}")
+  fi
+
   # Create a cluster with the specified stack version and store the cluster information in a file
+<<<<<<< HEAD
   oblt-cli cluster create custom \
       --template ess-ea-it \
       --cluster-name-prefix ea-hosted-it \
@@ -18,6 +34,9 @@ function ess_up() {
       --parameter "ExpireInHours=6" \
       --output-file="${PWD}/cluster-info.json" \
       --wait 30
+=======
+  "${oblt_cmd[@]}"
+>>>>>>> 992a1cc20 (oblt-cli: use the docker image for the elastic-agent when running Custom ECH Testing step (#14023))
 
   # Extract the cluster name from the cluster information file
   CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)

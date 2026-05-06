@@ -17,6 +17,7 @@ function ess_up {
   # from oblt-cli. A file bypasses PS arg marshalling entirely.
   $paramsPath      = Join-Path $PWD "params.json"
   $clusterInfoPath = Join-Path $PWD "cluster-info.json"
+<<<<<<< HEAD
   @{
       GitOps           = "true"
       GitHubRepository = $Env:BUILDKITE_REPO
@@ -25,6 +26,17 @@ function ess_up {
       StackVersion     = $StackVersion
       ExpireInHours    = "6"
   } | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
+=======
+  $params = @{
+      StackVersion     = $StackVersion
+  }
+
+  if ($Env:INTEGRATION_SERVER_DOCKER_IMAGE) {
+      $params.ElasticAgentDockerImage = $Env:INTEGRATION_SERVER_DOCKER_IMAGE
+  }
+
+  $params | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
+>>>>>>> 992a1cc20 (oblt-cli: use the docker image for the elastic-agent when running Custom ECH Testing step (#14023))
 
   try {
     # --output-file must be an absolute path; oblt-cli resolves relative
