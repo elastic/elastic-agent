@@ -18,7 +18,8 @@ function ess_up {
   $paramsPath      = Join-Path $PWD "params.json"
   $clusterInfoPath = Join-Path $PWD "cluster-info.json"
   $params = @{
-      StackVersion     = $StackVersion
+      StackVersion  = $StackVersion
+      ExpireInHours = "6"
   }
 
   if ($Env:INTEGRATION_SERVER_DOCKER_IMAGE) {
