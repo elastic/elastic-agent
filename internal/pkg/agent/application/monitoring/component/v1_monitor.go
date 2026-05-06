@@ -184,7 +184,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	outputOtelSupportedErr := verifyOutputOtelSupported(outputCfg)
 	monitoringRuntime := component.RuntimeManager(b.config.C.RuntimeManager)
 	if outputOtelSupportedErr != nil {
-		b.logger.Warnf("otel runtime is not supported for monitoring output, switching to process runtime, reason: %v", outputOtelSupportedErr)
+		b.logger.Infof("otel runtime is not supported for monitoring output, switching to process runtime, reason: %v", outputOtelSupportedErr)
 		monitoringRuntime = monitoringCfg.ProcessRuntimeManager
 	}
 	outputOtelSupported := outputOtelSupportedErr == nil

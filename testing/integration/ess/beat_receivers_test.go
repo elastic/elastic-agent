@@ -913,7 +913,7 @@ outputs:
 	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
 	require.NoError(t, err)
 
-	// verify we've logged a warning about using the process runtime
+	// verify we've logged a message about using the process runtime
 	var unsupportedLogRecords []map[string]any
 	var prometheusUnsupportedLogRecord map[string]any
 	var monitoringOutputUnsupportedLogRecord map[string]any
