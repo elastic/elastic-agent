@@ -23,6 +23,7 @@ function ess_up {
       GitHubCommit     = $Env:BUILDKITE_COMMIT
       EphemeralCluster = "true"
       StackVersion     = $StackVersion
+      ExpireInHours    = "6"
   } | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
 
   try {
