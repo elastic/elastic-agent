@@ -5,7 +5,7 @@ go 1.26.2
 // use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
 
-replace github.com/elastic/beats/v7 => ../../beats
+replace github.com/elastic/beats/v7 => github.com/swiatekm/beats/v7 v7.0.0-20260506195222-148f2efe0d48
 
 // Pin the elasticsearchexporter to a specific commit to include changes from
 // https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47309
