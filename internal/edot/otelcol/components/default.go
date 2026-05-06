@@ -23,6 +23,7 @@ import (
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
 	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
+	azuremonitorreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver"
 	couchdbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver"
 	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
@@ -167,6 +168,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			mbreceiver.NewFactoryWithSettings(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
+			azuremonitorreceiver.NewFactory(),
 			couchdbreceiver.NewFactory(),
 			haproxyreceiver.NewFactory(),
 			iisreceiver.NewFactory(),
