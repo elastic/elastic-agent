@@ -2555,6 +2555,7 @@ service:
 }
 
 func TestOtelElasticsearchStateStore_Agentless(t *testing.T) {
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/13822")
 	info := define.Require(t, define.Requirements{
 		Group: integration.Default,
 		Local: true,
