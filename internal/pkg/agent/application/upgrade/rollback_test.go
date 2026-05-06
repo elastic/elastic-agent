@@ -789,13 +789,7 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 //   - Update marker records C as new, A as previous, with both A and B listed
 //     in RollbacksAvailable with future TTLs.
 //
-// We roll back to A. B (also unexpired) must survive. On `main` it does not,
-// because RollbackWithOpts hard-codes the cleanup keep list to
-// [prevVersionedHome] — see
-// build/rollback-cleanup-deletes-other-rollback-targets.md. The
-// "other in-TTL rollback target B is preserved" subtest is the failing
-// demonstrator and will pass once the keep list is widened to union
-// marker.RollbacksAvailable.
+// We roll back to A. B (also unexpired) must survive
 func TestRollbackWithOpts_PreservesInTTLRollbacksAvailable(t *testing.T) {
 	agentExecutableName := AgentName
 	if runtime.GOOS == "windows" {
