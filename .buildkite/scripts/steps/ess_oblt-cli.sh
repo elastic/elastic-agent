@@ -13,7 +13,7 @@ function ess_up() {
   # Create a cluster with the specified stack version and store the cluster information in a file
   oblt-cli cluster create custom \
       --template ess-ea-it \
-      --cluster-name-prefix ea-hosted-it \
+      --cluster-name-prefix hosted \
       --parameter "ExpireInHours=6" \
       --parameter "StackVersion=$STACK_VERSION" \
       --output-file="${PWD}/cluster-info.json" \
