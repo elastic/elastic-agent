@@ -10,23 +10,20 @@ function ess_up() {
     return 1
   fi
 
-  # Build the oblt-cli command with conditional ElasticAgentDockerImage parameter
-  local oblt_cmd=(
-    oblt-cli cluster create custom
-    --template ess-ea-it
-    --cluster-name-prefix ea-hosted-it
-    --output-file="${PWD}/cluster-info.json"
-    --wait 30
-    --parameter "StackVersion=$STACK_VERSION"
-    --parameter "ExpireInHours=6"
-  )
-
+  # Build parameters JSON, conditionally including ElasticAgentDockerImage
+  local params_json="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$STACK_VERSION\""
   if [ -n "${INTEGRATION_SERVER_DOCKER_IMAGE:-}" ]; then
-    oblt_cmd+=(--parameter "ElasticAgentDockerImage=${INTEGRATION_SERVER_DOCKER_IMAGE}")
+    params_json+=",\"ElasticAgentDockerImage\":\"${INTEGRATION_SERVER_DOCKER_IMAGE}\""
   fi
+  params_json+="}"
 
   # Create a cluster with the specified stack version and store the cluster information in a file
-  "${oblt_cmd[@]}"
+  oblt-cli cluster create custom \
+      --template ess-ea-it \
+      --cluster-name-prefix ea-hosted-it \
+      --parameters="${params_json}" \
+      --output-file="${PWD}/cluster-info.json" \
+      --wait 30
 
   # Extract the cluster name from the cluster information file
   CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
