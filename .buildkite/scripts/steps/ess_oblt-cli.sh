@@ -14,8 +14,7 @@ function ess_up() {
   oblt-cli cluster create custom \
       --template ess-ea-it \
       --cluster-name-prefix ea-hosted-it \
-      --parameter "ExpireInHours=6" \
-      --parameter "StackVersion=$STACK_VERSION" \
+      --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"ExpireInHours\":\"6\",\"StackVersion\":\"$STACK_VERSION\"}" \
       --output-file="${PWD}/cluster-info.json" \
       --wait 30
 
