@@ -10,17 +10,31 @@ function ess_up() {
     return 1
   fi
 
+  # Build the oblt-cli command with conditional ElasticAgentDockerImage parameter
+  local oblt_cmd=(
+    oblt-cli cluster create custom
+    --template ess-ea-it
+    --cluster-name-prefix ea-hosted-it
+    --output-file="${PWD}/cluster-info.json"
+    --wait 20
+    --parameter "StackVersion=$STACK_VERSION"
+    --parameter "ExpireInHours=6"
+  )
+
+  if [ -n "${INTEGRATION_SERVER_DOCKER_IMAGE:-}" ]; then
+    oblt_cmd+=(--parameter "ElasticAgentDockerImage=${INTEGRATION_SERVER_DOCKER_IMAGE}")
+  fi
+
   # Create a cluster with the specified stack version and store the cluster information in a file
-  if ! oblt-cli cluster create custom \
-      --template ess-ea-it \
-      --cluster-name-prefix ea-hosted-it \
-      --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$STACK_VERSION\"}" \
-      --output-file="${PWD}/cluster-info.json" \
-      --wait 20 ; then
+  if ! "${oblt_cmd[@]}" ; then
 
     # fallback to check if secrets are available in case the cluster was created
     # but wait timed out (e.g. due to slow cluster creation or transient oblt-cli issues)
     CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
+    if [ -z "${CLUSTER_NAME}" ] || [ "${CLUSTER_NAME}" = "null" ]; then
+      echo "Error: Failed to extract ClusterName from cluster-info.json" >&2
+      return 1
+    fi
     oblt-cli cluster secrets env --cluster-name "$CLUSTER_NAME" --output-file="/dev/null"
   fi
 
