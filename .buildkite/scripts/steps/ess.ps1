@@ -43,7 +43,7 @@ function ess_up {
       if (Test-Path $clusterInfoPath) {
           $ClusterName = (Get-Content -Path $clusterInfoPath | ConvertFrom-Json).ClusterName
           if ($ClusterName) {
-              & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file nul | Out-Null
+              & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file nul
               if ($LASTEXITCODE -eq 0) {
                   Write-Output "Cluster creation wait timed out, but secrets are available - continuing"
               } else {
