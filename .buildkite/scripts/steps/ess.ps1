@@ -32,11 +32,11 @@ function ess_up {
     # paths against its own config dir (~/.oblt-cli), not CWD.
     & oblt-cli cluster create custom `
         --template ess-ea-it `
-        --cluster-name-prefix ea-hosted-it `
+        --cluster-name-prefix hosted `
         --parameters-file $paramsPath `
-        --parameter "ExpireInHours=6" `
+        --parameter "ExpireInHours=4" `
         --output-file $clusterInfoPath `
-        --wait 30
+        --wait 20
   } finally {
     Remove-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue
   }

@@ -14,11 +14,11 @@ function ess_up() {
   local oblt_cmd=(
     oblt-cli cluster create custom
     --template ess-ea-it
-    --cluster-name-prefix ea-hosted-it
+    --cluster-name-prefix hosted
     --output-file="${PWD}/cluster-info.json"
-    --wait 30
+    --wait 20
     --parameter "StackVersion=$STACK_VERSION"
-    --parameter "ExpireInHours=6"
+    --parameter "ExpireInHours=4"
   )
 
   if [ -n "${INTEGRATION_SERVER_DOCKER_IMAGE:-}" ]; then
