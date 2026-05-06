@@ -433,29 +433,32 @@ func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByI
 	var worstReceiverMessage string
 
 	for i, stream := range unit.Config.Streams {
+		// Resolve the canonical stream ID using the same fallback logic as
+		// receiver naming in getInputsForUnit. This ensures the lookup key
+		// matches the suffix used in the receiver's OTel component name.
+		var streamSource map[string]any
+		if src := stream.GetSource(); src != nil {
+			streamSource = src.AsMap()
+		}
+		streamID := resolveStreamID(stream.Id, streamSource, unit.ID, i)
+
 		var rs *status.AggregateStatus
 		if receiverByInputID != nil {
-			// Each stream has its own dedicated receiver. Use resolveStreamID
-			// to match the same fallback logic used when naming receivers.
-			var streamSource map[string]any
-			if src := stream.GetSource(); src != nil {
-				streamSource = src.AsMap()
-			}
-			rs = receiverByInputID[resolveStreamID(stream.Id, streamSource, unit.ID, i)]
+			rs = receiverByInputID[streamID]
 		}
 
 		if rs != nil {
 			// Extract the stream's status from its receiver's attributes
-			streamStatus := getStreamStatusFromReceiver(rs, stream.Id)
+			streamStatus := getStreamStatusFromReceiver(rs, streamID)
 			if streamStatus != nil {
-				unitStreamStatuses[stream.Id] = streamStatus
+				unitStreamStatuses[streamID] = streamStatus
 				streamStatusEvent := streamStatusToStatusEvent(streamStatus)
 				isError := streamStatusEvent.Err() != nil
 				streamState, streamMsg := StateWithMessage(streamStatusEvent)
 				if !isError {
 					streamMsg = ""
 				}
-				streamStatuses[stream.Id] = map[string]string{
+				streamStatuses[streamID] = map[string]string{
 					"error":  streamMsg,
 					"status": streamState.String(),
 				}
@@ -474,7 +477,7 @@ func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByI
 				if !isError {
 					topMsg = ""
 				}
-				streamStatuses[stream.Id] = map[string]string{
+				streamStatuses[streamID] = map[string]string{
 					"error":  topMsg,
 					"status": topState.String(),
 				}
@@ -486,7 +489,7 @@ func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByI
 			if !isError {
 				topMsg = ""
 			}
-			streamStatuses[stream.Id] = map[string]string{
+			streamStatuses[streamID] = map[string]string{
 				"error":  topMsg,
 				"status": topState.String(),
 			}
