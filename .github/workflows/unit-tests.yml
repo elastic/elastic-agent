@@ -57,7 +57,7 @@ jobs:
           brew install make
 
       - name: Install mage
-        run: go install github.com/magefile/mage@latest
+        run: make mage
 
       - name: mage unitTest
         run: mage unitTest
