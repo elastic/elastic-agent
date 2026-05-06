@@ -60,6 +60,7 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 			InputType: map[string]string{},
 		},
 		Filebeat: BeatRuntimeConfig{
+			Default: string(OtelRuntimeManager),
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier
 			InputType: make(map[string]string),
 		},
@@ -68,7 +69,6 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 }
 
 func (r *RuntimeConfig) Validate() error {
-
 	validateRuntime := func(val string, allowEmpty bool) error {
 		if allowEmpty && val == "" {
 			return nil
