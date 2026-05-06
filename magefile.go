@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
+// This file was contributed to by generative AI
+
 //go:build mage
 
 package main
@@ -2553,7 +2555,7 @@ func generateEnvFile(stack tcommon.Stack) error {
 			return fmt.Errorf("write KIBANA_PASSWORD: %w", err)
 		}
 
-		if _, err := fmt.Fprintf(w, "export ELASTIC_APM_SERVER_URL=\"%s\"\n", stack.IntegrationsServer); err != nil {
+    if _, err := fmt.Fprintf(w, "export ELASTIC_APM_SERVER_URL=\"%s\"\n", stack.IntegrationsServer); err != nil {
 			return fmt.Errorf("write ELASTIC_APM_SERVER_URL: %w", err)
 		}
 		return nil
