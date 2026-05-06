@@ -24,6 +24,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -600,17 +602,17 @@ func (f *Fixture) RunOtelWithClient(ctx context.Context, states ...State) error 
 // by [RunOtelWithCliet] or [Run].
 // If the Elastic Agent has been installed, or the process
 // has not been started by [RunOtelWithClient] or [Run],
-// Stop fails the test by calling t.Error
+// Stop fails the test by calling t.Fatal
 func (f *Fixture) Stop() {
 	f.procMutex.Lock()
 	defer f.procMutex.Unlock()
 
 	if f.installed {
-		f.t.Error("an installed Elastic Agent cannot be stopped")
+		f.t.Fatal("an installed Elastic Agent cannot be stopped")
 	}
 
 	if f.proc == nil {
-		f.t.Error("Elastic Agent has not been started")
+		f.t.Fatal("Elastic Agent has not been started")
 	}
 
 	f.stopping = true
@@ -1635,7 +1637,7 @@ func createTempDir(t *testing.T) string {
 
 	cleanup := func() {
 		if !t.Failed() {
-			if err := install.RemovePath(tempDir); err != nil {
+			if err := install.RemovePath(logp.NewNopLogger(), tempDir); err != nil {
 				t.Errorf("could not remove temp dir '%s': %s", tempDir, err)
 			}
 		} else {
