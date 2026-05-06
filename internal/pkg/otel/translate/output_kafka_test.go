@@ -77,10 +77,12 @@ headers:
 			"timeout": 10 * time.Second,
 			"record_headers": []map[string]any{
 				{
-					"some-key": "some value",
+					"name":  "some-key",
+					"value": "some value",
 				},
 				{
-					"some-key": "another value",
+					"name":  "some-key",
+					"value": "another value",
 				},
 			},
 		},

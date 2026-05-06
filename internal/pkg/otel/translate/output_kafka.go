@@ -44,7 +44,8 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 	var headers []map[string]any
 	for _, header := range kConfig.Headers {
 		headers = append(headers, map[string]any{
-			header.Key: header.Value,
+			"name":  header.Key,
+			"value": header.Value,
 		})
 	}
 
