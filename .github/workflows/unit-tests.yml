@@ -32,7 +32,6 @@ jobs:
           - ubuntu-22.04-arm
           - macos-15-intel
           - macos-15
-        race_detector: [true]
         include:
           - os: ubuntu-22.04
             fips_variant: "requirefips"
@@ -63,7 +62,7 @@ jobs:
       - name: mage unitTest
         run: mage unitTest
         env:
-          RACE_DETECTOR: ${{ matrix.race_detector }}
+          RACE_DETECTOR: true
           TEST_COVERAGE: true
           FIPS: ${{ matrix.fips_env }}
           GODEBUG: ${{ matrix.godebug }}
