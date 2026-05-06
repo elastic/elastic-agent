@@ -326,7 +326,7 @@ func (h *Diagnostics) diagComponents(ctx context.Context, action *fleetapi.Actio
 	}
 	rr, err := h.diagProvider.PerformComponentDiagnostics(ctx, additionalMetrics)
 	if err != nil {
-		h.log.Errorf("Error fetching component-level diagnostics: %w", err)
+		h.log.Errorf("Error fetching component-level diagnostics: %v", err)
 	}
 	h.log.Debug("Collecting results of component diagnostics")
 	for _, r := range rr {
