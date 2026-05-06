@@ -2707,8 +2707,6 @@ func askForStack() (tcommon.Stack, error) {
 }
 
 func generateEnvFile(stack tcommon.Stack) error {
-<<<<<<< HEAD
-=======
 	if err := writeEnvFile("./env.sh", func(w io.Writer) error {
 		if _, err := fmt.Fprintf(w, "export ELASTICSEARCH_HOST=\"%s\"\n", stack.Elasticsearch); err != nil {
 			return fmt.Errorf("write ELASTICSEARCH_HOST: %w", err)
@@ -2767,39 +2765,32 @@ func generateEnvFile(stack tcommon.Stack) error {
 }
 
 func writeEnvFile(path string, write func(io.Writer) error) error {
->>>>>>> b572c2525 (Replace Terraform ESS provisioning with oblt-cli for Windows and Linux but no FIPS (#13642))
 	fileExists := true
-	stat, err := os.Stat("./env.sh")
+	stat, err := os.Stat(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("cannot stat 'env.sh': %w", err)
+			return fmt.Errorf("cannot stat %q: %w", path, err)
 		}
 		fileExists = false
 	}
 
 	if fileExists {
-		bkpName := fmt.Sprintf("./env.sh-%d", rand.Int())
+		bkpName := fmt.Sprintf("%s-%d", path, rand.Int())
 		if err := os.Rename(stat.Name(), bkpName); err != nil {
-			return fmt.Errorf("cannot create backup: %w", err)
+			return fmt.Errorf("cannot create backup for %q: %w", path, err)
 		}
 		fmt.Printf("%q already existed, it was moved to %q\n", stat.Name(), bkpName)
 	}
 
-	f, err := os.Create("./env.sh")
+	f, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("Could not create './env.sh': %w", err)
+		return fmt.Errorf("could not create %q: %w", path, err)
 	}
 	defer f.Close()
 
-	fmt.Fprintf(f, "export ELASTICSEARCH_HOST=\"%s\"\n", stack.Elasticsearch)
-	fmt.Fprintf(f, "export ELASTICSEARCH_USERNAME=\"%s\"\n", stack.Username)
-	fmt.Fprintf(f, "export ELASTICSEARCH_PASSWORD=\"%s\"\n", stack.Password)
-
-	fmt.Fprintf(f, "export KIBANA_HOST=\"%s\"\n", stack.Kibana)
-	fmt.Fprintf(f, "export KIBANA_USERNAME=\"%s\"\n", stack.Username)
-	fmt.Fprintf(f, "export KIBANA_PASSWORD=\"%s\"\n", stack.Password)
-
-	fmt.Fprintf(f, "export INTEGRATIONS_SERVER_HOST=\"%s\"\n", stack.IntegrationsServer)
+	if err := write(f); err != nil {
+		return fmt.Errorf("could not write %q: %w", path, err)
+	}
 
 	return nil
 }
