@@ -62,6 +62,15 @@ function ess_up {
   # one. `ess_load_secrets` and `ess_down` read the local cluster-info.json
   # first, so the retry path doesn't need meta-data.
 
+  # However, store retry cluster names in a separate metadata key so they can
+  # be cleaned up by a dedicated cleanup step if the finally block fails (e.g., timeout)
+  if ($Env:BUILDKITE_RETRY_COUNT -and $Env:BUILDKITE_RETRY_COUNT -gt 0) {
+      $MetadataPrefix = if ($Env:FIPS -eq "true") { "fips." } else { "" }
+      $retryKey = "${MetadataPrefix}retry-cluster-$($Env:BUILDKITE_STEP_KEY)-$($Env:BUILDKITE_RETRY_COUNT)"
+      Write-Output "Storing retry cluster name in metadata: $retryKey = $ClusterName"
+      & buildkite-agent meta-data set $retryKey $ClusterName
+  }
+
   $rc = ess_load_secrets
   if ($rc -ne 0) {
       Write-Error "Error: ess_load_secrets failed (exit=$rc)"
