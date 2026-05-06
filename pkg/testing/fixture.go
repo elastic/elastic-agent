@@ -602,17 +602,17 @@ func (f *Fixture) RunOtelWithClient(ctx context.Context, states ...State) error 
 // by [RunOtelWithCliet] or [Run].
 // If the Elastic Agent has been installed, or the process
 // has not been started by [RunOtelWithClient] or [Run],
-// Stop fails the test by calling t.Error
+// Stop fails the test by calling t.Fatal
 func (f *Fixture) Stop() {
 	f.procMutex.Lock()
 	defer f.procMutex.Unlock()
 
 	if f.installed {
-		f.t.Error("an installed Elastic Agent cannot be stopped")
+		f.t.Fatal("an installed Elastic Agent cannot be stopped")
 	}
 
 	if f.proc == nil {
-		f.t.Error("Elastic Agent has not been started")
+		f.t.Fatal("Elastic Agent has not been started")
 	}
 
 	f.stopping = true
