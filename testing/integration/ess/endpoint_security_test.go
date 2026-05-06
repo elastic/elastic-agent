@@ -8,6 +8,7 @@ package ess
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/tls"
@@ -16,6 +17,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -24,6 +26,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -545,6 +548,27 @@ func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, 
 	policy, agentID, err := tools.InstallAgentWithPolicy(ctx, t,
 		installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err, "failed to install agent with policy")
+
+	updateLogLevelTemplateString := `{
+	   "name": "{{ .policyName }}",
+	   "namespace": "{{ .namespace }}",
+	   "advanced_settings": {
+		"agent_logging_level": {{ .logLevel }}
+	   }
+	}`
+	updateLogLevelTemplate, err := template.New("updatePolicyLogLevel").Parse(updateLogLevelTemplateString)
+	require.NoError(t, err)
+
+	buf := new(bytes.Buffer)
+	templateData := map[string]string{"policyName": policy.Name, "namespace": policy.Namespace}
+	templateData["logLevel"] = `"debug"`
+
+	err = updateLogLevelTemplate.Execute(buf, templateData)
+	require.NoError(t, err)
+
+	resp, err := info.KibanaClient.SendWithContext(ctx, http.MethodPut, "/api/fleet/agent_policies/"+policy.ID, nil, nil, buf)
+	require.NoError(t, err)
+	require.True(t, resp.StatusCode < 300)
 
 	return fixture, policy, agentID
 }
