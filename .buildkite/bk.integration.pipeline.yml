@@ -83,8 +83,8 @@ steps:
       - packaging-containers-arm64
     env:
       TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
-      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
       FORCE_ESS_CREATE: "true"
+      INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
     command: |
       #!/usr/bin/env bash
       buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'

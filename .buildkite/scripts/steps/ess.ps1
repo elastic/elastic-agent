@@ -15,9 +15,28 @@ function ess_up {
       return 1
   }
 
+<<<<<<< HEAD
   $BuildkiteBuildCreator = if ($Env:BUILDKITE_BUILD_CREATOR) { $Env:BUILDKITE_BUILD_CREATOR } else { get_git_user_email }
   $BuildkiteBuildNumber = if ($Env:BUILDKITE_BUILD_NUMBER) { $Env:BUILDKITE_BUILD_NUMBER } else { "0" }
   $BuildkitePipelineSlug = if ($Env:BUILDKITE_PIPELINE_SLUG) { $Env:BUILDKITE_PIPELINE_SLUG } else { "elastic-agent-integration-tests" }
+=======
+  # Write parameters to a JSON file and pass via --parameters-file.
+  # Windows PowerShell 5.1 mangles native-command arguments that contain
+  # embedded double quotes (even when passed as a separate argument), so
+  # the inline --parameters form produced "invalid character 'G'" errors
+  # from oblt-cli. A file bypasses PS arg marshalling entirely.
+  $paramsPath      = Join-Path $PWD "params.json"
+  $clusterInfoPath = Join-Path $PWD "cluster-info.json"
+  $params = @{
+      StackVersion     = $StackVersion
+  }
+
+  if ($Env:INTEGRATION_SERVER_DOCKER_IMAGE) {
+      $params.ElasticAgentDockerImage = $Env:INTEGRATION_SERVER_DOCKER_IMAGE
+  }
+
+  $params | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
+>>>>>>> 992a1cc20 (oblt-cli: use the docker image for the elastic-agent when running Custom ECH Testing step (#14023))
 
   Push-Location -Path $TfDir
   & terraform init
