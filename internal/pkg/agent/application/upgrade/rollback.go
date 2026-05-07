@@ -188,61 +188,54 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 
 	log.Infof("versioned homes to keep: %v", versionedHomesToKeep)
 
-	var cumulativeError error
-	relativeHomePaths := make([]string, 0, len(versionedHomesToKeep)+1)
-	for _, h := range versionedHomesToKeep {
-		relHomePath, err := filepath.Rel(dataDirPath, filepath.Join(topDirPath, h))
-		if err != nil {
-			cumulativeError = goerrors.Join(cumulativeError, fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", h, err))
-			// best effort: try to use the entry as-is, without calculating the path relative to `data`
-			relHomePath = h
-		}
-		relativeHomePaths = append(relativeHomePaths, relHomePath)
-	}
-
-	// Always preserve the versioned home that the top-level agent symlink
-	// resolves to, regardless of what the caller passed in
-	// versionedHomesToKeep. This closes the data-loss hazard described in
-	// https://github.com/elastic/elastic-agent/issues/13505: if a caller's
+	// Build the candidate keep list: what the caller asked for plus the live
+	// versioned home (the directory the top-level agent symlink resolves to).
+	//
+	// Always preserving the live install closes the data-loss hazard described
+	// in https://github.com/elastic/elastic-agent/issues/13505: if a caller's
 	// keep list is built from a stale marker.VersionedHome that no longer
 	// exists on disk, cleanup would otherwise treat the live install as
-	// "not in keep" and delete it.
-	//
-	// The TTL-based rollback retention (marker.RollbacksAvailable) covers
-	// the homes operators explicitly want to keep across an upgrade. This
-	// guard is the structural backstop on top of that — the symlink is the
-	// single source of truth for "the binary the daemon will launch on
-	// next start," and that directory must always survive cleanup.
+	// "not in keep" and delete it. The TTL-based rollback retention
+	// (marker.RollbacksAvailable) covers the homes operators explicitly want
+	// to keep across an upgrade; this guard is the structural backstop on top
+	// of that — the symlink is the single source of truth for "the binary the
+	// daemon will launch on next start," and that directory must always
+	// survive cleanup.
+	candidates := append(make([]string, 0, len(versionedHomesToKeep)+1), versionedHomesToKeep...)
 	if liveHome, err := liveVersionedHome(topDirPath); err == nil {
-		liveBasename, basenameErr := filepath.Rel(dataDirPath, filepath.Join(topDirPath, liveHome))
-		if basenameErr != nil {
-			log.Infow("could not compute live versioned home basename; cleanup proceeds without protection",
-				"error.message", basenameErr.Error())
-		} else if !slices.Contains(relativeHomePaths, liveBasename) {
-			log.Infof("adding live versioned home %q to keep list", liveBasename)
-			relativeHomePaths = append(relativeHomePaths, liveBasename)
-		}
+		candidates = append(candidates, liveHome)
 	} else {
 		log.Infow("could not derive live versioned home; cleanup proceeds without protection",
 			"error.message", err.Error())
 	}
 
-	// Drop keep-list entries that no longer exist on disk so the "Keeping"
-	// log line below reflects what is actually being preserved rather than a
-	// phantom path. A stale entry is harmless to leave in (the cleanup loop
-	// only iterates real subdirs) but misleading on triage. Each dropped
-	// entry is surfaced as an Info so the cause — usually a stale
+	// Normalize each candidate to a dataDir-relative basename, deduplicate,
+	// and drop entries that don't exist on disk so the "Keeping" log line
+	// below reflects what is actually being preserved rather than a phantom
+	// path. A stale entry is harmless to leave in (the cleanup loop only
+	// iterates real subdirs) but misleading on triage; each dropped entry is
+	// surfaced as an Info so the cause — usually a stale
 	// marker.VersionedHome — is visible in logs.
-	existingHomePaths := relativeHomePaths[:0]
-	for _, p := range relativeHomePaths {
-		if _, err := os.Stat(filepath.Join(dataDirPath, p)); err != nil {
-			log.Infow("dropping non-existent keep-list entry from cleanup",
-				"path", p, "error.message", err.Error())
+	var cumulativeError error
+	relativeHomePaths := make([]string, 0, len(candidates))
+	for _, h := range candidates {
+		rel, err := filepath.Rel(dataDirPath, filepath.Join(topDirPath, h))
+		if err != nil {
+			// We can't normalize this entry, and the cleanup loop below
+			// matches dataDir-relative basenames, so an un-normalized path
+			// would never match anyway. Record the failure for the caller
+			// and skip the entry rather than carry a value forward that
+			// can't preserve the directory.
+			cumulativeError = goerrors.Join(cumulativeError, fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", h, err))
 			continue
 		}
-		existingHomePaths = append(existingHomePaths, p)
+		if _, statErr := os.Stat(filepath.Join(dataDirPath, rel)); statErr != nil {
+			log.Infow("dropping non-existent keep-list entry from cleanup",
+				"path", rel, "error.message", statErr.Error())
+			continue
+		}
+		relativeHomePaths = append(relativeHomePaths, rel)
 	}
-	relativeHomePaths = existingHomePaths
 
 	log.Infof("Starting cleanup of versioned homes. Keeping: %v", relativeHomePaths)
 
