@@ -124,13 +124,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 		return err
 	}
 
-	// Persist the POLICY_CHANGE so that the next checkin reports the correct id/revision even if acks are disabled.
-	h.actionSaver.SetAction(a)
-	if err := h.actionSaver.Save(); err != nil {
-		h.log.Warnw("failed to persist policy change action to state store", "error.message", err)
-	}
-
-	h.ch <- newPolicyChange(ctx, c, a, acker, false, h.disableAckFn())
+	h.ch <- newPolicyChange(ctx, c, a, acker, false, h.actionSaver, h.disableAckFn())
 	return nil
 }
 
@@ -492,12 +486,13 @@ func fleetToReader(agentID string, headers map[string]string, cfg *configuration
 }
 
 type policyChange struct {
-	ctx        context.Context
-	cfg        *config.Config
-	action     fleetapi.Action
-	acker      acker.Acker
-	ackWatcher chan struct{}
-	disableAck bool
+	ctx         context.Context
+	cfg         *config.Config
+	action      fleetapi.Action
+	acker       acker.Acker
+	ackWatcher  chan struct{}
+	actionSaver actionSaver
+	disableAck  bool
 }
 
 func newPolicyChange(
@@ -506,6 +501,7 @@ func newPolicyChange(
 	action fleetapi.Action,
 	acker acker.Acker,
 	makeCh bool,
+	actionSaver actionSaver,
 	disableAck bool) *policyChange {
 	var ackWatcher chan struct{}
 	if makeCh {
@@ -513,12 +509,13 @@ func newPolicyChange(
 		ackWatcher = make(chan struct{})
 	}
 	return &policyChange{
-		ctx:        ctx,
-		cfg:        config,
-		action:     action,
-		acker:      acker,
-		ackWatcher: ackWatcher,
-		disableAck: disableAck,
+		ctx:         ctx,
+		cfg:         config,
+		action:      action,
+		acker:       acker,
+		ackWatcher:  ackWatcher,
+		actionSaver: actionSaver,
+		disableAck:  disableAck,
 	}
 }
 
@@ -529,6 +526,13 @@ func (l *policyChange) Config() *config.Config {
 // Ack sends an ack for the associated action if the results are expected.
 // An ack will be sent for UNENROLL actions, or by POLICY_CHANGE actions if it has not been explicitly disabled.
 func (l *policyChange) Ack() error {
+	// Persist policy change action even if sending acks is disabled
+	if l.actionSaver != nil && l.action != nil {
+		l.actionSaver.SetAction(l.action)
+		if err := l.actionSaver.Save(); err != nil {
+			return err
+		}
+	}
 	if l.disableAck || l.action == nil {
 		return nil
 	}

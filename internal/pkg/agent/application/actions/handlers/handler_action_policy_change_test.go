@@ -59,16 +59,14 @@ func TestPolicyChange(t *testing.T) {
 			},
 		}
 
-		mockSaver := newActionSaver()
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, &mockActionSaver{}, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
 
 		change := <-ch
 		require.Equal(t, config.MustNewConfigFrom(conf), change.Config())
-		mockSaver.AssertExpectations(t)
 	})
 	t.Run("Received config with $$ in inputs", func(t *testing.T) {
 		ch := make(chan coordinator.ConfigChange, 1)
@@ -85,10 +83,9 @@ func TestPolicyChange(t *testing.T) {
 				Policy: conf,
 			},
 		}
-		mockSaver := newActionSaver()
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, &mockActionSaver{}, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -98,7 +95,6 @@ func TestPolicyChange(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, conf, m)
-		mockSaver.AssertExpectations(t)
 	})
 }
 
@@ -587,14 +583,14 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		agentRootCertPool := x509.NewCertPool()
 		agentRootCertPool.AppendCertsFromPEM(agentRootPair.Cert)
 
-		fleetmTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+		fleetmTLSServer.TLS = &tls.Config{
 			RootCAs:      fleetRootCertPool,
 			Certificates: []tls.Certificate{cert},
 			ClientCAs:    agentRootCertPool,
 			ClientAuth:   tls.RequireAndVerifyClientCert,
 		}
 
-		fleetNomTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+		fleetNomTLSServer.TLS = &tls.Config{
 			RootCAs:      fleetRootCertPool,
 			Certificates: []tls.Certificate{cert},
 		}
@@ -764,7 +760,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
 									CAs: []string{string(fleetRootPair.Cert)},
-									Certificate: tlscommon.CertificateConfig{
+									Certificate: tlscommon.CertificateConfig{ //nolint:gosec // test data
 										Certificate:    "some certificate",
 										Key:            "some key",
 										Passphrase:     "",
