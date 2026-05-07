@@ -40,6 +40,7 @@ function ess_up {
         --parameter "ExpireInHours=4" `
 >>>>>>> 711f68efc (oblt-cli: tear-down deployments best effort, timeout earlier and shorter name (#14064))
         --output-file $clusterInfoPath `
+        --output-file $clusterInfoPath `
         --wait 20
   } finally {
     Remove-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue
