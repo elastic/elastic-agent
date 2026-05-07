@@ -14,12 +14,15 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-const exe = ".exe"
+const (
+	windowsOSName = "windows"
+	exe           = ".exe"
+)
 
 func changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
 
 	// handle windows suffixes
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsOSName {
 		symlinkPath += exe
 		newTarget += exe
 	}
@@ -44,7 +47,7 @@ func prevSymlinkPath(topDirPath string) string {
 	agentPrevName := AgentName + ".prev"
 
 	// handle windows suffixes
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsOSName {
 		agentPrevName = AgentName + ".exe.prev"
 	}
 
