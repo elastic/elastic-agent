@@ -614,3 +614,63 @@ spec:
           access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: READ_ONLY
+<<<<<<< HEAD
+=======
+
+# **************************************************************
+# SECTION START: Scheduler pipeline
+# (Definitions for scheduled runs of various Elastic Agent pipelines)
+# **************************************************************
+
+---
+# yaml-language-server: $schema=https://gist.githubusercontent.com/elasticmachine/988b80dae436cafea07d9a4a460a011d/raw/rre.schema.json
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: elastic-agent-pipeline-scheduler
+  description: 'Scheduled runs of Elastic Agent pipelines per active branch'
+  links:
+    - title: 'Scheduled runs of Elastic Agent pipelines per active branch'
+      url: https://buildkite.com/elastic/elastic-agent-pipeline-scheduler
+spec:
+  type: buildkite-pipeline
+  owner: group:ingest-fp
+  system: platform-ingest
+  implementation:
+    apiVersion: buildkite.elastic.dev/v1
+    kind: Pipeline
+    metadata:
+      name: Elastic Agent Pipeline Scheduler
+      description: ':alarm_clock: Scheduled runs of Elastic Agent pipelines per active branch'
+    spec:
+      repository: elastic/elastic-agent
+      pipeline_file: ".buildkite/trigger_pipelines.yml"
+      maximum_timeout_in_minutes: 240
+      schedules:
+        Extended Tests:
+          branch: main
+          cronline: "@daily"
+          message: Daily trigger of Extended pipeline for all the active branches
+          env:
+            PIPELINES_TO_TRIGGER: 'elastic-agent-extended-testing'
+      skip_intermediate_builds: true
+      provider_settings:
+        trigger_mode: none
+      teams:
+        ingest-fp:
+          access_level: MANAGE_BUILD_AND_READ
+        observablt-robots:
+          access_level: MANAGE_BUILD_AND_READ
+        # See https://buildkite.com/docs/pipelines/configure/step-types/trigger-step#permissions
+        # Otherwise even if merge commits in the main or any branch, they will fail
+        everyone:
+          access_level: BUILD_AND_READ
+      env:
+        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "true"
+        SLACK_NOTIFICATIONS_CHANNEL: "#ingest-notifications"
+        SLACK_NOTIFICATIONS_ON_SUCCESS: 'false'
+
+# *******************************
+# SECTION END: Scheduler pipeline
+# *******************************
+>>>>>>> 0fe58539a (bk: run extended ITs on scheduling for the active branches (#14026))
