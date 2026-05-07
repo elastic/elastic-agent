@@ -647,7 +647,6 @@ steps:
               - *k8s_max_test_version
 
   - group: "Serverless integration test"
-    skip: "See https://github.com/elastic/elastic-agent/issues/13927"
     key: integration-tests-serverless
     notify:
       - github_commit_status:
