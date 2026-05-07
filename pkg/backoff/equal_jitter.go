@@ -43,18 +43,6 @@ func NewEqualJitterBackoff(done <-chan struct{}, init, max time.Duration) Backof
 	return bo
 }
 
-// NewEqualJitterBackoffWithDone is equivalent to NewEqualJitterBackoff but
-// accepts a nil done channel for callers that manage cancellation externally.
-func NewEqualJitterBackoffWithDone(init, max time.Duration) *EqualJitterBackoff {
-	bo := &EqualJitterBackoff{
-		init:   init,
-		max:    max,
-		randFn: rand.N[time.Duration],
-	}
-	bo.Reset()
-	return bo
-}
-
 // Reset resets the duration of the backoff.
 func (b *EqualJitterBackoff) Reset() {
 	// Allow to sleep at least the init period on the first wait.
@@ -68,10 +56,8 @@ func (b *EqualJitterBackoff) NextWait() time.Duration {
 	return temp + b.nextRand
 }
 
-// Duration returns the next wait duration and advances the backoff state
-// without blocking. Use this instead of Wait when the caller manages its
-// own sleep/timer logic.
-func (b *EqualJitterBackoff) Duration() time.Duration {
+// Wait block until either the timer is completed or channel is done.
+func (b *EqualJitterBackoff) Wait() bool {
 	backoff := b.NextWait()
 
 	b.nextRand = b.randFn(b.duration)
@@ -79,13 +65,6 @@ func (b *EqualJitterBackoff) Duration() time.Duration {
 	if b.duration > b.max {
 		b.duration = b.max
 	}
-
-	return backoff
-}
-
-// Wait block until either the timer is completed or channel is done.
-func (b *EqualJitterBackoff) Wait() bool {
-	backoff := b.Duration()
 
 	select {
 	case <-b.done:

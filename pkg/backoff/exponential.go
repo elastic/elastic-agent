@@ -45,13 +45,6 @@ func (b *ExpBackoff) NextWait() time.Duration {
 	return nextWait
 }
 
-// Duration returns the next wait duration and advances the backoff state
-// without blocking.
-func (b *ExpBackoff) Duration() time.Duration {
-	b.duration = b.NextWait()
-	return b.duration
-}
-
 // Wait blocks until either the exponential backoff timer is completed or the
 // done channel is closed.
 // Wait returns true until done is closed. When done is closed, wait returns
