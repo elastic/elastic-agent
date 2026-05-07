@@ -184,19 +184,20 @@ func UpdateActiveCommit(log *logger.Logger, topDirPath, hash string, writeFile w
 	return nil
 }
 
-// markUpgradeFailed records an upgrade failure both in the in-memory
+// MarkUpgradeFailed records an upgrade failure both in the in-memory
 // upgrade-details (det.Fail(cause)) and, if a marker is on disk, by saving
 // the marker with state=Failed so the failure is surfaced to Fleet via the
 // next upgrade-details ack.
 //
 // det is always mutated, regardless of whether a marker is found. The marker
 // step is best-effort: if no marker exists (e.g. markUpgrade failed before
-// writing it) this is a no-op.
+// writing it, or the failure happened before the marker was created) this is
+// a no-op so callers can invoke it from any error path uniformly.
 //
-// Used by Upgrade()'s post-symlink rollback paths so the next agent run does
-// not start a watcher against an upgrade that has already been undone
-// (https://github.com/elastic/elastic-agent/issues/13505).
-func markUpgradeFailed(dataDirPath string, det *details.Details, cause error) error {
+// Called by the coordinator from its single upgrade-failure handling block,
+// so the next agent run does not start a watcher against an upgrade that has
+// already been undone (https://github.com/elastic/elastic-agent/issues/13505).
+func MarkUpgradeFailed(dataDirPath string, det *details.Details, cause error) error {
 	det.Fail(cause)
 	marker, err := LoadMarker(dataDirPath)
 	if err != nil {

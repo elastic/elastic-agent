@@ -502,8 +502,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		previous, // old agent version data
 		action, det, availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		abortErr := u.abortUpgrade(ctx, hashedDir, currentVersionedHome, det, err)
-		return nil, goerrors.Join(err, abortErr)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
+		return nil, goerrors.Join(err, rollbackErr)
 	}
 
 	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(paths.Top(), previous, current)
@@ -511,15 +511,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	var watcherCmd *exec.Cmd
 	if watcherCmd, err = u.watcherHelper.InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		abortErr := u.abortUpgrade(ctx, hashedDir, currentVersionedHome, det, err)
-		return nil, goerrors.Join(err, abortErr)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
+		return nil, goerrors.Join(err, rollbackErr)
 	}
 
 	watcherWaitErr := u.watcherHelper.WaitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
 	if watcherWaitErr != nil {
 		killWatcherErr := watcherCmd.Process.Kill()
-		abortErr := u.abortUpgrade(ctx, hashedDir, currentVersionedHome, det, watcherWaitErr)
-		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, abortErr)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
+		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, rollbackErr)
 	}
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, filepath.Join(paths.Top(), unpackRes.VersionedHome))
@@ -609,25 +609,6 @@ func extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentV
 func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVersion) bool {
 	log.Debugw("Comparing current and new agent version", "current_version", current, "new_version", newVersion)
 	return current == newVersion
-}
-
-// abortUpgrade undoes a partial upgrade after the symlink has been flipped.
-// Combines the physical undo (rollbackInstall: symlink revert, new home
-// removal, TTL clear) with the marker downgrade (markUpgradeFailed:
-// state=Failed) so the failure is reportable to Fleet on the next ack.
-// Returns the physical-undo error; marker-write failures are logged
-// best-effort and don't shadow the original failure. Always mutates det to
-// reflect the failure even if persistence to the marker fails.
-//
-// Used by every error path in Upgrade() that occurs after the symlink has
-// been flipped, so callers don't need to remember to combine the two steps.
-func (u *Upgrader) abortUpgrade(ctx context.Context, newVersionedHome, currentVersionedHome string, det *details.Details, cause error) error {
-	rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
-	if markFailedErr := markUpgradeFailed(paths.Data(), det, cause); markFailedErr != nil {
-		u.log.Infow("failed to mark upgrade marker as failed; reconcile deferred to next boot",
-			"error.message", markFailedErr.Error())
-	}
-	return rollbackErr
 }
 
 func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource availableRollbacksSource) error {

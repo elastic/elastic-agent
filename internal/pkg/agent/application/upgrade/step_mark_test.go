@@ -274,7 +274,7 @@ func TestMarkUpgradeFailed(t *testing.T) {
 		dataDir := t.TempDir()
 		det := details.NewDetails("8.5.0", details.StateReplacing, "action-1")
 
-		err := markUpgradeFailed(dataDir, det, cause)
+		err := MarkUpgradeFailed(dataDir, det, cause)
 		require.NoError(t, err)
 		require.Equal(t, details.StateFailed, det.State, "in-memory details must reflect failure")
 		require.NoFileExists(t, filepath.Join(dataDir, markerFilename))
@@ -292,7 +292,7 @@ func TestMarkUpgradeFailed(t *testing.T) {
 		}
 		require.NoError(t, SaveMarker(dataDir, original, true), "seed marker")
 
-		err := markUpgradeFailed(dataDir, det, cause)
+		err := MarkUpgradeFailed(dataDir, det, cause)
 		require.NoError(t, err)
 		require.Equal(t, details.StateFailed, det.State)
 
@@ -310,7 +310,7 @@ func TestMarkUpgradeFailed(t *testing.T) {
 		require.NoError(t, os.Mkdir(filepath.Join(dataDir, markerFilename), 0o755))
 
 		det := details.NewDetails("8.5.0", details.StateReplacing, "action-3")
-		err := markUpgradeFailed(dataDir, det, cause)
+		err := MarkUpgradeFailed(dataDir, det, cause)
 		require.Error(t, err, "load failure must be surfaced")
 		require.Equal(t, details.StateFailed, det.State,
 			"det must still reflect failure even when persistence fails")

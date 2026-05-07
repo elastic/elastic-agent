@@ -971,7 +971,14 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 			err = upgradeErrors.ErrInsufficientDiskSpace
 		}
 
-		det.Fail(err)
+		// MarkUpgradeFailed updates det in-memory and, if a marker exists on
+		// disk (i.e. the failure happened after markUpgrade ran), persists
+		// state=Failed so the next boot does not start a watcher against an
+		// upgrade that has already been undone. No-op when no marker exists.
+		if mErr := upgrade.MarkUpgradeFailed(paths.Data(), det, err); mErr != nil {
+			c.logger.Infow("failed to persist failed-state marker; reconcile deferred to next boot",
+				"error.message", mErr.Error())
+		}
 		return err
 	}
 
