@@ -62,10 +62,7 @@ import (
 
 	abreceiver "github.com/elastic/beats/v7/x-pack/auditbeat/abreceiver"
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
-	hbreceiver "github.com/elastic/beats/v7/x-pack/heartbeat/hbreceiver"
 	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
-	osqreceiver "github.com/elastic/beats/v7/x-pack/osquerybeat/osqreceiver"
-	pbreceiver "github.com/elastic/beats/v7/x-pack/packetbeat/pbreceiver"
 
 	// Processors:
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
@@ -170,10 +167,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			verifierreceiver.NewFactory(),
 			abreceiver.NewFactoryWithSettings(abreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			fbreceiver.NewFactoryWithSettings(fbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
-			hbreceiver.NewFactoryWithSettings(hbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			mbreceiver.NewFactoryWithSettings(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
-			osqreceiver.NewFactoryWithSettings(osqreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
-			pbreceiver.NewFactoryWithSettings(pbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
 			azuremonitorreceiver.NewFactory(),
