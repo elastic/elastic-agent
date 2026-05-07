@@ -34,4 +34,8 @@ name: opentelemetry-kube-stack
 sources:
 - https://github.com/open-telemetry/opentelemetry-operator
 type: application
+<<<<<<< HEAD
 version: 0.14.11
+=======
+version: 0.14.13
+>>>>>>> 6ea4be93c ([otel/kube-stack] Update the OpenTelemetry Kube Stack Helm Chart to latest versions (#14095))
