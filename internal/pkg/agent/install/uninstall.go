@@ -29,7 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/component"

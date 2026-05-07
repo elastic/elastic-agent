@@ -58,7 +58,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	pkgcomponent "github.com/elastic/elastic-agent/pkg/component"

@@ -26,7 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client/wait"

@@ -20,7 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 

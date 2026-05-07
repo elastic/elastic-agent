@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
