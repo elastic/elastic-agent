@@ -334,15 +334,6 @@ steps:
   # NOTE: we won't run automatically for merge commits but on schedules and manually,
   # as they are not relevant for pull requests and we want to avoid running them twice for the same pull request
   # (once for the pull request itself and once for the merge commit)
-  # Trigger for branches
-<<<<<<< HEAD
-  - label: "Triggering Extended tests for branches"
-    if: build.pull_request.id == null
-    trigger: "elastic-agent-extended-testing"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
-      branch: "${BUILDKITE_BRANCH}"
-=======
   #- label: "Triggering Extended tests for branches"
   #  if: build.pull_request.id == null
   #  trigger: "elastic-agent-extended-testing"
@@ -350,7 +341,6 @@ steps:
   #    commit: "${BUILDKITE_COMMIT}"
   #    branch: "${BUILDKITE_BRANCH}"
 
->>>>>>> 0fe58539a (bk: run extended ITs on scheduling for the active branches (#14026))
   # Trigger for pull requests - Serverless Beats Tests
   # this should help detecting issues earlier in the development cycle
   - label: "Trigger Serverless Beats Tests"
