@@ -30,7 +30,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 func TestEnvWithDefault(t *testing.T) {
@@ -591,7 +590,7 @@ func TestShouldEnroll(t *testing.T) {
 					if tries <= 1 {
 						call.Return(nil, fleetNetworkErr)
 					} else {
-						call.Return(nil, fleetcontract.ErrInvalidAPIKey)
+						call.Return(nil, client.ErrInvalidAPIKey)
 					}
 					tries++
 				}).Times(3)

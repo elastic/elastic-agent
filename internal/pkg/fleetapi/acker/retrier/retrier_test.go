@@ -15,7 +15,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 var (
@@ -29,10 +28,10 @@ type testAcker struct {
 	called          int
 
 	// list of responses to replay depending on the attempt number
-	responses []*fleetcontract.AckResponse
+	responses []*fleetapi.AckResponse
 }
 
-func (a *testAcker) AckBatch(ctx context.Context, actions []fleetapi.Action) (*fleetcontract.AckResponse, error) {
+func (a *testAcker) AckBatch(ctx context.Context, actions []fleetapi.Action) (*fleetapi.AckResponse, error) {
 	defer func() {
 		a.called++
 	}()
@@ -59,9 +58,9 @@ func TestRetrier(t *testing.T) {
 			name:    "no error",
 			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}},
 			acker: &testAcker{
-				responses: []*fleetcontract.AckResponse{
+				responses: []*fleetapi.AckResponse{
 					{
-						Items: []fleetcontract.AckResponseItem{
+						Items: []fleetapi.AckResponseItem{
 							{Status: http.StatusOK},
 						},
 					},
@@ -83,17 +82,17 @@ func TestRetrier(t *testing.T) {
 				&fleetapi.ActionUnknown{ActionID: "3"},
 			},
 			acker: &testAcker{
-				responses: []*fleetcontract.AckResponse{
+				responses: []*fleetapi.AckResponse{
 					{
 						Errors: true,
-						Items: []fleetcontract.AckResponseItem{
+						Items: []fleetapi.AckResponseItem{
 							{Status: http.StatusOK},
 							{Status: http.StatusNotFound},
 							{Status: http.StatusOK},
 						},
 					},
 					{
-						Items: []fleetcontract.AckResponseItem{
+						Items: []fleetapi.AckResponseItem{
 							{Status: http.StatusOK},
 						},
 					},

@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 // fakeBackoff allows controlling the sequence of Wait() return values for tests.
@@ -106,7 +106,7 @@ func TestRetryEnroll_ExitsOnTerminalEnrollError(t *testing.T) {
 	}{
 		{"context canceled", context.Canceled},
 		{"deadline exceeded", context.DeadlineExceeded},
-		{"invalid token", fleetcontract.ErrInvalidToken},
+		{"invalid token", fleetapi.ErrInvalidToken},
 	}
 
 	for _, tc := range tests {
@@ -130,20 +130,20 @@ func TestRetryEnroll_RetriesOnInvalidTokenWhenEnabled(t *testing.T) {
 	called := 0
 	enrollFn := func() error {
 		called++
-		return fleetcontract.ErrInvalidToken
+		return fleetapi.ErrInvalidToken
 	}
 	// Allow two waits, then stop the loop so the test terminates.
 	fb := &fakeBackoff{results: []bool{true, true, false}}
 	l := logger.NewWithoutConfig("")
 
 	err := retryEnroll(
-		t.Context(), fleetcontract.ErrInvalidToken, -1, l, enrollFn, "http://localhost", fb,
+		t.Context(), fleetapi.ErrInvalidToken, -1, l, enrollFn, "http://localhost", fb,
 		true,
 	)
 	// With RetryOnInvalidToken=true, ErrInvalidToken must not short-circuit the loop;
 	// we should see retries happen until the backoff itself signals stop.
 	require.Equal(t, 2, called)
-	require.ErrorIs(t, err, fleetcontract.ErrInvalidToken)
+	require.ErrorIs(t, err, fleetapi.ErrInvalidToken)
 }
 
 func TestRetryEnroll_InterruptsBackoffWaitOnCtxCancel(t *testing.T) {

@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 type mockAction struct {
@@ -37,9 +36,9 @@ func (m *mockAction) ID() string {
 	return args.String(0)
 }
 
-func (m *mockAction) AckEvent() fleetcontract.AckEvent {
+func (m *mockAction) AckEvent() fleetapi.AckEvent {
 	args := m.Called()
-	return args.Get(0).(fleetcontract.AckEvent)
+	return args.Get(0).(fleetapi.AckEvent)
 }
 
 func (m *mockAction) StartTime() (time.Time, error) {

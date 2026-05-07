@@ -20,11 +20,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 type ackRequest struct {
-	Events []fleetcontract.AckEvent `json:"events"`
+	Events []fleetapi.AckEvent `json:"events"`
 }
 
 type testAgentInfo struct{}
@@ -86,13 +85,13 @@ func TestAcker_Ack(t *testing.T) {
 		},
 		{
 			name:    "ack",
-			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "ack-test-action-id", ActionType: fleetcontract.ActionTypeUnknown}},
+			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "ack-test-action-id", ActionType: fleetapi.ActionTypeUnknown}},
 		},
 		{
 			name: "ackbatch",
 			actions: []fleetapi.Action{
-				&fleetapi.ActionUnknown{ActionID: "ack-test-action-id1", ActionType: fleetcontract.ActionTypeUnknown},
-				&fleetapi.ActionUnknown{ActionID: "ack-test-action-id2", ActionType: fleetcontract.ActionTypeUnknown},
+				&fleetapi.ActionUnknown{ActionID: "ack-test-action-id1", ActionType: fleetapi.ActionTypeUnknown},
+				&fleetapi.ActionUnknown{ActionID: "ack-test-action-id2", ActionType: fleetapi.ActionTypeUnknown},
 			},
 		},
 		{
@@ -121,11 +120,11 @@ func TestAcker_Ack(t *testing.T) {
 			actions: []fleetapi.Action{
 				&fleetapi.ActionUpgrade{
 					ActionID:   "upgrade-ok",
-					ActionType: fleetcontract.ActionTypeUpgrade,
+					ActionType: fleetapi.ActionTypeUpgrade,
 				},
 				&fleetapi.ActionUpgrade{
 					ActionID:   "upgrade-retry",
-					ActionType: fleetcontract.ActionTypeUpgrade,
+					ActionType: fleetapi.ActionTypeUpgrade,
 					Data: fleetapi.ActionUpgradeData{
 						Retry: 1,
 					},
@@ -133,7 +132,7 @@ func TestAcker_Ack(t *testing.T) {
 				},
 				&fleetapi.ActionUpgrade{
 					ActionID:   "upgrade-failed",
-					ActionType: fleetcontract.ActionTypeUpgrade,
+					ActionType: fleetapi.ActionTypeUpgrade,
 					Data: fleetapi.ActionUpgradeData{
 						Retry: -1,
 					},

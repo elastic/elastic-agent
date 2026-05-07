@@ -15,7 +15,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/conv"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 var ErrInvalidYAML = errors.New("could not parse YAML")
@@ -76,10 +75,10 @@ func migrateActionStoreToStateStore(
 	}
 
 	supportedActions := []string{
-		fleetcontract.ActionTypePolicyChange,
+		fleetapi.ActionTypePolicyChange,
 		// Unenroll action is supported for completeness as an unenrolled agent
 		// would not be upgraded.
-		fleetcontract.ActionTypeUnenroll,
+		fleetapi.ActionTypeUnenroll,
 	}
 	if !slices.Contains(supportedActions, action.Type) {
 		log.Warnf("unexpected action type when migrating from action store. "+
@@ -155,7 +154,7 @@ func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Stora
 
 	var action fleetapi.Action
 	switch yamlStore.Action.Type {
-	case fleetcontract.ActionTypePolicyChange:
+	case fleetapi.ActionTypePolicyChange:
 		action = &fleetapi.ActionPolicyChange{
 			ActionID:   yamlStore.Action.ActionID,
 			ActionType: yamlStore.Action.Type,
@@ -164,7 +163,7 @@ func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Stora
 		}
 		// Unenroll action is supported for completeness as an unenrolled agent
 		// would not be upgraded.
-	case fleetcontract.ActionTypeUnenroll:
+	case fleetapi.ActionTypeUnenroll:
 		action = &fleetapi.ActionUnenroll{
 			ActionID:   yamlStore.Action.ActionID,
 			ActionType: yamlStore.Action.Type,
@@ -177,7 +176,7 @@ func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Stora
 
 	var queue actionQueue
 	for _, a := range yamlStore.ActionQueue {
-		if a.Type != fleetcontract.ActionTypeUpgrade {
+		if a.Type != fleetapi.ActionTypeUpgrade {
 			log.Warnf(
 				"loaded a unsupported %s action from the deprecated YAML state store action queue, it will be dropped",
 				yamlStore.Action.Type)

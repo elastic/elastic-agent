@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 func TestAck(t *testing.T) {
@@ -30,7 +29,7 @@ func TestAck(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 
 				responses := struct {
-					Events []fleetcontract.AckEvent `json:"events"`
+					Events []AckEvent `json:"events"`
 				}{}
 
 				decoder := json.NewDecoder(r.Body)
@@ -61,8 +60,8 @@ func TestAck(t *testing.T) {
 
 			cmd := NewAckCmd(&agentinfo{}, client)
 
-			request := fleetcontract.AckRequest{
-				Events: []fleetcontract.AckEvent{
+			request := AckRequest{
+				Events: []AckEvent{
 					{
 						EventType: "ACTION_RESULT",
 						SubType:   "ACKNOWLEDGED",

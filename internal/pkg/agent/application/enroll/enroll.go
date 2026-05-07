@@ -32,7 +32,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 const (
@@ -110,13 +109,13 @@ RETRYLOOP:
 	for {
 		attemptNo++
 		switch {
-		case errors.Is(err, fleetcontract.ErrTooManyRequests):
+		case errors.Is(err, fleetapi.ErrTooManyRequests):
 			log.Warn("Too many requests on the remote server, will retry in a moment.")
-		case errors.Is(err, fleetcontract.ErrConnRefused):
+		case errors.Is(err, fleetapi.ErrConnRefused):
 			log.Warn("Remote server is not ready to accept connections(Connection Refused), will retry in a moment.")
-		case errors.Is(err, fleetcontract.ErrTemporaryServerError):
+		case errors.Is(err, fleetapi.ErrTemporaryServerError):
 			log.Warnf("Remote server failed to handle the request(%s), will retry in a moment.", err.Error())
-		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), errors.Is(err, fleetcontract.ErrInvalidToken) && !retryOnInvalidToken, err == nil, (maxAttempts != EnrollInfiniteAttempts && attemptNo > maxAttempts):
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), errors.Is(err, fleetapi.ErrInvalidToken) && !retryOnInvalidToken, err == nil, (maxAttempts != EnrollInfiniteAttempts && attemptNo > maxAttempts):
 			break RETRYLOOP
 		case err != nil:
 			log.Warnf("Error detected: %s, will retry in a moment.", err.Error())
@@ -163,7 +162,7 @@ func enroll(
 
 	r := &fleetapi.EnrollRequest{
 		EnrollAPIKey: options.EnrollAPIKey,
-		Type:         fleetcontract.PermanentEnroll,
+		Type:         fleetapi.PermanentEnroll,
 		ID:           options.ID,
 		ReplaceToken: options.ReplaceToken,
 		Metadata: fleetapi.Metadata{

@@ -32,7 +32,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 // dispatchFlushInterval is the max time between calls to dispatcher.Dispatch
@@ -255,7 +254,7 @@ func (m *managedConfigManager) Watch() <-chan coordinator.ConfigChange {
 
 func (m *managedConfigManager) wasUnenrolled() bool {
 	return m.stateStore.Action() != nil &&
-		m.stateStore.Action().Type() == fleetcontract.ActionTypeUnenroll
+		m.stateStore.Action().Type() == fleetapi.ActionTypeUnenroll
 }
 
 func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {

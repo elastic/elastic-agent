@@ -12,11 +12,10 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 type batchAcker interface {
-	AckBatch(ctx context.Context, actions []fleetapi.Action) (*fleetcontract.AckResponse, error)
+	AckBatch(ctx context.Context, actions []fleetapi.Action) (*fleetapi.AckResponse, error)
 }
 
 type retrier interface {
@@ -82,7 +81,7 @@ func (f *Acker) Commit(ctx context.Context) (err error) {
 	f.queue = make([]fleetapi.Action, 0)
 
 	f.log.Debugf("lazy acker: ack batch: %s", actions)
-	var resp *fleetcontract.AckResponse
+	var resp *fleetapi.AckResponse
 	resp, err = f.acker.AckBatch(ctx, actions)
 
 	// If request failed enqueue all actions with retrier if it is set

@@ -32,7 +32,6 @@ import (
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 type mockUpgradeManager struct {
@@ -380,7 +379,7 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 		{
 			name: "error from coordinator upgrade with notify endpoint",
 			upgradeAction: &fleetapi.ActionUpgrade{
-				ActionType: fleetcontract.ActionTypeUpgrade,
+				ActionType: fleetapi.ActionTypeUpgrade,
 				Data: fleetapi.ActionUpgradeData{
 					Version:   "255.0.0",
 					SourceURI: "http://localhost",
@@ -392,7 +391,7 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 		{
 			name: "no error from coordinator upgrade with notify endpoint",
 			upgradeAction: &fleetapi.ActionUpgrade{
-				ActionType: fleetcontract.ActionTypeUpgrade,
+				ActionType: fleetapi.ActionTypeUpgrade,
 				Data: fleetapi.ActionUpgradeData{
 					Version:   "255.0.0",
 					SourceURI: "http://localhost",
@@ -403,7 +402,7 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 		{
 			name: "error from coordinator upgrade without notify endpoint",
 			upgradeAction: &fleetapi.ActionUpgrade{
-				ActionType: fleetcontract.ActionTypeUpgrade,
+				ActionType: fleetapi.ActionTypeUpgrade,
 				Data: fleetapi.ActionUpgradeData{
 					Version:   "255.0.0",
 					SourceURI: "http://localhost",
@@ -414,7 +413,7 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 		{
 			name: "no error from coordinator upgrade without notify endpoint",
 			upgradeAction: &fleetapi.ActionUpgrade{
-				ActionType: fleetcontract.ActionTypeUpgrade,
+				ActionType: fleetapi.ActionTypeUpgrade,
 				Data: fleetapi.ActionUpgradeData{
 					Version:   "255.0.0",
 					SourceURI: "http://localhost",
@@ -432,7 +431,7 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 						Component: component.Component{
 							InputSpec: &component.InputRuntimeSpec{
 								Spec: component.InputSpec{
-									ProxiedActions: []string{fleetcontract.ActionTypeUpgrade},
+									ProxiedActions: []string{fleetapi.ActionTypeUpgrade},
 								},
 							},
 							InputType: "endpoint",

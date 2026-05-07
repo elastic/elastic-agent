@@ -51,7 +51,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
@@ -1295,7 +1294,7 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	// maintaining seamless operation.
 	err = ackFleet(ctx, fc, storedConfig.Fleet.Info.ID)
 	switch {
-	case errors.Is(err, fleetcontract.ErrInvalidAPIKey):
+	case errors.Is(err, fleetclient.ErrInvalidAPIKey):
 		// The API key is invalid, so enrollment is required.
 		return true, nil
 	case err != nil:
@@ -1346,7 +1345,7 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 func ackFleet(ctx context.Context, client fleetclient.Sender, agentID string) error {
 	const retryInterval = time.Second
 	const maxRetries = 3
-	ackRequest := &fleetcontract.AckRequest{Events: nil}
+	ackRequest := &fleetapi.AckRequest{Events: nil}
 	ackCMD := fleetapi.NewAckCmd(&agentInfo{agentID}, client)
 	retries := 0
 	return backoff.Retry(func() error {
@@ -1355,7 +1354,7 @@ func ackFleet(ctx context.Context, client fleetclient.Sender, agentID string) er
 		switch {
 		case err == nil:
 			return nil
-		case errors.Is(err, fleetcontract.ErrInvalidAPIKey) || retries == maxRetries:
+		case errors.Is(err, fleetclient.ErrInvalidAPIKey) || retries == maxRetries:
 			return backoff.Permanent(err)
 		default:
 			return err

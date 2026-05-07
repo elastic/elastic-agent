@@ -20,7 +20,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 const ()
@@ -117,7 +116,7 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 
 func (h *Migrate) notifyComponents(ctx context.Context, migrateAction *fleetapi.ActionMigrate) error {
 	state := h.coord.State()
-	ucs := findMatchingUnitsByActionType(state, fleetcontract.ActionTypeMigrate)
+	ucs := findMatchingUnitsByActionType(state, fleetapi.ActionTypeMigrate)
 	if len(ucs) > 0 {
 		err := notifyUnitsOfProxiedAction(ctx, h.log, migrateAction, ucs, h.coord.PerformAction)
 		if err != nil {
@@ -125,7 +124,7 @@ func (h *Migrate) notifyComponents(ctx context.Context, migrateAction *fleetapi.
 		}
 	} else {
 		// Log and continue
-		h.log.Debugf("No components running for %v action type", fleetcontract.ActionTypeMigrate)
+		h.log.Debugf("No components running for %v action type", fleetapi.ActionTypeMigrate)
 	}
 
 	return nil

@@ -13,7 +13,31 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
+)
+
+const (
+	// ActionTypeUnknown is used to indicate that the elastic-agent does not know how to handle the action
+	ActionTypeUnknown = "UNKNOWN"
+	// ActionTypeUpgrade specifies upgrade action.
+	ActionTypeUpgrade = "UPGRADE"
+	// ActionTypeUnenroll specifies unenroll action.
+	ActionTypeUnenroll = "UNENROLL"
+	// ActionTypePolicyChange specifies policy change action.
+	ActionTypePolicyChange = "POLICY_CHANGE"
+	// ActionTypePolicyReassign specifies policy reassign action.
+	ActionTypePolicyReassign = "POLICY_REASSIGN"
+	// ActionTypeSettings specifies change of agent settings.
+	ActionTypeSettings = "SETTINGS"
+	// ActionTypeInputAction specifies agent action.
+	ActionTypeInputAction = "INPUT_ACTION"
+	// ActionTypeCancel specifies a cancel action.
+	ActionTypeCancel = "CANCEL"
+	// ActionTypeDiagnostics specifies a diagnostics action.
+	ActionTypeDiagnostics = "REQUEST_DIAGNOSTICS"
+	// ActionTypeDiagnostics specifies a diagnostics action.
+	ActionTypeMigrate = "MIGRATE"
+	// ActionTypeDiagnostics specifies a diagnostics action.
+	ActionTypePrivilegeLevelChange = "PRIVILEGE_LEVEL_CHANGE"
 )
 
 // Error values that the Action interface can return
@@ -27,7 +51,7 @@ type Action interface {
 	fmt.Stringer
 	Type() string
 	ID() string
-	AckEvent() fleetcontract.AckEvent
+	AckEvent() AckEvent
 }
 
 // Actions is a slice of Actions to executes and allow to unmarshal
@@ -79,25 +103,25 @@ func NewAction(actionType string) Action {
 
 	// keep the case statements alphabetically sorted
 	switch actionType {
-	case fleetcontract.ActionTypeCancel:
+	case ActionTypeCancel:
 		action = &ActionCancel{}
-	case fleetcontract.ActionTypeDiagnostics:
+	case ActionTypeDiagnostics:
 		action = &ActionDiagnostics{}
-	case fleetcontract.ActionTypeInputAction:
+	case ActionTypeInputAction:
 		action = &ActionApp{}
-	case fleetcontract.ActionTypePolicyChange:
+	case ActionTypePolicyChange:
 		action = &ActionPolicyChange{}
-	case fleetcontract.ActionTypePolicyReassign:
+	case ActionTypePolicyReassign:
 		action = &ActionPolicyReassign{}
-	case fleetcontract.ActionTypeSettings:
+	case ActionTypeSettings:
 		action = &ActionSettings{}
-	case fleetcontract.ActionTypeUnenroll:
+	case ActionTypeUnenroll:
 		action = &ActionUnenroll{}
-	case fleetcontract.ActionTypeUpgrade:
+	case ActionTypeUpgrade:
 		action = &ActionUpgrade{}
-	case fleetcontract.ActionTypeMigrate:
+	case ActionTypeMigrate:
 		action = &ActionMigrate{}
-	case fleetcontract.ActionTypePrivilegeLevelChange:
+	case ActionTypePrivilegeLevelChange:
 		action = &ActionPrivilegeLevelChange{}
 	default:
 		action = &ActionUnknown{OriginalType: actionType}
@@ -106,8 +130,8 @@ func NewAction(actionType string) Action {
 	return action
 }
 
-func newAckEvent(id, aType string) fleetcontract.AckEvent {
-	return fleetcontract.AckEvent{
+func newAckEvent(id, aType string) AckEvent {
+	return AckEvent{
 		EventType: "ACTION_RESULT",
 		SubType:   "ACKNOWLEDGED",
 		ActionID:  id,
@@ -129,7 +153,7 @@ type ActionUnknown struct {
 
 // Type returns the type of the Action.
 func (a *ActionUnknown) Type() string {
-	return fleetcontract.ActionTypeUnknown
+	return ActionTypeUnknown
 }
 
 // ID returns the ID of the Action.
@@ -149,8 +173,8 @@ func (a *ActionUnknown) String() string {
 	return s.String()
 }
 
-func (a *ActionUnknown) AckEvent() fleetcontract.AckEvent {
-	return fleetcontract.AckEvent{
+func (a *ActionUnknown) AckEvent() AckEvent {
+	return AckEvent{
 		EventType: "ACTION_RESULT", // TODO Discuss EventType/SubType needed - by default only ACTION_RESULT was used - what is (or was) the intended purpose of these attributes? Are they documented? Can we change them to better support acking an error or a retry?
 		SubType:   "ACKNOWLEDGED",
 		ActionID:  a.ActionID,
@@ -189,7 +213,7 @@ func (a *ActionPolicyReassign) ID() string {
 	return a.ActionID
 }
 
-func (a *ActionPolicyReassign) AckEvent() fleetcontract.AckEvent {
+func (a *ActionPolicyReassign) AckEvent() AckEvent {
 	return newAckEvent(a.ActionID, a.ActionType)
 }
 
@@ -223,7 +247,7 @@ func (a *ActionPolicyChange) ID() string {
 	return a.ActionID
 }
 
-func (a *ActionPolicyChange) AckEvent() fleetcontract.AckEvent {
+func (a *ActionPolicyChange) AckEvent() AckEvent {
 	return newAckEvent(a.ActionID, a.ActionType)
 }
 
@@ -256,7 +280,7 @@ func (a *ActionUpgrade) String() string {
 	return s.String()
 }
 
-func (a *ActionUpgrade) AckEvent() fleetcontract.AckEvent {
+func (a *ActionUpgrade) AckEvent() AckEvent {
 	event := newAckEvent(a.ActionID, a.ActionType)
 	if a.Err != nil {
 		// FIXME Do we want to change EventType/SubType here?
@@ -369,7 +393,7 @@ func (a *ActionUnenroll) ID() string {
 	return a.ActionID
 }
 
-func (a *ActionUnenroll) AckEvent() fleetcontract.AckEvent {
+func (a *ActionUnenroll) AckEvent() AckEvent {
 	return newAckEvent(a.ActionID, a.ActionType)
 }
 
@@ -455,7 +479,7 @@ func (a *ActionMigrate) MarshalMap() (map[string]interface{}, error) {
 	return res, err
 }
 
-func (a *ActionMigrate) AckEvent() fleetcontract.AckEvent {
+func (a *ActionMigrate) AckEvent() AckEvent {
 	event := newAckEvent(a.ActionID, a.ActionType)
 	if a.Err != nil {
 		event.Error = a.Err.Error()
@@ -474,7 +498,7 @@ type ActionMigrateData struct {
 	Settings json.RawMessage `json:"settings" yaml:"settings,omitempty"`
 }
 
-func (a *ActionSettings) AckEvent() fleetcontract.AckEvent {
+func (a *ActionSettings) AckEvent() AckEvent {
 	return newAckEvent(a.ActionID, a.ActionType)
 }
 
@@ -510,7 +534,7 @@ func (a *ActionCancel) String() string {
 	return s.String()
 }
 
-func (a *ActionCancel) AckEvent() fleetcontract.AckEvent {
+func (a *ActionCancel) AckEvent() AckEvent {
 	return newAckEvent(a.ActionID, a.ActionType)
 }
 
@@ -547,7 +571,7 @@ func (a *ActionDiagnostics) String() string {
 	return s.String()
 }
 
-func (a *ActionDiagnostics) AckEvent() fleetcontract.AckEvent {
+func (a *ActionDiagnostics) AckEvent() AckEvent {
 	event := newAckEvent(a.ActionID, a.ActionType)
 	if a.Err != nil {
 		event.Error = a.Err.Error()
@@ -599,8 +623,8 @@ func (a *ActionApp) Type() string {
 	return a.ActionType
 }
 
-func (a *ActionApp) AckEvent() fleetcontract.AckEvent {
-	return fleetcontract.AckEvent{
+func (a *ActionApp) AckEvent() AckEvent {
+	return AckEvent{
 		EventType:       "ACTION_RESULT",
 		SubType:         "ACKNOWLEDGED",
 		ActionID:        a.ActionID,
@@ -652,7 +676,7 @@ func (a *ActionPrivilegeLevelChange) String() string {
 	return s.String()
 }
 
-func (a *ActionPrivilegeLevelChange) AckEvent() fleetcontract.AckEvent {
+func (a *ActionPrivilegeLevelChange) AckEvent() AckEvent {
 	event := newAckEvent(a.ActionID, a.ActionType)
 	if a.Err != nil {
 		event.Error = a.Err.Error()

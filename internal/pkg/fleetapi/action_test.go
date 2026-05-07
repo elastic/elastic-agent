@@ -11,8 +11,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 func TestActionSerialization(t *testing.T) {
@@ -94,7 +92,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		action, ok := (*a)[0].(*ActionUpgrade)
 		require.True(t, ok, "unable to cast action to specific type")
 		assert.Equal(t, "testid", action.ActionID)
-		assert.Equal(t, fleetcontract.ActionTypeUpgrade, action.ActionType)
+		assert.Equal(t, ActionTypeUpgrade, action.ActionType)
 		assert.Empty(t, action.ActionStartTime)
 		assert.Empty(t, action.ActionExpiration)
 		assert.Equal(t, "1.2.3", action.Data.Version)
@@ -109,7 +107,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		action, ok := (*a)[0].(*ActionUpgrade)
 		require.True(t, ok, "unable to cast action to specific type")
 		assert.Equal(t, "testid", action.ActionID)
-		assert.Equal(t, fleetcontract.ActionTypeUpgrade, action.ActionType)
+		assert.Equal(t, ActionTypeUpgrade, action.ActionType)
 		assert.Equal(t, "2022-01-02T12:00:00Z", action.ActionStartTime)
 		assert.Equal(t, "2022-01-02T13:00:00Z", action.ActionExpiration)
 		assert.Equal(t, "1.2.3", action.Data.Version)
@@ -124,7 +122,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		action, ok := (*a)[0].(*ActionPolicyChange)
 		require.True(t, ok, "unable to cast action to specific type")
 		assert.Equal(t, "testid", action.ActionID)
-		assert.Equal(t, fleetcontract.ActionTypePolicyChange, action.ActionType)
+		assert.Equal(t, ActionTypePolicyChange, action.ActionType)
 		assert.NotNil(t, action.Data.Policy)
 	})
 	t.Run("ActionPolicyChange with start time", func(t *testing.T) {
@@ -135,7 +133,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		action, ok := (*a)[0].(*ActionPolicyChange)
 		require.True(t, ok, "unable to cast action to specific type")
 		assert.Equal(t, "testid", action.ActionID)
-		assert.Equal(t, fleetcontract.ActionTypePolicyChange, action.ActionType)
+		assert.Equal(t, ActionTypePolicyChange, action.ActionType)
 		assert.NotNil(t, action.Data.Policy)
 	})
 	t.Run("ActionUpgrade with retry_attempt", func(t *testing.T) {
@@ -146,7 +144,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		action, ok := (*a)[0].(*ActionUpgrade)
 		require.True(t, ok, "unable to cast action to specific type")
 		assert.Equal(t, "testid", action.ActionID)
-		assert.Equal(t, fleetcontract.ActionTypeUpgrade, action.ActionType)
+		assert.Equal(t, ActionTypeUpgrade, action.ActionType)
 		assert.Empty(t, action.ActionStartTime)
 		assert.Empty(t, action.ActionExpiration)
 		assert.Equal(t, "1.2.3", action.Data.Version)
@@ -161,7 +159,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		action, ok := (*a)[0].(*ActionDiagnostics)
 		require.True(t, ok, "unable to cast action to specific type")
 		assert.Equal(t, "testid", action.ActionID)
-		assert.Equal(t, fleetcontract.ActionTypeDiagnostics, action.ActionType)
+		assert.Equal(t, ActionTypeDiagnostics, action.ActionType)
 		assert.Empty(t, action.Data.AdditionalMetrics)
 	})
 	t.Run("ActionDiagnostics with additional CPU metrics", func(t *testing.T) {
@@ -172,7 +170,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		action, ok := (*a)[0].(*ActionDiagnostics)
 		require.True(t, ok, "unable to cast action to specific type")
 		assert.Equal(t, "testid", action.ActionID)
-		assert.Equal(t, fleetcontract.ActionTypeDiagnostics, action.ActionType)
+		assert.Equal(t, ActionTypeDiagnostics, action.ActionType)
 		require.Len(t, action.Data.AdditionalMetrics, 1)
 		assert.Equal(t, "CPU", action.Data.AdditionalMetrics[0])
 	})

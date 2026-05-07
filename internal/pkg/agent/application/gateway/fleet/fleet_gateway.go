@@ -30,7 +30,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 // Max number of times an invalid API Key is checked
@@ -490,7 +489,7 @@ func (f *FleetGateway) shouldUseLongSched() bool {
 }
 
 func isUnauth(err error) bool {
-	return errors.Is(err, fleetcontract.ErrInvalidAPIKey)
+	return errors.Is(err, client.ErrInvalidAPIKey)
 }
 
 func (f *FleetGateway) SetClient(c client.Sender) {

@@ -20,7 +20,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 func TestHTTPClient(t *testing.T) {
@@ -164,7 +163,7 @@ func TestElasticApiVersion(t *testing.T) {
 
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-			assert.Equal(t, request.Header.Get(fleetcontract.ElasticAPIVersionHeaderKey), fleetcontract.DefaultFleetAPIVersion)
+			assert.Equal(t, request.Header.Get(elasticApiVersionHeaderKey), defaultFleetApiVersion)
 			writer.WriteHeader(http.StatusOK)
 		})
 
@@ -190,9 +189,9 @@ func TestElasticApiVersion(t *testing.T) {
 
 		mux := http.NewServeMux()
 		mux.HandleFunc("/genericbadrequest", func(writer http.ResponseWriter, request *http.Request) {
-			assert.Equal(t, request.Header.Get(fleetcontract.ElasticAPIVersionHeaderKey), fleetcontract.DefaultFleetAPIVersion)
-			// request return a 400 with the fleetcontract.DefaultFleetAPIVersion (just testing that we don't log that as a downgrade request)
-			writer.Header().Add(fleetcontract.ElasticAPIVersionHeaderKey, fleetcontract.DefaultFleetAPIVersion)
+			assert.Equal(t, request.Header.Get(elasticApiVersionHeaderKey), defaultFleetApiVersion)
+			// request return a 400 with the defaultFleetApiVersion (just testing that we don't log that as a downgrade request)
+			writer.Header().Add(elasticApiVersionHeaderKey, defaultFleetApiVersion)
 			writer.WriteHeader(http.StatusBadRequest)
 		})
 
@@ -221,9 +220,9 @@ func TestElasticApiVersion(t *testing.T) {
 
 		mux := http.NewServeMux()
 		mux.HandleFunc("/downgrade", func(writer http.ResponseWriter, request *http.Request) {
-			assert.Equal(t, request.Header.Get(fleetcontract.ElasticAPIVersionHeaderKey), fleetcontract.DefaultFleetAPIVersion)
+			assert.Equal(t, request.Header.Get(elasticApiVersionHeaderKey), defaultFleetApiVersion)
 			// request to downgrade to a completely fictitious version (just testing that we get a log for that)
-			writer.Header().Add(fleetcontract.ElasticAPIVersionHeaderKey, request.URL.Query().Get("version"))
+			writer.Header().Add(elasticApiVersionHeaderKey, request.URL.Query().Get("version"))
 			writer.WriteHeader(http.StatusBadRequest)
 		})
 
@@ -252,7 +251,7 @@ func TestElasticApiVersion(t *testing.T) {
 
 		mux := http.NewServeMux()
 		mux.HandleFunc("/warning", func(writer http.ResponseWriter, request *http.Request) {
-			assert.Equal(t, request.Header.Get(fleetcontract.ElasticAPIVersionHeaderKey), fleetcontract.DefaultFleetAPIVersion)
+			assert.Equal(t, request.Header.Get(elasticApiVersionHeaderKey), defaultFleetApiVersion)
 			// send back a warning simulating an unsupported api version
 			writer.Header().Add("Warning", request.URL.Query().Get("warning_msg"))
 			writer.WriteHeader(http.StatusBadRequest)

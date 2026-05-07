@@ -21,15 +21,14 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	"github.com/elastic/elastic-agent/pkg/fleetcontract"
 )
 
 type wrongAction struct{}
 
-func (wrongAction) ID() string                       { return "" }
-func (wrongAction) Type() string                     { return "" }
-func (wrongAction) String() string                   { return "" }
-func (wrongAction) AckEvent() fleetcontract.AckEvent { return fleetcontract.AckEvent{} }
+func (wrongAction) ID() string                  { return "" }
+func (wrongAction) Type() string                { return "" }
+func (wrongAction) String() string              { return "" }
+func (wrongAction) AckEvent() fleetapi.AckEvent { return fleetapi.AckEvent{} }
 
 func TestStateStore(t *testing.T) {
 	t.Run("ack token", func(t *testing.T) {
@@ -175,7 +174,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		require.NoError(t, err)
 
 		store.dirty = true
-		store.state.ActionSerializer.Action = fleetapi.NewAction(fleetcontract.ActionTypeUnknown)
+		store.state.ActionSerializer.Action = fleetapi.NewAction(fleetapi.ActionTypeUnknown)
 		err = store.Save()
 		require.Error(t, err, "expected an error when saving store with invalid state")
 
@@ -334,7 +333,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		ts := time.Now().UTC().Round(time.Second)
 		queue := []fleetapi.ScheduledAction{&fleetapi.ActionUpgrade{
 			ActionID:        "test",
-			ActionType:      fleetcontract.ActionTypeUpgrade,
+			ActionType:      fleetapi.ActionTypeUpgrade,
 			ActionStartTime: ts.Format(time.RFC3339),
 			Data: fleetapi.ActionUpgradeData{
 				Version:   "1.2.3",
@@ -374,7 +373,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		ts := time.Now().UTC().Round(time.Second)
 		queue := []fleetapi.ScheduledAction{&fleetapi.ActionUpgrade{
 			ActionID:        "test",
-			ActionType:      fleetcontract.ActionTypeUpgrade,
+			ActionType:      fleetapi.ActionTypeUpgrade,
 			ActionStartTime: ts.Format(time.RFC3339),
 			Data: fleetapi.ActionUpgradeData{
 				Version:   "1.2.3",
@@ -386,7 +385,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			// ScheduledAction right now, so it'll use 2 of them for this test.
 			&fleetapi.ActionUpgrade{
 				ActionID:        "test2",
-				ActionType:      fleetcontract.ActionTypeUpgrade,
+				ActionType:      fleetapi.ActionTypeUpgrade,
 				ActionStartTime: ts.Format(time.RFC3339),
 				Data: fleetapi.ActionUpgradeData{
 					Version:   "1.2.4",
@@ -576,7 +575,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			storePath := filepath.Join(t.TempDir(), "state.json")
 			want := &fleetapi.ActionUnenroll{
 				ActionID:   "abc123",
-				ActionType: fleetcontract.ActionTypeUnenroll,
+				ActionType: fleetapi.ActionTypeUnenroll,
 				IsDetected: true,
 				Signed: &fleetapi.Signed{
 					Data:      "some data",
@@ -623,7 +622,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			now := time.Now().UTC().Round(time.Second)
 			want := &fleetapi.ActionUpgrade{
 				ActionID:         "test",
-				ActionType:       fleetcontract.ActionTypeUpgrade,
+				ActionType:       fleetapi.ActionTypeUpgrade,
 				ActionStartTime:  now.Format(time.RFC3339),
 				ActionExpiration: now.Add(time.Hour).Format(time.RFC3339),
 				Data: fleetapi.ActionUpgradeData{
