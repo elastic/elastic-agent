@@ -379,6 +379,155 @@ func Test_watchCmd(t *testing.T) {
 	}
 }
 
+// Test_watchCmd_MarkerPointsToSelf is the end-to-end regression for the
+// data-loss bug fixed in the https://github.com/elastic/elastic-agent/pull/13935 (see
+// https://github.com/elastic/elastic-agent/issues/13505 and the cleanup keep-list
+// invalidation in [upgrade.cleanup]).
+//
+// Scenario: a single agent install lives on disk, the top-level elastic-agent
+// symlink points at it, and the upgrade marker is "stale" — PrevVersionedHome
+// references that same live install, while VersionedHome references a phantom
+// directory that never made it to disk (or has already been cleaned). This
+// shape can appear after a partial upgrade or watcher restart loop.
+//
+// The fix this test guards: cleanup must (1) consult the live symlink as a
+// keep-list source of truth and (2) drop non-existent keep-list entries so
+// the live install is preserved instead of being deleted as "not in keep".
+//
+// Wiring: the real [upgradeInstallationModifier] is passed in so the actual
+// upgrade.Cleanup path runs against a real on-disk layout. Only the agent
+// watcher is mocked, since speaking the gRPC control protocol would require
+// a running daemon.
+func Test_watchCmd_MarkerPointsToSelf(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// Symlink creation on Windows requires elevation or developer
+		// mode and afterRestartDelay is 20s on Windows. The cleanup
+		// logic under test is platform-agnostic; skipping here keeps
+		// the regression test reliable on the platforms the bug
+		// actually surfaces in our CI.
+		t.Skip("skipping on windows: symlink creation requires elevation")
+	}
+
+	log, obs := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	// Build a real install on disk and link the top-level binary into it.
+	// This is the live install — the directory the daemon would actually run.
+	const liveVersion = "9.3.0-SNAPSHOT"
+	const liveHash = "selfhsh" // 7 chars, ≥ upgrade.HashLen
+	liveHome := writeFakeInstallForWatcherTest(t, topDir, liveVersion, liveHash)
+	linkSelfForWatcherTest(t, topDir, liveHome)
+
+	// Marker says: we just upgraded *from* the live install (PrevVersionedHome)
+	// *to* a phantom directory (VersionedHome) that doesn't exist. UpdatedOn
+	// is recent so watchCmd takes the in-grace branch (Watch then cleanup),
+	// not the out-of-grace shortcut.
+	dataDir := paths.DataFrom(topDir)
+	require.NoError(t, os.MkdirAll(dataDir, 0o755))
+	require.NoError(t, upgrade.SaveMarker(dataDir, &upgrade.UpdateMarker{
+		Version:           "9.4.0",
+		Hash:              "newhash",
+		VersionedHome:     filepath.Join("data", "elastic-agent-9.4.0-newhsh"),
+		UpdatedOn:         time.Now(),
+		PrevVersion:       liveVersion,
+		PrevHash:          liveHash,
+		PrevVersionedHome: liveHome,
+	}, true))
+
+	// Mock the watcher (happy branch — Watch returns nil), real installation
+	// modifier so upgrade.Cleanup actually walks the data dir.
+	mockWatcher := newMockAgentWatcher(t)
+	mockWatcher.EXPECT().
+		Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+	realModifier := new(upgradeInstallationModifier)
+
+	cfg := configuration.DefaultUpgradeConfig().Watcher
+
+	err := watchCmd(log, topDir, cfg, mockWatcher, realModifier)
+
+	if t.Failed() || err != nil {
+		for _, l := range obs.All() {
+			t.Logf("\t%s - %s - %v", l.Level, l.Message, l.Context)
+		}
+	}
+	require.NoError(t, err, "watchCmd should not error on the stale-marker scenario")
+
+	// Core regression assertion: the live versioned home must still exist
+	// after cleanup. On main (no symlink guard, no phantom-drop) the only
+	// keep-list entry is marker.VersionedHome, which doesn't match liveHome,
+	// so liveHome would be removed by install.RemoveBut.
+	assert.DirExists(t, filepath.Join(topDir, liveHome),
+		"live versioned home must survive cleanup even when marker.VersionedHome is phantom")
+
+	binName := upgrade.AgentName
+	if runtime.GOOS == "windows" {
+		binName += ".exe"
+	}
+	assert.FileExists(t,
+		paths.BinaryPath(filepath.Join(topDir, liveHome), binName),
+		"live agent binary must survive cleanup")
+
+	// Sanity: the marker should have been removed (non-Windows path —
+	// watchCmd sets removeMarker = !isWindows() for the success branch).
+	loaded, loadErr := upgrade.LoadMarker(dataDir)
+	require.NoError(t, loadErr)
+	assert.Nil(t, loaded, "marker should be cleaned up after successful watch on non-windows")
+}
+
+// writeFakeInstallForWatcherTest builds the on-disk shape that step_unpack
+// produces for a single install: data/elastic-agent-<version>-<hash>/ plus
+// the binary placeholder and components/logs/run subdirectories. Returns
+// the versioned home path relative to topDir (the same shape used by
+// marker.VersionedHome / marker.PrevVersionedHome).
+//
+// Mirrors the helper of the same intent in the upgrade package's tests
+// (createFakeAgentInstall) — kept local here to avoid exporting test
+// plumbing across packages.
+func writeFakeInstallForWatcherTest(t *testing.T, topDir, version, hash string) string {
+	t.Helper()
+
+	hashStub := hash
+	if len(hashStub) > upgrade.HashLen {
+		hashStub = hashStub[:upgrade.HashLen]
+	}
+	relHome := filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", version, hashStub))
+	absHome := filepath.Join(topDir, relHome)
+
+	// paths.BinaryPath handles macOS's elastic-agent.app/Contents/MacOS
+	// nesting; passing "" gives us just the binary directory.
+	require.NoError(t, os.MkdirAll(paths.BinaryPath(absHome, ""), 0o750))
+	for _, sub := range []string{"components", "logs", "run"} {
+		require.NoError(t, os.MkdirAll(filepath.Join(absHome, sub), 0o750))
+	}
+
+	binName := upgrade.AgentName
+	if runtime.GOOS == "windows" {
+		binName += ".exe"
+	}
+	require.NoError(t, os.WriteFile(
+		paths.BinaryPath(absHome, binName),
+		[]byte("placeholder agent binary"), 0o750))
+
+	return relHome
+}
+
+// linkSelfForWatcherTest creates topDir/elastic-agent →
+// <versionedHome>/<binary> using a relative target, matching what
+// step_relink produces in production. liveVersionedHome reads this symlink
+// to identify the live install for the cleanup keep-list.
+func linkSelfForWatcherTest(t *testing.T, topDir, versionedHome string) {
+	t.Helper()
+
+	binName := upgrade.AgentName
+	target := paths.BinaryPath(versionedHome, upgrade.AgentName)
+	if runtime.GOOS == "windows" {
+		binName += ".exe"
+		target += ".exe"
+	}
+	require.NoError(t, os.Symlink(target, filepath.Join(topDir, binName)))
+}
+
 func Test_rollback(t *testing.T) {
 
 	type args struct {
