@@ -216,14 +216,14 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	if liveHome, err := liveVersionedHome(topDirPath); err == nil {
 		liveBasename, basenameErr := filepath.Rel(dataDirPath, filepath.Join(topDirPath, liveHome))
 		if basenameErr != nil {
-			log.Warnw("could not compute live versioned home basename; cleanup proceeds without protection",
+			log.Infow("could not compute live versioned home basename; cleanup proceeds without protection",
 				"error.message", basenameErr.Error())
 		} else if !slices.Contains(relativeHomePaths, liveBasename) {
 			log.Infof("adding live versioned home %q to keep list", liveBasename)
 			relativeHomePaths = append(relativeHomePaths, liveBasename)
 		}
 	} else {
-		log.Warnw("could not derive live versioned home; cleanup proceeds without protection",
+		log.Infow("could not derive live versioned home; cleanup proceeds without protection",
 			"error.message", err.Error())
 	}
 
@@ -231,12 +231,12 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	// log line below reflects what is actually being preserved rather than a
 	// phantom path. A stale entry is harmless to leave in (the cleanup loop
 	// only iterates real subdirs) but misleading on triage. Each dropped
-	// entry is surfaced as a Warn so the cause — usually a stale
+	// entry is surfaced as an Info so the cause — usually a stale
 	// marker.VersionedHome — is visible in logs.
 	existingHomePaths := relativeHomePaths[:0]
 	for _, p := range relativeHomePaths {
 		if _, err := os.Stat(filepath.Join(dataDirPath, p)); err != nil {
-			log.Warnw("dropping non-existent keep-list entry from cleanup",
+			log.Infow("dropping non-existent keep-list entry from cleanup",
 				"path", p, "error.message", err.Error())
 			continue
 		}

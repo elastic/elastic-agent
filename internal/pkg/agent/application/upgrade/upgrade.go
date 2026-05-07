@@ -624,7 +624,7 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 func (u *Upgrader) abortUpgrade(ctx context.Context, newVersionedHome, currentVersionedHome string, det *details.Details, cause error) error {
 	rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
 	if markFailedErr := markUpgradeFailed(paths.Data(), det, cause); markFailedErr != nil {
-		u.log.Warnw("failed to mark upgrade marker as failed; reconcile deferred to next boot",
+		u.log.Infow("failed to mark upgrade marker as failed; reconcile deferred to next boot",
 			"error.message", markFailedErr.Error())
 	}
 	return rollbackErr

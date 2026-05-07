@@ -257,7 +257,7 @@ func TestCleanup_PreservesLiveVersionedHome(t *testing.T) {
 // TestCleanup_DropsPhantomKeepListEntry ensures cleanup() drops keep-list
 // entries that don't exist on disk so the "Keeping" log line truthfully
 // reflects what is being preserved. The dropped entry must be reported via
-// a Warn log so triage can see why a stale marker.VersionedHome is gone.
+// an Info log so triage can see why a stale marker.VersionedHome is gone.
 func TestCleanup_DropsPhantomKeepListEntry(t *testing.T) {
 	testLogger, obs := loggertest.New(t.Name())
 	topDir := t.TempDir()
@@ -275,8 +275,8 @@ func TestCleanup_DropsPhantomKeepListEntry(t *testing.T) {
 
 	// Phantom entry was reported as dropped.
 	dropLogs := obs.FilterMessageSnippet("dropping non-existent keep-list entry").All()
-	if assert.Len(t, dropLogs, 1, "expected exactly one drop warning") {
-		assert.Equal(t, zapcore.WarnLevel, dropLogs[0].Level)
+	if assert.Len(t, dropLogs, 1, "expected exactly one drop log entry") {
+		assert.Equal(t, zapcore.InfoLevel, dropLogs[0].Level)
 	}
 
 	// "Keeping" log line must NOT mention the phantom entry.
