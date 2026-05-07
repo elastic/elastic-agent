@@ -34,11 +34,9 @@ function ess_up {
         --template ess-ea-it `
         --cluster-name-prefix hosted `
         --parameters-file $paramsPath `
-<<<<<<< HEAD
-=======
-        --parameter "ExpireInHours=4" `
->>>>>>> 711f68efc (oblt-cli: tear-down deployments best effort, timeout earlier and shorter name (#14064))
         --output-file $clusterInfoPath `
+        --output-file $clusterInfoPath `
+        --parameter "ExpireInHours=4" `
         --output-file $clusterInfoPath `
         --parameter "ExpireInHours=4" `
         --output-file $clusterInfoPath `
