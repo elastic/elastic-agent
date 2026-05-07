@@ -20,9 +20,9 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 
-	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 

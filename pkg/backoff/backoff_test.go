@@ -138,4 +138,3 @@ func TestReset(t *testing.T) {
 		})
 	}
 }
-
