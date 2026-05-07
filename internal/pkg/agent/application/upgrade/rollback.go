@@ -206,7 +206,13 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	if liveHome, err := liveVersionedHome(topDirPath); err == nil {
 		candidates = append(candidates, liveHome)
 	} else {
-		log.Infow("could not derive live versioned home; cleanup proceeds without protection",
+		// The symlink is the only authoritative source for the live install,
+		// so when it can't be read the keep list falls back to whatever the
+		// caller passed. On a healthy install the symlink is always present;
+		// reaching this branch means the top-level layout is broken (missing
+		// or corrupt symlink) and the operator should investigate before the
+		// next upgrade — hence Warn, not Info.
+		log.Warnw("could not derive live versioned home; cleanup proceeds without symlink-based protection",
 			"error.message", err.Error())
 	}
 
