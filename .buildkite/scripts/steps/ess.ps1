@@ -35,9 +35,6 @@ function ess_up {
         --cluster-name-prefix hosted `
         --parameters-file $paramsPath `
         --output-file $clusterInfoPath `
-        --output-file $clusterInfoPath `
-        --parameter "ExpireInHours=4" `
-        --output-file $clusterInfoPath `
         --parameter "ExpireInHours=4" `
         --output-file $clusterInfoPath `
         --wait 20
