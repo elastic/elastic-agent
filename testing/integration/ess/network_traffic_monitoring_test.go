@@ -43,6 +43,10 @@ func TestNetworkTraffic(t *testing.T) {
 			{Type: define.Linux},
 			{Type: define.Windows},
 		},
+		// The network_traffic Fleet integration relies on packetbeat, which
+		// has no windows/arm64 build, so the agent component never reaches
+		// HEALTHY on this combination.
+		SkipOS: []define.OS{{Type: define.Windows, Arch: define.ARM64}},
 	})
 
 	suite.Run(t, &NetworkTrafficRunner{info: info})
