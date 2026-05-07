@@ -704,7 +704,7 @@ func TestToComponents(t *testing.T) {
 							Err:      fmt.Errorf("decoding error: %w", makeMapStructureErr(t)),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 			},
 		},
@@ -930,7 +930,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 			},
 		},
@@ -980,6 +980,15 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+						{
 							ID:       "filestream-default-filestream-2",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
@@ -1006,15 +1015,6 @@ func TestToComponents(t *testing.T) {
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-0",
 							}),
 						},
 						{
@@ -1552,7 +1552,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 			},
 		},
@@ -1665,7 +1665,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 			},
 		},
@@ -1836,7 +1836,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 				{
 					InputType:  "filestream",
@@ -1874,7 +1874,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 				{
 					InputType:  "log",
@@ -1911,7 +1911,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 				{
 					InputType:  "log",
@@ -1940,7 +1940,7 @@ func TestToComponents(t *testing.T) {
 							}, "log"),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 				{
 					InputType:  "log",
@@ -1969,7 +1969,7 @@ func TestToComponents(t *testing.T) {
 							}, "log"),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 				{
 					InputType:  "log",
@@ -1998,7 +1998,7 @@ func TestToComponents(t *testing.T) {
 							}, "log"),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 				{
 					InputType:  "apm",
@@ -2457,7 +2457,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 			},
 		},
@@ -2510,7 +2510,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
@@ -2628,7 +2628,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
@@ -2745,7 +2745,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
@@ -2851,7 +2851,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					RuntimeManager: DefaultRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
@@ -2930,7 +2930,7 @@ func TestToComponents(t *testing.T) {
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {
 				require.NoError(t, err)
-				require.Len(t, result, len(scenario.Result))
+				require.Lenf(t, result, len(scenario.Result), "actual: %v\nexpected %v\n", result, scenario.Result)
 				sortComponents(scenario.Result)
 				sortComponents(result)
 				for i, expected := range scenario.Result {
@@ -3962,7 +3962,7 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	require.NotNil(t, config)
 	assert.Equal(t, string(DefaultRuntimeManager), config.Default)
 	assert.Equal(t, string(ProcessRuntimeManager), config.DynamicInputs)
-	assert.Equal(t, "", config.Filebeat.Default)
+	assert.Equal(t, "otel", config.Filebeat.Default)
 	assert.Empty(t, config.Filebeat.InputType)
 	assert.Equal(t, string(OtelRuntimeManager), config.Metricbeat.Default)
 	assert.Equal(t, map[string]string{}, config.Metricbeat.InputType)
