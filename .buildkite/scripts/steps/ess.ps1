@@ -19,7 +19,6 @@ function ess_up {
   $clusterInfoPath = Join-Path $PWD "cluster-info.json"
   $params = @{
       StackVersion  = $StackVersion
-      ExpireInHours = "6"
   }
 
   if ($Env:INTEGRATION_SERVER_DOCKER_IMAGE) {
@@ -40,6 +39,8 @@ function ess_up {
         --parameter "ExpireInHours=4" `
 >>>>>>> 711f68efc (oblt-cli: tear-down deployments best effort, timeout earlier and shorter name (#14064))
         --output-file $clusterInfoPath `
+        --output-file $clusterInfoPath `
+        --parameter "ExpireInHours=4" `
         --output-file $clusterInfoPath `
         --wait 20
   } finally {
