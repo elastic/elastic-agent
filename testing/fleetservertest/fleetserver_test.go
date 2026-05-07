@@ -81,7 +81,7 @@ func TestRunFleetServer(t *testing.T) {
 
 		switch actionsIdx {
 		case 0:
-			return CheckinAction{
+			return CheckinAction{ //nolint:gosec // test fixture, not a real token
 					AckToken: "tmpl.AckToken", Actions: []string{action.data}},
 				nil
 		}
@@ -819,7 +819,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 type agentInfo string
 
-func (a agentInfo) AgentID() string {
+func (a agentInfo) GetAgentID() string {
 	return string(a)
 }
 

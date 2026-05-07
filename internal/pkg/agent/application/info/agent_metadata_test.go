@@ -22,8 +22,8 @@ import (
 
 func TestECSMetadata(t *testing.T) {
 	agentInfo := new(AgentInfo)
-	agentInfo.agentID = "fake-agent-id"
-	agentInfo.logLevel = "trace"
+	agentInfo.AgentID = "fake-agent-id"
+	agentInfo.LogLevelPolicy = "trace"
 	agentInfo.unprivileged = true
 
 	l := testutils.NewErrorLogger(t)
@@ -40,13 +40,13 @@ func TestECSMetadata(t *testing.T) {
 	info := sysInfo.Info()
 	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
 
-	assert.Equal(t, agentInfo.agentID, metadata.Elastic.Agent.ID)
+	assert.Equal(t, agentInfo.AgentID, metadata.Elastic.Agent.ID)
 	assert.Equal(t, release.Version(), metadata.Elastic.Agent.Version)
 	assert.Equal(t, release.Snapshot(), metadata.Elastic.Agent.Snapshot)
 	assert.Equal(t, release.Complete(), metadata.Elastic.Agent.Complete)
 	assert.Equal(t, release.Info().String(), metadata.Elastic.Agent.BuildOriginal)
 	assert.Equal(t, release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()), metadata.Elastic.Agent.Upgradeable)
-	assert.Equal(t, agentInfo.logLevel, metadata.Elastic.Agent.LogLevel)
+	assert.Equal(t, agentInfo.LogLevelPolicy, metadata.Elastic.Agent.LogLevel)
 	assert.Equal(t, agentInfo.unprivileged, metadata.Elastic.Agent.Unprivileged)
 	assert.Equal(t, release.FIPSDistribution(), metadata.Elastic.Agent.FIPS)
 

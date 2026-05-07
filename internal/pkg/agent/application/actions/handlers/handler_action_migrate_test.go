@@ -66,7 +66,7 @@ func TestActionMigratelHandler(t *testing.T) {
 			t.Run("tamper protected agent - "+tc.name, func(t *testing.T) {
 				mockAgentInfo := info.NewMockAgent(t)
 				if tc.expectedRun {
-					mockAgentInfo.On("AgentID").Return("agent-id")
+					mockAgentInfo.On("GetAgentID").Return("agent-id")
 				}
 
 				action := &fleetapi.ActionMigrate{
@@ -108,7 +108,7 @@ func TestActionMigratelHandler(t *testing.T) {
 
 	t.Run("action propagated to coordinator", func(t *testing.T) {
 		mockAgentInfo := info.NewMockAgent(t)
-		mockAgentInfo.On("AgentID").Return("agent-id")
+		mockAgentInfo.On("GetAgentID").Return("agent-id")
 		action := &fleetapi.ActionMigrate{}
 
 		ack := &fakeAcker{}
@@ -135,7 +135,7 @@ func TestActionMigratelHandler(t *testing.T) {
 
 	t.Run("signature present", func(t *testing.T) {
 		mockAgentInfo := info.NewMockAgent(t)
-		mockAgentInfo.On("AgentID").Return("agent-id")
+		mockAgentInfo.On("GetAgentID").Return("agent-id")
 
 		private, signatureValidationKey, err := genKeys()
 		require.NoError(t, err)
@@ -185,7 +185,7 @@ func TestActionMigratelHandler(t *testing.T) {
 
 	t.Run("signature present, action not signed", func(t *testing.T) {
 		mockAgentInfo := info.NewMockAgent(t)
-		mockAgentInfo.On("AgentID").Return("agent-id")
+		mockAgentInfo.On("GetAgentID").Return("agent-id")
 
 		_, signatureValidationKey, err := genKeys()
 		require.NoError(t, err)
@@ -221,7 +221,7 @@ func TestActionMigratelHandler(t *testing.T) {
 
 	t.Run("signature not present", func(t *testing.T) {
 		mockAgentInfo := info.NewMockAgent(t)
-		mockAgentInfo.On("AgentID").Return("agent-id")
+		mockAgentInfo.On("GetAgentID").Return("agent-id")
 
 		private, _, err := genKeys()
 		require.NoError(t, err)
@@ -271,7 +271,7 @@ func TestActionMigratelHandler(t *testing.T) {
 
 	t.Run("malformed signature", func(t *testing.T) {
 		mockAgentInfo := info.NewMockAgent(t)
-		mockAgentInfo.On("AgentID").Return("agent-id")
+		mockAgentInfo.On("GetAgentID").Return("agent-id")
 
 		_, signatureValidationKey, err := genKeys()
 		require.NoError(t, err)
@@ -319,7 +319,7 @@ func TestActionMigratelHandler(t *testing.T) {
 
 	t.Run("fleet server", func(t *testing.T) {
 		mockAgentInfo := info.NewMockAgent(t)
-		mockAgentInfo.On("AgentID").Return("agent-id")
+		mockAgentInfo.On("GetAgentID").Return("agent-id")
 		action := &fleetapi.ActionMigrate{}
 
 		ack := &fakeAcker{}

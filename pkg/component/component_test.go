@@ -3169,7 +3169,7 @@ type testHeadersProvider struct {
 	headers map[string]string
 }
 
-func (h *testHeadersProvider) Headers() map[string]string {
+func (h *testHeadersProvider) GetHeaders() map[string]string {
 	return h.headers
 }
 

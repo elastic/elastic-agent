@@ -65,6 +65,7 @@ func New(
 	baseLogger *logger.Logger,
 	logLevel logp.Level,
 	agentInfo info.Agent,
+	agentInfoStore info.AgentInfoStore,
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
 	testingMode bool,
@@ -269,7 +270,7 @@ func New(
 			}
 
 			// TODO: stop using global state
-			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, availableRollbacksSource, upgrader)
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, agentInfoStore, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, availableRollbacksSource, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}

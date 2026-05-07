@@ -49,7 +49,7 @@ var (
 // agentInfo is a custom type that implements the fleetapi.AgentInfo interface
 type agentInfo string
 
-func (a *agentInfo) AgentID() string {
+func (a *agentInfo) GetAgentID() string {
 	return string(*a)
 }
 

@@ -159,7 +159,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 	return &ECSMeta{
 		Elastic: &ElasticECSMeta{
 			Agent: &AgentECSMeta{
-				ID:            i.agentID,
+				ID:            i.AgentID,
 				Version:       release.Version(),
 				Snapshot:      release.Snapshot(),
 				Complete:      release.Complete(),
@@ -167,7 +167,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 				// only upgradeable if running from Agent installer and running under the
 				// control of the system supervisor (or built specifically with upgrading enabled)
 				Upgradeable:  release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
-				LogLevel:     i.LogLevel(),
+				LogLevel:     i.GetLogLevelRuntime(),
 				Unprivileged: i.unprivileged,
 				FIPS:         release.FIPSDistribution(),
 			},
@@ -207,7 +207,7 @@ func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}
 	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
 
 	// Agent
-	meta[agentIDKey] = i.agentID
+	meta[agentIDKey] = i.AgentID
 	meta[agentVersionKey] = release.Version()
 
 	// Host

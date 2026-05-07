@@ -43,6 +43,7 @@ type managedConfigManager struct {
 	cfg                      *configuration.Configuration
 	client                   *remote.Client
 	store                    storage.Store
+	agentInfoStore           info.AgentInfoStore
 	stateStore               *store.StateStore
 	actionQueue              *queue.ActionQueue
 	dispatcher               *dispatcher.ActionDispatcher
@@ -59,7 +60,7 @@ type managedConfigManager struct {
 	errCh chan error
 }
 
-func newManagedConfigManager(ctx context.Context, log *logger.Logger, agentInfo info.Agent, cfg *configuration.Configuration, storeSaver storage.Store, runtime *runtime.Manager, fleetInitTimeout time.Duration, topPath string, client *remote.Client, fleetAcker *fleet.Acker, actionAcker acker.Acker, retrier *retrier.Retrier, stateStore *store.StateStore, actionQueue *queue.ActionQueue, source rollbacksSource, clientSetters ...actions.ClientSetter) (*managedConfigManager, error) {
+func newManagedConfigManager(ctx context.Context, log *logger.Logger, agentInfo info.Agent, agentInfoStore info.AgentInfoStore, cfg *configuration.Configuration, storeSaver storage.Store, runtime *runtime.Manager, fleetInitTimeout time.Duration, topPath string, client *remote.Client, fleetAcker *fleet.Acker, actionAcker acker.Acker, retrier *retrier.Retrier, stateStore *store.StateStore, actionQueue *queue.ActionQueue, source rollbacksSource, clientSetters ...actions.ClientSetter) (*managedConfigManager, error) {
 	actionDispatcher, err := dispatcher.New(log, topPath, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)
@@ -68,6 +69,7 @@ func newManagedConfigManager(ctx context.Context, log *logger.Logger, agentInfo 
 	return &managedConfigManager{
 		log:                      log,
 		agentInfo:                agentInfo,
+		agentInfoStore:           agentInfoStore,
 		cfg:                      cfg,
 		client:                   client,
 		store:                    storeSaver,
@@ -313,19 +315,19 @@ func fleetServerRunning(state runtime.ComponentState) bool {
 }
 
 func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *handlers.PolicyChangeHandler {
-	settingsHandler := handlers.NewSettings(
+	settingsHandler := handlers.NewSettingsHandler(
 		m.log,
 		m.agentInfo,
+		m.agentInfoStore,
 		m.coord,
 	)
 
 	policyChanger := handlers.NewPolicyChangeHandler(
 		m.log,
 		m.agentInfo,
+		m.agentInfoStore,
 		m.cfg,
-		m.store,
 		m.ch,
-		settingsHandler,
 		m.coord,
 	)
 
@@ -375,13 +377,13 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 			paths.Top(), // TODO: stop using global state
 			m.coord,
 			m.cfg.Settings.MonitoringConfig.Diagnostics.Limit,
-			uploader.New(m.agentInfo.AgentID(), m.client, m.cfg.Settings.MonitoringConfig.Diagnostics.Uploader),
+			uploader.New(m.agentInfo.GetAgentID(), m.client, m.cfg.Settings.MonitoringConfig.Diagnostics.Uploader),
 		),
 	)
 
 	m.dispatcher.MustRegister(
 		&fleetapi.ActionApp{},
-		handlers.NewAppAction(m.log, m.coord, m.agentInfo.AgentID()),
+		handlers.NewAppAction(m.log, m.coord, m.agentInfo.GetAgentID()),
 	)
 
 	m.dispatcher.MustRegister(

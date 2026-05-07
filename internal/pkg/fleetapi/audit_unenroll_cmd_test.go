@@ -24,7 +24,7 @@ func Test_AuditUnenrollCmd_Execute(t *testing.T) {
 	t.Run("test audit/unenroll roundtrip", withServerWithAuthClient(
 		func(t *testing.T) *http.ServeMux {
 			mux := http.NewServeMux()
-			path := fmt.Sprintf(auditUnenrollPath, agentInfo.AgentID())
+			path := fmt.Sprintf(auditUnenrollPath, agentInfo.GetAgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				decoder := json.NewDecoder(r.Body)
 				defer r.Body.Close()

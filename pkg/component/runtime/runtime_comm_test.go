@@ -26,15 +26,15 @@ import (
 )
 
 type agentInfoMock struct {
-	agentID      string
+	AgentID      string
 	snapshot     bool
 	version      string
 	unprivileged bool
 	isStandalone bool
 }
 
-func (a agentInfoMock) AgentID() string {
-	return a.agentID
+func (a agentInfoMock) GetAgentID() string {
+	return a.AgentID
 }
 func (a agentInfoMock) Snapshot() bool {
 	return a.snapshot
@@ -52,11 +52,15 @@ func (a agentInfoMock) IsStandalone() bool {
 	return a.isStandalone
 }
 
-func (a agentInfoMock) Headers() map[string]string                          { panic("implement me") }
-func (a agentInfoMock) LogLevel() string                                    { panic("implement me") }
-func (a agentInfoMock) RawLogLevel() string                                 { panic("implement me") }
-func (a agentInfoMock) ReloadID(ctx context.Context) error                  { panic("implement me") }
-func (a agentInfoMock) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }
+func (a agentInfoMock) GetHeaders() map[string]string      { panic("implement me") }
+func (a agentInfoMock) GetLogLevelRuntime() string         { panic("implement me") }
+func (a agentInfoMock) GetLogLevelPolicy() string          { panic("implement me") }
+func (a agentInfoMock) GetLogLevelOverride() string        { panic("implement me") }
+func (a agentInfoMock) ReloadID(ctx context.Context) error { panic("implement me") }
+func (a agentInfoMock) SetLogLevelPolicy(level string)     { panic("implement me") }
+func (a agentInfoMock) SetLogLevelOverride(level string) {
+	panic("implement me")
+}
 func (a agentInfoMock) ECSMetadata(l *logger.Logger) (*info.ECSMeta, error) { panic("implement me") }
 
 func TestCheckinExpected(t *testing.T) {
@@ -71,7 +75,7 @@ func TestCheckinExpected(t *testing.T) {
 		token:      "a_token",
 		cert:       pair,
 		agentInfo: agentInfoMock{
-			agentID:      "testagent",
+			AgentID:      "testagent",
 			snapshot:     true,
 			version:      "8.13.0+build1966-09-6",
 			unprivileged: true,
@@ -93,14 +97,14 @@ func TestCheckinExpected(t *testing.T) {
 
 func TestRuntimeComm_WriteStartUpInfo_packageVersion(t *testing.T) {
 	agentInfo := agentInfoMock{
-		agentID:      "NCC-1701",
+		AgentID:      "NCC-1701",
 		snapshot:     true,
 		version:      "8.13.0+build1966-09-6",
 		unprivileged: true,
 	}
 
 	want := client.AgentInfo{
-		ID:           agentInfo.AgentID(),
+		ID:           agentInfo.GetAgentID(),
 		Version:      agentInfo.Version(),
 		Snapshot:     agentInfo.Snapshot(),
 		Unprivileged: agentInfo.Unprivileged(),

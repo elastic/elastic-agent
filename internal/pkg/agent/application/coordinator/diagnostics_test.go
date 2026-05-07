@@ -153,7 +153,8 @@ func TestDiagnosticAgentInfo(t *testing.T) {
 			"header1": "value1",
 			"header2": "value2",
 		},
-		logLevel: "trace",
+		LogLevelPolicy:   "info",
+		LogLevelOverride: "trace",
 		meta: &info.ECSMeta{
 			Elastic: &info.ElasticECSMeta{
 				Agent: &info.AgentECSMeta{
@@ -182,7 +183,8 @@ headers:
   header1: value1
   header2: value2
 log_level: trace
-log_level_raw: trace
+log_level_policy: info
+log_level_override: trace
 metadata:
   elastic:
     agent:
@@ -744,30 +746,38 @@ func mapFromRawYAML(t *testing.T, str string) map[string]interface{} {
 }
 
 type fakeAgentInfo struct {
-	agentID      string
-	headers      map[string]string
-	logLevel     string
-	snapshot     bool
-	version      string
-	unprivileged bool
-	isStandalone bool
-	meta         *info.ECSMeta
+	agentID          string
+	headers          map[string]string
+	LogLevelPolicy   string
+	LogLevelOverride string
+	snapshot         bool
+	version          string
+	unprivileged     bool
+	isStandalone     bool
+	meta             *info.ECSMeta
 }
 
-func (a fakeAgentInfo) AgentID() string {
+func (a fakeAgentInfo) GetAgentID() string {
 	return a.agentID
 }
 
-func (a fakeAgentInfo) Headers() map[string]string {
+func (a fakeAgentInfo) GetHeaders() map[string]string {
 	return a.headers
 }
 
-func (a fakeAgentInfo) LogLevel() string {
-	return a.logLevel
+func (a fakeAgentInfo) GetLogLevelRuntime() string {
+	if a.LogLevelOverride != "" {
+		return a.LogLevelOverride
+	}
+	return a.LogLevelPolicy
 }
 
-func (a fakeAgentInfo) RawLogLevel() string {
-	return a.logLevel
+func (a fakeAgentInfo) GetLogLevelPolicy() string {
+	return a.LogLevelPolicy
+}
+
+func (a fakeAgentInfo) GetLogLevelOverride() string {
+	return a.LogLevelOverride
 }
 
 func (a fakeAgentInfo) Snapshot() bool {
@@ -790,8 +800,11 @@ func (a fakeAgentInfo) ECSMetadata(l *logger.Logger) (*info.ECSMeta, error) {
 	return a.meta, nil
 }
 
-func (a fakeAgentInfo) ReloadID(ctx context.Context) error                  { panic("implement me") }
-func (a fakeAgentInfo) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }
+func (a fakeAgentInfo) ReloadID(ctx context.Context) error { panic("implement me") }
+func (a fakeAgentInfo) SetLogLevelOverride(level string) {
+	panic("implement me")
+}
+func (a fakeAgentInfo) SetLogLevelPolicy(level string) { panic("implement me") }
 
 func TestCoordinatorPerformDiagnostics(t *testing.T) {
 	tests := []struct {

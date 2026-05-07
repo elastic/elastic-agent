@@ -21,7 +21,7 @@ import (
 const fleetTimeFormat = "2006-01-02T15:04:05.99999-07:00"
 
 type agentInfo interface {
-	AgentID() string
+	GetAgentID() string
 }
 
 // Acker is acker capable of acking action in fleet.
@@ -57,7 +57,7 @@ func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
 		span.End()
 	}()
 	// checkin
-	agentID := f.agentInfo.AgentID()
+	agentID := f.agentInfo.GetAgentID()
 	cmd := fleetapi.NewAckCmd(f.agentInfo, f.client)
 	event := action.AckEvent()
 	event.AgentID = agentID
@@ -85,7 +85,7 @@ func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *f
 		span.End()
 	}()
 	// checkin
-	agentID := f.agentInfo.AgentID()
+	agentID := f.agentInfo.GetAgentID()
 	events := make([]fleetapi.AckEvent, 0, len(actions))
 	ids := make([]string, 0, len(actions))
 	for _, action := range actions {

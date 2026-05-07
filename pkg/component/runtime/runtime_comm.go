@@ -132,7 +132,7 @@ func (c *runtimeComm) WriteStartUpInfo(w io.Writer, services ...client.Service) 
 		Supports:       []proto.ConnectionSupports{proto.ConnectionSupports_CheckinChunking},
 		MaxMessageSize: uint32(c.maxMessageSize), //nolint:gosec // guaranteed to be valid
 		AgentInfo: &proto.AgentInfo{
-			Id:           c.agentInfo.AgentID(),
+			Id:           c.agentInfo.GetAgentID(),
 			Version:      c.agentInfo.Version(),
 			Snapshot:     c.agentInfo.Snapshot(),
 			Mode:         ProtoAgentMode(c.agentInfo),
@@ -154,9 +154,9 @@ func (c *runtimeComm) CheckinExpected(
 	expected *proto.CheckinExpected,
 	observed *proto.CheckinObserved,
 ) {
-	if c.agentInfo != nil && c.agentInfo.AgentID() != "" {
+	if c.agentInfo != nil && c.agentInfo.GetAgentID() != "" {
 		expected.AgentInfo = &proto.AgentInfo{
-			Id:           c.agentInfo.AgentID(),
+			Id:           c.agentInfo.GetAgentID(),
 			Version:      c.agentInfo.Version(),
 			Snapshot:     c.agentInfo.Snapshot(),
 			Mode:         ProtoAgentMode(c.agentInfo),

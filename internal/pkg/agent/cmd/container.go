@@ -1137,7 +1137,7 @@ type agentInfo struct {
 	id string
 }
 
-func (a *agentInfo) AgentID() string {
+func (a *agentInfo) GetAgentID() string {
 	return a.id
 }
 

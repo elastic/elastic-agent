@@ -72,6 +72,7 @@ func TestLimitsLog(t *testing.T) {
 		log,
 		logp.DebugLevel,
 		&info.AgentInfo{}, // info.AgentInfo
+		nil,               // info.AgentInfoStore
 		nil,               // coordinator.ReExecManager
 		nil,               // apm.Tracer
 		true,              // testingMode
@@ -518,6 +519,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		log,
 		logp.DebugLevel,
 		&info.AgentInfo{},
+		nil, // info.AgentInfoStore
 		nil,
 		nil,
 		false, // not in testing mode - we are testing fs interactions
@@ -543,6 +545,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		log,
 		logp.DebugLevel,
 		&info.AgentInfo{},
+		nil, // info.AgentInfoStore
 		nil,
 		nil,
 		false, // not in testing mode - we are testing fs interactions
@@ -574,6 +577,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		log,
 		logp.DebugLevel,
 		&info.AgentInfo{},
+		nil, // info.AgentInfoStore
 		nil,
 		nil,
 		false, // not in testing mode - we are testing fs interactions
@@ -607,6 +611,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		log,
 		logp.DebugLevel,
 		&info.AgentInfo{},
+		nil, // info.AgentInfoStore
 		nil,
 		nil,
 		false, // not in testing mode - we are testing fs interactions
@@ -665,7 +670,7 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 
 	p, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "_meta", "elastic-agent.fleet.yml"))
 	require.NoError(t, err)
-	err = os.WriteFile(paths.ConfigFile(), p, 0640)
+	err = os.WriteFile(paths.ConfigFile(), p, 0640) //nolint:gosec // test fixture writing to controlled temp path
 	require.NoError(t, err)
 
 	isRoot, err := utils.HasRoot()
@@ -686,6 +691,7 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 		log,
 		logp.DebugLevel,
 		&info.AgentInfo{},
+		nil, // info.AgentInfoStore
 		nil,
 		nil,
 		false, // not in testing mode - we are testing fs interactions

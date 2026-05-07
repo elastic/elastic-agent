@@ -452,7 +452,7 @@ func stateToProto(state *coordinator.State, agentInfo info.Agent) (*cproto.State
 
 	return &cproto.StateResponse{
 		Info: &cproto.StateAgentInfo{
-			Id:           agentInfo.AgentID(),
+			Id:           agentInfo.GetAgentID(),
 			Version:      release.Version(),
 			Commit:       release.Commit(),
 			BuildTime:    release.BuildTime().Format(control.TimeFormat()),

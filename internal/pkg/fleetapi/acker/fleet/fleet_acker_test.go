@@ -28,7 +28,7 @@ type ackRequest struct {
 
 type testAgentInfo struct{}
 
-func (testAgentInfo) AgentID() string { return "agent-secret" }
+func (testAgentInfo) GetAgentID() string { return "agent-secret" }
 
 type testSender struct {
 	req *ackRequest
@@ -155,7 +155,7 @@ func TestAcker_Ack(t *testing.T) {
 			assert.EqualValues(t, "ACTION_RESULT", req.Events[i].EventType)
 			assert.EqualValues(t, "ACKNOWLEDGED", req.Events[i].SubType)
 			assert.EqualValues(t, ac.ID(), req.Events[i].ActionID)
-			assert.EqualValues(t, agentInfo.AgentID(), req.Events[i].AgentID)
+			assert.EqualValues(t, agentInfo.GetAgentID(), req.Events[i].AgentID)
 			assert.EqualValues(t, fmt.Sprintf("Action %q of type %q acknowledged.", ac.ID(), ac.Type()), req.Events[i].Message)
 			// Check if the fleet acker handles RetryableActions correctly using the UpgradeAction
 			if a, ok := ac.(*fleetapi.ActionUpgrade); ok {

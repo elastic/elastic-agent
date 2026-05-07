@@ -330,7 +330,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"type":      namespace,
 					},
 					"elastic_agent": mapstr.M{
-						"id":       agentInfo.AgentID(),
+						"id":       agentInfo.GetAgentID(),
 						"snapshot": agentInfo.Snapshot(),
 						"version":  agentInfo.Version(),
 					},

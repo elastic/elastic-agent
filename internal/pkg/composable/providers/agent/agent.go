@@ -29,7 +29,7 @@ func (*contextProvider) Run(ctx context.Context, comm corecomp.ContextProviderCo
 		return err
 	}
 	err = comm.Set(map[string]interface{}{
-		"id": a.AgentID(),
+		"id": a.GetAgentID(),
 		"version": map[string]interface{}{
 			"version":    release.Version(),
 			"commit":     release.Commit(),

@@ -113,7 +113,7 @@ func (e *AckCmd) Execute(ctx context.Context, r *AckRequest) (_ *AckResponse, er
 			errors.TypeUnexpected)
 	}
 
-	ap := fmt.Sprintf(ackPath, e.info.AgentID())
+	ap := fmt.Sprintf(ackPath, e.info.GetAgentID())
 	resp, err := e.client.Send(ctx, "POST", ap, nil, nil, bytes.NewBuffer(b))
 	if err != nil {
 		return nil, errors.New(err,

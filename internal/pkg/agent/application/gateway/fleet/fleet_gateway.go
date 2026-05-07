@@ -70,7 +70,7 @@ type backoffSettings struct {
 }
 
 type agentInfo interface {
-	AgentID() string
+	GetAgentID() string
 }
 
 type stateStore interface {

@@ -26,7 +26,7 @@ type LivenessResponse struct {
 func (c *Coordinator) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	s := c.State()
 	lr := LivenessResponse{
-		ID:      c.agentInfo.AgentID(),
+		ID:      c.agentInfo.GetAgentID(),
 		Status:  s.State.String(),
 		Message: s.Message,
 

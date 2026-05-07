@@ -360,13 +360,14 @@ func runElasticAgent(
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, paths.AgentConfigFile()))
 	}
+	agentInfoStore := info.NewEncryptedAgentInfoStore()
 
 	// Set the initial log level (either default or from config file)
 	logger.SetLevel(logLvl)
 
 	// Ensure that the log level now matches what is configured in the agentInfo.
 	var lvl logp.Level
-	err = lvl.Unpack(agentInfo.LogLevel())
+	err = lvl.Unpack(agentInfo.GetLogLevelRuntime())
 	if err != nil {
 		l.Error(errors.New(err, "failed to parse agent information log level"))
 	} else {
@@ -406,7 +407,7 @@ func runElasticAgent(
 	// create an availableRollbackSource
 	availableRollbacksSource := ttl.NewTTLMarkerRegistry(l, paths.Top())
 
-	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode,
+	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, agentInfoStore, rex, tracer, testingMode,
 		fleetInitTimeout, isBootstrap, override, initialUpgradeMarker, availableRollbacksSource, modifiers...)
 	if err != nil {
 		return err

@@ -72,7 +72,7 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 	}
 
 	signatureValidationKey := h.coord.Protection().SignatureValidationKey
-	signedData, err := protection.ValidateAction(action, signatureValidationKey, h.agentInfo.AgentID())
+	signedData, err := protection.ValidateAction(action, signatureValidationKey, h.agentInfo.GetAgentID())
 	if len(signatureValidationKey) != 0 && errors.Is(err, protection.ErrNotSigned) {
 		return err
 	} else if err != nil && !errors.Is(err, protection.ErrNotSigned) {

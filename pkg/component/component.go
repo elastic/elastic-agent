@@ -32,7 +32,7 @@ import (
 type GenerateMonitoringCfgFn func(map[string]interface{}, []Component, map[string]uint64) (map[string]interface{}, error)
 
 type HeadersProvider interface {
-	Headers() map[string]string
+	GetHeaders() map[string]string
 }
 
 type RuntimeManager string
@@ -987,7 +987,7 @@ func ParseOutput(outputName string, outputConfig map[string]any, ll logp.Level, 
 	// inject headers configured during enroll
 	if t == elasticsearchType && headers != nil {
 		// can be nil when called from install/uninstall
-		if agentHeaders := headers.Headers(); len(agentHeaders) > 0 {
+		if agentHeaders := headers.GetHeaders(); len(agentHeaders) > 0 {
 			headers := make(map[string]interface{})
 			if existingHeadersRaw, found := outputConfig[headersKey]; found {
 				existingHeaders, ok := existingHeadersRaw.(map[string]interface{})

@@ -27,7 +27,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
@@ -56,7 +55,7 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 	agentChildDERKey, _ := pem.Decode(agentChildPair.Key)
 	require.NoError(t, err, "could not create tls.Certificates from child certificate")
 
-	encPem, err := x509.EncryptPEMBlock( //nolint:staticcheck // we need to drop support for this, but while we don't, it needs to be tested.
+	encPem, err := x509.EncryptPEMBlock( //nolint:staticcheck // SA1019: legacy PEM encryption — kept while we still support it
 		rand.Reader,
 		"EC PRIVATE KEY",
 		agentChildDERKey.Bytes,
@@ -91,14 +90,14 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 	agentRootCertPool := x509.NewCertPool()
 	agentRootCertPool.AppendCertsFromPEM(agentRootPair.Cert)
 
-	fleetmTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+	fleetmTLSServer.TLS = &tls.Config{
 		RootCAs:      fleetRootCertPool,
 		Certificates: []tls.Certificate{cert},
 		ClientCAs:    agentRootCertPool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 	}
 
-	fleetNomTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+	fleetNomTLSServer.TLS = &tls.Config{
 		RootCAs:      fleetRootCertPool,
 		Certificates: []tls.Certificate{cert},
 	}
@@ -117,6 +116,7 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 		wantCertificateConfig    tlscommon.CertificateConfig
 		assertErr                func(t *testing.T, err error)
 		customLogLevelSetterMock func(t *testing.T) *mockLogLevelSetter
+		customAgentInfoStoreMock func(t *testing.T) *info.MockAgentInfoStore
 	}{{
 		name: "certificate and key with passphrase is applied when present",
 		originalCfg: &configuration.Configuration{
@@ -206,15 +206,24 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 			if tc.customLogLevelSetterMock != nil {
 				logLevelSetterMock = tc.customLogLevelSetterMock(t)
 			} else {
-				logLevelSetterMock = nilLogLevelSet(t)
+				logLevelSetterMock = assertDefaultLogLevelSet(t)
 			}
+
+			var agentInfoStoreMock *info.MockAgentInfoStore
+			if tc.customAgentInfoStoreMock != nil {
+				agentInfoStoreMock = tc.customAgentInfoStoreMock(t)
+			} else {
+				agentInfoStoreMock = info.NewMockAgentInfoStore(t)
+				assertSavesFleetTLSClient(t, agentInfoStoreMock, tc.wantCAs, tc.wantCertificateConfig).Return(nil)
+			}
+
 			h := PolicyChangeHandler{
-				agentInfo:            &info.AgentInfo{},
-				config:               tc.originalCfg,
-				store:                &storage.NullStore{},
-				setters:              []actions.ClientSetter{&setter},
-				log:                  log,
-				policyLogLevelSetter: logLevelSetterMock,
+				agentInfoCache:        &info.AgentInfo{},
+				agentInfoStore:        agentInfoStoreMock,
+				config:                tc.originalCfg,
+				setters:               []actions.ClientSetter{&setter},
+				log:                   log,
+				runtimeLogLevelSetter: logLevelSetterMock,
 			}
 
 			cfg := config.MustNewConfigFrom(tc.newCfg)
