@@ -66,7 +66,7 @@ function ess_up {
   # be cleaned up by a dedicated cleanup step if the finally block fails (e.g., timeout)
   if ($Env:BUILDKITE_RETRY_COUNT -and $Env:BUILDKITE_RETRY_COUNT -gt 0) {
       $MetadataPrefix = if ($Env:FIPS -eq "true") { "fips." } else { "" }
-      $retryKey = "${MetadataPrefix}retry-cluster-$($Env:BUILDKITE_STEP_KEY)-$($Env:BUILDKITE_RETRY_COUNT)"
+      $retryKey = "${MetadataPrefix}retry-cluster-$($Env:BUILDKITE_STEP_ID)-$($Env:BUILDKITE_RETRY_COUNT)"
       Write-Output "Storing retry cluster name in metadata: $retryKey = $ClusterName"
       & buildkite-agent meta-data set $retryKey $ClusterName
   }

@@ -45,7 +45,7 @@ function ess_up() {
   # be cleaned up by a dedicated cleanup step if the EXIT trap fails (e.g., timeout)
   if [ "${BUILDKITE_RETRY_COUNT:-0}" -gt 0 ]; then
     METADATA_PREFIX="${METADATA_PREFIX:-""}"
-    local retry_key="${METADATA_PREFIX}retry-cluster-${BUILDKITE_STEP_KEY}-${BUILDKITE_RETRY_COUNT}"
+    local retry_key="${METADATA_PREFIX}retry-cluster-${BUILDKITE_STEP_ID}-${BUILDKITE_RETRY_COUNT}"
     echo "Storing retry cluster name in metadata: $retry_key = $CLUSTER_NAME"
     buildkite-agent meta-data set "$retry_key" "$CLUSTER_NAME" || true
   fi
