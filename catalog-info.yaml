@@ -321,9 +321,7 @@ spec:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
         everyone:
-<<<<<<< HEAD
           access_level: BUILD_AND_READ
-=======
           access_level: READ_ONLY
 
 # **************************************************************
@@ -382,4 +380,3 @@ spec:
 # *******************************
 # SECTION END: Scheduler pipeline
 # *******************************
->>>>>>> 0fe58539a (bk: run extended ITs on scheduling for the active branches (#14026))
