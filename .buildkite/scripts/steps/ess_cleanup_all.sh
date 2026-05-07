@@ -52,7 +52,7 @@ while IFS= read -r metadata_key; do
     echo "✗ Failed to destroy cluster: $cluster_name (will auto-expire)"
     ((failed_count++))
   fi
-done <<< "$retry_clusters"
+done <<< "$retry_clusters" || true
 
 echo ""
 echo "~~~ Cleanup summary"
