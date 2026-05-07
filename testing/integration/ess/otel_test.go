@@ -2567,6 +2567,7 @@ func TestOtelElasticsearchStateStore_Agentless(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 	})
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/13822")
 
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
