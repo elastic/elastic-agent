@@ -1,0 +1,49 @@
+// begin 8.19.15 relnotes
+
+[[release-notes-8.19.15]]
+==  8.19.15
+
+Review important information about the  8.19.15 release.
+
+[discrete]
+[[security-updates-8.19.15]]
+=== Security updates
+
+
+
+
+* Strip `Unit.Config` from components diagnostic files to prevent secret leakage. https://github.com/elastic/elastic-agent/pull/13338[#13338]
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.19.15]]
+=== Enhancements
+
+
+
+
+* Update OTel components to v0.149.0. https://github.com/elastic/elastic-agent/pull/13601[#13601]
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.15]]
+=== Bug fixes
+
+
+
+
+* Persist logging level across agent restarts after policy changes. https://github.com/elastic/elastic-agent/pull/13289[#13289] 
+* Fix graceful shutdown of Beats processes on Windows when Elastic Agent runs as a service. https://github.com/elastic/elastic-agent/pull/13581[#13581]
+* Fix OpenTelemetry collector configuration to correctly merge user-defined extensions with automatically generated ones. https://github.com/elastic/elastic-agent/pull/13639[#13639]
+
+// end 8.19.15 relnotes
