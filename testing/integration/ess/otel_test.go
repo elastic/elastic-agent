@@ -108,10 +108,6 @@ func TestOtelStartShutdown(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,
 		Local: true,
-		OS: []define.OS{
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		},
 	})
 
 	otelConfig := `receivers:
@@ -129,10 +125,11 @@ service:
       exporters:
         - nop
 `
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	output := &bytes.Buffer{}
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithCmdOutput(output))
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -140,29 +137,35 @@ service:
 	err = fixture.ConfigureOtel(t.Context(), []byte(otelConfig))
 	require.NoError(t, err)
 
-	cmd, err := fixture.PrepareAgentCommand(ctx, []string{"otel"})
-	require.NoError(t, err)
-
-	output := strings.Builder{}
-	cmd.Stderr = &output
-	cmd.Stdout = &output
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		assert.NoError(t, fixture.RunOtelWithClient(ctx))
+	}()
 
 	t.Cleanup(func() {
 		if t.Failed() {
-			t.Log("Elastic-Agent output:")
+			t.Log("Otel Collector output:")
 			t.Log(output.String())
 		}
 	})
 
-	require.NoError(t, cmd.Start(), "could not start otel collector")
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		assert.Contains(collect, output.String(), "Everything is ready")
 	}, time.Second*30, time.Second)
 
 	// stop the collector and check that it emitted logs indicating a graceful shutdown
-	require.NoError(t, cmd.Process.Signal(os.Interrupt))
-	require.NoError(t, cmd.Wait())
-	assert.Contains(t, output.String(), "Shutdown complete")
+	fixture.Stop()
+	wg.Wait()
+
+	// Poll briefly: process.Info.Wait (used by RunOtelWithClient) returns as
+	// soon as the agent process exits and does not synchronize with the
+	// exec.Cmd stdio goroutines, so the last few log lines may still be in
+	// the kernel pipe buffer when wg.Wait returns.
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.Contains(collect, output.String(), "Shutdown complete")
+	}, 5*time.Second, 100*time.Millisecond)
 }
 
 func TestOtelFileProcessing(t *testing.T) {
@@ -2511,6 +2514,7 @@ func TestOtelElasticsearchStateStore_Agentless(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 	})
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/13822")
 
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
