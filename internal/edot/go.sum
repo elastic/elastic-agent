@@ -524,8 +524,8 @@ github.com/elastic/go-quark v0.3.0 h1:d4vokx0psEJo+93fnhvWpTJMggPd9rfMJSleoLva4x
 github.com/elastic/go-quark v0.3.0/go.mod h1:bO/XIGZBUJGxyiJ9FTsSYn9YlfOTRJnmOP+iBE2FyjA=
 github.com/elastic/go-seccomp-bpf v1.6.0 h1:NYduiYxRJ0ZkIyQVwlSskcqPPSg6ynu5pK0/d7SQATs=
 github.com/elastic/go-seccomp-bpf v1.6.0/go.mod h1:5tFsTvH4NtWGfpjsOQD53H8HdVQ+zSZFRUDSGevC0Kc=
-github.com/elastic/go-sfdc v0.0.0-20251207194532-c5aadd4a4e06 h1:TEeq+uvg9+B0f+8JdaqzAdtmhgz9KX/OGtKyQAKA4ac=
-github.com/elastic/go-sfdc v0.0.0-20251207194532-c5aadd4a4e06/go.mod h1:sw1pzz4pIqzDQxFWt3dFoG2uIUFAfThxlMfWpjH590E=
+github.com/elastic/go-sfdc v0.0.0-20260504130806-a46e22d049d9 h1:UbquKP8gHTRugCZQ/KoVQrz8XnHzncsrHFfgTa+PfTg=
+github.com/elastic/go-sfdc v0.0.0-20260504130806-a46e22d049d9/go.mod h1:sw1pzz4pIqzDQxFWt3dFoG2uIUFAfThxlMfWpjH590E=
 github.com/elastic/go-structform v0.0.12 h1:HXpzlAKyej8T7LobqKDThUw7BMhwV6Db24VwxNtgxCs=
 github.com/elastic/go-structform v0.0.12/go.mod h1:CZWf9aIRYY5SuKSmOhtXScE5uQiLZNqAFnwKR4OrIM4=
 github.com/elastic/go-sysinfo v1.15.4 h1:A3zQcunCxik14MgXu39cXFXcIw2sFXZ0zL886eyiv1Q=
@@ -704,10 +704,10 @@ github.com/go-openapi/swag/typeutils v0.25.5 h1:EFJ+PCga2HfHGdo8s8VJXEVbeXRCYwzz
 github.com/go-openapi/swag/typeutils v0.25.5/go.mod h1:itmFmScAYE1bSD8C4rS0W+0InZUBrB2xSPbWt6DLGuc=
 github.com/go-openapi/swag/yamlutils v0.25.5 h1:kASCIS+oIeoc55j28T4o8KwlV2S4ZLPT6G0iq2SSbVQ=
 github.com/go-openapi/swag/yamlutils v0.25.5/go.mod h1:Gek1/SjjfbYvM+Iq4QGwa/2lEXde9n2j4a3wI3pNuOQ=
-github.com/go-openapi/testify/enable/yaml/v2 v2.4.1 h1:NZOrZmIb6PTv5LTFxr5/mKV/FjbUzGE7E6gLz7vFoOQ=
-github.com/go-openapi/testify/enable/yaml/v2 v2.4.1/go.mod h1:r7dwsujEHawapMsxA69i+XMGZrQ5tRauhLAjV/sxg3Q=
-github.com/go-openapi/testify/v2 v2.4.1 h1:zB34HDKj4tHwyUQHrUkpV0Q0iXQ6dUCOQtIqn8hE6Iw=
-github.com/go-openapi/testify/v2 v2.4.1/go.mod h1:HCPmvFFnheKK2BuwSA0TbbdxJ3I16pjwMkYkP4Ywn54=
+github.com/go-openapi/testify/enable/yaml/v2 v2.5.0 h1:3hZD1fwydvCx/cc1R2uYNQirHqf2s6lqpKV3FcNTURA=
+github.com/go-openapi/testify/enable/yaml/v2 v2.5.0/go.mod h1:TvDZKBH7ZbMaF3EqH2AwTvNQCmzyZq8K1agRjf1B+Nk=
+github.com/go-openapi/testify/v2 v2.5.0 h1:UOCr63aAsMIDydZbZGqo5Ev01D4eydItRbekDuZMJLw=
+github.com/go-openapi/testify/v2 v2.5.0/go.mod h1:SgsVHtfooshd0tublTtJ50FPKhujf47YRqauXXOUxfw=
 github.com/go-openapi/validate v0.25.2 h1:12NsfLAwGegqbGWr2CnvT65X/Q2USJipmJ9b7xDJZz0=
 github.com/go-openapi/validate v0.25.2/go.mod h1:Pgl1LpPPGFnZ+ys4/hTlDiRYQdI1ocKypgE+8Q8BLfY=
 github.com/go-quicktest/qt v1.101.1-0.20240301121107-c6c8733fa1e6 h1:teYtXy9B7y5lHTp8V9KPxpYRAVA7dozigQcMiBust1s=
@@ -1513,8 +1513,8 @@ github.com/prometheus/procfs v0.0.2/go.mod h1:TjEm7ze935MbeOT/UhFTIMYKhuLP4wbCsT
 github.com/prometheus/procfs v0.0.8/go.mod h1:7Qr8sr6344vo1JqZ6HhLceV9o3AJ1Ff+GxbHq6oeK9A=
 github.com/prometheus/procfs v0.20.1 h1:XwbrGOIplXW/AU3YhIhLODXMJYyC1isLFfYCsTEycfc=
 github.com/prometheus/procfs v0.20.1/go.mod h1:o9EMBZGRyvDrSPH1RqdxhojkuXstoe4UlK79eF5TGGo=
-github.com/prometheus/prometheus v0.311.2-0.20260409145810-72293ff1d2e0 h1:QwOYpZWGGMjDW0g11F64TtvgP3JbIg92VAFPHxTunA8=
-github.com/prometheus/prometheus v0.311.2-0.20260409145810-72293ff1d2e0/go.mod h1:h4Ogksuo6VUZmnm6q/ruKTUzrg9Vvu6u/6O/rQ5xPMg=
+github.com/prometheus/prometheus v0.311.2-0.20260410083055-07c6232d159b h1:tjxqNQlYTJzrQrY7HM2SbnxqzuE64vnvlSmSbAvBBDE=
+github.com/prometheus/prometheus v0.311.2-0.20260410083055-07c6232d159b/go.mod h1:h4Ogksuo6VUZmnm6q/ruKTUzrg9Vvu6u/6O/rQ5xPMg=
 github.com/prometheus/sigv4 v0.4.1 h1:EIc3j+8NBea9u1iV6O5ZAN8uvPq2xOIUPcqCTivHuXs=
 github.com/prometheus/sigv4 v0.4.1/go.mod h1:eu+ZbRvsc5TPiHwqh77OWuCnWK73IdkETYY46P4dXOU=
 github.com/puzpuzpuz/xsync/v4 v4.4.0 h1:vlSN6/CkEY0pY8KaB0yqo/pCLZvp9nhdbBdjipT4gWo=
