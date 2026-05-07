@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  unit-tests:
+  k8s-tests:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
@@ -40,7 +40,6 @@ jobs:
         with:
           submodules: true
           # pkg/testing/tools/git TestGetReleaseBranches test require full git history
-          fetch-depth: 0
 
       - uses: actions/setup-go@v6
         with:
