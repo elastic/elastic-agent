@@ -480,6 +480,16 @@ func waitForWatcherWithTimeoutCreationFunc(ctx context.Context, log *logger.Logg
 		return fmt.Errorf("error starting update marker watcher: %w", err)
 	}
 
+	// The watcher holds OS resources (on Windows, an fsnotify directory
+	// handle obtained via ReadDirectoryChangesW). Make sure it has fully
+	// shut down before we return so the watched directory can be removed
+	// by callers; otherwise on Windows the directory remains busy until
+	// the goroutine's deferred watcher.Close() runs.
+	defer func() {
+		cancel()
+		<-markerWatcher.Done()
+	}()
+
 	log.Infof("waiting up to %s for upgrade watcher to set %s state in upgrade marker", waitTime, details.StateWatching)
 
 	for {
