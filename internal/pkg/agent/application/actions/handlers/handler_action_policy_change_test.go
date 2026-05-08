@@ -1154,25 +1154,3 @@ func assertSavesLogLevelPolicy(t *testing.T, store *info.MockAgentInfoStore, wan
 			assert.Equal(t, wantLevel, logging["level"], "WithLogLevelPolicy should set agent.logging.level")
 		})
 }
-
-// assertSavesLogLevelOverride returns a Save expectation that checks the
-// per-agent log level override is persisted with the expected value or
-// cleared when the expected value is empty.
-func assertSavesLogLevelOverride(t *testing.T, store *info.MockAgentInfoStore, wantLevel string) *info.MockAgentInfoStore_Save_Call {
-	return store.EXPECT().
-		Save(mock.Anything, mock.Anything).
-		Run(func(ctx context.Context, opts ...info.SaveOption) {
-			m := map[string]any{}
-			for _, o := range opts {
-				o(m)
-			}
-			agent, _ := m["agent"].(map[string]any)
-			logging, _ := agent["logging"].(map[string]any)
-			if wantLevel == "" {
-				_, present := logging["level_override"]
-				assert.False(t, present, "WithLogLevelOverride(\"\") should not set agent.logging.level_override")
-				return
-			}
-			assert.Equal(t, wantLevel, logging["level_override"], "WithLogLevelOverride should set agent.logging.level_override")
-		})
-}
