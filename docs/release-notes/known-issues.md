@@ -186,7 +186,7 @@ For more information, check [Issue #45693](https://github.com/elastic/beats/issu
 
 **Resolution**
 
-This issue was fixed in [#45730](https://github.com/elastic/beats/pull/45730). The fix is included in {{agent}} 8.19.1 and 9.1.1.
+This issue was fixed in [#45730](https://github.com/elastic/beats/pull/45730). The fix is included in {{agent}} 9.1.1 and 8.19.1.
 :::
 
 :::{dropdown} {{agents}} remain in an "Upgrade scheduled" state
