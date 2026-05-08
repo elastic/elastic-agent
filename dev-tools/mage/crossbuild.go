@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"go/build"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -384,7 +385,18 @@ func chownPaths(uid, gid int, path string) error {
 		log.Printf("chown took: %v, changed %d files", time.Since(start), numFixed)
 	}()
 
-	return filepath.Walk(path, func(name string, info os.FileInfo, err error) error {
+	root, err := os.OpenRoot(path)
+	if err != nil {
+		return fmt.Errorf("failed to open root %q: %w", path, err)
+	}
+	defer root.Close()
+
+	return fs.WalkDir(root.FS(), ".", func(name string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		info, err := d.Info()
 		if err != nil {
 			return err
 		}
@@ -401,7 +413,7 @@ func chownPaths(uid, gid int, path string) error {
 			return nil
 		}
 
-		if err := os.Chown(name, uid, gid); err != nil {
+		if err := root.Lchown(name, uid, gid); err != nil {
 			return fmt.Errorf("failed to chown path=%v : %w", name, err)
 		}
 		numFixed++
