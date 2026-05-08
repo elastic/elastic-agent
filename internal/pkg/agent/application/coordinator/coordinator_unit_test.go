@@ -1536,6 +1536,72 @@ func TestCoordinatorReportsOTelManagerUpdateFailure(t *testing.T) {
 	assert.Contains(t, state.Message, errorStr, "Failed policy update should be reported in Coordinator state message")
 }
 
+type ackErrConfigChange struct {
+	cfg *config.Config
+	err error
+}
+
+func (l *ackErrConfigChange) Config() *config.Config { return l.cfg }
+func (l *ackErrConfigChange) Ack() error             { return l.err }
+func (l *ackErrConfigChange) Fail(err error)         {}
+
+func TestCoordinatorReportsConfigChangeAckFailure(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	stateChan := make(chan State, 1)
+	configChan := make(chan ConfigChange, 1)
+
+	coord := &Coordinator{
+		logger:    logger,
+		agentInfo: &info.AgentInfo{},
+		state: State{
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
+		},
+
+		stateBroadcaster: &broadcaster.Broadcaster[State]{InputChan: stateChan},
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+		},
+		runtimeMgr:         &fakeRuntimeManager{},
+		otelMgr:            &fakeOTelManager{},
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+		isManaged:          true,
+	}
+
+	const errorStr = "ack failed for testing reasons"
+	configChan <- &ackErrConfigChange{
+		cfg: config.MustNewConfigFrom(nil),
+		err: errors.New(errorStr),
+	}
+	coord.runLoopIteration(ctx)
+	require.Error(t, coord.actionsErr, "Ack failure should be saved in actionsErr")
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Failed, state.State, "Ack failure should cause failed Coordinator")
+		assert.Contains(t, state.Message, errorStr, "Ack failure should be reported in Coordinator state message")
+	default:
+		assert.Fail(t, "Policy change should cause state update")
+	}
+
+	// A subsequent successful policy change ack should clear actionsErr.
+	configChan <- &configChange{cfg: config.MustNewConfigFrom(nil)}
+	coord.runLoopIteration(ctx)
+
+	assert.NoError(t, coord.actionsErr, "Successful Ack should clear actionsErr")
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Healthy, state.State, "Successful Ack should restore healthy state")
+		assert.Equal(t, state.Message, "Running", "Successful Ack should restore previous state message")
+	default:
+		assert.Fail(t, "Policy change should cause state update")
+	}
+}
+
 func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 	// Make sure:
 	// - An input unit that depends on an undefined variable is not created
