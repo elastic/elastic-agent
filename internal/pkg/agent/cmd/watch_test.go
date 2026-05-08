@@ -399,15 +399,6 @@ func Test_watchCmd(t *testing.T) {
 // watcher is mocked, since speaking the gRPC control protocol would require
 // a running daemon.
 func Test_watchCmd_MarkerPointsToSelf(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		// Symlink creation on Windows requires elevation or developer
-		// mode and afterRestartDelay is 20s on Windows. The cleanup
-		// logic under test is platform-agnostic; skipping here keeps
-		// the regression test reliable on the platforms the bug
-		// actually surfaces in our CI.
-		t.Skip("skipping on windows: symlink creation requires elevation")
-	}
-
 	log, obs := loggertest.New(t.Name())
 	topDir := t.TempDir()
 
@@ -468,11 +459,16 @@ func Test_watchCmd_MarkerPointsToSelf(t *testing.T) {
 		paths.BinaryPath(filepath.Join(topDir, liveHome), binName),
 		"live agent binary must survive cleanup")
 
-	// Sanity: the marker should have been removed (non-Windows path —
-	// watchCmd sets removeMarker = !isWindows() for the success branch).
+	// Sanity: watchCmd sets removeMarker = !isWindows() for the success
+	// branch, so the marker should be gone on non-Windows and preserved
+	// on Windows.
 	loaded, loadErr := upgrade.LoadMarker(dataDir)
 	require.NoError(t, loadErr)
-	assert.Nil(t, loaded, "marker should be cleaned up after successful watch on non-windows")
+	if runtime.GOOS == "windows" {
+		assert.NotNil(t, loaded, "marker should be preserved after successful watch on windows")
+	} else {
+		assert.Nil(t, loaded, "marker should be cleaned up after successful watch on non-windows")
+	}
 }
 
 // writeFakeInstallForWatcherTest builds the on-disk shape that step_unpack
