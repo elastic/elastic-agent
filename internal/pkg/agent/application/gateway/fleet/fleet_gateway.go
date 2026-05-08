@@ -8,6 +8,7 @@ import (
 	"context"
 	stderrors "errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -99,6 +100,32 @@ type FleetGateway struct {
 	actionCh           chan []fleetapi.Action
 	rollbackSource     rollbacksSource
 	compression        string
+
+	// agentPolicyID and policyRevisionIDX track the most recently applied
+	// policy. They are updated via SetPolicyDetails when the policy-change
+	// handler successfully applies a policy, and seeded at construction from
+	// the persisted action store so that the first checkin after an agent
+	// restart already reports the values.
+	agentPolicyID     atomic.Pointer[string]
+	policyRevisionIDX atomic.Int64
+}
+
+// SetPolicyDetails records the policy id and revision index reported by the
+// agent in subsequent checkin requests. It is called by the policy-change
+// handler after a successful apply.
+func (f *FleetGateway) SetPolicyDetails(policyID string, revisionIDX int64) {
+	id := policyID
+	f.agentPolicyID.Store(&id)
+	f.policyRevisionIDX.Store(revisionIDX)
+}
+
+// policyDetails returns the most recently set policy id and revision index.
+func (f *FleetGateway) policyDetails() (string, int64) {
+	var id string
+	if p := f.agentPolicyID.Load(); p != nil {
+		id = *p
+	}
+	return id, f.policyRevisionIDX.Load()
 }
 
 // New creates a new fleet gateway
@@ -144,7 +171,7 @@ func newFleetGatewayWithScheduler(
 	stateFetcher StateFetcher,
 	source rollbacksSource,
 ) (*FleetGateway, error) {
-	return &FleetGateway{
+	gw := &FleetGateway{
 		log:            log,
 		client:         client,
 		settings:       settings,
@@ -156,7 +183,14 @@ func newFleetGatewayWithScheduler(
 		errCh:          make(chan error),
 		actionCh:       make(chan []fleetapi.Action, 1),
 		rollbackSource: source,
-	}, nil
+	}
+	// Seed the in-memory policy details from the persisted action so that the
+	// first checkin after an agent restart already reports the correct policy
+	// id and revision index instead of zero values.
+	if pc := asPolicyChange(stateStore.Action()); pc != nil {
+		gw.SetPolicyDetails(pc.PolicyID(), pc.PolicyRevisionIDX())
+	}
+	return gw, nil
 }
 
 func (f *FleetGateway) Actions() <-chan []fleetapi.Action {
@@ -405,9 +439,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	// Fix loglevel with the current log level used by coordinator
 	ecsMeta.Elastic.Agent.LogLevel = state.LogLevel.String()
 
-	action := f.stateStore.Action()
-	agentPolicyID := getPolicyID(action)
-	policyRevisionIDX := getPolicyRevisionIDX(action)
+	agentPolicyID, policyRevisionIDX := f.policyDetails()
 
 	// get available rollbacks
 	rollbacks, err := f.rollbackSource.Get()
@@ -533,48 +565,11 @@ func RequestBackoff(done <-chan struct{}) backoff.Backoff {
 	)
 }
 
-// getPolicyID returns the policy ID associated with a POLICY_CHANGE action by
-// reading the "id" attribute from the action's policy data, the field
-// fleet-server emits in PolicyData.
-func getPolicyID(action fleetapi.Action) string {
-	policyChange, ok := action.(*fleetapi.ActionPolicyChange)
-	if !ok {
-		return ""
-	}
-	v, ok := policyChange.Data.Policy["id"]
-	if !ok {
-		return ""
-	}
-	vv, ok := v.(string)
-	if !ok {
-		return ""
-	}
-	return vv
-}
-
-// getPolicyRevisionIDX returns the policy revision index associated with a
-// POLICY_CHANGE action by reading the "revision" attribute from the action's
-// policy data, the field fleet-server emits in PolicyData. The function
-// accepts int, int64, and float64 values to tolerate JSON unmarshal types.
-func getPolicyRevisionIDX(action fleetapi.Action) int64 {
-	policyChange, ok := action.(*fleetapi.ActionPolicyChange)
-	if !ok {
-		return 0
-	}
-	v, ok := policyChange.Data.Policy["revision"]
-	if !ok {
-		return 0
-	}
-	switch vv := v.(type) {
-	case int64:
-		return vv
-	case int:
-		return int64(vv)
-	case float64:
-		return int64(vv)
-	default:
-		return 0
-	}
+// asPolicyChange returns the underlying *ActionPolicyChange when the given
+// action is one, or nil otherwise.
+func asPolicyChange(action fleetapi.Action) *fleetapi.ActionPolicyChange {
+	pc, _ := action.(*fleetapi.ActionPolicyChange)
+	return pc
 }
 
 var errComponentStateChanged = errors.New("error component state changed")

@@ -1225,87 +1225,52 @@ func TestAvailableRollbacks(t *testing.T) {
 	}
 }
 
-func TestGetPolicyIDAndRevisionIDX(t *testing.T) {
-	testcases := []struct {
-		name       string
-		action     fleetapi.Action
-		wantID     string
-		wantRevIdx int64
-	}{
-		{
-			name: "policy data with id and int revision",
-			action: &fleetapi.ActionPolicyChange{
-				ActionID:   "policy:abc-123:7",
-				ActionType: fleetapi.ActionTypePolicyChange,
-				Data: fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{
-					"id":       "abc-123",
-					"revision": int(7),
-				}},
-			},
-			wantID:     "abc-123",
-			wantRevIdx: 7,
-		},
-		{
-			name: "policy data with int64 revision",
-			action: &fleetapi.ActionPolicyChange{
-				ActionID:   "policy:abc-123:7",
-				ActionType: fleetapi.ActionTypePolicyChange,
-				Data: fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{
-					"id":       "abc-123",
-					"revision": int64(7),
-				}},
-			},
-			wantID:     "abc-123",
-			wantRevIdx: 7,
-		},
-		{
-			name: "policy data with float64 revision (json unmarshal)",
-			action: &fleetapi.ActionPolicyChange{
-				ActionID:   "policy:abc-123:7",
-				ActionType: fleetapi.ActionTypePolicyChange,
-				Data: fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{
-					"id":       "abc-123",
-					"revision": float64(7),
-				}},
-			},
-			wantID:     "abc-123",
-			wantRevIdx: 7,
-		},
-		{
-			name: "missing policy data returns zero values",
-			action: &fleetapi.ActionPolicyChange{
-				ActionID:   "policy:abc-123:7",
-				ActionType: fleetapi.ActionTypePolicyChange,
-				Data:       fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{}},
-			},
-			wantID:     "",
-			wantRevIdx: 0,
-		},
-		{
-			name: "wrong-typed values return zero values",
-			action: &fleetapi.ActionPolicyChange{
-				ActionID:   "policy:abc-123:7",
-				ActionType: fleetapi.ActionTypePolicyChange,
-				Data: fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{
-					"id":       42,
-					"revision": "7",
-				}},
-			},
-			wantID:     "",
-			wantRevIdx: 0,
-		},
-		{
-			name:       "non-POLICY_CHANGE action returns zero values",
-			action:     &fleetapi.ActionUnenroll{ActionID: "policy:foo:1"},
-			wantID:     "",
-			wantRevIdx: 0,
-		},
-	}
+func TestFleetGatewayWarmStartAndSetPolicyDetails(t *testing.T) {
+	log, _ := loggertest.New("fleet_gateway")
 
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.wantID, getPolicyID(tc.action))
-			assert.Equal(t, tc.wantRevIdx, getPolicyRevisionIDX(tc.action))
+	t.Run("warm-starts from persisted action", func(t *testing.T) {
+		stateStore := newStateStore(t, log)
+		stateStore.SetAction(&fleetapi.ActionPolicyChange{
+			ActionID:   "policy:warm-id:3",
+			ActionType: fleetapi.ActionTypePolicyChange,
+			Data: fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{
+				"id":       "warm-id",
+				"revision": int64(3),
+			}},
 		})
-	}
+		require.NoError(t, stateStore.Save())
+
+		gw, err := newFleetGatewayWithScheduler(log, defaultGatewaySettings, new(testAgentInfo), newTestingClient(), scheduler.NewStepper(), noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), newMockRollbacksSource(t))
+		require.NoError(t, err)
+
+		id, rev := gw.policyDetails()
+		assert.Equal(t, "warm-id", id)
+		assert.Equal(t, int64(3), rev)
+	})
+
+	t.Run("starts empty when no persisted action", func(t *testing.T) {
+		stateStore := newStateStore(t, log)
+		gw, err := newFleetGatewayWithScheduler(log, defaultGatewaySettings, new(testAgentInfo), newTestingClient(), scheduler.NewStepper(), noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), newMockRollbacksSource(t))
+		require.NoError(t, err)
+
+		id, rev := gw.policyDetails()
+		assert.Equal(t, "", id)
+		assert.Equal(t, int64(0), rev)
+	})
+
+	t.Run("SetPolicyDetails overrides", func(t *testing.T) {
+		stateStore := newStateStore(t, log)
+		gw, err := newFleetGatewayWithScheduler(log, defaultGatewaySettings, new(testAgentInfo), newTestingClient(), scheduler.NewStepper(), noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), newMockRollbacksSource(t))
+		require.NoError(t, err)
+
+		gw.SetPolicyDetails("live-id", 9)
+		id, rev := gw.policyDetails()
+		assert.Equal(t, "live-id", id)
+		assert.Equal(t, int64(9), rev)
+
+		gw.SetPolicyDetails("newer-id", 10)
+		id, rev = gw.policyDetails()
+		assert.Equal(t, "newer-id", id)
+		assert.Equal(t, int64(10), rev)
+	})
 }
