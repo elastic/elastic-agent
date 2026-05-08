@@ -7,6 +7,7 @@ package info
 import (
 	"bytes"
 	"context"
+	goerrors "errors"
 	"fmt"
 	"time"
 
@@ -38,7 +39,7 @@ type AgentInfoStore interface {
 }
 
 // SaveOption mutates the on-disk config map for a single Save call.
-type SaveOption func(configMap map[string]interface{})
+type SaveOption func(configMap map[string]interface{}) error
 
 // WithLogLevelOverride sets agent.logging.level_override. An empty level
 // removes the key (matches the omitempty semantic).
@@ -89,53 +90,76 @@ func WithFleet(cfg any) SaveOption {
 // setNested places value at the given nested path, creating intermediate maps.
 // Path must contain at least one segment.
 func setNested(value any, path ...string) SaveOption {
-	return func(m map[string]interface{}) {
-		parent := navigateOrCreate(m, path[:len(path)-1])
+	return func(m map[string]interface{}) error {
+		parent, err := navigateOrCreate(m, path[:len(path)-1])
+		if err != nil {
+			return err
+		}
 		parent[path[len(path)-1]] = value
+		return nil
 	}
 }
 
 // setOrDeleteNested either sets value at the given nested path or deletes the
 // leaf key when del is true. Intermediate maps are created on set.
 func setOrDeleteNested(value any, del bool, path ...string) SaveOption {
-	return func(m map[string]interface{}) {
+	return func(m map[string]interface{}) error {
 		if del {
-			parent := navigate(m, path[:len(path)-1])
+			parent, err := navigate(m, path[:len(path)-1])
+			if err != nil {
+				return err
+			}
 			if parent != nil {
 				delete(parent, path[len(path)-1])
 			}
-			return
+			return nil
 		}
-		parent := navigateOrCreate(m, path[:len(path)-1])
+		parent, err := navigateOrCreate(m, path[:len(path)-1])
+		if err != nil {
+			return err
+		}
 		parent[path[len(path)-1]] = value
+		return nil
 	}
 }
 
 // navigateOrCreate walks the path, creating any missing maps along the way.
-func navigateOrCreate(m map[string]interface{}, path []string) map[string]interface{} {
+// Returns an error if an intermediate key already holds a non-map value.
+func navigateOrCreate(m map[string]interface{}, path []string) (map[string]interface{}, error) {
 	cur := m
 	for _, seg := range path {
-		next, ok := cur[seg].(map[string]interface{})
-		if !ok {
-			next = make(map[string]interface{})
+		existing, present := cur[seg]
+		if !present {
+			next := make(map[string]interface{})
 			cur[seg] = next
+			cur = next
+			continue
+		}
+		next, ok := existing.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("agent info store: nested value at %q is %T, expected map[string]interface{}", seg, existing)
 		}
 		cur = next
 	}
-	return cur
+	return cur, nil
 }
 
-// navigate walks the path and returns nil if any segment is missing.
-func navigate(m map[string]interface{}, path []string) map[string]interface{} {
+// navigate walks the path. It returns (nil, nil) when a segment is missing,
+// and an error when an intermediate key holds a non-map value.
+func navigate(m map[string]interface{}, path []string) (map[string]interface{}, error) {
 	cur := m
 	for _, seg := range path {
-		next, ok := cur[seg].(map[string]interface{})
+		existing, present := cur[seg]
+		if !present {
+			return nil, nil
+		}
+		next, ok := existing.(map[string]interface{})
 		if !ok {
-			return nil
+			return nil, fmt.Errorf("agent info store: nested value at %q is %T, expected map[string]interface{}", seg, existing)
 		}
 		cur = next
 	}
-	return cur
+	return cur, nil
 }
 
 // NullAgentInfoStore is a no-op AgentInfoStore: Load returns an empty
@@ -280,8 +304,12 @@ func saveLocked(diskStore storage.Storage, agentConfigFile string, opts []SaveOp
 		}
 	}
 
+	var optsErr error
 	for _, opt := range opts {
-		opt(configMap)
+		optsErr = goerrors.Join(optsErr, opt(configMap))
+	}
+	if optsErr != nil {
+		return fmt.Errorf("applying agent info save options: %w", optsErr)
 	}
 
 	data, err := yaml.Marshal(configMap)
@@ -302,6 +330,7 @@ func loadConfigMap(s storage.Storage) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, errors.New(err, "failed loading from store", errors.TypeFilesystem)
 	}
+	defer reader.Close()
 	cfg, err := config.NewConfigFrom(reader)
 	if err != nil {
 		return nil, errors.New(err, "failed parsing existing agent config", errors.TypeFilesystem)

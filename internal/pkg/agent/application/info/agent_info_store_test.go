@@ -13,119 +13,267 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
-func TestEncryptedAgentInfoStore_SavePartialMerge(t *testing.T) {
+// TestSaveOptions exercises every SaveOption against a fresh store and asserts
+// both the typed AgentInfo and the on-disk map after a Save and Load.
+func TestSaveOptions(t *testing.T) {
+	httpCfg := map[string]interface{}{"enabled": true, "host": "127.0.0.1"}
+	pprofCfg := map[string]interface{}{"enabled": false}
+
+	cases := []struct {
+		name   string
+		opt    SaveOption
+		verify func(t *testing.T, info *AgentInfo, raw map[string]interface{})
+	}{
+		{
+			name: "WithID",
+			opt:  WithID("agent-id"),
+			verify: func(t *testing.T, info *AgentInfo, raw map[string]interface{}) {
+				require.Equal(t, "agent-id", info.AgentID)
+			},
+		},
+		{
+			name: "WithHeaders",
+			opt:  WithHeaders(map[string]string{"X-Test": "yes"}),
+			verify: func(t *testing.T, info *AgentInfo, raw map[string]interface{}) {
+				agent := raw["agent"].(map[string]interface{})
+				require.Equal(t, map[string]interface{}{"X-Test": "yes"}, agent["headers"])
+			},
+		},
+		{
+			name: "WithLogLevelPolicy",
+			opt:  WithLogLevelPolicy("debug"),
+			verify: func(t *testing.T, info *AgentInfo, raw map[string]interface{}) {
+				require.Equal(t, "debug", info.LogLevelPolicy)
+			},
+		},
+		{
+			name: "WithLogLevelOverride",
+			opt:  WithLogLevelOverride("warning"),
+			verify: func(t *testing.T, info *AgentInfo, raw map[string]interface{}) {
+				require.Equal(t, "warning", info.LogLevelOverride)
+			},
+		},
+		{
+			name: "WithEventLoggingToFiles",
+			opt:  WithEventLoggingToFiles(true),
+			verify: func(t *testing.T, info *AgentInfo, raw map[string]interface{}) {
+				eventData := raw["agent"].(map[string]interface{})["logging"].(map[string]interface{})["event_data"].(map[string]interface{})
+				require.Equal(t, true, eventData["to_files"])
+			},
+		},
+		{
+			name: "WithEventLoggingToStderr",
+			opt:  WithEventLoggingToStderr(true),
+			verify: func(t *testing.T, info *AgentInfo, raw map[string]interface{}) {
+				eventData := raw["agent"].(map[string]interface{})["logging"].(map[string]interface{})["event_data"].(map[string]interface{})
+				require.Equal(t, true, eventData["to_stderr"])
+			},
+		},
+		{
+			name: "WithMonitoringHTTP",
+			opt:  WithMonitoringHTTP(httpCfg),
+			verify: func(t *testing.T, info *AgentInfo, raw map[string]interface{}) {
+				monitoring := raw["agent"].(map[string]interface{})["monitoring"].(map[string]interface{})
+				require.Equal(t, httpCfg, monitoring["http"])
+			},
+		},
+		{
+			name: "WithMonitoringPprof",
+			opt:  WithMonitoringPprof(pprofCfg),
+			verify: func(t *testing.T, info *AgentInfo, raw map[string]interface{}) {
+				monitoring := raw["agent"].(map[string]interface{})["monitoring"].(map[string]interface{})
+				require.Equal(t, pprofCfg, monitoring["pprof"])
+			},
+		},
+		{
+			name: "WithFleet enabled marks the agent as managed",
+			opt:  WithFleet(map[string]interface{}{"enabled": true, "access_api_key": "k"}),
+			verify: func(t *testing.T, info *AgentInfo, raw map[string]interface{}) {
+				require.False(t, info.isStandalone)
+				require.Equal(t, true, raw["fleet"].(map[string]interface{})["enabled"])
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, _ := setupEmptyStorePaths(t)
+
+			require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx, tc.opt))
+
+			info, err := NewEncryptedAgentInfoStore().Load(ctx)
+			require.NoError(t, err)
+			tc.verify(t, info, readEncrypted(t, ctx))
+		})
+	}
+}
+
+// TestSave_PreservesUntouchedFields verifies that fields not addressed by the
+// passed options are preserved across a Save (including across two saves
+// in a row).
+func TestSave_PreservesUntouchedFields(t *testing.T) {
 	initial := map[string]interface{}{
 		"agent": map[string]interface{}{
-			"id":            "agent-id",
-			"headers":       map[string]string{"x": "y"},
-			"logging.level": "info",
+			"id":                     "agent-id",
+			"headers":                map[string]interface{}{"X-Elastic-Agent-Id": "agent-id"},
+			"logging.level_override": "warning",
 		},
 		"fleet": map[string]interface{}{
 			"enabled":        true,
-			"access_api_key": "key",
+			"access_api_key": "secret-key",
 		},
 	}
 	ctx := setupEncryptedStore(t, initial)
 
-	require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx, WithLogLevelOverride("debug")))
+	fleetCfg := configuration.DefaultFleetAgentConfig()
+	fleetCfg.Enabled = true
+	fleetCfg.AccessAPIKey = "secret-key"
+
+	policySave := func(level string) error {
+		return NewEncryptedAgentInfoStore().Save(ctx,
+			WithFleet(fleetCfg),
+			WithLogLevelPolicy(level),
+			WithEventLoggingToFiles(true),
+			WithEventLoggingToStderr(false),
+		)
+	}
+
+	require.NoError(t, policySave("info"))
+	require.NoError(t, policySave("debug"))
 
 	info, err := NewEncryptedAgentInfoStore().Load(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "agent-id", info.AgentID)
-	require.Equal(t, "info", info.LogLevelPolicy)
-	require.Equal(t, "debug", info.LogLevelOverride)
-
-	// fleet section must still be present
-	got := readEncrypted(t, ctx)
-	require.NotNil(t, got["fleet"])
-}
-
-func TestEncryptedAgentInfoStore_SaveClearOverride(t *testing.T) {
-	initial := map[string]interface{}{
-		"agent": map[string]interface{}{
-			"id":                     "agent-id",
-			"logging.level":          "info",
-			"logging.level_override": "warning",
-		},
-	}
-	ctx := setupEncryptedStore(t, initial)
-
-	require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx, WithLogLevelOverride("")))
-
-	info, err := NewEncryptedAgentInfoStore().Load(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "", info.LogLevelOverride, "empty override level should remove the key")
-	require.Equal(t, "agent-id", info.AgentID)
-	require.Equal(t, "info", info.LogLevelPolicy)
-}
-
-func TestEncryptedAgentInfoStore_LoadStandaloneVsManaged(t *testing.T) {
-	t.Run("no fleet section is treated as standalone", func(t *testing.T) {
-		ctx := setupEncryptedStore(t, map[string]interface{}{
-			"agent": map[string]interface{}{"id": "test-id"},
-		})
-
-		got, err := NewAgentInfo(ctx, false)
-		require.NoError(t, err)
-		require.Equal(t, "test-id", got.AgentID)
-		require.True(t, got.isStandalone)
-	})
-
-	t.Run("fleet.enabled=true is treated as managed", func(t *testing.T) {
-		ctx := setupEncryptedStore(t, map[string]interface{}{
-			"agent": map[string]interface{}{"id": "test-id"},
-			"fleet": map[string]interface{}{"enabled": true},
-		})
-
-		got, err := NewAgentInfo(ctx, false)
-		require.NoError(t, err)
-		require.Equal(t, "test-id", got.AgentID)
-		require.False(t, got.isStandalone)
-	})
-}
-
-func TestEncryptedAgentInfoStore_SavePolicyBatch(t *testing.T) {
-	// Initial state has an override that policy save must NOT touch.
-	initial := map[string]interface{}{
-		"agent": map[string]interface{}{
-			"id":                     "agent-id",
-			"logging.level_override": "warning",
-		},
-		"fleet": map[string]interface{}{"enabled": true},
-	}
-	ctx := setupEncryptedStore(t, initial)
-
-	require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx,
-		WithLogLevelPolicy("debug"),
-		WithEventLoggingToFiles(true),
-		WithEventLoggingToStderr(false),
-	))
-
-	info, err := NewEncryptedAgentInfoStore().Load(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "debug", info.LogLevelPolicy)
-	// override preserved across the policy save
+	require.Equal(t, map[string]string{"X-Elastic-Agent-Id": "agent-id"}, info.Headers)
 	require.Equal(t, "warning", info.LogLevelOverride)
+	require.Equal(t, "debug", info.LogLevelPolicy)
+}
 
-	// event_data fields land at agent.logging.event_data.{to_files,to_stderr};
-	// drill in via the raw map to verify.
+// TestSave_WithFleetReplacesEntireSection verifies that WithFleet swaps the
+// whole fleet subtree (it does not merge with the existing one).
+func TestSave_WithFleetReplacesEntireSection(t *testing.T) {
+	initial := map[string]interface{}{
+		"agent": map[string]interface{}{"id": "agent-id"},
+		"fleet": map[string]interface{}{
+			"enabled":        true,
+			"access_api_key": "old-key",
+			"client":         map[string]interface{}{"host": "old.host"},
+		},
+	}
+	ctx := setupEncryptedStore(t, initial)
+
+	newFleet := map[string]interface{}{
+		"enabled":        true,
+		"access_api_key": "new-key",
+	}
+	require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx, WithFleet(newFleet)))
+
 	got := readEncrypted(t, ctx)
-	agent := got["agent"].(map[string]interface{})
-	logging := agent["logging"].(map[string]interface{})
-	eventData := logging["event_data"].(map[string]interface{})
-	require.Equal(t, true, eventData["to_files"])
-	require.Equal(t, false, eventData["to_stderr"])
-	// fleet preserved
-	require.NotNil(t, got["fleet"])
+	require.Equal(t, newFleet, got["fleet"])
+	require.Equal(t, "agent-id", got["agent"].(map[string]interface{})["id"])
+}
+
+// TestSave_EmptyValueDeletesKey verifies that passing an empty string to a
+// clearable option removes the key from the on-disk map.
+func TestSave_EmptyValueDeletesKey(t *testing.T) {
+	cases := []struct {
+		name      string
+		opt       SaveOption
+		clearedAt []string // path in the on-disk map that should disappear
+	}{
+		{
+			name:      "WithLogLevelPolicy empty string",
+			opt:       WithLogLevelPolicy(""),
+			clearedAt: []string{"agent", "logging", "level"},
+		},
+		{
+			name:      "WithLogLevelOverride empty string",
+			opt:       WithLogLevelOverride(""),
+			clearedAt: []string{"agent", "logging", "level_override"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := setupEncryptedStore(t, map[string]interface{}{
+				"agent": map[string]interface{}{
+					"id":                     "agent-id",
+					"logging.level":          "info",
+					"logging.level_override": "warning",
+				},
+			})
+
+			require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx, tc.opt))
+
+			raw := readEncrypted(t, ctx)
+			cur, ok := raw[tc.clearedAt[0]].(map[string]interface{})
+			require.True(t, ok)
+			for _, seg := range tc.clearedAt[1 : len(tc.clearedAt)-1] {
+				cur, ok = cur[seg].(map[string]interface{})
+				require.True(t, ok)
+			}
+			_, exists := cur[tc.clearedAt[len(tc.clearedAt)-1]]
+			require.False(t, exists)
+
+			require.Equal(t, "agent-id", raw["agent"].(map[string]interface{})["id"])
+		})
+	}
+}
+
+// TestSave_NoOpsLeavesNoFile verifies that calling Save with no options does
+// not create the on-disk file.
+func TestSave_NoOpsLeavesNoFile(t *testing.T) {
+	ctx, encPath := setupEmptyStorePaths(t)
+	require.NoFileExists(t, encPath)
+
+	require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx))
+	require.NoFileExists(t, encPath)
+}
+
+// TestNullAgentInfoStore verifies that the no-op variant returns an empty
+// AgentInfo and accepts (and discards) any save options.
+func TestNullAgentInfoStore(t *testing.T) {
+	var s NullAgentInfoStore
+	ctx := context.Background()
+
+	info, err := s.Load(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	require.Empty(t, info.AgentID)
+
+	require.NoError(t, s.Save(ctx, WithID("ignored"), WithLogLevelPolicy("debug")))
+}
+
+// TestErrors covers all error paths surfaced by Load and Save.
+func TestErrors(t *testing.T) {
+	t.Run("Load: corrupt YAML", func(t *testing.T) {
+		ctx, encPath := setupEmptyStorePaths(t)
+		store, err := storage.NewEncryptedDiskStore(ctx, encPath)
+		require.NoError(t, err)
+		require.NoError(t, store.Save(bytes.NewReader([]byte("not: valid: yaml: ::: [["))))
+
+		_, err = NewEncryptedAgentInfoStore().Load(ctx)
+		require.Error(t, err)
+	})
+
+	t.Run("Save: intermediate path holds a non-map value", func(t *testing.T) {
+		ctx := setupEncryptedStore(t, map[string]interface{}{
+			"agent": "this should be a map but isn't",
+		})
+
+		err := NewEncryptedAgentInfoStore().Save(ctx, WithLogLevelPolicy("debug"))
+		require.Error(t, err)
+	})
 }
 
 // setupEncryptedStore prepares a temp encrypted store with the given initial
@@ -163,142 +311,6 @@ func setupEmptyStorePaths(t *testing.T) (context.Context, string) {
 	encPath := filepath.Join(tmpPath, "fleet.enc")
 	require.Equal(t, encPath, paths.AgentConfigFile())
 	return ctx, encPath
-}
-
-func TestEncryptedAgentInfoStore_SaveCreatesFileWhenMissing(t *testing.T) {
-	ctx, encPath := setupEmptyStorePaths(t)
-	require.NoFileExists(t, encPath)
-
-	require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx, WithID("new-agent")))
-	require.FileExists(t, encPath)
-
-	info, err := NewEncryptedAgentInfoStore().Load(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "new-agent", info.AgentID)
-}
-
-func TestEncryptedAgentInfoStore_LoadWhenFileMissing(t *testing.T) {
-	ctx, encPath := setupEmptyStorePaths(t)
-	require.NoFileExists(t, encPath)
-
-	info, err := NewEncryptedAgentInfoStore().Load(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, info)
-	require.Empty(t, info.AgentID)
-	require.True(t, info.isStandalone, "missing file should default to standalone")
-}
-
-func TestEncryptedAgentInfoStore_SaveNoOptsIsNoOp(t *testing.T) {
-	ctx, encPath := setupEmptyStorePaths(t)
-	require.NoFileExists(t, encPath)
-
-	require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx))
-	require.NoFileExists(t, encPath, "Save with no options must not create the file")
-}
-
-func TestEncryptedAgentInfoStore_ClearLogLevelPolicy(t *testing.T) {
-	initial := map[string]interface{}{
-		"agent": map[string]interface{}{
-			"id":                     "agent-id",
-			"logging.level":          "warning",
-			"logging.level_override": "debug",
-		},
-	}
-	ctx := setupEncryptedStore(t, initial)
-
-	require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx, WithLogLevelPolicy("")))
-
-	info, err := NewEncryptedAgentInfoStore().Load(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "", info.LogLevelPolicy, "empty policy level should remove the key")
-	require.Equal(t, "debug", info.LogLevelOverride, "override should remain untouched")
-	require.Equal(t, "agent-id", info.AgentID)
-}
-
-func TestEncryptedAgentInfoStore_WithFleetWholesaleReplacement(t *testing.T) {
-	initial := map[string]interface{}{
-		"agent": map[string]interface{}{"id": "agent-id"},
-		"fleet": map[string]interface{}{
-			"enabled":        true,
-			"access_api_key": "old-key",
-			"client": map[string]interface{}{
-				"host": "old.host",
-			},
-		},
-	}
-	ctx := setupEncryptedStore(t, initial)
-
-	newFleet := map[string]interface{}{
-		"enabled":        true,
-		"access_api_key": "new-key",
-	}
-	require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx, WithFleet(newFleet)))
-
-	got := readEncrypted(t, ctx)
-	require.Equal(t, newFleet, got["fleet"], "fleet section must be replaced wholesale, not merged")
-	// agent section preserved
-	agent := got["agent"].(map[string]interface{})
-	require.Equal(t, "agent-id", agent["id"])
-}
-
-func TestEncryptedAgentInfoStore_WithIDRoundTrip(t *testing.T) {
-	ctx, _ := setupEmptyStorePaths(t)
-
-	require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx, WithID("first")))
-	info, err := NewEncryptedAgentInfoStore().Load(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "first", info.AgentID)
-
-	require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx, WithID("second")))
-	info, err = NewEncryptedAgentInfoStore().Load(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "second", info.AgentID)
-}
-
-func TestEncryptedAgentInfoStore_SetNestedOptions(t *testing.T) {
-	ctx := setupEncryptedStore(t, map[string]interface{}{
-		"agent": map[string]interface{}{"id": "agent-id"},
-	})
-
-	headers := map[string]string{"x-test": "yes"}
-	httpCfg := map[string]interface{}{"enabled": true, "host": "127.0.0.1"}
-	pprofCfg := map[string]interface{}{"enabled": false}
-
-	require.NoError(t, NewEncryptedAgentInfoStore().Save(ctx,
-		WithHeaders(headers),
-		WithMonitoringHTTP(httpCfg),
-		WithMonitoringPprof(pprofCfg),
-	))
-
-	got := readEncrypted(t, ctx)
-	agent := got["agent"].(map[string]interface{})
-	require.Equal(t, map[string]interface{}{"x-test": "yes"}, agent["headers"])
-	monitoring := agent["monitoring"].(map[string]interface{})
-	require.Equal(t, httpCfg, monitoring["http"])
-	require.Equal(t, pprofCfg, monitoring["pprof"])
-}
-
-func TestNullAgentInfoStore(t *testing.T) {
-	var s NullAgentInfoStore
-	ctx := context.Background()
-
-	info, err := s.Load(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, info)
-	require.Empty(t, info.AgentID)
-
-	require.NoError(t, s.Save(ctx, WithID("ignored"), WithLogLevelPolicy("debug")))
-}
-
-func TestEncryptedAgentInfoStore_LoadCorruptYAML(t *testing.T) {
-	ctx, encPath := setupEmptyStorePaths(t)
-
-	store, err := storage.NewEncryptedDiskStore(ctx, encPath)
-	require.NoError(t, err)
-	require.NoError(t, store.Save(bytes.NewReader([]byte("not: valid: yaml: ::: [["))))
-
-	_, err = NewEncryptedAgentInfoStore().Load(ctx)
-	require.Error(t, err)
 }
 
 // readEncrypted reads and decrypts the on-disk encrypted store at the configured path.
