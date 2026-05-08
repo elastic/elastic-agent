@@ -65,12 +65,6 @@ func TestNewAgentInfoWithLog(t *testing.T) {
 			defaultLogLevel: "debug",
 			expected:        &AgentInfo{AgentID: "testID", LogLevelPolicy: "info", LogLevelOverride: "warning", unprivileged: !hasRoot, isStandalone: false},
 		},
-		{
-			name:            "fleet without persisted level applies and persists the default",
-			loaded:          &AgentInfo{AgentID: "x", isStandalone: false},
-			defaultLogLevel: "info",
-			expected:        &AgentInfo{AgentID: "x", LogLevelPolicy: "info", unprivileged: !hasRoot, isStandalone: false},
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setFakeStore(t, tc.loaded, nil)
@@ -79,16 +73,6 @@ func TestNewAgentInfoWithLog(t *testing.T) {
 			assert.Equal(t, tc.expected, ai)
 		})
 	}
-}
-
-func TestNewAgentInfoWithLog_PersistsDefaultLevelInFleetModeWhenMissing(t *testing.T) {
-	fake := setFakeStore(t, &AgentInfo{AgentID: "x", isStandalone: false}, nil)
-
-	_, err := NewAgentInfoWithLog(context.Background(), "info", false)
-	assert.NoError(t, err)
-
-	logging := fake.state["agent"].(map[string]interface{})["logging"].(map[string]interface{})
-	assert.Equal(t, "info", logging["level"])
 }
 
 func TestNewAgentInfoWithLog_GeneratesAgentIDWhenMissing(t *testing.T) {

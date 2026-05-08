@@ -76,28 +76,14 @@ type AgentInfo struct {
 var defaultAgentInfoStore AgentInfoStore = NewEncryptedAgentInfoStore()
 
 // NewAgentInfoWithLog returns the agent's information, loading whatever is
-// persisted and filling in any missing fields with defaults.
+// persisted on disk and filling in runtime-derived fields. The only thing it
+// persists is a freshly-generated agent ID when one is requested and none
+// exists yet.
 func NewAgentInfoWithLog(ctx context.Context, defaultLogLevel string, createAgentID bool) (*AgentInfo, error) {
 	info, err := defaultAgentInfoStore.Load(ctx)
 	if err != nil {
 		return nil, err
 	}
-	opts, err := initializeAgentInfo(info, defaultLogLevel, createAgentID)
-	if err != nil {
-		return nil, err
-	}
-	if len(opts) > 0 {
-		if err := defaultAgentInfoStore.Save(ctx, opts...); err != nil {
-			return nil, fmt.Errorf("failed to persist agent info: %w", err)
-		}
-	}
-	return info, nil
-}
-
-// initializeAgentInfo fills in any missing fields on info and returns the
-// changes that should be persisted.
-func initializeAgentInfo(info *AgentInfo, defaultLogLevel string, createAgentID bool) ([]SaveOption, error) {
-	var opts []SaveOption
 
 	isRoot, err := utils.HasRoot()
 	if err != nil {
@@ -111,22 +97,18 @@ func initializeAgentInfo(info *AgentInfo, defaultLogLevel string, createAgentID 
 			return nil, fmt.Errorf("failed to generate agent ID: %w", err)
 		}
 		info.AgentID = id
-		opts = append(opts, WithID(id))
+		if err := defaultAgentInfoStore.Save(ctx, WithID(id)); err != nil {
+			return nil, fmt.Errorf("failed to persist agent info: %w", err)
+		}
 	}
 
-	// Standalone agents always use the supplied default and don't persist it.
+	// Standalone agents always use the supplied default in memory; the value
+	// is not persisted because there's no fleet to roundtrip it through.
 	if info.isStandalone {
 		info.LogLevelPolicy = defaultLogLevel
-		return opts, nil
 	}
 
-	// Fleet agents apply and persist the default only when no level is set.
-	if info.LogLevelPolicy == "" {
-		info.LogLevelPolicy = defaultLogLevel
-		opts = append(opts, WithLogLevelPolicy(defaultLogLevel))
-	}
-
-	return opts, nil
+	return info, nil
 }
 
 // NewAgentInfo creates a new agent information.
