@@ -10,3 +10,4 @@ description: |
   ship with mode 0644 across deb, rpm, tar.gz, and zip packages.
 
 component: elastic-agent
+pr: https://github.com/elastic/elastic-agent/pull/14117
