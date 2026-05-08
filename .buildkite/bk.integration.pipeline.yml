@@ -647,7 +647,6 @@ steps:
               - *k8s_max_test_version
 
   - group: "Serverless integration test"
-    skip: "See https://github.com/elastic/elastic-agent/issues/13927"
     key: integration-tests-serverless
     notify:
       - github_commit_status:
@@ -727,7 +726,7 @@ steps:
       - integration-tests-debian
     allow_dependency_failure: true
     command: |
-      .buildkite/scripts/steps/ess_down_oblt-cli.sh
+      .buildkite/scripts/steps/ess_cleanup_all.sh
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
