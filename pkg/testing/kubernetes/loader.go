@@ -17,7 +17,7 @@ import (
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 
-	"github.com/elastic/cloud-on-k8s/v2/pkg/apis/agent/v1alpha1"
+	"github.com/elastic/cloud-on-k8s/v3/pkg/apis/agent/v1alpha1"
 )
 
 // LoadFromYAML converts the given YAML reader to a list of k8s objects
