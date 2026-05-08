@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -775,4 +776,231 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		oldAgentInstall,
 		nil, nil, nil)
 	require.NoError(t, err, "error writing fake update marker")
+}
+
+// TestRollbackWithOpts_PreservesInTTLRollbacksAvailable encodes the
+// multi-rollback retention contract for RollbackWithOpts: in-TTL entries in
+// marker.RollbacksAvailable must survive a rollback regardless of which one is
+// chosen as the rollback target.
+//
+// Setup:
+//   - Three on-disk installs A, B, C.
+//   - Symlink points at C (the failing upgrade).
+//   - Update marker records C as new, A as previous, with both A and B listed
+//     in RollbacksAvailable with future TTLs.
+//
+// We roll back to A. B (also unexpired) must survive
+func TestRollbackWithOpts_PreservesInTTLRollbacksAvailable(t *testing.T) {
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+
+	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"}
+	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"}
+	versionC := testAgentVersion{version: "3.0.0", hash: "cccccc"}
+
+	testLogger, _ := loggertest.New(t.Name())
+	testTop := t.TempDir()
+
+	relA := createFakeAgentInstall(t, testTop, versionA.version, versionA.hash, true)
+	relB := createFakeAgentInstall(t, testTop, versionB.version, versionB.hash, true)
+	relC := createFakeAgentInstall(t, testTop, versionC.version, versionC.hash, true)
+
+	createLink(t, testTop, relC)
+
+	validUntil := time.Now().Add(24 * time.Hour)
+	availableRollbacks := map[string]ttl.TTLMarker{
+		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: validUntil},
+		relB: {Version: versionB.version, Hash: versionB.hash, ValidUntil: validUntil},
+	}
+
+	require.NoError(t,
+		ttl.NewTTLMarkerRegistry(testLogger, testTop).Set(availableRollbacks),
+		"writing TTL registry with two valid entries")
+
+	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
+	err := markUpgrade(
+		testLogger,
+		paths.DataFrom(testTop),
+		time.Now(),
+		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
+		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
+		nil, nil, availableRollbacks,
+	)
+	require.NoError(t, err, "writing update marker with two RollbacksAvailable entries")
+
+	mockClient := client.NewMockClient(t)
+	mockClient.EXPECT().Connect(
+		mock.AnythingOfType("*context.timerCtx"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+	).Return(nil)
+	mockClient.EXPECT().Disconnect().Return()
+	mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+
+	err = RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, relA, versionA.hash)
+	require.NoError(t, err, "RollbackWithOpts to A")
+
+	t.Run("rollback target A is preserved", func(t *testing.T) {
+		assertAgentInstallExists(t, filepath.Join(testTop, relA), agentExecutableName)
+	})
+
+	t.Run("failing upgrade C is cleaned up", func(t *testing.T) {
+		assertAgentInstallCleaned(t, filepath.Join(testTop, relC), agentExecutableName)
+	})
+
+	t.Run("other in-TTL rollback target B is preserved", func(t *testing.T) {
+		// B's directory must survive — its TTL has not expired and the live
+		// TTL registry still lists it as a valid rollback target.
+		assertAgentInstallExists(t, filepath.Join(testTop, relB), agentExecutableName)
+	})
+}
+
+// TestRollbackWithOpts_RemovesMalformedTTLRollbacksAvailable verifies that a
+// directory whose .ttl marker is corrupt is NOT preserved by post-rollback
+// cleanup. Under the registry contract a parseable TTL is the only proof an
+// install is a valid rollback target, so a malformed entry is treated like a
+// missing one. This preserves the self-healing property that a corrupt .ttl
+// outside the active install gets reaped at the next rollback, allowing
+// future upgrades to proceed against a clean registry.
+func TestRollbackWithOpts_RemovesMalformedTTLRollbacksAvailable(t *testing.T) {
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+
+	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"}
+	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"}
+	versionC := testAgentVersion{version: "3.0.0", hash: "cccccc"}
+
+	testLogger, _ := loggertest.New(t.Name())
+	testTop := t.TempDir()
+
+	relA := createFakeAgentInstall(t, testTop, versionA.version, versionA.hash, true)
+	relB := createFakeAgentInstall(t, testTop, versionB.version, versionB.hash, true)
+	relC := createFakeAgentInstall(t, testTop, versionC.version, versionC.hash, true)
+
+	createLink(t, testTop, relC)
+
+	// A has a valid in-TTL marker; B has a corrupt one (unparseable YAML).
+	// Both directories must survive the rollback to A.
+	now := time.Now()
+	availableRollbacks := map[string]ttl.TTLMarker{
+		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: now.Add(24 * time.Hour)},
+	}
+	require.NoError(t,
+		ttl.NewTTLMarkerRegistry(testLogger, testTop).Set(availableRollbacks),
+		"writing TTL registry with single valid entry")
+	require.NoError(t,
+		os.WriteFile(filepath.Join(testTop, relB, ".ttl"), []byte("this is not yaml"), 0644),
+		"writing corrupt .ttl for B")
+
+	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
+	err := markUpgrade(
+		testLogger,
+		paths.DataFrom(testTop),
+		now,
+		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
+		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
+		nil, nil, availableRollbacks,
+	)
+	require.NoError(t, err, "writing update marker")
+
+	mockClient := client.NewMockClient(t)
+	mockClient.EXPECT().Connect(
+		mock.AnythingOfType("*context.timerCtx"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+	).Return(nil)
+	mockClient.EXPECT().Disconnect().Return()
+	mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+
+	err = RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, relA, versionA.hash)
+	require.NoError(t, err, "RollbackWithOpts to A")
+
+	t.Run("rollback target A is preserved", func(t *testing.T) {
+		assertAgentInstallExists(t, filepath.Join(testTop, relA), agentExecutableName)
+	})
+
+	t.Run("failing upgrade C is cleaned up", func(t *testing.T) {
+		assertAgentInstallCleaned(t, filepath.Join(testTop, relC), agentExecutableName)
+	})
+
+	t.Run("install B with corrupt .ttl is cleaned up", func(t *testing.T) {
+		// B's .ttl is unparseable, so we cannot prove B is a valid rollback
+		// target. Treat it like a directory with no .ttl and let cleanup
+		// reap it — that's the self-healing path that lets the next upgrade
+		// proceed against a clean registry.
+		assertAgentInstallCleaned(t, filepath.Join(testTop, relB), agentExecutableName)
+	})
+}
+
+// TestRollbackWithOpts_RemovesExpiredRollbacksAvailable verifies that expired
+// entries in marker.RollbacksAvailable are not preserved by the rollback
+// cleanup: the keep list is filtered by ValidUntil so expired directories get
+// swept alongside the failing upgrade target.
+func TestRollbackWithOpts_RemovesExpiredRollbacksAvailable(t *testing.T) {
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+
+	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"}
+	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"}
+	versionC := testAgentVersion{version: "3.0.0", hash: "cccccc"}
+
+	testLogger, _ := loggertest.New(t.Name())
+	testTop := t.TempDir()
+
+	relA := createFakeAgentInstall(t, testTop, versionA.version, versionA.hash, true)
+	relB := createFakeAgentInstall(t, testTop, versionB.version, versionB.hash, true)
+	relC := createFakeAgentInstall(t, testTop, versionC.version, versionC.hash, true)
+
+	createLink(t, testTop, relC)
+
+	now := time.Now()
+	availableRollbacks := map[string]ttl.TTLMarker{
+		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: now.Add(24 * time.Hour)},
+		relB: {Version: versionB.version, Hash: versionB.hash, ValidUntil: now.Add(-1 * time.Hour)},
+	}
+
+	require.NoError(t,
+		ttl.NewTTLMarkerRegistry(testLogger, testTop).Set(availableRollbacks),
+		"writing TTL registry with mixed-TTL entries")
+
+	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
+	err := markUpgrade(
+		testLogger,
+		paths.DataFrom(testTop),
+		now,
+		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
+		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
+		nil, nil, availableRollbacks,
+	)
+	require.NoError(t, err, "writing update marker with mixed TTL RollbacksAvailable entries")
+
+	mockClient := client.NewMockClient(t)
+	mockClient.EXPECT().Connect(
+		mock.AnythingOfType("*context.timerCtx"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+	).Return(nil)
+	mockClient.EXPECT().Disconnect().Return()
+	mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+
+	err = RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, relA, versionA.hash)
+	require.NoError(t, err, "RollbackWithOpts to A")
+
+	t.Run("rollback target A is preserved", func(t *testing.T) {
+		assertAgentInstallExists(t, filepath.Join(testTop, relA), agentExecutableName)
+	})
+
+	t.Run("failing upgrade C is cleaned up", func(t *testing.T) {
+		assertAgentInstallCleaned(t, filepath.Join(testTop, relC), agentExecutableName)
+	})
+
+	t.Run("expired rollback target B is cleaned up", func(t *testing.T) {
+		assertAgentInstallCleaned(t, filepath.Join(testTop, relB), agentExecutableName)
+	})
 }

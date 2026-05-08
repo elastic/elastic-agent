@@ -412,18 +412,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	for _, tc := range tests[:1] {
 		agent := agentDocs[tc.dsType+"-"+tc.dsDataset+"-"+processNamespace].Hits.Hits[0].Source
 		otel := otelDocs[tc.dsType+"-"+tc.dsDataset+"-"+receiverNamespace].Hits.Hits[0].Source
-		ignoredFields := []string{
-			// Expected to change between agentDocs and OtelDocs
-			"@timestamp",
-			"agent.ephemeral_id",
-			// agent.id is different because it's the id of the underlying beat
-			"agent.id",
-			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
-			"agent.version",
-			"data_stream.namespace",
-			"elastic_agent.id",
-			"event.ingested",
-		}
+		ignoredFields := append(RuntimeComparisonIgnoredFields, "data_stream.namespace")
 		switch tc.onlyCompareKeys {
 		case true:
 			AssertMapstrKeysEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), "expected document keys to be equal for "+tc.dsType+"-"+tc.dsDataset)
@@ -663,18 +652,7 @@ outputs:
 		otelDocs := esDocs["otel"]
 
 		// Fields that are present in both agent and otel documents, but are expected to change
-		ignoredFields := []string{
-			"@timestamp",
-			"agent.id",
-			"agent.ephemeral_id",
-			"elastic_agent.id",
-			"data_stream.namespace",
-			"event.ingested",
-			"event.duration",
-
-			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
-			"agent.version",
-		}
+		ignoredFields := append(RuntimeComparisonIgnoredFields, "data_stream.namespace", "event.duration")
 
 		testCases := []struct {
 			metricset     string
