@@ -100,7 +100,32 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
 		// hash is the same as hash of agent which initiated watcher.
+<<<<<<< HEAD
 		if err := upgrade.Cleanup(log, paths.Top(), paths.VersionedHome(paths.Top()), release.ShortCommit(), true, false); err != nil {
+=======
+		versionedHomesToKeep := make([]string, 0, len(marker.RollbacksAvailable)+1)
+		// current version needs to be kept
+		if marker.Details != nil && marker.Details.State == details.StateRollback {
+			// we need to keep the previous versioned home (we have rolled back)
+			versionedHomesToKeep = append(versionedHomesToKeep, marker.PrevVersionedHome)
+		} else {
+			// we need to keep the upgraded version, since it has not been rolled back
+			absCurrentVersionedHome := paths.VersionedHome(topDir)
+			currentVersionedHome, err := filepath.Rel(topDir, absCurrentVersionedHome)
+			if err != nil {
+				return fmt.Errorf("extracting current home path %q relative to %q: %w", absCurrentVersionedHome, topDir, err)
+			}
+			versionedHomesToKeep = append(versionedHomesToKeep, currentVersionedHome)
+		}
+
+		if inTTL, err := upgrade.InTTLRollbacks(log, topDir, time.Now()); err != nil {
+			log.Infow("could not read TTL registry; cleanup will only preserve the current versioned home", "error.message", err.Error())
+		} else {
+			versionedHomesToKeep = append(versionedHomesToKeep, inTTL...)
+		}
+		log.Infof("About to clean up upgrade. Keeping versioned homes: %v", versionedHomesToKeep)
+		if err := installModifier.Cleanup(log, paths.Top(), true, false, versionedHomesToKeep...); err != nil {
+>>>>>>> f128da800 (Preserve unexpired available rollback agent versions during rollback (#14024))
 			log.Error("clean up of prior watcher run failed", err)
 		}
 		// exit nicely
@@ -135,19 +160,55 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	// Why is this being skipped on Windows? The comment above is not clear.
 	// issue: https://github.com/elastic/elastic-agent/issues/3027
 	removeMarker := !isWindows()
+<<<<<<< HEAD
 	err = upgrade.Cleanup(log, paths.Top(), marker.VersionedHome, marker.Hash, removeMarker, false)
+=======
+	newVersionedHome := marker.VersionedHome
+	if newVersionedHome == "" {
+		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
+		newVersionedHome = filepath.Join("data", fmt.Sprintf("elastic-agent-%s", marker.Hash[:6]))
+	}
+	versionedHomesToKeep := make([]string, 0, len(marker.RollbacksAvailable)+1)
+	versionedHomesToKeep = append(versionedHomesToKeep, newVersionedHome)
+	if inTTL, keepErr := upgrade.InTTLRollbacks(log, topDir, time.Now()); keepErr != nil {
+		log.Infow("could not read TTL registry; cleanup will only preserve the new versioned home", "error.message", keepErr.Error())
+	} else {
+		versionedHomesToKeep = append(versionedHomesToKeep, inTTL...)
+	}
+
+	err = installModifier.Cleanup(log, topDir, removeMarker, false, versionedHomesToKeep...)
+>>>>>>> f128da800 (Preserve unexpired available rollback agent versions during rollback (#14024))
 	if err != nil {
 		log.Error("cleanup after successful watch failed", err)
 	}
 	return err
 }
 
+<<<<<<< HEAD
 func isWindows() bool {
 	return runtime.GOOS == "windows"
 }
 
 func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.Duration, log *logger.Logger) error {
 	errChan := make(chan error)
+=======
+func rollback(log *logp.Logger, topDir string, client client.Client, installModifier installationModifier, versionedHome string) error {
+	// TODO: there should be some sanity check in rollback functions like the installation we are going back to should exist and work
+	log.Infof("rolling back to %s", versionedHome)
+	dataDir := paths.DataFrom(topDir)
+	marker, err := upgrade.LoadMarker(dataDir)
+	if err != nil {
+		log.Error("failed to load marker", err)
+		return err
+	}
+	if marker == nil {
+		// no marker found we're not in upgrade process, recreate one marker to track the rollback
+		marker = &upgrade.UpdateMarker{}
+		log.Info("No update marker found, recreating an empty one to track the rollback")
+	} else {
+		log.With("marker", marker, "details", marker.Details).Info("Loaded update marker")
+	}
+>>>>>>> f128da800 (Preserve unexpired available rollback agent versions during rollback (#14024))
 
 	ctx, cancel := context.WithCancel(ctx)
 
