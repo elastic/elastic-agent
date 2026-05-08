@@ -5,8 +5,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "sunday"
-      time: "22:00"
+      day: "monday"
+      time: "08:00"
     labels:
       - automation
       - skip-changelog
