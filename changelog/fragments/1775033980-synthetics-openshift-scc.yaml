@@ -1,0 +1,13 @@
+kind: enhancement
+
+summary: Enable elastic-agent-complete to run in OpenShift with arbitrary UIDs (SCC)
+
+# Long description; in case the summary is not enough to describe the change
+# this field accommodate a description without length limits.
+# NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
+#description:
+
+component: elastic-agent
+
+# PR URL; optional; the PR number that added the changeset.
+pr: https://github.com/elastic/elastic-agent/pull/13369
