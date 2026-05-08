@@ -17,7 +17,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260507213829-7bbe8ee6dcfb
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.41.1
+	github.com/elastic/elastic-agent-libs v0.42.2
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.46.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.46.0
@@ -104,6 +104,7 @@ require (
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
+	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/elastic/ebpfevents v0.8.0 // indirect
 	github.com/elastic/entcollect v0.0.0-20260501012805-5fd94422b104 // indirect
 	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
@@ -382,12 +383,12 @@ require (
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
 	github.com/elastic/apm-data v1.21.0 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
-	github.com/elastic/elastic-agent-autodiscover v0.10.3-0.20260423154939-e990715f9426 // indirect
+	github.com/elastic/elastic-agent-autodiscover v1.0.0 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.18.1 // indirect
 	github.com/elastic/elastic-agent-system-metrics v0.14.3 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
-	github.com/elastic/go-docappender/v2 v2.14.0 // indirect
+	github.com/elastic/go-docappender/v2 v2.14.1 // indirect
 	github.com/elastic/go-elasticsearch/v8 v8.19.5 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
