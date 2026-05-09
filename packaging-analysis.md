@@ -328,3 +328,23 @@ CI scripts that need different behaviour set env vars explicitly.
 - The internal `packageAgent` function, `flattenDependencies`,
   `extractAgentCoreForPackage`, and related helpers are unchanged in their
   overall structure — see [packaging-internals.md](./packaging-internals.md).
+
+---
+
+## 8. Change: `USE_PACKAGE_VERSION` defaults to `true`
+
+**Before:** `USE_PACKAGE_VERSION` defaulted to `false`. A bare `mage package`
+used `version/version.go`'s version and produced a snapshot build only if
+`SNAPSHOT=true` was set explicitly.
+
+**After:** `setPackagingDefaults()` in `dev-tools/mage/settings.go` sets
+`Packaging.UsePackageVersion = true`. A bare `mage package` now reads
+`.package-version` and automatically picks up the branch's manifest URL,
+version, and snapshot flag — no env vars required.
+
+**Callers that must opt out:**
+
+| Script / target | Why | Action |
+|---|---|---|
+| `build-agent-core.sh` | Binary-DRA must stamp `version/version.go`'s version | `USE_PACKAGE_VERSION=false` already added |
+| `package.sh` (MANIFEST_URL branch) | `MANIFEST_URL` and `USE_PACKAGE_VERSION=true` are mutually exclusive | `USE_PACKAGE_VERSION=false` already added |
