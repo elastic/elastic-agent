@@ -41,7 +41,7 @@ notice:
 check-ci:
 	@mage -v check
 	@$(MAKE) notice
-	@dev-tools/dependencies-report
+	@dev-tools/dependencies-report && rm dependencies.csv
 	@GENERATEKUSTOMIZE=true $(MAKE) -C deploy/kubernetes generate-k8s
 	@$(MAKE) -C deploy/kubernetes generate-k8s
 	@mage -v helm:lint
