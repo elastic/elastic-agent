@@ -5,11 +5,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14095
-        - https://github.com/elastic/elastic-agent/pull/14024
-        - https://github.com/elastic/elastic-agent/pull/14115
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/14021
+        - https://github.com/elastic/elastic-agent/pull/13683
+      issue: []
       impact: ""
       action: ""
       timestamp: 1776464382
@@ -23,9 +20,7 @@ entries:
         exits gracefully.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14095
-        - https://github.com/elastic/elastic-agent/pull/14024
-        - https://github.com/elastic/elastic-agent/pull/14115
+        - https://github.com/elastic/elastic-agent/pull/13862
       issue:
         - https://github.com/elastic/elastic-agent/issues/13586
       impact: ""
@@ -42,11 +37,8 @@ entries:
         fail. The service now stops promptly.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14095
-        - https://github.com/elastic/elastic-agent/pull/14024
-        - https://github.com/elastic/elastic-agent/pull/14115
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/14021
+        - https://github.com/elastic/elastic-agent/pull/13878
+      issue: []
       impact: ""
       action: ""
       timestamp: 1777366905
@@ -58,11 +50,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14095
-        - https://github.com/elastic/elastic-agent/pull/14024
-        - https://github.com/elastic/elastic-agent/pull/14115
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/14021
+        - https://github.com/elastic/elastic-agent/pull/13894
+      issue: []
       impact: ""
       action: ""
       timestamp: 1777410560
@@ -74,11 +63,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14095
-        - https://github.com/elastic/elastic-agent/pull/14024
-        - https://github.com/elastic/elastic-agent/pull/14115
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/14021
+        - https://github.com/elastic/elastic-agent/pull/13974
+      issue: []
       impact: ""
       action: ""
       timestamp: 1777882926
@@ -90,9 +76,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14095
         - https://github.com/elastic/elastic-agent/pull/14024
-        - https://github.com/elastic/elastic-agent/pull/14115
       issue:
         - https://github.com/elastic/elastic-agent/issues/14021
       impact: ""
