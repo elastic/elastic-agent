@@ -93,6 +93,7 @@ ssl.curve_types: "P-256"
 					"certificate_authorities": []any{"/not/a/real/path/ca.pem"},
 					"renegotiation":           int64(0),
 					"cipher_suites":           []any{},
+					"disable_legacy_pem_support": false,
 					"verification_mode":       uint64(0),
 					"curve_types":             []any{uint64(23)},
 				},
