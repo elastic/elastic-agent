@@ -6,6 +6,7 @@ package mage
 
 import (
 	"context"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -13,6 +14,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestMain disables USE_PACKAGE_VERSION for the whole package so LoadSettings
+// doesn't read .package-version (and consequently fetch the manifest from
+// Elastic's CDN) by default. Tests that exercise that behaviour explicitly
+// re-enable it via t.Setenv.
+func TestMain(m *testing.M) {
+	os.Setenv("USE_PACKAGE_VERSION", "false")
+	os.Exit(m.Run())
+}
 
 func TestGetVersion(t *testing.T) {
 	cfg, err := LoadSettings()
@@ -770,11 +780,11 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads packaging settings from env vars", func(t *testing.T) {
-		// Disable the USE_PACKAGE_VERSION default so .package-version does
-		// not override AGENT_PACKAGE_VERSION / MANIFEST_URL during this test.
+		// Disable USE_PACKAGE_VERSION so .package-version doesn't override our
+		// env values. MANIFEST_URL reading is tested separately via
+		// loadPackagingSettingsFromEnv to avoid LoadSettings's manifest fetch.
 		t.Setenv("USE_PACKAGE_VERSION", "false")
 		t.Setenv("AGENT_PACKAGE_VERSION", "2.0.0")
-		t.Setenv("MANIFEST_URL", "https://manifest.url")
 		t.Setenv("AGENT_DROP_PATH", "/drop/path")
 		t.Setenv("KEEP_ARCHIVE", "true")
 
@@ -782,9 +792,18 @@ func TestLoadSettings(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "2.0.0", settings.Packaging.AgentPackageVersion)
-		assert.Equal(t, "https://manifest.url", settings.Packaging.ManifestURL)
 		assert.Equal(t, "/drop/path", settings.Packaging.AgentDropPath)
 		assert.True(t, settings.Packaging.KeepArchive)
+	})
+
+	t.Run("loadPackagingSettingsFromEnv reads MANIFEST_URL", func(t *testing.T) {
+		t.Setenv("USE_PACKAGE_VERSION", "false")
+		t.Setenv("MANIFEST_URL", "https://manifest.url")
+
+		s := DefaultSettings()
+		require.NoError(t, s.loadPackagingSettingsFromEnv())
+
+		assert.Equal(t, "https://manifest.url", s.Packaging.ManifestURL)
 	})
 
 	t.Run("applies .package-version overrides when USE_PACKAGE_VERSION is set", func(t *testing.T) {

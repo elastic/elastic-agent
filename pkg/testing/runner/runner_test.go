@@ -20,6 +20,9 @@ import (
 )
 
 func TestNewRunner_Clean(t *testing.T) {
+	// LoadSettings reads .package-version (and consequently fetches the manifest)
+	// when USE_PACKAGE_VERSION is enabled; this test only needs Go version info.
+	t.Setenv("USE_PACKAGE_VERSION", "false")
 	tmpdir := t.TempDir()
 	stateDir := filepath.Join(tmpdir, "state")
 	err := os.MkdirAll(stateDir, 0755)

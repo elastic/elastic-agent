@@ -634,26 +634,11 @@ func Package(ctx context.Context) error {
 
 	switch cfg.Packaging.CoreSource {
 	case devtools.CoreSourceLocal, "":
-		// Apply only snapshot and version from the manifest — not the commit hash.
-		// AgentCoreCommitHash() will return the git HEAD hash (the commit the
-		// compiler actually baked into the binary).
-		cfgWithManifest, err := cfg.WithManifestInfo(ctx)
-		if err != nil {
-			return fmt.Errorf("failed downloading manifest: %w", err)
-		}
-		cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithAgentCoreVersion(cfgWithManifest.AgentCoreVersion())
-		ctx = devtools.ContextWithSettings(ctx, cfg)
 		mg.CtxDeps(ctx, PackageAgentCore)
 	case devtools.CoreSourceManifest:
-		var err error
-		cfg, err = cfg.WithManifestInfo(ctx)
-		if err != nil {
-			return fmt.Errorf("failed downloading manifest: %w", err)
-		}
 		if cfg.Packaging.Manifest == nil {
 			return errors.New("AGENT_CORE_SOURCE=manifest requires MANIFEST_URL to be set")
 		}
-		ctx = devtools.ContextWithSettings(ctx, cfg)
 	default:
 		return fmt.Errorf("unknown AGENT_CORE_SOURCE=%q (want %q or %q)",
 			cfg.Packaging.CoreSource, devtools.CoreSourceLocal, devtools.CoreSourceManifest)
@@ -1982,10 +1967,6 @@ func Ironbank(ctx context.Context) error {
 		return nil
 	}
 	cfg := devtools.SettingsFromContext(ctx)
-	cfg, err := cfg.WithManifestInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed downloading manifest: %w", err)
-	}
 	if err := prepareIronbankBuild(cfg); err != nil {
 		return fmt.Errorf("failed to prepare the IronBank context: %w", err)
 	}
@@ -4251,10 +4232,6 @@ func (h Helm) Package(ctx context.Context) error {
 	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
 	productionPackage := cfg.Build.SnapshotSet && !cfg.Build.Snapshot
 
-	cfg, err := cfg.WithManifestInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed downloading manifest: %w", err)
-	}
 	agentPackageVersion := cfg.AgentPackageVersion()
 	agentImageTag := agentPackageVersion
 	agentChartVersion := agentPackageVersion
@@ -4294,7 +4271,7 @@ func (h Helm) Package(ctx context.Context) error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
 		func(format string, v ...interface{}) {})
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
