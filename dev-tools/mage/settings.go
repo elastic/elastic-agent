@@ -879,9 +879,11 @@ func (s *Settings) WithAgentCoreVersion(version string) *Settings {
 	return clone
 }
 
-// WithManifestInfo downloads the manifest at ManifestURL and applies version information to a copy of
-// the settings. It sets Build.Snapshot, Build.AgentCoreVersion, Build.AgentCoreCommitHash,
-// Build.DependenciesVersion, and Packaging.Manifest. It is a no-op if ManifestURL is empty.
+// WithManifestInfo downloads the manifest at ManifestURL and applies version information to a copy
+// of the settings. It sets Build.Snapshot, Build.AgentCoreVersion, Packaging.AgentPackageVersion,
+// Build.DependenciesVersion, and Packaging.Manifest. Build.AgentCoreCommitHash is set only when
+// CoreSource is CoreSourceManifest: for CoreSourceLocal the locally-built binary's commit is git
+// HEAD, not the manifest's. It is a no-op if ManifestURL is empty.
 func (s *Settings) WithManifestInfo(ctx context.Context) (*Settings, error) {
 	if s.Packaging.ManifestURL == "" {
 		return s, nil
@@ -909,8 +911,10 @@ func (s *Settings) WithManifestInfo(ctx context.Context) (*Settings, error) {
 	// VersionWithBuildMetadata preserves the build ID for Independent Agent Releases while
 	// omitting the prerelease — snapshot state is captured in Build.Snapshot.
 	clone.Packaging.AgentPackageVersion = parsedVersion.VersionWithBuildMetadata()
-	clone.Build.AgentCoreCommitHash = agentCoreProject.CommitHash
 	clone.Build.DependenciesVersion = parsedVersion.VersionWithPrerelease()
+	if s.Packaging.CoreSource == CoreSourceManifest {
+		clone.Build.AgentCoreCommitHash = agentCoreProject.CommitHash
+	}
 	return clone, nil
 }
 
@@ -1331,49 +1335,56 @@ func MustLoadSettings() *Settings {
 	return s
 }
 
-// LoadSettings reads all settings from environment variables and returns a new Settings.
-// Each call returns a fresh settings with defaults, then overridden by environment variables.
-func LoadSettings() (*Settings, error) {
-	return LoadSettingsWithOptions(LoadOptions{})
-}
-
-// LoadSettingsWithOptions reads all settings from environment variables and returns a new Settings,
-// respecting the provided LoadOptions. Use LoadOptions.SkipVCS to skip git-based initialization
-// when running in a directory that is not a git repository.
-func LoadSettingsWithOptions(opts LoadOptions) (*Settings, error) {
-	s := DefaultSettings()
-
+// loadSettingsFromEnv populates settings from environment variables only.
+// No filesystem reads, no network. Intended for hermetic testing of the
+// env-var → settings mapping; callers that need full settings should use
+// LoadSettings instead.
+func (s *Settings) loadSettingsFromEnv() error {
 	if err := s.loadBuildSettingsFromEnv(); err != nil {
-		return nil, fmt.Errorf("loading build settings: %w", err)
+		return fmt.Errorf("loading build settings: %w", err)
 	}
-
 	s.loadBeatSettingsFromEnv()
-
 	if err := s.loadTestSettingsFromEnv(); err != nil {
-		return nil, fmt.Errorf("loading test settings: %w", err)
+		return fmt.Errorf("loading test settings: %w", err)
 	}
-
 	s.loadCrossBuildSettingsFromEnv()
-
-	// Initialize repo info early so that loadPackagingSettingsFromEnv can
-	// default PackageVersionDir to the repo root.
-	if err := s.initRepoInfo(); err != nil {
-		return nil, fmt.Errorf("initializing repo info: %w", err)
-	}
-
 	if err := s.loadPackagingSettingsFromEnv(); err != nil {
-		return nil, fmt.Errorf("loading packaging settings: %w", err)
+		return fmt.Errorf("loading packaging settings: %w", err)
 	}
 	if err := s.loadIntegrationTestSettingsFromEnv(); err != nil {
-		return nil, fmt.Errorf("loading integration test settings: %w", err)
+		return fmt.Errorf("loading integration test settings: %w", err)
 	}
 	s.loadDockerSettingsFromEnv()
 	s.loadKubernetesSettingsFromEnv()
 	s.loadDevMachineSettingsFromEnv()
 	s.loadFmtSettingsFromEnv()
+	return nil
+}
 
-	// Initialize elastic beats dir and build variables.
-	// These depend on the filesystem and must be initialized in order.
+// LoadSettings reads all settings from environment variables, the filesystem
+// (.package-version, version/version.go, git HEAD), and the manifest URL if
+// set. Each call returns fresh settings.
+func LoadSettings() (*Settings, error) {
+	return LoadSettingsWithOptions(LoadOptions{})
+}
+
+// LoadSettingsWithOptions reads all settings like LoadSettings but respects the
+// provided LoadOptions. Use LoadOptions.SkipVCS to skip git-based initialization
+// (commit hash lookup) when running in a directory that is not a git repository.
+func LoadSettingsWithOptions(opts LoadOptions) (*Settings, error) {
+	s := DefaultSettings()
+
+	if err := s.loadSettingsFromEnv(); err != nil {
+		return nil, err
+	}
+
+	// Filesystem-dependent initialisation, in order: RepoInfo first because
+	// applyPackageVersionOverrides needs RepoInfo.RootDir to find
+	// .package-version, then the rest.
+	if err := s.initRepoInfo(); err != nil {
+		return nil, fmt.Errorf("initializing repo info: %w", err)
+	}
+	s.applyPackageVersionOverrides()
 	if err := s.initElasticBeatsDir(); err != nil {
 		return nil, fmt.Errorf("initializing elastic beats dir: %w", err)
 	}
@@ -1384,6 +1395,14 @@ func LoadSettingsWithOptions(opts LoadOptions) (*Settings, error) {
 		if err := s.initCommitHash(); err != nil {
 			return nil, fmt.Errorf("initializing commit hash: %w", err)
 		}
+	}
+
+	// Apply manifest info if MANIFEST_URL is set. Uses context.Background()
+	// because LoadSettings has no caller-supplied context; cancellation isn't
+	// meaningful for a build tool's startup. No-op when no manifest URL is set.
+	s, err := s.WithManifestInfo(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("applying manifest info: %w", err)
 	}
 
 	return s, nil
@@ -1596,33 +1615,39 @@ func (s *Settings) loadPackagingSettingsFromEnv() error {
 		log.Printf("Warning: unknown AGENT_CORE_SOURCE=%q; defaulting to %q", v, CoreSourceLocal)
 		s.Packaging.CoreSource = CoreSourceLocal
 	}
-
-	// Apply .package-version overrides when USE_PACKAGE_VERSION is set.
-	// AgentPackageVersion and AgentCoreVersion are both set from pv.CoreVersion
-	// because the full package's agent_package_version must match the core
-	// archive's agent_core_version (extractAgentCoreForPackage looks up the
-	// core archive by the same version). For standalone packageAgentCore, this
-	// means the core archive is named with .package-version's version rather
-	// than version/version.go's; that is intentional.
-	if s.Packaging.UsePackageVersion {
-		pv, err := GetPackageVersionInfo(s)
-		if err != nil {
-			log.Printf("Warning: failed to get package version info: %v", err)
-		}
-		if pv != nil {
-			s.Packaging.ManifestURL = pv.ManifestURL
-			s.Packaging.AgentPackageVersion = pv.CoreVersion
-			s.Build.AgentCoreVersion = pv.CoreVersion
-			s.Build.Snapshot = true
-			s.IntegrationTest.AgentVersion = pv.Version
-			s.IntegrationTest.AgentStackVersion = pv.StackVersion
-
-			if s.Packaging.AgentDropPath == "" {
-				s.Packaging.AgentDropPath = filepath.Join(s.RepoInfo.RootDir, "build", "distributions", "elastic-agent-drop")
-			}
-		}
-	}
 	return nil
+}
+
+// applyPackageVersionOverrides reads .package-version and propagates its
+// values when USE_PACKAGE_VERSION is set. Requires RepoInfo to be initialised.
+//
+// AgentPackageVersion and AgentCoreVersion are both set from pv.CoreVersion
+// because the full package's agent_package_version must match the core
+// archive's agent_core_version (extractAgentCoreForPackage looks up the core
+// archive by the same version). For standalone packageAgentCore, this means
+// the core archive is named with .package-version's version rather than
+// version/version.go's; that is intentional.
+func (s *Settings) applyPackageVersionOverrides() {
+	if !s.Packaging.UsePackageVersion {
+		return
+	}
+	pv, err := GetPackageVersionInfo(s)
+	if err != nil {
+		log.Printf("Warning: failed to get package version info: %v", err)
+	}
+	if pv == nil {
+		return
+	}
+	s.Packaging.ManifestURL = pv.ManifestURL
+	s.Packaging.AgentPackageVersion = pv.CoreVersion
+	s.Build.AgentCoreVersion = pv.CoreVersion
+	s.Build.Snapshot = true
+	s.IntegrationTest.AgentVersion = pv.Version
+	s.IntegrationTest.AgentStackVersion = pv.StackVersion
+
+	if s.Packaging.AgentDropPath == "" {
+		s.Packaging.AgentDropPath = filepath.Join(s.RepoInfo.RootDir, "build", "distributions", "elastic-agent-drop")
+	}
 }
 
 // loadIntegrationTestSettingsFromEnv overrides integration test settings from environment variables.
