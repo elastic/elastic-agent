@@ -7,13 +7,11 @@ source "${_SELF}/../common.sh"
 
 mage clean
 
-# When MANIFEST_URL is provided (DRA full-package run), download core from the
-# manifest. Otherwise compile core from this checkout and read version/snapshot
-# from .package-version.
-if test -z "${MANIFEST_URL:-}"; then
-  export AGENT_CORE_SOURCE=local
-  export USE_PACKAGE_VERSION=true
-else
+# Default behavior (no MANIFEST_URL): compile core from this checkout and read
+# version/snapshot from .package-version (AGENT_CORE_SOURCE=local and
+# USE_PACKAGE_VERSION=true are both defaults). When MANIFEST_URL is provided
+# (DRA full-package run), download core from the manifest instead.
+if [ -n "${MANIFEST_URL:-}" ]; then
   export AGENT_CORE_SOURCE=manifest
   export USE_PACKAGE_VERSION=false
 fi
