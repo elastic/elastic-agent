@@ -9,10 +9,6 @@ source .buildkite/scripts/common.sh
 #
 # Making a change here can affect the released images to agentless, so be cautious.
 
-export USE_PACKAGE_VERSION="true"
 export WINDOWS_NPCAP="true"
-# Always compile core from this checkout; integration tests and agentless
-# release builds must exercise the core from this commit.
-export AGENT_CORE_SOURCE=local
 
 mage package
