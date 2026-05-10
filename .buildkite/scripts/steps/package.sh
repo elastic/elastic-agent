@@ -16,9 +16,6 @@ if [ -n "${MANIFEST_URL:-}" ]; then
   export USE_PACKAGE_VERSION=false
 fi
 
-export AGENT_DROP_PATH=build/elastic-agent-drop
-mkdir -p "$AGENT_DROP_PATH"
-
 MAGE_TARGETS=("package")
 if [ "$FIPS" != "true" ]; then
   MAGE_TARGETS+=("helm:package")

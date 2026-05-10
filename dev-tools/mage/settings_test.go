@@ -224,11 +224,12 @@ func TestSettingsWithMethods(t *testing.T) {
 
 	t.Run("WithAgentDropPath", func(t *testing.T) {
 		original := DefaultSettings()
+		originalDropPath := original.Packaging.AgentDropPath
 
 		modified := original.WithAgentDropPath("/path/to/drop")
 
 		assert.Equal(t, "/path/to/drop", modified.Packaging.AgentDropPath)
-		assert.Empty(t, original.Packaging.AgentDropPath)
+		assert.Equal(t, originalDropPath, original.Packaging.AgentDropPath)
 	})
 
 	t.Run("WithStackProvisioner", func(t *testing.T) {
