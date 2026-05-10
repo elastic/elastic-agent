@@ -16,7 +16,7 @@ import (
 func TestGetVersion(t *testing.T) {
 	cfg, err := LoadSettings()
 	require.NoError(t, err)
-	bp := cfg.BeatQualifiedVersion()
+	bp := cfg.AgentQualifiedCoreVersion()
 	assert.NotEmpty(t, bp)
 }
 
@@ -24,7 +24,7 @@ func TestAgentPackageVersion(t *testing.T) {
 	t.Run("agent package version without env var", func(t *testing.T) {
 		cfg, err := LoadSettings()
 		require.NoError(t, err)
-		expectedPkgVersion := cfg.BeatQualifiedVersion()
+		expectedPkgVersion := cfg.AgentQualifiedCoreVersion()
 		actualPkgVersion := cfg.AgentPackageVersion()
 		assert.Equal(t, expectedPkgVersion, actualPkgVersion)
 	})
@@ -193,13 +193,13 @@ func TestSettingsWithMethods(t *testing.T) {
 		assert.Equal(t, []PackageType{TarGz, Zip}, modified.SelectedPackageTypes)
 	})
 
-	t.Run("WithBeatVersion", func(t *testing.T) {
+	t.Run("WithAgentCoreVersion", func(t *testing.T) {
 		original := DefaultSettings()
 
-		modified := original.WithBeatVersion("1.2.3")
+		modified := original.WithAgentCoreVersion("1.2.3")
 
-		assert.Equal(t, "1.2.3", modified.Build.BeatVersion)
-		assert.Empty(t, original.Build.BeatVersion)
+		assert.Equal(t, "1.2.3", modified.Build.AgentCoreVersion)
+		assert.Empty(t, original.Build.AgentCoreVersion)
 	})
 
 	t.Run("WithAgentDropPath", func(t *testing.T) {
@@ -705,7 +705,7 @@ func TestLoadSettings(t *testing.T) {
 		assert.True(t, settings.Build.VersionQualified)
 		assert.Equal(t, "true", settings.Build.CI)
 		assert.Equal(t, 8, settings.Build.MaxParallel)
-		assert.Equal(t, "1.2.3", settings.Build.BeatVersion)
+		assert.Equal(t, "1.2.3", settings.Build.AgentCoreVersion)
 		assert.True(t, settings.Build.GolangCrossBuild)
 		assert.Equal(t, "1.21.0", settings.Build.BeatGoVersion)
 		assert.Equal(t, "main", settings.Build.BeatDocBranch)
@@ -796,7 +796,6 @@ func TestLoadSettings(t *testing.T) {
 		isSnapshot := strings.HasSuffix(pv.Version, SnapshotSuffix)
 		assert.Equal(t, pv.ManifestURL, settings.Packaging.ManifestURL)
 		assert.Equal(t, pv.CoreVersion, settings.Packaging.AgentPackageVersion)
-		assert.Equal(t, pv.CoreVersion, settings.Build.BeatVersion)
 		assert.Equal(t, isSnapshot, settings.Build.Snapshot)
 		assert.Equal(t, pv.Version, settings.IntegrationTest.AgentVersion)
 		assert.Equal(t, pv.StackVersion, settings.IntegrationTest.AgentStackVersion)
