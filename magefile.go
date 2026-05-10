@@ -632,6 +632,10 @@ func Package(ctx context.Context) error {
 		return errors.New("elastic-agent package is expected to build at least one platform package")
 	}
 
+	if err := os.MkdirAll(cfg.Packaging.AgentDropPath, 0o755); err != nil {
+		return fmt.Errorf("creating agent drop path %q: %w", cfg.Packaging.AgentDropPath, err)
+	}
+
 	switch cfg.Packaging.CoreSource {
 	case devtools.CoreSourceLocal, "":
 		mg.CtxDeps(ctx, PackageAgentCore)

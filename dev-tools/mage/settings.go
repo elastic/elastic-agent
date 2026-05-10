@@ -724,6 +724,9 @@ func (s *Settings) setPackagingDefaults() {
 	// in .buildkite/scripts/steps/build-agent-core.sh) set
 	// USE_PACKAGE_VERSION=false explicitly.
 	s.Packaging.UsePackageVersion = true
+	// Default drop path under build/distributions, alongside the rest of
+	// packaging output. The packaging code creates this directory on demand.
+	s.Packaging.AgentDropPath = "build/distributions/elastic-agent-drop"
 }
 
 // setIntegrationTestDefaults sets default values for IntegrationTestSettings.
@@ -1612,10 +1615,6 @@ func (s *Settings) applyPackageVersionOverrides() {
 	s.Build.Snapshot = true
 	s.IntegrationTest.AgentVersion = pv.Version
 	s.IntegrationTest.AgentStackVersion = pv.StackVersion
-
-	if s.Packaging.AgentDropPath == "" {
-		s.Packaging.AgentDropPath = filepath.Join(s.RepoInfo.RootDir, "build", "distributions", "elastic-agent-drop")
-	}
 }
 
 // loadIntegrationTestSettingsFromEnv overrides integration test settings from environment variables.
