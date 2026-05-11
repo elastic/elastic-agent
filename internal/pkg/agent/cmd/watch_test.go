@@ -405,7 +405,7 @@ func Test_watchCmd_MarkerPointsToSelf(t *testing.T) {
 	// Build a real install on disk and link the top-level binary into it.
 	// This is the live install — the directory the daemon would actually run.
 	const liveVersion = "9.3.0-SNAPSHOT"
-	const liveHash = "selfhsh" // 7 chars, ≥ upgrade.HashLen
+	const liveHash = "oldhash" // 7 chars, ≥ upgrade.HashLen; helper truncates to upgrade.HashLen
 	liveHome := writeFakeInstallForWatcherTest(t, topDir, liveVersion, liveHash)
 	linkSelfForWatcherTest(t, topDir, liveHome)
 
@@ -418,7 +418,7 @@ func Test_watchCmd_MarkerPointsToSelf(t *testing.T) {
 	require.NoError(t, upgrade.SaveMarker(dataDir, &upgrade.UpdateMarker{
 		Version:           "9.4.0",
 		Hash:              "newhash",
-		VersionedHome:     filepath.Join("data", "elastic-agent-9.4.0-newhsh"),
+		VersionedHome:     filepath.Join("data", "elastic-agent-9.4.0-newhas"),
 		UpdatedOn:         time.Now(),
 		PrevVersion:       liveVersion,
 		PrevHash:          liveHash,

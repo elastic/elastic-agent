@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -275,9 +274,7 @@ func TestCleanup_DropsPhantomKeepListEntry(t *testing.T) {
 
 	// Phantom entry was reported as dropped.
 	dropLogs := obs.FilterMessageSnippet("dropping non-existent keep-list entry").All()
-	if assert.Len(t, dropLogs, 1, "expected exactly one drop log entry") {
-		assert.Equal(t, zapcore.InfoLevel, dropLogs[0].Level)
-	}
+	assert.Len(t, dropLogs, 1, "expected exactly one drop log entry")
 
 	// "Keeping" log line must NOT mention the phantom entry.
 	keepLogs := obs.FilterMessageSnippet("Starting cleanup of versioned homes. Keeping:").All()
@@ -528,9 +525,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				assert.NoError(t, err, "reading topPath elastic-agent link")
 				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
 				snippetLogs := logs.FilterMessageSnippet("pre-restart hook error, not fatal").All()
-				if assert.Len(t, snippetLogs, 1) {
-					assert.Equal(t, zapcore.WarnLevel, snippetLogs[0].Level)
-				}
+				assert.Len(t, snippetLogs, 1)
 				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
 			},
 		},

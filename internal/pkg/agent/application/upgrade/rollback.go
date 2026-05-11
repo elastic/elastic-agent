@@ -206,13 +206,17 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	if liveHome, err := liveVersionedHome(topDirPath); err == nil {
 		candidates = append(candidates, liveHome)
 	} else {
-		// The symlink is the only authoritative source for the live install,
-		// so when it can't be read the keep list falls back to whatever the
-		// caller passed. On a healthy install the symlink is always present;
-		// reaching this branch means the top-level layout is broken (missing
-		// or corrupt symlink) and the operator should investigate before the
-		// next upgrade — hence Warn, not Info.
-		log.Warnw("could not derive live versioned home; cleanup proceeds without symlink-based protection",
+		// The symlink is the only authoritative source for the live install
+		// within this function. When it can't be read, the keep list falls
+		// back to whatever the caller passed. If that keep list also doesn't
+		// include the actual live install (e.g. a stale marker where
+		// marker.VersionedHome points at a phantom directory), the cleanup
+		// loop below will delete the live install — and with keepLogs=false
+		// the on-disk logs that would explain the incident go with it.
+		// Error level — not Warn — because the failure mode is destructive
+		// AND removes its own evidence, so the log line itself needs to
+		// flush and ship at high priority before the cleanup proceeds.
+		log.Errorw("could not derive live versioned home from symlink; cleanup proceeds with caller's keep list only — live install may be deleted if it is not in the keep list",
 			"error.message", err.Error())
 	}
 
