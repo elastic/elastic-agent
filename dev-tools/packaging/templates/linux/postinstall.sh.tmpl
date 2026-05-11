@@ -2,16 +2,7 @@
 
 set -e
 
-<<<<<<< HEAD
-commit_hash="{{ commit_short }}"
-=======
-PREFIX=""
-if [[ ${RPM_INSTALL_PREFIX:-/} != "/" ]]; then
-    PREFIX=${RPM_INSTALL_PREFIX}
-fi
-
 commit_hash="{{ core_commit_short }}"
->>>>>>> 68e52d042 ([mage] Fix commit hash override (#13823))
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
 symlink_dir="/usr/share/elastic-agent/bin"
 symlink="/usr/share/elastic-agent/bin/elastic-agent"
