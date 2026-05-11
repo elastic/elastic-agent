@@ -14,11 +14,11 @@ function ess_up() {
   local oblt_cmd=(
     oblt-cli cluster create custom
     --template ess-ea-it
-    --cluster-name-prefix ea-hosted-it
+    --cluster-name-prefix hosted
     --output-file="${PWD}/cluster-info.json"
-    --wait 30
+    --wait 20
     --parameter "StackVersion=$STACK_VERSION"
-    --parameter "ExpireInHours=6"
+    --parameter "ExpireInHours=4"
   )
 
   if [ -n "${INTEGRATION_SERVER_DOCKER_IMAGE:-}" ]; then
@@ -40,6 +40,15 @@ function ess_up() {
   # otherwise the global cleanup step would destroy the retry's cluster and
   # leak the shared one. `ess_load_secrets` and `ess_down` read the local
   # cluster-info.json first, so the retry path doesn't need meta-data.
+
+  # However, store retry cluster names in a separate metadata key so they can
+  # be cleaned up by a dedicated cleanup step if the EXIT trap fails (e.g., timeout)
+  if [ "${BUILDKITE_RETRY_COUNT:-0}" -gt 0 ]; then
+    METADATA_PREFIX="${METADATA_PREFIX:-""}"
+    local retry_key="${METADATA_PREFIX}retry-cluster-${BUILDKITE_STEP_ID}-${BUILDKITE_RETRY_COUNT}"
+    echo "Storing retry cluster name in metadata: $retry_key = $CLUSTER_NAME"
+    buildkite-agent meta-data set "$retry_key" "$CLUSTER_NAME" || true
+  fi
 
   ess_load_secrets
 }

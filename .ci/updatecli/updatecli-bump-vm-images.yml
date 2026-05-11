@@ -73,5 +73,6 @@ targets:
     spec:
       files:
         - .buildkite/pipeline.yml
+        - .buildkite/bk.integration.pipeline.yml
       matchpattern: '(IMAGE_.+): "1.0.([\d]+)"'
       replacepattern: '$1: "1.0.{{ source "latestVersion" }}"'

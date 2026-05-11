@@ -353,13 +353,16 @@ steps:
         - .buildkite/scripts/**
         - .buildkite/hooks/**
 
+  # NOTE: we won't run automatically for merge commits but on schedules and manually,
+  # as they are not relevant for pull requests and we want to avoid running them twice for the same pull request
+  # (once for the pull request itself and once for the merge commit)
   # Trigger for branches
-  - label: "Triggering Extended tests for branches"
-    if: build.pull_request.id == null
-    trigger: "elastic-agent-extended-testing"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
-      branch: "${BUILDKITE_BRANCH}"
+  #- label: "Triggering Extended tests for branches"
+  #  if: build.pull_request.id == null
+  #  trigger: "elastic-agent-extended-testing"
+  #  build:
+  #    commit: "${BUILDKITE_COMMIT}"
+  #    branch: "${BUILDKITE_BRANCH}"
 
   # Trigger for pull requests - Serverless Beats Tests
   # this should help detecting issues earlier in the development cycle
