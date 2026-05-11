@@ -246,10 +246,7 @@ func (Build) GenerateConfig() error {
 func (Build) WindowsArchiveRootBinary(ctx context.Context) error {
 	fmt.Println("--- Compiling root binary for windows archive")
 	cfg := devtools.SettingsFromContext(ctx)
-	hashShort, err := cfg.Build.CommitHashShort()
-	if err != nil {
-		return fmt.Errorf("error getting commit hash: %w", err)
-	}
+	hashShort := cfg.AgentCoreCommitHashShort()
 
 	outputName := "elastic-agent-archive-root"
 	if runtime.GOOS != "windows" {
@@ -1061,11 +1058,10 @@ func Clean(ctx context.Context) error {
 }
 
 func dockerCommitHash(cfg *devtools.Settings) string {
-	commit, err := cfg.Build.CommitHash()
-	if err == nil && len(commit) > commitLen {
+	commit := cfg.Build.CommitHash()
+	if len(commit) > commitLen {
 		return commit[:commitLen]
 	}
-
 	return ""
 }
 

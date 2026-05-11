@@ -279,7 +279,7 @@ shared:
         mode: 0644
       /usr/share/{{.BeatName}}/.build_hash.txt:
         content: >
-          {{ commit }}
+          {{ core_commit }}
         mode: 0644
       /etc/{{.BeatName}}/elastic-agent.reference.yml:
         source: 'elastic-agent.reference.yml'
@@ -294,7 +294,7 @@ shared:
         config: true
       /etc/{{.BeatName}}/.elastic-agent.active.commit:
         content: >
-          {{ commit }}
+          {{ core_commit }}
         mode: 0644
       /usr/bin/{{.BeatName}}:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.sh.tmpl'
@@ -302,19 +302,49 @@ shared:
       /lib/systemd/system/{{.BeatServiceName}}.service:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl'
         mode: 0644
+<<<<<<< HEAD
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}:
         source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+=======
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}:
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+>>>>>>> 68e52d042 ([mage] Fix commit hash override (#13823))
         mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/package.version:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/package.version:
         content: >
           {{ agent_package_version }}
         mode: 0644
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components:
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
+<<<<<<< HEAD
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/manifest.yaml:
+=======
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/elastic-otel-collector:
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/elastic-otel-collector.spec.yml:
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/module:
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
+        preserve_mode: true
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/certs/certs.pem:
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/certs/certs.pem'
+        mode: 0640
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/lenses:
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/lenses'
+        preserve_mode: true
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/osqueryd:
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osqueryd'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/osquery-extension.ext:
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/manifest.yaml:
+>>>>>>> 68e52d042 ([mage] Fix commit hash override (#13823))
         mode: 0644
         content: >
           {{ manifest .fips }}
@@ -323,7 +353,7 @@ shared:
     'otelcol':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/otelcol.sh'
       mode: 0755
-    'data/{{.BeatName}}-{{ commit_short }}/otelcol':
+    'data/{{.BeatName}}-{{ core_commit_short }}/otelcol':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/otelcol.sh'
       mode: 0755
     'otel_samples':
@@ -342,7 +372,7 @@ shared:
       mode: 0644
     .build_hash.txt:
       content: >
-        {{ commit }}
+        {{ core_commit }}
       mode: 0644
     'elastic-agent.reference.yml':
       source: 'elastic-agent.reference.yml'
@@ -357,7 +387,7 @@ shared:
       config: true
     '.elastic-agent.active.commit':
       content: >
-        {{ commit }}
+        {{ core_commit }}
       mode: 0644
     'manifest.yaml':
       mode: 0644
@@ -368,6 +398,7 @@ shared:
     '{{.BeatName}}{{.BinaryExt}}':
       source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
+<<<<<<< HEAD
     'data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}':
       source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
@@ -376,11 +407,18 @@ shared:
       mode: 0755
       skip_on_missing: true
     'data/{{.BeatName}}-{{ commit_short }}/package.version':
+=======
+    'data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      mode: 0755
+    'data/{{.BeatName}}-{{ core_commit_short }}/package.version':
+>>>>>>> 68e52d042 ([mage] Fix commit hash override (#13823))
       content: >
         {{ agent_package_version }}
       mode: 0644
     <<: *agent_binary_common_files
 
+<<<<<<< HEAD
   - &agent_darwin_app_bundle_files
     'data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/Info.plist':
       template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/Info.plist.tmpl'
@@ -401,28 +439,159 @@ shared:
       mode: 0755
       skip_on_missing: true
     'data/{{.BeatName}}-{{ commit_short }}/package.version':
+=======
+  - &agent_darwin_binary_common_files
+    'data/{{.BeatName}}-{{ core_commit_short }}/package.version':
+>>>>>>> 68e52d042 ([mage] Fix commit hash override (#13823))
       content: >
         {{ agent_package_version }}
       mode: 0644
     'otelcol':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/otelcol.sh'
       mode: 0755
-    'data/{{.BeatName}}-{{ commit_short }}/otelcol':
+    'data/{{.BeatName}}-{{ core_commit_short }}/otelcol':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/otelcol.sh'
       mode: 0755
     'otel_samples':
       source: '{{ repo.RootDir }}/internal/pkg/otel/samples/darwin/'
       mode: 0755
+<<<<<<< HEAD
     <<: *agent_darwin_app_bundle_files
     <<: *agent_binary_common_files
 
+=======
+    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/Info.plist':
+      template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/Info.plist.tmpl'
+      mode: 0644
+    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/PkgInfo':
+      template: '{{ elastic_beats_dir }}/dev-tools/packaging/files/darwin/PkgInfo'
+      mode: 0644
+    <<: *agent_binary_common_files
+
+  - &agent_darwin_binary_files
+    '{{.BeatName}}{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      mode: 0755
+    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      mode: 0755
+    <<: *agent_darwin_binary_common_files
+
+>>>>>>> 68e52d042 ([mage] Fix commit hash override (#13823))
   - &agent_unpacked_components_files
-    'data/{{.BeatName}}-{{ commit_short }}/components':
+    'data/{{.BeatName}}-{{ core_commit_short }}/components':
       source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
       mode: 0755
       config_mode: 0644
       skip_on_missing: true
 
+<<<<<<< HEAD
+=======
+  - &agent_unpacked_windows_components_files
+    'data/{{.BeatName}}-{{ core_commit_short }}/components':
+      source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/'
+      mode: 0755
+      config_mode: 0644
+      skip_on_missing: true
+
+  - &agent_windows_otel_scripts_samples
+    'otelcol.ps1':
+      source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
+      mode: 0755
+    'data/{{.BeatName}}-{{ core_commit_short }}/otelcol.ps1':
+      source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
+      mode: 0755
+    'otel_samples':
+      source: '{{ repo.RootDir }}/internal/edot/samples/windows/'
+      mode: 0755
+
+  - &agent_otel_collector_binary_spec
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/elastic-otel-collector{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
+      mode: 0755
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/elastic-otel-collector.spec.yml':
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
+      mode: 0755
+
+  - &agent_otel_collector_binary_spec_core
+    'components/elastic-otel-collector{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}'
+      mode: 0755
+    'components/elastic-otel-collector.spec.yml':
+      source: '{{ repo.RootDir }}/internal/edot/spec.yml'
+      mode: 0755
+
+  - &metricbeat_lightweight_module
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/module':
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
+      preserve_mode: true
+
+  - &metricbeat_lightweight_module_core
+    'components/module':
+      source: '{{ repo.RootDir }}/build/package/module'
+      preserve_mode: true
+
+  - &osquerybeat_osquery_certs
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/certs/certs.pem':
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/certs/certs.pem'
+      mode: 0640
+
+  - &osquerybeat_osquery_certs_core
+    'components/certs/certs.pem':
+      source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/certs/certs.pem'
+      mode: 0640
+
+  - &osquerybeat_osquery_lenses
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/lenses':
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/lenses'
+      preserve_mode: true
+
+  - &osquerybeat_osquery_lenses_core
+    'components/lenses':
+      source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/lenses'
+      preserve_mode: true
+
+  - &osquerybeat_osqueryd
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/osqueryd{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osqueryd{{.BinaryExt}}'
+      mode: 0755
+
+  - &osquerybeat_osqueryd_core
+    'components/osqueryd{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/osqueryd{{.BinaryExt}}'
+      mode: 0755
+
+  - &osquerybeat_osqueryapp
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/osquery.app':
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery.app'
+      preserve_mode: true
+
+  - &osquerybeat_osqueryapp_core
+    'components/osquery.app':
+      source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/osquery.app'
+      preserve_mode: true
+
+  - &osquerybeat_extension
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/osquery-extension.ext':
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
+      mode: 0755
+
+  - &osquerybeat_extension_core
+    'components/osquery-extension.ext':
+      source: '{{ repo.RootDir }}/beats/x-pack/osquerybeat/ext/osquery-extension/build/golang-crossbuild/osquery-extension-{{.GOOS}}-{{.Platform.Arch}}'
+      mode: 0755
+
+  - &osquerybeat_extension_windows
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/osquery-extension{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension{{.BinaryExt}}'
+      mode: 0755
+
+  - &osquerybeat_extension_windows_core
+    'components/osquery-extension{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/beats/x-pack/osquerybeat/ext/osquery-extension/build/golang-crossbuild/osquery-extension-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}'
+      mode: 0755
+
+>>>>>>> 68e52d042 ([mage] Fix commit hash override (#13823))
   # Binary package spec (tar.gz for linux) for community beats.
   - &agent_binary_spec
     <<: *common
@@ -538,12 +707,40 @@ shared:
         config: true
       '.elastic-agent.active.commit':
         content: >
-          {{ commit }}
+          {{ core_commit }}
         mode: 0644
       'hints.inputs.d':
         source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
         mode: 0755
 
+<<<<<<< HEAD
+=======
+  - &agent_cloud_docker_spec
+    <<: *agent_cloud_binary_spec
+    extra_vars:
+      dockerfile: 'Dockerfile.elastic-agent.tmpl'
+      docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
+      user: '{{ .BeatName }}'
+      linux_capabilities: ''
+      beats_install_path: "install"
+    files:
+      'elastic-agent.yml':
+        source: 'elastic-agent.docker.yml'
+        mode: 0600
+        config: true
+      'otel.yml':
+        source: 'otel.yml'
+        mode: 0600
+        config: true
+      '.elastic-agent.active.commit':
+        content: >
+          {{ core_commit }}
+        mode: 0644
+      'hints.inputs.d':
+        source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
+        mode: 0755
+
+>>>>>>> 68e52d042 ([mage] Fix commit hash override (#13823))
   - &agent_docker_fips_spec
     <<: *agent_binary_fips_spec
     extra_vars:
@@ -559,7 +756,7 @@ shared:
         config: true
       '.elastic-agent.active.commit':
         content: >
-          {{ commit }}
+          {{ core_commit }}
         mode: 0644
       'hints.inputs.d':
         source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
@@ -599,17 +796,83 @@ shared:
   # service build is based on previous cloud variant
   - &agent_docker_service_spec
     docker_variant: 'service'
+<<<<<<< HEAD
+=======
+    extra_tags:
+      - 'git-{{ substring core_commit 0 12 }}'
+>>>>>>> 68e52d042 ([mage] Fix commit hash override (#13823))
     files:
       'data/service/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip':
         source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip'
         mode: 0755
-      'data/{{.BeatName}}-{{ commit_short }}/components/connectors':
+      'data/{{.BeatName}}-{{ core_commit_short }}/components/connectors':
         source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/connectors.sh'
         mode: 0755
-      'data/{{.BeatName}}-{{ commit_short }}/components/connectors.spec.yml':
+      'data/{{.BeatName}}-{{ core_commit_short }}/components/connectors.spec.yml':
         source: '{{ elastic_beats_dir }}/specs/connectors.spec.yml'
         mode: 0644
 
+<<<<<<< HEAD
+=======
+  - &agent_docker_edot_spec
+    <<: *agent_binary_spec_no_component_files
+    docker_variant: 'elastic-otel-collector'
+    name: 'elastic-otel-collector'
+    extra_vars:
+      dockerfile: 'Dockerfile.elastic-agent.tmpl'
+      docker_entrypoint: 'docker-entrypoint.edot.tmpl'
+      user: '{{ .BeatName }}'
+      linux_capabilities: ''
+      beats_install_path: "install"
+    files:
+      'elastic-agent.yml':
+        source: 'elastic-agent.docker.yml'
+        mode: 0600
+        config: true
+      'otel.yml':
+        source: 'otel.yml'
+        mode: 0600
+        config: true
+
+  - &agent_docker_edot_wolfi_spec
+    <<: *agent_docker_edot_spec
+    docker_variant: 'elastic-otel-collector-wolfi'
+    name: 'elastic-otel-collector-wolfi'
+
+  - &agent_docker_slim_spec
+    <<: *agent_binary_spec_no_component_files
+    docker_variant: 'slim'
+    extra_vars:
+      dockerfile: 'Dockerfile.elastic-agent.tmpl'
+      docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
+      user: '{{ .BeatName }}'
+      linux_capabilities: ''
+      beats_install_path: "install"
+    files:
+      'elastic-agent.yml':
+        source: 'elastic-agent.docker.yml'
+        mode: 0600
+        config: true
+      'otel.yml':
+        source: 'otel.yml'
+        mode: 0600
+        config: true
+      '.elastic-agent.active.commit':
+        content: >
+          {{ core_commit }}
+        mode: 0644
+      'hints.inputs.d':
+        source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
+        mode: 0755
+      'data/{{.BeatName}}-{{ core_commit_short }}/components/pf-host-agent.spec.yml':
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/pf-host-agent.spec.yml'
+        expand_spec: true
+
+  - &agent_docker_slim_wolfi_spec
+    <<: *agent_docker_slim_spec
+    docker_variant: 'slim-wolfi'
+
+>>>>>>> 68e52d042 ([mage] Fix commit hash override (#13823))
   # includes nodejs with @elastic/synthetics
   - &agent_docker_complete_spec
     <<: *agent_docker_spec
@@ -1184,11 +1447,11 @@ specs:
         <<: *agent_darwin_binary_spec
         <<: *elastic_license_for_binaries
         files:
-          'data/{{.BeatName}}-{{ commit_short }}/elastic-agent':
+          'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent':
             template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/elastic-agent.tmpl'
             mode: 0755
           '{{.BeatName}}{{.BinaryExt}}':
-            source: data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}
+            source: data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}
             symlink: true
             mode: 0755
 
@@ -1199,7 +1462,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
+            source: data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}
             symlink: true
             mode: 0755
 
@@ -1400,7 +1663,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
+            source: data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}
             symlink: true
             mode: 0755
 
@@ -1412,7 +1675,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
+            source: data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}
             symlink: true
             mode: 0755
     - os: linux

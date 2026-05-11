@@ -24,6 +24,12 @@ func testPackageSpec(t testing.TB) PackageSpec {
 		Snapshot: true,
 		OS:       "windows",
 		Arch:     "x86_64",
+<<<<<<< HEAD
+=======
+		ExtraTags: []string{
+			"git-{{ substring core_commit 0 12 }}",
+		},
+>>>>>>> 68e52d042 ([mage] Fix commit hash override (#13823))
 		Files: map[string]PackageFile{
 			"brewbeat.yml": PackageFile{
 				Source: "./testdata/config.yml",
@@ -71,6 +77,14 @@ func testPackage(t testing.TB, pack func(PackageSpec) error) {
 	readmePath := filepath.ToSlash(filepath.Clean(readme.Source))
 	assert.True(t, strings.HasPrefix(readmePath, packageStagingDir))
 
+<<<<<<< HEAD
+=======
+	commit := spec.ExtraTags[0]
+	expectedCommitHash := spec.cfg.Build.CommitHash()
+	expected := "git-" + expectedCommitHash[:12]
+	assert.Equal(t, expected, commit)
+
+>>>>>>> 68e52d042 ([mage] Fix commit hash override (#13823))
 	if err := pack(spec); err != nil {
 		t.Fatal(err)
 	}
