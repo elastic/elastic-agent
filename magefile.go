@@ -1579,7 +1579,6 @@ func PackageUsingDRA(ctx context.Context) error {
 	if !ok {
 		return fmt.Errorf("%q project not found in manifest %q", mage.AgentCoreProjectName, cfg.Packaging.ManifestURL)
 	}
-	cfg = cfg.WithAgentCommitHashOverride(agentCoreProject.CommitHash)
 	ctx = devtools.ContextWithSettings(ctx, cfg)
 
 	return packageAgent(
