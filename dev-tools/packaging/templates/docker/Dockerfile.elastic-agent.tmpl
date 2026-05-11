@@ -244,6 +244,8 @@ RUN cd {{$beatHome}}/.node \
 # Install synthetics as a regular user, installing npm deps as root odesn't work
    # fix .node .npm and .synthetics
    && chown -R {{ .user }}:{{ .user }} $NODE_PATH
+# TODO: Remove this step when Node.js is bumped to a version that bundles npm >= 11.14.0
+RUN npm install -g npm@11.14.1
 USER {{ .user }}
 # If this fails dump the NPM logs
 RUN (npm i -g --loglevel verbose --production --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 /root/.npm/_logs/* && exit 1') && \
