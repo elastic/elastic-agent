@@ -322,8 +322,6 @@ shared:
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/endpoint-security-resources.zip'
         mode: 0644
         skip_on_missing: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/module:
-        mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/module:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
         preserve_mode: true
