@@ -575,7 +575,7 @@ spec:
           message: Daily trigger of Extended pipeline for all the active branches
           env:
             PIPELINES_TO_TRIGGER: 'elastic-agent-extended-testing'
-            skip_intermediate_builds: true
+      skip_intermediate_builds: true
       provider_settings:
         trigger_mode: none
       teams:
