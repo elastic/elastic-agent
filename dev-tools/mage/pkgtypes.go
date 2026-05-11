@@ -954,7 +954,7 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path comes from WalkDir callback over a controlled source directory, no user input
 		if err != nil {
 			return err
 		}
@@ -1037,7 +1037,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path comes from WalkDir callback over a controlled source directory, no user input
 		if err != nil {
 			return err
 		}
