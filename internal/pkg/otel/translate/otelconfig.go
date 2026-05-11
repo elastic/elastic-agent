@@ -464,20 +464,30 @@ func getReceiversConfigForComponent(
 		for k, v := range sharedConfig {
 			receiverConfig[k] = v
 		}
-		switch beatName {
-		case "filebeat":
-			receiverConfig[beatName] = map[string]any{
-				"inputs": []map[string]any{ri.config},
-			}
-		case "metricbeat":
-			receiverConfig[beatName] = map[string]any{
-				"modules": []map[string]any{ri.config},
-			}
+		receiverConfig[beatName] = map[string]any{
+			beatInputsKey(beatName): []map[string]any{ri.config},
 		}
 		receiversConfig[receiverID.String()] = receiverConfig
 	}
 
 	return receiversConfig, nil
+}
+
+// beatInputsKey returns the config key used to pass inputs/modules/monitors/protocols
+// to each beat type inside its receiver config. Each beat nests its stream configuration
+// under a beat-specific key (e.g. filebeat.inputs, metricbeat.modules, heartbeat.monitors).
+func beatInputsKey(beatName string) string {
+	switch beatName {
+	case "metricbeat", "auditbeat":
+		return "modules"
+	case "heartbeat":
+		return "monitors"
+	case "packetbeat":
+		return "protocols"
+	default:
+		// filebeat, osquerybeat, and any future beats use "inputs"
+		return "inputs"
+	}
 }
 
 // GetDefaultProcessors returns the default beat processors used across all pipelines.
