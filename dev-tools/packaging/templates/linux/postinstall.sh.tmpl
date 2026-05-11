@@ -7,7 +7,7 @@ if [[ ${RPM_INSTALL_PREFIX:-/} != "/" ]]; then
     PREFIX=${RPM_INSTALL_PREFIX}
 fi
 
-commit_hash="{{ commit_short }}"
+commit_hash="{{ core_commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
 symlink_dir="${PREFIX}/usr/share/elastic-agent/bin"
 new_agent_dir="${PREFIX}/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
