@@ -256,10 +256,7 @@ func (Build) GenerateConfig() error {
 func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch string) error {
 	fmt.Printf("--- Compiling root binary for %s windows archive\n", goarch)
 	cfg := devtools.SettingsFromContext(ctx)
-	hashShort, err := cfg.Build.CommitHashShort()
-	if err != nil {
-		return fmt.Errorf("error getting commit hash: %w", err)
-	}
+	hashShort := cfg.AgentCoreCommitHashShort()
 
 	outputName := "elastic-agent-archive-root"
 	if runtime.GOOS != "windows" {
@@ -609,6 +606,10 @@ func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
@@ -1083,11 +1084,10 @@ func Clean(ctx context.Context) error {
 }
 
 func dockerCommitHash(cfg *devtools.Settings) string {
-	commit, err := cfg.Build.CommitHash()
-	if err == nil && len(commit) > commitLen {
+	commit := cfg.Build.CommitHash()
+	if len(commit) > commitLen {
 		return commit[:commitLen]
 	}
-
 	return ""
 }
 
@@ -1500,6 +1500,10 @@ func PackageUsingDRA(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
