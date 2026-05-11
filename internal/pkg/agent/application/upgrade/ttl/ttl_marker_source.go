@@ -33,26 +33,46 @@ func NewTTLMarkerRegistry(log *logger.Logger, baseDir string) *TTLMarkerRegistry
 	}
 }
 
+// Set reconciles the on-disk .ttl markers with the desired state m: existing
+// markers whose versionedHome is not in m are removed, and entries in m are
+// written (creating or overwriting). Existing markers with unparseable payloads
+// are tolerated via GetAll's partial-success contract: malformed entries are
+// logged and either swept (when absent from m) or overwritten by addOrReplace
+// (when present in m), so a single corrupt marker cannot wedge upgrades or
+// rollbacks.
 func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
-	// identify the marker files to be deleted first
-	existingMarkers, err := T.Get()
+	existingMarkers, malformed, err := T.GetAll()
 	if err != nil {
 		return fmt.Errorf("accessing existing markers: %w", err)
 	}
 
+	for versionedHome, parseErr := range malformed {
+		T.log.Infow("existing TTL marker is unparseable; overwriting or sweeping it",
+			"versionedHome", versionedHome, "error.message", parseErr.Error())
+	}
+
 	for versionedHome := range existingMarkers {
-		_, ok := m[versionedHome]
-		if !ok {
-			// the existing marker should not be in the final state
-			T.log.Debugf("Removing marker for versionedHome: %s", versionedHome)
-			err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
-			if err != nil {
-				return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
-			}
+		if _, ok := m[versionedHome]; ok {
+			continue
+		}
+		T.log.Debugf("Removing marker for versionedHome: %s", versionedHome)
+		err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
+		if err != nil {
+			return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
 		}
 	}
 
-	// create all the remaining markers
+	for versionedHome := range malformed {
+		if _, ok := m[versionedHome]; ok {
+			continue
+		}
+		T.log.Debugf("Removing malformed marker for versionedHome: %s", versionedHome)
+		err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
+		if err != nil {
+			return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
+		}
+	}
+
 	return T.addOrReplace(m)
 }
 
