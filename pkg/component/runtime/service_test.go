@@ -342,33 +342,38 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	parsedCISAddr, err := url.Parse(cisAddr)
 	require.NoError(t, err)
 
+	// First, wait for the warning log message indicating the runtime continued
+	// past the non-fatal install failure. Filtering the observer (rather than
+	// draining it with TakeAll) means the assertion does not race with the
+	// connection-server dial below.
 	expectedWarnLogMsg := fmt.Sprintf("exit code %d is non-fatal, continuing to run...", nonFatalExitCode)
-	require.Eventually(t, func() bool {
+	require.Eventuallyf(t, func() bool {
+		return logObs.FilterLevelExact(zapcore.WarnLevel).FilterMessage(expectedWarnLogMsg).Len() > 0
+	}, 30*time.Second, 100*time.Millisecond, "did not observe expected non-fatal warn log %q", expectedWarnLogMsg)
+
+	// Then verify the connection-info server is still accepting connections.
+	// The dial is retried because on Windows winio's DialPipe can intermittently
+	// return ERROR_PIPE_BUSY between Accept calls; the conn is closed each
+	// attempt to avoid leaking client-side pipe handles.
+	require.Eventuallyf(t, func() bool {
+		var conn net.Conn
 		if runtime.GOOS != "windows" {
-			_, err = net.Dial("unix", parsedCISAddr.Host+parsedCISAddr.Path)
+			conn, err = net.Dial("unix", parsedCISAddr.Host+parsedCISAddr.Path)
 		} else {
 			if strings.HasPrefix(cisAddr, "npipe:///") {
 				path := strings.TrimPrefix(cisAddr, "npipe:///")
 				cisAddr = `\\.\pipe\` + path
 			}
-			_, err = npipe.Dial(cisAddr)("", "")
+			conn, err = npipe.Dial(cisAddr)("", "")
 		}
 
 		if err != nil {
 			t.Logf("Connection info server is not running: %v", err)
 			return false
 		}
-
-		logs := logObs.TakeAll()
-		for _, l := range logs {
-			t.Logf("[%s] %s", l.Level, l.Message)
-			if l.Level == zapcore.WarnLevel && l.Message == expectedWarnLogMsg {
-				return true
-			}
-		}
-
-		return false
-	}, 30*time.Second, 1*time.Second)
+		_ = conn.Close()
+		return true
+	}, 30*time.Second, 1*time.Second, "connection info server did not accept a connection")
 }
 
 // TestServiceStartRetry tests that the service runtime will
