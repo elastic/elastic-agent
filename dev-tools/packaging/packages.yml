@@ -437,7 +437,7 @@ shared:
       mode: 0755
       config_mode: 0644
       skip_on_missing: true
-    'data/{{.BeatName}}-{{ commit_short }}/components/endpoint-security-resources.zip':
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security-resources.zip':
       source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/endpoint-security-resources.zip'
       mode: 0644
       skip_on_missing: true
@@ -448,7 +448,7 @@ shared:
       mode: 0755
       config_mode: 0644
       skip_on_missing: true
-    'data/{{.BeatName}}-{{ commit_short }}/components/endpoint-security-resources.zip':
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security-resources.zip':
       source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/endpoint-security-resources.zip'
       mode: 0644
       skip_on_missing: true
