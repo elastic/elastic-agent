@@ -176,9 +176,11 @@ func TestSetLogLevelFleetManagedSurvivesRestart(t *testing.T) {
 	}, 5*time.Minute, 500*time.Millisecond, "service never started (status: %v, err: %v)", svcStatus, svcStatusErr)
 
 	// Step 3: wait for the agent to reconnect to Fleet and be healthy again
+	// Give this a minute beyond Fleet Server's default 5 minute checkin poll timeout.
+	// See https://github.com/elastic/elastic-agent/issues/13986.
 	require.Eventuallyf(t, func() bool {
 		return waitForAgentAndFleetHealthy(ctx, t, f)
-	}, 5*time.Minute, time.Second, "agent never became healthy again after restart")
+	}, 6*time.Minute, time.Second, "agent never became healthy again after restart")
 
 	// Step 4: verify the log level reported to Fleet is still the policy level,
 	// not the startup default "info". This is the regression check — before the
