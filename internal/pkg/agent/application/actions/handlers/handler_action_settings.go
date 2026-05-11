@@ -21,22 +21,19 @@ const clearLogLevelValue = ""
 // Settings handles settings change coming from fleet and updates log level.
 type SettingsHandler struct {
 	log                   *logger.Logger
-	agentInfoCache        info.Agent
-	agentInfoStore        info.AgentInfoStore
+	agentInfo             info.Agent
 	runtimeLogLevelSetter logLevelSetter
 }
 
 // NewSettingsHandler creates a new SettingsHandler.
 func NewSettingsHandler(
 	log *logger.Logger,
-	agentInfoCache info.Agent,
-	agentInfoStore info.AgentInfoStore,
+	agentInfo info.Agent,
 	runtimeLogLevelSetter logLevelSetter,
 ) *SettingsHandler {
 	return &SettingsHandler{
 		log:                   log,
-		agentInfoCache:        agentInfoCache,
-		agentInfoStore:        agentInfoStore,
+		agentInfo:             agentInfo,
 		runtimeLogLevelSetter: runtimeLogLevelSetter,
 	}
 }
@@ -60,10 +57,9 @@ func (h *SettingsHandler) handleLogLevel(ctx context.Context, logLevel string, a
 			return fmt.Errorf("failed to unpack override log level %q: %w", logLevelOverride, err)
 		}
 	}
-	if err := h.agentInfoStore.Save(ctx, info.WithLogLevelOverride(logLevel)); err != nil {
+	if err := h.agentInfo.SetLogLevelOverride(ctx, logLevel); err != nil {
 		return fmt.Errorf("failed to persist log level override: %w", err)
 	}
-	h.agentInfoCache.SetLogLevelOverride(logLevel)
 
 	if err := acker.Ack(ctx, action); err != nil {
 		h.log.Errorf("failed to acknowledge SETTINGS action with id '%s'", action.ActionID)
@@ -73,7 +69,7 @@ func (h *SettingsHandler) handleLogLevel(ctx context.Context, logLevel string, a
 
 	// Push the effective log level to the runtime.
 	var logLevelRuntime logp.Level
-	logLevelRuntimeStr := h.agentInfoCache.GetLogLevelRuntime()
+	logLevelRuntimeStr := h.agentInfo.GetLogLevelRuntime()
 	if err := logLevelRuntime.Unpack(logLevelRuntimeStr); err != nil {
 		return fmt.Errorf("failed to unpack runtime log level %q: %w", logLevelRuntime, err)
 	}

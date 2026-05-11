@@ -33,7 +33,7 @@ type agentInfoMock struct {
 	isStandalone bool
 }
 
-func (a agentInfoMock) GetAgentID() string {
+func (a agentInfoMock) AgentID() string {
 	return a.AgentID
 }
 func (a agentInfoMock) Snapshot() bool {
@@ -52,7 +52,7 @@ func (a agentInfoMock) IsStandalone() bool {
 	return a.isStandalone
 }
 
-func (a agentInfoMock) GetHeaders() map[string]string      { panic("implement me") }
+func (a agentInfoMock) Headers() map[string]string         { panic("implement me") }
 func (a agentInfoMock) GetLogLevelRuntime() string         { panic("implement me") }
 func (a agentInfoMock) GetLogLevelPolicy() string          { panic("implement me") }
 func (a agentInfoMock) GetLogLevelOverride() string        { panic("implement me") }
@@ -104,7 +104,7 @@ func TestRuntimeComm_WriteStartUpInfo_packageVersion(t *testing.T) {
 	}
 
 	want := client.AgentInfo{
-		ID:           agentInfo.GetAgentID(),
+		ID:           agentInfo.AgentID(),
 		Version:      agentInfo.Version(),
 		Snapshot:     agentInfo.Snapshot(),
 		Unprivileged: agentInfo.Unprivileged(),

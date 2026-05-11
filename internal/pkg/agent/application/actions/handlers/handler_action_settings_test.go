@@ -21,10 +21,9 @@ import (
 )
 
 func TestSettings_handleLogLevel(t *testing.T) {
-	expectLogLevelApplied := func(override string, runtime logp.Level) func(*testing.T, *info.MockAgent, *info.MockAgentInfoStore, *mockLogLevelSetter, *acker.MockAcker) {
-		return func(t *testing.T, agent *info.MockAgent, store *info.MockAgentInfoStore, setter *mockLogLevelSetter, acker *acker.MockAcker) {
-			assertSavesLogLevelOverride(t, store, override).Return(nil)
-			agent.EXPECT().SetLogLevelOverride(override)
+	expectLogLevelApplied := func(override string, runtime logp.Level) func(*testing.T, *info.MockAgent, *mockLogLevelSetter, *acker.MockAcker) {
+		return func(t *testing.T, agent *info.MockAgent, setter *mockLogLevelSetter, acker *acker.MockAcker) {
+			agent.EXPECT().SetLogLevelOverride(mock.Anything, override).Return(nil)
 			acker.EXPECT().Ack(mock.Anything, mock.Anything).Return(nil)
 			acker.EXPECT().Commit(mock.Anything).Return(nil)
 			agent.EXPECT().GetLogLevelRuntime().Return(runtime.String())
@@ -39,7 +38,7 @@ func TestSettings_handleLogLevel(t *testing.T) {
 	tests := []struct {
 		name       string
 		args       args
-		setupMocks func(*testing.T, *info.MockAgent, *info.MockAgentInfoStore, *mockLogLevelSetter, *acker.MockAcker)
+		setupMocks func(*testing.T, *info.MockAgent, *mockLogLevelSetter, *acker.MockAcker)
 		wantErr    assert.ErrorAssertionFunc
 	}{
 		{
@@ -91,7 +90,7 @@ func TestSettings_handleLogLevel(t *testing.T) {
 					Data:       fleetapi.ActionSettingsData{LogLevel: "verbose"},
 				},
 			},
-			setupMocks: func(t *testing.T, agent *info.MockAgent, store *info.MockAgentInfoStore, setter *mockLogLevelSetter, acker *acker.MockAcker) {
+			setupMocks: func(t *testing.T, agent *info.MockAgent, setter *mockLogLevelSetter, acker *acker.MockAcker) {
 				// no calls expected: validation fails before SetLogLevelOverride / acker / setter
 			},
 			wantErr: assert.Error,
@@ -106,8 +105,8 @@ func TestSettings_handleLogLevel(t *testing.T) {
 					Data:       fleetapi.ActionSettingsData{LogLevel: "debug"},
 				},
 			},
-			setupMocks: func(t *testing.T, agent *info.MockAgent, store *info.MockAgentInfoStore, setter *mockLogLevelSetter, acker *acker.MockAcker) {
-				store.EXPECT().Save(mock.Anything, mock.Anything).Return(fmt.Errorf("disk write failed"))
+			setupMocks: func(t *testing.T, agent *info.MockAgent, setter *mockLogLevelSetter, acker *acker.MockAcker) {
+				agent.EXPECT().SetLogLevelOverride(mock.Anything, "debug").Return(fmt.Errorf("disk write failed"))
 			},
 			wantErr: assert.Error,
 		},
@@ -116,45 +115,21 @@ func TestSettings_handleLogLevel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			log, _ := loggertest.New(tt.name)
 			mockAgentInfo := info.NewMockAgent(t)
-			mockAgentInfoStore := info.NewMockAgentInfoStore(t)
 			mockLogLevelSetter := newMockLogLevelSetter(t)
 			mockAcker := acker.NewMockAcker(t)
 
 			if tt.setupMocks != nil {
-				tt.setupMocks(t, mockAgentInfo, mockAgentInfoStore, mockLogLevelSetter, mockAcker)
+				tt.setupMocks(t, mockAgentInfo, mockLogLevelSetter, mockAcker)
 			}
 
 			ctx := context.Background()
 
 			h := &SettingsHandler{
 				log:                   log,
-				agentInfoCache:        mockAgentInfo,
-				agentInfoStore:        mockAgentInfoStore,
+				agentInfo:             mockAgentInfo,
 				runtimeLogLevelSetter: mockLogLevelSetter,
 			}
 			tt.wantErr(t, h.handleLogLevel(ctx, tt.args.logLevel, mockAcker, tt.args.action), fmt.Sprintf("handleLogLevel(%v, %v, %v, %v)", ctx, tt.args.logLevel, mockAcker, tt.args.action))
 		})
 	}
-}
-
-// assertSavesLogLevelOverride returns a Save expectation that checks the
-// per-agent log level override is persisted with the expected value or
-// cleared when the expected value is empty.
-func assertSavesLogLevelOverride(t *testing.T, store *info.MockAgentInfoStore, wantLevel string) *info.MockAgentInfoStore_Save_Call {
-	return store.EXPECT().
-		Save(mock.Anything, mock.Anything).
-		Run(func(ctx context.Context, opts ...info.SaveOption) {
-			m := map[string]any{}
-			for _, o := range opts {
-				o(m)
-			}
-			agent, _ := m["agent"].(map[string]any)
-			logging, _ := agent["logging"].(map[string]any)
-			if wantLevel == "" {
-				_, present := logging["level_override"]
-				assert.False(t, present, "WithLogLevelOverride(\"\") should not set agent.logging.level_override")
-				return
-			}
-			assert.Equal(t, wantLevel, logging["level_override"], "WithLogLevelOverride should set agent.logging.level_override")
-		})
 }

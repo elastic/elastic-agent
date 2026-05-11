@@ -1,0 +1,285 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
+package info
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"time"
+
+	"github.com/gofrs/uuid/v5"
+	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/pkg/backoff"
+)
+
+// defaultAgentConfigFile is a name of file used to store agent information
+const (
+	agentInfoKey            = "agent"
+	maxRetriesloadAgentInfo = 5
+)
+
+// persistentAgentInfo is the on-disk shape of the `agent.*` section of the
+// encrypted agent config file. Fields are flat (dotted) ucfg/yaml paths so
+// that they round-trip through ucfg without changing the on-disk layout.
+type persistentAgentInfo struct {
+	ID               string                                 `json:"id" yaml:"id" config:"id"`
+	Headers          map[string]string                      `json:"headers" yaml:"headers" config:"headers"`
+	LogLevel         string                                 `json:"logging.level,omitempty" yaml:"logging.level,omitempty" config:"logging.level,omitempty"`
+	LogLevelOverride string                                 `json:"logging.level_override,omitempty" yaml:"logging.level_override,omitempty" config:"logging.level_override,omitempty"`
+	MonitoringHTTP   *monitoringConfig.MonitoringHTTPConfig `json:"monitoring.http,omitempty" yaml:"monitoring.http,omitempty" config:"monitoring.http,omitempty"`
+}
+
+type ioStore interface {
+	Save(io.Reader) error
+	Load() (io.ReadCloser, error)
+}
+
+// updateLogLevel updates the policy-level log level (agent.logging.level) and
+// persists it to disk.
+func updateLogLevel(ctx context.Context, level string) error {
+	ai, _, err := loadAgentInfoWithBackoff(ctx, false, defaultLogLevel, false)
+	if err != nil {
+		return err
+	}
+
+	if ai.LogLevel == level {
+		// no action needed
+		return nil
+	}
+
+	agentConfigFile := paths.AgentConfigFile()
+	diskStore, err := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
+	if err != nil {
+		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
+
+	ai.LogLevel = level
+	return updateAgentInfo(diskStore, ai)
+}
+
+// updateLogLevelOverride updates the per-agent log level override
+// (agent.logging.level_override) and persists it to disk.
+func updateLogLevelOverride(ctx context.Context, level string) error {
+	ai, _, err := loadAgentInfoWithBackoff(ctx, false, defaultLogLevel, false)
+	if err != nil {
+		return err
+	}
+
+	if ai.LogLevelOverride == level {
+		// no action needed
+		return nil
+	}
+
+	agentConfigFile := paths.AgentConfigFile()
+	diskStore, err := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
+	if err != nil {
+		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
+
+	ai.LogLevelOverride = level
+	return updateAgentInfo(diskStore, ai)
+}
+
+func generateAgentID() (string, error) {
+	uid, err := uuid.NewV4()
+	if err != nil {
+		return "", fmt.Errorf("error while generating UUID for agent: %w", err)
+	}
+
+	return uid.String(), nil
+}
+
+// getInfoFromStore uses the IO store to return the config from agent.* fields in the config,
+// as well as a bool indicating if agent is running in standalone mode.
+func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, bool, error) {
+	agentConfigFile := paths.AgentConfigFile()
+	reader, err := s.Load()
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to load from ioStore: %w", err)
+	}
+
+	// reader is closed by this function
+	cfg, err := config.NewConfigFrom(reader)
+	if err != nil {
+		return nil, false, errors.New(err,
+			fmt.Sprintf("fail to read configuration %s for the agent", agentConfigFile),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, agentConfigFile))
+	}
+
+	configMap, err := cfg.ToMapStr()
+	if err != nil {
+		return nil, false, errors.New(err,
+			"failed to unpack stored config to map",
+			errors.TypeFilesystem)
+	}
+
+	// check fleet config. This behavior emulates configuration.IsStandalone
+	fleetmode, fleetExists := configMap["fleet"]
+	isStandalone := true
+	if fleetExists {
+		fleetCfg, ok := fleetmode.(map[string]interface{})
+		if ok {
+			if fleetCfg["enabled"] == true {
+				isStandalone = false
+			}
+		}
+	}
+
+	agentInfoSubMap, found := configMap[agentInfoKey]
+	if !found {
+		return &persistentAgentInfo{
+			LogLevel:       logLevel,
+			MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
+		}, isStandalone, nil
+	}
+
+	cc, err := config.NewConfigFrom(agentInfoSubMap)
+	if err != nil {
+		return nil, false, errors.New(err, "failed to create config from agent info submap")
+	}
+
+	pid := &persistentAgentInfo{
+		LogLevel:       logLevel,
+		MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
+	}
+	if err := cc.UnpackTo(&pid); err != nil {
+		return nil, false, errors.New(err, "failed to unpack stored config to map")
+	}
+
+	return pid, isStandalone, nil
+}
+
+func updateAgentInfo(s ioStore, agentInfo *persistentAgentInfo) error {
+	agentConfigFile := paths.AgentConfigFile()
+	reader, err := s.Load()
+	if err != nil {
+		return errors.New(err, "failed loading from store",
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, agentConfigFile))
+	}
+
+	// reader is closed by this function
+	cfg, err := config.NewConfigFrom(reader)
+	if err != nil {
+		return errors.New(err, fmt.Sprintf("fail to read configuration %s for the agent", agentConfigFile),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, agentConfigFile))
+	}
+
+	configMap := make(map[string]interface{})
+	if err := cfg.UnpackTo(&configMap); err != nil {
+		return errors.New(err, "failed to unpack stored config to map")
+	}
+
+	// best effort to keep the ID
+	if agentInfoSubMap, found := configMap[agentInfoKey]; found {
+		if cc, err := config.NewConfigFrom(agentInfoSubMap); err == nil {
+			pid := &persistentAgentInfo{}
+			err := cc.UnpackTo(&pid)
+			if err == nil && pid.ID != agentInfo.ID {
+				// if our id is different (we just generated it)
+				// keep the one present in the file
+				agentInfo.ID = pid.ID
+			}
+		}
+	}
+
+	configMap[agentInfoKey] = agentInfo
+
+	r, err := yamlToReader(configMap)
+	if err != nil {
+		return errors.New(err, "failed creating yaml reader")
+	}
+
+	if err := s.Save(r); err != nil {
+		return errors.New(err, "failed saving agent info",
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, agentConfigFile))
+	}
+
+	return nil
+}
+
+func yamlToReader(in interface{}) (io.Reader, error) {
+	data, err := yaml.Marshal(in)
+	if err != nil {
+		return nil, errors.New(err, "could not marshal to YAML")
+	}
+	return bytes.NewReader(data), nil
+}
+
+func loadAgentInfoWithBackoff(ctx context.Context, forceUpdate bool, logLevel string, createAgentID bool) (*persistentAgentInfo, bool, error) {
+	var err error
+	var ai *persistentAgentInfo
+	var isStandalone bool
+
+	signal := make(chan struct{})
+	backExp := backoff.NewExpBackoff(signal, 100*time.Millisecond, 3*time.Second)
+
+	for i := 0; i <= maxRetriesloadAgentInfo; i++ {
+		backExp.Wait()
+		ai, isStandalone, err = loadAgentInfo(ctx, forceUpdate, logLevel, createAgentID)
+		if !errors.Is(err, filelock.ErrAppAlreadyRunning) {
+			break
+		}
+	}
+
+	close(signal)
+	return ai, isStandalone, err
+}
+
+func loadAgentInfo(ctx context.Context, forceUpdate bool, logLevel string, createAgentID bool) (*persistentAgentInfo, bool, error) {
+	idLock := paths.AgentConfigFileLock()
+	if err := idLock.TryLock(); err != nil {
+		return nil, false, err
+	}
+	//nolint:errcheck // keeping the same behavior, and making linter happy
+	defer idLock.Unlock()
+
+	agentConfigFile := paths.AgentConfigFile()
+	diskStore, err := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
+	if err != nil {
+		return nil, false, fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
+
+	agentInfo, isStandalone, err := getInfoFromStore(diskStore, logLevel)
+	if err != nil {
+		return nil, false, fmt.Errorf("could not get agent info from store: %w", err)
+	}
+
+	if agentInfo != nil && !forceUpdate && (agentInfo.ID != "" || !createAgentID) {
+		return agentInfo, isStandalone, nil
+	}
+
+	if err := updateID(agentInfo, diskStore); err != nil {
+		return nil, false, fmt.Errorf("could not update agent ID on disk store: %w", err)
+	}
+
+	return agentInfo, isStandalone, nil
+}
+
+func updateID(agentInfo *persistentAgentInfo, s ioStore) error {
+	var err error
+	agentInfo.ID, err = generateAgentID()
+	if err != nil {
+		return err
+	}
+
+	if err := updateAgentInfo(s, agentInfo); err != nil {
+		return errors.New(err, "storing generated agent id", errors.TypeFilesystem)
+	}
+
+	return nil
+}

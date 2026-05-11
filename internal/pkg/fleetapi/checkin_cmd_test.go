@@ -25,7 +25,7 @@ import (
 
 type agentinfo struct{}
 
-func (*agentinfo) GetAgentID() string { return "id" }
+func (*agentinfo) AgentID() string { return "id" }
 
 func TestCheckin(t *testing.T) {
 	const withAPIKey = "secret"
@@ -41,7 +41,7 @@ func TestCheckin(t *testing.T) {
 	}
 	`
 			mux := http.NewServeMux()
-			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.GetAgentID())
+			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprint(w, raw)
@@ -94,7 +94,7 @@ func TestCheckin(t *testing.T) {
 	}
 	`
 			mux := http.NewServeMux()
-			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.GetAgentID())
+			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				fmt.Fprint(w, raw)
@@ -155,7 +155,7 @@ func TestCheckin(t *testing.T) {
 	}
 	`
 			mux := http.NewServeMux()
-			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.GetAgentID())
+			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				fmt.Fprint(w, raw)
@@ -187,7 +187,7 @@ func TestCheckin(t *testing.T) {
 		func(t *testing.T) *http.ServeMux {
 			raw := `{ "actions": [] }`
 			mux := http.NewServeMux()
-			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.GetAgentID())
+			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				fmt.Fprint(w, raw)
@@ -210,7 +210,7 @@ func TestCheckin(t *testing.T) {
 		func(t *testing.T) *http.ServeMux {
 			raw := `{"actions": []}`
 			mux := http.NewServeMux()
-			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.GetAgentID())
+			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				type Request struct {
 					Metadata *info.ECSMeta `json:"local_metadata"`
@@ -244,7 +244,7 @@ func TestCheckin(t *testing.T) {
 		func(t *testing.T) *http.ServeMux {
 			raw := `{"actions": []}`
 			mux := http.NewServeMux()
-			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.GetAgentID())
+			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				type Request struct {
 					Metadata *info.ECSMeta `json:"local_metadata"`
@@ -278,7 +278,7 @@ func TestCheckin(t *testing.T) {
 		func(t *testing.T) *http.ServeMux {
 			raw := `{"actions": []}`
 			mux := http.NewServeMux()
-			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.GetAgentID())
+			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				type Request struct {
 					Metadata *info.ECSMeta `json:"local_metadata"`
@@ -344,7 +344,7 @@ func TestCheckinCompression(t *testing.T) {
 				t.Helper()
 
 				mux := http.NewServeMux()
-				path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.GetAgentID())
+				path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 				mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 					checkinPayload, err := readMaybeCompressedCheckinBody(r)
 					require.NoError(t, err)

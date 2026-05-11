@@ -584,7 +584,7 @@ func TestRetriesOnFailures(t *testing.T) {
 
 type testAgentInfo struct{}
 
-func (testAgentInfo) GetAgentID() string { return "agent-secret" }
+func (testAgentInfo) AgentID() string { return "agent-secret" }
 
 func emptyStateFetcher() coordinator.State {
 	return coordinator.State{}

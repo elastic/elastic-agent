@@ -642,7 +642,7 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 // It mainly calls a conversion function from the control protocol client.
 func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, inputType string) ([]map[string]any, error) {
 	agentInfo := &client.AgentInfo{
-		ID:           info.GetAgentID(),
+		ID:           info.AgentID(),
 		Version:      info.Version(),
 		Snapshot:     info.Snapshot(),
 		ManagedMode:  runtime.ProtoAgentMode(info),

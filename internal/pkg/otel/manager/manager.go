@@ -545,7 +545,7 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 		namespace = monitoring.Namespace
 	}
 	agentFields := map[string]any{
-		"id":      agentInfo.GetAgentID(),
+		"id":      agentInfo.AgentID(),
 		"version": agentInfo.Version(),
 	}
 	// Add hostname as agent.name if available
@@ -564,7 +564,7 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 			"dataset": "elastic_agent.elastic_agent",
 		},
 		"elastic_agent": map[string]any{
-			"id":       agentInfo.GetAgentID(),
+			"id":       agentInfo.AgentID(),
 			"process":  "elastic-otel-collector",
 			"snapshot": agentInfo.Snapshot(),
 			"version":  agentInfo.Version(),

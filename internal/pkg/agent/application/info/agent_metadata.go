@@ -159,7 +159,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 	return &ECSMeta{
 		Elastic: &ElasticECSMeta{
 			Agent: &AgentECSMeta{
-				ID:            i.AgentID,
+				ID:            i.agentID,
 				Version:       release.Version(),
 				Snapshot:      release.Snapshot(),
 				Complete:      release.Complete(),

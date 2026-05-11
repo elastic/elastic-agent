@@ -5,10 +5,14 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	goerrors "errors"
 	"fmt"
+	"io"
 	"sort"
+
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -18,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -30,9 +35,9 @@ import (
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
 type PolicyChangeHandler struct {
 	log                   *logger.Logger
-	agentInfoCache        info.Agent
-	agentInfoStore        info.AgentInfoStore
+	agentInfo             info.Agent
 	config                *configuration.Configuration
+	store                 storage.Store
 	ch                    chan coordinator.ConfigChange
 	setters               []actions.ClientSetter
 	runtimeLogLevelSetter logLevelSetter
@@ -46,18 +51,18 @@ type PolicyChangeHandler struct {
 // NewPolicyChangeHandler creates a new PolicyChange handler.
 func NewPolicyChangeHandler(
 	log *logger.Logger,
-	agentInfoCache info.Agent,
-	agentInfoStore info.AgentInfoStore,
+	agentInfo info.Agent,
 	config *configuration.Configuration,
+	store storage.Store,
 	ch chan coordinator.ConfigChange,
 	runtimeLogLevelSetter logLevelSetter,
 	setters ...actions.ClientSetter,
 ) *PolicyChangeHandler {
 	return &PolicyChangeHandler{
 		log:                   log,
-		agentInfoCache:        agentInfoCache,
-		agentInfoStore:        agentInfoStore,
+		agentInfo:             agentInfo,
 		config:                config,
+		store:                 store,
 		ch:                    ch,
 		setters:               setters,
 		runtimeLogLevelSetter: runtimeLogLevelSetter,
@@ -248,18 +253,10 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return validationErr
 	}
 
-	// Step 2: Compute desired state without updating any cache yet.
+	// Step 2: Parse the incoming policy configuration.
 	cfg, err := configuration.NewFromConfig(c)
 	if err != nil {
 		return fmt.Errorf("failed to parse policy configuration: %w", err)
-	}
-
-	desiredFleet := h.config.Fleet
-	if validatedFleetConfig != nil {
-		// Deep enough copy: only the Client subtree changes here.
-		newFleet := *h.config.Fleet
-		newFleet.Client = *validatedFleetConfig
-		desiredFleet = &newFleet
 	}
 
 	policyLogLevel := logger.DefaultLogLevel.String()
@@ -269,20 +266,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 
 	hasEventLoggingOutputChanged := h.hasEventLoggingOutputChanged(cfg)
 
-	// Step 3: Persist atomically. If this fails, no caches or runtime state are touched.
-	saveOpts := []info.SaveOption{
-		info.WithFleet(desiredFleet),
-		info.WithLogLevelPolicy(policyLogLevel),
-		info.WithEventLoggingToFiles(cfg.Settings.EventLoggingConfig.ToFiles),
-		info.WithEventLoggingToStderr(cfg.Settings.EventLoggingConfig.ToStderr),
-		info.WithMonitoringHTTP(cfg.Settings.MonitoringConfig.HTTP),
-		info.WithMonitoringPprof(cfg.Settings.MonitoringConfig.Pprof),
-	}
-	if err := h.agentInfoStore.Save(ctx, saveOpts...); err != nil {
-		return fmt.Errorf("failed to persist policy config: %w", err)
-	}
-
-	// Step 4: Update caches now that disk is consistent.
+	// Step 3: Update in-memory caches.
 	if validatedFleetConfig != nil {
 		h.config.Fleet.Client = *validatedFleetConfig
 	}
@@ -292,7 +276,14 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	if loggingConfig != nil {
 		h.config.Settings.LoggingConfig.Level = loggingConfig.Level
 	}
-	h.agentInfoCache.SetLogLevelPolicy(policyLogLevel)
+	h.config.Settings.MonitoringConfig.HTTP = cfg.Settings.MonitoringConfig.HTTP
+	h.config.Settings.MonitoringConfig.Pprof = cfg.Settings.MonitoringConfig.Pprof
+	h.agentInfo.SetLogLevelPolicy(policyLogLevel)
+
+	// Step 4: Persist the updated configuration to disk.
+	if err := saveConfig(h.agentInfo, h.config, h.store, h.log); err != nil {
+		return fmt.Errorf("failed to persist policy config: %w", err)
+	}
 
 	// Step 5: Apply runtime changes.
 	var runtimeErr error
@@ -301,7 +292,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	}
 
 	var logLevelRuntime logp.Level
-	logLevelRuntimeStr := h.agentInfoCache.GetLogLevelRuntime()
+	logLevelRuntimeStr := h.agentInfo.GetLogLevelRuntime()
 	if err := logLevelRuntime.Unpack(logLevelRuntimeStr); err != nil {
 		runtimeErr = goerrors.Join(runtimeErr, fmt.Errorf("failed to unpack runtime log level %q: %w", logLevelRuntimeStr, err))
 	} else {
@@ -317,7 +308,58 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		h.runtimeLogLevelSetter.ReExec(nil)
 	}
 
-	return runtimeErr
+	if runtimeErr != nil {
+		return runtimeErr
+	}
+
+	return nil
+}
+
+// saveConfig persists the validated fleet + agent settings (including the
+// per-agent log level override held on agentInfo) via fleetToReader.
+func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store, log *logger.Logger) error {
+	if validatedConfig == nil {
+		return nil
+	}
+	reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), agentInfo.GetLogLevelOverride(), validatedConfig)
+	if err != nil {
+		return errors.New(
+			err, "fail to persist new Fleet Server API client hosts",
+			errors.TypeUnexpected, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
+	}
+	if err := saveConfigToStore(store, reader, log); err != nil {
+		return errors.New(
+			err, "fail to persist new Fleet Server API client hosts",
+			errors.TypeFilesystem, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
+	}
+	return nil
+}
+
+// fleetToReader serializes the fleet + agent.* sections that need to land in
+// fleet.enc. logLevelOverride is the in-memory per-agent override held by
+// AgentInfo; when non-empty it is persisted to agent.logging.level_override.
+func fleetToReader(agentID string, headers map[string]string, logLevelOverride string, cfg *configuration.Configuration) (io.ReadSeeker, error) {
+	agentConfig := map[string]interface{}{
+		"id":                           agentID,
+		"headers":                      headers,
+		"logging.level":                cfg.Settings.LoggingConfig.Level,
+		"logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
+		"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
+		"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
+		"monitoring.pprof":             cfg.Settings.MonitoringConfig.Pprof,
+	}
+	if logLevelOverride != "" {
+		agentConfig["logging.level_override"] = logLevelOverride
+	}
+	configToStore := map[string]interface{}{
+		"fleet": cfg.Fleet,
+		"agent": agentConfig,
+	}
+	data, err := yaml.Marshal(configToStore)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(data), nil
 }
 
 // hasEventLoggingOutputChanged returns true if the output of the event logger has changed

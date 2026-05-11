@@ -757,11 +757,11 @@ type fakeAgentInfo struct {
 	meta             *info.ECSMeta
 }
 
-func (a fakeAgentInfo) GetAgentID() string {
+func (a fakeAgentInfo) AgentID() string {
 	return a.agentID
 }
 
-func (a fakeAgentInfo) GetHeaders() map[string]string {
+func (a fakeAgentInfo) Headers() map[string]string {
 	return a.headers
 }
 
@@ -801,7 +801,7 @@ func (a fakeAgentInfo) ECSMetadata(l *logger.Logger) (*info.ECSMeta, error) {
 }
 
 func (a fakeAgentInfo) ReloadID(ctx context.Context) error { panic("implement me") }
-func (a fakeAgentInfo) SetLogLevelOverride(level string) {
+func (a fakeAgentInfo) SetLogLevelOverride(ctx context.Context, level string) error {
 	panic("implement me")
 }
 func (a fakeAgentInfo) SetLogLevelPolicy(level string) { panic("implement me") }

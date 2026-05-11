@@ -1253,7 +1253,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					LogLevelOverride string            `yaml:"log_level_override"`
 					Metadata         *info.ECSMeta     `yaml:"metadata"`
 				}{
-					Headers:          c.agentInfo.GetHeaders(),
+					Headers:          c.agentInfo.Headers(),
 					LogLevelRuntime:  c.agentInfo.GetLogLevelRuntime(),
 					LogLevelPolicy:   c.agentInfo.GetLogLevelPolicy(),
 					LogLevelOverride: c.agentInfo.GetLogLevelOverride(),

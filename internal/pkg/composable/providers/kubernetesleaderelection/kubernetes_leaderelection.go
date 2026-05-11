@@ -71,7 +71,7 @@ func (p *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 	if found {
 		id = leaderElectorPrefix + podName
 	} else {
-		id = leaderElectorPrefix + agentInfo.GetAgentID()
+		id = leaderElectorPrefix + agentInfo.AgentID()
 	}
 
 	ns, err := kubernetes.InClusterNamespace()

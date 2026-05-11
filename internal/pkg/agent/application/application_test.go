@@ -72,7 +72,6 @@ func TestLimitsLog(t *testing.T) {
 		log,
 		logp.DebugLevel,
 		&info.AgentInfo{}, // info.AgentInfo
-		nil,               // info.AgentInfoStore
 		nil,               // coordinator.ReExecManager
 		nil,               // apm.Tracer
 		true,              // testingMode
@@ -519,7 +518,6 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		log,
 		logp.DebugLevel,
 		&info.AgentInfo{},
-		nil, // info.AgentInfoStore
 		nil,
 		nil,
 		false, // not in testing mode - we are testing fs interactions
@@ -545,7 +543,6 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		log,
 		logp.DebugLevel,
 		&info.AgentInfo{},
-		nil, // info.AgentInfoStore
 		nil,
 		nil,
 		false, // not in testing mode - we are testing fs interactions
@@ -577,7 +574,6 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		log,
 		logp.DebugLevel,
 		&info.AgentInfo{},
-		nil, // info.AgentInfoStore
 		nil,
 		nil,
 		false, // not in testing mode - we are testing fs interactions
@@ -611,7 +607,6 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		log,
 		logp.DebugLevel,
 		&info.AgentInfo{},
-		nil, // info.AgentInfoStore
 		nil,
 		nil,
 		false, // not in testing mode - we are testing fs interactions
@@ -691,7 +686,6 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 		log,
 		logp.DebugLevel,
 		&info.AgentInfo{},
-		nil, // info.AgentInfoStore
 		nil,
 		nil,
 		false, // not in testing mode - we are testing fs interactions

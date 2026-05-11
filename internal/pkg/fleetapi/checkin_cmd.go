@@ -105,7 +105,7 @@ type CheckinCmd struct {
 }
 
 type AgentInfo interface {
-	GetAgentID() string
+	AgentID() string
 }
 
 // NewCheckinCmd creates a new api command.
@@ -144,7 +144,7 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 		requestHeaders.Set(checkinContentEncodingHeader, checkinContentEncodingGzip)
 	}
 
-	cp := fmt.Sprintf(checkingPath, e.info.GetAgentID())
+	cp := fmt.Sprintf(checkingPath, e.info.AgentID())
 	sendStart := time.Now()
 	resp, err := e.client.Send(ctx, http.MethodPost, cp, nil, requestHeaders, requestBody)
 	sendDuration := time.Since(sendStart)

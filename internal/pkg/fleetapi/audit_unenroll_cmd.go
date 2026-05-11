@@ -81,7 +81,7 @@ func (e *AuditUnenrollCmd) Execute(ctx context.Context, r *AuditUnenrollRequest)
 	if err != nil {
 		return nil, &ReqError{err}
 	}
-	path := fmt.Sprintf(auditUnenrollPath, e.info.GetAgentID())
+	path := fmt.Sprintf(auditUnenrollPath, e.info.AgentID())
 	resp, err := e.client.Send(ctx, http.MethodPost, path, nil, nil, bytes.NewBuffer(p))
 	if err != nil {
 		// Invalid credentials should result in no retries

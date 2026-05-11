@@ -9,33 +9,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/elastic/elastic-agent/pkg/utils"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
-
-type fakeAgentInfoStore struct {
-	loaded  *AgentInfo
-	loadErr error
-	state   map[string]interface{}
-}
-
-func (f *fakeAgentInfoStore) Load(_ context.Context) (*AgentInfo, error) {
-	if f.loadErr != nil {
-		return nil, f.loadErr
-	}
-	return f.loaded, nil
-}
-
-func (f *fakeAgentInfoStore) Save(_ context.Context, opts ...SaveOption) error {
-	if f.state == nil {
-		f.state = map[string]interface{}{}
-	}
-	for _, o := range opts {
-		o(f.state)
-	}
-	return nil
-}
 
 func TestNewAgentInfoWithLog(t *testing.T) {
 	hasRoot, err := utils.HasRoot()
@@ -43,31 +20,35 @@ func TestNewAgentInfoWithLog(t *testing.T) {
 
 	for _, tc := range []struct {
 		name            string
-		loaded          *AgentInfo
+		loaded          *persistentAgentInfo
+		isStandalone    bool
 		defaultLogLevel string
 		expected        *AgentInfo
 	}{
 		{
 			name:            "standalone uses the supplied default in memory",
-			loaded:          &AgentInfo{AgentID: "testID", LogLevelPolicy: "info", isStandalone: true},
+			loaded:          &persistentAgentInfo{ID: "testID", LogLevel: "info"},
+			isStandalone:    true,
 			defaultLogLevel: "debug",
-			expected:        &AgentInfo{AgentID: "testID", LogLevelPolicy: "debug", unprivileged: !hasRoot, isStandalone: true},
+			expected:        &AgentInfo{agentID: "testID", logLevelPolicy: "debug", unprivileged: !hasRoot, isStandalone: true},
 		},
 		{
 			name:            "fleet keeps the on-disk policy level",
-			loaded:          &AgentInfo{AgentID: "testID", LogLevelPolicy: "info", isStandalone: false},
+			loaded:          &persistentAgentInfo{ID: "testID", LogLevel: "info"},
+			isStandalone:    false,
 			defaultLogLevel: "debug",
-			expected:        &AgentInfo{AgentID: "testID", LogLevelPolicy: "info", unprivileged: !hasRoot, isStandalone: false},
+			expected:        &AgentInfo{agentID: "testID", logLevelPolicy: "info", unprivileged: !hasRoot, isStandalone: false},
 		},
 		{
 			name:            "fleet with per-agent override",
-			loaded:          &AgentInfo{AgentID: "testID", LogLevelPolicy: "info", LogLevelOverride: "warning", isStandalone: false},
+			loaded:          &persistentAgentInfo{ID: "testID", LogLevel: "info", LogLevelOverride: "warning"},
+			isStandalone:    false,
 			defaultLogLevel: "debug",
-			expected:        &AgentInfo{AgentID: "testID", LogLevelPolicy: "info", LogLevelOverride: "warning", unprivileged: !hasRoot, isStandalone: false},
+			expected:        &AgentInfo{agentID: "testID", logLevelPolicy: "info", logLevelOverride: "warning", unprivileged: !hasRoot, isStandalone: false},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			setFakeStore(t, tc.loaded, nil)
+			setFakeLoader(t, tc.loaded, tc.isStandalone, nil)
 			ai, err := NewAgentInfoWithLog(t.Context(), tc.defaultLogLevel, false)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expected, ai)
@@ -75,32 +56,24 @@ func TestNewAgentInfoWithLog(t *testing.T) {
 	}
 }
 
-func TestNewAgentInfoWithLog_GeneratesAgentIDWhenMissing(t *testing.T) {
-	fake := setFakeStore(t, &AgentInfo{isStandalone: true}, nil)
-
-	ai, err := NewAgentInfoWithLog(context.Background(), "info", true)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, ai.AgentID, "a new agent ID should have been generated")
-
-	saved := fake.state["agent"].(map[string]interface{})
-	assert.Equal(t, ai.AgentID, saved["id"], "agent.id should be persisted")
-}
-
 func TestNewAgentInfoWithLog_LoadErrorPropagates(t *testing.T) {
 	wantErr := errors.New("disk read failed")
-	setFakeStore(t, nil, wantErr)
+	setFakeLoader(t, nil, false, wantErr)
 
 	_, err := NewAgentInfoWithLog(context.Background(), "info", true)
 	assert.ErrorIs(t, err, wantErr)
 }
 
-// setFakeStore swaps in a fakeAgentInfoStore for the duration of the test and
-// returns it so callers can inspect what was persisted.
-func setFakeStore(t *testing.T, loaded *AgentInfo, loadErr error) *fakeAgentInfoStore {
+// setFakeLoader swaps out doLoadAgentInfoWithBackoff for the duration of the
+// test so the disk-load path can be stubbed without a real encrypted vault.
+func setFakeLoader(t *testing.T, loaded *persistentAgentInfo, isStandalone bool, loadErr error) {
 	t.Helper()
-	prev := defaultAgentInfoStore
-	t.Cleanup(func() { defaultAgentInfoStore = prev })
-	fake := &fakeAgentInfoStore{loaded: loaded, loadErr: loadErr}
-	defaultAgentInfoStore = fake
-	return fake
+	prev := doLoadAgentInfoWithBackoff
+	t.Cleanup(func() { doLoadAgentInfoWithBackoff = prev })
+	doLoadAgentInfoWithBackoff = func(_ context.Context, _ bool, logLevel string, _ bool) (*persistentAgentInfo, bool, error) {
+		if loadErr != nil {
+			return nil, false, loadErr
+		}
+		return loaded, isStandalone, nil
+	}
 }
