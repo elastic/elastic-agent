@@ -358,6 +358,24 @@ func TestSettingsGetPackageTypes(t *testing.T) {
 
 		assert.Nil(t, types)
 	})
+
+	t.Run("returns all package types when PACKAGES is all", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Packages = "all"
+
+		types := s.GetPackageTypes()
+
+		assert.Equal(t, AllPackageTypes, types)
+	})
+
+	t.Run("returns all package types when PACKAGES is ALL (case-insensitive)", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Packages = "ALL"
+
+		types := s.GetPackageTypes()
+
+		assert.Equal(t, AllPackageTypes, types)
+	})
 }
 
 func TestSettingsGetDockerVariants(t *testing.T) {
