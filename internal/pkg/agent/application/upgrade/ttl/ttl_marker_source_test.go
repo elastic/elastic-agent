@@ -281,3 +281,131 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 		})
 	}
 }
+
+// TestTTLMarkerRegistry_Set_TolerateMalformedExisting proves that Set no
+// longer aborts when an existing .ttl file holds a corrupt payload that
+// cannot be parsed as YAML, so a single bad marker on disk cannot wedge
+// subsequent upgrade and rollback cycles.
+func TestTTLMarkerRegistry_Set_TolerateMalformedExisting(t *testing.T) {
+	const corruptPayload = "not valid yaml: {"
+
+	const markerYAMLTemplate = `
+        version: {{ .Version }}
+        hash: {{ .Hash }}
+        valid_until: {{ .ValidUntil }}`
+
+	markerTpl, err := template.New("marker").Parse(markerYAMLTemplate)
+	require.NoError(t, err)
+
+	tomorrowString := time.Now().Add(24 * time.Hour).Format(time.RFC3339)
+	tomorrow, err := time.Parse(time.RFC3339, tomorrowString)
+	require.NoError(t, err)
+
+	homeA := filepath.Join("data", "elastic-agent-1.2.3-a")
+	homeB := filepath.Join("data", "elastic-agent-4.5.6-b")
+	homeC := filepath.Join("data", "elastic-agent-7.8.9-c")
+
+	renderMarker := func(t *testing.T, version, hash, validUntil string) string {
+		t.Helper()
+		b := new(strings.Builder)
+		require.NoError(t, markerTpl.Execute(b, map[string]string{
+			"Version":    version,
+			"Hash":       hash,
+			"ValidUntil": validUntil,
+		}))
+		return b.String()
+	}
+
+	t.Run("corrupt live ttl is overwritten when desired state includes it", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		for _, home := range []string{homeA, homeB, homeC} {
+			require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, home), 0755))
+		}
+
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, homeA, ttlMarkerName), []byte(corruptPayload), 0644))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpDir, homeB, ttlMarkerName),
+			[]byte(renderMarker(t, "4.5.6", "bbbbbb", tomorrowString)),
+			0644,
+		))
+
+		desired := map[string]TTLMarker{
+			homeA: {Version: "1.2.3", Hash: "aaaaaa", ValidUntil: tomorrow},
+			homeC: {Version: "7.8.9", Hash: "cccccc", ValidUntil: tomorrow},
+		}
+
+		testLogger, _ := loggertest.New(t.Name())
+		T := NewTTLMarkerRegistry(testLogger, tmpDir)
+		require.NoError(t, T.Set(desired))
+
+		aPath := filepath.Join(tmpDir, homeA, ttlMarkerName)
+		if assert.FileExists(t, aPath, "corrupt marker should have been overwritten with valid YAML") {
+			got, readErr := readTTLMarker(aPath)
+			require.NoError(t, readErr, "rewritten marker must parse")
+			assert.Equal(t, "1.2.3", got.Version)
+			assert.Equal(t, "aaaaaa", got.Hash)
+			assert.True(t, got.ValidUntil.Equal(tomorrow), "ValidUntil mismatch")
+		}
+
+		assert.NoFileExists(t, filepath.Join(tmpDir, homeB, ttlMarkerName), "B was not in desired state and should have been swept")
+
+		cPath := filepath.Join(tmpDir, homeC, ttlMarkerName)
+		if assert.FileExists(t, cPath) {
+			got, readErr := readTTLMarker(cPath)
+			require.NoError(t, readErr)
+			assert.Equal(t, "7.8.9", got.Version)
+			assert.Equal(t, "cccccc", got.Hash)
+			assert.True(t, got.ValidUntil.Equal(tomorrow), "ValidUntil mismatch")
+		}
+	})
+
+	// Set(nil) is the rollback path called from rollbackInstall: a corrupt
+	// marker on disk must not block the rollback that recovers from a failed
+	// upgrade, otherwise the broken state is sticky.
+	t.Run("Set(nil) sweeps a malformed live ttl", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		for _, home := range []string{homeA, homeB} {
+			require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, home), 0755))
+		}
+
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, homeA, ttlMarkerName), []byte(corruptPayload), 0644))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpDir, homeB, ttlMarkerName),
+			[]byte(renderMarker(t, "4.5.6", "bbbbbb", tomorrowString)),
+			0644,
+		))
+
+		testLogger, _ := loggertest.New(t.Name())
+		T := NewTTLMarkerRegistry(testLogger, tmpDir)
+		require.NoError(t, T.Set(nil))
+
+		assert.NoFileExists(t, filepath.Join(tmpDir, homeA, ttlMarkerName))
+		assert.NoFileExists(t, filepath.Join(tmpDir, homeB, ttlMarkerName))
+	})
+
+	t.Run("malformed existing is reaped when desired targets a different home", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		for _, home := range []string{homeA, homeC} {
+			require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, home), 0755))
+		}
+
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, homeA, ttlMarkerName), []byte(corruptPayload), 0644))
+
+		desired := map[string]TTLMarker{
+			homeC: {Version: "7.8.9", Hash: "cccccc", ValidUntil: tomorrow},
+		}
+
+		testLogger, _ := loggertest.New(t.Name())
+		T := NewTTLMarkerRegistry(testLogger, tmpDir)
+		require.NoError(t, T.Set(desired))
+
+		assert.NoFileExists(t, filepath.Join(tmpDir, homeA, ttlMarkerName), "malformed marker outside desired set must be removed")
+
+		cPath := filepath.Join(tmpDir, homeC, ttlMarkerName)
+		if assert.FileExists(t, cPath) {
+			got, readErr := readTTLMarker(cPath)
+			require.NoError(t, readErr)
+			assert.Equal(t, "7.8.9", got.Version)
+		}
+	})
+}
