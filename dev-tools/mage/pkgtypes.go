@@ -78,6 +78,9 @@ var (
 	Docker             = PackageType(pkgcommon.Docker)
 )
 
+// AllPackageTypes contains all available package types.
+var AllPackageTypes = []PackageType{RPM, Deb, Zip, TarGz, Docker}
+
 // OSPackageArgs define a set of package types to build for an operating
 // system using the contained PackageSpec.
 type OSPackageArgs struct {

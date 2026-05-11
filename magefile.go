@@ -580,10 +580,18 @@ func Package(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
+<<<<<<< HEAD
 	cfg := devtools.SettingsFromContext(ctx)
 
 	platforms := cfg.GetPlatforms()
 	if len(platforms) == 0 {
+=======
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
+
+	if len(cfg.GetPlatforms()) == 0 {
+>>>>>>> 3c6d42ef5 (fix: restore default packaging behavior when PACKAGES env var is empty (#13478))
 		panic("elastic-agent package is expected to build at least one platform package")
 	}
 
@@ -1557,10 +1565,18 @@ func PackageUsingDRA(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
+<<<<<<< HEAD
 	cfg := devtools.SettingsFromContext(ctx)
 
 	platforms := cfg.GetPlatforms()
 	if len(platforms) == 0 {
+=======
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
+
+	if len(cfg.GetPlatforms()) == 0 {
+>>>>>>> 3c6d42ef5 (fix: restore default packaging behavior when PACKAGES env var is empty (#13478))
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
 	}
 

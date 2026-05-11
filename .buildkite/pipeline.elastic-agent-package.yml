@@ -70,7 +70,12 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         env:
           PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
+<<<<<<< HEAD
           FIPS: "{{matrix.fips}}"
+=======
+          PACKAGES: "all"
+          FIPS: "false"
+>>>>>>> 3c6d42ef5 (fix: restore default packaging behavior when PACKAGES env var is empty (#13478))
         command: |
           if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
@@ -94,15 +99,75 @@ steps:
           - elastic/vault-docker-login#v0.5.2:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
+<<<<<<< HEAD
       - label: ":package: FIPS={{matrix.fips}} Package ARM elastic-agent"
         key: package_elastic-agent-arm
+=======
+      - label: ":package: FIPS=true Cross Building and package elastic-agent"
+        key: package_elastic-agent_fips
+        agents:
+          provider: "gcp"
+          machineType: "c2-standard-16"
+          diskSizeGb: 400
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
+        env:
+          PLATFORMS: "linux/amd64"
+          PACKAGES: "all"
+          FIPS: "true"
+        command: |
+          if [[ -z "$${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+          fi
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          .buildkite/scripts/steps/package.sh
+        artifact_paths:
+          - "build/distributions/**/*"
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
+      - label: ":package: FIPS=false Package ARM elastic-agent"
+        key: package_elastic-agent_arm
+>>>>>>> 3c6d42ef5 (fix: restore default packaging behavior when PACKAGES env var is empty (#13478))
         agents:
           provider: "aws"
           instanceType: "t4g.2xlarge"
           image: "${IMAGE_UBUNTU_2404_ARM_64}"
           diskSizeGb: 400
         env:
+<<<<<<< HEAD
           PLATFORMS: "linux/arm64 darwin/arm64"
+=======
+          PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
+          PACKAGES: "all"
+          FIPS: "false"
+        command: |
+          echo "Add support for multiarch"
+          docker run --privileged --rm tonistiigi/binfmt:master --install all
+
+          if [[ -z "$${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+          fi
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          .buildkite/scripts/steps/package.sh
+          ls -lahR build/
+        artifact_paths:
+          - "build/distributions/**/*"
+
+      - label: ":package: FIPS=true Package ARM elastic-agent"
+        key: package_elastic-agent_arm_fips
+        agents:
+          provider: "aws"
+          instanceType: "t4g.2xlarge"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
+          diskSizeGb: 400
+        env:
+          PLATFORMS: "linux/arm64"
+>>>>>>> 3c6d42ef5 (fix: restore default packaging behavior when PACKAGES env var is empty (#13478))
           PACKAGES: "docker,tar.gz,deb,rpm"
           FIPS: "{{matrix.fips}}"
         command: |
