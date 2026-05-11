@@ -303,7 +303,7 @@ shared:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl'
         mode: 0644
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}:
-        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+        source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
         mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/package.version:
         content: >
@@ -366,10 +366,10 @@ shared:
 
   - &agent_binary_files
     '{{.BeatName}}{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
     'data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
     'data/{{.BeatName}}-{{ core_commit_short }}/elastic-otel-collector{{.BinaryExt}}':
       source: build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -391,10 +391,10 @@ shared:
 
   - &agent_darwin_binary_files
     '{{.BeatName}}{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
     'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
     'data/{{.BeatName}}-{{ core_commit_short }}/elastic-otel-collector{{.BinaryExt}}':
       source: build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -572,10 +572,10 @@ shared:
       repository: 'docker.elastic.co/beats-ci'
     files:
       'data/cloud_downloads/filebeat.sh':
-        template: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/filebeat.sh.tmpl'
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/filebeat.sh'
         mode: 0755
       'data/cloud_downloads/metricbeat.sh':
-        template: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh.tmpl'
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh'
         mode: 0755
       'data/cloud_downloads/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
         source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
@@ -587,10 +587,10 @@ shared:
       repository: 'docker.elastic.co/beats-ci'
     files:
       'data/cloud_downloads/filebeat.sh':
-        template: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/filebeat.sh.tmpl'
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/filebeat.sh'
         mode: 0755
       'data/cloud_downloads/metricbeat.sh':
-        template: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh.tmpl'
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh'
         mode: 0755
       'data/cloud_downloads/agentbeat-fips-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
         source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-fips-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
