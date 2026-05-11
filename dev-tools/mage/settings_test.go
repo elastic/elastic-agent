@@ -202,15 +202,6 @@ func TestSettingsWithMethods(t *testing.T) {
 		assert.Empty(t, original.Build.BeatVersion)
 	})
 
-	t.Run("WithAgentCommitHashOverride", func(t *testing.T) {
-		original := DefaultSettings()
-
-		modified := original.WithAgentCommitHashOverride("abc123")
-
-		assert.Equal(t, "abc123", modified.Build.AgentCommitHashOverride)
-		assert.Empty(t, original.Build.AgentCommitHashOverride)
-	})
-
 	t.Run("WithAgentDropPath", func(t *testing.T) {
 		original := DefaultSettings()
 
@@ -357,6 +348,24 @@ func TestSettingsGetPackageTypes(t *testing.T) {
 		types := s.GetPackageTypes()
 
 		assert.Nil(t, types)
+	})
+
+	t.Run("returns all package types when PACKAGES is all", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Packages = "all"
+
+		types := s.GetPackageTypes()
+
+		assert.Equal(t, AllPackageTypes, types)
+	})
+
+	t.Run("returns all package types when PACKAGES is ALL (case-insensitive)", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Packages = "ALL"
+
+		types := s.GetPackageTypes()
+
+		assert.Equal(t, AllPackageTypes, types)
 	})
 }
 
@@ -528,52 +537,69 @@ func TestMaybeSnapshotSuffix(t *testing.T) {
 }
 
 func TestBuildSettingsCommitHash(t *testing.T) {
-	t.Run("returns override when set", func(t *testing.T) {
-		bs := &BuildSettings{
-			AgentCommitHashOverride: "abc123def456",
-		}
-
-		hash, err := bs.CommitHash()
-
-		require.NoError(t, err)
-		assert.Equal(t, "abc123def456", hash)
-	})
-
-	t.Run("caches git commit hash", func(t *testing.T) {
+	t.Run("returns empty string when not initialized", func(t *testing.T) {
 		bs := &BuildSettings{}
 
-		hash1, err := bs.CommitHash()
+		assert.Empty(t, bs.CommitHash())
+	})
+
+	t.Run("returns hash populated by LoadSettings", func(t *testing.T) {
+		s, err := LoadSettings()
 		require.NoError(t, err)
 
-		hash2, err := bs.CommitHash()
-		require.NoError(t, err)
+		assert.NotEmpty(t, s.Build.CommitHash())
+	})
 
-		assert.Equal(t, hash1, hash2)
-		assert.NotEmpty(t, hash1)
+	t.Run("ignores agent core commit hash", func(t *testing.T) {
+		s, err := LoadSettings()
+		require.NoError(t, err)
+		s.Build.AgentCoreCommitHash = "abc123def456"
+
+		// CommitHash must return the actual git hash of the source tree, not the agent-core override.
+		assert.NotEqual(t, "abc123def456", s.Build.CommitHash())
 	})
 }
 
 func TestBuildSettingsCommitHashShort(t *testing.T) {
-	t.Run("returns first 6 characters of hash", func(t *testing.T) {
-		bs := &BuildSettings{
-			AgentCommitHashOverride: "abc123def456789",
-		}
-
-		shortHash, err := bs.CommitHashShort()
-
+	t.Run("returns first 6 characters of git hash", func(t *testing.T) {
+		s, err := LoadSettings()
 		require.NoError(t, err)
-		assert.Equal(t, "abc123", shortHash)
+
+		fullHash := s.Build.CommitHash()
+		require.GreaterOrEqual(t, len(fullHash), 6)
+		assert.Equal(t, fullHash[:6], s.Build.CommitHashShort())
+	})
+}
+
+func TestSettingsAgentCoreCommitHash(t *testing.T) {
+	t.Run("returns AgentCoreCommitHash when set", func(t *testing.T) {
+		s := DefaultSettings()
+		s.Build.AgentCoreCommitHash = "abc123def456"
+
+		assert.Equal(t, "abc123def456", s.AgentCoreCommitHash())
 	})
 
-	t.Run("returns full hash if less than 6 chars", func(t *testing.T) {
-		bs := &BuildSettings{
-			AgentCommitHashOverride: "abc",
-		}
-
-		shortHash, err := bs.CommitHashShort()
-
+	t.Run("returns repo git hash when AgentCoreCommitHash not set", func(t *testing.T) {
+		s, err := LoadSettings()
 		require.NoError(t, err)
-		assert.Equal(t, "abc", shortHash)
+
+		assert.Equal(t, s.Build.CommitHash(), s.AgentCoreCommitHash())
+	})
+}
+
+func TestSettingsAgentCoreCommitHashShort(t *testing.T) {
+	t.Run("returns first 6 characters of AgentCoreCommitHash", func(t *testing.T) {
+		s := DefaultSettings()
+		s.Build.AgentCoreCommitHash = "abc123def456789"
+
+		assert.Equal(t, "abc123", s.AgentCoreCommitHashShort())
+	})
+
+	t.Run("returns full value when shorter than 6 chars", func(t *testing.T) {
+		s := DefaultSettings()
+		s.Build.AgentCoreCommitHash = "abc"
+
+		assert.Equal(t, "abc", s.AgentCoreCommitHashShort())
 	})
 }
 
@@ -662,7 +688,6 @@ func TestLoadSettings(t *testing.T) {
 		t.Setenv("CI", "true")
 		t.Setenv("MAX_PARALLEL", "8")
 		t.Setenv("BEAT_VERSION", "1.2.3")
-		t.Setenv("AGENT_COMMIT_HASH_OVERRIDE", "abc123")
 		t.Setenv("GOLANG_CROSSBUILD", "1")
 		t.Setenv("BEAT_GO_VERSION", "1.21.0")
 		t.Setenv("BEAT_DOC_BRANCH", "main")
@@ -681,7 +706,6 @@ func TestLoadSettings(t *testing.T) {
 		assert.Equal(t, "true", settings.Build.CI)
 		assert.Equal(t, 8, settings.Build.MaxParallel)
 		assert.Equal(t, "1.2.3", settings.Build.BeatVersion)
-		assert.Equal(t, "abc123", settings.Build.AgentCommitHashOverride)
 		assert.True(t, settings.Build.GolangCrossBuild)
 		assert.Equal(t, "1.21.0", settings.Build.BeatGoVersion)
 		assert.Equal(t, "main", settings.Build.BeatDocBranch)
