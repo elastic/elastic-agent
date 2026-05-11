@@ -359,8 +359,8 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 		var conn net.Conn
 		if runtime.GOOS != "windows" {
 			dialCtx, cancelDial := context.WithTimeout(ctx, time.Second)
-			defer cancelDial()
 			conn, err = (&net.Dialer{}).DialContext(dialCtx, "unix", parsedCISAddr.Host+parsedCISAddr.Path)
+			cancelDial()
 		} else {
 			if strings.HasPrefix(cisAddr, "npipe:///") {
 				path := strings.TrimPrefix(cisAddr, "npipe:///")
