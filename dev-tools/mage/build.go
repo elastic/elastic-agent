@@ -110,6 +110,11 @@ func DefaultBuildArgs(cfg *Settings) BuildArgs {
 			for varName, value := range fipsConfig.Compile.Env {
 				args.Env[varName] = value
 			}
+			// windows FIPS builds use the upstream FIPS module
+			if platform.GOOS == "windows" {
+				delete(args.Env, "GOEXPERIMENT")
+				args.Env["GOFIPS140"] = "latest"
+			}
 		}
 	}
 

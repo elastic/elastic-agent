@@ -221,7 +221,9 @@ func CrossBuildImage(cfg *Settings, platform string) (string, error) {
 
 	goVersion := cfg.GoVersion()
 
-	if cfg.Build.FIPSBuild {
+	// FIPS on Linux has to be build using the Go microsoft fork for backwards compatibility reasons.
+	// On Windows, we use the upstream Go mode.
+	if cfg.Build.FIPSBuild && strings.HasPrefix(platform, "linux") {
 		tagSuffix += "-fips"
 	}
 
