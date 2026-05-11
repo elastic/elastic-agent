@@ -204,6 +204,10 @@ func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 		t.Skipf("platform: %s, architecture: %s, version: %s, and distro: %s combination is not supported by test.  required: %v", runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, req.OS)
 		return nil
 	}
+	if skipped, ok := req.runtimeSkipped(runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, dockerVariant); ok {
+		t.Skipf("platform: %s, architecture: %s, version: %s, and distro: %s matches skip_os entry %+v. Skipping", runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, skipped)
+		return nil
+	}
 
 	if DryRun {
 		return dryRun(t, req)

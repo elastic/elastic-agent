@@ -14,6 +14,8 @@ env:
   IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1777597312"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1777597312"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1777597312"
+  IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
+  IMAGE_WIN_11_ARM64_VERSION: "1.0.1777597312"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
@@ -88,8 +90,8 @@ steps:
       - packaging-containers-arm64
     env:
       TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
-      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
       FORCE_ESS_CREATE: "true"
+      INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
     command: |
       #!/usr/bin/env bash
       buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
@@ -317,6 +319,67 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          - default
+
+      - label: "Win11ARM64:sudo:{{matrix}}"
+        depends_on:
+          - packaging-arm64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-arm64* . --step 'packaging-arm64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        agents:
+          provider: "azure"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
+        retry:
+          automatic:
+            limit: 1
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          - default
+          - fleet
+          - fleet-endpoint-security
+          - fleet-privileged
+          - standalone-upgrade
+          - upgrade
+          - upgrade-flavor
+          - install-uninstall
+
+      - label: "Win11ARM64:non-sudo:{{matrix}}"
+        depends_on:
+          - packaging-arm64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-arm64* . --step 'packaging-arm64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        agents:
+          provider: "azure"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
+        retry:
+          automatic:
+            limit: 1
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
@@ -653,7 +716,6 @@ steps:
               - *k8s_max_test_version
 
   - group: "Serverless integration test"
-    skip: "See https://github.com/elastic/elastic-agent/issues/13927"
     key: integration-tests-serverless
     notify:
       - github_commit_status:
@@ -733,7 +795,7 @@ steps:
       - integration-tests-debian
     allow_dependency_failure: true
     command: |
-      .buildkite/scripts/steps/ess_down_oblt-cli.sh
+      .buildkite/scripts/steps/ess_cleanup_all.sh
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
