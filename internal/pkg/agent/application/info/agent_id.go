@@ -26,6 +26,7 @@ import (
 // defaultAgentConfigFile is a name of file used to store agent information
 const (
 	agentInfoKey            = "agent"
+	defaultLogLevel         = "info"
 	maxRetriesloadAgentInfo = 5
 )
 
@@ -43,29 +44,6 @@ type persistentAgentInfo struct {
 type ioStore interface {
 	Save(io.Reader) error
 	Load() (io.ReadCloser, error)
-}
-
-// updateLogLevel updates the policy-level log level (agent.logging.level) and
-// persists it to disk.
-func updateLogLevel(ctx context.Context, level string) error {
-	ai, _, err := loadAgentInfoWithBackoff(ctx, false, defaultLogLevel, false)
-	if err != nil {
-		return err
-	}
-
-	if ai.LogLevel == level {
-		// no action needed
-		return nil
-	}
-
-	agentConfigFile := paths.AgentConfigFile()
-	diskStore, err := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
-	if err != nil {
-		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
-	}
-
-	ai.LogLevel = level
-	return updateAgentInfo(diskStore, ai)
 }
 
 // updateLogLevelOverride updates the per-agent log level override

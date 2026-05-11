@@ -244,11 +244,11 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					Settings: configuration.DefaultSettingsConfig()}
 
 				h := PolicyChangeHandler{
-					agentInfo:            &info.AgentInfo{},
-					config:               originalCfg,
-					store:                &storage.NullStore{},
-					setters:              []actions.ClientSetter{&setter},
-					log:                  log,
+					agentInfo:             &info.AgentInfo{},
+					config:                originalCfg,
+					store:                 &storage.NullStore{},
+					setters:               []actions.ClientSetter{&setter},
+					log:                   log,
 					runtimeLogLevelSetter: newMockLogLevelSetter(t),
 				}
 
@@ -301,11 +301,11 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					Settings: configuration.DefaultSettingsConfig()}
 
 				h := PolicyChangeHandler{
-					agentInfo:            &info.AgentInfo{},
-					config:               originalCfg,
-					store:                &storage.NullStore{},
-					setters:              []actions.ClientSetter{&setter},
-					log:                  log,
+					agentInfo:             &info.AgentInfo{},
+					config:                originalCfg,
+					store:                 &storage.NullStore{},
+					setters:               []actions.ClientSetter{&setter},
+					log:                   log,
 					runtimeLogLevelSetter: newMockLogLevelSetter(t),
 				}
 
@@ -351,11 +351,11 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				Settings: configuration.DefaultSettingsConfig()}
 
 			h := PolicyChangeHandler{
-				agentInfo:            &info.AgentInfo{},
-				config:               originalCfg,
-				store:                &storage.NullStore{},
-				setters:              []actions.ClientSetter{&setter},
-				log:                  log,
+				agentInfo:             &info.AgentInfo{},
+				config:                originalCfg,
+				store:                 &storage.NullStore{},
+				setters:               []actions.ClientSetter{&setter},
+				log:                   log,
 				runtimeLogLevelSetter: defaultLogLevelSet(t),
 			}
 
@@ -399,11 +399,11 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				Settings: configuration.DefaultSettingsConfig()}
 
 			h := PolicyChangeHandler{
-				agentInfo:            &info.AgentInfo{},
-				config:               originalCfg,
-				store:                &storage.NullStore{},
-				setters:              []actions.ClientSetter{&setter},
-				log:                  log,
+				agentInfo:             &info.AgentInfo{},
+				config:                originalCfg,
+				store:                 &storage.NullStore{},
+				setters:               []actions.ClientSetter{&setter},
+				log:                   log,
 				runtimeLogLevelSetter: defaultLogLevelSet(t),
 			}
 
@@ -453,11 +453,11 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					Settings: configuration.DefaultSettingsConfig()}
 
 				h := PolicyChangeHandler{
-					agentInfo:            &info.AgentInfo{},
-					config:               originalCfg,
-					store:                &storage.NullStore{},
-					setters:              []actions.ClientSetter{&setter},
-					log:                  log,
+					agentInfo:             &info.AgentInfo{},
+					config:                originalCfg,
+					store:                 &storage.NullStore{},
+					setters:               []actions.ClientSetter{&setter},
+					log:                   log,
 					runtimeLogLevelSetter: defaultLogLevelSet(t),
 				}
 
@@ -509,11 +509,11 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					Settings: configuration.DefaultSettingsConfig()}
 
 				h := PolicyChangeHandler{
-					agentInfo:            &info.AgentInfo{},
-					config:               originalCfg,
-					store:                &storage.NullStore{},
-					setters:              []actions.ClientSetter{&setter},
-					log:                  log,
+					agentInfo:             &info.AgentInfo{},
+					config:                originalCfg,
+					store:                 &storage.NullStore{},
+					setters:               []actions.ClientSetter{&setter},
+					log:                   log,
 					runtimeLogLevelSetter: newMockLogLevelSetter(t),
 				}
 
@@ -577,14 +577,14 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		agentRootCertPool := x509.NewCertPool()
 		agentRootCertPool.AppendCertsFromPEM(agentRootPair.Cert)
 
-		fleetmTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+		fleetmTLSServer.TLS = &tls.Config{
 			RootCAs:      fleetRootCertPool,
 			Certificates: []tls.Certificate{cert},
 			ClientCAs:    agentRootCertPool,
 			ClientAuth:   tls.RequireAndVerifyClientCert,
 		}
 
-		fleetNomTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+		fleetNomTLSServer.TLS = &tls.Config{
 			RootCAs:      fleetRootCertPool,
 			Certificates: []tls.Certificate{cert},
 		}
@@ -754,7 +754,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
 									CAs: []string{string(fleetRootPair.Cert)},
-									Certificate: tlscommon.CertificateConfig{
+									Certificate: tlscommon.CertificateConfig{ //nolint:gosec // test fixture, not real credentials
 										Certificate:    "some certificate",
 										Key:            "some key",
 										Passphrase:     "",
@@ -919,11 +919,11 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					logLevelSetterMock = defaultLogLevelSet(t)
 				}
 				h := PolicyChangeHandler{
-					agentInfo:            &info.AgentInfo{},
-					config:               tc.originalCfg,
-					store:                &storage.NullStore{},
-					setters:              []actions.ClientSetter{&setter},
-					log:                  log,
+					agentInfo:             &info.AgentInfo{},
+					config:                tc.originalCfg,
+					store:                 &storage.NullStore{},
+					setters:               []actions.ClientSetter{&setter},
+					log:                   log,
 					runtimeLogLevelSetter: logLevelSetterMock,
 				}
 
@@ -1100,10 +1100,10 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 			}
 
 			h := &PolicyChangeHandler{
-				log:                  log,
-				agentInfo:            &info.AgentInfo{},
-				config:               configuration.DefaultConfiguration(),
-				store:                &storage.NullStore{},
+				log:                   log,
+				agentInfo:             &info.AgentInfo{},
+				config:                configuration.DefaultConfiguration(),
+				store:                 &storage.NullStore{},
 				runtimeLogLevelSetter: mockLogSetter,
 			}
 
@@ -1143,10 +1143,10 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *tes
 			mockLogSetter.EXPECT().SetLogLevel(mock.Anything, mock.Anything).Return(nil).Once()
 
 			h := &PolicyChangeHandler{
-				log:                  log,
-				agentInfo:            &info.AgentInfo{},
-				config:               configuration.DefaultConfiguration(),
-				store:                &storage.NullStore{},
+				log:                   log,
+				agentInfo:             &info.AgentInfo{},
+				config:                configuration.DefaultConfiguration(),
+				store:                 &storage.NullStore{},
 				runtimeLogLevelSetter: mockLogSetter,
 			}
 

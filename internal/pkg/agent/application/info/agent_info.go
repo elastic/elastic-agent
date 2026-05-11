@@ -13,8 +13,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-const defaultLogLevel = "info"
-
 type Agent interface {
 	// AgentID returns an agent identifier.
 	AgentID() string

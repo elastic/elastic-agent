@@ -819,7 +819,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 type agentInfo string
 
-func (a agentInfo) GetAgentID() string {
+func (a agentInfo) AgentID() string {
 	return string(a)
 }
 

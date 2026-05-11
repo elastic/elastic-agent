@@ -26,7 +26,7 @@ import (
 )
 
 type agentInfoMock struct {
-	AgentID      string
+	agentID      string
 	snapshot     bool
 	version      string
 	unprivileged bool
@@ -34,7 +34,7 @@ type agentInfoMock struct {
 }
 
 func (a agentInfoMock) AgentID() string {
-	return a.AgentID
+	return a.agentID
 }
 func (a agentInfoMock) Snapshot() bool {
 	return a.snapshot
@@ -58,7 +58,7 @@ func (a agentInfoMock) GetLogLevelPolicy() string          { panic("implement me
 func (a agentInfoMock) GetLogLevelOverride() string        { panic("implement me") }
 func (a agentInfoMock) ReloadID(ctx context.Context) error { panic("implement me") }
 func (a agentInfoMock) SetLogLevelPolicy(level string)     { panic("implement me") }
-func (a agentInfoMock) SetLogLevelOverride(level string) {
+func (a agentInfoMock) SetLogLevelOverride(_ context.Context, _ string) error {
 	panic("implement me")
 }
 func (a agentInfoMock) ECSMetadata(l *logger.Logger) (*info.ECSMeta, error) { panic("implement me") }
@@ -75,7 +75,7 @@ func TestCheckinExpected(t *testing.T) {
 		token:      "a_token",
 		cert:       pair,
 		agentInfo: agentInfoMock{
-			AgentID:      "testagent",
+			agentID:      "testagent",
 			snapshot:     true,
 			version:      "8.13.0+build1966-09-6",
 			unprivileged: true,
@@ -97,7 +97,7 @@ func TestCheckinExpected(t *testing.T) {
 
 func TestRuntimeComm_WriteStartUpInfo_packageVersion(t *testing.T) {
 	agentInfo := agentInfoMock{
-		AgentID:      "NCC-1701",
+		agentID:      "NCC-1701",
 		snapshot:     true,
 		version:      "8.13.0+build1966-09-6",
 		unprivileged: true,

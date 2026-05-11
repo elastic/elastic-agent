@@ -91,14 +91,14 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 	agentRootCertPool := x509.NewCertPool()
 	agentRootCertPool.AppendCertsFromPEM(agentRootPair.Cert)
 
-	fleetmTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+	fleetmTLSServer.TLS = &tls.Config{
 		RootCAs:      fleetRootCertPool,
 		Certificates: []tls.Certificate{cert},
 		ClientCAs:    agentRootCertPool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 	}
 
-	fleetNomTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+	fleetNomTLSServer.TLS = &tls.Config{
 		RootCAs:      fleetRootCertPool,
 		Certificates: []tls.Certificate{cert},
 	}
@@ -209,11 +209,11 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 				logLevelSetterMock = defaultLogLevelSet(t)
 			}
 			h := PolicyChangeHandler{
-				agentInfo:            &info.AgentInfo{},
-				config:               tc.originalCfg,
-				store:                &storage.NullStore{},
-				setters:              []actions.ClientSetter{&setter},
-				log:                  log,
+				agentInfo:             &info.AgentInfo{},
+				config:                tc.originalCfg,
+				store:                 &storage.NullStore{},
+				setters:               []actions.ClientSetter{&setter},
+				log:                   log,
 				runtimeLogLevelSetter: logLevelSetterMock,
 			}
 

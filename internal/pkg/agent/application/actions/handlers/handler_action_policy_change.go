@@ -315,53 +315,6 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	return nil
 }
 
-// saveConfig persists the validated fleet + agent settings (including the
-// per-agent log level override held on agentInfo) via fleetToReader.
-func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store, log *logger.Logger) error {
-	if validatedConfig == nil {
-		return nil
-	}
-	reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), agentInfo.GetLogLevelOverride(), validatedConfig)
-	if err != nil {
-		return errors.New(
-			err, "fail to persist new Fleet Server API client hosts",
-			errors.TypeUnexpected, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
-	}
-	if err := saveConfigToStore(store, reader, log); err != nil {
-		return errors.New(
-			err, "fail to persist new Fleet Server API client hosts",
-			errors.TypeFilesystem, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
-	}
-	return nil
-}
-
-// fleetToReader serializes the fleet + agent.* sections that need to land in
-// fleet.enc. logLevelOverride is the in-memory per-agent override held by
-// AgentInfo; when non-empty it is persisted to agent.logging.level_override.
-func fleetToReader(agentID string, headers map[string]string, logLevelOverride string, cfg *configuration.Configuration) (io.ReadSeeker, error) {
-	agentConfig := map[string]interface{}{
-		"id":                           agentID,
-		"headers":                      headers,
-		"logging.level":                cfg.Settings.LoggingConfig.Level,
-		"logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
-		"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
-		"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
-		"monitoring.pprof":             cfg.Settings.MonitoringConfig.Pprof,
-	}
-	if logLevelOverride != "" {
-		agentConfig["logging.level_override"] = logLevelOverride
-	}
-	configToStore := map[string]interface{}{
-		"fleet": cfg.Fleet,
-		"agent": agentConfig,
-	}
-	data, err := yaml.Marshal(configToStore)
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewReader(data), nil
-}
-
 // hasEventLoggingOutputChanged returns true if the output of the event logger has changed
 func (h *PolicyChangeHandler) hasEventLoggingOutputChanged(new *configuration.Configuration) bool {
 	switch {
@@ -415,6 +368,25 @@ func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Con
 	return nil
 }
 
+func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store, log *logger.Logger) error {
+	if validatedConfig == nil {
+		// nothing to do for fleet hosts
+		return nil
+	}
+	reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), agentInfo.GetLogLevelOverride(), validatedConfig)
+	if err != nil {
+		return errors.New(
+			err, "fail to persist new Fleet Server API client hosts",
+			errors.TypeUnexpected, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
+	}
+	if err := saveConfigToStore(store, reader, log); err != nil {
+		return errors.New(
+			err, "fail to persist new Fleet Server API client hosts",
+			errors.TypeFilesystem, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
+	}
+	return nil
+}
+
 func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 	if k1.Protocol != k2.Protocol {
 		return false
@@ -461,6 +433,30 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 	}
 
 	return true
+}
+
+func fleetToReader(agentID string, headers map[string]string, logLevelOverride string, cfg *configuration.Configuration) (io.ReadSeeker, error) {
+	agentConfig := map[string]interface{}{
+		"id":                           agentID,
+		"headers":                      headers,
+		"logging.level":                cfg.Settings.LoggingConfig.Level,
+		"logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
+		"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
+		"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
+		"monitoring.pprof":             cfg.Settings.MonitoringConfig.Pprof,
+	}
+	if logLevelOverride != "" {
+		agentConfig["logging.level_override"] = logLevelOverride
+	}
+	configToStore := map[string]interface{}{
+		"fleet": cfg.Fleet,
+		"agent": agentConfig,
+	}
+	data, err := yaml.Marshal(configToStore)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(data), nil
 }
 
 type policyChange struct {
