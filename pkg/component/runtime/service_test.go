@@ -152,9 +152,9 @@ func TestResolveUninstallTokenArg(t *testing.T) {
 			uninstallSpec: &component.ServiceOperationsCommandSpec{
 				Args: []string{"uninstall", "--log", "stderr", "--uninstall-token"},
 			},
-			uninstallToken: "EQo1ML2T95pdcH",
+			uninstallToken: "placeholder",
 			wantUninstallSpec: &component.ServiceOperationsCommandSpec{
-				Args: []string{"uninstall", "--log", "stderr", "--uninstall-token", "EQo1ML2T95pdcH"},
+				Args: []string{"uninstall", "--log", "stderr", "--uninstall-token", "placeholder"},
 			},
 		},
 		{
@@ -166,9 +166,9 @@ func TestResolveUninstallTokenArg(t *testing.T) {
 					return args
 				}(),
 			},
-			uninstallToken: "EQo1ML2T95pdcH",
+			uninstallToken: "placeholder",
 			wantUninstallSpec: &component.ServiceOperationsCommandSpec{
-				Args: []string{"uninstall", "--log", "stderr", "--uninstall-token", "EQo1ML2T95pdcH"},
+				Args: []string{"uninstall", "--log", "stderr", "--uninstall-token", "placeholder"},
 			},
 		},
 	}
@@ -459,7 +459,8 @@ func mockEndpointBinary(t *testing.T, exitCode int) string {
 		outPath += ".exe"
 	}
 
-	cmd := exec.Command(
+	cmd := exec.CommandContext(
+		t.Context(),
 		"go", "build",
 		"-o", outPath,
 		"-ldflags", "-X 'main.ExitCode="+strconv.Itoa(exitCode)+"'",
