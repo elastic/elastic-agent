@@ -1574,11 +1574,6 @@ func PackageUsingDRA(ctx context.Context) error {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 
-	// fix the commit hash independently of the current commit hash on the branch
-	agentCoreProject, ok := cfg.Packaging.Manifest.Projects[mage.AgentCoreProjectName]
-	if !ok {
-		return fmt.Errorf("%q project not found in manifest %q", mage.AgentCoreProjectName, cfg.Packaging.ManifestURL)
-	}
 	ctx = devtools.ContextWithSettings(ctx, cfg)
 
 	return packageAgent(
