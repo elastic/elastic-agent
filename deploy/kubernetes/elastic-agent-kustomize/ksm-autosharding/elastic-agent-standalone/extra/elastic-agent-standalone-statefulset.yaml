@@ -28,14 +28,11 @@ spec:
       # If you are using the Universal Profiling integration, please uncomment the following line before applying.
       # hostPID: true
       hostNetwork: false
-      # The following setting is needed for Universal Profiling to allow to set procMount to "Unmasked".
-      # If you are using the Universal Profiling integration, please uncomment the following line before applying.
-      # hostUsers: false
       dnsPolicy: ClusterFirstWithHostNet
       # Uncomment if using hints feature
       #initContainers:
       #  - name: k8s-templates-downloader
-      #    image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0
+      #    image: docker.elastic.co/elastic-agent/elastic-agent:9.4.1
       #    command: ['bash']
       #    args:
       #      - -c
@@ -47,7 +44,7 @@ spec:
       #        mountPath: /etc/elastic-agent/inputs.d
       containers:
         - name: elastic-agent-standalone
-          image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0
+          image: docker.elastic.co/elastic-agent/elastic-agent:9.4.1
           args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
           env:
             # The API Key with access privilleges to connect to Elasticsearch. https://www.elastic.co/guide/en/fleet/current/grant-access-to-elasticsearch.html#create-api-key-standalone-agent
@@ -95,7 +92,6 @@ spec:
             # The following capabilities are needed for Universal Profiling.
             # More fine graded capabilities are only available for newer Linux kernels.
             # If you are using the Universal Profiling integration, please uncomment these lines before applying.
-            #procMount: "Unmasked"
             #privileged: true
             #capabilities:
             #  add:

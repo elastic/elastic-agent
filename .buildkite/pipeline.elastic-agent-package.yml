@@ -10,8 +10,8 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1776780011"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1776780011"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1777597312"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1777597312"
 
 steps:
   - input: "Build parameters"
@@ -66,6 +66,7 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         env:
           PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
+          PACKAGES: "all"
           FIPS: "false"
         command: |
           if [[ -z "$${MANIFEST_URL}" ]]; then
@@ -90,6 +91,7 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         env:
           PLATFORMS: "linux/amd64"
+          PACKAGES: "all"
           FIPS: "true"
         command: |
           if [[ -z "$${MANIFEST_URL}" ]]; then
@@ -114,7 +116,7 @@ steps:
           diskSizeGb: 400
         env:
           PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
-          PACKAGES: "docker,tar.gz,deb,rpm,zip"
+          PACKAGES: "all"
           FIPS: "false"
         command: |
           echo "Add support for multiarch"

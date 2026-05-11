@@ -36,6 +36,7 @@ var packageArchMap = map[string]string{
 	"linux-arm64-deb":    "arm64.deb",
 	"linux-arm64-rpm":    "aarch64.rpm",
 	"windows-amd64-zip":  "windows-x86_64.zip",
+	"windows-arm64-zip":  "windows-arm64.zip",
 	"darwin-amd64-targz": "darwin-x86_64.tar.gz",
 	"darwin-arm64-targz": "darwin-aarch64.tar.gz",
 }

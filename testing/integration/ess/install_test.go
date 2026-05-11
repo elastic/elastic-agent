@@ -156,6 +156,7 @@ func TestInstallWithBasePath(t *testing.T) {
 	checks := &installtest.CheckOpts{
 		Privileged:    opts.Privileged,
 		TargetVersion: fixture.Version(),
+		TopPath:       topPath,
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
@@ -208,6 +209,10 @@ func TestInstallServersWithBasePath(t *testing.T) {
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
+		// apm-server and fleet-server have no windows/arm64 build
+		// (see dev-tools/packaging/packages.yml: comp-apm_server, comp-fleet-server),
+		// so the "servers" install flavor cannot be exercised on this combination.
+		SkipOS: []define.OS{{Type: define.Windows, Arch: define.ARM64}},
 	})
 
 	// Get path to Elastic Agent executable
@@ -259,6 +264,7 @@ func TestInstallServersWithBasePath(t *testing.T) {
 	checks := &installtest.CheckOpts{
 		Privileged:    opts.Privileged,
 		TargetVersion: fixture.Version(),
+		TopPath:       topPath,
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
@@ -333,6 +339,7 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	checks := &installtest.CheckOpts{
 		Privileged:    opts.Privileged,
 		TargetVersion: fixture.Version(),
+		TopPath:       installtest.DefaultTopPath(),
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, checks))
 
@@ -392,6 +399,7 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 	checks := &installtest.CheckOpts{
 		Privileged:    opts.Privileged,
 		TargetVersion: fixture.Version(),
+		TopPath:       topPath,
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
@@ -402,6 +410,52 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 	fixture.PostUninstallHook(func(t *testing.T) {
 		require.NoError(t, installtest.CheckUninstallSuccess(checks))
 	})
+}
+
+func TestInstallFailureCleanup(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		// We require sudo for this test to run
+		// `elastic-agent install`.
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+	})
+
+	// Get path to Elastic Agent executable
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	// Force enrollment to fail instantly by pointing to a malformed URL, triggering an install failure.
+	opts := atesting.InstallOpts{
+		Force:      true,
+		Privileged: true,
+		Insecure:   true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             "http://invalid-url-%",
+			EnrollmentToken: "bogus-enrollment-token",
+		},
+	}
+
+	out, err := fixture.Install(ctx, &opts)
+	require.Errorf(t, err, "install should have failed; output: %s", out)
+
+	// Verify the install directory and any platform-specific state was cleaned up.
+	checks := &installtest.CheckOpts{
+		Privileged: opts.Privileged,
+		TopPath:    installtest.DefaultTopPath(),
+	}
+	err = installtest.CheckUninstallSuccess(checks)
+	require.NoError(t, err)
 }
 
 // Isolate the tests of --develop (which uses --namespace in it's implementation) into it's own test
@@ -445,6 +499,7 @@ func TestInstallSecondAgentInDevelopmentNamespace(t *testing.T) {
 	checks := &installtest.CheckOpts{
 		Privileged:    opts.Privileged,
 		TargetVersion: fixture.Version(),
+		TopPath:       topPath,
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
@@ -499,6 +554,7 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 		Username:      customUsername,
 		Group:         customGroup,
 		TargetVersion: fixture.Version(),
+		TopPath:       topPath,
 	}
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
@@ -594,6 +650,7 @@ func testSecondAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, b
 			Username:      installOpts.Username,
 			Group:         installOpts.Group,
 			TargetVersion: devFixture.Version(),
+			TopPath:       topPath,
 		}
 
 		require.NoError(t, installtest.CheckSuccess(ctx, devFixture, topPath, checks))

@@ -256,10 +256,7 @@ func (Build) GenerateConfig() error {
 func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch string) error {
 	fmt.Printf("--- Compiling root binary for %s windows archive\n", goarch)
 	cfg := devtools.SettingsFromContext(ctx)
-	hashShort, err := cfg.Build.CommitHashShort()
-	if err != nil {
-		return fmt.Errorf("error getting commit hash: %w", err)
-	}
+	hashShort := cfg.AgentCoreCommitHashShort()
 
 	outputName := "elastic-agent-archive-root"
 	if runtime.GOOS != "windows" {
@@ -579,13 +576,7 @@ func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	params.Env["FIPS"] = "true"
-
-	// We also set GODEBUG=tlsmlkem=0 to disable the X25519MLKEM768 TLS key
-	// exchange mechanism; without this setting and with the GODEBUG=fips140=only
-	// setting, we get errors in tests like so:
-	// Failed to connect: crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
-	// Note that we are only disabling this TLS key exchange mechanism in tests!
-	params.Env["GODEBUG"] = "fips140=only,tlsmlkem=0"
+	params.Env["GODEBUG"] = "fips140=only"
 	params.Tags = append(params.Tags, "requirefips")
 	return devtools.GoTest(ctx, params)
 }
@@ -615,6 +606,10 @@ func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
@@ -1089,11 +1084,10 @@ func Clean(ctx context.Context) error {
 }
 
 func dockerCommitHash(cfg *devtools.Settings) string {
-	commit, err := cfg.Build.CommitHash()
-	if err == nil && len(commit) > commitLen {
+	commit := cfg.Build.CommitHash()
+	if len(commit) > commitLen {
 		return commit[:commitLen]
 	}
-
 	return ""
 }
 
@@ -1506,6 +1500,10 @@ func PackageUsingDRA(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
@@ -2079,19 +2077,22 @@ func (Integration) Clean(ctx context.Context) error {
 	defer os.RemoveAll(".integration-cache")
 
 	_, err := os.Stat(".integration-cache")
-	if err == nil {
-		// .integration-cache exists; need to run `Clean` from the runner
-		cfg := devtools.SettingsFromContext(ctx)
-		r, err := createTestRunner(cfg, false, "", "")
-		if err != nil {
-			return fmt.Errorf("error creating test runner: %w", err)
-		}
-		err = r.Clean()
-		if err != nil {
-			return fmt.Errorf("error running clean: %w", err)
-		}
+	if err != nil {
+		fmt.Println(">>> No .integration-cache found; nothing to clean via the runner (orphaned VMs or stacks will not be touched)")
+		return nil
 	}
+	fmt.Println(">>> Found .integration-cache; running runner.Clean")
 
+	cfg := devtools.SettingsFromContext(ctx)
+	r, err := createTestRunner(cfg, false, "", "")
+	if err != nil {
+		return fmt.Errorf("error creating test runner: %w", err)
+	}
+	err = r.Clean()
+	if err != nil {
+		return fmt.Errorf("error running clean: %w", err)
+	}
+	fmt.Println(">>> runner.Clean completed")
 	return nil
 }
 
@@ -2552,8 +2553,8 @@ func generateEnvFile(stack tcommon.Stack) error {
 			return fmt.Errorf("write KIBANA_PASSWORD: %w", err)
 		}
 
-		if _, err := fmt.Fprintf(w, "export INTEGRATIONS_SERVER_HOST=\"%s\"\n", stack.IntegrationsServer); err != nil {
-			return fmt.Errorf("write INTEGRATIONS_SERVER_HOST: %w", err)
+		if _, err := fmt.Fprintf(w, "export ELASTIC_APM_SERVER_URL=\"%s\"\n", stack.IntegrationsServer); err != nil {
+			return fmt.Errorf("write ELASTIC_APM_SERVER_URL: %w", err)
 		}
 		return nil
 	}); err != nil {
@@ -2581,8 +2582,8 @@ func generateEnvFile(stack tcommon.Stack) error {
 			return fmt.Errorf("write KIBANA_PASSWORD: %w", err)
 		}
 
-		if _, err := fmt.Fprintf(w, "$env:INTEGRATIONS_SERVER_HOST=\"%s\"\n", stack.IntegrationsServer); err != nil {
-			return fmt.Errorf("write INTEGRATIONS_SERVER_HOST: %w", err)
+		if _, err := fmt.Fprintf(w, "$env:ELASTIC_APM_SERVER_URL=\"%s\"\n", stack.IntegrationsServer); err != nil {
+			return fmt.Errorf("write ELASTIC_APM_SERVER_URL: %w", err)
 		}
 		return nil
 	})

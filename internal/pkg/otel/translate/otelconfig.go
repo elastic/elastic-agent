@@ -23,7 +23,7 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 	"golang.org/x/exp/maps"
 
-	fbfeatures "github.com/elastic/beats/v7/filebeat/features"
+	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
@@ -256,6 +256,13 @@ func GetProcessorID() otelcomponent.ID {
 func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
+}
+
+// getKafkaPartitionerExtensionID returns the id for kafkapartitioner extension
+// outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
+func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(kafkapartitionerextension.Type.String()), extensionName)
 }
 
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
@@ -618,16 +625,17 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 			extensionCfg[elasticsearchStateStoreExtensionName] = unitConfigMap
 		}
 	} else if exporterType.String() == "kafka" {
-		partitioner, ok := unitConfigMap["partition"]
+		extensionID := getKafkaPartitionerExtensionID(outputName)
 		extensionCfg = map[string]any{}
+		partitioner, ok := unitConfigMap["partition"]
 		if ok {
-			extensionCfg[kafkapartitionerextension.Type.String()] = partitioner
+			extensionCfg[extensionID.String()] = partitioner
 		} else {
 			// Specifying empty map will make the extension use the default hash partitioner.
-			extensionCfg[kafkapartitionerextension.Type.String()] = map[string]any{}
+			extensionCfg[extensionID.String()] = map[string]any{}
 		}
 		exporterConfig["record_partitioner"] = map[string]any{
-			"extension": kafkapartitionerextension.Type.String(),
+			"extension": extensionID.String(),
 		}
 	}
 

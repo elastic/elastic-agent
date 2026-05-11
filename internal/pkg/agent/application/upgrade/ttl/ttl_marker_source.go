@@ -71,27 +71,66 @@ func (T TTLMarkerRegistry) Remove(versionedHome string) error {
 	return nil
 }
 
-func (T TTLMarkerRegistry) Get() (map[string]TTLMarker, error) {
+// GetAll reads all .ttl markers under the registry's base directory and
+// returns two maps:
+//   - markers: successfully parsed entries keyed by versioned home (relative
+//     to baseDir).
+//   - malformed: per-entry errors keyed by versioned home for entries whose
+//     .ttl file could not be read or parsed (e.g. corrupt YAML, permissions,
+//     ENOENT during read). Entries whose path cannot be made relative to
+//     baseDir are keyed by the original glob match instead.
+//
+// The returned error is non-nil only on structural failures (e.g. a glob
+// failure) where no scan could be performed. Callers that need to be
+// conservative about disk-state decisions (e.g. cleanup keep lists) should
+// inspect malformed and decide whether to preserve those directories rather
+// than discarding them as untracked.
+func (T TTLMarkerRegistry) GetAll() (map[string]TTLMarker, map[string]error, error) {
 	matches, err := filepath.Glob(filepath.Join(T.baseDir, T.markerFileGlobPattern))
 	if err != nil {
-		return nil, fmt.Errorf("failed to glob files using %q: %w", T.markerFileGlobPattern, err)
+		return nil, nil, fmt.Errorf("failed to glob files using %q: %w", T.markerFileGlobPattern, err)
 	}
 	T.log.Debugf("Found matching versionedHomes: %v", matches)
 	ttlMarkers := make(map[string]TTLMarker, len(matches))
+	malformed := map[string]error{}
 	for _, match := range matches {
 		T.log.Debugf("Reading marker from versionedHome: %s", match)
-		relPath, err := filepath.Rel(T.baseDir, filepath.Dir(match))
-		if err != nil {
-			return nil, fmt.Errorf("failed to determine path for %q relative to %q : %w", match, T.baseDir, err)
+		relPath, relErr := filepath.Rel(T.baseDir, filepath.Dir(match))
+		if relErr != nil {
+			T.log.Infof("skipping marker %q: failed to compute path relative to %q: %s", match, T.baseDir, relErr)
+			malformed[match] = fmt.Errorf("computing path relative to %q: %w", T.baseDir, relErr)
+			continue
 		}
-		marker, err := readTTLMarker(match)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read marker from file %q: %w", match, err)
+		marker, readErr := readTTLMarker(match)
+		if readErr != nil {
+			T.log.Infof("skipping malformed marker %q: %s", match, readErr)
+			malformed[relPath] = fmt.Errorf("reading marker file %q: %w", match, readErr)
+			continue
 		}
 		ttlMarkers[relPath] = marker
 	}
 
-	return ttlMarkers, nil
+	return ttlMarkers, malformed, nil
+}
+
+// Get reads all .ttl markers and returns only successfully parsed entries.
+// It preserves the all-or-nothing contract: if any per-entry parse fails,
+// Get returns (nil, joined error) so existing callers continue to see the
+// same behavior. Callers that want partial results plus a list of malformed
+// entries should use GetAll directly.
+func (T TTLMarkerRegistry) Get() (map[string]TTLMarker, error) {
+	markers, malformed, err := T.GetAll()
+	if err != nil {
+		return nil, err
+	}
+	if len(malformed) > 0 {
+		errs := make([]error, 0, len(malformed))
+		for _, e := range malformed {
+			errs = append(errs, e)
+		}
+		return nil, errors.Join(errs...)
+	}
+	return markers, nil
 }
 
 func (T TTLMarkerRegistry) addOrReplace(m map[string]TTLMarker) error {
