@@ -1333,7 +1333,7 @@ func (s *Settings) initCommitHash() error {
 		// by a different user until safe.directory is configured. Configure it now so we
 		// can read the commit hash. devtools.GolangCrossBuild() also does this before Build(),
 		// but that is too late since initCommitHash runs during LoadSettings().
-		if configErr := sh.Run("git", "config", "--global", "--add", "safe.directory", s.ElasticBeatsDir); configErr != nil {
+		if configErr := sh.Run("git", "config", "--global", "--add", "safe.directory", s.RepoInfo.RootDir); configErr != nil {
 			return fmt.Errorf("failed to configure git safe.directory in crossbuild context: %w", configErr)
 		}
 		hash, err = sh.Output("git", "rev-parse", "HEAD")
