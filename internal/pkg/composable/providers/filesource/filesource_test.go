@@ -123,7 +123,6 @@ func TestContextProvider(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	comm := ctesting.NewContextComm(ctx)
 	setChan := make(chan map[string]interface{})
 	comm.CallOnSet(func(value map[string]interface{}) {
@@ -131,9 +130,19 @@ func TestContextProvider(t *testing.T) {
 		setChan <- value
 	})
 
+	// Ensure the provider goroutine exits and closes its fsnotify watcher
+	// before t.TempDir's cleanup runs RemoveAll; on Windows the watcher
+	// holds an open directory handle that blocks deletion.
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		_ = provider.Run(ctx, comm)
 	}()
+	t.Cleanup(func() {
+		cancel()
+		wg.Wait()
+	})
 
 	// wait for it to be called once
 	var current map[string]interface{}
