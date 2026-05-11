@@ -23,6 +23,7 @@ import (
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
 	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
+	azuremonitorreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver"
 	couchdbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver"
 	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
@@ -59,6 +60,7 @@ import (
 
 	elasticapmintakereceiver "github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver" // for collecting APM data from Elastic APM agents
 
+	abreceiver "github.com/elastic/beats/v7/x-pack/auditbeat/abreceiver"
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 
@@ -163,10 +165,12 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			zipkinreceiver.NewFactory(),
 			elasticmonitoringreceiver.NewFactory(),
 			verifierreceiver.NewFactory(),
+			abreceiver.NewFactoryWithSettings(abreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			fbreceiver.NewFactoryWithSettings(fbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			mbreceiver.NewFactoryWithSettings(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
+			azuremonitorreceiver.NewFactory(),
 			couchdbreceiver.NewFactory(),
 			haproxyreceiver.NewFactory(),
 			iisreceiver.NewFactory(),

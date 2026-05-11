@@ -180,4 +180,3 @@ Build your custom Collector using the `ocb` tool and the configuration file by r
 The command generates a new Collector in the specified output path, `otelcol-dev`. The generated Collector includes the components you specified in the configuration file.
 
 For general information on building a custom Collector, refer to the [OpenTelemetry documentation](https://opentelemetry.io/docs/collector/custom-collector/#step-1---install-the-builder).
-

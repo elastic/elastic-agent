@@ -1815,7 +1815,8 @@ func (s *Settings) GetPlatforms() BuildPlatformList {
 // GetPackageTypes returns the package types to use.
 // If SelectedPackageTypes is set in the settings, returns that.
 // Otherwise parses from PACKAGES env var.
-// If PACKAGES is empty, returns nil (meaning all package types are selected).
+// If PACKAGES is "all", returns all available package types.
+// If PACKAGES is empty, returns nil.
 func (s *Settings) GetPackageTypes() []PackageType {
 	// Check settings override first
 	if s.SelectedPackageTypes != nil {
@@ -1824,6 +1825,9 @@ func (s *Settings) GetPackageTypes() []PackageType {
 	// Fall back to env var
 	if s.CrossBuild.Packages == "" {
 		return nil
+	}
+	if strings.ToLower(s.CrossBuild.Packages) == "all" {
+		return AllPackageTypes
 	}
 	var types []PackageType
 	for _, pkgtype := range strings.Split(s.CrossBuild.Packages, ",") {

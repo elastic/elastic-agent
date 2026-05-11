@@ -579,13 +579,7 @@ func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	params.Env["FIPS"] = "true"
-
-	// We also set GODEBUG=tlsmlkem=0 to disable the X25519MLKEM768 TLS key
-	// exchange mechanism; without this setting and with the GODEBUG=fips140=only
-	// setting, we get errors in tests like so:
-	// Failed to connect: crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
-	// Note that we are only disabling this TLS key exchange mechanism in tests!
-	params.Env["GODEBUG"] = "fips140=only,tlsmlkem=0"
+	params.Env["GODEBUG"] = "fips140=only"
 	params.Tags = append(params.Tags, "requirefips")
 	return devtools.GoTest(ctx, params)
 }
@@ -615,6 +609,10 @@ func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
@@ -1506,6 +1504,10 @@ func PackageUsingDRA(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")

@@ -17,23 +17,26 @@ function ess_up {
   # from oblt-cli. A file bypasses PS arg marshalling entirely.
   $paramsPath      = Join-Path $PWD "params.json"
   $clusterInfoPath = Join-Path $PWD "cluster-info.json"
-  @{
-      GitOps           = "true"
-      GitHubRepository = $Env:BUILDKITE_REPO
-      GitHubCommit     = $Env:BUILDKITE_COMMIT
-      EphemeralCluster = "true"
+  $params = @{
       StackVersion     = $StackVersion
-  } | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
+  }
+
+  if ($Env:INTEGRATION_SERVER_DOCKER_IMAGE) {
+      $params.ElasticAgentDockerImage = $Env:INTEGRATION_SERVER_DOCKER_IMAGE
+  }
+
+  $params | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
 
   try {
     # --output-file must be an absolute path; oblt-cli resolves relative
     # paths against its own config dir (~/.oblt-cli), not CWD.
     & oblt-cli cluster create custom `
         --template ess-ea-it `
-        --cluster-name-prefix ea-hosted-it `
+        --cluster-name-prefix hosted `
         --parameters-file $paramsPath `
+        --parameter "ExpireInHours=4" `
         --output-file $clusterInfoPath `
-        --wait 30
+        --wait 20
   } finally {
     Remove-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue
   }
@@ -58,6 +61,15 @@ function ess_up {
   # global cleanup step would destroy the retry's cluster and leak the shared
   # one. `ess_load_secrets` and `ess_down` read the local cluster-info.json
   # first, so the retry path doesn't need meta-data.
+
+  # However, store retry cluster names in a separate metadata key so they can
+  # be cleaned up by a dedicated cleanup step if the finally block fails (e.g., timeout)
+  if ($Env:BUILDKITE_RETRY_COUNT -and $Env:BUILDKITE_RETRY_COUNT -gt 0) {
+      $MetadataPrefix = if ($Env:FIPS -eq "true") { "fips." } else { "" }
+      $retryKey = "${MetadataPrefix}retry-cluster-$($Env:BUILDKITE_STEP_ID)-$($Env:BUILDKITE_RETRY_COUNT)"
+      Write-Output "Storing retry cluster name in metadata: $retryKey = $ClusterName"
+      & buildkite-agent meta-data set $retryKey $ClusterName
+  }
 
   $rc = ess_load_secrets
   if ($rc -ne 0) {
