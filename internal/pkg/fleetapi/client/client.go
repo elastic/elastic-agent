@@ -43,8 +43,9 @@ type Sender interface {
 const defaultFleetApiVersion = "2023-06-01"
 
 var baseRoundTrippers = func(rt http.RoundTripper) (http.RoundTripper, error) {
-	rt = NewFleetUserAgentRoundTripper(rt, release.Version())
-
+	ver := release.Version()
+	rt = NewFleetUserAgentRoundTripper(rt, ver)
+	rt = NewElasticAgentVersionRoundTripper(rt, ver)
 	rt = NewElasticApiVersionRoundTripper(rt, defaultFleetApiVersion)
 
 	return rt, nil

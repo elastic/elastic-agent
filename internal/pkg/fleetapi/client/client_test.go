@@ -111,6 +111,36 @@ func TestHTTPClient(t *testing.T) {
 		},
 	))
 
+	t.Run("Elastic Agent Version header", withServer(
+		func(t *testing.T) *http.ServeMux {
+			msg := `{ message: "hello" }`
+			mux := http.NewServeMux()
+			mux.HandleFunc("/echo-hello", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, msg)
+				require.Equal(t, r.Header.Get("Elastic-Agent-Version"), "v8.0.0")
+			})
+			return mux
+		}, func(t *testing.T, host string) {
+			cfg := config.MustNewConfigFrom(map[string]interface{}{
+				"host": host,
+			})
+
+			client, err := remote.NewWithRawConfig(nil, cfg, func(wrapped http.RoundTripper) (http.RoundTripper, error) {
+				return NewElasticAgentVersionRoundTripper(wrapped, "8.0.0"), nil
+			})
+
+			require.NoError(t, err)
+			resp, err := client.Send(ctx, "GET", "/echo-hello", nil, nil, nil)
+			require.NoError(t, err)
+
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			assert.Equal(t, `{ message: "hello" }`, string(body))
+		},
+	))
+
 	t.Run("Fleet endpoint is not responding", func(t *testing.T) {
 		cfg := config.MustNewConfigFrom(map[string]interface{}{
 			"host": "127.0.0.0:7278",
