@@ -49,8 +49,8 @@ nodes:
         secure-port: "10257"
 `
 
-func NewProvisioner() common.InstanceProvisioner {
-	return &provisioner{}
+func NewProvisioner(log common.Logger) common.InstanceProvisioner {
+	return &provisioner{logger: log}
 }
 
 type provisioner struct {
@@ -63,10 +63,6 @@ func (p *provisioner) Name() string {
 
 func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeK8SCluster
-}
-
-func (p *provisioner) SetLogger(l common.Logger) {
-	p.logger = l
 }
 
 func (p *provisioner) Supported(batch define.OS) bool {
@@ -96,7 +92,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 			return nil, fmt.Errorf("failed to add k8s tests to image %s: %w", agentImageName, err)
 		}
 
-		exists, err := p.clusterExists(instanceName)
+		exists, err := p.clusterExists(ctx, instanceName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if cluster exists: %w", err)
 		}
@@ -105,12 +101,12 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 			nodeImage := fmt.Sprintf("kindest/node:%s", k8sVersion)
 			clusterConfig := strings.NewReader(clusterCfg)
 
-			ret, err := p.kindCmd(clusterConfig, "create", "cluster", "--name", instanceName, "--image", nodeImage, "--config", "-")
+			ret, err := p.kindCmd(ctx, clusterConfig, "create", "cluster", "--name", instanceName, "--image", nodeImage, "--config", "-")
 			if err != nil {
 				return nil, fmt.Errorf("kind: failed to create cluster %s: %s", instanceName, ret.stderr)
 			}
 
-			exists, err = p.clusterExists(instanceName)
+			exists, err = p.clusterExists(ctx, instanceName)
 			if err != nil {
 				return nil, err
 			}
@@ -122,7 +118,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 			p.logger.Logf("Kind cluster %s already exists", instanceName)
 		}
 
-		kConfigPath, err := p.writeKubeconfig(instanceName)
+		kConfigPath, err := p.writeKubeconfig(ctx, instanceName)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +155,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 }
 
 func (p *provisioner) LoadImage(ctx context.Context, clusterName string, image string) error {
-	ret, err := p.kindCmd(nil, "load", "docker-image", "--name", clusterName, image)
+	ret, err := p.kindCmd(ctx, nil, "load", "docker-image", "--name", clusterName, image)
 	if err != nil {
 		return fmt.Errorf("kind: load docker-image %s failed: %w: %s", image, err, ret.stderr)
 	}
@@ -214,7 +210,7 @@ func (p *provisioner) Clean(ctx context.Context, cfg common.Config, instances []
 	for _, instance := range instances {
 		// manually check if the cluster exists
 		// kind will not return an error if we try to delete a nonexistent cluster
-		exists, err := p.clusterExists(instance.Name)
+		exists, err := p.clusterExists(ctx, instance.Name)
 		if err != nil {
 			p.logger.Logf("Failed to check if cluster exists: %s", err)
 			continue
@@ -223,7 +219,7 @@ func (p *provisioner) Clean(ctx context.Context, cfg common.Config, instances []
 			p.logger.Logf("Tried to delete instance, but it was not found: %s", instance.Name)
 			continue
 		}
-		err = p.deleteCluster(instance.Name)
+		err = p.deleteCluster(ctx, instance.Name)
 		if err != nil {
 			// prevent a failure from stopping the other instances and clean
 			p.logger.Logf("Delete instance %s failed: %s", instance.Name, err)
@@ -233,8 +229,8 @@ func (p *provisioner) Clean(ctx context.Context, cfg common.Config, instances []
 	return nil
 }
 
-func (p *provisioner) clusterExists(name string) (bool, error) {
-	ret, err := p.kindCmd(nil, "get", "clusters")
+func (p *provisioner) clusterExists(ctx context.Context, name string) (bool, error) {
+	ret, err := p.kindCmd(ctx, nil, "get", "clusters")
 	if err != nil {
 		return false, err
 	}
@@ -247,10 +243,10 @@ func (p *provisioner) clusterExists(name string) (bool, error) {
 	return false, nil
 }
 
-func (p *provisioner) writeKubeconfig(name string) (string, error) {
+func (p *provisioner) writeKubeconfig(ctx context.Context, name string) (string, error) {
 	kubecfg := fmt.Sprintf("%s-kubecfg", name)
 
-	ret, err := p.kindCmd(nil, "get", "kubeconfig", "--name", name)
+	ret, err := p.kindCmd(ctx, nil, "get", "kubeconfig", "--name", name)
 	if err != nil {
 		return "", fmt.Errorf("kind get kubeconfig: stderr: %s: %w", ret.stderr, err)
 	}
@@ -273,10 +269,9 @@ type cmdResult struct {
 	stderr string
 }
 
-func (p *provisioner) kindCmd(stdIn io.Reader, args ...string) (cmdResult, error) {
-
+func (p *provisioner) kindCmd(ctx context.Context, stdIn io.Reader, args ...string) (cmdResult, error) {
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("kind", args...)
+	cmd := exec.CommandContext(ctx, "kind", args...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if stdIn != nil {
@@ -289,7 +284,7 @@ func (p *provisioner) kindCmd(stdIn io.Reader, args ...string) (cmdResult, error
 	}, err
 }
 
-func (p *provisioner) deleteCluster(name string) error {
-	_, err := p.kindCmd(nil, "delete", "cluster", "--name", name)
+func (p *provisioner) deleteCluster(ctx context.Context, name string) error {
+	_, err := p.kindCmd(ctx, nil, "delete", "cluster", "--name", name)
 	return err
 }

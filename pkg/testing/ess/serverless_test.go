@@ -20,7 +20,9 @@ func TestProvisionGetRegions(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
-	_ = logp.DevelopmentSetup()
+	logger, err := logp.NewDevelopmentLogger("ess-test")
+	require.NoError(t, err)
+
 	key, found, err := GetESSAPIKey()
 	if !found {
 		t.Skip("No credentials found for ESS")
@@ -31,7 +33,7 @@ func TestProvisionGetRegions(t *testing.T) {
 	cfg := ProvisionerConfig{Region: "bad-region-ID", APIKey: key}
 	prov := &ServerlessProvisioner{
 		cfg: cfg,
-		log: &defaultLogger{wrapped: logp.L()},
+		log: &defaultLogger{wrapped: logger},
 	}
 	err = prov.CheckCloudRegion(ctx)
 	require.NoError(t, err)
@@ -43,7 +45,9 @@ func TestStackProvisioner(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	_ = logp.DevelopmentSetup()
+	logger, err := logp.NewDevelopmentLogger("ess-test")
+	require.NoError(t, err)
+
 	key, found, err := GetESSAPIKey()
 	if !found {
 		t.Skip("No credentials found for ESS")
@@ -52,8 +56,9 @@ func TestStackProvisioner(t *testing.T) {
 	require.True(t, found)
 
 	cfg := ProvisionerConfig{Region: "aws-eu-west-1", APIKey: key}
-	provClient, err := NewServerlessProvisioner(ctx, cfg)
+	provClient, err := NewServerlessProvisioner(ctx, &defaultLogger{wrapped: logger}, cfg)
 	require.NoError(t, err)
+
 	request := common.StackRequest{ID: "stack-test-one", Version: "8.9.0"}
 
 	stack, err := provClient.Create(ctx, request)
@@ -72,7 +77,9 @@ func TestStackProvisioner(t *testing.T) {
 }
 
 func TestStartServerless(t *testing.T) {
-	_ = logp.DevelopmentSetup()
+	logger, err := logp.NewDevelopmentLogger("ess-test")
+	require.NoError(t, err)
+
 	key, found, err := GetESSAPIKey()
 	if !found {
 		t.Skip("No credentials found for ESS")
@@ -81,7 +88,7 @@ func TestStartServerless(t *testing.T) {
 	clientHandle := NewServerlessClient("aws-eu-west-1",
 		"observability",
 		key,
-		&defaultLogger{wrapped: logp.L()})
+		&defaultLogger{wrapped: logger})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
