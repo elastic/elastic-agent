@@ -17,9 +17,13 @@ set -euo pipefail
 #   - Tier 2 on each commit
 #   - Tier 3 on scheduled builds (env var K8S_SCHEDULED_TIER3=true)
 
-# K8s versions - sync with .buildkite/bk.integration.pipeline.yml
+# K8s versions
 K8S_MIN_VERSION="v1.27.16"
 K8S_MAX_VERSION="v1.34.0"
+ALL_VERSIONS='["v1.27.16", "v1.28.15", "v1.29.14", "v1.30.0", "v1.31.0", "v1.32.0", "v1.33.0", "v1.34.0"]'
+
+DEFAULT_VARIANT='["basic"]'
+ALL_VARIANTS='["basic", "slim", "complete", "service", "elastic-otel-collector", "wolfi", "slim-wolfi", "complete-wolfi", "elastic-otel-collector-wolfi"]'
 
 # Packaging-related files that trigger Tier 2 testing
 PACKAGING_FILES=(
@@ -99,17 +103,17 @@ get_test_config() {
     tier1)
       echo "Using Tier 1: Min/max K8s versions, basic container image" >&2
       versions_yaml="[\"${K8S_MIN_VERSION}\", \"${K8S_MAX_VERSION}\"]"
-      variants_yaml='["basic"]'
+      variants_yaml="${DEFAULT_VARIANT}"
       ;;
     tier2)
       echo "Using Tier 2: Min/max K8s versions, all container images" >&2
       versions_yaml="[\"${K8S_MIN_VERSION}\", \"${K8S_MAX_VERSION}\"]"
-      variants_yaml='["basic", "slim", "complete", "service", "elastic-otel-collector", "wolfi", "slim-wolfi", "complete-wolfi", "elastic-otel-collector-wolfi"]'
+      variants_yaml="${ALL_VARIANTS}"
       ;;
     tier3)
       echo "Using Tier 3: All K8s versions, all container images" >&2
-      versions_yaml='["v1.27.16", "v1.28.15", "v1.29.14", "v1.30.0", "v1.31.0", "v1.32.0", "v1.33.0", "v1.34.0"]'
-      variants_yaml='["basic", "slim", "complete", "service", "elastic-otel-collector", "wolfi", "slim-wolfi", "complete-wolfi", "elastic-otel-collector-wolfi"]'
+      versions_yaml="${ALL_VERSIONS}"
+      variants_yaml="${ALL_VARIANTS}"
       ;;
     *)
       echo "ERROR: Unknown tier: ${tier}" >&2
@@ -140,7 +144,7 @@ steps:
   - label: ":kubernetes: {{matrix.version}}:amd64:{{matrix.variant}}"
     env:
       K8S_VERSION: "{{matrix.version}}"
-      DOCKER_VARIANTS: "{{matrix.var§iant}}"
+      DOCKER_VARIANTS: "{{matrix.variant}}"
       TARGET_ARCH: "amd64"
     command: |
       buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
