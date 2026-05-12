@@ -279,7 +279,7 @@ shared:
         mode: 0644
       /usr/share/{{.BeatName}}/.build_hash.txt:
         content: >
-          {{ commit }}
+          {{ core_commit }}
         mode: 0644
       /etc/{{.BeatName}}/elastic-agent.reference.yml:
         source: 'elastic-agent.reference.yml'
@@ -294,7 +294,7 @@ shared:
         config: true
       /etc/{{.BeatName}}/.elastic-agent.active.commit:
         content: >
-          {{ commit }}
+          {{ core_commit }}
         mode: 0644
       /usr/bin/{{.BeatName}}:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.sh.tmpl'
@@ -302,19 +302,19 @@ shared:
       /lib/systemd/system/{{.BeatServiceName}}.service:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl'
         mode: 0644
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}:
         source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
         mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/package.version:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/package.version:
         content: >
           {{ agent_package_version }}
         mode: 0644
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components:
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/manifest.yaml:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/manifest.yaml:
         mode: 0644
         content: >
           {{ manifest .fips }}
@@ -323,7 +323,7 @@ shared:
     'otelcol':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/otelcol.sh'
       mode: 0755
-    'data/{{.BeatName}}-{{ commit_short }}/otelcol':
+    'data/{{.BeatName}}-{{ core_commit_short }}/otelcol':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/otelcol.sh'
       mode: 0755
     'otel_samples':
@@ -342,7 +342,7 @@ shared:
       mode: 0644
     .build_hash.txt:
       content: >
-        {{ commit }}
+        {{ core_commit }}
       mode: 0644
     'elastic-agent.reference.yml':
       source: 'elastic-agent.reference.yml'
@@ -357,7 +357,7 @@ shared:
       config: true
     '.elastic-agent.active.commit':
       content: >
-        {{ commit }}
+        {{ core_commit }}
       mode: 0644
     'manifest.yaml':
       mode: 0644
@@ -368,24 +368,24 @@ shared:
     '{{.BeatName}}{{.BinaryExt}}':
       source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
-    'data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}':
+    'data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}':
       source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
-    'data/{{.BeatName}}-{{ commit_short }}/elastic-otel-collector{{.BinaryExt}}':
+    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-otel-collector{{.BinaryExt}}':
       source: build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
       skip_on_missing: true
-    'data/{{.BeatName}}-{{ commit_short }}/package.version':
+    'data/{{.BeatName}}-{{ core_commit_short }}/package.version':
       content: >
         {{ agent_package_version }}
       mode: 0644
     <<: *agent_binary_common_files
 
   - &agent_darwin_app_bundle_files
-    'data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/Info.plist':
+    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/Info.plist':
       template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/Info.plist.tmpl'
       mode: 0644
-    'data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/PkgInfo':
+    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/PkgInfo':
       template: '{{ elastic_beats_dir }}/dev-tools/packaging/files/darwin/PkgInfo'
       mode: 0644
 
@@ -393,21 +393,21 @@ shared:
     '{{.BeatName}}{{.BinaryExt}}':
       source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
-    'data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}':
+    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}':
       source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
-    'data/{{.BeatName}}-{{ commit_short }}/elastic-otel-collector{{.BinaryExt}}':
+    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-otel-collector{{.BinaryExt}}':
       source: build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
       skip_on_missing: true
-    'data/{{.BeatName}}-{{ commit_short }}/package.version':
+    'data/{{.BeatName}}-{{ core_commit_short }}/package.version':
       content: >
         {{ agent_package_version }}
       mode: 0644
     'otelcol':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/otelcol.sh'
       mode: 0755
-    'data/{{.BeatName}}-{{ commit_short }}/otelcol':
+    'data/{{.BeatName}}-{{ core_commit_short }}/otelcol':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/otelcol.sh'
       mode: 0755
     'otel_samples':
@@ -417,7 +417,7 @@ shared:
     <<: *agent_binary_common_files
 
   - &agent_unpacked_components_files
-    'data/{{.BeatName}}-{{ commit_short }}/components':
+    'data/{{.BeatName}}-{{ core_commit_short }}/components':
       source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
       mode: 0755
       config_mode: 0644
@@ -456,7 +456,7 @@ shared:
     <<: *elastic_agent_components
     files:
       <<: *agent_binary_files
-      'data/{{.BeatName}}-{{ commit_short }}/components':
+      'data/{{.BeatName}}-{{ core_commit_short }}/components':
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/'
         mode: 0755
         config_mode: 0644
@@ -464,7 +464,7 @@ shared:
       'otelcol.ps1':
         source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
         mode: 0755
-      'data/{{.BeatName}}-{{ commit_short }}/otelcol.ps1':
+      'data/{{.BeatName}}-{{ core_commit_short }}/otelcol.ps1':
         source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
         mode: 0755
       # windows not supported yet
@@ -538,7 +538,7 @@ shared:
         config: true
       '.elastic-agent.active.commit':
         content: >
-          {{ commit }}
+          {{ core_commit }}
         mode: 0644
       'hints.inputs.d':
         source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
@@ -559,7 +559,7 @@ shared:
         config: true
       '.elastic-agent.active.commit':
         content: >
-          {{ commit }}
+          {{ core_commit }}
         mode: 0644
       'hints.inputs.d':
         source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
@@ -603,10 +603,10 @@ shared:
       'data/service/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip':
         source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip'
         mode: 0755
-      'data/{{.BeatName}}-{{ commit_short }}/components/connectors':
+      'data/{{.BeatName}}-{{ core_commit_short }}/components/connectors':
         source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/connectors.sh'
         mode: 0755
-      'data/{{.BeatName}}-{{ commit_short }}/components/connectors.spec.yml':
+      'data/{{.BeatName}}-{{ core_commit_short }}/components/connectors.spec.yml':
         source: '{{ elastic_beats_dir }}/specs/connectors.spec.yml'
         mode: 0644
 
@@ -1184,11 +1184,11 @@ specs:
         <<: *agent_darwin_binary_spec
         <<: *elastic_license_for_binaries
         files:
-          'data/{{.BeatName}}-{{ commit_short }}/elastic-agent':
+          'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent':
             template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/elastic-agent.tmpl'
             mode: 0755
           '{{.BeatName}}{{.BinaryExt}}':
-            source: data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}
+            source: data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}
             symlink: true
             mode: 0755
 
@@ -1199,7 +1199,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
+            source: data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}
             symlink: true
             mode: 0755
 
@@ -1400,7 +1400,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
+            source: data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}
             symlink: true
             mode: 0755
 
@@ -1412,7 +1412,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
+            source: data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}
             symlink: true
             mode: 0755
     - os: linux
