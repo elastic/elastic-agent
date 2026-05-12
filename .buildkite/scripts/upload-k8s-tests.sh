@@ -124,6 +124,13 @@ get_test_config() {
   echo "${versions_yaml}|${variants_yaml}"
 }
 
+# Convert JSON array to YAML array format (e.g., ["a", "b"] -> "        - \"a\"\n        - \"b\"")
+json_to_yaml_array() {
+  local json_array=$1
+  local indent=$2
+  echo "${json_array}" | jq -r '.[]' | sed "s/^/${indent}- \"/" | sed 's/$/\"/'
+}
+
 # Generate the complete pipeline YAML with matrix embedded
 generate_pipeline() {
   local versions_yaml=$1
@@ -166,11 +173,17 @@ steps:
       - *oblt_cli_plugin
       - *vault_github_token
     matrix:
+      setup:
+        version:
 EOF
 
-  # Append the matrix configuration (without quotes, as proper YAML)
-  echo "      version: ${versions_yaml}"
-  echo "      variant: ${variants_yaml}"
+  # Append version array in expanded YAML format
+  json_to_yaml_array "${versions_yaml}" "          "
+
+  echo "        variant:"
+  # Append variant array in expanded YAML format
+  json_to_yaml_array "${variants_yaml}" "          "
+
 }
 
 # Main
