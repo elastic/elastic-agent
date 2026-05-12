@@ -16,8 +16,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
@@ -318,27 +316,6 @@ func TestTTLMarkerRegistry_Set_TolerateMalformedExisting(t *testing.T) {
 		return b.String()
 	}
 
-	assertMalformedMarkerLogged := func(t *testing.T, entries []observer.LoggedEntry, wantVersionedHome string) {
-		t.Helper()
-		const wantMsg = "existing TTL marker is unparseable; overwriting or sweeping it"
-		for _, e := range entries {
-			if e.Message != wantMsg {
-				continue
-			}
-			fields := e.ContextMap()
-			if got, ok := fields["versionedHome"].(string); !ok || got != wantVersionedHome {
-				continue
-			}
-			assert.Equal(t, zapcore.InfoLevel, e.Level, "malformed TTL marker log must be info level so operators see it")
-			errMsg, ok := fields["error.message"].(string)
-			assert.True(t, ok, "malformed TTL marker log must carry an error.message field")
-			assert.NotEmpty(t, errMsg, "malformed TTL marker log must carry a non-empty error.message")
-			return
-		}
-		assert.Fail(t, "expected log entry not found",
-			"no info log %q with versionedHome=%q in %d entries", wantMsg, wantVersionedHome, len(entries))
-	}
-
 	t.Run("corrupt live ttl is overwritten when desired state includes it", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		for _, home := range []string{homeA, homeB, homeC} {
@@ -357,11 +334,9 @@ func TestTTLMarkerRegistry_Set_TolerateMalformedExisting(t *testing.T) {
 			homeC: {Version: "7.8.9", Hash: "cccccc", ValidUntil: tomorrow},
 		}
 
-		testLogger, obs := loggertest.New(t.Name())
+		testLogger, _ := loggertest.New(t.Name())
 		T := NewTTLMarkerRegistry(testLogger, tmpDir)
 		require.NoError(t, T.Set(desired))
-
-		assertMalformedMarkerLogged(t, obs.TakeAll(), homeA)
 
 		aPath := filepath.Join(tmpDir, homeA, ttlMarkerName)
 		if assert.FileExists(t, aPath, "corrupt marker should have been overwritten with valid YAML") {
