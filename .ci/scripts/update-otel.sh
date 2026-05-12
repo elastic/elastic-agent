@@ -21,21 +21,14 @@ next_contrib=${3:-$next_beta_core}
 GOMOD_FILES=("internal/edot/go.mod" "go.mod")
 
 for gomod_file in "${GOMOD_FILES[@]}"; do
-  # Get current versions from the go.mod
-  current_beta_core=$(grep 'go\.opentelemetry\.io/collector/component/componentstatus v' "$gomod_file" | cut -d' ' -f 2 || true)
-  current_stable_core=$(grep 'go\.opentelemetry\.io/collector/pdata v' "$gomod_file" | cut -d' ' -f 2 || true)
-  current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v' "$gomod_file" | cut -d' ' -f 2 || true)
+  echo "=> Updating core to $next_beta_core/$next_stable_core in $gomod_file"
+  echo "=> Updating contrib to $next_contrib in $gomod_file"
 
-  [[ -n "$current_beta_core" ]] || (echo "Error: couldn't find current beta core version." && exit 2)
-  [[ -n "$current_stable_core" ]] || (echo "Error: couldn't find current stable core version" && exit 3)
-  [[ -n "$current_contrib" ]] || (echo "Error: couldn't find current contrib version" && exit 4)
-
-  echo "=> Updating core from $current_beta_core/$current_stable_core to $next_beta_core/$next_stable_core in $gomod_file"
-  echo "=> Updating contrib from $current_contrib to $next_contrib in $gomod_file"
-
-  sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_beta_core/\1 $next_beta_core/" "$gomod_file"
-  sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_stable_core/\1 $next_stable_core/" "$gomod_file"
-  sed -i.bak "s/\(github\.com\/open-telemetry\/opentelemetry\-collector\-contrib\/.*\) $current_contrib/\1 $next_contrib/" "$gomod_file"
+  # Rewrite every collector/contrib line to the target version regardless of its current value (release or pseudo-version).
+  # `replace` directives (lines containing `=>`) are left alone so deliberate pins are preserved.
+  sed -i.bak -E "/=>/!s|(go\\.opentelemetry\\.io/collector[^[:space:]]*) v0\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.+-]*)?|\\1 $next_beta_core|" "$gomod_file"
+  sed -i.bak -E "/=>/!s|(go\\.opentelemetry\\.io/collector[^[:space:]]*) v1\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.+-]*)?|\\1 $next_stable_core|" "$gomod_file"
+  sed -i.bak -E "/=>/!s|(github\\.com/open-telemetry/opentelemetry-collector-contrib/[^[:space:]]*) v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.+-]*)?|\\1 $next_contrib|" "$gomod_file"
   rm "${gomod_file}.bak"
 done
 

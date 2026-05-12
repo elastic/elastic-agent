@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent/internal/edot
 
-go 1.26.2
+go 1.26.3
 
 // use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
@@ -17,7 +17,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260507213829-7bbe8ee6dcfb
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.42.1
+	github.com/elastic/elastic-agent-libs v0.42.2
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.46.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.46.0
@@ -79,9 +79,9 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/collector/component/componenttest v0.150.0
-	go.opentelemetry.io/collector/connector/forwardconnector v0.149.0
-	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.149.0
-	go.opentelemetry.io/collector/receiver/nopreceiver v0.149.0
+	go.opentelemetry.io/collector/connector/forwardconnector v0.150.0
+	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.150.0
+	go.opentelemetry.io/collector/receiver/nopreceiver v0.150.0
 	go.opentelemetry.io/ebpf-profiler v0.0.202614
 	go.uber.org/zap v1.28.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -109,7 +109,7 @@ require (
 	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
 	github.com/elastic/go-licenser v0.4.2 // indirect
 	github.com/elastic/go-quark v0.3.0 // indirect
-	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.46.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.47.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/tk-btf v0.2.0 // indirect
 	github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb // indirect
@@ -203,16 +203,16 @@ require (
 	go.opentelemetry.io/collector/confmap/provider/envprovider v1.56.0
 	go.opentelemetry.io/collector/confmap/provider/fileprovider v1.56.0
 	go.opentelemetry.io/collector/confmap/provider/httpprovider v1.56.0
-	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.55.0
+	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.56.0
 	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.56.0
 	go.opentelemetry.io/collector/connector v0.150.0
 	go.opentelemetry.io/collector/exporter v1.56.0
 	go.opentelemetry.io/collector/exporter/debugexporter v0.150.0
-	go.opentelemetry.io/collector/exporter/nopexporter v0.149.0
+	go.opentelemetry.io/collector/exporter/nopexporter v0.150.0
 	go.opentelemetry.io/collector/exporter/otlpexporter v0.150.0
-	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.149.0
+	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.150.0
 	go.opentelemetry.io/collector/extension v1.56.0
-	go.opentelemetry.io/collector/extension/memorylimiterextension v0.149.0
+	go.opentelemetry.io/collector/extension/memorylimiterextension v0.150.0
 	go.opentelemetry.io/collector/featuregate v1.56.0
 	go.opentelemetry.io/collector/otelcol v0.150.0
 	go.opentelemetry.io/collector/processor v1.56.0
@@ -387,8 +387,8 @@ require (
 	github.com/elastic/elastic-agent-system-metrics v0.14.3 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
-	github.com/elastic/go-docappender/v2 v2.14.0 // indirect
-	github.com/elastic/go-elasticsearch/v8 v8.19.5 // indirect
+	github.com/elastic/go-docappender/v2 v2.14.1 // indirect
+	github.com/elastic/go-elasticsearch/v8 v8.19.6 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
@@ -696,7 +696,7 @@ require (
 	go.opentelemetry.io/collector/extension/xextension v0.150.0 // indirect
 	go.opentelemetry.io/collector/filter v0.150.0 // indirect
 	go.opentelemetry.io/collector/internal/fanoutconsumer v0.150.0 // indirect
-	go.opentelemetry.io/collector/internal/memorylimiter v0.149.0 // indirect
+	go.opentelemetry.io/collector/internal/memorylimiter v0.150.0 // indirect
 	go.opentelemetry.io/collector/internal/sharedcomponent v0.150.0 // indirect
 	go.opentelemetry.io/collector/internal/telemetry v0.150.0 // indirect
 	go.opentelemetry.io/collector/pdata v1.56.0
