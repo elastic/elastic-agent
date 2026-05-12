@@ -303,7 +303,13 @@ func (b GolangCrossBuilder) Build() error {
 	if cfg.Build.VersionQualified {
 		args = append(args, "--env", "VERSION_QUALIFIER="+cfg.Build.VersionQualifier)
 	}
-	if cfg.CrossBuild.MountModcache {
+
+	// We don't mount the mod cache when building with the upstream Go FIPS module. When setting
+	// a strict module version, the module archive has to be decompressed into the module cache directory.
+	// As such, it can't be readonly.
+	// TODO: Make crossbuild work as non-root and mount this as rw.
+	isWindowsFIPSBuild := cfg.Build.FIPSBuild && strings.HasPrefix(b.Platform, "windows")
+	if cfg.CrossBuild.MountModcache && !isWindowsFIPSBuild {
 		// Mount $GOPATH/pkg/mod into the container, read-only.
 		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
 		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
