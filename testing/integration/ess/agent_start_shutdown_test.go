@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -40,20 +39,27 @@ func TestAgentStartShutdown(t *testing.T) {
 	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
+	// set logging level to debug so we see the log message we want
+	var config = `
+agent:
+  logging:
+    level: debug
+outputs:
+  default:
+    type: fake-output
+inputs:
+  - id: fake
+    type: fake
+    state: 2
+    message: Healthy
+`
+
+	require.NoError(t, fixture.Configure(ctx, []byte(config)))
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		// simpleConfig2 wires up the fake input/output component so the
-		// agent has something to run; Reached returning false keeps the
-		// fixture's state machine from advancing, which means the agent
-		// keeps running until we explicitly stop it.
-		assert.NoError(t, fixture.Run(ctx, aTesting.State{
-			Configure: simpleConfig2,
-			Reached: func(*client.AgentState) bool {
-				return false
-			},
-		}))
+		assert.NoError(t, fixture.Run(ctx))
 	}()
 
 	t.Cleanup(func() {
@@ -64,7 +70,7 @@ func TestAgentStartShutdown(t *testing.T) {
 	})
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		assert.Contains(collect, output.String(), "Elastic Agent started")
+		assert.Contains(collect, output.String(), "Registered signal handlers")
 	}, 30*time.Second, time.Second)
 
 	fixture.Stop()
