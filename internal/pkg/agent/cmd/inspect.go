@@ -18,6 +18,7 @@ import (
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/redact"
 	"github.com/elastic/elastic-agent-libs/service"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -253,7 +254,8 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 }
 
 func printMapStringConfig(mapStr map[string]interface{}, streams *cli.IOStreams) error {
-	data, err := yaml.Marshal(diagnostics.Redact(mapStr, streams.Err))
+	redact.Redact(mapStr, diagnostics.RedactOpts(streams.Err)...)
+	data, err := yaml.Marshal(mapStr)
 	if err != nil {
 		return errors.New(err, "could not marshal to YAML")
 	}
