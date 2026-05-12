@@ -505,13 +505,8 @@ github.com/elastic/opentelemetry-collector-components/extension/apmconfigextensi
 github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.46.0/go.mod h1:81okh9x9u/hD9T3TQszvPSQmhOdCXIQjjnXGFewxU7U=
 github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.47.0 h1:4attwqC1w0fx7RjNezaKhSgK5c63y71eoQfgdFQ6ZRc=
 github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.47.0/go.mod h1:20QG3/bBHI5rlmvsLdbZ93OHgHmjZxznUqqjiRi6uXY=
-<<<<<<< HEAD
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20251113000200-a6f7cddc8520 h1:n8/E3EdG6E28sENjCf5Ya6G+049oPv9mPG+WPGZD3jA=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20251113000200-a6f7cddc8520/go.mod h1:MIu4kkhsN8t25+udaWtPsVnTbDiVXueDbxZ70SXuYYI=
-=======
-github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced h1:XcWi/S3OoeE5Qwmj381AoO3nr3AVXl4Z4QO0mqyjlzU=
-github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced/go.mod h1:8e9NcGfE2xeor8r+WV9a+hKBEkzJEDnqZN7tqb3GUe8=
->>>>>>> bf11990b9 (Fix update-otel.sh to correctly update all dependency versions (#14162))
 github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b h1:NWuTKdMCJlU9ehRH8V0w1Kk1QI5Vn+9OcJWIO9wI+pE=
 github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b/go.mod h1:R1WWATZlmmkryuE5hLQNHj89rdPPi4ErobBZYx2LmGs=
 github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.46.0 h1:l/ETAJs8oZv2IecOkvHeHL0W6bTV7ZFP1hB5mWD5O8Y=
@@ -1583,13 +1578,8 @@ go.opentelemetry.io/collector/confmap/provider/fileprovider v1.56.0 h1:7FIaMPNrT
 go.opentelemetry.io/collector/confmap/provider/fileprovider v1.56.0/go.mod h1:5r9PR6rZTwknT/XyPWq0RPPbIOvRzw6rWxyxYhUJvmY=
 go.opentelemetry.io/collector/confmap/provider/httpprovider v1.56.0 h1:xKynCqLjTHqKOhIr52nxmnNU0+GqR7NWoCSVdR5B2sI=
 go.opentelemetry.io/collector/confmap/provider/httpprovider v1.56.0/go.mod h1:hNNLFunlDUDGhMmyW3VucvHSw2B2ZHwwn3NpF5o9a1k=
-<<<<<<< HEAD
-go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.45.0 h1:0PHVG1qnfseT3rhaVCZP9stSdjsFVDtlFllAdQwrUqk=
-go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.45.0/go.mod h1:YfvPtBan9lrxyoThA7DOZfNMU14/xJA3CedwJwtB+uE=
-=======
 go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.56.0 h1:wTEYQPRk6dN5d1RPbS+y5bmecTLqFjjmg29+jK+0/mI=
 go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.56.0/go.mod h1:BhQOv8qbIfWFWY3BKoo9qCDQdcK8P9qkREodwYkbIpE=
->>>>>>> bf11990b9 (Fix update-otel.sh to correctly update all dependency versions (#14162))
 go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.56.0 h1:ei2PWbVOZywICCjrMCndTpI0xRcRih1aJ6Oi3yeSn2U=
 go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.56.0/go.mod h1:uEXugVAldQbCFfAl3vQqWCGyRLGd1vU3yzd0IOjBWZM=
 go.opentelemetry.io/collector/confmap/xconfmap v0.150.0 h1:PR+c4/Ly4Plx862jJ1Cg+HFewMrHsWaN9eKxrYBhtK4=

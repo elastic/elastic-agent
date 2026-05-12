@@ -18,24 +18,8 @@ next_stable_core=${2:-}
 
 next_contrib=${3:-$next_beta_core}
 
-# Get current versions from internal/edot/go.mod
-current_beta_core=$(grep 'go\.opentelemetry\.io/collector/receiver/otlpreceiver v' internal/edot/go.mod | cut -d' ' -f 2 || true)
-current_stable_core=$(grep 'go\.opentelemetry\.io/collector/confmap/provider/fileprovider v' internal/edot/go.mod | cut -d' ' -f 2 || true)
-current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v' internal/edot/go.mod | cut -d' ' -f 2 || true)
+GOMOD_FILES=("internal/edot/go.mod" "go.mod")
 
-<<<<<<< HEAD
-[[ -n "$current_beta_core" ]] || (echo "Error: couldn't find current beta core version." && exit 2)
-[[ -n "$current_stable_core" ]] || (echo "Error: couldn't find current stable core version" && exit 3)
-[[ -n "$current_contrib" ]] || (echo "Error: couldn't find current contrib version" && exit 4)
-
-echo "=> Updating core from $current_beta_core/$current_stable_core to $next_beta_core/$next_stable_core"
-echo "=> Updating contrib from $current_contrib to $next_contrib"
-
-sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_beta_core/\1 $next_beta_core/" internal/edot/go.mod
-sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_stable_core/\1 $next_stable_core/" internal/edot/go.mod
-sed -i.bak "s/\(github\.com\/open-telemetry\/opentelemetry\-collector\-contrib\/.*\) $current_contrib/\1 $next_contrib/" internal/edot/go.mod
-rm internal/edot/go.mod.bak
-=======
 for gomod_file in "${GOMOD_FILES[@]}"; do
   echo "=> Updating core to $next_beta_core/$next_stable_core in $gomod_file"
   echo "=> Updating contrib to $next_contrib in $gomod_file"
@@ -47,7 +31,6 @@ for gomod_file in "${GOMOD_FILES[@]}"; do
   sed -i.bak -E "/=>/!s|(github\\.com/open-telemetry/opentelemetry-collector-contrib/[^[:space:]]*) v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.+-]*)?|\\1 $next_contrib|" "$gomod_file"
   rm "${gomod_file}.bak"
 done
->>>>>>> bf11990b9 (Fix update-otel.sh to correctly update all dependency versions (#14162))
 
 # Update elastic/opentelemetry-collector-components in internal/edot/go.mod.
 # Find the latest release of each submodule whose go.mod uses the new OTel versions.
@@ -191,6 +174,6 @@ else
 fi
 elastic-agent-changelog-tool new "$changelog_fragment_name"
 sed -i.bak "s/^kind:.*$/kind: enhancement/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
-sed -i.bak "s/^summary:.*$/summary: Update OTel components to ${next_contrib}/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
+sed -i.bak "s/^summary:.*$/summary: Update OTel Collector components to ${next_contrib}/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
 sed -i.bak "s/^component:.*$/component: elastic-agent/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
 rm ./changelog/fragments/*-"${changelog_fragment_name}".yaml.bak
