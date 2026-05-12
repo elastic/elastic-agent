@@ -536,8 +536,7 @@ func (l *policyChange) Ack() error {
 	if pc, ok := l.action.(*fleetapi.ActionPolicyChange); ok && pc != nil && l.stateStore != nil {
 		l.stateStore.SetAction(pc)
 		if err := l.stateStore.Save(); err != nil && l.log != nil {
-			l.log.Warnw("failed to persist policy change action to state store",
-				"error.message", err)
+			return fmt.Errorf("failed to perist policy change action to state store: %w", err)
 		}
 	}
 
