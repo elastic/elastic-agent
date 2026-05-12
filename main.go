@@ -14,6 +14,7 @@ import (
 
 // Setups and Runs agent.
 func main() {
+	// Test comment to trigger build.
 	var err error
 	defer func() {
 		if err != nil {
