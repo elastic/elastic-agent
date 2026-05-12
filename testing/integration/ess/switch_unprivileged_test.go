@@ -235,6 +235,7 @@ func TestSwitchToUnprivilegedDeduplication(t *testing.T) {
 		Sudo:  true,  // We require sudo for this test to run `elastic-agent install`.
 		Local: false, // not safe to run this test locally as it installs Elastic Agent.
 	})
+	t.Skip("Skipping due to flaky behavior tracked in #14079")
 
 	ctx := context.Background()
 

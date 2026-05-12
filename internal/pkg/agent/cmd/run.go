@@ -490,6 +490,7 @@ func runElasticAgent(
 	// listen for signals
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	l.Debug("Registered signal handlers")
 	isRex := false
 	logShutdown := true
 LOOP:
