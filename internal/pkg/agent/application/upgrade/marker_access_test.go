@@ -162,15 +162,11 @@ func watchFileNotEmpty(t *testing.T, ctx context.Context, filePath string, errCh
 }
 
 func randomBytes(length int) []byte {
-	chars := []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ" +
-		"abcdefghijklmnopqrstuvwxyzåäö" +
-		"0123456789" +
-		"~=+%^*/()[]{}/!@#$?|")
+	chars := []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789~=+%^*/()[]{}/!@#$?|")
 
-	var b []byte
-	for i := 0; i < length; i++ {
-		rune := chars[rand.IntN(len(chars))]
-		b = append(b, byte(rune))
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = chars[rand.IntN(len(chars))]
 	}
 
 	return b
