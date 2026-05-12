@@ -1,0 +1,17 @@
+name: flaky-test-reporter.yml
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  run:
+    if: github.event.pull_request.number == 14202
+    uses: ./.github/workflows/gh-aw-estc-pr-buildkite-flaky-test-reporter.lock.yml
+    with:
+      trigger-mode: pull_request
+      buildkite-org: elastic
+      buildkite-pipeline: elastic-agent
+    secrets:
+      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+      BUILDKITE_API_TOKEN: ${{ secrets.BUILDKITE_LOGS_API_TOKEN }}
