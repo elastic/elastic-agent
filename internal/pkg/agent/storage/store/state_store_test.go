@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"sync"
 	"testing"
 	"time"
 
@@ -672,40 +671,6 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			}
 		})
 	})
-}
-
-type testAcker struct {
-	acked     []string
-	ackedLock sync.Mutex
-}
-
-func (t *testAcker) Ack(_ context.Context, action fleetapi.Action) error {
-	t.ackedLock.Lock()
-	defer t.ackedLock.Unlock()
-
-	if t.acked == nil {
-		t.acked = make([]string, 0)
-	}
-
-	t.acked = append(t.acked, action.ID())
-	return nil
-}
-
-func (t *testAcker) Commit(_ context.Context) error {
-	return nil
-}
-
-func (t *testAcker) Clear() {
-	t.ackedLock.Lock()
-	defer t.ackedLock.Unlock()
-
-	t.acked = make([]string, 0)
-}
-
-func (t *testAcker) Items() []string {
-	t.ackedLock.Lock()
-	defer t.ackedLock.Unlock()
-	return t.acked
 }
 
 // hasEmptyFields will check if action has any empty fields. It returns a string
