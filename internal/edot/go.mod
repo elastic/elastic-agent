@@ -83,7 +83,7 @@ require (
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.150.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.150.0
 	go.opentelemetry.io/ebpf-profiler v0.0.202614
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -529,7 +529,7 @@ require (
 	github.com/linode/go-metadata v0.2.4 // indirect
 	github.com/linode/linodego v1.66.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20251013123823-9fd1530e3ec3 // indirect
-	github.com/magefile/mage v1.15.0 // indirect
+	github.com/magefile/mage v1.17.2 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-ieproxy v0.0.1 // indirect
