@@ -1749,6 +1749,18 @@
                         }
                     ]
                 },
+                "podLabels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Labels applied to the Agent pods.",
+                    "examples": [
+                        {
+                            "app.kubernetes.io/team": "observability"
+                        }
+                    ]
+                },
                 "annotations": {
                     "type": "object",
                     "additionalProperties": {
