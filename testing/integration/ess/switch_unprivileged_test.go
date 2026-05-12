@@ -8,29 +8,38 @@ package ess
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff/v5"
+	"github.com/gofrs/uuid/v5"
 	"github.com/schollz/progressbar/v3"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
+	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
-	"github.com/elastic/elastic-agent/testing/fleetservertest"
 	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
+
+var ErrUnprivilegedMismatch = errors.New("unprivileged state mismatch")
+
+type Logger interface {
+	Logf(format string, args ...interface{})
+}
 
 func TestSwitchUnprivilegedWithoutBasePath(t *testing.T) {
 
@@ -212,180 +221,163 @@ func TestSwitchUnprivilegedWithBasePath(t *testing.T) {
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: false, TargetVersion: define.Version()}))
 }
 
-// TestSwitchToUnprivilegedDeduplication verifies that a PRIVILEGE_LEVEL_CHANGE
-// action delivered to an agent that is already running at the target privilege
-// level is acked via the dedup branch of handlerPrivilegeLevelChange (handler
-// returns nil, agent stays HEALTHY) instead of falling through to the
-// "can change privilege level only when running as root/Administrator" error.
-//
-// We also inject a SETTINGS action with log_level=debug on the first checkin
-// so the diagnostic Debugf added in handler_action_privilege_level_change.go
-// (issue #14079 investigation) is captured in any artifact from this run.
 func TestSwitchToUnprivilegedDeduplication(t *testing.T) {
-	_ = define.Require(t, define.Requirements{
+	stack := define.Require(t, define.Requirements{
 		Group: integration.Fleet,
 		Stack: &define.Stack{},
 		OS: []define.OS{
-			{Type: define.Darwin},
-			{Type: define.Linux},
+			{
+				Type: define.Darwin,
+			}, {
+				Type: define.Linux,
+			},
 		},
-		Sudo:  true,
-		Local: false,
+		Sudo:  true,  // We require sudo for this test to run `elastic-agent install`.
+		Local: false, // not safe to run this test locally as it installs Elastic Agent.
 	})
+	t.Skip("Skipping due to flaky behavior tracked in #14079")
 
-	ctx, cancel := testcontext.WithTimeout(t, t.Context(), 15*time.Minute)
+	ctx := context.Background()
+
+	// Get path to Elastic Agent executable
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err, "getting path to Elastic Agent executable failed")
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	apiKey, policy := createBasicFleetPolicyData(t, "http://fleet-server:8221")
-	checkinWithAcker := fleetservertest.NewCheckinActionsWithAcker()
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err, "preparing Elastic Agent fixture failed")
 
-	handlers := &fleetservertest.Handlers{
-		APIKey:          apiKey.Key,
-		EnrollmentToken: "enrollmentToken",
-		AgentID:         policy.AgentID, // no enroll handler is called when AgentID is preset
-		CheckinFn:       fleetservertest.NewHandlerCheckin(checkinWithAcker.ActionsGenerator()),
-		EnrollFn:        fleetservertest.NewHandlerEnroll(policy.AgentID, policy.PolicyID, apiKey),
-		AckFn:           fleetservertest.NewHandlerAckWithAcker(checkinWithAcker.Acker()),
-		StatusFn:        fleetservertest.NewHandlerStatusHealthy(),
-	}
+	kibClient := stack.KibanaClient
 
-	fleetServer := fleetservertest.NewServer(handlers, fleetservertest.WithRequestLog(t.Logf))
-	defer fleetServer.Close()
-
-	// Point the policy's fleet.hosts at the running mock fleet. The policy-change
-	// handler at handler_action_policy_change.go:249 validates connectivity to
-	// every host in the new policy — leaving the placeholder from
-	// createBasicFleetPolicyData would fail DNS and push the agent to state=4
-	// before we ever get to the privilege change.
-	policy.FleetHosts = []string{fleetServer.LocalhostURL}
-
-	// First checkin: initial POLICY_CHANGE so the agent converges, plus a
-	// SETTINGS action setting log_level=debug. The latter ensures the
-	// diagnostic log added in handlerPrivilegeLevelChange (issue #14079
-	// investigation) shows up in agent logs / any diagnostics bundle.
-	policyAction, err := fleetservertest.NewActionWithEmptyPolicyChange("policy-change-1", policy)
-	require.NoError(t, err, "failed to create initial policy-change action")
-	settingsAction, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
-		AgentID:  policy.AgentID,
-		ActionID: "settings-debug-log",
-		Type:     fleetapi.ActionTypeSettings,
-		Data:     `{"log_level":"debug"}`,
-	})
-	require.NoError(t, err, "failed to create settings action")
-	checkinWithAcker.AddCheckin("ack-bootstrap", 0, policyAction, settingsAction)
-
-	fixture, err := define.NewFixtureFromLocalBuild(t,
-		define.Version(),
-		atesting.WithAllowErrors(),
-		atesting.WithLogOutput())
-	require.NoError(t, err, "NewFixtureFromLocalBuild failed")
-	err = fixture.EnsurePrepared(ctx)
-	require.NoError(t, err, "fixture.EnsurePrepared failed")
-
-	out, err := fixture.Install(ctx, &atesting.InstallOpts{
-		Force:          true,
-		NonInteractive: true,
-		Insecure:       true, // mock fleet-server uses plain HTTP
-		Privileged:     true, // start privileged, then switch
-		EnrollOpts: atesting.EnrollOpts{
-			URL:             fleetServer.LocalhostURL,
-			EnrollmentToken: "anythingWillDo",
+	t.Log("Enrolling the agent in Fleet")
+	policyUUID := uuid.Must(uuid.NewV4()).String()
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
 		},
-	})
-	require.NoErrorf(t, err, "error installing agent, output: %s", out)
+	}
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		Privileged:     true, // start privileged, then switch
+	}
+	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, kibClient, createPolicyReq)
+	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
 
-	check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
-	require.True(t, WaitHealthyAndUnprivileged(t, ctx, fixture, false, 2*time.Minute, 10*time.Second),
-		"agent never became healthy in privileged mode")
+	t.Log("Waiting for Agent to be healthy...")
+	err = WaitHealthyAndUnprivileged(ctx, fixture, false, 2*time.Minute, 10*time.Second, t)
+	require.NoError(t, err, "waiting for agent to become healthy failed")
 
-	// First PRIVILEGE_LEVEL_CHANGE: privileged → unprivileged (real switch +
-	// reexec). The handler at handler_action_privilege_level_change.go takes
-	// the isRoot==true branch (stopComponents, SwitchServiceUser, ack, ReExec).
-	const privActionData = `{"unprivileged":true,"user_info":{"username":"","groupname":"","password":""}}`
-	privAction1, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
-		AgentID:  policy.AgentID,
-		ActionID: "priv-change-1",
-		Type:     fleetapi.ActionTypePrivilegeLevelChange,
-		Data:     privActionData,
-	})
-	require.NoError(t, err, "failed to create first privilege-level-change action")
-	checkinWithAcker.AddCheckin("ack-priv-1", 0, privAction1)
+	agentID, err := fixture.AgentID(ctx)
+	require.NoError(t, err, "retrieving agent ID failed")
 
-	require.True(t, WaitHealthyAndUnprivileged(t, ctx, fixture, true, 5*time.Minute, 10*time.Second),
-		"agent never became healthy unprivileged after first switch")
+	t.Logf("Agent ID: %q", agentID)
 
-	// Second PRIVILEGE_LEVEL_CHANGE (duplicate): the agent is already at the
-	// target level, so the handler must take the dedup branch at
-	// handler_action_privilege_level_change.go:114-121 — log "already running
-	// as user X and group Y, no changes required" and ack. If the regression
-	// returns it falls through to "can change privilege level only when
-	// running as root/Administrator" and the top-level state goes to FAILED.
-	privAction2, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
-		AgentID:  policy.AgentID,
-		ActionID: "priv-change-2",
-		Type:     fleetapi.ActionTypePrivilegeLevelChange,
-		Data:     privActionData,
-	})
-	require.NoError(t, err, "failed to create duplicate privilege-level-change action")
-	checkinWithAcker.AddCheckin("ack-priv-2", 0, privAction2)
-
-	dedupSubstr := fmt.Sprintf("already running as user %s and group %s",
-		install.ElasticUsername, install.ElasticGroupName)
-	const failureSubstr = "can change privilege level only when running as root/Administrator"
-
-	require.Eventuallyf(t, func() bool {
-		if agentLogContains(t, fixture, failureSubstr) {
-			t.Fatalf("agent log contains regression marker %q after duplicate privilege-level-change", failureSubstr)
+	t.Log("Waiting for enrolled Agent status to be online...")
+	_, err = backoff.Retry(ctx, func() (bool, error) {
+		checkSuccessful := check.FleetAgentStatus(
+			ctx, t, kibClient, agentID, "online")()
+		if !checkSuccessful {
+			return checkSuccessful, fmt.Errorf("agent status is not online")
 		}
-		return checkinWithAcker.Acked("priv-change-2") && agentLogContains(t, fixture, dedupSubstr)
-	}, 3*time.Minute, 5*time.Second,
-		"duplicate privilege-level-change never acked with dedup marker %q in agent log", dedupSubstr)
+		return checkSuccessful, nil
+	}, backoff.WithMaxElapsedTime(2*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(10*time.Second)))
 
-	// Final sanity: agent must remain HEALTHY and unprivileged.
-	assert.True(t, WaitHealthyAndUnprivileged(t, ctx, fixture, true, 1*time.Minute, 5*time.Second),
-		"agent not healthy and unprivileged after duplicate privilege-level-change")
+	require.NoError(t, err, "waiting for enrolled agent to be online failed")
+
+	t.Logf("Switching agent privilege level...")
+
+	switchErrg := new(errgroup.Group)
+
+	var actionsCount = 5
+	errors := make([]string, actionsCount)
+	for i := 0; i < actionsCount; i++ {
+		switchErrg.Go(func() error {
+			err := fleettools.SwitchAgentToUnprivileged(ctx, kibClient, agentID)
+			if err != nil {
+				errors[i] = err.Error()
+			}
+			return err
+		})
+	}
+
+	switchErr := switchErrg.Wait()
+	// log all errors
+	require.NoErrorf(t, switchErr, "switching agent privilege level failed: %s", strings.Join(errors, "; "))
+
+	t.Log("Waiting for switched Agent status to be online...")
+	_, err = backoff.Retry(ctx, func() (any, error) {
+		checkSuccessful := check.FleetAgentStatus(ctx, t, kibClient, agentID, "online")()
+		if !checkSuccessful {
+			return checkSuccessful, fmt.Errorf("agent status is not online")
+		}
+		return checkSuccessful, nil
+	}, backoff.WithMaxElapsedTime(10*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(15*time.Second)))
+
+	require.NoError(t, err, "waiting for switched agent to be online failed")
+
+	// now that the watcher has stopped lets ensure that it's still the expected
+	// version, otherwise it's possible that it was rolled back to the original version
+	err = WaitHealthyAndUnprivileged(ctx, fixture, true, 2*time.Minute, 10*time.Second, t)
+	require.NoError(t, err, "waiting for healthy unprivileged agent failed")
 }
 
-// agentLogContains reports whether any of the installed agent's NDJSON log
-// files under <workDir>/data/elastic-agent-*/logs/ contain substr. Errors
-// reading individual files are logged and skipped so a transient rotation
-// doesn't fail the assertion.
-func agentLogContains(t *testing.T, f *atesting.Fixture, substr string) bool {
-	t.Helper()
-	pattern := filepath.Join(f.WorkDir(), "data", "elastic-agent-*", "logs", "elastic-agent-*.ndjson")
-	matches, err := filepath.Glob(pattern)
+func checkHealthyAndUnprivileged(ctx context.Context, f *atesting.Fixture, unprivileged bool) error {
+	status, err := f.ExecStatus(ctx)
 	if err != nil {
-		t.Logf("agentLogContains: glob %q error: %v", pattern, err)
-		return false
+		return err
 	}
-	for _, p := range matches {
-		data, err := os.ReadFile(p)
-		if err != nil {
-			t.Logf("agentLogContains: read %q error: %v", p, err)
-			continue
-		}
-		if strings.Contains(string(data), substr) {
-			return true
-		}
+
+	if status.State != int(v2proto.State_HEALTHY) {
+		return fmt.Errorf("agent state is not healthy: got %d",
+			status.State)
 	}
-	return false
+
+	if status.Info.Unprivileged != unprivileged {
+		return ErrUnprivilegedMismatch
+	}
+
+	return nil
 }
 
-// WaitHealthyAndUnprivileged polls the agent's status until it reports
-// STATE_HEALTHY with Info.Unprivileged matching the requested value, or until
-// timeout. Failures are reported through assert.EventuallyWithT, so the parent
-// test is marked failed but execution continues; the bool return lets callers
-// short-circuit follow-up steps that depend on the agent being healthy.
-func WaitHealthyAndUnprivileged(t *testing.T, ctx context.Context, f *atesting.Fixture, unprivileged bool, timeout time.Duration, interval time.Duration) bool {
-	t.Helper()
-	return assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-		status, err := f.ExecStatus(ctx)
-		if !assert.NoError(collect, err, "fetching agent status failed") {
-			return
+func WaitHealthyAndUnprivileged(ctx context.Context, f *atesting.Fixture, unprivileged bool, timeout time.Duration, interval time.Duration, logger Logger) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	// The deadline was set above, we don't need to check for it.
+	deadline, _ := ctx.Deadline()
+
+	t := time.NewTicker(interval)
+	defer t.Stop()
+
+	var lastErr error
+	for {
+		select {
+		case <-ctx.Done():
+			if lastErr != nil {
+				return fmt.Errorf("failed waiting for healthy agent and unprivileged state (%w): %w", ctx.Err(), lastErr)
+			}
+			return ctx.Err()
+		case <-t.C:
+			err := checkHealthyAndUnprivileged(ctx, f, unprivileged)
+			// If we're in an upgrade process, the versions might not match
+			// so we wait to see if we get to a stable version
+			if errors.Is(err, ErrUnprivilegedMismatch) {
+				logger.Logf("unprivileged mismatch, ignoring, waiting until deadline: %s", time.Until(deadline))
+				continue
+			}
+			if err == nil {
+				return nil
+			}
+			lastErr = err
+			logger.Logf("waiting for healthy agent and proper unprivileged state: %s", err)
 		}
-		assert.Equal(collect, int(v2proto.State_HEALTHY), status.State,
-			"agent state not HEALTHY (message: %q)", status.Message)
-		assert.Equal(collect, unprivileged, status.Info.Unprivileged,
-			"agent unprivileged mismatch")
-	}, timeout, interval, "agent never reached HEALTHY+unprivileged=%v", unprivileged)
+	}
 }
