@@ -1,12 +1,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 #
-# Kubernetes Integration Tests - Dynamic Pipeline
-# This pipeline is uploaded dynamically based on the test tier needed
+# Kubernetes Integration Tests - Pipeline used for running on scheduler
 #
-# Expected environment variables:
-#   K8S_TEST_TIER: "tier1", "tier2", or "tier3"
-#   K8S_TEST_VERSIONS: JSON array of k8s versions to test
-#   K8S_TEST_VARIANTS: JSON array of container variants to test
 
 env:
   ASDF_MAGE_VERSION: 1.14.0
@@ -15,41 +10,37 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1777597312"
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1777597312"
 
 common:
-  - google_oidc_observability_plugin: &google_oidc_observability_plugin
-      elastic/oblt-google-auth#v1.3.0:
-        lifetime: 10800
-  - oblt_cli_plugin: &oblt_cli_plugin
-      elastic/oblt-cli#v0.4.1:
-        version-file: .oblt-cli-version
-  - vault_github_token: &vault_github_token
-      elastic/vault-github-token#v0.1.0:
+  - vault_docker_login: &vault_docker_login
+      elastic/vault-docker-login#v0.5.2:
+        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
 steps:
-  - label: ":kubernetes: {{matrix.version}}:amd64:{{matrix.variant}}"
+
+  - label: ":package: amd64: Containers"
+    key: packaging-containers-amd64
     env:
-      K8S_VERSION: "{{matrix.version}}"
-      DOCKER_VARIANTS: "{{matrix.variant}}"
-      TARGET_ARCH: "amd64"
+      PACKAGES: "docker"
+      PLATFORMS: "linux/amd64"
     command: |
-      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
-      .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
+      .buildkite/scripts/steps/integration-package.sh
+      .buildkite/scripts/steps/integration-cloud-image-push.sh
     artifact_paths:
-      - build/*
-      - build/diagnostics/**
-      - build/*.pod_logs_dump/*
-    retry:
-      automatic:
-        limit: 1
+      - build/distributions/**
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
-      image: "${IMAGE_UBUNTU_2404_X86_64}"
-      diskSizeGb: 80
+      diskSizeGb: 200
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
     plugins:
-      - *google_oidc_observability_plugin
-      - *oblt_cli_plugin
-      - *vault_github_token
-    matrix: $K8S_TEST_MATRIX
+      - *vault_docker_login
+
+  - key: integration-tests-kubernetes
+    depends_on:
+      - packaging-containers-amd64
+    steps:
+      - label: "Upload k8s tests pipeline"
+        command: ".buildkite/scripts/upload-k8s-tests.sh"
