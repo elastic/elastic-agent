@@ -56,7 +56,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [mongodbreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/mongodbreceiver/v0.150.0/receiver/mongodbreceiver/README.md) | v0.150.0 |
 | [mysqlreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/mysqlreceiver/v0.150.0/receiver/mysqlreceiver/README.md) | v0.150.0 |
 | [nginxreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/nginxreceiver/v0.150.0/receiver/nginxreceiver/README.md) | v0.150.0 |
-| [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.149.0/receiver/nopreceiver/README.md) | v0.149.0 |
+| [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.150.0/receiver/nopreceiver/README.md) | v0.150.0 |
 | [oracledbreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/oracledbreceiver/v0.150.0/receiver/oracledbreceiver/README.md) | v0.150.0 |
 | [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.150.0/receiver/otlpreceiver/README.md) | v0.150.0 |
 | [postgresqlreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/postgresqlreceiver/v0.150.0/receiver/postgresqlreceiver/README.md) | v0.150.0 |
@@ -85,9 +85,9 @@ This section provides a summary of components included in the Elastic Distributi
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.150.0/exporter/fileexporter/README.md) | v0.150.0 |
 | [kafkaexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/kafkaexporter/v0.150.0/exporter/kafkaexporter/README.md) | v0.150.0 |
 | [loadbalancingexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/loadbalancingexporter/v0.150.0/exporter/loadbalancingexporter/README.md) | v0.150.0 |
-| [nopexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/nopexporter/v0.149.0/exporter/nopexporter/README.md) | v0.149.0 |
+| [nopexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/nopexporter/v0.150.0/exporter/nopexporter/README.md) | v0.150.0 |
 | [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlpexporter/v0.150.0/exporter/otlpexporter/README.md) | v0.150.0 |
-| [otlphttpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlphttpexporter/v0.149.0/exporter/otlphttpexporter/README.md) | v0.149.0 |
+| [otlphttpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlphttpexporter/v0.150.0/exporter/otlphttpexporter/README.md) | v0.150.0 |
 
 ### Processors
 
@@ -103,7 +103,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.150.0/processor/geoipprocessor/README.md) | v0.150.0 |
 | [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.150.0/processor/k8sattributesprocessor/README.md) | v0.150.0 |
 | [logdedupprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/logdedupprocessor/v0.150.0/processor/logdedupprocessor/README.md) | v0.150.0 |
-| [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.149.0/processor/memorylimiterprocessor/README.md) | v0.149.0 |
+| [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.150.0/processor/memorylimiterprocessor/README.md) | v0.150.0 |
 | [ratelimitprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/ratelimitprocessor/v0.46.0/processor/ratelimitprocessor/README.md) | v0.46.0 |
 | [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.150.0/processor/resourcedetectionprocessor/README.md) | v0.150.0 |
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.150.0/processor/resourceprocessor/README.md) | v0.150.0 |
@@ -126,7 +126,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [healthcheckv2extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckv2extension/v0.150.0/extension/healthcheckv2extension/README.md) | v0.150.0 |
 | [k8sleaderelector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/k8sleaderelector/v0.150.0/extension/k8sleaderelector/README.md) | v0.150.0 |
 | [k8sobserver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/observer/k8sobserver/v0.150.0/extension/observer/k8sobserver/README.md) | v0.150.0 |
-| [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.149.0/extension/memorylimiterextension/README.md) | v0.149.0 |
+| [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.150.0/extension/memorylimiterextension/README.md) | v0.150.0 |
 | [opampextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/opampextension/v0.150.0/extension/opampextension/README.md) | v0.150.0 |
 | [pprofextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/pprofextension/v0.150.0/extension/pprofextension/README.md) | v0.150.0 |
 
@@ -135,7 +135,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.46.0/connector/elasticapmconnector/README.md) | v0.46.0 |
-| [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/blob/connector/forwardconnector/v0.149.0/connector/forwardconnector/README.md) | v0.149.0 |
+| [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/blob/connector/forwardconnector/v0.150.0/connector/forwardconnector/README.md) | v0.150.0 |
 | [otlpjsonconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/otlpjsonconnector/v0.150.0/connector/otlpjsonconnector/README.md) | v0.150.0 |
 | [profilingmetricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/profilingmetricsconnector/v0.46.0/connector/profilingmetricsconnector/README.md) | v0.46.0 |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.150.0/connector/routingconnector/README.md) | v0.150.0 |
