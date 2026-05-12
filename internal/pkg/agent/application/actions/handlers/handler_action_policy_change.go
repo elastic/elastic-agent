@@ -32,13 +32,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
-// actionSaver is a more limited version of the stateStore
-// It is used to ensure that all POLICY_CHANGE actions saved even when they are not acked.
-type actionSaver interface {
-	SetAction(fleetapi.Action)
-	Save() error
-}
-
 // PolicyDetailsSetter is implemented by components that need to be notified
 // of the most recently applied policy id and revision index, e.g. the fleet
 // gateway which includes them in subsequent checkin requests.
@@ -52,7 +45,7 @@ type PolicyChangeHandler struct {
 	agentInfo            info.Agent
 	config               *configuration.Configuration
 	store                storage.Store
-	actionSaver          actionSaver
+	stateStore           stateStore
 	ch                   chan coordinator.ConfigChange
 	setters              []actions.ClientSetter
 	policyDetailsSetters []PolicyDetailsSetter
@@ -71,7 +64,7 @@ func NewPolicyChangeHandler(
 	agentInfo info.Agent,
 	config *configuration.Configuration,
 	store storage.Store,
-	actionSaver actionSaver,
+	stateStore stateStore,
 	ch chan coordinator.ConfigChange,
 	policyLogLevelSetter logLevelSetter,
 	coordinator *coordinator.Coordinator,
@@ -82,7 +75,7 @@ func NewPolicyChangeHandler(
 		agentInfo:            agentInfo,
 		config:               config,
 		store:                store,
-		actionSaver:          actionSaver,
+		stateStore:           stateStore,
 		ch:                   ch,
 		setters:              setters,
 		coordinator:          coordinator,
@@ -139,7 +132,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 		return err
 	}
 
-	h.ch <- newPolicyChange(ctx, c, a, acker, false, h.actionSaver, h.policyDetailsSetters, h.disableAckFn())
+	h.ch <- newPolicyChange(ctx, h.log, c, a, acker, false, h.stateStore, h.policyDetailsSetters, h.disableAckFn())
 	return nil
 }
 
@@ -502,22 +495,24 @@ func fleetToReader(agentID string, headers map[string]string, cfg *configuration
 
 type policyChange struct {
 	ctx                  context.Context
+	log                  *logger.Logger
 	cfg                  *config.Config
 	action               fleetapi.Action
 	acker                acker.Acker
 	ackWatcher           chan struct{}
-	actionSaver          actionSaver
+	stateStore           stateStore
 	policyDetailsSetters []PolicyDetailsSetter
 	disableAck           bool
 }
 
 func newPolicyChange(
 	ctx context.Context,
+	log *logger.Logger,
 	config *config.Config,
 	action fleetapi.Action,
 	acker acker.Acker,
 	makeCh bool,
-	actionSaver actionSaver,
+	stateStore stateStore,
 	policyDetailsSetters []PolicyDetailsSetter,
 	disableAck bool) *policyChange {
 	var ackWatcher chan struct{}
@@ -527,11 +522,12 @@ func newPolicyChange(
 	}
 	return &policyChange{
 		ctx:                  ctx,
+		log:                  log,
 		cfg:                  config,
 		action:               action,
 		acker:                acker,
 		ackWatcher:           ackWatcher,
-		actionSaver:          actionSaver,
+		stateStore:           stateStore,
 		policyDetailsSetters: policyDetailsSetters,
 		disableAck:           disableAck,
 	}
@@ -541,18 +537,32 @@ func (l *policyChange) Config() *config.Config {
 	return l.cfg
 }
 
-// Ack sends an ack for the associated action if the results are expected.
-// An ack will be sent for UNENROLL actions, or by POLICY_CHANGE actions if it has not been explicitly disabled.
+// Ack is the post-apply hook called by the coordinator's ack chain.
+//
+// The work happens in three steps so that the error returned by Ack reflects
+// only Fleet-side ack failures, not local persistence failures (see
+// https://github.com/elastic/elastic-agent/issues/13677):
+//
+//  1. Send the network ack (unless explicitly disabled). A failure here
+//     propagates so the coordinator can retry.
+//  2. Persist the POLICY_CHANGE action to the state store and broadcast the
+//     policy id and revision to live consumers. Persistence failures are
+//     logged at warn level but do not propagate, so a transient disk hiccup
+//     does not masquerade as a Fleet ack failure.
+//  3. Commit the ack batch. Failures propagate.
 func (l *policyChange) Ack() error {
-	// Persist the action and broadcast its policy id and revision index to
-	// any registered setters (e.g. the fleet gateway) only after the policy
-	// has been successfully applied — Ack is the post-apply hook called by
-	// the coordinator's ack chain.
+	if !l.disableAck && l.action != nil {
+		if err := l.acker.Ack(l.ctx, l.action); err != nil {
+			return err
+		}
+	}
+
 	if pc, ok := l.action.(*fleetapi.ActionPolicyChange); ok && pc != nil {
-		if l.actionSaver != nil {
-			l.actionSaver.SetAction(pc)
-			if err := l.actionSaver.Save(); err != nil {
-				return err
+		if l.stateStore != nil {
+			l.stateStore.SetAction(pc)
+			if err := l.stateStore.Save(); err != nil && l.log != nil {
+				l.log.Warnw("failed to persist policy change action to state store",
+					"error.message", err)
 			}
 		}
 		id, rev := pc.PolicyID(), pc.PolicyRevisionIDX()
@@ -560,18 +570,17 @@ func (l *policyChange) Ack() error {
 			s.SetPolicyDetails(id, rev)
 		}
 	}
+
 	if l.disableAck || l.action == nil {
 		return nil
 	}
-	err := l.acker.Ack(l.ctx, l.action)
-	if err != nil {
+	if err := l.acker.Commit(l.ctx); err != nil {
 		return err
 	}
-	err = l.acker.Commit(l.ctx)
-	if err == nil && l.ackWatcher != nil {
+	if l.ackWatcher != nil {
 		close(l.ackWatcher)
 	}
-	return err
+	return nil
 }
 
 // WaitAck waits for policy change to be acked.

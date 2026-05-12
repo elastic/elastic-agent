@@ -424,7 +424,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		}
 	})
 
-	t.Run("when we ACK we save to disk", func(t *testing.T) {
+	t.Run("SetAction + Save persist the action", func(t *testing.T) {
 		ActionPolicyChange := &fleetapi.ActionPolicyChange{
 			ActionID: "abc123",
 		}
@@ -437,10 +437,10 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		require.NoError(t, err)
 		store.SetAckToken(ackToken)
 
-		acker := NewStateStoreActionAcker(&testAcker{}, store)
 		require.Empty(t, store.Action())
 
-		require.NoError(t, acker.Ack(context.Background(), ActionPolicyChange))
+		store.SetAction(ActionPolicyChange)
+		require.NoError(t, store.Save())
 		require.NotNil(t, store.Action(), "store should have an action stored")
 		require.Empty(t, store.Queue())
 		require.Equal(t, ackToken, store.AckToken())

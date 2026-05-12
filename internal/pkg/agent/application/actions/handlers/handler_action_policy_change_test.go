@@ -60,7 +60,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, &mockActionSaver{}, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, &mockStateStore{}, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -85,7 +85,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, &mockActionSaver{}, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, &mockStateStore{}, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -117,7 +117,7 @@ func TestPolicyAcked(t *testing.T) {
 				Policy: config,
 			},
 		}
-		mockSaver := newActionSaver()
+		mockSaver := newStateStoreMock()
 
 		// Test default FF value
 		cfg := configuration.DefaultConfiguration()
@@ -147,7 +147,7 @@ func TestPolicyAcked(t *testing.T) {
 				Policy: config,
 			},
 		}
-		mockSaver := newActionSaver()
+		mockSaver := newStateStoreMock()
 
 		cfg := configuration.DefaultConfiguration()
 		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
@@ -177,7 +177,7 @@ func TestPolicyAcked(t *testing.T) {
 				Policy: config,
 			},
 		}
-		mockSaver := newActionSaver()
+		mockSaver := newStateStoreMock()
 
 		cfg := configuration.DefaultConfiguration()
 		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
@@ -1177,22 +1177,39 @@ func nilLogLevelSet(t *testing.T) *mockLogLevelSetter {
 	return logLevelSetter
 }
 
-type mockActionSaver struct {
+// mockStateStore implements the package-local stateStore interface to spy on
+// SetAction/Save calls from the policy-change handler. The other accessors
+// return zero values since the handler only uses SetAction/Save.
+type mockStateStore struct {
 	mock.Mock
 }
 
-func (m *mockActionSaver) SetAction(a fleetapi.Action) {
+func (m *mockStateStore) SetAction(a fleetapi.Action) {
 	m.Called(a)
 }
 
-func (m *mockActionSaver) Save() error {
+func (m *mockStateStore) Save() error {
 	args := m.Called()
 	return args.Error(0)
 }
 
-func newActionSaver() *mockActionSaver {
-	mockSaver := &mockActionSaver{}
-	mockSaver.On("SetAction", mock.Anything).Return().Once()
-	mockSaver.On("Save").Return(nil).Once()
-	return mockSaver
+func (m *mockStateStore) AckToken() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+func (m *mockStateStore) SetAckToken(s string) {
+	m.Called(s)
+}
+
+func (m *mockStateStore) Action() fleetapi.Action {
+	args := m.Called()
+	return m.Get(0).(fleetapi.Action)
+}
+
+func newStateStoreMock() *mockStateStore {
+	s := &mockStateStore{}
+	s.On("SetAction", mock.Anything).Return().Once()
+	s.On("Save").Return(nil).Once()
+	return s
 }
