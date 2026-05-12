@@ -5,7 +5,6 @@
 package filesource
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -122,7 +121,7 @@ func TestContextProvider(t *testing.T) {
 	provider, err := builder(log, c, true)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx := t.Context()
 	comm := ctesting.NewContextComm(ctx)
 	setChan := make(chan map[string]interface{})
 	comm.CallOnSet(func(value map[string]interface{}) {
@@ -139,10 +138,7 @@ func TestContextProvider(t *testing.T) {
 		defer wg.Done()
 		_ = provider.Run(ctx, comm)
 	}()
-	t.Cleanup(func() {
-		cancel()
-		wg.Wait()
-	})
+	t.Cleanup(func() { wg.Wait() })
 
 	// wait for it to be called once
 	var current map[string]interface{}
