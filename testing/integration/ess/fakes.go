@@ -24,6 +24,7 @@ var fakeComponentPltfs = []string{
 	"linux/amd64",
 	"linux/arm64",
 	"windows/amd64",
+	"windows/arm64",
 }
 
 var fakeComponent = atesting.UsableComponent{
