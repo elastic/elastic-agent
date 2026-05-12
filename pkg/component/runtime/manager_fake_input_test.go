@@ -166,6 +166,10 @@ func (suite *FakeInputSuite) TestManager_Features() {
 
 				unit, ok := componentState.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
 				if !ok {
+					if componentState.State == client.UnitStateStarting {
+						// Units may not be populated yet during STARTING state; wait for next update.
+						continue
+					}
 					subscriptionErrCh <- errors.New("unit missing: fake-input")
 					return
 				}
