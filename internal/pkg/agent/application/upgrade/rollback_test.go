@@ -1098,3 +1098,39 @@ func TestLiveVersionedHome(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+// TestCleanup_AbortsWhenLiveHomeUnresolvable encodes the
+// refusal-to-proceed contract: when the symlink cannot be resolved, cleanup
+// must return an error and leave the on-disk state untouched rather than risk
+// deleting the live install based on a stale keep list. The resolve runs
+// before any destructive op so neither the versioned home nor the upgrade
+// marker may be mutated when the abort fires.
+func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
+	t.Run("removeMarker=false: error returned and versioned home untouched", func(t *testing.T) {
+		testLogger, _ := loggertest.New(t.Name())
+		topDir := t.TempDir()
+
+		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
+		err := cleanup(testLogger, topDir, false, false, 0, phantomHome)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot identify live versioned home")
+	})
+
+	t.Run("removeMarker=true: marker survives because resolve precedes CleanMarker", func(t *testing.T) {
+		testLogger, _ := loggertest.New(t.Name())
+		topDir := t.TempDir()
+
+		require.NoError(t, os.MkdirAll(paths.DataFrom(topDir), 0o750))
+		markerPath := filepath.Join(paths.DataFrom(topDir), markerFilename)
+		require.NoError(t, os.WriteFile(markerPath, []byte("placeholder upgrade marker"), 0o600),
+			"writing placeholder marker file")
+
+		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
+		err := cleanup(testLogger, topDir, true, false, 0, phantomHome)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot identify live versioned home")
+
+		assert.FileExists(t, markerPath,
+			"upgrade marker must survive an aborted cleanup (CleanMarker must not run before resolve)")
+	})
+}
