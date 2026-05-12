@@ -19,10 +19,14 @@ require (
 	github.com/elastic/cloud-on-k8s/v3 v3.4.0
 	github.com/elastic/elastic-agent-autodiscover v0.10.2
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-libs v0.40.0
+=======
+	github.com/elastic/elastic-agent-libs v0.42.2
+>>>>>>> ff91827fc (build(deps): bump the go-dependencies group across 1 directory with 4 updates (#14141))
 	github.com/elastic/elastic-agent-system-metrics v0.14.3
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
-	github.com/elastic/go-elasticsearch/v8 v8.19.5
+	github.com/elastic/go-elasticsearch/v8 v8.19.6
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.4
 	github.com/elastic/go-ucfg v0.9.1
@@ -84,7 +88,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/gotestsum v1.13.0
-	helm.sh/helm/v3 v3.19.5
+	helm.sh/helm/v3 v3.20.2
 	howett.net/plist v1.0.1
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
@@ -116,7 +120,13 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
+<<<<<<< HEAD
 	github.com/BurntSushi/toml v1.5.0 // indirect
+=======
+	github.com/BurntSushi/toml v1.6.0 // indirect
+	github.com/DefangLabs/secret-detector v0.0.0-20250403165618-22662109213e // indirect
+	github.com/IBM/sarama v1.47.0 // indirect
+>>>>>>> ff91827fc (build(deps): bump the go-dependencies group across 1 directory with 4 updates (#14141))
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
@@ -132,7 +142,17 @@ require (
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
+<<<<<<< HEAD
 	github.com/containerd/containerd v1.7.29 // indirect
+=======
+	github.com/cilium/ebpf v0.21.0 // indirect
+	github.com/compose-spec/compose-go/v2 v2.10.2 // indirect
+	github.com/containerd/console v1.0.5 // indirect
+	github.com/containerd/containerd v1.7.30 // indirect
+	github.com/containerd/containerd/api v1.10.0 // indirect
+	github.com/containerd/containerd/v2 v2.2.2 // indirect
+	github.com/containerd/continuity v0.4.5 // indirect
+>>>>>>> ff91827fc (build(deps): bump the go-dependencies group across 1 directory with 4 updates (#14141))
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -146,6 +166,13 @@ require (
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
+<<<<<<< HEAD
+=======
+	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203 // indirect
+	github.com/elastic/go-docappender/v2 v2.14.1 // indirect
+	github.com/elastic/go-freelru v0.16.0 // indirect
+	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
+>>>>>>> ff91827fc (build(deps): bump the go-dependencies group across 1 directory with 4 updates (#14141))
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
@@ -242,7 +269,12 @@ require (
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+<<<<<<< HEAD
 	github.com/rubenv/sql-migrate v1.8.0 // indirect
+=======
+	github.com/rs/cors v1.11.1 // indirect
+	github.com/rubenv/sql-migrate v1.8.1 // indirect
+>>>>>>> ff91827fc (build(deps): bump the go-dependencies group across 1 directory with 4 updates (#14141))
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
@@ -320,11 +352,17 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260406210006-6f92a3bedf2d // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+<<<<<<< HEAD
 	k8s.io/apiextensions-apiserver v0.35.0 // indirect
 	k8s.io/apiserver v0.35.0 // indirect
+=======
+	gotest.tools/v3 v3.5.2 // indirect
+	k8s.io/apiextensions-apiserver v0.35.1 // indirect
+	k8s.io/apiserver v0.35.1 // indirect
+>>>>>>> ff91827fc (build(deps): bump the go-dependencies group across 1 directory with 4 updates (#14141))
 	k8s.io/component-base v0.35.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect
-	k8s.io/kubectl v0.34.2 // indirect
+	k8s.io/kubectl v0.35.1 // indirect
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect
 	kernel.org/pub/linux/libs/security/libcap/psx v1.2.77 // indirect
 	oras.land/oras-go/v2 v2.6.0 // indirect
