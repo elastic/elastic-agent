@@ -30,9 +30,6 @@ const (
 	maxRetriesloadAgentInfo = 5
 )
 
-// persistentAgentInfo is the on-disk shape of the `agent.*` section of the
-// encrypted agent config file. Fields are flat (dotted) ucfg/yaml paths so
-// that they round-trip through ucfg without changing the on-disk layout.
 type persistentAgentInfo struct {
 	ID               string                                 `json:"id" yaml:"id" config:"id"`
 	Headers          map[string]string                      `json:"headers" yaml:"headers" config:"headers"`

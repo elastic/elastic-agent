@@ -207,7 +207,7 @@ func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}
 	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
 
 	// Agent
-	meta[agentIDKey] = i.AgentID
+	meta[agentIDKey] = i.agentID
 	meta[agentVersionKey] = release.Version()
 
 	// Host

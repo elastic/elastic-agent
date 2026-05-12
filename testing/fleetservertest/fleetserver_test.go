@@ -81,7 +81,7 @@ func TestRunFleetServer(t *testing.T) {
 
 		switch actionsIdx {
 		case 0:
-			return CheckinAction{ //nolint:gosec // test fixture, not a real token
+			return CheckinAction{
 					AckToken: "tmpl.AckToken", Actions: []string{action.data}},
 				nil
 		}

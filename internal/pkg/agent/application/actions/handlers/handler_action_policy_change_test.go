@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -21,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
@@ -1114,24 +1116,31 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 
 func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *testing.T) {
 	tests := []struct {
-		name          string
-		policyLevel   string
-		expectedLevel logp.Level
+		name                 string
+		policyLevel          string
+		overrideLevel        string
+		expectedRuntimeLevel logp.Level
 	}{
 		{
-			name:          "error level is persisted to h.config",
-			policyLevel:   "error",
-			expectedLevel: logp.ErrorLevel,
+			name:                 "error level is persisted to h.config",
+			policyLevel:          "error",
+			expectedRuntimeLevel: logp.ErrorLevel,
 		},
 		{
-			name:          "debug level is persisted to h.config",
-			policyLevel:   "debug",
-			expectedLevel: logp.DebugLevel,
+			name:                 "debug level is persisted to h.config",
+			policyLevel:          "debug",
+			expectedRuntimeLevel: logp.DebugLevel,
 		},
 		{
-			name:          "warning level is persisted to h.config",
-			policyLevel:   "warning",
-			expectedLevel: logp.WarnLevel,
+			name:                 "warning level is persisted to h.config",
+			policyLevel:          "warning",
+			expectedRuntimeLevel: logp.WarnLevel,
+		},
+		{
+			name:                 "per-agent override survives policy change and is persisted",
+			policyLevel:          "info",
+			overrideLevel:        "warning",
+			expectedRuntimeLevel: logp.WarnLevel,
 		},
 	}
 
@@ -1139,14 +1148,23 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *tes
 		t.Run(tt.name, func(t *testing.T) {
 			log, _ := loggertest.New(tt.name)
 
+			runtime := tt.expectedRuntimeLevel
 			mockLogSetter := newMockLogLevelSetter(t)
-			mockLogSetter.EXPECT().SetLogLevel(mock.Anything, mock.Anything).Return(nil).Once()
+			mockLogSetter.EXPECT().SetLogLevel(mock.Anything, &runtime).Return(nil).Once()
 
+			mockAgent := info.NewMockAgent(t)
+			mockAgent.EXPECT().SetLogLevelPolicy(tt.policyLevel).Return().Once()
+			mockAgent.EXPECT().GetLogLevelRuntime().Return(runtime.String()).Once()
+			mockAgent.EXPECT().AgentID().Return("agent-id").Once()
+			mockAgent.EXPECT().Headers().Return(nil).Once()
+			mockAgent.EXPECT().GetLogLevelOverride().Return(tt.overrideLevel).Once()
+
+			capture := &captureStore{}
 			h := &PolicyChangeHandler{
 				log:                   log,
-				agentInfo:             &info.AgentInfo{},
+				agentInfo:             mockAgent,
 				config:                configuration.DefaultConfiguration(),
-				store:                 &storage.NullStore{},
+				store:                 capture,
 				runtimeLogLevelSetter: mockLogSetter,
 			}
 
@@ -1156,10 +1174,42 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *tes
 			err := h.handlePolicyChange(context.Background(), cfg)
 			require.NoError(t, err)
 
-			assert.Equal(t, tt.expectedLevel, h.config.Settings.LoggingConfig.Level,
+			var policyLvl logp.Level
+			require.NoError(t, policyLvl.Unpack(tt.policyLevel))
+			assert.Equal(t, policyLvl, h.config.Settings.LoggingConfig.Level,
 				"h.config.Settings.LoggingConfig.Level should be updated to the policy log level")
+
+			require.NotEmpty(t, capture.saved, "saveConfig should have written to the store")
+			var got map[string]any
+			require.NoError(t, yaml.Unmarshal(capture.saved, &got))
+			agentSection, ok := got["agent"].(map[any]any)
+			require.True(t, ok, "saved yaml must contain agent section")
+			assert.Equal(t, tt.policyLevel, agentSection["logging.level"], "agent.logging.level should be persisted to fleet.enc")
+
+			override, present := agentSection["logging.level_override"]
+			if tt.overrideLevel != "" {
+				assert.True(t, present, "agent.logging.level_override should be persisted when AgentInfo holds an override")
+				assert.Equal(t, tt.overrideLevel, override)
+			} else {
+				assert.False(t, present, "agent.logging.level_override should not be persisted when AgentInfo holds no override")
+			}
 		})
 	}
+}
+
+// captureStore is a storage.Store that records the bytes passed to Save so a
+// test can assert on the yaml that fleetToReader produced.
+type captureStore struct {
+	saved []byte
+}
+
+func (c *captureStore) Save(r io.Reader) error {
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	c.saved = b
+	return nil
 }
 
 func defaultLogLevelSet(t *testing.T) *mockLogLevelSetter {
