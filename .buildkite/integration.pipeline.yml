@@ -173,7 +173,7 @@ steps:
         - .buildkite/**
         - magefile.go
         - dev-tools/**
-        - "{**.go,go.{mod,sum}}"
+        - "go.{mod,sum}"
 
   ## Branches
   - label: "Triggering custom FIPS integration tests (branches)"
