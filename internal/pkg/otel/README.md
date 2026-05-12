@@ -46,10 +46,6 @@ This section provides a summary of components included in the Elastic Distributi
 | [kubeletstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kubeletstatsreceiver/v0.150.0/receiver/kubeletstatsreceiver/README.md) | v0.150.0 |
 | [nginxreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/nginxreceiver/v0.150.0/receiver/nginxreceiver/README.md) | v0.150.0 |
 | [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.150.0/receiver/nopreceiver/README.md) | v0.150.0 |
-<<<<<<< HEAD:internal/pkg/otel/README.md
-=======
-| [oracledbreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/oracledbreceiver/v0.150.0/receiver/oracledbreceiver/README.md) | v0.150.0 |
->>>>>>> bf11990b9 (Fix update-otel.sh to correctly update all dependency versions (#14162)):internal/edot/README.md
 | [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.150.0/receiver/otlpreceiver/README.md) | v0.150.0 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.150.0/receiver/prometheusreceiver/README.md) | v0.150.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.150.0/receiver/receivercreator/README.md) | v0.150.0 |
@@ -82,13 +78,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.150.0/processor/filterprocessor/README.md) | v0.150.0 |
 | [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.150.0/processor/geoipprocessor/README.md) | v0.150.0 |
 | [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.150.0/processor/k8sattributesprocessor/README.md) | v0.150.0 |
-<<<<<<< HEAD:internal/pkg/otel/README.md
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.150.0/processor/memorylimiterprocessor/README.md) | v0.150.0 |
-=======
-| [logdedupprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/logdedupprocessor/v0.150.0/processor/logdedupprocessor/README.md) | v0.150.0 |
-| [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.150.0/processor/memorylimiterprocessor/README.md) | v0.150.0 |
-| [ratelimitprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/ratelimitprocessor/v0.46.0/processor/ratelimitprocessor/README.md) | v0.46.0 |
->>>>>>> bf11990b9 (Fix update-otel.sh to correctly update all dependency versions (#14162)):internal/edot/README.md
 | [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.150.0/processor/resourcedetectionprocessor/README.md) | v0.150.0 |
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.150.0/processor/resourceprocessor/README.md) | v0.150.0 |
 | [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.150.0/processor/transformprocessor/README.md) | v0.150.0 |
@@ -108,10 +98,6 @@ This section provides a summary of components included in the Elastic Distributi
 | [k8sleaderelector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/k8sleaderelector/v0.150.0/extension/k8sleaderelector/README.md) | v0.150.0 |
 | [k8sobserver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/observer/k8sobserver/v0.150.0/extension/observer/k8sobserver/README.md) | v0.150.0 |
 | [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.150.0/extension/memorylimiterextension/README.md) | v0.150.0 |
-<<<<<<< HEAD:internal/pkg/otel/README.md
-=======
-| [opampextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/opampextension/v0.150.0/extension/opampextension/README.md) | v0.150.0 |
->>>>>>> bf11990b9 (Fix update-otel.sh to correctly update all dependency versions (#14162)):internal/edot/README.md
 | [pprofextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/pprofextension/v0.150.0/extension/pprofextension/README.md) | v0.150.0 |
 
 ### Connectors
@@ -120,11 +106,6 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.46.0/connector/elasticapmconnector/README.md) | v0.46.0 |
 | [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/blob/connector/forwardconnector/v0.150.0/connector/forwardconnector/README.md) | v0.150.0 |
-<<<<<<< HEAD:internal/pkg/otel/README.md
-=======
-| [otlpjsonconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/otlpjsonconnector/v0.150.0/connector/otlpjsonconnector/README.md) | v0.150.0 |
-| [profilingmetricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/profilingmetricsconnector/v0.46.0/connector/profilingmetricsconnector/README.md) | v0.46.0 |
->>>>>>> bf11990b9 (Fix update-otel.sh to correctly update all dependency versions (#14162)):internal/edot/README.md
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.150.0/connector/routingconnector/README.md) | v0.150.0 |
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.150.0/connector/spanmetricsconnector/README.md) | v0.150.0 |
 ## Persistence in OpenTelemetry Collector
