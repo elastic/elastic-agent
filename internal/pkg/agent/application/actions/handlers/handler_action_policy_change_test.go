@@ -1178,8 +1178,7 @@ func nilLogLevelSet(t *testing.T) *mockLogLevelSetter {
 }
 
 // mockStateStore implements the package-local stateStore interface to spy on
-// SetAction/Save calls from the policy-change handler. The other accessors
-// return zero values since the handler only uses SetAction/Save.
+// SetAction/Save calls from the policy-change handler.
 type mockStateStore struct {
 	mock.Mock
 }
@@ -1204,7 +1203,7 @@ func (m *mockStateStore) SetAckToken(s string) {
 
 func (m *mockStateStore) Action() fleetapi.Action {
 	args := m.Called()
-	return m.Get(0).(fleetapi.Action)
+	return args.Get(0).(fleetapi.Action)
 }
 
 func newStateStoreMock() *mockStateStore {

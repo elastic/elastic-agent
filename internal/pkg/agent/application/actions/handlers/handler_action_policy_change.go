@@ -543,20 +543,14 @@ func (l *policyChange) Config() *config.Config {
 // only Fleet-side ack failures, not local persistence failures (see
 // https://github.com/elastic/elastic-agent/issues/13677):
 //
-//  1. Send the network ack (unless explicitly disabled). A failure here
-//     propagates so the coordinator can retry.
-//  2. Persist the POLICY_CHANGE action to the state store and broadcast the
+//  1. Persist the POLICY_CHANGE action to the state store and broadcast the
 //     policy id and revision to live consumers. Persistence failures are
 //     logged at warn level but do not propagate, so a transient disk hiccup
 //     does not masquerade as a Fleet ack failure.
+//  2. Send the network ack (unless explicitly disabled). A failure here
+//     propagates so the coordinator can retry.
 //  3. Commit the ack batch. Failures propagate.
 func (l *policyChange) Ack() error {
-	if !l.disableAck && l.action != nil {
-		if err := l.acker.Ack(l.ctx, l.action); err != nil {
-			return err
-		}
-	}
-
 	if pc, ok := l.action.(*fleetapi.ActionPolicyChange); ok && pc != nil {
 		if l.stateStore != nil {
 			l.stateStore.SetAction(pc)
@@ -571,15 +565,18 @@ func (l *policyChange) Ack() error {
 		}
 	}
 
-	if l.disableAck || l.action == nil {
-		return nil
+	if !l.disableAck && l.action != nil {
+		if err := l.acker.Ack(l.ctx, l.action); err != nil {
+			return err
+		}
+		if err := l.acker.Commit(l.ctx); err != nil {
+			return err
+		}
+		if l.ackWatcher != nil {
+			close(l.ackWatcher)
+		}
 	}
-	if err := l.acker.Commit(l.ctx); err != nil {
-		return err
-	}
-	if l.ackWatcher != nil {
-		close(l.ackWatcher)
-	}
+
 	return nil
 }
 
