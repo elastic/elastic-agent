@@ -23,6 +23,7 @@ current_beta_core=$(grep 'go\.opentelemetry\.io/collector/receiver/otlpreceiver 
 current_stable_core=$(grep 'go\.opentelemetry\.io/collector/confmap/provider/fileprovider v' internal/edot/go.mod | cut -d' ' -f 2 || true)
 current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v' internal/edot/go.mod | cut -d' ' -f 2 || true)
 
+<<<<<<< HEAD
 [[ -n "$current_beta_core" ]] || (echo "Error: couldn't find current beta core version." && exit 2)
 [[ -n "$current_stable_core" ]] || (echo "Error: couldn't find current stable core version" && exit 3)
 [[ -n "$current_contrib" ]] || (echo "Error: couldn't find current contrib version" && exit 4)
@@ -34,6 +35,19 @@ sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_beta_core/\1 $next
 sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_stable_core/\1 $next_stable_core/" internal/edot/go.mod
 sed -i.bak "s/\(github\.com\/open-telemetry\/opentelemetry\-collector\-contrib\/.*\) $current_contrib/\1 $next_contrib/" internal/edot/go.mod
 rm internal/edot/go.mod.bak
+=======
+for gomod_file in "${GOMOD_FILES[@]}"; do
+  echo "=> Updating core to $next_beta_core/$next_stable_core in $gomod_file"
+  echo "=> Updating contrib to $next_contrib in $gomod_file"
+
+  # Rewrite every collector/contrib line to the target version regardless of its current value (release or pseudo-version).
+  # `replace` directives (lines containing `=>`) are left alone so deliberate pins are preserved.
+  sed -i.bak -E "/=>/!s|(go\\.opentelemetry\\.io/collector[^[:space:]]*) v0\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.+-]*)?|\\1 $next_beta_core|" "$gomod_file"
+  sed -i.bak -E "/=>/!s|(go\\.opentelemetry\\.io/collector[^[:space:]]*) v1\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.+-]*)?|\\1 $next_stable_core|" "$gomod_file"
+  sed -i.bak -E "/=>/!s|(github\\.com/open-telemetry/opentelemetry-collector-contrib/[^[:space:]]*) v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.+-]*)?|\\1 $next_contrib|" "$gomod_file"
+  rm "${gomod_file}.bak"
+done
+>>>>>>> bf11990b9 (Fix update-otel.sh to correctly update all dependency versions (#14162))
 
 # Update elastic/opentelemetry-collector-components in internal/edot/go.mod.
 # Find the latest release of each submodule whose go.mod uses the new OTel versions.

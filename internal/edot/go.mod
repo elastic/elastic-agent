@@ -37,6 +37,10 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
+<<<<<<< HEAD
+=======
+	go.opentelemetry.io/collector/component/componenttest v0.150.0
+>>>>>>> bf11990b9 (Fix update-otel.sh to correctly update all dependency versions (#14162))
 	go.opentelemetry.io/collector/connector/forwardconnector v0.150.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.150.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.150.0
@@ -58,8 +62,21 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
+<<<<<<< HEAD
 	github.com/elastic/apm-data v1.21.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.47.0 // indirect
+=======
+	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
+	github.com/elastic/ebpfevents v0.8.0 // indirect
+	github.com/elastic/entcollect v0.0.0-20260501012805-5fd94422b104 // indirect
+	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
+	github.com/elastic/go-licenser v0.4.2 // indirect
+	github.com/elastic/go-quark v0.3.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.47.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
+	github.com/elastic/tk-btf v0.2.0 // indirect
+	github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb // indirect
+>>>>>>> bf11990b9 (Fix update-otel.sh to correctly update all dependency versions (#14162))
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.5 // indirect
 	github.com/go-openapi/swag/conv v0.25.5 // indirect
@@ -126,7 +143,11 @@ require (
 	go.opentelemetry.io/collector/confmap/provider/envprovider v1.56.0
 	go.opentelemetry.io/collector/confmap/provider/fileprovider v1.56.0
 	go.opentelemetry.io/collector/confmap/provider/httpprovider v1.56.0
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.45.0
+=======
+	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.56.0
+>>>>>>> bf11990b9 (Fix update-otel.sh to correctly update all dependency versions (#14162))
 	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.56.0
 	go.opentelemetry.io/collector/connector v0.150.0
 	go.opentelemetry.io/collector/exporter v1.56.0
