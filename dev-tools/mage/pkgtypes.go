@@ -961,7 +961,7 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path comes from filepath.Walk on trusted build inputs, no user-controlled symlink attack surface
 		if err != nil {
 			return err
 		}
@@ -1044,7 +1044,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path comes from filepath.WalkDir on trusted build inputs, no user-controlled symlink attack surface
 		if err != nil {
 			return err
 		}
