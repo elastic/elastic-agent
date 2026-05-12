@@ -133,6 +133,69 @@ The new process looks like this:
   - we invoke the new agent binary if the new version > 8.13.0
 - Shutdown current agent and its command components, copy components state once again and restart
 
+### Marker reconciliation on startup
+
+In addition to the in-flight upgrade flow shown above, the agent reconciles
+any on-disk upgrade marker against the running version when it starts up
+([`cmd.handleUpgrade`](../internal/pkg/agent/cmd/run.go)). This handles
+cases where an upgrade was interrupted before reaching re-exec, leaving a
+stale marker behind, or where a previous boot wrote a terminal-state marker
+that needs to be cleaned up.
+
+The classifier compares the running agent's commit hash
+([`release.Commit`](../internal/pkg/release/version.go)) against
+`marker.Hash` and `marker.PrevHash` (truncated to `HashLen = 6`; see
+[`UpdateMarker.IsTarget` / `IsPrevious`](../internal/pkg/agent/application/upgrade/step_mark.go)).
+Five outcomes:
+
+1. **No marker on disk** — nothing to do.
+2. **Marker is terminal (`Completed`/`Rollback`/`Failed`) and `Acked`** —
+   leftover bookkeeping; remove it.
+3. **Running agent matches `marker.Hash`** — we are the upgrade target. Run
+   normal post-upgrade housekeeping (install marker, service config,
+   Windows uninstall registry entry).
+4. **Running agent matches `marker.PrevHash`** — two sub-cases:
+   - **Marker already terminal** (e.g. set to `Rollback` by the watcher on
+     a previous boot, or `Failed` by a prior reconcile pass): return the
+     marker so the coordinator can finish reporting to Fleet; no physical
+     work to redo.
+   - **Marker not yet terminal**: the on-disk state is inconsistent with
+     the running agent.
+     [`ReconcileMismatchedUpgrade`](../internal/pkg/agent/application/upgrade/reconcile.go)
+     aligns the symlink and `active.commit` to the running install, removes
+     the partial new versioned home referenced by the marker, and rewrites
+     the marker as `state=Failed` so the failure is reportable to Fleet via
+     the normal upgrade-details path. The marker is removed on a subsequent
+     boot once Fleet acks it.
+5. **Running agent matches neither** — discard the marker as stale; do
+   not touch any versioned homes.
+
+The reconcile path also runs synchronously inside `Upgrade()`'s rollback
+paths ([`(Upgrader).abortUpgrade`](../internal/pkg/agent/application/upgrade/reconcile.go))
+so that an aborted upgrade transitions to `state=Failed` immediately rather
+than waiting for the next agent restart. The on-startup classifier is the
+safety net for cases where the synchronous path didn't run (process killed,
+cleanup itself failed, marker from an older agent version that didn't have
+this logic).
+
+### Cleanup safety guarantee
+
+[`upgrade.cleanup`](../internal/pkg/agent/application/upgrade/rollback.go)
+always preserves the versioned home that the top-level agent symlink
+resolves to, regardless of what keep list the caller provides. This is a
+structural backstop on top of the TTL-based rollback retention
+(`marker.RollbacksAvailable`): the symlink is the single source of truth
+for "the binary the daemon will launch on next start," and that directory
+must always survive cleanup. See
+[`liveVersionedHome`](../internal/pkg/agent/application/upgrade/step_relink.go)
+and the guard at the top of the cleanup loop in
+[`rollback.go`](../internal/pkg/agent/application/upgrade/rollback.go).
+
+This protects the live install against a caller-supplied keep list that
+references directories no longer on disk — the failure mode that could
+otherwise have caused cleanup to delete every versioned home except a
+missing one.
+
 ### Windows Add/Remove Programs registry entry
 
 Starting from version 9.4.0, Elastic Agent creates an entry in the Windows

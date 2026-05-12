@@ -265,3 +265,64 @@ func TestMarkUpgrade(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateMarker_IsTarget_IsPrevious(t *testing.T) {
+	const (
+		targetHash = "aaaaaa"
+		prevHash   = "bbbbbb"
+	)
+	marker := &UpdateMarker{Hash: targetHash, PrevHash: prevHash}
+
+	tests := []struct {
+		name        string
+		runningHash string
+		wantTarget  bool
+		wantPrev    bool
+	}{
+		{
+			name:        "matches target",
+			runningHash: targetHash,
+			wantTarget:  true,
+		},
+		{
+			name:        "matches previous",
+			runningHash: prevHash,
+			wantPrev:    true,
+		},
+		{
+			name:        "matches neither",
+			runningHash: "cccccc",
+		},
+		{
+			name:        "long running hash truncated to target",
+			runningHash: targetHash + "0123456789abcdef",
+			wantTarget:  true,
+		},
+		{
+			name:        "long running hash truncated to prev",
+			runningHash: prevHash + "0123456789abcdef",
+			wantPrev:    true,
+		},
+		{
+			name:        "empty running hash matches nothing",
+			runningHash: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.wantTarget, marker.IsTarget(tc.runningHash))
+			assert.Equal(t, tc.wantPrev, marker.IsPrevious(tc.runningHash))
+		})
+	}
+}
+
+func TestUpdateMarker_IsTarget_IsPrevious_EmptyMarkerHashes(t *testing.T) {
+	// A marker with empty hashes must never match anything, including an
+	// empty runningHash. Without this guard, "" == um.Hash would be true.
+	marker := &UpdateMarker{}
+	assert.False(t, marker.IsTarget(""))
+	assert.False(t, marker.IsPrevious(""))
+	assert.False(t, marker.IsTarget("aaaaaa"))
+	assert.False(t, marker.IsPrevious("aaaaaa"))
+}

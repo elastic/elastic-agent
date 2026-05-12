@@ -79,24 +79,15 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 
 	settings := NewRollbackSettings(opts...)
 
-	symlinkPath := filepath.Join(topDirPath, AgentName)
-
 	if prevVersionedHome == "" {
 		// fallback for upgrades that didn't use the manifest and path remapping
 		hashedDir := fmt.Sprintf("%s-%s", AgentName, prevHash)
 		prevVersionedHome = filepath.Join("data", hashedDir)
 	}
 
-	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
-	symlinkTarget := paths.BinaryPath(filepath.Join(topDirPath, prevVersionedHome), AgentName)
-
-	// change symlink
-	if err := changeSymlink(log, topDirPath, symlinkPath, symlinkTarget); err != nil {
-		return err
-	}
-
-	// revert active commit
-	if err := UpdateActiveCommit(log, topDirPath, prevHash, os.WriteFile); err != nil {
+	// Repoint the top-level symlink at the previous install and revert
+	// active.commit to its hash.
+	if err := AlignActiveInstall(log, topDirPath, prevVersionedHome, prevHash); err != nil {
 		return err
 	}
 
@@ -198,6 +189,33 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 			relHomePath = h
 		}
 		relativeHomePaths = append(relativeHomePaths, relHomePath)
+	}
+
+	// Always preserve the versioned home that the top-level agent symlink
+	// resolves to, regardless of what the caller passed in
+	// versionedHomesToKeep. This closes the data-loss hazard described in
+	// https://github.com/elastic/elastic-agent/issues/13505: if a caller's
+	// keep list is built from a stale marker.VersionedHome that no longer
+	// exists on disk, cleanup would otherwise treat the live install as
+	// "not in keep" and delete it.
+	//
+	// The TTL-based rollback retention (marker.RollbacksAvailable) covers
+	// the homes operators explicitly want to keep across an upgrade. This
+	// guard is the structural backstop on top of that — the symlink is the
+	// single source of truth for "the binary the daemon will launch on
+	// next start," and that directory must always survive cleanup.
+	if liveHome, err := liveVersionedHome(topDirPath); err == nil {
+		liveBasename, basenameErr := filepath.Rel(dataDirPath, filepath.Join(topDirPath, liveHome))
+		if basenameErr != nil {
+			log.Warnw("could not compute live versioned home basename; cleanup proceeds without protection",
+				"error.message", basenameErr.Error())
+		} else if !slices.Contains(relativeHomePaths, liveBasename) {
+			log.Infof("adding live versioned home %q to keep list", liveBasename)
+			relativeHomePaths = append(relativeHomePaths, liveBasename)
+		}
+	} else {
+		log.Warnw("could not derive live versioned home; cleanup proceeds without protection",
+			"error.message", err.Error())
 	}
 
 	log.Infof("Starting cleanup of versioned homes. Keeping: %v", relativeHomePaths)

@@ -502,8 +502,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		previous, // old agent version data
 		action, det, availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
-		return nil, goerrors.Join(err, rollbackErr)
+		abortErr := u.abortUpgrade(ctx, hashedDir, currentVersionedHome)
+		return nil, goerrors.Join(err, abortErr)
 	}
 
 	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(paths.Top(), previous, current)
@@ -511,15 +511,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	var watcherCmd *exec.Cmd
 	if watcherCmd, err = u.watcherHelper.InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
-		return nil, goerrors.Join(err, rollbackErr)
+		abortErr := u.abortUpgrade(ctx, hashedDir, currentVersionedHome)
+		return nil, goerrors.Join(err, abortErr)
 	}
 
 	watcherWaitErr := u.watcherHelper.WaitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
 	if watcherWaitErr != nil {
 		killWatcherErr := watcherCmd.Process.Kill()
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
-		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, rollbackErr)
+		abortErr := u.abortUpgrade(ctx, hashedDir, currentVersionedHome)
+		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, abortErr)
 	}
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, filepath.Join(paths.Top(), unpackRes.VersionedHome))

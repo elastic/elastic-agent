@@ -137,17 +137,13 @@ type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, wr
 func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
 	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
 
-		if len(previousAgent.hash) > HashLen {
-			previousAgent.hash = previousAgent.hash[:HashLen]
-		}
-
 		marker := &UpdateMarker{
 			Version:            agent.version,
-			Hash:               agent.hash,
+			Hash:               truncateHash(agent.hash),
 			VersionedHome:      agent.versionedHome,
 			UpdatedOn:          updatedOn,
 			PrevVersion:        previousAgent.version,
-			PrevHash:           previousAgent.hash,
+			PrevHash:           truncateHash(previousAgent.hash),
 			PrevVersionedHome:  previousAgent.versionedHome,
 			Action:             action,
 			Details:            upgradeDetails,
@@ -280,4 +276,29 @@ func IsTerminalState(marker *UpdateMarker) bool {
 	default:
 		return false
 	}
+}
+
+// IsTarget reports whether runningHash matches the upgrade target recorded in
+// the marker (the version the upgrade was advancing to). runningHash is
+// truncated to HashLen because marker.Hash is stored truncated (see
+// markUpgradeProvider).
+func (um *UpdateMarker) IsTarget(runningHash string) bool {
+	return um.Hash != "" && truncateHash(runningHash) == um.Hash
+}
+
+// IsPrevious reports whether runningHash matches the previous version recorded
+// in the marker (the version the upgrade was advancing from). runningHash is
+// truncated to HashLen because marker.Hash is stored truncated (see
+// markUpgradeProvider).
+func (um *UpdateMarker) IsPrevious(runningHash string) bool {
+	return um.PrevHash != "" && truncateHash(runningHash) == um.PrevHash
+}
+
+// truncateHash truncates hash to HashLen, matching the format the upgrade
+// marker stores commit hashes in.
+func truncateHash(hash string) string {
+	if len(hash) > HashLen {
+		return hash[:HashLen]
+	}
+	return hash
 }

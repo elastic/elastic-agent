@@ -230,7 +230,7 @@ func runElasticAgentCritical(
 	l := baseLogger.With("log.source", agentName)
 
 	// handleUpgrade, but don't error yet
-	initialUpdateMarker, err = handleUpgrade(l)
+	initialUpdateMarker, err = handleUpgrade(ctx, l)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to handle upgrade: %w", err))
 	}
@@ -813,10 +813,23 @@ func setupMetrics(
 	return s, nil
 }
 
-// handleUpgrade checks if agent is being run as part of an
-// ongoing upgrade operation, i.e. being re-exec'd and performs
-// any upgrade-specific work, if needed.
-func handleUpgrade(log *logger.Logger) (*upgrade.UpdateMarker, error) {
+// handleUpgrade reconciles any on-disk upgrade marker with the version of the
+// agent that is actually running, and performs the appropriate cleanup or
+// post-upgrade work before the daemon proceeds.
+//
+// If there is no marker on disk, returns (nil, nil). Otherwise:
+//
+//  1. Marker in terminal state and acked: leftover bookkeeping; remove it.
+//  2. Running agent matches marker.Hash (the upgrade target): run post-upgrade
+//     housekeeping.
+//  3. Running agent matches marker.PrevHash:
+//     a. Marker in terminal state: return it so the coordinator can finish
+//     reporting; no physical work to do.
+//     b. Marker not yet terminal: on-disk state is inconsistent with the
+//     running agent; reconcile it and rewrite the marker with
+//     state=Failed so the mismatch is reported to Fleet.
+//  4. Running agent matches neither: discard the marker.
+func handleUpgrade(ctx context.Context, log *logger.Logger) (*upgrade.UpdateMarker, error) {
 	upgradeMarker, err := upgrade.LoadMarker(paths.Data())
 	if err != nil {
 		return nil, fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
@@ -827,12 +840,59 @@ func handleUpgrade(log *logger.Logger) (*upgrade.UpdateMarker, error) {
 		return nil, nil
 	}
 
+	if upgrade.IsTerminalState(upgradeMarker) && upgradeMarker.Acked {
+		log.Infow("removing acked terminal-state upgrade marker")
+		return nil, upgrade.CleanMarker(log, paths.Data())
+	}
+
+	runningHash := release.Commit()
+	switch {
+	// We are the upgrade target; post-upgrade housekeeping is needed
+	case upgradeMarker.IsTarget(runningHash):
+		return upgradeMarker, postUpgradeHousekeeping(log, upgradeMarker)
+
+	// Running agent matches marker.PrevHash. Either the marker is already in a
+	// terminal state from an earlier pass (waiting for coordinator ack), or the
+	// on-disk state is inconsistent with the running agent and needs to be
+	// reconciled.
+	case upgradeMarker.IsPrevious(runningHash):
+		if upgrade.IsTerminalState(upgradeMarker) {
+			// Marker is already terminal; coordinator hasn't acked yet. Return
+			// it so reporting can complete; nothing physical to redo.
+			return upgradeMarker, nil
+		}
+		log.Warnw("running agent matches marker.PrevHash; reconciling on-disk state",
+			"marker.hash", upgradeMarker.Hash, "marker.prev_hash", upgradeMarker.PrevHash,
+			"marker.version", upgradeMarker.Version, "marker.prev_version", upgradeMarker.PrevVersion,
+			"running.hash", runningHash)
+
+		homeRelPath, relErr := filepath.Rel(paths.Top(), paths.Home())
+		if relErr != nil {
+			return upgradeMarker, fmt.Errorf("computing relative home path: %w", relErr)
+		}
+		return upgradeMarker, upgrade.ReconcileMismatchedUpgrade(
+			ctx, log, &upgrade.AgentWatcherHelper{},
+			paths.Top(), homeRelPath, runningHash, upgradeMarker)
+
+	default:
+		log.Errorw("upgrade marker references neither the running agent nor a known previous version; discarding",
+			"marker.hash", upgradeMarker.Hash, "marker.prev_hash", upgradeMarker.PrevHash,
+			"running.hash", runningHash)
+		return nil, upgrade.DiscardStaleMarker(ctx, log, &upgrade.AgentWatcherHelper{}, paths.Top())
+	}
+}
+
+// postUpgradeHousekeeping performs the install-marker / service-config /
+// registry updates expected after a successful re-exec into the upgrade
+// target. Idempotent — safe to call again on a subsequent boot if the marker
+// is still around.
+func postUpgradeHousekeeping(log *logger.Logger, upgradeMarker *upgrade.UpdateMarker) error {
 	if err := ensureInstallMarkerPresent(); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := upgrade.EnsureServiceConfigUpToDate(); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Update the Add/Remove Programs registry entry with the running version.
@@ -856,7 +916,7 @@ func handleUpgrade(log *logger.Logger) (*upgrade.UpdateMarker, error) {
 		}
 	}
 
-	return upgradeMarker, nil
+	return nil
 }
 
 func ensureInstallMarkerPresent() error {
