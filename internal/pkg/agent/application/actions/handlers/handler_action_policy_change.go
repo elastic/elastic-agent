@@ -32,13 +32,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
-// PolicyDetailsSetter is implemented by components that need to be notified
-// of the most recently applied policy id and revision index, e.g. the fleet
-// gateway which includes them in subsequent checkin requests.
-type PolicyDetailsSetter interface {
-	SetPolicyDetails(policyID string, revisionIDX int64)
-}
-
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
 type PolicyChangeHandler struct {
 	log                  *logger.Logger
@@ -48,7 +41,6 @@ type PolicyChangeHandler struct {
 	stateStore           stateStore
 	ch                   chan coordinator.ConfigChange
 	setters              []actions.ClientSetter
-	policyDetailsSetters []PolicyDetailsSetter
 	policyLogLevelSetter logLevelSetter
 	coordinator          *coordinator.Coordinator
 	disableAckFn         func() bool
@@ -93,13 +85,6 @@ func (h *PolicyChangeHandler) AddSetter(cs actions.ClientSetter) {
 	h.setters = append(h.setters, cs)
 }
 
-// AddPolicyDetailsSetter registers a setter that is notified with the policy
-// id and revision index after a POLICY_CHANGE action has been successfully
-// applied.
-func (h *PolicyChangeHandler) AddPolicyDetailsSetter(s PolicyDetailsSetter) {
-	h.policyDetailsSetters = append(h.policyDetailsSetters, s)
-}
-
 // Handle handles policy change action.
 func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
 	h.log.Debugf("handlerPolicyChange: action '%+v' received", a)
@@ -132,7 +117,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 		return err
 	}
 
-	h.ch <- newPolicyChange(ctx, h.log, c, a, acker, false, h.stateStore, h.policyDetailsSetters, h.disableAckFn())
+	h.ch <- newPolicyChange(ctx, h.log, c, a, acker, false, h.stateStore, h.disableAckFn())
 	return nil
 }
 
@@ -494,15 +479,14 @@ func fleetToReader(agentID string, headers map[string]string, cfg *configuration
 }
 
 type policyChange struct {
-	ctx                  context.Context
-	log                  *logger.Logger
-	cfg                  *config.Config
-	action               fleetapi.Action
-	acker                acker.Acker
-	ackWatcher           chan struct{}
-	stateStore           stateStore
-	policyDetailsSetters []PolicyDetailsSetter
-	disableAck           bool
+	ctx        context.Context
+	log        *logger.Logger
+	cfg        *config.Config
+	action     fleetapi.Action
+	acker      acker.Acker
+	ackWatcher chan struct{}
+	stateStore stateStore
+	disableAck bool
 }
 
 func newPolicyChange(
@@ -513,7 +497,6 @@ func newPolicyChange(
 	acker acker.Acker,
 	makeCh bool,
 	stateStore stateStore,
-	policyDetailsSetters []PolicyDetailsSetter,
 	disableAck bool) *policyChange {
 	var ackWatcher chan struct{}
 	if makeCh {
@@ -521,15 +504,14 @@ func newPolicyChange(
 		ackWatcher = make(chan struct{})
 	}
 	return &policyChange{
-		ctx:                  ctx,
-		log:                  log,
-		cfg:                  config,
-		action:               action,
-		acker:                acker,
-		ackWatcher:           ackWatcher,
-		stateStore:           stateStore,
-		policyDetailsSetters: policyDetailsSetters,
-		disableAck:           disableAck,
+		ctx:        ctx,
+		log:        log,
+		cfg:        config,
+		action:     action,
+		acker:      acker,
+		ackWatcher: ackWatcher,
+		stateStore: stateStore,
+		disableAck: disableAck,
 	}
 }
 
@@ -551,17 +533,11 @@ func (l *policyChange) Config() *config.Config {
 //     propagates so the coordinator can retry.
 //  3. Commit the ack batch. Failures propagate.
 func (l *policyChange) Ack() error {
-	if pc, ok := l.action.(*fleetapi.ActionPolicyChange); ok && pc != nil {
-		if l.stateStore != nil {
-			l.stateStore.SetAction(pc)
-			if err := l.stateStore.Save(); err != nil && l.log != nil {
-				l.log.Warnw("failed to persist policy change action to state store",
-					"error.message", err)
-			}
-		}
-		id, rev := pc.PolicyID(), pc.PolicyRevisionIDX()
-		for _, s := range l.policyDetailsSetters {
-			s.SetPolicyDetails(id, rev)
+	if pc, ok := l.action.(*fleetapi.ActionPolicyChange); ok && pc != nil && l.stateStore != nil {
+		l.stateStore.SetAction(pc)
+		if err := l.stateStore.Save(); err != nil && l.log != nil {
+			l.log.Warnw("failed to persist policy change action to state store",
+				"error.message", err)
 		}
 	}
 

@@ -177,11 +177,6 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		return err
 	}
 
-	// The fleet gateway always tracks the latest applied policy id and
-	// revision index for use in checkin requests, regardless of whether the
-	// agent is running a local Fleet Server.
-	policyChanger.AddPolicyDetailsSetter(gateway)
-
 	// Not running a Fleet Server so the gateway and acker can be changed based on the configuration change.
 	if m.cfg.Fleet.Server == nil {
 		policyChanger.AddSetter(gateway)
