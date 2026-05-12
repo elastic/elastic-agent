@@ -7,12 +7,7 @@ replace github.com/elastic/elastic-agent => ../../
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260507231111-1c26a2d430b8
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.40.0
-=======
 	github.com/elastic/elastic-agent-libs v0.42.2
-	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
->>>>>>> ff91827fc (build(deps): bump the go-dependencies group across 1 directory with 4 updates (#14141))
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.46.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.46.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.46.0
