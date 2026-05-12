@@ -125,10 +125,8 @@ generate_matrix() {
   # Create matrix combining versions and variants
   cat <<EOF
 {
-  "setup": {
-    "version": ${versions},
-    "variant": ${variants}
-  }
+  "version": ${versions},
+  "variant": ${variants}
 }
 EOF
 }
@@ -149,6 +147,7 @@ main() {
 
   # Upload the k8s pipeline
   echo "Uploading Kubernetes test pipeline..." >&2
+  buildkite-agent pipeline upload .buildkite/k8s-testing-pipeline.yml --dry-run
   buildkite-agent pipeline upload .buildkite/k8s-testing-pipeline.yml
 }
 
