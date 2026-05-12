@@ -370,6 +370,9 @@ func TestRollbackWithOpts(t *testing.T) {
 						useVersionInPath: true,
 					},
 				},
+				upgradeFrom:  version123Snapshot,
+				upgradeTo:    version456Snapshot,
+				currentAgent: version456Snapshot,
 			},
 			setupMocks: func(mockClient *client.MockClient) {
 				mockClient.EXPECT().Connect(
@@ -409,6 +412,9 @@ func TestRollbackWithOpts(t *testing.T) {
 						useVersionInPath: true,
 					},
 				},
+				upgradeFrom:  version123Snapshot,
+				upgradeTo:    version456Snapshot,
+				currentAgent: version456Snapshot,
 			},
 			setupMocks: func(mockClient *client.MockClient) {
 				// nothing to do here, no restart will be issued
@@ -442,6 +448,9 @@ func TestRollbackWithOpts(t *testing.T) {
 						useVersionInPath: true,
 					},
 				},
+				upgradeFrom:  version123Snapshot,
+				upgradeTo:    version456Snapshot,
+				currentAgent: version456Snapshot,
 			},
 			setupMocks: func(mockClient *client.MockClient) {
 				mockClient.EXPECT().Connect(
@@ -489,6 +498,9 @@ func TestRollbackWithOpts(t *testing.T) {
 						useVersionInPath: true,
 					},
 				},
+				upgradeFrom:  version123Snapshot,
+				upgradeTo:    version456Snapshot,
+				currentAgent: version456Snapshot,
 			},
 			setupMocks: func(mockClient *client.MockClient) {
 				// no restart request should be made
@@ -526,6 +538,9 @@ func TestRollbackWithOpts(t *testing.T) {
 						useVersionInPath: true,
 					},
 				},
+				upgradeFrom:  version123Snapshot,
+				upgradeTo:    version456Snapshot,
+				currentAgent: version456Snapshot,
 			},
 			setupMocks: func(mockClient *client.MockClient) {
 				mockClient.EXPECT().Connect(
