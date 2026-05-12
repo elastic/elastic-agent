@@ -41,7 +41,7 @@ check_packaging_files_modified() {
     return 1
   fi
 
-  echo "Checking for packaging file changes in PR..."
+  echo "Checking for packaging file changes in PR..." >&2
 
   # Get the base branch (usually main)
   BASE_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-main}"
@@ -53,22 +53,22 @@ check_packaging_files_modified() {
   CHANGED_FILES=$(git diff --name-only "origin/${BASE_BRANCH}...HEAD" || true)
 
   if [[ -z "${CHANGED_FILES}" ]]; then
-    echo "No changed files detected"
+    echo "No changed files detected" >&2
     return 1
   fi
 
-  echo "Changed files:"
-  echo "${CHANGED_FILES}"
+  echo "Changed files:" >&2
+  echo "${CHANGED_FILES}" >&2
 
   # Check if any packaging files were modified
   for pattern in "${PACKAGING_FILES[@]}"; do
     if echo "${CHANGED_FILES}" | grep -q "^${pattern}"; then
-      echo "Packaging files modified (matched: ${pattern})"
+      echo "Packaging files modified (matched: ${pattern})" >&2
       return 0
     fi
   done
 
-  echo "No packaging files modified"
+  echo "No packaging files modified" >&2
   return 1
 }
 
@@ -102,22 +102,22 @@ generate_matrix() {
 
   case "${tier}" in
     tier1)
-      echo "Using Tier 1: Min/max K8s versions, basic container image"
+      echo "Using Tier 1: Min/max K8s versions, basic container image" >&2
       versions="[\"${K8S_MIN_VERSION}\",\"${K8S_MAX_VERSION}\"]"
       variants="${BASIC_VARIANT}"
       ;;
     tier2)
-      echo "Using Tier 2: Min/max K8s versions, all container images"
+      echo "Using Tier 2: Min/max K8s versions, all container images" >&2
       versions="[\"${K8S_MIN_VERSION}\",\"${K8S_MAX_VERSION}\"]"
       variants="${ALL_VARIANTS}"
       ;;
     tier3)
-      echo "Using Tier 3: All K8s versions, all container images"
+      echo "Using Tier 3: All K8s versions, all container images" >&2
       versions="${K8S_ALL_VERSIONS}"
       variants="${ALL_VARIANTS}"
       ;;
     *)
-      echo "ERROR: Unknown tier: ${tier}"
+      echo "ERROR: Unknown tier: ${tier}" >&2
       exit 1
       ;;
   esac
@@ -135,21 +135,20 @@ EOF
 
 # Main
 main() {
-  echo "Determining Kubernetes test tier..."
+  echo "Determining Kubernetes test tier..." >&2
 
   K8S_TEST_TIER=$(determine_tier)
-  echo "Selected tier: ${K8S_TEST_TIER}"
+  echo "Selected tier: ${K8S_TEST_TIER}" >&2
 
   K8S_TEST_MATRIX=$(generate_matrix "${K8S_TEST_TIER}")
-  echo "Generated matrix:"
-  echo "${K8S_TEST_MATRIX}"
-  export K8S_TEST_TIER K8S_TEST_MATRIX
+  echo "Generated matrix:" >&2
+  echo "${K8S_TEST_MATRIX}" >&2
 
   # Export matrix for pipeline
   export K8S_TEST_TIER K8S_TEST_MATRIX
 
   # Upload the k8s pipeline
-  echo "Uploading Kubernetes test pipeline..."
+  echo "Uploading Kubernetes test pipeline..." >&2
   buildkite-agent pipeline upload .buildkite/k8s-testing-pipeline.yml
 }
 
