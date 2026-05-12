@@ -7,7 +7,7 @@ replace github.com/elastic/elastic-agent => ../../
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260511201038-0962d887dbf8
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.40.0
+	github.com/elastic/elastic-agent-libs v0.42.2
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.46.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.46.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.46.0
@@ -304,8 +304,8 @@ require (
 	github.com/elastic/elastic-agent-system-metrics v0.14.3 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
-	github.com/elastic/go-docappender/v2 v2.14.0 // indirect
-	github.com/elastic/go-elasticsearch/v8 v8.19.5 // indirect
+	github.com/elastic/go-docappender/v2 v2.14.1 // indirect
+	github.com/elastic/go-elasticsearch/v8 v8.19.6 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
