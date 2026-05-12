@@ -103,9 +103,9 @@ To build a local version of the agent for development, run the command below. Th
 # DEV=true disable signature verification to allow replacing binaries in the components sub-directory of the package.
 # EXTERNAL=true downloads the matching version of the binaries that are packaged with agent (Beats for example).
 # SNAPSHOT=true indicates that this is a snapshot version and not a release version.
-# PLATFORMS=linux/amd64 builds an agent that will run on 64 bit Linux systems.
-# PACKAGES=tar.gz produces a tar.gz package
-DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz mage -v package
+# PLATFORMS=linux/amd64 builds an agent that will run on 64 bit X86 Linux systems.
+# PACKAGES is required. Use PACKAGES=all to build all package types, or specify types (e.g. tar.gz,rpm,deb,zip,docker).
+EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz mage -v package
 ```
 
 If you build the same agent package often (when running integration tests, for example),

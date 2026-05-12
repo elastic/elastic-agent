@@ -78,6 +78,9 @@ var (
 	Docker             = PackageType(pkgcommon.Docker)
 )
 
+// AllPackageTypes contains all available package types.
+var AllPackageTypes = []PackageType{RPM, Deb, Zip, TarGz, Docker}
+
 // OSPackageArgs define a set of package types to build for an operating
 // system using the contained PackageSpec.
 type OSPackageArgs struct {
@@ -933,7 +936,7 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: build tooling, path is from trusted Walk source
 		if err != nil {
 			return err
 		}
@@ -1017,7 +1020,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: build tooling, path is from trusted WalkDir source
 		if err != nil {
 			return err
 		}

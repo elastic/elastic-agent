@@ -70,6 +70,7 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         env:
           PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
+          PACKAGES: "all"
           FIPS: "{{matrix.fips}}"
         command: |
           if [[ -z "$${MANIFEST_URL}" ]]; then
