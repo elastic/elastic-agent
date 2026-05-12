@@ -60,6 +60,10 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
+<<<<<<< HEAD
+=======
+	go.opentelemetry.io/collector/component/componenttest v0.150.0
+>>>>>>> bf11990b9 (Fix update-otel.sh to correctly update all dependency versions (#14162))
 	go.opentelemetry.io/collector/connector/forwardconnector v0.150.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.150.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.150.0
