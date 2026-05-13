@@ -8,10 +8,12 @@ import (
 	"context"
 	"fmt"
 	"go/build"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +23,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 const defaultCrossBuildTarget = "golangCrossBuild"
@@ -151,6 +154,18 @@ func CrossBuild(ctx context.Context, cfg *Settings, options ...CrossBuildOption)
 		if !buildPlatform.Flags.CanCrossBuild() {
 			return fmt.Errorf("unsupported cross build platform %v", buildPlatform.Name)
 		}
+
+		if cfg.Build.FIPSBuild {
+			fipsConfig := packaging.Settings().FIPS
+			if !slices.ContainsFunc(fipsConfig.Compile.Platforms, func(p packaging.Platform) bool {
+				return p.Platform() == buildPlatform.Name
+			}) {
+				log.Printf("Skipping crossbuild of %q for platform %q since it's not listed in FIPS supported platforms",
+					params.Name, buildPlatform.Name)
+				continue
+			}
+		}
+
 		builder := GolangCrossBuilder{Platform: buildPlatform.Name, Target: params.Target, InDir: params.InDir, ImageSelector: params.ImageSelector, Config: cfg}
 		if params.Serial {
 			if err := builder.Build(); err != nil {
@@ -206,7 +221,9 @@ func CrossBuildImage(cfg *Settings, platform string) (string, error) {
 
 	goVersion := cfg.GoVersion()
 
-	if cfg.Build.FIPSBuild {
+	// FIPS on Linux has to be build using the Go microsoft fork for backwards compatibility reasons.
+	// On Windows, we use the upstream Go mode.
+	if cfg.Build.FIPSBuild && strings.HasPrefix(platform, "linux") {
 		tagSuffix += "-fips"
 	}
 
@@ -286,7 +303,13 @@ func (b GolangCrossBuilder) Build() error {
 	if cfg.Build.VersionQualified {
 		args = append(args, "--env", "VERSION_QUALIFIER="+cfg.Build.VersionQualifier)
 	}
-	if cfg.CrossBuild.MountModcache {
+
+	// We don't mount the mod cache when building with the upstream Go FIPS module. When setting
+	// a strict module version, the module archive has to be decompressed into the module cache directory.
+	// As such, it can't be readonly.
+	// TODO: Make crossbuild work as non-root and mount this as rw.
+	isWindowsFIPSBuild := cfg.Build.FIPSBuild && strings.HasPrefix(b.Platform, "windows")
+	if cfg.CrossBuild.MountModcache && !isWindowsFIPSBuild {
 		// Mount $GOPATH/pkg/mod into the container, read-only.
 		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
 		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
@@ -370,7 +393,18 @@ func chownPaths(uid, gid int, path string) error {
 		log.Printf("chown took: %v, changed %d files", time.Since(start), numFixed)
 	}()
 
-	return filepath.Walk(path, func(name string, info os.FileInfo, err error) error {
+	root, err := os.OpenRoot(path)
+	if err != nil {
+		return fmt.Errorf("failed to open root %q: %w", path, err)
+	}
+	defer root.Close()
+
+	return fs.WalkDir(root.FS(), ".", func(name string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		info, err := d.Info()
 		if err != nil {
 			return err
 		}
@@ -387,7 +421,7 @@ func chownPaths(uid, gid int, path string) error {
 			return nil
 		}
 
-		if err := os.Chown(name, uid, gid); err != nil {
+		if err := root.Lchown(name, uid, gid); err != nil {
 			return fmt.Errorf("failed to chown path=%v : %w", name, err)
 		}
 		numFixed++

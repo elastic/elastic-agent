@@ -408,10 +408,10 @@ type Coordinator struct {
 	// failures immediately https://github.com/elastic/elastic-agent/issues/2887.
 	// For now, we track three distinct errors for those three failure types,
 	// and merge them into a readable error in generateReportableState.
-	configErr        error
-	componentGenErr  error
-	runtimeUpdateErr error
-	otelErr          error
+	configErr         error
+	componentModelErr error
+	runtimeUpdateErr  error
+	otelErr           error
 
 	// The raw policy before spec lookup or variable substitution
 	ast *transpiler.AST
@@ -1656,7 +1656,6 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 			err := c.refreshComponentModel(ctx)
 			if err != nil {
 				err = fmt.Errorf("error refreshing component model for PID update: %w", err)
-				c.setConfigManagerError(err)
 				c.logger.Errorf("%s", err)
 			}
 		}
@@ -1668,27 +1667,12 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		c.applyComponentState(componentState)
 
 	case change := <-c.managerChans.configManagerUpdate:
-		if err := c.processConfig(ctx, change.Config()); err != nil {
-			c.logger.Errorf("applying new policy: %s", err.Error())
-			change.Fail(err)
-		} else {
-			if err := change.Ack(); err != nil {
-				err = fmt.Errorf("failed to ack configuration change: %w", err)
-				// Workaround: setConfigManagerError is usually used by the config
-				// manager to report failed ACKs / etc when communicating with Fleet.
-				// We need to report a failed ACK here, but the policy change has
-				// already been successfully applied so we don't want to report it as
-				// a general Coordinator or policy failure.
-				// This arises uniquely here because this is the only case where an
-				// action is responsible for reporting the failure of its own ACK
-				// call. The "correct" fix is to make this Ack() call unfailable
-				// and handle ACK retries and reporting in the config manager like
-				// with other action types -- this error would then end up invoking
-				// setConfigManagerError "organically" via the config manager's
-				// reporting channel. In the meantime, we do it manually.
-				c.setConfigManagerError(err)
-				c.logger.Errorf("%s", err.Error())
-			}
+		err := c.processConfigChange(ctx, change)
+		if err != nil {
+			c.logger.Errorf("%s", err)
+		}
+		if c.isManaged {
+			c.setConfigManagerActionsError(err)
 		}
 
 	case vars := <-c.managerChans.varsManagerUpdate:
@@ -1726,20 +1710,27 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 }
 
 // Always called on the main Coordinator goroutine.
-func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
+func (c *Coordinator) processConfigChange(ctx context.Context, change ConfigChange) (err error) {
 	c.migrationProgressWg.Wait()
 
-	// processConfigAgent will apply persisted config and set c.otelCfg before calling refreshComponentModel
-	err = c.processConfigAgent(ctx, cfg)
+	// processConfig will apply persisted config and set c.otelCfg before calling refreshComponentModel
+	err = c.processConfig(ctx, change.Config())
 	if err != nil {
-		return err
+		change.Fail(err)
+		return fmt.Errorf("failed to apply new policy change: %w", err)
+	}
+
+	if err := change.Ack(); err != nil {
+		// This currently only happens if we fail to save the action to the state store.
+		// Not a transient failure, so return error instead of just logging.
+		return fmt.Errorf("failed to ack new policy change: %w", err)
 	}
 
 	return nil
 }
 
 // Always called on the main Coordinator goroutine.
-func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config) (err error) {
+func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
 	span, ctx := apm.StartSpan(ctx, "config", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -1968,6 +1959,11 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		// Nothing to process yet
 		return nil
 	}
+
+	defer func() {
+		// Update componentModelErr with the results.
+		c.setComponentModelError(err)
+	}()
 
 	span, ctx := apm.StartSpan(ctx, "refreshComponentModel", "app.internal")
 	defer func() {
@@ -2285,11 +2281,6 @@ func (c *Coordinator) ackMigration(ctx context.Context, action *fleetapi.ActionM
 // Called from both the main Coordinator goroutine and from external
 // goroutines via diagnostics hooks.
 func (c *Coordinator) generateComponentModel() (err error) {
-	defer func() {
-		// Update componentGenErr with the results.
-		c.setComponentGenError(err)
-	}()
-
 	ast := c.ast.ShallowClone()
 
 	// perform variable substitution for inputs
