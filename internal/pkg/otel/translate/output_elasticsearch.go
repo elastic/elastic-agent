@@ -136,10 +136,11 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 		"logs_dynamic_pipeline": map[string]any{
 			"enabled": true,
 		},
-		"logs_dynamic_id":          map[string]any{"enabled": true},
-		"include_source_on_error":  true,
-		"retry":                    getRetryConfig(escfg),
-		"suppress_conflict_errors": true,
+		"logs_dynamic_id":           map[string]any{"enabled": true},
+		"include_source_on_error":   true,
+		"retry":                     getRetryConfig(escfg),
+		"suppress_conflict_errors":  true,
+		"bulk_response_filter_path": "errors,items.*.error,items.*.status,items.*.failure_store",
 	}
 
 	// Compression
@@ -206,7 +207,6 @@ func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
 	hosts := []string{}
 	for _, h := range outputHosts {
 		esURL, err := common.MakeURL(escfg.Protocol, escfg.Path, h, 9200)
-
 		if err != nil {
 			return nil, fmt.Errorf("cannot generate ES URL from host %w", err)
 		}
@@ -217,7 +217,7 @@ func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
 
 	if len(escfg.Params) != 0 {
 		// convert params to map[string][]string
-		var params = make(map[string][]string, 0)
+		params := make(map[string][]string, 0)
 		for key, value := range escfg.Params {
 			params[key] = []string{value}
 		}
