@@ -104,8 +104,8 @@ github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.3.1 h1:Wgf5rZb
 github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.3.1/go.mod h1:xxCBG/f/4Vbmh2XQJBsOmNdxWUY5j/s27jujKPbQf14=
 github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v1.1.1 h1:bFWuoEKg+gImo7pvkiQEFAc8ocibADgXeiLAxWhWmkI=
 github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v1.1.1/go.mod h1:Vih/3yc6yac2JzU4hzpaDupBJP0Flaia9rXXrU8xyww=
-github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.3 h1:ZJJNFaQ86GVKQ9ehwqyAFE6pIfyicpuJ8IkVaPBc6/4=
-github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.3/go.mod h1:URuDvhmATVKqHBH9/0nOiNKk0+YcwfQ3WkK5PqHKxc8=
+github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.4 h1:jWQK1GI+LeGGUKBADtcH2rRqPxYB1Ljwms5gFA2LqrM=
+github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.4/go.mod h1:8mwH4klAm9DUgR2EEHyEEAQlRDvLPyg5fQry3y+cDew=
 github.com/Azure/azure-storage-blob-go v0.15.0 h1:rXtgp8tN1p29GvpGgfJetavIG0V7OgcSXPpwp3tx6qk=
 github.com/Azure/azure-storage-blob-go v0.15.0/go.mod h1:vbjsVbX0dlxnRc4FFMPsS9BsJWPcne7GB7onqlPvz58=
 github.com/Azure/go-amqp v1.5.0 h1:GRiQK1VhrNFbyx5VlmI6BsA1FCp27W5rb9kxOZScnTo=
@@ -1293,6 +1293,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.150.0 h1
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.150.0/go.mod h1:LekRbCvy+oEIdEl+KxUO7NABHCGjAHVvB2+r/cK3T+8=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azure v0.150.0 h1:lz0XapQI68IXDBOQxwDBOSdZwuGgkyNLkg5SxW/GWUc=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azure v0.150.0/go.mod h1:Rl4ZoEstikWUCNg6dizdlPyAEw5+4H9lCQ1JpPKCUHg=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azurelogs v0.150.0 h1:Y1MAnHniAztzbm5WaRw9+NDOad6Xb3HwKNbniICyz5o=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azurelogs v0.150.0/go.mod h1:bimtksa56lMByOSl7EAMRtACIf2eiKb1JA2VFs8QMkw=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.150.0 h1:QyAlAfLh26KhfhHoS0p77qGtQ9o1lTTfqR84ir+q++Y=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.150.0/go.mod h1:oH8MAPQVje+h6zawzcX9O5heDyXm3hhvTUl0SqTE6cs=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.150.0 h1:7nJYM5XUNc2KB67v9YOeC2FLoWJSt0IUGDc/8qVJyoI=
@@ -1333,6 +1335,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceive
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver v0.150.0/go.mod h1:6Pef/1DWHlM5dcGU0Clxah1pB5WU/FG01B6Mk/xes/E=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.150.0 h1:luYkbF87DjtK6jmMHcP2VMgo8GK5ttSWnCkZcZo29Ow=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.150.0/go.mod h1:2sKotBe4v7raXGpKir0GyItwp11IeJsxNLzmPsJOlcE=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azureeventhubreceiver v0.150.0 h1:XsZWxHAQbtx3n606z1BiXZiD3XXRxvEnbZCyu2NYn+M=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azureeventhubreceiver v0.150.0/go.mod h1:VCP6WCyIa7IaCAhJrMX0IlI9JgEGSme/n62WqBV8RZE=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver v0.150.0 h1:8TojpQRDFk/0Qe4jGkHBFaxk1WBMIUR/CuxUDzn7yDY=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver v0.150.0/go.mod h1:vNmhhvmq5osy015qemlRJyw7X9zAhR/wC0TkNgXusTQ=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver v0.150.0 h1:zkvEDWt6ppnKpfOr3Ez2h08mQUfqRn09zmHWLJHtqsc=
