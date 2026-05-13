@@ -41,13 +41,8 @@ require (
 	github.com/josephspurrier/goversioninfo v1.5.0
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
 	github.com/knadh/koanf/maps v0.1.2
-<<<<<<< HEAD
 	github.com/magefile/mage v1.15.0
 	github.com/moby/moby/client v0.4.0
-=======
-	github.com/magefile/mage v1.17.2
-	github.com/moby/moby/client v0.4.1
->>>>>>> 798b80c5a (use elastic-agent-libs/redact to redact slice maps (#14007))
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.150.0
 	github.com/otiai10/copy v1.14.0
