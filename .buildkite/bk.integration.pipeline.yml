@@ -614,7 +614,7 @@ steps:
               - "${IMAGE_RHEL_8}"
               - "${IMAGE_RHEL_10}"
 
-  - group: ":kubernetes: Kubernetes"
+  - label: ":kubernetes: Kubernetes"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Kubernetes"
