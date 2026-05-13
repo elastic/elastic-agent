@@ -202,6 +202,14 @@ LOOP:
 					ch.log.Debugf("received state: error: %s",
 						err)
 
+					// Context was canceled — the watcher is shutting down normally.
+					// Do not count this as a lost connection.
+					if ctx.Err() != nil {
+						stateCancel()
+						ch.agentClient.Disconnect()
+						return
+					}
+
 					// agent has crashed or exited
 					stateCancel()
 					ch.agentClient.Disconnect()
