@@ -188,7 +188,12 @@ func UpdateActiveCommit(log *logger.Logger, topDirPath, hash string, writeFile w
 func CleanMarker(log *logger.Logger, dataDirPath string) error {
 	markerFile := markerFilePath(dataDirPath)
 	log.Infow("Removing marker file", "file.path", markerFile)
-	if err := os.Remove(markerFile); !os.IsNotExist(err) {
+	// The leading err != nil guard is load-bearing — os.IsNotExist(nil)
+	// returns false, so dropping the guard would cause the success case
+	// (err == nil) to also enter the return branch. Currently harmless
+	// because there's no work after this block, but brittle to future
+	// additions; keep the guard.
+	if err := os.Remove(markerFile); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
