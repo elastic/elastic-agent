@@ -232,3 +232,53 @@ func TestActionUpgradeMarshalMap(t *testing.T) {
 		t.Fatal(diff)
 	}
 }
+
+func TestActionPolicyChangePolicyIDAndRevision(t *testing.T) {
+	testcases := []struct {
+		name       string
+		action     *ActionPolicyChange
+		wantID     string
+		wantRevIdx int64
+	}{
+		{
+			name: "id and int revision",
+			action: &ActionPolicyChange{Data: ActionPolicyChangeData{Policy: map[string]interface{}{
+				"id": "abc-123", "revision": int(7),
+			}}},
+			wantID: "abc-123", wantRevIdx: 7,
+		},
+		{
+			name: "int64 revision",
+			action: &ActionPolicyChange{Data: ActionPolicyChangeData{Policy: map[string]interface{}{
+				"id": "abc-123", "revision": int64(7),
+			}}},
+			wantID: "abc-123", wantRevIdx: 7,
+		},
+		{
+			name: "float64 revision (json unmarshal)",
+			action: &ActionPolicyChange{Data: ActionPolicyChangeData{Policy: map[string]interface{}{
+				"id": "abc-123", "revision": float64(7),
+			}}},
+			wantID: "abc-123", wantRevIdx: 7,
+		},
+		{
+			name:   "missing keys return zero values",
+			action: &ActionPolicyChange{Data: ActionPolicyChangeData{Policy: map[string]interface{}{}}},
+		},
+		{
+			name: "wrong-typed values return zero values",
+			action: &ActionPolicyChange{Data: ActionPolicyChangeData{Policy: map[string]interface{}{
+				"id": 42, "revision": "7",
+			}}},
+		},
+		{
+			name: "nil action returns zero values",
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.wantID, tc.action.PolicyID())
+			assert.Equal(t, tc.wantRevIdx, tc.action.PolicyRevisionIDX())
+		})
+	}
+}
