@@ -23,12 +23,6 @@ import (
 	"text/template"
 	"time"
 
-<<<<<<< HEAD
-	"github.com/gofrs/uuid/v5"
-=======
-	"go.opentelemetry.io/otel/sdk/metric"
->>>>>>> 7cd82ddcb (Fix flaky TestLogIngestionFleetManaged (#14229))
-
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
