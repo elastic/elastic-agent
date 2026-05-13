@@ -17,6 +17,8 @@ set -euo pipefail
 #   - Tier 2 on each commit
 #   - Tier 3 on scheduled builds (env var K8S_SCHEDULED_TIER3=true)
 
+IMAGE_UBUNTU_2404_X86_64=${IMAGE_UBUNTU_2404_X86_64:?"environment variable missing."}
+
 # K8s versions
 K8S_MIN_VERSION="v1.27.16"
 K8S_MAX_VERSION="v1.34.0"
@@ -124,19 +126,12 @@ get_test_config() {
   echo "${versions_yaml}|${variants_yaml}"
 }
 
-# Convert JSON array to YAML array format (e.g., ["a", "b"] -> "        - \"a\"\n        - \"b\"")
-json_to_yaml_array() {
-  local json_array=$1
-  local indent=$2
-  echo "${json_array}" | jq -r '.[]' | sed "s/^/${indent}- \"/" | sed 's/$/\"/'
-}
-
 # Generate the complete pipeline YAML with matrix embedded
 generate_pipeline() {
   local versions_yaml=$1
   local variants_yaml=$2
 
-  cat <<'EOF'
+  cat <<EOF
 common:
   - google_oidc_observability_plugin: &google_oidc_observability_plugin
       elastic/oblt-google-auth#v1.3.0:
@@ -149,6 +144,7 @@ common:
 
 steps:
   - group: ":kubernetes: Kubernetes"
+    key: integration-tests-kubernetes
     steps:
       - label: ":kubernetes: {{matrix.version}}:amd64:{{matrix.variant}}"
         env:
@@ -176,15 +172,9 @@ steps:
           - *vault_github_token
         matrix:
           setup:
-            version:
+            version: ${versions_yaml}
+            variant: ${variants_yaml}
 EOF
-
-  # Append version array in expanded YAML format
-  json_to_yaml_array "${versions_yaml}" "              "
-
-  echo "            variant:"
-  # Append variant array in expanded YAML format
-  json_to_yaml_array "${variants_yaml}" "              "
 
 }
 

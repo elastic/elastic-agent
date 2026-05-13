@@ -615,7 +615,6 @@ steps:
               - "${IMAGE_RHEL_10}"
 
   - group: ":kubernetes: Kubernetes"
-    key: integration-tests-kubernetes
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Kubernetes"
