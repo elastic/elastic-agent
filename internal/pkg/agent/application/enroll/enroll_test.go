@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -191,10 +192,10 @@ func TestClearAgentStores_RemovesBothFiles(t *testing.T) {
 	require.NoError(t, clearAgentStores(actionStore, stateStore))
 
 	_, err := os.Stat(actionStore)
-	require.True(t, os.IsNotExist(err), "action store file must be removed, got err=%v", err)
+	require.True(t, errors.Is(err, fs.ErrNotExist), "action store file must be removed, got err=%v", err)
 
 	_, err = os.Stat(stateStore)
-	require.True(t, os.IsNotExist(err), "state store file must be removed, got err=%v", err)
+	require.True(t, errors.Is(err, fs.ErrNotExist), "state store file must be removed, got err=%v", err)
 }
 
 func TestClearAgentStores_MissingFilesAreOK(t *testing.T) {

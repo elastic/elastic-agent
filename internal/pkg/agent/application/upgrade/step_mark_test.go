@@ -5,6 +5,8 @@
 package upgrade
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -37,7 +39,7 @@ func TestCleanMarker_RemovesExistingMarker(t *testing.T) {
 	require.NoError(t, CleanMarker(log, dataDir))
 
 	_, err := os.Stat(markerFile)
-	require.True(t, os.IsNotExist(err), "marker file must be removed, got err=%v", err)
+	require.True(t, errors.Is(err, fs.ErrNotExist), "marker file must be removed, got err=%v", err)
 }
 
 func TestCleanMarker_MissingMarkerIsOK(t *testing.T) {
