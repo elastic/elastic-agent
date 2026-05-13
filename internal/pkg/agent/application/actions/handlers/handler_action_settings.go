@@ -54,7 +54,7 @@ func (h *SettingsHandler) handleLogLevel(ctx context.Context, logLevel string, a
 	if logLevel != clearLogLevelValue {
 		var logLevelOverride logp.Level
 		if err := logLevelOverride.Unpack(logLevel); err != nil {
-			return fmt.Errorf("failed to unpack override log level %q: %w", logLevelOverride, err)
+			return fmt.Errorf("failed to unpack override log level %q: %w", logLevel, err)
 		}
 	}
 	if err := h.agentInfo.SetLogLevelOverride(ctx, logLevel); err != nil {
@@ -71,7 +71,7 @@ func (h *SettingsHandler) handleLogLevel(ctx context.Context, logLevel string, a
 	var logLevelRuntime logp.Level
 	logLevelRuntimeStr := h.agentInfo.GetLogLevelRuntime()
 	if err := logLevelRuntime.Unpack(logLevelRuntimeStr); err != nil {
-		return fmt.Errorf("failed to unpack runtime log level %q: %w", logLevelRuntime, err)
+		return fmt.Errorf("failed to unpack runtime log level %q: %w", logLevelRuntimeStr, err)
 	}
 	h.log.Infof("Settings action done, setting agent log level to %s", logLevelRuntime)
 	return h.runtimeLogLevelSetter.SetLogLevel(ctx, &logLevelRuntime)
