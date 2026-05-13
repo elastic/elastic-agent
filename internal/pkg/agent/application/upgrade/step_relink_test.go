@@ -5,6 +5,8 @@
 package upgrade
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -77,11 +79,11 @@ func TestChangeSymlinkRefusesNonExistentTarget(t *testing.T) {
 	// no symlink should have been created at the live path
 	livePath := filepath.Join(topDir, agentExecutableForTest())
 	_, statErr := os.Lstat(livePath)
-	assert.True(t, os.IsNotExist(statErr), "live symlink must not be created when target is missing, got err=%v", statErr)
+	assert.True(t, errors.Is(statErr, fs.ErrNotExist), "live symlink must not be created when target is missing, got err=%v", statErr)
 
 	// nor should a staging symlink have been left behind
 	_, statErr = os.Lstat(prevSymlinkPath(topDir))
-	assert.True(t, os.IsNotExist(statErr), "staging symlink must not be created when target is missing, got err=%v", statErr)
+	assert.True(t, errors.Is(statErr, fs.ErrNotExist), "staging symlink must not be created when target is missing, got err=%v", statErr)
 }
 
 // TestChangeSymlinkRotatesOverStalePrev ensures that a leftover staging
@@ -116,5 +118,5 @@ func TestChangeSymlinkRotatesOverStalePrev(t *testing.T) {
 
 	// staging symlink should not linger after a successful rotation
 	_, statErr := os.Lstat(stalePrev)
-	assert.True(t, os.IsNotExist(statErr), "staging symlink must not linger after rotation, got err=%v", statErr)
+	assert.True(t, errors.Is(statErr, fs.ErrNotExist), "staging symlink must not linger after rotation, got err=%v", statErr)
 }
