@@ -19,16 +19,26 @@ import (
 )
 
 func TestWriteMarkerFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	markerFile := filepath.Join(tmpDir, markerFilename)
+	tests := []struct {
+		name        string
+		shouldFsync bool
+	}{
+		{name: "with fsync", shouldFsync: true},
+		{name: "without fsync", shouldFsync: false},
+	}
 
-	markerBytes := []byte("foo bar")
-	err := writeMarkerFile(markerFile, markerBytes, true)
-	require.NoError(t, err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			markerFile := filepath.Join(t.TempDir(), markerFilename)
+			markerBytes := []byte("foo bar")
 
-	data, err := os.ReadFile(markerFile)
-	require.NoError(t, err)
-	require.Equal(t, markerBytes, data)
+			require.NoError(t, writeMarkerFile(markerFile, markerBytes, tc.shouldFsync))
+
+			data, err := os.ReadFile(markerFile)
+			require.NoError(t, err)
+			require.Equal(t, markerBytes, data, "writeMarkerFile must persist data to the final file path")
+		})
+	}
 }
 
 func TestWriteMarkerFileWithTruncation(t *testing.T) {
@@ -152,15 +162,11 @@ func watchFileNotEmpty(t *testing.T, ctx context.Context, filePath string, errCh
 }
 
 func randomBytes(length int) []byte {
-	chars := []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ" +
-		"abcdefghijklmnopqrstuvwxyzåäö" +
-		"0123456789" +
-		"~=+%^*/()[]{}/!@#$?|")
+	chars := []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789~=+%^*/()[]{}/!@#$?|")
 
-	var b []byte
-	for i := 0; i < length; i++ {
-		rune := chars[rand.IntN(len(chars))]
-		b = append(b, byte(rune))
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = chars[rand.IntN(len(chars))]
 	}
 
 	return b

@@ -745,8 +745,13 @@ func setupMetrics(
 // handleUpgrade checks if agent is being run as part of an
 // ongoing upgrade operation, i.e. being re-exec'd and performs
 // any upgrade-specific work, if needed.
+<<<<<<< HEAD
 func handleUpgrade() (*details.Details, error) {
 	upgradeMarker, err := upgrade.LoadMarker(paths.Data())
+=======
+func handleUpgrade(log *logger.Logger) (*upgrade.UpdateMarker, error) {
+	upgradeMarker, err := upgrade.TryLoadMarker(log, paths.Data())
+>>>>>>> 5a1d10ae6 (fix: prevent agent startup failure when upgrade marker file is corrupt (#14194))
 	if err != nil {
 		return nil, fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
 	}
