@@ -6,7 +6,6 @@
 env:
   ASDF_MAGE_VERSION: 1.14.0
   ASDF_KIND_VERSION: "0.27.0"
-  TARGET_ARCH: "amd64"
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.

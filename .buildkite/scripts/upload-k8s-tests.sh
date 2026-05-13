@@ -148,41 +148,43 @@ common:
       elastic/vault-github-token#v0.1.0:
 
 steps:
-  - label: ":kubernetes: {{matrix.version}}:amd64:{{matrix.variant}}"
-    env:
-      K8S_VERSION: "{{matrix.version}}"
-      DOCKER_VARIANTS: "{{matrix.variant}}"
-      TARGET_ARCH: "amd64"
-    command: |
-      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
-      .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
-    artifact_paths:
-      - build/*
-      - build/diagnostics/**
-      - build/*.pod_logs_dump/*
-    retry:
-      automatic:
-        limit: 1
-    agents:
-      provider: "gcp"
-      machineType: "n2-standard-8"
-      image: "${IMAGE_UBUNTU_2404_X86_64}"
-      diskSizeGb: 80
-    plugins:
-      - *google_oidc_observability_plugin
-      - *oblt_cli_plugin
-      - *vault_github_token
-    matrix:
-      setup:
-        version:
+  - group: ":kubernetes: Kubernetes"
+    steps:
+      - label: ":kubernetes: {{matrix.version}}:amd64:{{matrix.variant}}"
+        env:
+          K8S_VERSION: "{{matrix.version}}"
+          DOCKER_VARIANTS: "{{matrix.variant}}"
+          TARGET_ARCH: "amd64"
+        command: |
+          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
+          .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+          - build/*.pod_logs_dump/*
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
+          diskSizeGb: 80
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            version:
 EOF
 
   # Append version array in expanded YAML format
-  json_to_yaml_array "${versions_yaml}" "          "
+  json_to_yaml_array "${versions_yaml}" "              "
 
-  echo "        variant:"
+  echo "            variant:"
   # Append variant array in expanded YAML format
-  json_to_yaml_array "${variants_yaml}" "          "
+  json_to_yaml_array "${variants_yaml}" "              "
 
 }
 

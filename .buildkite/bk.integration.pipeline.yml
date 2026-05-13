@@ -2,6 +2,7 @@
 
 env:
   ASDF_MAGE_VERSION: 1.14.0
+  ASDF_KIND_VERSION: "0.27.0"
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
@@ -621,9 +622,7 @@ steps:
     depends_on:
       - integration-ess
       - packaging-containers-amd64
-    steps:
-      - label: "Upload k8s tests pipeline"
-        command: ".buildkite/scripts/upload-k8s-tests.sh"
+    command: ".buildkite/scripts/upload-k8s-tests.sh"
 
   - group: "Serverless integration test"
     key: integration-tests-serverless
