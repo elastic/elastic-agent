@@ -42,6 +42,13 @@ func TestPolicyChangePersistsWithoutAck(t *testing.T) {
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
+		OS: []define.OS{ // Flaky test see: https://github.com/elastic/elastic-agent/issues/14249, only windows is undefined so those tests are skipped
+			{
+				Type: define.Darwin,
+			}, {
+				Type: define.Linux,
+			},
+		},
 	})
 
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(15*time.Minute))
