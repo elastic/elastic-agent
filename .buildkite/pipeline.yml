@@ -372,6 +372,8 @@ steps:
     build:
       commit: "${BUILDKITE_COMMIT}"
       branch: "${BUILDKITE_BRANCH}"
+      env:
+        IMAGE_UBUNTU_2204_X86_64: "${IMAGE_UBUNTU_2204_X86_64}"
     if_changed:
       include:
         - .buildkite/serverless.beats.tests.yml
