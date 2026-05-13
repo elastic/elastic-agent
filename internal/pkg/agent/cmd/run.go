@@ -495,6 +495,7 @@ func runElasticAgent(
 	// listen for signals
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	l.Debug("Registered signal handlers")
 	isRex := false
 	logShutdown := true
 LOOP:
@@ -816,7 +817,7 @@ func setupMetrics(
 // ongoing upgrade operation, i.e. being re-exec'd and performs
 // any upgrade-specific work, if needed.
 func handleUpgrade(log *logger.Logger) (*upgrade.UpdateMarker, error) {
-	upgradeMarker, err := upgrade.LoadMarker(paths.Data())
+	upgradeMarker, err := upgrade.TryLoadMarker(log, paths.Data())
 	if err != nil {
 		return nil, fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
 	}
