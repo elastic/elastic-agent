@@ -7,10 +7,6 @@ replace github.com/elastic/elastic-agent => ../../
 
 replace github.com/elastic/beats/v7 => ../../beats
 
-// Pin the elasticsearchexporter to a specific commit to include changes from
-// https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47309
-replace github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter => github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.149.1-0.20260409063637-ffa805c75b6a
-
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0

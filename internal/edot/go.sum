@@ -1185,8 +1185,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometr
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.150.0/go.mod h1:YYLnerxxFS8XFLsAy3SOjKEqkFhj3XpnRvlZU1CCOsA=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.150.0 h1:rggUJoWwTrB258MCPrD3LFqQRnabDhhXj0Ki/pXG3ks=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.150.0/go.mod h1:dzSFtUe1ZfMlM3oRWBSXRUGxDVYQ0Xl7M5PqFLwoGoY=
-github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.149.1-0.20260409063637-ffa805c75b6a h1:ASD2+YgpqKi7hWRWpXr/FQJsl7xhoxwjlJv4lyJ96Nw=
-github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.149.1-0.20260409063637-ffa805c75b6a/go.mod h1:6g7lGCWZKRsiYNEdZ8SOnsmDYEuwvuuxNz9kWMjy7t8=
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.150.0 h1:m7c1JNCAgzGe22ezg1JJSOuWuOhQw1mt26byOu/Zqmg=
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.150.0/go.mod h1:gj8WNm+le0h0J9rRkWPwS0qLDpMROTCd/kjRkK6V8Hw=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.150.0 h1:vG/GFZISqI+1egdMvK7NX2WaqzxLAZ6lYuuR7q8JswU=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.150.0/go.mod h1:dO+NQkMhANvkTKAS7qBYdORDmqLeR7I1v+9t6NTXILE=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.150.0 h1:1gdKZ7djobQJUukmU2C3UkuthPQdlP+yXX5bktb3xWM=
