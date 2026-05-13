@@ -62,6 +62,9 @@ jobs:
       env:
         BRANCH_NAME: ${{ matrix.branch }}
 
+    - name: Tidy all Go modules
+      run: mage tidy
+
     - name: Export beats versions to environment variables
       run: |
         echo BEATS_PREVIOUS_VERSION=$(cat /tmp/.beats-previous-version) >> "$GITHUB_ENV"
