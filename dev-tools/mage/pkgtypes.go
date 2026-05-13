@@ -943,11 +943,7 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-<<<<<<< HEAD
 		file, err := os.Open(path) //nolint:gosec // G122: build tooling, path is from trusted Walk source
-=======
-		file, err := os.Open(path) //nolint:gosec // G122: path comes from filepath.Walk on trusted build inputs, no user-controlled symlink attack surface
->>>>>>> 68798ffe2 (fix: skip EXEC_UID/EXEC_GID env vars when using rootless Docker (#14197))
 		if err != nil {
 			return err
 		}
@@ -1031,11 +1027,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-<<<<<<< HEAD
 		file, err := os.Open(path) //nolint:gosec // G122: build tooling, path is from trusted WalkDir source
-=======
-		file, err := os.Open(path) //nolint:gosec // G122: path comes from filepath.WalkDir on trusted build inputs, no user-controlled symlink attack surface
->>>>>>> 68798ffe2 (fix: skip EXEC_UID/EXEC_GID env vars when using rootless Docker (#14197))
 		if err != nil {
 			return err
 		}
