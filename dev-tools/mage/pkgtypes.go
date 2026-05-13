@@ -896,7 +896,7 @@ func addUIDGidEnvArgs(args []string) ([]string, error) {
 // dirsFirst returns files with directory-source entries (paths ending in "/")
 // before regular-file entries, so explicit files always overwrite any
 // conflicting path laid down by a directory expansion.
-func dirsFirst(files []PackageFile) []PackageFile {
+func dirsFirst(files map[string]PackageFile) []PackageFile {
 	out := make([]PackageFile, 0, len(files))
 	for _, f := range files {
 		if strings.HasSuffix(f.Source, "/") {
