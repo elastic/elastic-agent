@@ -16,7 +16,7 @@ common:
       elastic/vault-docker-login#v0.5.2:
         secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
   - sparse_checkout_plugin: &sparse_checkout_plugin
-      sparse-checkout#v1.3.1:
+      sparse-checkout#v1.6.0:
         paths:
         - .buildkite
         - .go-version
