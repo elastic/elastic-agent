@@ -892,10 +892,17 @@ func addUIDGidEnvArgs(args []string) ([]string, error) {
 			"Using UID=%d GID=%d", uid, gid)
 	}
 
-	return append(args,
-		"-e", "EXEC_UID="+strconv.Itoa(uid),
-		"-e", "EXEC_GID="+strconv.Itoa(gid),
-	), nil
+	// In rootless Docker, container UID 0 maps to the host user's UID, so files
+	// created as root inside the container are already owned by the correct user
+	// on the host.
+	if !isRootlessDocker() {
+		args = append(args,
+			"-e", "EXEC_UID="+strconv.Itoa(uid),
+			"-e", "EXEC_GID="+strconv.Itoa(gid),
+		)
+	}
+
+	return args, nil
 }
 
 // addFileToZip adds a file (or directory) to a zip archive.
@@ -957,7 +964,11 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
+<<<<<<< HEAD
 		file, err := os.Open(path) //nolint:gosec // G122: path comes from filepath.Walk, no user input involved
+=======
+		file, err := os.Open(path) //nolint:gosec // G122: path comes from filepath.Walk on trusted build inputs, no user-controlled symlink attack surface
+>>>>>>> 68798ffe2 (fix: skip EXEC_UID/EXEC_GID env vars when using rootless Docker (#14197))
 		if err != nil {
 			return err
 		}
@@ -1040,7 +1051,11 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
+<<<<<<< HEAD
 		file, err := os.Open(path) //nolint:gosec // G122: path comes from filepath.WalkDir, no user input involved
+=======
+		file, err := os.Open(path) //nolint:gosec // G122: path comes from filepath.WalkDir on trusted build inputs, no user-controlled symlink attack surface
+>>>>>>> 68798ffe2 (fix: skip EXEC_UID/EXEC_GID env vars when using rootless Docker (#14197))
 		if err != nil {
 			return err
 		}
