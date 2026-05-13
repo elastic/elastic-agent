@@ -2007,6 +2007,16 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		err := mgr.Run(ctx)
 		assert.ErrorIs(t, err, context.Canceled)
 	}()
+	// Drain errors continuously so the Run loop's blocking reportErr calls don't stall.
+	go func() {
+		for {
+			select {
+			case <-mgr.Errors():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	testComp := testComponent("test")
 	components := []component.Component{testComp}
@@ -2042,13 +2052,15 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	case mgr.internalCollectorStatusCh <- otelStatus:
 	}
 
-	// verify we get the component running state from the manager
-	componentStates, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
-	require.NoError(t, err)
-	require.NotNil(t, componentStates)
-	require.Len(t, componentStates, 1)
-	componentState := componentStates[0]
-	assert.Equal(t, componentState.State.State, client.UnitStateHealthy)
+	// verify we get the component running state from the manager; loop until Healthy
+	// because the OpAMP session emits an initial StatusStarting before our explicit status.
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		componentStates, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
+		require.NoError(collect, err)
+		require.NotNil(collect, componentStates)
+		require.Len(collect, componentStates, 1)
+		assert.Equal(collect, client.UnitStateHealthy, componentStates[0].State.State)
+	}, 5*time.Second, 100*time.Millisecond)
 
 	// stop the component by sending a nil config
 	mgr.Update(nil, nil, logp.InfoLevel, nil)
@@ -2068,7 +2080,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		require.Len(collect, componentStates, 1)
 		componentState := componentStates[0]
 		assert.Equal(collect, componentState.State.State, client.UnitStateStopped)
-	}, time.Millisecond, time.Second*5)
+	}, 5*time.Second, time.Millisecond)
 }
 
 func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
@@ -2104,6 +2116,16 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		err := mgr.Run(ctx)
 		assert.ErrorIs(t, err, context.Canceled)
 	}()
+	// Drain errors continuously so the Run loop's blocking reportErr calls don't stall.
+	go func() {
+		for {
+			select {
+			case <-mgr.Errors():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	testComp := testComponent("test")
 	components := []component.Component{testComp}
@@ -2126,13 +2148,14 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 	}
 
 	// verify we get the component Starting state from the manager
-	componentStates, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
-	require.NoError(t, err)
-	require.NotNil(t, componentStates)
-	require.Len(t, componentStates, 1)
-	componentState := componentStates[0]
-	assert.Equal(t, componentState.State.State, client.UnitStateStarting)
-	assert.Equal(t, componentState.State.Message, "STARTING")
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		componentStates, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
+		require.NoError(collect, err)
+		require.NotNil(collect, componentStates)
+		require.Len(collect, componentStates, 1)
+		assert.Equal(collect, client.UnitStateStarting, componentStates[0].State.State)
+		assert.Equal(collect, "STARTING", componentStates[0].State.Message)
+	}, 5*time.Second, 100*time.Millisecond)
 
 	// stop the component by sending a nil config
 	mgr.Update(nil, nil, logp.InfoLevel, nil)
@@ -2152,7 +2175,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		require.Len(collect, componentStates, 1)
 		componentState := componentStates[0]
 		assert.Equal(collect, componentState.State.State, client.UnitStateStopped)
-	}, time.Millisecond, time.Second*5)
+	}, 5*time.Second, time.Millisecond)
 }
 
 func getFromChannelOrErrorWithContext[T any](t *testing.T, ctx context.Context, ch <-chan T, errCh <-chan error) (T, error) {
