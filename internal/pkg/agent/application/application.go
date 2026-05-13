@@ -254,8 +254,7 @@ func New(
 			}
 
 			retrier := retrier.New(fleetAcker, log)
-			batchedAcker := lazy.NewAcker(fleetAcker, log, lazy.WithRetrier(retrier))
-			actionAcker = stateStore.NewStateStoreActionAcker(batchedAcker, stateStorage)
+			actionAcker = lazy.NewAcker(fleetAcker, log, lazy.WithRetrier(retrier))
 
 			actionQueue, err := queue.NewActionQueue(stateStorage.Queue(), stateStorage)
 			if err != nil {
