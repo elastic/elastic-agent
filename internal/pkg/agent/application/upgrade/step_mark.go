@@ -188,7 +188,7 @@ func UpdateActiveCommit(log *logger.Logger, topDirPath, hash string, writeFile w
 func CleanMarker(log *logger.Logger, dataDirPath string) error {
 	markerFile := markerFilePath(dataDirPath)
 	log.Infow("Removing marker file", "file.path", markerFile)
-	if err := os.Remove(markerFile); !os.IsNotExist(err) {
+	if err := os.Remove(markerFile); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 

@@ -31,7 +31,7 @@ func changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string
 	log.Infow("Changing symlink", "symlink_path", symlinkPath, "new_path", newTarget, "prev_path", prevNewPath)
 
 	// remove symlink to avoid upgrade failures
-	if err := os.Remove(prevNewPath); !os.IsNotExist(err) {
+	if err := os.Remove(prevNewPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 

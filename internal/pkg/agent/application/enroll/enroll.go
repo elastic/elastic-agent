@@ -250,13 +250,13 @@ func enroll(
 
 	// clear action store
 	// fail only if file exists and there was a failure
-	if err := os.Remove(paths.AgentActionStoreFile()); !os.IsNotExist(err) {
+	if err := os.Remove(paths.AgentActionStoreFile()); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
 	// clear action store
 	// fail only if file exists and there was a failure
-	if err := os.Remove(paths.AgentStateStoreFile()); !os.IsNotExist(err) {
+	if err := os.Remove(paths.AgentStateStoreFile()); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
