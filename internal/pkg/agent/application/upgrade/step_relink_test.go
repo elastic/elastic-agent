@@ -19,8 +19,8 @@ import (
 )
 
 func agentExecutableForTest() string {
-	name := AgentName
-	if runtime.GOOS == windowsOSName {
+	name := agentName
+	if runtime.GOOS == windows {
 		name += exe
 	}
 	return name
@@ -38,7 +38,7 @@ func writeFakeAgentBinary(t *testing.T, topDir, versionedHomeRel string) string 
 	binPath := paths.BinaryPath(absVersionedHome, agentExecutableForTest())
 	require.NoError(t, os.WriteFile(binPath, []byte("fake agent binary"), 0o750))
 
-	return paths.BinaryPath(absVersionedHome, AgentName)
+	return paths.BinaryPath(absVersionedHome, agentName)
 }
 
 func TestChangeSymlinkHappyPath(t *testing.T) {
@@ -46,7 +46,7 @@ func TestChangeSymlinkHappyPath(t *testing.T) {
 	log := newErrorLogger(t)
 
 	newTarget := writeFakeAgentBinary(t, topDir, filepath.Join("data", "elastic-agent-1.2.3-abcdef"))
-	symlinkPath := filepath.Join(topDir, AgentName)
+	symlinkPath := filepath.Join(topDir, agentName)
 
 	require.NoError(t, changeSymlink(log, topDir, symlinkPath, newTarget))
 
@@ -55,7 +55,7 @@ func TestChangeSymlinkHappyPath(t *testing.T) {
 	require.NoError(t, err, "live symlink must exist after rotation")
 
 	expected := newTarget
-	if runtime.GOOS == windowsOSName {
+	if runtime.GOOS == windows {
 		expected += exe
 	}
 	assert.Equal(t, expected, linkTarget)
@@ -68,8 +68,8 @@ func TestChangeSymlinkRefusesNonExistentTarget(t *testing.T) {
 	topDir := t.TempDir()
 	log := newErrorLogger(t)
 
-	newTarget := paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-deleted"), AgentName)
-	symlinkPath := filepath.Join(topDir, AgentName)
+	newTarget := paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-deleted"), agentName)
+	symlinkPath := filepath.Join(topDir, agentName)
 
 	err := changeSymlink(log, topDir, symlinkPath, newTarget)
 	require.Error(t, err)
@@ -96,7 +96,7 @@ func TestChangeSymlinkRotatesOverStalePrev(t *testing.T) {
 	log := newErrorLogger(t)
 
 	newTarget := writeFakeAgentBinary(t, topDir, filepath.Join("data", "elastic-agent-1.2.3-abcdef"))
-	symlinkPath := filepath.Join(topDir, AgentName)
+	symlinkPath := filepath.Join(topDir, agentName)
 
 	// pre-create a leftover .prev staging symlink pointing nowhere meaningful
 	stalePrev := prevSymlinkPath(topDir)
@@ -111,7 +111,7 @@ func TestChangeSymlinkRotatesOverStalePrev(t *testing.T) {
 	require.NoError(t, err, "live symlink must exist after rotation")
 
 	expected := newTarget
-	if runtime.GOOS == windowsOSName {
+	if runtime.GOOS == windows {
 		expected += exe
 	}
 	assert.Equal(t, expected, linkTarget, "live symlink must point at the new target, not the stale staging path")
