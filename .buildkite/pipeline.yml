@@ -8,8 +8,6 @@ common:
       # This plugin authenticates to Google Cloud using the OIDC token.
       elastic/oblt-google-auth#v1.3.0:
         lifetime: 10800 # seconds
-        project-id: "elastic-observability-ci"
-        project-number: "911195782929"
   - sparse_checkout_plugin: &sparse_checkout_plugin
       sparse-checkout#v1.6.0:
         paths:
@@ -186,14 +184,24 @@ steps:
         plugins:
           - *google_oidc_plugin
 
+  - label: "upload"
+    key: "upload-readme"
+    command: "touch README1.md"
+    plugins:
+      - *google_oidc_plugin
+    artifact_paths:
+      - "README1.md"
+
   - group: "download/upload tests"
+    depends_on:
+      - step: "upload-readme"
     steps:
       - label: "upload"
         command: "touch foo && buildkite-agent artifact upload foo"
         plugins:
           - *google_oidc_plugin
       - label: "download"
-        command: "buildkite-agent artifact download * . --step 'unit-tests-2204'"
+        command: "buildkite-agent artifact download * . --step 'upload-readme'"
         plugins:
           - *google_oidc_plugin
 
