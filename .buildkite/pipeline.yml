@@ -184,6 +184,13 @@ steps:
         plugins:
           - *google_oidc_plugin
 
+  - group: "download tests"
+    steps:
+      - label: "download 15 ARM"
+        command: "buildkite-agent artifact download * . --step 'unit-tests-2204'"
+        plugins:
+          - *google_oidc_plugin
+
   - group: "macOS tests"
     skip: "fast testing"
     key: "macos-unit-tests"
