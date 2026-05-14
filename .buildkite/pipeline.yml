@@ -197,11 +197,16 @@ steps:
       - step: "upload-readme"
     steps:
       - label: "upload"
+        key: "upload-foo"
         command: "touch foo && buildkite-agent artifact upload foo"
         plugins:
           - *google_oidc_plugin
-      - label: "download"
-        command: "buildkite-agent artifact download * . --step 'upload-readme'"
+      - label: "download artifact_paths"
+        command: "buildkite-agent artifact download 'README1.md' . --step 'upload-readme'"
+        plugins:
+          - *google_oidc_plugin
+      - label: "download_agent"
+        command: "buildkite-agent artifact download 'foo' . --step 'upload-foo'"
         plugins:
           - *google_oidc_plugin
 
