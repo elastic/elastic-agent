@@ -241,31 +241,6 @@ steps:
           manual:
             allowed: true
 
-<<<<<<< HEAD
-=======
-      - label: "Unit tests - Windows 11 arm64"
-        env:
-          GODEBUG: "asyncpreemptoff=1"  # see https://github.com/elastic/elastic-agent/issues/13796
-        key: "unit-tests-win11-arm64"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11_ARM64}"
-          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
-          vmSize: "Standard_D8ps_v6"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
->>>>>>> 1560de672 (Disable async preemption in Windows 11 unit tests (#14275))
   - label: ":junit: Junit annotate"
     agents:
       # requires at least "bash", "curl" and "git"
