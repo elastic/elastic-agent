@@ -1,0 +1,21 @@
+# Terraform variables for Buildkite GCS Artifacts setup
+# Copy this file to terraform.tfvars and fill in your values
+
+project_id = "your-gcp-project-id"
+
+bucket_name = "bk-elastic-agent"
+
+bucket_location = "US"  # or "us-central1", "europe-west1", etc.
+
+buildkite_organization_slug = "elastic"
+
+# Optional: Restrict to specific pipelines (empty list = allow all in org)
+# allowed_pipeline_slugs = ["elastic-agent", "elastic-agent-package"]
+allowed_pipeline_slugs = []
+
+# Artifact retention
+artifact_retention_days      = 30  # Main artifacts
+test_artifact_retention_days = 7   # PR/test artifacts
+
+# Elastic users group with read access
+elastic_users_group = "buildkite-users@elastic.co"
