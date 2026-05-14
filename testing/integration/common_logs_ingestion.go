@@ -23,8 +23,9 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/gofrs/uuid/v5"
 	"go.opentelemetry.io/otel/sdk/metric"
+
+	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -200,27 +201,31 @@ func TestMonitoringLogsAreShipped(
 	agentFixture *atesting.Fixture,
 	policy kibana.PolicyResponse,
 ) {
-	// Stage 1: Make sure metricbeat logs are populated
-	t.Log("Making sure metricbeat logs are populated")
+	// Fetch agent status once up-front to get the agent ID for scoped ES queries.
+	status, err := agentFixture.ExecStatus(ctx)
+	require.NoError(t, err, "could not get agent status")
+	agentID := status.Info.ID
+	t.Logf("Agent ID: %q", agentID)
+
+	// Stage 1: Make sure monitoring data is being shipped.
+	// elastic_agent.elastic_agent is produced in both runtimes: by filestream-monitoring
+	// reading the agent's own log files in classic mode, and by elasticmonitoringreceiver
+	// in EDOT/OTel mode.
+	t.Log("Making sure monitoring logs are populated")
 	docs := FindESDocs(t, func() (estools.Documents, error) {
-		return estools.GetLogsForDataset(ctx, info.ESClient, "elastic_agent.metricbeat")
+		return estools.GetResultsForAgentAndDatastream(ctx, info.ESClient, "elastic_agent.elastic_agent", agentID)
 	})
-	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
+	t.Logf("elastic_agent.elastic_agent: Got %d documents", len(docs.Hits.Hits))
 	require.NotZero(t, len(docs.Hits.Hits),
-		"Looking for logs in dataset 'elastic_agent.metricbeat'")
+		"Looking for monitoring data in dataset elastic_agent.elastic_agent for agent %q", agentID)
 
 	// Stage 2: make sure all components are healthy
 	t.Log("Making sure all components are healthy")
-	status, err := agentFixture.ExecStatus(ctx)
-	require.NoError(t, err,
-		"could not get agent status to verify all components are healthy")
 	for _, c := range status.Components {
 		assert.Equalf(t, client.Healthy, client.State(c.State),
 			"component %s: want %s, got %s",
 			c.Name, client.Healthy, client.State(c.State))
 	}
-	agentID := status.Info.ID
-	t.Logf("Agent ID: %q", agentID)
 
 	// Stage 3: Make sure there are no errors in logs
 	t.Log("Making sure there are no error logs")

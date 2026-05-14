@@ -86,7 +86,7 @@ Refer to [architecture.md](./docs/architecture.md).
 
 ## Packaging and delivery
 
-Build artifacts (for example tar, deb, rpm, Docker images) are produced via mage packaging targets; see `magefile.go` for environment variables such as `EXTERNAL`, `SNAPSHOT`, `PLATFORMS`, `PACKAGES`, `DEV`, `DOCKER_VARIANTS`. Kubernetes-oriented deployment material lives under `deploy/helm/`.
+Build artifacts (for example tar, deb, rpm, Docker images) are produced via mage packaging targets; see `magefile.go` for environment variables such as `EXTERNAL`, `SNAPSHOT`, `PLATFORMS`, `PACKAGES`, `DEV`, `DOCKER_VARIANTS`. The `PACKAGES` env var is **required** — use `PACKAGES=all` to build all package types, or specify types (for example `PACKAGES=tar.gz,rpm,deb`). Kubernetes-oriented deployment material lives under `deploy/helm/`.
 Produced artifacts will be placed in the `build` directory.
 
 ## Testing
@@ -179,6 +179,5 @@ Unless instructed otherwise, always add the `backport-active-all` label to the p
 - [docs/architecture.md](./docs/architecture.md) — architecture overview
 - [docs/component-specs.md](./docs/component-specs.md) — component spec format
 - [docs/test-framework-dev-guide.md](./docs/test-framework-dev-guide.md) — integration tests
-- [docs/local-k8s-testing.md](./docs/local-k8s-testing.md) — Kubernetes testing
 - [Elastic Agent docs](https://www.elastic.co/docs) — product documentation
 - [Fleet Server](https://github.com/elastic/fleet-server) - Control protocol server for managed agents

@@ -80,6 +80,9 @@ var (
 	Docker             = PackageType(pkgcommon.Docker)
 )
 
+// AllPackageTypes contains all available package types.
+var AllPackageTypes = []PackageType{RPM, Deb, Zip, TarGz, Docker}
+
 // OSPackageArgs define a set of package types to build for an operating
 // system using the contained PackageSpec.
 type OSPackageArgs struct {
@@ -886,10 +889,17 @@ func addUIDGidEnvArgs(args []string) ([]string, error) {
 			"Using UID=%d GID=%d", uid, gid)
 	}
 
-	return append(args,
-		"-e", "EXEC_UID="+strconv.Itoa(uid),
-		"-e", "EXEC_GID="+strconv.Itoa(gid),
-	), nil
+	// In rootless Docker, container UID 0 maps to the host user's UID, so files
+	// created as root inside the container are already owned by the correct user
+	// on the host.
+	if !isRootlessDocker() {
+		args = append(args,
+			"-e", "EXEC_UID="+strconv.Itoa(uid),
+			"-e", "EXEC_GID="+strconv.Itoa(gid),
+		)
+	}
+
+	return args, nil
 }
 
 // addFileToZip adds a file (or directory) to a zip archive.
@@ -951,7 +961,7 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path comes from WalkDir callback over a controlled source directory, no user input
 		if err != nil {
 			return err
 		}
@@ -1034,7 +1044,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path comes from WalkDir callback over a controlled source directory, no user input
 		if err != nil {
 			return err
 		}

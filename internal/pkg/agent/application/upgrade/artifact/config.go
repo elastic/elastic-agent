@@ -11,6 +11,7 @@ import (
 	"time"
 
 	c "github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
@@ -174,6 +175,17 @@ func (c *Config) Unpack(cfg *c.C) error {
 
 	if err := cfg.Unpack(&tmp); err != nil {
 		return err
+	}
+
+	// A non-positive RetrySleepInitDuration would be passed straight to
+	// cenkalti/backoff's InitialInterval, which then yields 0 from NextBackOff()
+	// and turns transient download failures into a tight retry loop. Clamp to
+	// the default so a misconfigured policy can't cause that.
+	if tmp.RetrySleepInitDuration <= 0 {
+		def := DefaultConfig().RetrySleepInitDuration
+		logp.L().Warnf("agent.download.retry_sleep_init_duration must be > 0, got %s; using default %s",
+			tmp.RetrySleepInitDuration, def)
+		tmp.RetrySleepInitDuration = def
 	}
 
 	transport := DefaultConfig().HTTPTransportSettings

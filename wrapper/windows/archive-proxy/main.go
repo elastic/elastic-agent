@@ -10,7 +10,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
@@ -24,6 +26,33 @@ func main() {
 		// this should never happen
 		log.Fatal("No commit SHA provided\n")
 	}
+
+	// Absorb console-control signals (CTRL+C, CTRL+BREAK, etc.) so the proxy
+	// stays alive until the nested agent finishes its own graceful shutdown.
+	//
+	// The proxy spawns the nested agent without CREATE_NEW_PROCESS_GROUP, so
+	// the nested agent shares this proxy's process group and receives the
+	// same console signals directly from the kernel — it doesn't need us to
+	// forward anything. What it does need is for *us* not to die first: the
+	// proxy holds the only handle to a JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+	// JobObject the nested agent is assigned to, so if Windows' default Ctrl
+	// handler terminated the proxy with STATUS_CONTROL_C_EXIT, that JobObject
+	// would close and Windows would TerminateProcess the nested agent (and
+	// its component children) before they could finish flushing.
+	//
+	// By installing a signal handler we tell the Go runtime to suppress the
+	// default Windows handler and just push the signal onto a channel that
+	// nobody reads — turning the signal into a no-op for the proxy. The
+	// nested agent handles shutdown on its own and we wait for it via
+	// command.Wait below. See https://github.com/elastic/elastic-agent/issues/13586
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	defer signal.Stop(sigCh)
+	go func() {
+		for range sigCh {
+			// drain only — actual shutdown is driven by the nested agent
+		}
+	}()
 
 	exePath, err := os.Executable()
 	if err != nil {
