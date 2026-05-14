@@ -2990,8 +2990,13 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
+<<<<<<< HEAD
 	cfg := devtools.SettingsFromContext(ctx)
 	mg.Deps(Build.TestBinaries)
+=======
+	cfg := devtools.SettingsFromContextWithOptions(ctx, devtools.LoadOptions{SkipVCS: true})
+	mg.Deps(Build.TestFakeComponent)
+>>>>>>> 16ccf0be3 (Fix running integration tests without .git (#14277))
 	version := cfg.IntegrationTest.AgentVersion
 	if version == "" {
 		return errors.New("AGENT_VERSION environment variable must be set")
