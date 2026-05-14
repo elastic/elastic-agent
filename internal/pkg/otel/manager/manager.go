@@ -770,6 +770,11 @@ func (m *OTelManager) applyMergedConfig(
 		m.stopCollector()
 		if wasRunning {
 			m.emitCollectorOff(ctx)
+			// Emit STOPPED for all tracked otel-managed components. When the collector
+			// stops, the OpAMP session is closed and no further status updates arrive, so
+			// we must proactively emit STOPPED here to clear them from the coordinator state.
+			stoppedUpdates := m.processComponentStates(nil)
+			m.reportComponentStateUpdates(ctx, stoppedUpdates)
 		}
 		return nil
 	}
