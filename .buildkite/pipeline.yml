@@ -31,7 +31,6 @@ env:
 
 steps:
   - label: "check-ci"
-    skip: "fast testing"
     key: "check-ci"
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
@@ -46,7 +45,6 @@ steps:
     steps:
       - label: "Unit tests - Ubuntu 22.04"
         key: "unit-tests-2204"
-        skip: "fast testing"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
           - "build/TEST-*.html"
@@ -66,7 +64,6 @@ steps:
           - *google_oidc_plugin
 
       - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
-        skip: "fast testing"
         key: "unit-tests-2204-fips-tag"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
@@ -89,7 +86,6 @@ steps:
           - *google_oidc_plugin
 
       - label: "Unit tests - fips140=only Ubuntu 22.04"
-        skip: "fast testing"
         key: "unit-tests-2204-fips140-only"
         # Note: The GODEBUG=fips140=only environment variable must be set in the command itself (as opposed to
         # in the env block) so that it is applied *only* to the 'go' command invoked by the script, and
@@ -115,7 +111,6 @@ steps:
           - *google_oidc_plugin
 
       - label: "Unit tests - Ubuntu 22.04 ARM64"
-        skip: "fast testing"
         key: "unit-tests-2204-arm64"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
@@ -137,7 +132,6 @@ steps:
           - *google_oidc_plugin
 
       - label: "Unit tests - Windows 2022"
-        skip: "fast testing"
         key: "unit-tests-win2022"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
@@ -160,7 +154,6 @@ steps:
           - *google_oidc_plugin
 
       - label: "Unit tests - Windows 2016"
-        skip: "fast testing"
         key: "unit-tests-win2016"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
@@ -211,7 +204,6 @@ steps:
           - *google_oidc_plugin
 
   - group: "macOS tests"
-    skip: "fast testing"
     key: "macos-unit-tests"
     steps:
       - label: "Unit tests - macOS 15 ARM"
@@ -254,7 +246,6 @@ steps:
           - *google_oidc_plugin
 
   - group: "Desktop Windows tests"
-    skip: "fast testing"
     key: "extended-windows"
     steps:
       - label: "Unit tests - Windows 10"
@@ -324,7 +315,6 @@ steps:
           - *google_oidc_plugin
 
   - label: ":junit: Junit annotate"
-    skip: "fast testing"
     agents:
       # requires at least "bash", "curl" and "git"
       image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
@@ -356,7 +346,6 @@ steps:
         allow_failure: true
 
   - group: "K8s tests"
-    skip: "fast testing"
     key: "k8s-tests"
     steps:
       - label: "K8s tests: {{matrix.k8s_version}}"
@@ -383,7 +372,6 @@ steps:
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed
   - label: "Trigger k8s sync"
-    skip: "fast testing"
     branches: main
     command: ".buildkite/scripts/steps/sync-k8s.sh"
     agents:
@@ -398,7 +386,6 @@ steps:
 
   # Trigger for pull requests
   - label: "Trigger Extended tests for Pull request"
-    skip: "fast testing"
     if: |
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
@@ -447,7 +434,6 @@ steps:
   # Trigger for pull requests - Serverless Beats Tests
   # this should help detecting issues earlier in the development cycle
   - label: "Trigger Serverless Beats Tests"
-    skip: "fast testing"
     if: build.pull_request.id != null
     trigger: "beats-agent-serverless-tests"
     build:
@@ -462,7 +448,6 @@ steps:
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/issues/11604
   - label: "Trigger Elastic Agent Package"
-    skip: "fast testing"
     if: build.pull_request.id != null
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
@@ -487,7 +472,6 @@ steps:
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/pull/11725
   - label: "DRY RUN publish to serverless"
-    skip: "fast testing"
     if: build.pull_request.id != null && build.env("BUILDKITE_PULL_REQUEST_BASE_BRANCH") == "main"
     if_changed:
       include:
@@ -508,7 +492,6 @@ steps:
   - wait: ~
 
   - label: "Publish to serverless"
-    skip: "fast testing"
     branches: main
     trigger: "agentless-serverless-release"
     build:
