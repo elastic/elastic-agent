@@ -184,9 +184,13 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-  - group: "download tests"
+  - group: "download/upload tests"
     steps:
-      - label: "download 15 ARM"
+      - label: "upload"
+        command: "touch foo && buildkite-agent artifact upload foo"
+        plugins:
+          - *google_oidc_plugin
+      - label: "download"
         command: "buildkite-agent artifact download * . --step 'unit-tests-2204'"
         plugins:
           - *google_oidc_plugin
