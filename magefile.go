@@ -2830,7 +2830,7 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
-	cfg := devtools.SettingsFromContext(ctx)
+	cfg := devtools.SettingsFromContextWithOptions(ctx, devtools.LoadOptions{SkipVCS: true})
 	mg.Deps(Build.TestFakeComponent)
 	version := cfg.IntegrationTest.AgentVersion
 	if version == "" {
