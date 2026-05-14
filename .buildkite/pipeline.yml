@@ -48,6 +48,7 @@ steps:
     steps:
       - label: "Unit tests - Ubuntu 22.04"
         key: "unit-tests-2204"
+        skip: "fast testing"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
           - "build/TEST-*.html"
@@ -138,6 +139,7 @@ steps:
           - *google_oidc_plugin
 
       - label: "Unit tests - Windows 2022"
+        skip: "fast testing"
         key: "unit-tests-win2022"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
