@@ -15,7 +15,6 @@ common:
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
 
-
 steps:
   - label: "Packaging: Service Container linux/amd64"
     key: packaging-service-container-amd64
