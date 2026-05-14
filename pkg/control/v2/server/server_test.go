@@ -5,11 +5,15 @@
 package server
 
 import (
+	"context"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +28,70 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 )
+
+// TestStateWatch_LatestOnlyBufferLen verifies that StateWatch passes bufferLen=0
+// to StateSubscribe when latest_only=true, and bufferLen=32 when latest_only=false.
+func TestStateWatch_LatestOnlyBufferLen(t *testing.T) {
+	tests := []struct {
+		name       string
+		latestOnly bool
+		wantBufLen int
+	}{
+		{"latest_only=false uses bufferLen=32", false, 32},
+		{"latest_only=true uses bufferLen=0", true, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotBufLen := make(chan int, 1)
+			sub := &fakeStateSubscriber{
+				subscribeFunc: func(ctx context.Context, bufferLen int) chan coordinator.State {
+					gotBufLen <- bufferLen
+					ch := make(chan coordinator.State)
+					go func() { <-ctx.Done(); close(ch) }()
+					return ch
+				},
+			}
+
+			s := &Server{
+				stateSub:  sub,
+				agentInfo: new(info.AgentInfo),
+			}
+
+			lis, err := net.Listen("tcp", "localhost:0")
+			require.NoError(t, err)
+			grpcSrv := grpc.NewServer()
+			cproto.RegisterElasticAgentControlServer(grpcSrv, s)
+			go grpcSrv.Serve(lis) //nolint:errcheck
+			defer grpcSrv.Stop()
+
+			conn, err := grpc.NewClient(lis.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+			require.NoError(t, err)
+			defer conn.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+
+			stream, err := cproto.NewElasticAgentControlClient(conn).StateWatch(ctx, &cproto.StateWatchRequest{LatestOnly: tc.latestOnly})
+			require.NoError(t, err)
+			_ = stream
+
+			select {
+			case buf := <-gotBufLen:
+				assert.Equal(t, tc.wantBufLen, buf)
+			case <-ctx.Done():
+				t.Fatal("timed out waiting for StateSubscribe to be called")
+			}
+		})
+	}
+}
+
+type fakeStateSubscriber struct {
+	subscribeFunc func(ctx context.Context, bufferLen int) chan coordinator.State
+}
+
+func (f *fakeStateSubscriber) StateSubscribe(ctx context.Context, bufferLen int) chan coordinator.State {
+	return f.subscribeFunc(ctx, bufferLen)
+}
 
 func TestStateMapping(t *testing.T) {
 	now := time.Now()

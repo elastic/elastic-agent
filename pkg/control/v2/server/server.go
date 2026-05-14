@@ -46,6 +46,14 @@ type TestModeConfigSetter interface {
 	SetConfig(ctx context.Context, cfg string) error
 }
 
+// stateSubscriber is the subset of coordinator.Coordinator required by StateWatch.
+type stateSubscriber interface {
+	StateSubscribe(ctx context.Context, bufferLen int) chan coordinator.State
+}
+
+type RollbacksSource interface {
+	Get() (map[string]ttl.TTLMarker, error)
+}
 // Server is the daemon side of the control protocol.
 type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
@@ -53,6 +61,7 @@ type Server struct {
 	logger     *logger.Logger
 	agentInfo  info.Agent
 	coord      *coordinator.Coordinator
+	stateSub   stateSubscriber
 	listener   net.Listener
 	server     *grpc.Server
 	tracer     *apm.Tracer
@@ -69,6 +78,7 @@ func New(log *logger.Logger, agentInfo info.Agent, coord *coordinator.Coordinato
 		logger:         log,
 		agentInfo:      agentInfo,
 		coord:          coord,
+		stateSub:       coord,
 		tracer:         tracer,
 		diagHooks:      diagHooks,
 		grpcConfig:     grpcConfig,
@@ -151,7 +161,7 @@ func (s *Server) StateWatch(req *cproto.StateWatchRequest, srv cproto.ElasticAge
 	if req.GetLatestOnly() {
 		bufferLen = 0
 	}
-	subChan := s.coord.StateSubscribe(ctx, bufferLen)
+	subChan := s.stateSub.StateSubscribe(ctx, bufferLen)
 	for {
 		select {
 		case <-ctx.Done():
