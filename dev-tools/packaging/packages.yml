@@ -314,8 +314,6 @@ shared:
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
-<<<<<<< HEAD
-=======
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/elastic-otel-collector:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
         mode: 0755
@@ -341,7 +339,6 @@ shared:
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/osquery-extension.ext:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
         mode: 0755
->>>>>>> 7bb5dee29 (Fix non-executable package file permissions (#14117))
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/manifest.yaml:
         mode: 0644
         content: >
@@ -355,13 +352,8 @@ shared:
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/otelcol.sh'
       mode: 0755
     'otel_samples':
-<<<<<<< HEAD
       source: '{{ repo.RootDir }}/internal/pkg/otel/samples/linux/'
-      mode: 0755
-=======
-      source: '{{ repo.RootDir }}/internal/edot/samples/linux/'
       mode: 0644
->>>>>>> 7bb5dee29 (Fix non-executable package file permissions (#14117))
 
   - &agent_binary_common_files
     LICENSE.txt:
@@ -444,20 +436,9 @@ shared:
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/otelcol.sh'
       mode: 0755
     'otel_samples':
-<<<<<<< HEAD
       source: '{{ repo.RootDir }}/internal/pkg/otel/samples/darwin/'
-      mode: 0755
+      mode: 0644
     <<: *agent_darwin_app_bundle_files
-=======
-      source: '{{ repo.RootDir }}/internal/edot/samples/darwin/'
-      mode: 0644
-    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/Info.plist':
-      template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/Info.plist.tmpl'
-      mode: 0644
-    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/PkgInfo':
-      template: '{{ elastic_beats_dir }}/dev-tools/packaging/files/darwin/PkgInfo'
-      mode: 0644
->>>>>>> 7bb5dee29 (Fix non-executable package file permissions (#14117))
     <<: *agent_binary_common_files
 
   - &agent_unpacked_components_files
@@ -471,117 +452,6 @@ shared:
       mode: 0644
       skip_on_missing: true
 
-<<<<<<< HEAD
-=======
-  - &agent_unpacked_windows_components_files
-    'data/{{.BeatName}}-{{ core_commit_short }}/components':
-      source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/'
-      mode: 0755
-      config_mode: 0644
-      skip_on_missing: true
-    'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security-resources.zip':
-      source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/endpoint-security-resources.zip'
-      mode: 0644
-      skip_on_missing: true
-
-  - &agent_windows_otel_scripts_samples
-    'otelcol.ps1':
-      source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
-      mode: 0755
-    'data/{{.BeatName}}-{{ core_commit_short }}/otelcol.ps1':
-      source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
-      mode: 0755
-    'otel_samples':
-      source: '{{ repo.RootDir }}/internal/edot/samples/windows/'
-      mode: 0644
-
-  - &agent_otel_collector_binary_spec
-    'data/{{.BeatName}}-{{ core_commit_short }}/components/elastic-otel-collector{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
-      mode: 0755
-    'data/{{.BeatName}}-{{ core_commit_short }}/components/elastic-otel-collector.spec.yml':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
-      mode: 0644
-
-  - &agent_otel_collector_binary_spec_core
-    'components/elastic-otel-collector{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}'
-      mode: 0755
-    'components/elastic-otel-collector.spec.yml':
-      source: '{{ repo.RootDir }}/internal/edot/spec.yml'
-      mode: 0644
-
-  - &metricbeat_lightweight_module
-    'data/{{.BeatName}}-{{ core_commit_short }}/components/module':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
-      preserve_mode: true
-
-  - &metricbeat_lightweight_module_core
-    'components/module':
-      source: '{{ repo.RootDir }}/build/package/module'
-      preserve_mode: true
-
-  - &osquerybeat_osquery_certs
-    'data/{{.BeatName}}-{{ core_commit_short }}/components/certs/certs.pem':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/certs/certs.pem'
-      mode: 0640
-
-  - &osquerybeat_osquery_certs_core
-    'components/certs/certs.pem':
-      source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/certs/certs.pem'
-      mode: 0640
-
-  - &osquerybeat_osquery_lenses
-    'data/{{.BeatName}}-{{ core_commit_short }}/components/lenses':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/lenses'
-      preserve_mode: true
-
-  - &osquerybeat_osquery_lenses_core
-    'components/lenses':
-      source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/lenses'
-      preserve_mode: true
-
-  - &osquerybeat_osqueryd
-    'data/{{.BeatName}}-{{ core_commit_short }}/components/osqueryd{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osqueryd{{.BinaryExt}}'
-      mode: 0755
-
-  - &osquerybeat_osqueryd_core
-    'components/osqueryd{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/osqueryd{{.BinaryExt}}'
-      mode: 0755
-
-  - &osquerybeat_osqueryapp
-    'data/{{.BeatName}}-{{ core_commit_short }}/components/osquery.app':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery.app'
-      preserve_mode: true
-
-  - &osquerybeat_osqueryapp_core
-    'components/osquery.app':
-      source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/osquery.app'
-      preserve_mode: true
-
-  - &osquerybeat_extension
-    'data/{{.BeatName}}-{{ core_commit_short }}/components/osquery-extension.ext':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
-      mode: 0755
-
-  - &osquerybeat_extension_core
-    'components/osquery-extension.ext':
-      source: '{{ repo.RootDir }}/beats/x-pack/osquerybeat/ext/osquery-extension/build/golang-crossbuild/osquery-extension-{{.GOOS}}-{{.Platform.Arch}}'
-      mode: 0755
-
-  - &osquerybeat_extension_windows
-    'data/{{.BeatName}}-{{ core_commit_short }}/components/osquery-extension{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension{{.BinaryExt}}'
-      mode: 0755
-
-  - &osquerybeat_extension_windows_core
-    'components/osquery-extension{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/beats/x-pack/osquerybeat/ext/osquery-extension/build/golang-crossbuild/osquery-extension-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}'
-      mode: 0755
-
->>>>>>> 7bb5dee29 (Fix non-executable package file permissions (#14117))
   # Binary package spec (tar.gz for linux) for community beats.
   - &agent_binary_spec
     <<: *common
@@ -619,6 +489,10 @@ shared:
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/'
         mode: 0755
         config_mode: 0644
+        skip_on_missing: true
+      'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security-resources.zip':
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/endpoint-security-resources.zip'
+        mode: 0644
         skip_on_missing: true
       'otelcol.ps1':
         source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'

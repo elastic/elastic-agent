@@ -399,13 +399,8 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) {
 	checkDockerUser(t, p, info, *rootUserContainer)
 	checkRequiredFilePermissions(t, p, configFilePattern, os.FileMode(0644))
 	if !fipsPackage {
-<<<<<<< HEAD
-		// FIPS docker image do not contain an otelcol script, run this check only on non FIPS compliant images
-		checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
-=======
 		// FIPS docker image do not contain an otelcol script, run this check only on non FIPS-capable images
 		checkRequiredFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
->>>>>>> 7bb5dee29 (Fix non-executable package file permissions (#14117))
 	}
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
 	checkFilePermissions(t, p, otelSamplesFilePattern, expectedManifestMode)
@@ -419,65 +414,6 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) {
 	if strings.Contains(file, "-complete") {
 		checkCompleteDocker(t, file)
 	}
-<<<<<<< HEAD
-=======
-
-	name, err := dockerName(file, info.Config.Labels)
-	if err != nil {
-		t.Errorf("error constructing docker name: %v", err)
-		return "", -1
-	}
-
-	return name, info.Size
-}
-
-func dockerName(file string, labels map[string]string) (string, error) {
-	version, found := labels["version"]
-	if !found {
-		return "", errors.New("version label not found")
-	}
-
-	parts := strings.Split(file, "/")
-	if len(parts) == 0 {
-		return "", errors.New("failed to get file name parts")
-	}
-
-	lastPart := parts[len(parts)-1]
-	versionIdx := strings.Index(lastPart, version)
-	if versionIdx < 0 {
-		return "", fmt.Errorf("version not found in nam %q", file)
-	}
-	return lastPart[:versionIdx-1], nil
-}
-
-func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
-	p, info, err := readDocker(t, file, true)
-	if err != nil {
-		t.Errorf("error reading file %v: %v", file, err)
-		return "", -1
-	}
-
-	checkDockerEntryPoint(t, p, info)
-	checkDockerLabels(t, p, info, file)
-	checkDockerUser(t, p, info, *rootUserContainer)
-	checkRequiredFilePermissions(t, p, configFilePattern, os.FileMode(0644))
-	checkRequiredFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
-	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
-	checkFilePermissions(t, p, otelSamplesFilePattern, expectedManifestMode)
-	checkFilePermissions(t, p, otelCollectorSpecPattern, expectedManifestMode)
-	checkFilePermissions(t, p, endpointResourcesZipPattern, expectedManifestMode)
-	checkModulesPresent(t, "", p)
-	checkModulesDPresent(t, "", p)
-	checkLicensesPresent(t, "licenses/", p)
-
-	name, err := dockerName(file, info.Config.Labels)
-	if err != nil {
-		t.Errorf("error constructing docker name: %v", err)
-		return "", -1
-	}
-
-	return name, info.Size
->>>>>>> 7bb5dee29 (Fix non-executable package file permissions (#14117))
 }
 
 func checkCompleteDocker(t *testing.T, file string) {
