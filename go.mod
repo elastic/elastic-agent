@@ -2,7 +2,7 @@ module github.com/elastic/elastic-agent
 
 go 1.26.3
 
-replace github.com/elastic/beats/v7 => ./beats
+replace github.com/elastic/beats/v7 => /home/mikolaj/Projects/elastic-agent/beats
 
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
