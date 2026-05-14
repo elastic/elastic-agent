@@ -125,6 +125,7 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
+          - "build/crashdumps/*"
           - "coverage-*.out"
         agents:
           provider: "gcp"
@@ -145,6 +146,7 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
+          - "build/crashdumps/*"
           - "coverage-*.out"
         agents:
           provider: "gcp"
@@ -206,6 +208,7 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
+          - "build/crashdumps/*"
           - "coverage-*.out"
         agents:
           provider: "azure"
@@ -226,6 +229,7 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
+          - "build/crashdumps/*"
           - "coverage-*.out"
         agents:
           provider: "azure"
