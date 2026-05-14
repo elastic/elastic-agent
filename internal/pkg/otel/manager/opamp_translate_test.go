@@ -25,7 +25,6 @@ func TestComponentHealthToAggregate(t *testing.T) {
 			Healthy:   false,
 			Status:    "StatusRecoverableError",
 			LastError: "something failed",
-			//nolint:gosec // G115: ts.UnixNano() is positive for any post-epoch time.
 			StatusTimeUnixNano: uint64(ts.UnixNano()),
 		}
 
