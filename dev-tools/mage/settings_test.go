@@ -909,7 +909,10 @@ func TestMustLoadSettings(t *testing.T) {
 
 func TestLoadSettingsWithOptionsSkipVCS(t *testing.T) {
 	t.Run("initCommitHash fails outside a git repository", func(t *testing.T) {
-		t.Chdir(t.TempDir())
+		tmpDir := t.TempDir()
+		// Prevent git from walking up past tmpDir and finding the checkout's .git.
+		t.Setenv("GIT_CEILING_DIRECTORIES", tmpDir)
+		t.Chdir(tmpDir)
 
 		s := &Settings{}
 		err := s.initCommitHash()
