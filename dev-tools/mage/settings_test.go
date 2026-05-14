@@ -907,6 +907,22 @@ func TestMustLoadSettings(t *testing.T) {
 	})
 }
 
+func TestLoadSettingsWithOptionsSkipVCS(t *testing.T) {
+	t.Run("initCommitHash fails outside a git repository", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+
+		s := &Settings{}
+		err := s.initCommitHash()
+		require.Error(t, err)
+	})
+
+	t.Run("SkipVCS=true succeeds and leaves commit hash empty", func(t *testing.T) {
+		cfg, err := LoadSettingsWithOptions(LoadOptions{SkipVCS: true})
+		require.NoError(t, err)
+		assert.Empty(t, cfg.Build.CommitHash())
+	})
+}
+
 func TestEnvMap(t *testing.T) {
 	t.Run("includes settings values", func(t *testing.T) {
 		cfg, err := LoadSettings()
