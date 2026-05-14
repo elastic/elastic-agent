@@ -174,6 +174,8 @@ steps:
             limit: 1
           manual:
             allowed: true
+        # NOTE: we cannot use OIDC for windows-2016, it's not supported by BK
+        #       The Job API is available on Unix agents, and agents running Windows versions after build 17063
         plugins:
           - *google_oidc_plugin
 
