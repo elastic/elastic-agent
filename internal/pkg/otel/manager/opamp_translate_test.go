@@ -22,9 +22,9 @@ func TestComponentHealthToAggregate(t *testing.T) {
 	t.Run("leaf_with_status_and_error", func(t *testing.T) {
 		ts := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 		h := &protobufs.ComponentHealth{
-			Healthy:   false,
-			Status:    "StatusRecoverableError",
-			LastError: "something failed",
+			Healthy:            false,
+			Status:             "StatusRecoverableError",
+			LastError:          "something failed",
 			StatusTimeUnixNano: uint64(ts.UnixNano()),
 		}
 
