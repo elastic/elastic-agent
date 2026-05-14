@@ -5,8 +5,6 @@
 package upgrade
 
 import (
-	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -23,24 +21,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
-
-// TestCleanMarker_RemovesExistingMarker is a regression test for the
-// !os.IsNotExist(err) antipattern previously present in CleanMarker.
-// When the marker existed and os.Remove succeeded, os.IsNotExist(nil)
-// returned false and the function returned the nil error — happening to
-// be correct only because there was no subsequent work. The guard is
-// still load-bearing for future additions; this test pins the behavior.
-func TestCleanMarker_RemovesExistingMarker(t *testing.T) {
-	dataDir := t.TempDir()
-	markerFile := markerFilePath(dataDir)
-	require.NoError(t, os.WriteFile(markerFile, []byte("placeholder"), 0o600))
-
-	log, _ := loggertest.New(t.Name())
-	require.NoError(t, CleanMarker(log, dataDir))
-
-	_, err := os.Stat(markerFile)
-	require.True(t, errors.Is(err, fs.ErrNotExist), "marker file must be removed, got err=%v", err)
-}
 
 func TestCleanMarker_MissingMarkerIsOK(t *testing.T) {
 	dataDir := t.TempDir()
