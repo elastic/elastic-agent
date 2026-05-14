@@ -873,10 +873,17 @@ func addUIDGidEnvArgs(args []string) ([]string, error) {
 			"Using UID=%d GID=%d", uid, gid)
 	}
 
-	return append(args,
-		"-e", "EXEC_UID="+strconv.Itoa(uid),
-		"-e", "EXEC_GID="+strconv.Itoa(gid),
-	), nil
+	// In rootless Docker, container UID 0 maps to the host user's UID, so files
+	// created as root inside the container are already owned by the correct user
+	// on the host.
+	if !isRootlessDocker() {
+		args = append(args,
+			"-e", "EXEC_UID="+strconv.Itoa(uid),
+			"-e", "EXEC_GID="+strconv.Itoa(gid),
+		)
+	}
+
+	return args, nil
 }
 
 // addFileToZip adds a file (or directory) to a zip archive.
