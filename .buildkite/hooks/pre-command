@@ -60,8 +60,8 @@ fi
 # Required: Upload destination
 export BUILDKITE_ARTIFACT_UPLOAD_DESTINATION="gs://buildkite-elastic-agent/$BUILDKITE_PIPELINE_ID/$BUILDKITE_BUILD_ID/$BUILDKITE_JOB_ID"
 
-# Optional: ACL
-export BUILDKITE_GS_ACL="private"
+# Disable ACL setting for GCS buckets with uniform bucket-level access
+export BUILDKITE_GS_ACL=""
 
 # Optional: Authenticated access in UI
 export BUILDKITE_GCS_ACCESS_HOST="storage.cloud.google.com"
