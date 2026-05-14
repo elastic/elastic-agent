@@ -149,13 +149,13 @@ func (s *Server) State(_ context.Context, _ *cproto.Empty) (*cproto.StateRespons
 }
 
 // StateWatch streams the current state of the Elastic Agent to the client.
-func (s *Server) StateWatch(_ *cproto.Empty, srv cproto.ElasticAgentControl_StateWatchServer) error {
+func (s *Server) StateWatch(req *cproto.StateWatchRequest, srv cproto.ElasticAgentControl_StateWatchServer) error {
 	ctx := srv.Context()
-	// TODO: Should we expose the subscription buffer size in the RPC? This
-	// would e.g. let subscribers who only care about the latest state set a
-	// buffer size of 0 so they will always receive the most recent value
-	// instead of the full sequence.
-	subChan := s.coord.StateSubscribe(ctx, 32)
+	bufferLen := 32
+	if req.GetLatestOnly() {
+		bufferLen = 0
+	}
+	subChan := s.coord.StateSubscribe(ctx, bufferLen)
 	for {
 		select {
 		case <-ctx.Done():
