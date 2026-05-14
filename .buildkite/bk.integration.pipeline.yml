@@ -739,6 +739,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2022}"
         plugins:
+          - *google_oidc_observability_plugin
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
 
@@ -761,6 +762,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
         plugins:
+          - *google_oidc_observability_plugin
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
       - label: "Ubuntu:2404:amd64:sudo"
@@ -781,6 +783,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
+          - *google_oidc_observability_plugin
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
 
