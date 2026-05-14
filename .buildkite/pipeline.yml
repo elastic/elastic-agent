@@ -3,13 +3,11 @@
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:
-  - google_oidc_plugin: &google_oidc_plugin
+  - google_oidc_observability_plugin: &google_oidc_observability_plugin
       # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
       # This plugin authenticates to Google Cloud using the OIDC token.
       elastic/oblt-google-auth#v1.3.0:
         lifetime: 10800 # seconds
-        project-id: "elastic-observability-ci"
-        project-number: "911195782929"
   - sparse_checkout_plugin: &sparse_checkout_plugin
       sparse-checkout#v1.6.0:
         paths:
@@ -37,25 +35,25 @@ steps:
       - key: "upload-readme"
         command: "touch README1.md"
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
         artifact_paths:
           - "README1.md"
       - key: "upload-foo"
         command: "touch foo && buildkite-agent artifact upload foo"
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
       - label: "download artifact_paths"
         depends_on:
           - step: "upload-readme"
         command: "buildkite-agent artifact download 'README1.md' . --step 'upload-readme'"
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
       - label: "download_agent"
         depends_on:
           - step: "upload-foo"
         command: "buildkite-agent artifact download 'foo' . --step 'upload-foo'"
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
 
   - label: "check-ci"
     key: "check-ci"
@@ -88,7 +86,7 @@ steps:
           manual:
             allowed: true
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
 
       - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
         key: "unit-tests-2204-fips-tag"
@@ -110,7 +108,7 @@ steps:
           manual:
             allowed: true
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
 
       - label: "Unit tests - fips140=only Ubuntu 22.04"
         key: "unit-tests-2204-fips140-only"
@@ -135,7 +133,7 @@ steps:
           manual:
             allowed: true
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
 
       - label: "Unit tests - Ubuntu 22.04 ARM64"
         key: "unit-tests-2204-arm64"
@@ -156,7 +154,7 @@ steps:
           manual:
             allowed: true
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
 
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
@@ -178,7 +176,7 @@ steps:
           manual:
             allowed: true
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
 
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
@@ -202,7 +200,7 @@ steps:
         # NOTE: we cannot use OIDC for windows-2016, it's not supported by BK
         #       The Job API is available on Unix agents, and agents running Windows versions after build 17063
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
 
   - group: "macOS tests"
     key: "macos-unit-tests"
@@ -222,8 +220,6 @@ steps:
             limit: 1
           manual:
             allowed: true
-        plugins:
-          - *google_oidc_plugin
 
       # Runs only on main and release branches
       - label: "Unit tests - macOS 13"
@@ -244,7 +240,7 @@ steps:
           manual:
             allowed: true
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
 
   - group: "Desktop Windows tests"
     key: "extended-windows"
@@ -269,7 +265,7 @@ steps:
           manual:
             allowed: true
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
 
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
@@ -291,7 +287,7 @@ steps:
           manual:
             allowed: true
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
 
       - label: "Unit tests - Windows 11 arm64"
         key: "unit-tests-win11-arm64"
@@ -313,7 +309,7 @@ steps:
           manual:
             allowed: true
         plugins:
-          - *google_oidc_plugin
+          - *google_oidc_observability_plugin
 
   - label: ":junit: Junit annotate"
     agents:
