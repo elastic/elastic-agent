@@ -5,7 +5,7 @@ go 1.26.3
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260512230302-d61a96255c9d
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260513201213-90648d9c9c65
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.42.2
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.46.0
@@ -311,7 +311,7 @@ require (
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
 	github.com/elastic/go-perf v0.0.0-20260224073651-af0ee0c731b7 // indirect
 	github.com/elastic/go-seccomp-bpf v1.6.0 // indirect
-	github.com/elastic/go-sfdc v0.0.0-20251207194532-c5aadd4a4e06 // indirect
+	github.com/elastic/go-sfdc v0.0.0-20260504130806-a46e22d049d9 // indirect
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-sysinfo v1.15.4 // indirect
 	github.com/elastic/go-ucfg v0.9.1 // indirect
