@@ -240,3 +240,4 @@ steps:
           format: "junit"
           branches: "main"
           debug: true
+      - *google_oidc_plugin

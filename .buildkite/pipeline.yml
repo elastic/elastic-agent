@@ -30,30 +30,6 @@ env:
   IMAGE_WIN_11_ARM64_VERSION: "1.0.1778605951"
 
 steps:
-  - group: "download/upload tests"
-    steps:
-      - key: "upload-readme"
-        command: "touch README1.md"
-        plugins:
-          - *google_oidc_observability_plugin
-        artifact_paths:
-          - "README1.md"
-      - key: "upload-foo"
-        command: "touch foo && buildkite-agent artifact upload foo"
-        plugins:
-          - *google_oidc_observability_plugin
-      - label: "download artifact_paths"
-        depends_on:
-          - step: "upload-readme"
-        command: "buildkite-agent artifact download 'README1.md' . --step 'upload-readme'"
-        plugins:
-          - *google_oidc_observability_plugin
-      - label: "download_agent"
-        depends_on:
-          - step: "upload-foo"
-        command: "buildkite-agent artifact download 'foo' . --step 'upload-foo'"
-        plugins:
-          - *google_oidc_observability_plugin
 
   - label: "check-ci"
     key: "check-ci"
@@ -324,6 +300,7 @@ steps:
           artifacts: "**TEST-*.xml"
           always-annotate: true
           run-in-docker: false
+      - *google_oidc_observability_plugin
     depends_on:
       - step: "unit-tests-2204"
         allow_failure: true
