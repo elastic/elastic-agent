@@ -16,6 +16,12 @@ common:
   - vault_docker_login: &vault_docker_login
       elastic/vault-docker-login#v0.5.2:
         secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+  - sparse_checkout_plugin: &sparse_checkout_plugin
+      sparse-checkout#v1.6.0:
+        paths:
+        - .buildkite
+        - .go-version
+        - version/version.go
 
 steps:
   - group: "Integration tests: packaging"
@@ -163,12 +169,16 @@ steps:
 
   - label: "Triggering Integration tests"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
+    plugins:
+    - *sparse_checkout_plugin
 
   ## PRs
   - label: "Triggering custom FIPS integration tests"
     if: build.pull_request.id != null
     key: "fips-its-prs"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
+    plugins:
+    - *sparse_checkout_plugin
     if_changed:
       include:
         - .buildkite/**
@@ -181,6 +191,8 @@ steps:
     if: build.pull_request.id == null
     key: "fips-its-branches"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
+    plugins:
+    - *sparse_checkout_plugin
 
   - label: "Test packages"
     depends_on:
