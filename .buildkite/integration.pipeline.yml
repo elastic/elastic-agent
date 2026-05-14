@@ -169,6 +169,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
           - *vault_docker_login
+          - *google_oidc_plugin
 
       - label: ":package: arm64: FIPS Containers"
         key: packaging-containers-arm64-fips
