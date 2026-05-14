@@ -1367,7 +1367,7 @@ specs:
         <<: *common_fips
         <<: *elastic_license_for_binaries
         name: '{{.BeatName}}'
-        version: '{{ beat_version }}'
+        version: '{{ agent_core_version }}'
         qualifier: core-fips
         files:
           '{{.BeatName}}{{.BinaryExt}}':
