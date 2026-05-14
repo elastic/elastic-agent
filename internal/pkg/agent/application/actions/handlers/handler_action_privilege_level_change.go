@@ -7,7 +7,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"os/user"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -96,7 +95,10 @@ func (h *PrivilegeLevelChange) handleChange(ctx context.Context, a fleetapi.Acti
 	}
 
 	if !isRoot {
-		// check if we're already running as the desired user
+		// Already running unprivileged. The action is a duplicate iff our
+		// current effective identity already matches the target. See
+		// currentEffectiveIDs (per-platform) for why we don't use
+		// os/user.Current() on Unix — issue #14079.
 		gid, err := install.FindGID(groupname)
 		if err != nil {
 			return fmt.Errorf("failed to find GID for group %s: %w", groupname, err)
@@ -106,16 +108,16 @@ func (h *PrivilegeLevelChange) handleChange(ctx context.Context, a fleetapi.Acti
 			return fmt.Errorf("failed to find UID for user %s: %w", username, err)
 		}
 
-		currentUser, err := user.Current()
+		currentUID, currentGID, err := currentEffectiveIDs()
 		if err != nil {
-			return fmt.Errorf("failed to get current user: %w", err)
+			return err
 		}
 
-		if targetingSameUser(currentUser.Uid, currentUser.Gid, fmt.Sprint(uid), fmt.Sprint(gid)) {
-			// already running as desired user, do not fail the action
-			// some form of deduplication
+		h.log.Debugf("handlerPrivilegeLevelChange: dedup check current_uid=%q current_gid=%q target_uid=%q target_gid=%q target_username=%q target_groupname=%q",
+			currentUID, currentGID, fmt.Sprint(uid), fmt.Sprint(gid), username, groupname)
+
+		if targetingSameUser(currentUID, currentGID, fmt.Sprint(uid), fmt.Sprint(gid)) {
 			h.log.Infof("already running as user %s and group %s, no changes required", username, groupname)
-			// ack action so it's not hanging
 			ackCommitFn()
 			return nil
 		}
