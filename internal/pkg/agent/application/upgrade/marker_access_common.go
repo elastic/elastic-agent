@@ -31,14 +31,13 @@ func writeMarkerFileCommon(markerFile string, markerBytes []byte, shouldFsync bo
 		return fmt.Errorf("failed to write upgrade marker file: %w", err)
 	}
 
-	if !shouldFsync {
-		return nil
+	if shouldFsync {
+		if err := f.Sync(); err != nil {
+			return fmt.Errorf("failed to sync upgrade marker file to disk: %w", err)
+		}
 	}
 
-	if err := f.Sync(); err != nil {
-		return fmt.Errorf("failed to sync upgrade marker file to disk: %w", err)
-	}
-	// I think we need to close before trying to swap the files on Windows
+	// Close before rotating on Windows to avoid sharing violations.
 	closeFile()
 
 	if err := file.SafeFileRotate(markerFile, f.Name()); err != nil {
