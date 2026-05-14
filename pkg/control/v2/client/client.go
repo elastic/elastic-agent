@@ -207,7 +207,9 @@ type Client interface {
 	// State returns the current state of the running agent.
 	State(ctx context.Context) (*AgentState, error)
 	// StateWatch watches the current state of the running agent.
-	StateWatch(ctx context.Context) (ClientStateWatch, error)
+	// Pass WithLatestOnly() to skip intermediate states and always receive
+	// the most recent state at the time of each read.
+	StateWatch(ctx context.Context, opts ...StateWatchOption) (ClientStateWatch, error)
 	// Restart triggers restarting the current running daemon.
 	Restart(ctx context.Context) error
 	// Upgrade triggers upgrade of the current running daemon.
@@ -230,6 +232,21 @@ type Client interface {
 type ClientStateWatch interface {
 	// Recv receives the next agent state.
 	Recv() (*AgentState, error)
+}
+
+// StateWatchOption configures a StateWatch call.
+type StateWatchOption func(*stateWatchConfig)
+
+type stateWatchConfig struct {
+	latestOnly bool
+}
+
+// WithLatestOnly configures StateWatch to always return the most recent agent
+// state at the time of each read, skipping any intermediate states that
+// accumulated since the previous read. Use this when only the current state
+// matters and replaying every transition would be wasteful.
+func WithLatestOnly() StateWatchOption {
+	return func(c *stateWatchConfig) { c.latestOnly = true }
 }
 
 // Option is an option to adjust how the client operates.
@@ -319,8 +336,12 @@ func (c *client) State(ctx context.Context) (*AgentState, error) {
 }
 
 // StateWatch watches the current state of the running agent.
-func (c *client) StateWatch(ctx context.Context) (ClientStateWatch, error) {
-	cli, err := c.client.StateWatch(ctx, &cproto.Empty{})
+func (c *client) StateWatch(ctx context.Context, opts ...StateWatchOption) (ClientStateWatch, error) {
+	cfg := &stateWatchConfig{}
+	for _, o := range opts {
+		o(cfg)
+	}
+	cli, err := c.client.StateWatch(ctx, &cproto.StateWatchRequest{LatestOnly: cfg.latestOnly})
 	if err != nil {
 		return nil, err
 	}
