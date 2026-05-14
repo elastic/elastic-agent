@@ -56,3 +56,14 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" ]]; then
     release_manager_login
   fi
 fi
+
+# Required: Upload destination
+export BUILDKITE_ARTIFACT_UPLOAD_DESTINATION="gs://buildkite-elastic-agent/$BUILDKITE_PIPELINE_ID/$BUILDKITE_BUILD_ID/$BUILDKITE_JOB_ID"
+
+# Optional: ACL
+export BUILDKITE_GS_ACL="private"
+
+# Optional: Authenticated access in UI
+export BUILDKITE_GCS_ACCESS_HOST="storage.cloud.google.com"
+
+export BUILDKITE_AGENT_LOG_LEVEL="debug"
