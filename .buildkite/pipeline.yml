@@ -1,5 +1,15 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - sparse_checkout_plugin: &sparse_checkout_plugin
+      sparse-checkout#v1.6.0:
+        paths:
+        - .buildkite
+        - .go-version
+        - version/version.go
+
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
 
@@ -303,6 +313,8 @@ steps:
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
     command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
+    plugins:
+    - *sparse_checkout_plugin
     env:
       BUILDKITE_PULL_REQUEST: ${BUILDKITE_PULL_REQUEST}
       BUILDKITE_PULL_REQUEST_BASE_BRANCH: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
@@ -362,6 +374,8 @@ steps:
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh | buildkite-agent pipeline upload
+    plugins:
+    - *sparse_checkout_plugin
     if_changed:
       include:
         - .buildkite/pipeline.elastic-agent-package.yml
