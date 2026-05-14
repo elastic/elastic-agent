@@ -562,14 +562,34 @@ func listSrcGOPATHs() ([]string, error) {
 // settingsContextKey is the key used to store Settings in context.
 type settingsContextKey struct{}
 
+// LoadOptions configures optional behavior during settings loading.
+type LoadOptions struct {
+	// SkipVCS disables git-based initialization (commit hash lookup).
+	// Use this when running mage targets in a directory that is not a git
+	// repository and the commit hash is not needed.
+	SkipVCS bool
+}
+
 // SettingsFromContext returns the Settings from the context if present,
 // otherwise loads fresh settings from environment variables. This is the preferred
 // way to get settings in mage targets that receive a context.
 func SettingsFromContext(ctx context.Context) *Settings {
+	return SettingsFromContextWithOptions(ctx, LoadOptions{})
+}
+
+// SettingsFromContextWithOptions returns the Settings from the context if present,
+// otherwise loads fresh settings using the provided LoadOptions. Use this in mage
+// targets that need non-default load behaviour (e.g. LoadOptions{SkipVCS: true})
+// but still want to reuse already-loaded settings stored in the context.
+func SettingsFromContextWithOptions(ctx context.Context, opts LoadOptions) *Settings {
 	if s, ok := ctx.Value(settingsContextKey{}).(*Settings); ok && s != nil {
 		return s
 	}
-	return MustLoadSettings()
+	s, err := LoadSettingsWithOptions(opts)
+	if err != nil {
+		panic(fmt.Errorf("failed to load settings: %w", err))
+	}
+	return s
 }
 
 // ContextWithSettings returns a new context with the given Settings stored in it.
@@ -1274,6 +1294,13 @@ func MustLoadSettings() *Settings {
 // LoadSettings reads all settings from environment variables and returns a new Settings.
 // Each call returns a fresh settings with defaults, then overridden by environment variables.
 func LoadSettings() (*Settings, error) {
+	return LoadSettingsWithOptions(LoadOptions{})
+}
+
+// LoadSettingsWithOptions reads all settings from environment variables and returns a new Settings,
+// respecting the provided LoadOptions. Use LoadOptions.SkipVCS to skip git-based initialization
+// when running in a directory that is not a git repository.
+func LoadSettingsWithOptions(opts LoadOptions) (*Settings, error) {
 	s := DefaultSettings()
 
 	if err := s.loadBuildSettingsFromEnv(); err != nil {
@@ -1311,8 +1338,10 @@ func LoadSettings() (*Settings, error) {
 	if err := s.initBuildVariables(); err != nil {
 		return nil, fmt.Errorf("initializing build variables: %w", err)
 	}
-	if err := s.initCommitHash(); err != nil {
-		return nil, fmt.Errorf("initializing commit hash: %w", err)
+	if !opts.SkipVCS {
+		if err := s.initCommitHash(); err != nil {
+			return nil, fmt.Errorf("initializing commit hash: %w", err)
+		}
 	}
 
 	return s, nil
