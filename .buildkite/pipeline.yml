@@ -8,6 +8,8 @@ common:
       # This plugin authenticates to Google Cloud using the OIDC token.
       elastic/oblt-google-auth#v1.3.0:
         lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
   - sparse_checkout_plugin: &sparse_checkout_plugin
       sparse-checkout#v1.6.0:
         paths:
