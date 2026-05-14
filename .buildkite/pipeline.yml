@@ -375,7 +375,14 @@ steps:
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh | buildkite-agent pipeline upload
     plugins:
-    - *sparse_checkout_plugin
+    - sparse-checkout#v1.6.0:
+        paths:
+        - .buildkite
+        - .go-version
+        - version/version.go
+        - .package-version
+        - magefile.go
+        - dev-tools
     if_changed:
       include:
         - .buildkite/pipeline.elastic-agent-package.yml
