@@ -1822,6 +1822,168 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			}),
 		},
+		{
+			name:              "filestream per stream default processors are stripped when DefaultProcessors is enabled",
+			defaultProcessors: func() *bool { b := true; return &b }(),
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "filestream-default",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:   "filestream-unit",
+								Type: client.UnitTypeInput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"id":         "test",
+									"use_output": "default",
+									"streams": []any{
+										map[string]any{
+											"id": "test-1",
+											"data_stream": map[string]any{
+												"dataset": "generic-1",
+											},
+											"paths": []any{"/var/log/*.log"},
+											// Mix of default processors (should be stripped) and a
+											// custom one (must be preserved).
+											"processors": []any{
+												map[string]any{"add_cloud_metadata": nil},
+												map[string]any{"add_docker_metadata": nil},
+												map[string]any{"add_kubernetes_metadata": nil},
+												map[string]any{
+													"add_host_metadata": map[string]any{
+														"when.not.contains.tags": "forwarded",
+													},
+												},
+												map[string]any{
+													"timestamp": map[string]any{
+														"field":   "datetime",
+														"layouts": []any{"2006-01-02T15:04:05.999999999"},
+													},
+												},
+											},
+										},
+									},
+								}),
+							},
+							{
+								ID:     "filestream-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"processors": map[string]any{
+					// Default processors must appear here — applied once globally per event.
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"filebeatreceiver/_agent-component/filestream-default": map[string]any{
+						"filebeat": map[string]any{
+							"inputs": []map[string]any{
+								{
+									"id":   "test-1",
+									"type": "filestream",
+									"data_stream": map[string]any{
+										"dataset": "generic-1",
+									},
+									"paths": []any{"/var/log/*.log"},
+									"index": "logs-generic-1-default",
+									// Default processors must NOT appear here; only add_agent_metadata
+									// (injected by createStreamRulesForReceiver) and the custom timestamp
+									// processor must survive.
+									"processors": []any{
+										mapstr.M{
+											"add_agent_metadata": mapstr.M{
+												"data_stream": mapstr.M{
+													"dataset":   "generic-1",
+													"namespace": "default",
+													"type":      "logs",
+												},
+												"elastic_agent": mapstr.M{
+													"id":       agentInfo.AgentID(),
+													"snapshot": agentInfo.Snapshot(),
+													"version":  agentInfo.Version(),
+												},
+												"input_id":  "test",
+												"stream_id": "test-1",
+											},
+										},
+										map[string]any{
+											"timestamp": map[string]any{
+												"field":   "datetime",
+												"layouts": []any{"2006-01-02T15:04:05.999999999"},
+											},
+										},
+									},
+								},
+							},
+						},
+						"path": map[string]any{
+							"home": paths.Components(),
+							"data": filepath.Join(paths.Run(), "filestream-default"),
+						},
+						"queue": map[string]any{
+							"mem": map[string]any{
+								"events": uint64(3200),
+								"flush": map[string]any{
+									"min_events": uint64(1600),
+									"timeout":    "10s",
+								},
+							},
+						},
+						"logging": map[string]any{
+							"with_fields": map[string]any{
+								"component": map[string]any{
+									"binary":  "filebeat",
+									"dataset": "elastic_agent.filebeat",
+									"type":    "filestream",
+									"id":      "filestream-default",
+								},
+								"log": map[string]any{
+									"source": "filestream-default",
+								},
+							},
+						},
+						"http": map[string]any{
+							"enabled": false,
+						},
+						"management.otel.enabled": true,
+					},
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/filestream-default": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"filebeatreceiver/_agent-component/filestream-default"},
+						},
+					},
+				},
+			}),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
