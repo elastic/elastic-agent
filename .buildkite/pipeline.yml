@@ -332,7 +332,6 @@ steps:
 
   - group: "K8s tests"
     key: "k8s-tests"
-    skip: "faster builds"
     steps:
       - label: "K8s tests: {{matrix.k8s_version}}"
         env:
@@ -372,7 +371,6 @@ steps:
 
   # Trigger for pull requests
   - label: "Trigger Extended tests for Pull request"
-    skip: "faster builds"
     if: |
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
