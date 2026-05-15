@@ -8,12 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-<<<<<<< HEAD
-=======
 	"io/fs"
 	"os"
 	"path/filepath"
->>>>>>> afe041a57 (Fix silent early-return when removing stale enrollment and upgrade artifacts (#14234))
 	"testing"
 	"testing/synctest"
 	"time"
@@ -176,9 +173,6 @@ func TestRetryEnroll_InterruptsBackoffWaitOnCtxCancel(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 	})
 }
-<<<<<<< HEAD
-=======
-
 // TestClearAgentStores_RemovesBothFiles is a regression test for the
 // !os.IsNotExist(err) antipattern that previously lived inline in enroll().
 // When the action store file existed and was successfully removed, the
@@ -209,47 +203,3 @@ func TestClearAgentStores_MissingFilesAreOK(t *testing.T) {
 
 	require.NoError(t, clearAgentStores(actionStore, stateStore))
 }
-
-func TestLoadPersistentConfig_FleetCheckin(t *testing.T) {
-	tests := []struct {
-		name     string
-		yaml     string
-		expected *configuration.FleetCheckin
-	}{
-		{
-			name:     "no fleet.checkin uses default",
-			yaml:     "",
-			expected: configuration.DefaultFleetCheckin(),
-		},
-		{
-			name: "compression none",
-			yaml: "fleet:\n  checkin:\n    compression: none\n",
-			expected: &configuration.FleetCheckin{
-				Compression: configuration.CheckinCompressionNone,
-			},
-		},
-		{
-			name: "compression gzip",
-			yaml: "fleet:\n  checkin:\n    compression: gzip\n",
-			expected: &configuration.FleetCheckin{
-				Compression: configuration.CheckinCompressionGzip,
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			tmpFile, err := os.CreateTemp(t.TempDir(), "elastic-agent-*.yml")
-			require.NoError(t, err)
-			require.NoError(t, os.WriteFile(tmpFile.Name(), []byte(tc.yaml), 0o600))
-			tmpFile.Close()
-
-			result, err := LoadPersistentConfig(tmpFile.Name())
-			require.NoError(t, err)
-
-			require.Contains(t, result, "fleet.checkin")
-			require.Equal(t, tc.expected, result["fleet.checkin"])
-		})
-	}
-}
->>>>>>> afe041a57 (Fix silent early-return when removing stale enrollment and upgrade artifacts (#14234))
