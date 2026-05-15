@@ -24,7 +24,7 @@ K8S_MIN_VERSION="v1.27.16"
 K8S_MAX_VERSION="v1.34.0"
 ALL_VERSIONS='["v1.27.16", "v1.28.15", "v1.29.14", "v1.30.0", "v1.31.0", "v1.32.0", "v1.33.0", "v1.34.0"]'
 
-DEFAULT_VARIANT='["basic"]'
+DEFAULT_VARIANT='["complete", "complete-wolfi"]'
 ALL_VARIANTS='["basic", "slim", "complete", "service", "elastic-otel-collector", "wolfi", "slim-wolfi", "complete-wolfi", "elastic-otel-collector-wolfi"]'
 
 # Packaging-related files that trigger Tier 2 testing
