@@ -11,7 +11,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	stderrors "errors"
 	"io"
 	"io/fs"
 	"net"
@@ -1155,10 +1154,10 @@ func TestClearAgentStores_RemovesBothFiles(t *testing.T) {
 	require.NoError(t, clearAgentStores(actionStore, stateStore))
 
 	_, err := os.Stat(actionStore)
-	require.True(t, stderrors.Is(err, fs.ErrNotExist), "action store file must be removed, got err=%v", err)
+	require.ErrorIs(t, err, fs.ErrNotExist, "action store file must be removed")
 
 	_, err = os.Stat(stateStore)
-	require.True(t, stderrors.Is(err, fs.ErrNotExist), "state store file must be removed, got err=%v", err)
+	require.ErrorIs(t, err, fs.ErrNotExist, "state store file must be removed")
 }
 
 func TestClearAgentStores_MissingFilesAreOK(t *testing.T) {
