@@ -11,7 +11,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	stderrors "errors"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -1134,4 +1136,35 @@ func Test_EnrollCmd_RemoteConfig(t *testing.T) {
 			require.EqualValues(t, tc.expectedRemote, actCfg)
 		})
 	}
+}
+
+// TestClearAgentStores_RemovesBothFiles is a regression test for the
+// !os.IsNotExist(err) antipattern that previously lived inline in enroll().
+// When the action store file existed and was successfully removed, the
+// subsequent os.IsNotExist(nil) returned false and the function returned
+// early without ever attempting to remove the state store file — leaving
+// stale state-store data behind across enrollments.
+func TestClearAgentStores_RemovesBothFiles(t *testing.T) {
+	dir := t.TempDir()
+	actionStore := filepath.Join(dir, "action_store.yml")
+	stateStore := filepath.Join(dir, "state.enc")
+
+	require.NoError(t, os.WriteFile(actionStore, []byte("stale-action"), 0o600))
+	require.NoError(t, os.WriteFile(stateStore, []byte("stale-state"), 0o600))
+
+	require.NoError(t, clearAgentStores(actionStore, stateStore))
+
+	_, err := os.Stat(actionStore)
+	require.True(t, stderrors.Is(err, fs.ErrNotExist), "action store file must be removed, got err=%v", err)
+
+	_, err = os.Stat(stateStore)
+	require.True(t, stderrors.Is(err, fs.ErrNotExist), "state store file must be removed, got err=%v", err)
+}
+
+func TestClearAgentStores_MissingFilesAreOK(t *testing.T) {
+	dir := t.TempDir()
+	actionStore := filepath.Join(dir, "action_store.yml")
+	stateStore := filepath.Join(dir, "state.enc")
+
+	require.NoError(t, clearAgentStores(actionStore, stateStore))
 }
