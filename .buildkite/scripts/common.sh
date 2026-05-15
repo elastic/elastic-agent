@@ -65,7 +65,7 @@ start_rpm_lock_diagnostics() {
       if [[ -n "${lock_pids}" ]]; then
         sudo fuser -v /var/lib/rpm/.rpm.lock 2>&1
         echo "process tree for lock holders:"
-        ps -p "${lock_pids// /,}" -o pid,ppid,cmd 2>&1 || true
+        ps -p "$(echo "${lock_pids}" | tr -s ' ' ',' | sed 's/^,//;s/,$//')" -o pid,ppid,cmd 2>&1 || true
       else
         echo "(lock not held)"
       fi
