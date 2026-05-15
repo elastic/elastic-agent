@@ -38,6 +38,12 @@ spec:
       branch_configuration: "main 7.* 8.* 9.*"
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/pipeline.yml"
+      initial_step_plugins:
+      - sparse-checkout#v1.6.0:
+          paths:
+          - .buildkite
+          - .go-version
+          - version/version.go
       provider_settings:
         build_pull_request_forks: false
         build_pull_requests: true
@@ -46,11 +52,6 @@ spec:
         # required by "build_pull_requests: true" when used with buildkite-pr-bot
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
-      schedules:
-        Daily main:
-          branch: main
-          cronline: "0 0 * * 1-5"
-          message: Mon-Fri daily build
       cancel_intermediate_builds: true
       cancel_intermediate_builds_branch_filter: "!main !7.* !8.* !9.*"
       skip_intermediate_builds: true
