@@ -101,8 +101,8 @@ func TestStandaloneUpgrade_Flavor_Servers(t *testing.T) {
 		Group: integration.UpgradeFlavor,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
-		// apm-server and fleet-server have no windows/arm64 build
-		// (see dev-tools/packaging/packages.yml: comp-apm_server, comp-fleet-server),
+		// apm-server has no windows/arm64 build
+		// (see dev-tools/packaging/packages.yml: comp-apm_server),
 		// so the "servers" flavor cannot be exercised on this combination. The
 		// older agents in the upgrade matrix additionally lack windows/arm64
 		// support in their upgrade artifact map (PR #11673).
