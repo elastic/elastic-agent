@@ -68,13 +68,19 @@ message Empty {
 
 // StateWatchRequest is the request message for StateWatch.
 message StateWatchRequest {
-  // If true, the subscriber will always receive the most recent state at the
-  // time of the read, skipping any intermediate states that have accumulated
-  // since the last read. Useful for subscribers that only care about the
-  // current state rather than the full sequence of transitions.
-  // If false (default), the subscriber receives up to 32 buffered states in
-  // order, preserving backward compatibility with the previous Empty request.
-  bool latest_only = 1;
+  // Number of recent state transitions to buffer per subscriber. When the
+  // subscriber falls behind by more than this many transitions, the oldest
+  // ones are dropped so the subscriber skips ahead to the most recent
+  // buffer_size transitions.
+  //
+  // 0 = latest-only: always deliver the most recent state, skipping all
+  //     intermediate transitions accumulated since the last read.
+  //
+  // Unset = server default (currently 32), preserving backward compatibility
+  //     for clients that send no request or an empty request.
+  //
+  // Values above the server's internal maximum are capped silently.
+  optional int32 buffer_size = 1;
 }
 
 // Version response message.

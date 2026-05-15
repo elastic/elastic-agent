@@ -234,11 +234,19 @@ type ClientStateWatch interface {
 	Recv() (*AgentState, error)
 }
 
+// StateWatchBufferSizeLatestOnly and StateWatchBufferSizeAllAvailable are
+// convenience re-exports of the same constants from the cproto package, so
+// callers do not need to import cproto directly.
+const (
+	StateWatchBufferSizeLatestOnly   = cproto.StateWatchBufferSizeLatestOnly
+	StateWatchBufferSizeAllAvailable = cproto.StateWatchBufferSizeAllAvailable
+)
+
 // StateWatchOption configures a StateWatch call.
 type StateWatchOption func(*stateWatchConfig)
 
 type stateWatchConfig struct {
-	latestOnly bool
+	bufferSize *int32
 }
 
 // WithLatestOnly configures StateWatch to always return the most recent agent
@@ -246,7 +254,15 @@ type stateWatchConfig struct {
 // accumulated since the previous read. Use this when only the current state
 // matters and replaying every transition would be wasteful.
 func WithLatestOnly() StateWatchOption {
-	return func(c *stateWatchConfig) { c.latestOnly = true }
+	return WithBufferSize(StateWatchBufferSizeLatestOnly)
+}
+
+// WithBufferSize configures the number of recent state transitions buffered per
+// read. Use StateWatchBufferSizeLatestOnly (0) for latest-only delivery, or
+// StateWatchBufferSizeAllAvailable (32) to receive all buffered transitions in
+// order. Values above the server's internal maximum are capped silently.
+func WithBufferSize(n int32) StateWatchOption {
+	return func(c *stateWatchConfig) { c.bufferSize = &n }
 }
 
 // Option is an option to adjust how the client operates.
@@ -341,7 +357,7 @@ func (c *client) StateWatch(ctx context.Context, opts ...StateWatchOption) (Clie
 	for _, o := range opts {
 		o(cfg)
 	}
-	cli, err := c.client.StateWatch(ctx, &cproto.StateWatchRequest{LatestOnly: cfg.latestOnly})
+	cli, err := c.client.StateWatch(ctx, &cproto.StateWatchRequest{BufferSize: cfg.bufferSize})
 	if err != nil {
 		return nil, err
 	}

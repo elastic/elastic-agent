@@ -157,9 +157,9 @@ func (s *Server) State(_ context.Context, _ *cproto.Empty) (*cproto.StateRespons
 // StateWatch streams the current state of the Elastic Agent to the client.
 func (s *Server) StateWatch(req *cproto.StateWatchRequest, srv cproto.ElasticAgentControl_StateWatchServer) error {
 	ctx := srv.Context()
-	bufferLen := 32
-	if req.GetLatestOnly() {
-		bufferLen = 0
+	bufferLen := int(cproto.StateWatchBufferSizeAllAvailable)
+	if req.BufferSize != nil {
+		bufferLen = int(req.GetBufferSize())
 	}
 	subChan := s.stateSub.StateSubscribe(ctx, bufferLen)
 	for {

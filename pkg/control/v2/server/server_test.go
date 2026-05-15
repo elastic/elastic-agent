@@ -29,16 +29,22 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 )
 
-// TestStateWatch_LatestOnlyBufferLen verifies that StateWatch passes bufferLen=0
-// to StateSubscribe when latest_only=true, and bufferLen=32 when latest_only=false.
-func TestStateWatch_LatestOnlyBufferLen(t *testing.T) {
+// TestStateWatch_BufferSize verifies that StateWatch passes the requested
+// buffer_size to StateSubscribe, and falls back to AllAvailable (32) when
+// buffer_size is unset.
+func TestStateWatch_BufferSize(t *testing.T) {
+	allAvail := cproto.StateWatchBufferSizeAllAvailable
+	latestOnly := cproto.StateWatchBufferSizeLatestOnly
+	custom := int32(8)
 	tests := []struct {
 		name       string
-		latestOnly bool
+		bufferSize *int32
 		wantBufLen int
 	}{
-		{"latest_only=false uses bufferLen=32", false, 32},
-		{"latest_only=true uses bufferLen=0", true, 0},
+		{"unset uses AllAvailable (32)", nil, 32},
+		{"LatestOnly (0) passes 0", &latestOnly, 0},
+		{"AllAvailable (32) passes 32", &allAvail, 32},
+		{"custom value (8) passes 8", &custom, 8},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -71,7 +77,7 @@ func TestStateWatch_LatestOnlyBufferLen(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 
-			stream, err := cproto.NewElasticAgentControlClient(conn).StateWatch(ctx, &cproto.StateWatchRequest{LatestOnly: tc.latestOnly})
+			stream, err := cproto.NewElasticAgentControlClient(conn).StateWatch(ctx, &cproto.StateWatchRequest{BufferSize: tc.bufferSize})
 			require.NoError(t, err)
 			_ = stream
 
