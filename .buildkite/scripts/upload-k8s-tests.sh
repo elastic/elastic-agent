@@ -5,7 +5,7 @@ set -euo pipefail
 # This script determines which Kubernetes test tier to run and uploads the appropriate pipeline.
 #
 # Test Tiers:
-# - Tier 1: Min/max K8s versions, basic container image only
+# - Tier 1: Min/max K8s versions, complete* container images only
 # - Tier 2: Min/max K8s versions, all container images
 # - Tier 3: All K8s versions, all container images
 #
