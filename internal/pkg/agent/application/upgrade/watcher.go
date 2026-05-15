@@ -131,7 +131,11 @@ func (ch *AgentWatcher) Run(ctx context.Context) {
 				if flipFlopCount > statusFailureFlipFlopsAllowed {
 					err := fmt.Errorf("%w '%d' times in a row", ErrAgentFlipFlopFailed, flipFlopCount)
 					ch.log.Error(err)
-					ch.notifyChan <- err
+					select {
+					case ch.notifyChan <- err:
+					case <-ctx.Done():
+						return
+					}
 				}
 			case <-failedTimer.C:
 				if failedErr == nil {
@@ -139,8 +143,12 @@ func (ch *AgentWatcher) Run(ctx context.Context) {
 					continue
 				}
 				// error lasted longer than the checkInterval, notify!
-				ch.notifyChan <- fmt.Errorf("last error was not cleared before checkInterval (%s) elapsed: %w",
-					ch.checkInterval, failedErr)
+				select {
+				case ch.notifyChan <- fmt.Errorf("last error was not cleared before checkInterval (%s) elapsed: %w",
+					ch.checkInterval, failedErr):
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}()
@@ -163,7 +171,7 @@ LOOP:
 			if err != nil {
 				ch.connectCounter.Add(1)
 				ch.log.Errorf("Failed connecting to running daemon: %s", err)
-				if ch.checkFailures() {
+				if ch.checkFailures(ctx) {
 					return
 				}
 				// agent is probably not running
@@ -178,7 +186,7 @@ LOOP:
 				ch.agentClient.Disconnect()
 				ch.log.Errorf("Failed to start state watch: %s", err)
 				ch.connectCounter.Add(1)
-				if ch.checkFailures() {
+				if ch.checkFailures(ctx) {
 					return
 				}
 				// agent is probably not running
@@ -218,7 +226,7 @@ LOOP:
 					ch.agentClient.Disconnect()
 					ch.log.Errorf("Lost connection: failed reading next state: %s", err)
 					ch.lostCounter.Add(1)
-					if ch.checkFailures() {
+					if ch.checkFailures(ctx) {
 						return
 					}
 					continue LOOP
@@ -238,7 +246,7 @@ LOOP:
 					// count the PID change as a lost connection, but allow
 					// the communication to continue unless has become a failure
 					ch.lostCounter.Add(1)
-					if ch.checkFailures() {
+					if ch.checkFailures(ctx) {
 						stateCancel()
 						ch.agentClient.Disconnect()
 						return
@@ -271,13 +279,19 @@ LOOP:
 	}
 }
 
-func (ch *AgentWatcher) checkFailures() bool {
+func (ch *AgentWatcher) checkFailures(ctx context.Context) bool {
 	if failures := ch.connectCounter.Load(); failures > statusCheckMissesAllowed {
-		ch.notifyChan <- fmt.Errorf("%w '%d' times in a row", ErrCannotConnect, failures)
+		select {
+		case ch.notifyChan <- fmt.Errorf("%w '%d' times in a row", ErrCannotConnect, failures):
+		case <-ctx.Done():
+		}
 		return true
 	}
 	if failures := ch.lostCounter.Load(); failures > statusLossesAllowed {
-		ch.notifyChan <- fmt.Errorf("%w '%d' times in a row", ErrLostConnection, failures)
+		select {
+		case ch.notifyChan <- fmt.Errorf("%w '%d' times in a row", ErrLostConnection, failures):
+		case <-ctx.Done():
+		}
 		return true
 	}
 	return false
