@@ -24,6 +24,35 @@ env:
   IMAGE_WIN_10_VERSION: "1.0.1778605951"
   IMAGE_WIN_11_VERSION: "1.0.1778605951"
   IMAGE_WIN_11_ARM64_VERSION: "1.0.1778605951"
+  BUILDKITE_PLUGIN_S3_CACHE_BUCKET: "elastic-agent-ci-go-cache"
+  BUILDKITE_PLUGIN_S3_CACHE_PREFIX: "elastic-agent-test"
+
+common:
+- aws_oidc: &aws_oidc
+    # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-aws-buildkite-oidc.tf
+    elastic/oblt-aws-auth#v0.2.0:
+- base_cache_settings: &base_cache_settings
+    manifest:
+     - go.mod
+     - go.sum
+     - internal/edot/go.mod
+     - internal/edot/go.sum
+     - .go-version
+    backend: s3
+    restore: pipeline
+    save:
+    - file
+    - branch
+    compression: tgz
+- linux_cache_settings: &linux_cache_settings
+    <<: *base_cache_settings
+    path: /opt/buildkite-agent/.cache/go-build
+- windows_cache_settings: &windows_cache_settings
+    <<: *base_cache_settings
+    path: /c/Users/buildkite/AppData/Local/go-build
+- macos_cache_settings: &macos_cache_settings
+    <<: *base_cache_settings
+    path: /Users/admin/Library/Caches/go-build
 
 steps:
   - label: "check-ci"
@@ -51,6 +80,11 @@ steps:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
           machineType: "n2-standard-8"
+        plugins:
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/amd64"
         retry:
           automatic:
             limit: 1
@@ -71,6 +105,11 @@ steps:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
           machineType: "n2-standard-8"
+        plugins:
+        - *aws_oidc
+        - cache#v1.8.0:
+            <<: *linux_cache_settings
+            key-extra: "linux/amd64"
         retry:
           automatic:
             limit: 1
@@ -94,6 +133,11 @@ steps:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
           machineType: "n2-standard-8"
+        plugins:
+        - *aws_oidc
+        - cache#v1.8.0:
+            <<: *linux_cache_settings
+            key-extra: "linux/amd64"
         retry:
           automatic:
             limit: 1
@@ -113,6 +157,11 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
           diskSizeGb: 200
           instanceType: "m6g.xlarge"
+        plugins:
+        - *aws_oidc
+        - cache#v1.8.0:
+            <<: *linux_cache_settings
+            key-extra: "linux/arm64"
         retry:
           automatic:
             limit: 1
@@ -133,6 +182,11 @@ steps:
           machineType: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
+        plugins:
+        - *aws_oidc
+        - cache#v1.8.0:
+            <<: *windows_cache_settings
+            key-extra: "windows/amd64"
         retry:
           automatic:
             limit: 1
@@ -153,6 +207,11 @@ steps:
           machineType: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
+        plugins:
+        - *aws_oidc
+        - cache#v1.8.0:
+            <<: *windows_cache_settings
+            key-extra: "windows/amd64"
         retry:
           automatic:
             limit: 1
@@ -172,6 +231,11 @@ steps:
         agents:
           provider: orka
           imagePrefix: generic-base-15-arm-002
+        plugins:
+        - *aws_oidc
+        - cache#v1.8.0:
+            <<: *macos_cache_settings
+            key-extra: "macos/arm64"
         retry:
           automatic:
             limit: 1
@@ -191,6 +255,11 @@ steps:
         agents:
           provider: orka
           imagePrefix: generic-13-ventura-x64
+        plugins:
+        - *aws_oidc
+        - cache#v1.8.0:
+            <<: *macos_cache_settings
+            key-extra: "macos/arm64"
         retry:
           automatic:
             limit: 1
@@ -214,6 +283,11 @@ steps:
           imageVersion: "${IMAGE_WIN_10_VERSION}"
           vmSize: "Standard_D8s_v5"
           diskSizeGb: "256"
+        plugins:
+        - *aws_oidc
+        - cache#v1.8.0:
+            <<: *windows_cache_settings
+            key-extra: "windows/amd64"
         retry:
           automatic:
             limit: 1
@@ -236,6 +310,11 @@ steps:
           imageVersion: "${IMAGE_WIN_11_VERSION}"
           vmSize: "Standard_D8s_v5"
           diskSizeGb: "256"
+        plugins:
+        - *aws_oidc
+        - cache#v1.8.0:
+            <<: *windows_cache_settings
+            key-extra: "windows/amd64"
         retry:
           automatic:
             limit: 1
@@ -258,6 +337,11 @@ steps:
           imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
           vmSize: "Standard_D8ps_v6"
           diskSizeGb: "256"
+        plugins:
+        - *aws_oidc
+        - cache#v1.8.0:
+            <<: *windows_cache_settings
+            key-extra: "windows/arm64"
         retry:
           automatic:
             limit: 1
