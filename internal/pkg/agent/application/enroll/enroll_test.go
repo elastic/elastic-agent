@@ -173,6 +173,7 @@ func TestRetryEnroll_InterruptsBackoffWaitOnCtxCancel(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 	})
 }
+
 // TestClearAgentStores_RemovesBothFiles is a regression test for the
 // !os.IsNotExist(err) antipattern that previously lived inline in enroll().
 // When the action store file existed and was successfully removed, the
