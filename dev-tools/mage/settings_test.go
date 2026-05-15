@@ -6,6 +6,7 @@ package mage
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -904,6 +905,26 @@ func TestMustLoadSettings(t *testing.T) {
 			settings := MustLoadSettings()
 			assert.NotNil(t, settings)
 		})
+	})
+}
+
+func TestLoadSettingsWithOptionsSkipVCS(t *testing.T) {
+	t.Run("initCommitHash fails outside a git repository", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		// Prevent git from walking up past tmpDir and finding the checkout's .git.
+		// The ceiling must be a strict ancestor of cwd; listing tmpDir itself is ignored.
+		t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(tmpDir))
+		t.Chdir(tmpDir)
+
+		s := &Settings{}
+		err := s.initCommitHash()
+		require.Error(t, err)
+	})
+
+	t.Run("SkipVCS=true succeeds and leaves commit hash empty", func(t *testing.T) {
+		cfg, err := LoadSettingsWithOptions(LoadOptions{SkipVCS: true})
+		require.NoError(t, err)
+		assert.Empty(t, cfg.Build.CommitHash())
 	})
 }
 
