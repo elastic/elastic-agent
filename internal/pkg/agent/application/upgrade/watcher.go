@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
@@ -53,8 +54,10 @@ var (
 // AgentWatcher watches for the ability to connect to the running Elastic Agent, if it reports any errors
 // and how many times it disconnects from the Elastic Agent while running.
 type AgentWatcher struct {
-	connectCounter int
-	lostCounter    int
+	// connectCounter and lostCounter are written only by Run() but may be read
+	// concurrently by tests, so they use atomic types to avoid a data race.
+	connectCounter atomic.Int32
+	lostCounter    atomic.Int32
 	lastPid        int32
 
 	notifyChan    chan error
@@ -84,8 +87,8 @@ func NewAgentWatcher(ch chan error, log *logger.Logger, checkInterval time.Durat
 func (ch *AgentWatcher) Run(ctx context.Context) {
 	ch.log.Info("Agent watcher started")
 
-	ch.connectCounter = 0
-	ch.lostCounter = 0
+	ch.connectCounter.Store(0)
+	ch.lostCounter.Store(0)
 	ch.lastPid = -1
 
 	// tracking of an error runs in a separate goroutine, because
@@ -158,7 +161,7 @@ LOOP:
 			err := ch.agentClient.Connect(connectCtx, grpc.WithBlock(), grpc.WithDisableRetry(), grpc.FailOnNonTempDialError(true))
 			connectCancel()
 			if err != nil {
-				ch.connectCounter++
+				ch.connectCounter.Add(1)
 				ch.log.Errorf("Failed connecting to running daemon: %s", err)
 				if ch.checkFailures() {
 					return
@@ -174,7 +177,7 @@ LOOP:
 				stateCancel()
 				ch.agentClient.Disconnect()
 				ch.log.Errorf("Failed to start state watch: %s", err)
-				ch.connectCounter++
+				ch.connectCounter.Add(1)
 				if ch.checkFailures() {
 					return
 				}
@@ -187,7 +190,7 @@ LOOP:
 			// clear the connectCounter as connection was successfully made
 			// we don't want a disconnect and a reconnect to be counted with
 			// the connectCounter that is tracked with the lostCounter
-			ch.connectCounter = 0
+			ch.connectCounter.Store(0)
 
 			// failure is tracked only for the life of the connection to
 			// the watch streaming protocol. either an error that last longer
@@ -214,7 +217,7 @@ LOOP:
 					stateCancel()
 					ch.agentClient.Disconnect()
 					ch.log.Errorf("Lost connection: failed reading next state: %s", err)
-					ch.lostCounter++
+					ch.lostCounter.Add(1)
 					if ch.checkFailures() {
 						return
 					}
@@ -234,7 +237,7 @@ LOOP:
 					ch.lastPid = state.Info.PID
 					// count the PID change as a lost connection, but allow
 					// the communication to continue unless has become a failure
-					ch.lostCounter++
+					ch.lostCounter.Add(1)
 					if ch.checkFailures() {
 						stateCancel()
 						ch.agentClient.Disconnect()
@@ -269,11 +272,11 @@ LOOP:
 }
 
 func (ch *AgentWatcher) checkFailures() bool {
-	if failures := ch.connectCounter; failures > statusCheckMissesAllowed {
+	if failures := ch.connectCounter.Load(); failures > statusCheckMissesAllowed {
 		ch.notifyChan <- fmt.Errorf("%w '%d' times in a row", ErrCannotConnect, failures)
 		return true
 	}
-	if failures := ch.lostCounter; failures > statusLossesAllowed {
+	if failures := ch.lostCounter.Load(); failures > statusLossesAllowed {
 		ch.notifyChan <- fmt.Errorf("%w '%d' times in a row", ErrLostConnection, failures)
 		return true
 	}

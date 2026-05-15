@@ -297,7 +297,7 @@ func TestWatcher_GracefulShutdownWithPreloadedLostCounter(t *testing.T) {
 	// reaches the threshold. The test file is in the same package so it can
 	// read the private field directly.
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		assert.Equal(c, statusLossesAllowed, w.lostCounter)
+		assert.Equal(c, int32(statusLossesAllowed), w.lostCounter.Load())
 	}, 3*time.Second, 5*time.Millisecond)
 
 	// Cancel the context, simulating grace-period expiry triggering watch()'s
