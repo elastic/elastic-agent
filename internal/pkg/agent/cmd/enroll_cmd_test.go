@@ -1002,7 +1002,7 @@ func mTLSServer(t *testing.T, agentPassphrase string) (
 	agentRootCertPool := x509.NewCertPool()
 	agentRootCertPool.AppendCertsFromPEM(agentRootPair.Cert)
 
-	cfg := &tls.Config{ //nolint:gosec // it's just a test
+	cfg := &tls.Config{
 		RootCAs:      fleetRootCertPool,
 		Certificates: []tls.Certificate{cert},
 		ClientCAs:    agentRootCertPool,

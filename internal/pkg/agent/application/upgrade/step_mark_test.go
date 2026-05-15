@@ -25,7 +25,6 @@ func TestCleanMarker_MissingMarkerIsOK(t *testing.T) {
 	require.NoError(t, CleanMarker(log, dataDir))
 }
 
-
 func TestMarkUpgrade(t *testing.T) {
 	log, _ := loggertest.New("test")
 	agent := agentInstall{
