@@ -48,12 +48,21 @@ try {
     # - schedtrace=10000: scheduler state every 10s; shows what was running on which M/P.
     # - GOTRACEBACK=crash: full goroutine traceback to stderr THEN raises SIGABRT, so WER
     #   captures the dump.
-    # - GOFLAGS=-count=999999: loop tests in-process so the bug has many chances per binary.
+    # Loop over fresh binary invocations (same reason as the diagnostic script: the crash
+    # is most likely at binary startup; -count loops accumulate heap and OOM instead).
     $env:GODEBUG = "clobberfree=1,gctrace=1,schedtrace=10000"
     $env:GOTRACEBACK = "crash"
-    $env:GOFLAGS = "-count=999999"
-    mage unitTest
-    $mageExit = $LASTEXITCODE
+
+    $maxRuns = 5
+    for ($run = 1; $run -le $maxRuns; $run++) {
+        Write-Host "--- Unit test run $run of $maxRuns"
+        mage unitTest
+        $mageExit = $LASTEXITCODE
+        if ($mageExit -ne 0) {
+            Write-Host "Test binary exited with code $mageExit on run $run"
+            break
+        }
+    }
 
     Write-Host "--- Prepare artifacts"
     $buildkiteJobId = $env:BUILDKITE_JOB_ID
