@@ -6,3 +6,6 @@ $env:BUILDKITE_GS_ACL=""
 
 # Optional: Authenticated access in UI
 $env:BUILDKITE_GCS_ACCESS_HOST="storage.cloud.google.com"
+
+# Optional: Experimental https://buildkite.com/docs/agent/self-hosted/configure/experiments#available-experiments-normalised-upload-paths
+$env:BUILDKITE_AGENT_EXPERIMENT="normalised-upload-paths"
