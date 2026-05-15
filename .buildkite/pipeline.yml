@@ -1,8 +1,8 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
-# Diagnostic pipeline: Windows 11 unit tests only, 10 parallel runs.
-# Most failures are on Windows 11. parallelism:10 gives 10 independent
-# test-binary executions in parallel to reproduce the panic and capture
-# full goroutine dumps via GOTRACEBACK=crash.
+# Diagnostic pipeline: two Windows 11 variants for golang/go#77975.
+# "diagnostic" run: GOGC=1 forces a GC after every alloc to maximise the
+# shrinkstack/scanstack frequency and make the IOCP stack-corruption crash
+# more consistent. "instrumented" run: WER dumps + clobberfree + gctrace.
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
