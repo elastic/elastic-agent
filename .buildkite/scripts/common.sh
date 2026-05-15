@@ -61,7 +61,14 @@ start_rpm_lock_diagnostics() {
     while true; do
       echo "--- RPM lock diagnostics: $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
       echo "fuser /var/lib/rpm/.rpm.lock:"
-      sudo fuser -v /var/lib/rpm/.rpm.lock 2>&1 || echo "(lock not held)"
+      lock_pids=$(sudo fuser /var/lib/rpm/.rpm.lock 2>/dev/null) || true
+      if [[ -n "${lock_pids}" ]]; then
+        sudo fuser -v /var/lib/rpm/.rpm.lock 2>&1
+        echo "process tree for lock holders:"
+        ps -p "${lock_pids// /,}" -o pid,ppid,cmd 2>&1 || true
+      else
+        echo "(lock not held)"
+      fi
       echo "Running systemd services:"
       systemctl list-units --state=running --type=service --no-pager 2>&1 || true
       sleep 30
