@@ -2,6 +2,19 @@
 
 set -eo pipefail
 
+# Collect boot-probe artifacts if the probe ran (it's a no-op on container agents).
+if [[ -d /tmp/boot-probe ]]; then
+    if [[ -s /tmp/boot-probe/sampler.pid ]]; then
+        kill "$(cat /tmp/boot-probe/sampler.pid)" 2>/dev/null || true
+    fi
+    pkill -f 'vmstat 5'  2>/dev/null || true
+    pkill -f 'iostat -xz' 2>/dev/null || true
+    tar czf boot-probe.tgz -C /tmp boot-probe 2>/dev/null || true
+    if [[ -s boot-probe.tgz ]]; then
+        buildkite-agent artifact upload boot-probe.tgz || true
+    fi
+fi
+
 if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   if [[ -z "${WORKSPACE-""}" ]]; then
       WORKSPACE=$(git rev-parse --show-toplevel)
