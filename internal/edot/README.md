@@ -35,6 +35,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [akamaisiemreceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/akamaisiemreceiver/v0.1.0/receiver/akamaisiemreceiver/README.md) | v0.1.0 |
 | [apachereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/apachereceiver/v0.151.0/receiver/apachereceiver/README.md) | v0.151.0 |
 | [awss3receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awss3receiver/v0.151.0/receiver/awss3receiver/README.md) | v0.151.0 |
 | [azureeventhubreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/azureeventhubreceiver/v0.151.0/receiver/azureeventhubreceiver/README.md) | v0.151.0 |
