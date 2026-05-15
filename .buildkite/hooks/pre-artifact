@@ -8,3 +8,6 @@ export BUILDKITE_GS_ACL=""
 
 # Optional: Authenticated access in UI
 export BUILDKITE_GCS_ACCESS_HOST="storage.cloud.google.com"
+
+# Optional: for debugging purposes
+export BUILDKITE_AGENT_LOG_LEVEL="debug"

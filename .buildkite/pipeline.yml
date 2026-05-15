@@ -308,8 +308,6 @@ steps:
           always-annotate: true
           run-in-docker: false
       - *google_oidc_plugin
-    env:
-      BUILDKITE_AGENT_LOG_LEVEL: "debug"
     depends_on:
       - step: "unit-tests-2204"
         allow_failure: true
