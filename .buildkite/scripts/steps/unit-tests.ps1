@@ -19,12 +19,14 @@ $env:TEST_COVERAGE = $true
 if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
   $env:RACE_DETECTOR = $true
 }
-# Diagnostic: verify asyncpreemptoff=1 also prevents the panic on Windows 11
-# (previous confirmation was on Windows 2025 only). GOFLAGS=-count=999999 runs
-# each test repeatedly until the binary crashes; the job will either fail when
-# the corruption manifests or run until the CI timeout. If all 3 jobs survive,
-# asyncpreemptoff=1 is confirmed to suppress the bug on Windows 11 as well.
-$env:GODEBUG = "asyncpreemptoff=1"
+# Diagnostic: maximize GC pressure to make golang/go#77975 more consistent.
+# GOGC=1 triggers a GC cycle after every allocation, maximising shrinkstack and
+# scanstack frequency. This forces the kernel's async IOCP write (which targets
+# a goroutine-stack-allocated variable) to race against far more stack
+# relocations per second, making the memory-corruption crash far more likely
+# without suppressing the bug like asyncpreemptoff=1 does.
+# GOFLAGS=-count=999999 keeps each job looping until it crashes or times out.
+$env:GOGC = "1"
 $env:GOTRACEBACK = "crash"
 $env:GOFLAGS = "-count=999999"
 mage unitTest
@@ -36,5 +38,4 @@ Move-Item -Path "build/TEST-go-unit.xml" -Destination "build/TEST-$buildkiteJobI
 if ($LASTEXITCODE -ne 0) {
   exit 1
 }
-
 
