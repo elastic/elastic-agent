@@ -139,9 +139,9 @@ steps:
         key: "unit-tests-win2022"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
+          - "build\TEST-*.html"
+          - "build\TEST-*.xml"
+          - "build\diagnostics\*"
           - "coverage-*.out"
         agents:
           provider: "gcp"
@@ -163,9 +163,9 @@ steps:
         # NOTE: we cannot use OIDC for windows-2016, it's not supported by BK
         #       Therefore we cannot store artifacts on GCP
         #artifact_paths:
-        #  - "build/TEST-*.html"
-        #  - "build/TEST-*.xml"
-        #  - "build/diagnostics/*"
+        #  - "build\TEST-*.html"
+        #  - "build\TEST-*.xml"
+        #  - "build\diagnostics\*"
         #  - "coverage-*.out"
         agents:
           provider: "gcp"
@@ -232,9 +232,9 @@ steps:
         key: "unit-tests-win10"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
+          - "build\TEST-*.html"
+          - "build\TEST-*.xml"
+          - "build\diagnostics\*"
           - "coverage-*.out"
         agents:
           provider: "azure"
@@ -256,9 +256,9 @@ steps:
         key: "unit-tests-win11"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
+          - "build\TEST-*.html"
+          - "build\TEST-*.xml"
+          - "build\diagnostics\*"
           - "coverage-*.out"
         agents:
           provider: "azure"
@@ -280,9 +280,9 @@ steps:
         key: "unit-tests-win11-arm64"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
+          - "build\TEST-*.html"
+          - "build\TEST-*.xml"
+          - "build\diagnostics\*"
           - "coverage-*.out"
         agents:
           provider: "azure"
