@@ -42,7 +42,8 @@ disable_background_package_managers() {
     return 0
   fi
   echo "Disabling background package managers to prevent RPM lock contention"
-  for unit in dnf-automatic.timer dnf-makecache.timer dnf-makecache.service packagekit.service; do
+  # google-osconfig-agent performs GCP patch management and is a known RPM lock holder
+  for unit in dnf-automatic.timer dnf-makecache.timer dnf-makecache.service packagekit.service google-osconfig-agent.service; do
     sudo systemctl disable --now "$unit" 2>/dev/null || true
   done
 }
@@ -59,8 +60,8 @@ start_rpm_lock_diagnostics() {
   (
     while true; do
       echo "--- RPM lock diagnostics: $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
-      echo "lsof /var/lib/rpm/.rpm.lock:"
-      sudo lsof /var/lib/rpm/.rpm.lock 2>&1 || echo "(lock not held)"
+      echo "fuser /var/lib/rpm/.rpm.lock:"
+      sudo fuser -v /var/lib/rpm/.rpm.lock 2>&1 || echo "(lock not held)"
       echo "Running systemd services:"
       systemctl list-units --state=running --type=service --no-pager 2>&1 || true
       sleep 30
