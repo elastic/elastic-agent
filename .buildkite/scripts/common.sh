@@ -49,6 +49,27 @@ disable_background_package_managers() {
 
 disable_background_package_managers
 
+# On RPM-based systems, log the RPM lock state every 30 seconds in the background.
+# This captures which process holds /var/lib/rpm/.rpm.lock so that intermittent
+# lock contention failures have context in CI logs even when the failure is flaky.
+start_rpm_lock_diagnostics() {
+  if ! command -v dnf >/dev/null 2>&1; then
+    return 0
+  fi
+  (
+    while true; do
+      echo "--- RPM lock diagnostics: $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
+      echo "lsof /var/lib/rpm/.rpm.lock:"
+      sudo lsof /var/lib/rpm/.rpm.lock 2>&1 || echo "(lock not held)"
+      echo "Running systemd services:"
+      systemctl list-units --state=running --type=service --no-pager 2>&1 || true
+      sleep 30
+    done
+  ) &
+}
+
+start_rpm_lock_diagnostics
+
 getOSOptions() {
   case $(uname | tr '[:upper:]' '[:lower:]') in
     linux*)
