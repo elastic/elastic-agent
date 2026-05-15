@@ -1,11 +1,2 @@
 # Shorten BUILDKITE_MESSAGE if needed to avoid filling the Windows env var buffer
 $env:BUILDKITE_MESSAGE = $env:BUILDKITE_MESSAGE.Substring(0, [System.Math]::Min(2048, $env:BUILDKITE_MESSAGE.Length))
-
-# Required: Upload destination
-$env:BUILDKITE_ARTIFACT_UPLOAD_DESTINATION="gs://buildkite-elastic-agent/$env:BUILDKITE_PIPELINE_ID/$env:BUILDKITE_BUILD_ID/$env:BUILDKITE_JOB_ID"
-
-# Disable ACL setting for GCS buckets with uniform bucket-level access
-$env:BUILDKITE_GS_ACL=""
-
-# Optional: Authenticated access in UI
-$env:BUILDKITE_GCS_ACCESS_HOST="storage.cloud.google.com"
