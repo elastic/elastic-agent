@@ -7,13 +7,6 @@ git reset --quiet --hard
 
 $env:GOTMPDIR = "$env:BUILDKITE_BUILD_CHECKOUT_PATH"
 
-Write-Host "--- Build"
-mage build
-
-if ($LASTEXITCODE -ne 0) {
-  exit 1
-}
-
 Write-Host "--- Unit tests"
 $env:TEST_COVERAGE = $true
 if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
