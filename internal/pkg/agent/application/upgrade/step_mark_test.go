@@ -22,6 +22,13 @@ import (
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
+func TestCleanMarker_MissingMarkerIsOK(t *testing.T) {
+	dataDir := t.TempDir()
+
+	log, _ := loggertest.New(t.Name())
+	require.NoError(t, CleanMarker(log, dataDir))
+}
+
 func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
 	// Create a temporary directory for the test
 	tempDir := t.TempDir()
