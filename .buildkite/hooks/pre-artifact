@@ -10,4 +10,4 @@ export BUILDKITE_GS_ACL=""
 export BUILDKITE_GCS_ACCESS_HOST="storage.cloud.google.com"
 
 # Optional: for debugging purposes
-export BUILDKITE_AGENT_LOG_LEVEL="debug"
+#export BUILDKITE_AGENT_LOG_LEVEL="debug"
