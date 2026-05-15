@@ -25,17 +25,32 @@ if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
 # a goroutine-stack-allocated variable) to race against far more stack
 # relocations per second, making the memory-corruption crash far more likely
 # without suppressing the bug like asyncpreemptoff=1 does.
-# GOFLAGS=-count=999999 keeps each job looping until it crashes or times out.
+# Loop over fresh binary invocations instead of -count: the crash is most
+# likely at binary startup when goroutine stacks are freshly allocated.
 $env:GOGC = "1"
 $env:GOTRACEBACK = "crash"
-$env:GOFLAGS = "-count=999999"
-mage unitTest
-# Copy coverage file to build directory so it can be downloaded as an artifact
+
+$maxRuns = 5
+for ($run = 1; $run -le $maxRuns; $run++) {
+  Write-Host "--- Unit test run $run of $maxRuns"
+  mage unitTest
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "Test binary exited with code $LASTEXITCODE on run $run"
+    Write-Host "--- Prepare artifacts"
+    $buildkiteJobId = $env:BUILDKITE_JOB_ID
+    if (Test-Path "build/TEST-go-unit.cov") {
+      Move-Item -Path "build/TEST-go-unit.cov" -Destination "coverage-$buildkiteJobId.out"
+    }
+    if (Test-Path "build/TEST-go-unit.xml") {
+      Move-Item -Path "build/TEST-go-unit.xml" -Destination "build/TEST-$buildkiteJobId.xml"
+    }
+    exit $LASTEXITCODE
+  }
+}
+
+# Copy artifacts from the final run
 Write-Host "--- Prepare artifacts"
 $buildkiteJobId = $env:BUILDKITE_JOB_ID
 Move-Item -Path "build/TEST-go-unit.cov" -Destination "coverage-$buildkiteJobId.out"
 Move-Item -Path "build/TEST-go-unit.xml" -Destination "build/TEST-$buildkiteJobId.xml"
-if ($LASTEXITCODE -ne 0) {
-  exit 1
-}
 

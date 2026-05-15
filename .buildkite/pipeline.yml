@@ -23,7 +23,7 @@ steps:
   - label: "Unit tests - Windows 11 (diagnostic run %n)"
     key: "unit-tests-win11"
     command: .buildkite/scripts/steps/unit-tests.ps1
-    parallelism: 3
+    parallelism: 10
     artifact_paths:
       - "build/TEST-*.html"
       - "build/TEST-*.xml"
