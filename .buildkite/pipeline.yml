@@ -1,18 +1,29 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - sparse_checkout_plugin: &sparse_checkout_plugin
+      sparse-checkout#v1.6.0:
+        paths:
+        - .buildkite
+        - .go-version
+        - .package-version
+        - version/version.go
+
 env:
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1777597312"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1777597312"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1777597312"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1777597312"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1778806890"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1778806890"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1778806890"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1778806890"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
   IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
-  IMAGE_WIN_10_VERSION: "1.0.1777597312"
-  IMAGE_WIN_11_VERSION: "1.0.1777597312"
-  IMAGE_WIN_11_ARM64_VERSION: "1.0.1777597312"
+  IMAGE_WIN_10_VERSION: "1.0.1778806890"
+  IMAGE_WIN_11_VERSION: "1.0.1778806890"
+  IMAGE_WIN_11_ARM64_VERSION: "1.0.1778806890"
 
 steps:
   - label: "check-ci"
@@ -68,10 +79,7 @@ steps:
 
       - label: "Unit tests - fips140=only Ubuntu 22.04"
         key: "unit-tests-2204-fips140-only"
-        # Note: The GODEBUG=fips140=only environment variable must be set in the command itself (as opposed to
-        # in the env block) so that it is applied *only* to the 'go' command invoked by the script, and
-        # not to any other Go code executed as part of the Buildkite agent itself.
-        command: 'GODEBUG="fips140=only,tlsmlkem=0" .buildkite/scripts/steps/unit-tests.sh'
+        command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
           FIPS: "true"
         artifact_paths:
@@ -148,6 +156,28 @@ steps:
           manual:
             allowed: true
 
+      - label: "Unit tests - fips140=only Windows 2022"
+        key: "unit-tests-win2022-fips140-only"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          FIPS: "true"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_WIN_2022}"
+          machineType: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+
   - group: "macOS tests"
     key: "macos-unit-tests"
     steps:
@@ -170,6 +200,7 @@ steps:
       # Runs only on main and release branches
       - label: "Unit tests - macOS 13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
+        skip: "Ongoing issues with MacOS 13 CI runners. Unskip after resolved."
         branches: "main 8.* 9.*"
         artifact_paths:
           - "build/TEST-*.html"
@@ -209,6 +240,8 @@ steps:
             allowed: true
 
       - label: "Unit tests - Windows 11"
+        env:
+          GODEBUG: "asyncpreemptoff=1"  # see https://github.com/elastic/elastic-agent/issues/13796
         key: "unit-tests-win11"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
@@ -229,8 +262,32 @@ steps:
             allowed: true
 
       - label: "Unit tests - Windows 11 arm64"
+        env:
+          GODEBUG: "asyncpreemptoff=1"  # see https://github.com/elastic/elastic-agent/issues/13796
         key: "unit-tests-win11-arm64"
         command: .buildkite/scripts/steps/unit-tests.ps1
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "azure"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+
+      - label: "Unit tests - fips140=only Windows 11 arm64"
+        key: "unit-tests-win11-arm64-fips140-only"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          FIPS: "true"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -278,6 +335,10 @@ steps:
         allow_failure: true
       - step: "unit-tests-win11-arm64"
         allow_failure: true
+      - step: "unit-tests-win2022-fips140-only"
+        allow_failure: true
+      - step: "unit-tests-win11-arm64-fips140-only"
+        allow_failure: true
 
   - group: "K8s tests"
     key: "k8s-tests"
@@ -324,6 +385,8 @@ steps:
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
     command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
+    plugins:
+    - *sparse_checkout_plugin
     env:
       BUILDKITE_PULL_REQUEST: ${BUILDKITE_PULL_REQUEST}
       BUILDKITE_PULL_REQUEST_BASE_BRANCH: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
@@ -352,13 +415,16 @@ steps:
         - .buildkite/scripts/**
         - .buildkite/hooks/**
 
+  # NOTE: we won't run automatically for merge commits but on schedules and manually,
+  # as they are not relevant for pull requests and we want to avoid running them twice for the same pull request
+  # (once for the pull request itself and once for the merge commit)
   # Trigger for branches
-  - label: "Triggering Extended tests for branches"
-    if: build.pull_request.id == null
-    trigger: "elastic-agent-extended-testing"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
-      branch: "${BUILDKITE_BRANCH}"
+  #- label: "Triggering Extended tests for branches"
+  #  if: build.pull_request.id == null
+  #  trigger: "elastic-agent-extended-testing"
+  #  build:
+  #    commit: "${BUILDKITE_COMMIT}"
+  #    branch: "${BUILDKITE_BRANCH}"
 
   # Trigger for pull requests - Serverless Beats Tests
   # this should help detecting issues earlier in the development cycle
@@ -381,6 +447,15 @@ steps:
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh | buildkite-agent pipeline upload
+    plugins:
+    - sparse-checkout#v1.6.0:
+        paths:
+        - .buildkite
+        - .go-version
+        - version/version.go
+        - .package-version
+        - magefile.go
+        - dev-tools
     if_changed:
       include:
         - .buildkite/pipeline.elastic-agent-package.yml

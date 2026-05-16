@@ -168,6 +168,7 @@ The following example configuration files are available for the Gateway mode:
 % start:edot-gateway-9x-table
 | Version | Configuration  |
 |---------|----------------|
+| 9.4     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/linux/gateway.yml) |
 | 9.3     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/linux/gateway.yml) |
 | 9.2     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.8/internal/pkg/otel/samples/linux/gateway.yml) |
 | 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.10/internal/pkg/otel/samples/linux/gateway.yml) |
@@ -503,18 +504,18 @@ For Gateway mode configurations by Stack version, refer to the [Gateway mode sec
 [`resourcedetection`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor
 [`OTLP`]: https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver
 % start:edot-samples-links
-[Logs - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/linux/platformlogs.yml
-[Logs - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/linux/managed_otlp/platformlogs.yml
-[Logs &#124; Metrics - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/linux/platformlogs_hostmetrics.yml
-[Logs &#124; Metrics - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/linux/managed_otlp/platformlogs_hostmetrics.yml
-[Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/linux/logs_metrics_traces.yml
-[Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/linux/managed_otlp/logs_metrics_traces.yml
-[Logs - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/windows/platformlogs.yml
-[Logs - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/windows/managed_otlp/platformlogs.yml
-[Logs &#124; Metrics - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/windows/platformlogs_hostmetrics.yml
-[Logs &#124; Metrics - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/windows/managed_otlp/platformlogs_hostmetrics.yml
-[Logs &#124; Metrics &#124; App - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/windows/logs_metrics_traces.yml
-[Logs &#124; Metrics &#124; App - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.4/internal/edot/samples/windows/managed_otlp/logs_metrics_traces.yml
+[Logs - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/linux/platformlogs.yml
+[Logs - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/linux/managed_otlp/platformlogs.yml
+[Logs &#124; Metrics - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/linux/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/linux/managed_otlp/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/linux/logs_metrics_traces.yml
+[Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/linux/managed_otlp/logs_metrics_traces.yml
+[Logs - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/windows/platformlogs.yml
+[Logs - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/windows/managed_otlp/platformlogs.yml
+[Logs &#124; Metrics - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/windows/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/windows/managed_otlp/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics &#124; App - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/windows/logs_metrics_traces.yml
+[Logs &#124; Metrics &#124; App - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.1/internal/edot/samples/windows/managed_otlp/logs_metrics_traces.yml
 
 % end:edot-samples-links
 [Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/edot/samples/linux/gateway.yml

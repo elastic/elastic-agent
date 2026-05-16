@@ -33,7 +33,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
@@ -256,10 +255,7 @@ func (Build) GenerateConfig() error {
 func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch string) error {
 	fmt.Printf("--- Compiling root binary for %s windows archive\n", goarch)
 	cfg := devtools.SettingsFromContext(ctx)
-	hashShort, err := cfg.Build.CommitHashShort()
-	if err != nil {
-		return fmt.Errorf("error getting commit hash: %w", err)
-	}
+	hashShort := cfg.AgentCoreCommitHashShort()
 
 	outputName := "elastic-agent-archive-root"
 	if runtime.GOOS != "windows" {
@@ -290,11 +286,22 @@ func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch strin
 	}
 
 	if cfg.Build.FIPSBuild {
-		// there is no actual FIPS relevance for this particular binary
-		// but better safe than sorry
-		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
-		args.Env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
-		args.CGO = true
+		fipsConfig := packaging.Settings().FIPS
+		supported := false
+		for _, p := range fipsConfig.Compile.Platforms {
+			if p.Platform() == "windows/"+goarch {
+				supported = true
+				break
+			}
+		}
+
+		if supported {
+			// there is no actual FIPS relevance for this particular binary
+			// but better safe than sorry
+			args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
+			args.Env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
+			args.CGO = true
+		}
 	}
 
 	return devtools.Build(ctx, cfg, args)
@@ -576,16 +583,9 @@ func (Test) Unit(ctx context.Context) error {
 func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 
-	cfg := devtools.SettingsFromContext(ctx)
+	cfg := devtools.SettingsFromContext(ctx).WithFIPSBuild(true)
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	params.Env["FIPS"] = "true"
-
-	// We also set GODEBUG=tlsmlkem=0 to disable the X25519MLKEM768 TLS key
-	// exchange mechanism; without this setting and with the GODEBUG=fips140=only
-	// setting, we get errors in tests like so:
-	// Failed to connect: crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
-	// Note that we are only disabling this TLS key exchange mechanism in tests!
-	params.Env["GODEBUG"] = "fips140=only,tlsmlkem=0"
 	params.Tags = append(params.Tags, "requirefips")
 	return devtools.GoTest(ctx, params)
 }
@@ -615,6 +615,10 @@ func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
@@ -1089,11 +1093,10 @@ func Clean(ctx context.Context) error {
 }
 
 func dockerCommitHash(cfg *devtools.Settings) string {
-	commit, err := cfg.Build.CommitHash()
-	if err == nil && len(commit) > commitLen {
+	commit := cfg.Build.CommitHash()
+	if len(commit) > commitLen {
 		return commit[:commitLen]
 	}
-
 	return ""
 }
 
@@ -1269,7 +1272,6 @@ func collectPackageDependencies(cfg *devtools.Settings, platforms []string, pack
 			downloads.LogLevel.Set(downloads.FatalLevel)
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
-			completedDownloads := &atomic.Int32{}
 
 			for _, spec := range dependencies {
 				for _, platform := range platforms {
@@ -1289,7 +1291,7 @@ func collectPackageDependencies(cfg *devtools.Settings, platforms []string, pack
 						if mg.Verbose() {
 							log.Printf(">>> Downloading package %s component %s/%s", packageName, spec.BinaryName, platform)
 						}
-						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
+						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath))
 					}
 				}
 			}
@@ -1297,9 +1299,6 @@ func collectPackageDependencies(cfg *devtools.Settings, platforms []string, pack
 			err = errGroup.Wait()
 			if err != nil {
 				panic(err)
-			}
-			if completedDownloads.Load() == 0 {
-				panic(fmt.Sprintf("No packages were successfully downloaded. You may be building against an invalid or unreleased version. version=%s. If this is an unreleased version, try SNAPSHOT=true or EXTERNAL=false", packageVersion))
 			}
 		}
 	} else {
@@ -1506,6 +1505,10 @@ func PackageUsingDRA(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
@@ -1717,14 +1720,13 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, man
 
 // Helper that wraps the fetchBinaryFromArtifactsApi in a way that is compatible with the errgroup.Go() function.
 // Ensures the arguments are captured by value before starting the goroutine.
-func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string, compl *atomic.Int32) func() error {
+func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string) func() error {
 	return func() error {
 		_, err := downloads.FetchProjectBinary(ctx, project, packageName, binary, version, 3, false, targetPath, true)
 		if err != nil {
 			return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
 		}
 
-		compl.Add(1)
 		fmt.Printf("Done downloading %s into %s\n", packageName, targetPath)
 		return nil
 	}
@@ -2827,7 +2829,7 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
-	cfg := devtools.SettingsFromContext(ctx)
+	cfg := devtools.SettingsFromContextWithOptions(ctx, devtools.LoadOptions{SkipVCS: true})
 	mg.Deps(Build.TestFakeComponent)
 	version := cfg.IntegrationTest.AgentVersion
 	if version == "" {
