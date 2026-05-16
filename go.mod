@@ -44,7 +44,7 @@ require (
 	github.com/magefile/mage v1.15.0
 	github.com/moby/moby/client v0.4.0
 	github.com/oklog/ulid/v2 v2.1.1
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.150.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.151.0
 	github.com/otiai10/copy v1.14.0
 	github.com/rednafi/link-patrol v0.0.0-20240826150821-057643e74d4d
 	github.com/rs/zerolog v1.27.0
