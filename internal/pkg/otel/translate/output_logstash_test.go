@@ -22,7 +22,7 @@ func TestLogStashToExporter(t *testing.T) {
 	}{{
 		name: "basic translation logic",
 		input: `
-hosts:
+hosts: 
 - localhost:5044
 worker: 3
 loadbalance: true
@@ -53,7 +53,7 @@ proxy_url: socks5://user:password@socks5-proxy:2233
 		{
 			name: "when host is a string and ssl is configured",
 			input: `
-hosts:
+hosts: 
 - localhost:5044
 worker: 3
 ssl.enabled: true

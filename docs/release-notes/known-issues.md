@@ -170,10 +170,9 @@ This issue is triggered if the upgrade fails during one of the early checks insi
 Restart the {{agent}} to clear the coordinator’s `overrideState` and allow new upgrade attempts to proceed.
 
 **Resolution**
-
 This issue was fixed in [#9992](https://github.com/elastic/elastic-agent/pull/9992), which ensures that the coordinator clears its override state whenever an early failure occurs.
 
-The fix is included in versions 9.1.4, 9.0.8, 8.19.4, and 8.18.8.
+The fix is included in versions 9.1.4 and 8.19.4, and planned for versions 9.0.8 and 8.18.8.
 :::
 
 :::{dropdown} [Windows] {{agent}} does not process Windows security events
@@ -184,9 +183,9 @@ On August 1, 2025, a known issue was discovered where {{agent}} does not process
 
 For more information, check [Issue #45693](https://github.com/elastic/beats/issues/45693).
 
-**Resolution**
+**Workaround**
 
-This issue was fixed in [#45730](https://github.com/elastic/beats/pull/45730). The fix is included in {{agent}} 9.1.1 and 8.19.1.
+No workaround is available at the moment, but a fix is expected to be available in {{agent}} 8.19.1 and 9.1.1.
 :::
 
 :::{dropdown} {{agents}} remain in an "Upgrade scheduled" state

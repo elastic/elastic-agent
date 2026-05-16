@@ -88,8 +88,8 @@ func TestGetSupported(t *testing.T) {
 				Distro: Rhel,
 			},
 			Results: []common.SupportedOS{
-				RhelAMD64_10,
 				RhelAMD64_8,
+				RhelAMD64_10,
 			},
 		},
 		{

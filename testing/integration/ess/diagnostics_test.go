@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/redact"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -295,7 +294,7 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		case map[string]any:
 			for rootKey, value := range root {
 				if rootKey == "custom_attr" {
-					if value != redact.REDACTED {
+					if value != "<REDACTED>" {
 						return fmt.Errorf("found non-redacted value in %q", rootKey)
 					}
 				}

@@ -33,6 +33,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
@@ -286,22 +287,11 @@ func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch strin
 	}
 
 	if cfg.Build.FIPSBuild {
-		fipsConfig := packaging.Settings().FIPS
-		supported := false
-		for _, p := range fipsConfig.Compile.Platforms {
-			if p.Platform() == "windows/"+goarch {
-				supported = true
-				break
-			}
-		}
-
-		if supported {
-			// there is no actual FIPS relevance for this particular binary
-			// but better safe than sorry
-			args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
-			args.Env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
-			args.CGO = true
-		}
+		// there is no actual FIPS relevance for this particular binary
+		// but better safe than sorry
+		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
+		args.Env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
+		args.CGO = true
 	}
 
 	return devtools.Build(ctx, cfg, args)
@@ -583,9 +573,10 @@ func (Test) Unit(ctx context.Context) error {
 func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 
-	cfg := devtools.SettingsFromContext(ctx).WithFIPSBuild(true)
+	cfg := devtools.SettingsFromContext(ctx)
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	params.Env["FIPS"] = "true"
+	params.Env["GODEBUG"] = "fips140=only"
 	params.Tags = append(params.Tags, "requirefips")
 	return devtools.GoTest(ctx, params)
 }
@@ -1272,6 +1263,7 @@ func collectPackageDependencies(cfg *devtools.Settings, platforms []string, pack
 			downloads.LogLevel.Set(downloads.FatalLevel)
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
+			completedDownloads := &atomic.Int32{}
 
 			for _, spec := range dependencies {
 				for _, platform := range platforms {
@@ -1291,7 +1283,7 @@ func collectPackageDependencies(cfg *devtools.Settings, platforms []string, pack
 						if mg.Verbose() {
 							log.Printf(">>> Downloading package %s component %s/%s", packageName, spec.BinaryName, platform)
 						}
-						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath))
+						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
 					}
 				}
 			}
@@ -1299,6 +1291,9 @@ func collectPackageDependencies(cfg *devtools.Settings, platforms []string, pack
 			err = errGroup.Wait()
 			if err != nil {
 				panic(err)
+			}
+			if completedDownloads.Load() == 0 {
+				panic(fmt.Sprintf("No packages were successfully downloaded. You may be building against an invalid or unreleased version. version=%s. If this is an unreleased version, try SNAPSHOT=true or EXTERNAL=false", packageVersion))
 			}
 		}
 	} else {
@@ -1720,13 +1715,14 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, man
 
 // Helper that wraps the fetchBinaryFromArtifactsApi in a way that is compatible with the errgroup.Go() function.
 // Ensures the arguments are captured by value before starting the goroutine.
-func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string) func() error {
+func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string, compl *atomic.Int32) func() error {
 	return func() error {
 		_, err := downloads.FetchProjectBinary(ctx, project, packageName, binary, version, 3, false, targetPath, true)
 		if err != nil {
 			return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
 		}
 
+		compl.Add(1)
 		fmt.Printf("Done downloading %s into %s\n", packageName, targetPath)
 		return nil
 	}

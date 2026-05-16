@@ -1,0 +1,140 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
+package backoff
+
+import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+)
+
+type factory func(<-chan struct{}) Backoff
+
+func TestCloseChannel(t *testing.T) {
+	init := time.Second
+	max := 5 * time.Second
+
+	tests := map[string]factory{
+		"ExpBackoff": func(done <-chan struct{}) Backoff {
+			return NewExpBackoff(done, init, max)
+		},
+		"EqualJitterBackoff": func(done <-chan struct{}) Backoff {
+			return NewEqualJitterBackoff(done, init, max)
+		},
+	}
+
+	for name, f := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := make(chan struct{})
+			b := f(c)
+			close(c)
+			assert.False(t, b.Wait(), "should return false because the channel should get closed faster than the next wait duration")
+		})
+	}
+}
+
+func TestUnblockAfterInit(t *testing.T) {
+	init := 1 * time.Millisecond
+	max := 5 * time.Second
+
+	tests := map[string]factory{
+		"ExpBackoff": func(done <-chan struct{}) Backoff {
+			return NewExpBackoff(done, init, max)
+		},
+		"EqualJitterBackoff": func(done <-chan struct{}) Backoff {
+			return NewEqualJitterBackoff(done, init, max)
+		},
+	}
+
+	for name, f := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := make(chan struct{})
+			defer close(c)
+
+			b := f(c)
+
+			startedAt := time.Now()
+			assert.True(t, b.Wait())
+			assert.True(t, time.Since(startedAt) >= init)
+		})
+	}
+}
+
+func TestNextWait(t *testing.T) {
+	init := time.Millisecond
+	max := 5 * time.Second
+
+	tests := map[string]factory{
+		"ExpBackoff": func(done <-chan struct{}) Backoff {
+			return NewExpBackoff(done, init, max)
+		},
+		"EqualJitterBackoff": func(done <-chan struct{}) Backoff {
+			return NewEqualJitterBackoff(done, init, max)
+		},
+	}
+
+	for name, f := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := make(chan struct{})
+			b := f(c)
+
+			startWait := b.NextWait()
+			assert.Equal(t, startWait, b.NextWait(), "next wait not stable")
+
+			startedAt := time.Now()
+			b.Wait()
+			waitDuration := time.Since(startedAt)
+			nextWait := b.NextWait()
+
+			t.Logf("actualWait: %s startWait: %s nextWait: %s", waitDuration, startWait, nextWait)
+			assert.Less(t, startWait, nextWait, "wait value did not increase")
+			assert.GreaterOrEqual(t, waitDuration, startWait, "next wait duration <= actual wait duration")
+		})
+	}
+}
+
+func TestReset(t *testing.T) {
+	init := time.Millisecond
+	max := 5 * time.Second
+
+	tests := map[string]factory{
+		"ExpBackoff": func(done <-chan struct{}) Backoff {
+			return NewExpBackoff(done, init, max)
+		},
+		"EqualJitterBackoff": func(done <-chan struct{}) Backoff {
+			// Use a custom randFn to ensure the jitter value is always the same for testing
+			// purposes. Constructor uses rand.N which is not deterministic.
+			bo := &EqualJitterBackoff{
+				done: done,
+				init: init,
+				max:  max,
+				// force the random function to return the max value for deterministic behavior
+				randFn: func(t time.Duration) time.Duration { return t },
+			}
+			bo.Reset()
+			return bo
+		},
+	}
+
+	for name, f := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := make(chan struct{})
+			b := f(c)
+
+			startWait := b.NextWait()
+
+			b.Wait()
+			nextWait := b.NextWait()
+			t.Logf("startWait: %s nextWait: %s", startWait, nextWait)
+			assert.Greater(t, nextWait, startWait, "nextWait value did not increase after Wait")
+
+			b.Reset()
+			restartWait := b.NextWait()
+			t.Logf("startWait: %s restartWait: %s", startWait, restartWait)
+			assert.Equal(t, startWait, restartWait, "wait value did not reset to initial value after reset")
+		})
+	}
+}

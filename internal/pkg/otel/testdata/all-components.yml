@@ -87,8 +87,6 @@ receivers:
     username: test
     password: test
   docker_stats:
-  azure_event_hub:
-    connection: Endpoint=sb://namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=superSecret1234=;EntityPath=hubName
   awss3:
     starttime: "2024-01-01 01:00"
     endtime: "2024-01-02"
@@ -118,11 +116,6 @@ receivers:
           value_type: int
         scalar_oids:
           - oid: ".1.3.6.1.2.1.1.8.0"
-  azuremonitor:
-    subscription_ids:
-      - 00000000-0000-0000-0000-000000000000
-    cloud: AzureCloud
-    credentials: default_credentials
   kafkametrics:
     brokers: [localhost:9092]
     protocol_version: 2.0.0
@@ -213,7 +206,6 @@ service:
         - nop
         - elasticapmintake
         - elasticmonitoringreceiver
-        - azure_event_hub
         - verifier
 
     logs/forward_receive:
@@ -254,7 +246,6 @@ service:
         - postgresql
         - prometheusremotewrite
         - snmp
-        - azuremonitor
         - kafkametrics
         - statsd
         - haproxy
@@ -265,7 +256,6 @@ service:
         - oracledb
         - vcenter
         - zookeeper
-        - azure_event_hub
 
     metrics/aggregated:
       receivers:
@@ -298,4 +288,3 @@ service:
         - jaeger
         - zipkin
         - elasticapmintake
-        - azure_event_hub

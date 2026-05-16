@@ -68,7 +68,6 @@ agent.monitoring:
 agent.grpc:
   address: localhost
   port: 7001
-agent.internal.runtime.filebeat.default: process
 `
 
 func TestEventLogFile(t *testing.T) {
@@ -264,6 +263,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 
 		return false
 	}, 3*time.Minute, 10*time.Second, "cannot find events on stderr")
+
 }
 
 func addOverwriteToPolicy(t *testing.T, info *define.Info, policyName, policyID string) {
@@ -333,6 +333,7 @@ func readEventLogFile(t *testing.T, agentFixture *atesting.Fixture) string {
 		}
 
 		return false
+
 	}, time.Minute, time.Second, "could not find event log file")
 
 	logEntryBytes, err := os.ReadFile(logFileName)
@@ -387,8 +388,8 @@ func collectDiagnosticsAndVeriflyLogs(
 	ctx context.Context,
 	agentFixture *atesting.Fixture,
 	cmd,
-	expectedFiles []string,
-) {
+	expectedFiles []string) {
+
 	diagPath, err := agentFixture.ExecDiagnostics(ctx, cmd...)
 	if err != nil {
 		t.Fatalf("could not execute diagnostics excluding events log: %s", err)
@@ -412,6 +413,7 @@ func getLogFilenames(
 	t *testing.T,
 	basepath string,
 ) (logFiles, eventLogFiles []string) {
+
 	logFilesGlob := filepath.Join(basepath, "*.ndjson")
 	logFilesPath, err := filepath.Glob(logFilesGlob)
 	if err != nil {

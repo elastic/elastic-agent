@@ -411,7 +411,8 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			},
 			"http": map[string]any{
-				"enabled": false,
+				"enabled": true,
+				"host":    "localhost",
 			},
 			"management.otel.enabled": true,
 		}
@@ -461,15 +462,24 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 		},
 		"http": map[string]any{
-			"enabled": false,
+			"enabled": true,
+			"host":    "localhost",
 		},
 		"management.otel.enabled": true,
+	}
+
+	getBeatMonitoringConfig := func(_, _ string) map[string]any {
+		return map[string]any{
+			"http": map[string]any{
+				"enabled": true,
+				"host":    "localhost",
+			},
+		}
 	}
 
 	tests := []struct {
 		name              string
 		model             *component.Model
-		runtimeConfig     *component.RuntimeConfig
 		expectedConfig    *confmap.Conf
 		expectedError     error
 		defaultProcessors *bool // value of the default_processors feature flag
@@ -773,7 +783,8 @@ func TestGetOtelConfig(t *testing.T) {
 							},
 						},
 						"http": map[string]any{
-							"enabled": false,
+							"enabled": true,
+							"host":    "localhost",
 						},
 						"management.otel.enabled": true,
 					},
@@ -1371,7 +1382,8 @@ func TestGetOtelConfig(t *testing.T) {
 							},
 						},
 						"http": map[string]any{
-							"enabled": false,
+							"enabled": true,
+							"host":    "localhost",
 						},
 						"management.otel.enabled": true,
 					},
@@ -1571,7 +1583,8 @@ func TestGetOtelConfig(t *testing.T) {
 							},
 						},
 						"http": map[string]any{
-							"enabled": false,
+							"enabled": true,
+							"host":    "localhost",
 						},
 						"management.otel.enabled": true,
 					},
@@ -1686,128 +1699,10 @@ func TestGetOtelConfig(t *testing.T) {
 							},
 						},
 						"http": map[string]any{
-							"enabled": false,
+							"enabled": true,
+							"host":    "localhost",
 						},
 						"management.otel.enabled": true,
-					},
-				},
-				"service": map[string]any{
-					"extensions": []any{"beatsauth/_agent-component/default"},
-					"pipelines": map[string]any{
-						"logs/_agent-component/system-metrics": map[string][]string{
-							"exporters":  {"elasticsearch/_agent-component/default"},
-							"processors": {"beat/_agent-component"},
-							"receivers":  {"metricbeatreceiver/_agent-component/system-metrics"},
-						},
-					},
-				},
-			}),
-		},
-		{
-			name: "system/metrics with shared intake queue enabled",
-			runtimeConfig: &component.RuntimeConfig{
-				SharedReceiverQueues: true,
-			},
-			model: &component.Model{
-				Components: []component.Component{
-					{
-						ID:         "system-metrics",
-						InputType:  "system/metrics",
-						OutputType: "elasticsearch",
-						OutputName: "default",
-						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "elastic-otel-collector",
-							Spec: component.InputSpec{
-								Command: &component.CommandSpec{
-									Args: []string{"metricbeat"},
-								},
-							},
-						},
-						Units: []component.Unit{
-							{
-								ID:     "system/metrics",
-								Type:   client.UnitTypeInput,
-								Config: component.MustExpectedConfig(systemMetricsConfig),
-							},
-							{
-								ID:     "system/metrics-default",
-								Type:   client.UnitTypeOutput,
-								Config: component.MustExpectedConfig(esOutputConfig()),
-							},
-						},
-					},
-				},
-			},
-			expectedConfig: confmap.NewFromStringMap(map[string]any{
-				"exporters": map[string]any{
-					"elasticsearch/_agent-component/default": expectedESConfig("default"),
-				},
-				"extensions": map[string]any{
-					"beatsauth/_agent-component/default": expectedExtensionConfig(),
-				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
-				"receivers": map[string]any{
-					"metricbeatreceiver/_agent-component/system-metrics": map[string]any{
-						"metricbeat": map[string]any{
-							"modules": []map[string]any{
-								{
-									"module":      "system",
-									"data_stream": map[string]any{"dataset": "generic-1"},
-									"id":          "test-1",
-									"index":       "metrics-generic-1-default",
-									"metricsets": map[string]any{
-										"cpu": map[string]any{
-											"data_stream.dataset": "system.cpu",
-										},
-										"memory": map[string]any{
-											"data_stream.dataset": "system.memory",
-										},
-										"network": map[string]any{
-											"data_stream.dataset": "system.network",
-										},
-										"filesystem": map[string]any{
-											"data_stream.dataset": "system.filesystem",
-										},
-									},
-									"processors": defaultInputProcessors("test-1", "generic-1", "metrics"),
-								},
-							},
-						},
-						"path": map[string]any{
-							"home": paths.Components(),
-							"data": filepath.Join(paths.Run(), "system-metrics"),
-						},
-						"queue": map[string]any{
-							"mem": map[string]any{
-								"events": uint64(3200),
-								"flush": map[string]any{
-									"min_events": uint64(1600),
-									"timeout":    "10s",
-								},
-							},
-						},
-						"logging": map[string]any{
-							"with_fields": map[string]any{
-								"component": map[string]any{
-									"binary":  "metricbeat",
-									"dataset": "elastic_agent.metricbeat",
-									"type":    "system/metrics",
-									"id":      "system-metrics",
-								},
-								"log": map[string]any{
-									"source": "system-metrics",
-								},
-							},
-						},
-						"http": map[string]any{
-							"enabled": false,
-						},
-						"management.otel.enabled": true,
-						"shared_intake_queue":     "default",
 					},
 				},
 				"service": map[string]any{
@@ -1838,11 +1733,7 @@ func TestGetOtelConfig(t *testing.T) {
 				}))
 				require.NoError(t, err)
 			}
-			runtimeCfg := &component.RuntimeConfig{}
-			if tt.runtimeConfig != nil {
-				runtimeCfg = tt.runtimeConfig
-			}
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, runtimeCfg, logp.NewNopLogger())
+			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig, logp.NewNopLogger())
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff
@@ -1861,6 +1752,19 @@ func TestGetOtelConfig(t *testing.T) {
 
 func TestGetReceiversConfigForComponent(t *testing.T) {
 	testAgentInfo := &info.AgentInfo{}
+	mockBeatMonitoringConfigGetter := func(componentID, beatName string) map[string]any {
+		return nil // Behavior when self-monitoring is disabled
+	}
+
+	customBeatMonitoringConfigGetter := func(componentID, beatName string) map[string]any {
+		return map[string]any{
+			"http": map[string]any{
+				"enabled": true,
+				"host":    "custom-host:5067",
+				"port":    5067,
+			},
+		}
+	}
 
 	// Create proper component configurations that match existing test patterns
 	filebeatComponent := &component.Component{
@@ -1937,29 +1841,32 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                 string
-		component            *component.Component
-		outputQueueConfig    map[string]any
-		expectedError        string
-		expectedReceiverType string
-		expectedBeatName     string
+		name                       string
+		component                  *component.Component
+		outputQueueConfig          map[string]any
+		beatMonitoringConfigGetter BeatMonitoringConfigGetter
+		expectedError              string
+		expectedReceiverType       string
+		expectedBeatName           string
 	}{
 		{
-			name:                 "filebeat component",
-			component:            filebeatComponent,
-			outputQueueConfig:    nil,
-			expectedReceiverType: "filebeatreceiver",
-			expectedBeatName:     "filebeat",
+			name:                       "filebeat component with default monitoring",
+			component:                  filebeatComponent,
+			outputQueueConfig:          nil,
+			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
+			expectedReceiverType:       "filebeatreceiver",
+			expectedBeatName:           "filebeat",
 		},
 		{
-			name:      "metricbeat component with queue config",
+			name:      "metricbeat component with custom monitoring and queue config",
 			component: metricbeatComponent,
 			outputQueueConfig: map[string]any{
 				"type": "memory",
 				"size": 1000,
 			},
-			expectedReceiverType: "metricbeatreceiver",
-			expectedBeatName:     "metricbeat",
+			beatMonitoringConfigGetter: customBeatMonitoringConfigGetter,
+			expectedReceiverType:       "metricbeatreceiver",
+			expectedBeatName:           "metricbeat",
 		},
 		{
 			name: "component with no input units",
@@ -1985,9 +1892,10 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 					},
 				},
 			},
-			outputQueueConfig:    nil,
-			expectedReceiverType: "filebeatreceiver",
-			expectedBeatName:     "filebeat",
+			outputQueueConfig:          nil,
+			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
+			expectedReceiverType:       "filebeatreceiver",
+			expectedBeatName:           "filebeat",
 		},
 		{
 			name: "unsupported component type",
@@ -1995,8 +1903,9 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				ID:        "unsupported-test-id",
 				InputType: "unsupported",
 			},
-			outputQueueConfig: nil,
-			expectedError:     "unknown otel receiver type for input type: unsupported",
+			outputQueueConfig:          nil,
+			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
+			expectedError:              "unknown otel receiver type for input type: unsupported",
 		},
 	}
 
@@ -2006,7 +1915,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				tt.component,
 				testAgentInfo,
 				tt.outputQueueConfig,
-				"",
+				tt.beatMonitoringConfigGetter,
 			)
 
 			if tt.expectedError != "" {
@@ -2038,11 +1947,13 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				assert.NotContains(t, receiverConfig, "queue", "queue config should not be present")
 			}
 
-			// Verify HTTP monitoring is disabled for OTel-managed beat receivers
+			// Verify monitoring configuration is present (http section should exist)
 			assert.Contains(t, receiverConfig, "http", "http monitoring config should be present")
-			httpConfig, ok := receiverConfig["http"].(map[string]any)
-			require.True(t, ok, "http config should be a map")
-			assert.Equal(t, false, httpConfig["enabled"], "http monitoring should be disabled for OTel-managed components")
+			expectedMonitoringConfig := tt.beatMonitoringConfigGetter(tt.component.ID, tt.component.InputSpec.BinaryName)
+			// If the monitoring getter is not nil, verify the http section is the same
+			if expectedMonitoringConfig != nil {
+				assert.Equal(t, expectedMonitoringConfig["http"], receiverConfig["http"])
+			}
 		})
 	}
 }

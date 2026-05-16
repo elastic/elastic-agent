@@ -335,45 +335,13 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	require.NoError(t, agentFixture.Prepare(ctx), "failed preparing agent fixture")
 
 	_, outputID := createMockESOutput(t, info, 0, 0, 100, 0)
-	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String())
 	policyID, enrollmentAPIKey := createPolicy(
 		t,
 		ctx,
 		agentFixture,
 		info,
-		policyName,
+		fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
 		outputID)
-
-	reqBody := fmt.Sprintf(`
-{
-  "name": "%s",
-  "namespace": "default",
-  "overrides": {
-    "agent": {
-      "internal": {
-        "runtime": {
-          "filebeat": {
-            "default": "process"
-          }
-        }
-      }
-    }
-  }
-}
-`, policyName)
-
-	status, result, err := info.KibanaClient.Request(
-		http.MethodPut,
-		fmt.Sprintf("/api/fleet/agent_policies/%s", policyID),
-		nil,
-		nil,
-		bytes.NewBufferString(reqBody))
-	if err != nil {
-		t.Fatalf("could not execute request to update policy: %s", err)
-	}
-	if status != http.StatusOK {
-		t.Fatalf("updating policy failed. Status code %d, response:\n%s", status, string(result))
-	}
 
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	if err != nil {
@@ -709,7 +677,7 @@ func TestContainerCMDAgentMonitoringRuntimeExperimentalPolicy(t *testing.T) {
 						// See https://github.com/elastic/elastic-agent/issues/11162.
 					default:
 						// Non-monitoring components should use the default runtime
-						assert.Equalf(ct, string(component.OtelRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
+						assert.Equalf(ct, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
 					}
 				}
 			}, 1*time.Minute, 1*time.Second,

@@ -51,13 +51,6 @@ func makeGoTestArgs(cfg *Settings, name string) GoTestArgs {
 	if cfg.Test.Coverage {
 		params.CoverageProfileFile = fileName + ".cov"
 	}
-	if cfg.Build.FIPSBuild {
-		// fips140=only causes the Go runtime to reject non-FIPS algorithms.
-		// tlsmlkem=0 disables X25519MLKEM768 (uses X25519, which is not FIPS-compliant).
-		// Both are set here rather than in the shell environment so that they apply
-		// only to the 'go test' subprocess and not to mage itself.
-		params.Env["GODEBUG"] = "fips140=only,tlsmlkem=0"
-	}
 	return params
 }
 

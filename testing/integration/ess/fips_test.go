@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -54,7 +53,6 @@ func TestFIPS(t *testing.T) {
 		Stack: &define.Stack{},
 		OS: []define.OS{
 			{Type: define.Linux},
-			{Type: define.Windows},
 		},
 		Sudo:  true, // requires Agent installation
 		Local: true,
@@ -209,14 +207,8 @@ func addIntegrationAndCheckData(t *testing.T, info *define.Info, fixture *atesti
 	}, 2*time.Minute, 5*time.Second, "no system.cpu data received in Elasticsearch")
 
 	// Check that system logs show up in Elasticsearch
-	var dataStreamName string
-	if runtime.GOOS == "windows" {
-		dataStreamName = "system.system"
-	} else {
-		dataStreamName = "system.syslog"
-	}
 	require.Eventually(t, func() bool {
-		docs, err := estools.GetResultsForAgentAndDatastream(ctx, info.ESClient, dataStreamName, status.Info.ID)
+		docs, err := estools.GetResultsForAgentAndDatastream(ctx, info.ESClient, "system.syslog", status.Info.ID)
 		require.NoError(t, err, "error fetching system logs")
 		t.Logf("Generated %d system events", docs.Hits.Total.Value)
 
@@ -228,7 +220,7 @@ func downgradeFIPSAgent(t *testing.T, info *define.Info, startFixture *atesting.
 	t.Helper()
 
 	startVersion := define.Version()
-	endVersions := getUpgradeableFIPSVersions(t, runtime.GOOS, runtime.GOARCH)
+	endVersions := getUpgradeableFIPSVersions(t)
 
 	for _, endVersion := range endVersions {
 		t.Run(startVersion+"_to_"+endVersion.String(), func(t *testing.T) {

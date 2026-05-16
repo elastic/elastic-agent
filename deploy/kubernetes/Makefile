@@ -70,7 +70,7 @@ $(eval HASDIFF =$(shell sh -c "git status | grep $(FILE_REPO) | wc -l"))
 .PHONY: ci-create-kubernetes-templates-pull-request
 ci-create-kubernetes-templates-pull-request:
 ifeq ($(HASDIFF),1)
-	echo "INFO: Create branch to update k8s templates"
+	echo "INFO: Create branch to update k8s templates"	
 	@git config user.name "$(GITHUB_USERNAME)"
 	@git config user.email "$(GITHUB_EMAIL)"
 	@git config remote.origin.url "https://$(GITHUB_USERNAME):${VAULT_GITHUB_TOKEN}@github.com/elastic/kibana.git"
@@ -93,7 +93,7 @@ else
 		--body "Automated by ${BUILDKITE_BUILD_URL}" \
 		--label automation \
 		--label release_note:skip \
-		--label backport:all-open \
+		--label backport:skip \
 		--base main \
 		--head $(ELASTIC_AGENT_BRANCH)
 endif
@@ -103,7 +103,7 @@ else
 endif
 
 
-## ci-create-kustomize : Create default kustomize folder
+## ci-create-kustomize : Create default kustomize folder 
 .PHONY: ci-create-kustomize $(ALL)
 ci-create-kustomize: $(ALL)
 
@@ -121,14 +121,14 @@ $(ALL):
 	@for f in $(shell ls $@/*.yaml | grep -v elastic-agent-standalone-daemonset-configmap); do \
 		cp -r $$f  $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base; \
 	done
-
+	
 	@echo "Generating $@ kustomize-ksm-hints files"
 	@for f in $(shell ls elastic-agent-standalone/*.yaml | grep elastic-agent-standalone-daemonset-configmap.yaml); do \
 		cp -r $$f  $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone; \
 	done
 	sed -i.bak -e "s/#hints.enabled/hints.enabled/g" -e "s/#hints.default_container_logs/hints.default_container_logs/g" $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/elastic-agent-standalone-daemonset-configmap.yaml
 	sed -i.bak -e "/- id: container-log/,/- \/var\/log\/containers/d" $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/elastic-agent-standalone-daemonset-configmap.yaml
-	rm $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/elastic-agent-standalone-daemonset-configmap.yaml.bak
+	rm $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/elastic-agent-standalone-daemonset-configmap.yaml.bak 
 	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g"  $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/kustomization.yaml.original > $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/kustomization.yaml
 
 	mkdir -p $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/extra/
@@ -139,7 +139,7 @@ $(ALL):
 
 	@echo "Generating processor $$ELASTIC_PROCESSOR"
 	sed -e "s/#<processors_placeholder>/$$ELASTIC_PROCESSOR/g"  elastic-agent-standalone/elastic-agent-standalone-daemonset-configmap.yaml > $(KUSTOMIZE_DEFAULT)/elastic-agent-standalone/base/elastic-agent-standalone-daemonset-configmap.yaml
-
+	
 else
 	echo "No KSM templates generated. Please run: GENERATEKUSTOMIZE=true make ci-create-kustomize "
 endif

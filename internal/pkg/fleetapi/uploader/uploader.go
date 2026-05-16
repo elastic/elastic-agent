@@ -17,9 +17,9 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-	"github.com/elastic/elastic-agent/pkg/backoff"
 )
 
 // The following constants correspond with fleer-server API paths for file uploads.

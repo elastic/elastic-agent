@@ -15,8 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-libs/redact"
-
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
@@ -99,9 +97,9 @@ func TestInspect(t *testing.T) {
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"inputs.0.custom_attr"}, yObj.SecretPaths)
 	require.Len(t, yObj.Inputs, 1)
-	assert.Equalf(t, redact.REDACTED, yObj.Inputs[0].CustomAttr, "inspect output: %s", p)
-	assert.Equalf(t, redact.REDACTED, yObj.Agent.Protection.SigningKey, "`signing_key` is not redacted but it should be, because it contains `key`. inspect output: %s", p)
-	assert.Equalf(t, redact.REDACTED, yObj.Agent.Protection.UninstallTokenHash, "`uninstall_token_hash` is not redacted but it should be, because it contains `token`. inspect output: %s", p)
+	assert.Equalf(t, "<REDACTED>", yObj.Inputs[0].CustomAttr, "inspect output: %s", p)
+	assert.Equalf(t, "<REDACTED>", yObj.Agent.Protection.SigningKey, "`signing_key` is not redacted but it should be, because it contains `key`. inspect output: %s", p)
+	assert.Equalf(t, "<REDACTED>", yObj.Agent.Protection.UninstallTokenHash, "`uninstall_token_hash` is not redacted but it should be, because it contains `token`. inspect output: %s", p)
 
 	p, err = fixture.Exec(ctx, []string{"inspect", "components", "beat/metrics-monitoring"})
 	require.NoErrorf(t, err, "Error when running inspect components, output: %s", p)

@@ -1366,11 +1366,24 @@ service:
 
 	doc1 := docs.Hits.Hits[0].Source
 	doc2 := docs.Hits.Hits[1].Source
-	ignoredFields := append(RuntimeComparisonIgnoredFields,
+	ignoredFields := []string{
+		// Expected to change between filebeat and fbreceiver
+		"@timestamp",
+		"agent.ephemeral_id",
+		"agent.id",
+
+		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
+		"agent.version",
+
+		// Missing from fbreceiver doc
+		"elastic_agent.id",
+		"elastic_agent.snapshot",
+		"elastic_agent.version",
+
 		// only in fbreceiver doc
 		"agent.otelcol.component.id",
 		"agent.otelcol.component.kind",
-	)
+	}
 
 	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
 	cancel()
@@ -1557,7 +1570,47 @@ processors:
 	require.Equal(t, "custom-value", customFieldValue, "custom_field should be equal to custom-value")
 }
 
-// AssertMapsEqual and AssertMapstrKeysEqual are defined in assert_tools.go
+func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
+	t.Helper()
+
+	flatM1 := m1.Flatten()
+	flatM2 := m2.Flatten()
+	for _, f := range ignoredFields {
+		// Checking ignored fields is disabled until we resolve an issue with event.ingested not being set
+		// in some cases.
+		// See https://github.com/elastic/elastic-agent/issues/8486 for details.
+		//hasKeyM1, _ := flatM1.HasKey(f)
+		//hasKeyM2, _ := flatM2.HasKey(f)
+		//
+		//if !hasKeyM1 && !hasKeyM2 {
+		//	assert.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
+		//}
+		flatM1.Delete(f)
+		flatM2.Delete(f)
+	}
+	require.Zero(t, cmp.Diff(flatM1, flatM2), msg)
+}
+
+func AssertMapstrKeysEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
+	t.Helper()
+	// Delete all ignored fields.
+	for _, f := range ignoredFields {
+		_ = m1.Delete(f)
+		_ = m2.Delete(f)
+	}
+
+	flatM1 := m1.Flatten()
+	flatM2 := m2.Flatten()
+
+	for k := range flatM1 {
+		flatM1[k] = ""
+	}
+	for k := range flatM2 {
+		flatM2[k] = ""
+	}
+
+	require.Zero(t, cmp.Diff(flatM1, flatM2), msg)
+}
 
 func TestFBOtelRestartE2E(t *testing.T) {
 	// This test ensures that filebeatreceiver is able to deliver logs even
@@ -2876,9 +2929,9 @@ outputs:
     broker_timeout: 30s
     queue.mem.flush.timeout: 1s
     ssl:
-      certificate_authorities:
+      certificate_authorities: 
         - {{.CaCert}}
-      supported_protocols:
+      supported_protocols: 
        - TLSv1.3
       verification_mode: full
     username: beats
@@ -2972,13 +3025,21 @@ agent.monitoring:
 		require.True(t, agentOk, "missing document for agent")
 		require.True(t, otelOk, "missing document for otel")
 
-		ignoredFields := append(RuntimeComparisonIgnoredFields,
+		ignoredFields := []string{
+			"@timestamp",
+			"agent.id",
+			"agent.ephemeral_id",
+			"elastic_agent.id",
 			"data_stream.namespace",
+			"event.ingested",
 			"event.duration",
 			// For Kafka, raw_index contains the destination topic which is different between the two runtimes.
 			"@metadata.raw_index",
+
+			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
+			"agent.version",
 			"@metadata.version",
-		)
+		}
 
 		agentDoc = agentDoc.Flatten()
 		otelDoc = otelDoc.Flatten()
@@ -3478,13 +3539,21 @@ agent.monitoring:
 	require.True(t, agentOk, "missing document for agent")
 	require.True(t, otelOk, "missing document for otel")
 
-	ignoredFields := append(RuntimeComparisonIgnoredFields,
+	ignoredFields := []string{
+		"@timestamp",
+		"agent.id",
+		"agent.ephemeral_id",
+		"elastic_agent.id",
 		"data_stream.namespace",
+		"event.ingested",
 		"event.duration",
+
 		// testcase is different for both agent and otel
 		"testcase",
+		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
+		"agent.version",
 		"metadata.version",
-	)
+	}
 
 	agentDoc = agentDoc.Flatten()
 	otelDoc = otelDoc.Flatten()

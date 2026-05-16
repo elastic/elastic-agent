@@ -12,18 +12,20 @@ common:
         - version/version.go
 
 env:
+  VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1778605951"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1778605951"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1778605951"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1778605951"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1777597312"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1777597312"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1777597312"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1777597312"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
   IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
-  IMAGE_WIN_10_VERSION: "1.0.1778605951"
-  IMAGE_WIN_11_VERSION: "1.0.1778605951"
-  IMAGE_WIN_11_ARM64_VERSION: "1.0.1778605951"
+  IMAGE_WIN_10_VERSION: "1.0.1777597312"
+  IMAGE_WIN_11_VERSION: "1.0.1777597312"
+  IMAGE_WIN_11_ARM64_VERSION: "1.0.1777597312"
 
 steps:
   - label: "check-ci"
@@ -79,7 +81,10 @@ steps:
 
       - label: "Unit tests - fips140=only Ubuntu 22.04"
         key: "unit-tests-2204-fips140-only"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
+        # Note: The GODEBUG=fips140=only environment variable must be set in the command itself (as opposed to
+        # in the env block) so that it is applied *only* to the 'go' command invoked by the script, and
+        # not to any other Go code executed as part of the Buildkite agent itself.
+        command: 'GODEBUG="fips140=only,tlsmlkem=0" .buildkite/scripts/steps/unit-tests.sh'
         env:
           FIPS: "true"
         artifact_paths:
@@ -147,28 +152,6 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2016}"
-          machineType: "n2-standard-8"
-          disk_size: 200
-          disk_type: "pd-ssd"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
-      - label: "Unit tests - fips140=only Windows 2022"
-        key: "unit-tests-win2022-fips140-only"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_WIN_2022}"
           machineType: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
@@ -283,28 +266,6 @@ steps:
           manual:
             allowed: true
 
-      - label: "Unit tests - fips140=only Windows 11 arm64"
-        key: "unit-tests-win11-arm64-fips140-only"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11_ARM64}"
-          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
-          vmSize: "Standard_D8ps_v6"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
   - label: ":junit: Junit annotate"
     agents:
       # requires at least "bash", "curl" and "git"
@@ -334,10 +295,6 @@ steps:
       - step: "unit-tests-win11"
         allow_failure: true
       - step: "unit-tests-win11-arm64"
-        allow_failure: true
-      - step: "unit-tests-win2022-fips140-only"
-        allow_failure: true
-      - step: "unit-tests-win11-arm64-fips140-only"
         allow_failure: true
 
   - group: "K8s tests"

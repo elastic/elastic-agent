@@ -8,7 +8,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/backoff"
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 

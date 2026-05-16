@@ -1,6 +1,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
 env:
+  VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
 
   # Make Docker builds less verbose
@@ -8,8 +9,8 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1778605951"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1778605951"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1777597312"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1777597312"
 
 common:
   - vault_docker_login: &vault_docker_login
@@ -47,11 +48,11 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
 
-      - label: ":package: amd64: FIPS tar.gz,zip (linux,windows)"
+      - label: ":package: amd64: FIPS tar.gz"
         key: "packaging-amd64-fips"
         env:
-          PACKAGES: "tar.gz,zip"
-          PLATFORMS: "linux/amd64,windows/amd64"
+          PACKAGES: "tar.gz"
+          PLATFORMS: "linux/amd64"
           FIPS: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
@@ -61,7 +62,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "n2-standard-4"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
 
       # Packaging linux and windows for arm64
