@@ -324,6 +324,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 		m.agentInfo,
 		m.cfg,
 		m.store,
+		m.stateStore,
 		m.ch,
 		settingsHandler,
 		m.coord,
