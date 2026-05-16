@@ -60,7 +60,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, &mockStateStore{}, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -85,7 +85,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, &mockStateStore{}, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -117,10 +117,11 @@ func TestPolicyAcked(t *testing.T) {
 				Policy: config,
 			},
 		}
+		mockSaver := newStateStoreMock()
 
 		// Test default FF value
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
 
 		err := handler.Handle(context.Background(), action, tacker)
 		require.NoError(t, err)
@@ -131,6 +132,7 @@ func TestPolicyAcked(t *testing.T) {
 		actions := tacker.Items()
 		assert.Len(t, actions, 1)
 		assert.Equal(t, actionID, actions[0])
+		mockSaver.AssertExpectations(t)
 	})
 	t.Run("Config change acks when forced", func(t *testing.T) {
 		ch := make(chan coordinator.ConfigChange, 1)
@@ -145,9 +147,10 @@ func TestPolicyAcked(t *testing.T) {
 				Policy: config,
 			},
 		}
+		mockSaver := newStateStoreMock()
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
 		handler.disableAckFn = func() bool { return false }
 
 		err := handler.Handle(context.Background(), action, tacker)
@@ -159,6 +162,7 @@ func TestPolicyAcked(t *testing.T) {
 		actions := tacker.Items()
 		assert.Len(t, actions, 1)
 		assert.Equal(t, actionID, actions[0])
+		mockSaver.AssertExpectations(t)
 	})
 	t.Run("Config change do not ack when disabled", func(t *testing.T) {
 		ch := make(chan coordinator.ConfigChange, 1)
@@ -173,9 +177,10 @@ func TestPolicyAcked(t *testing.T) {
 				Policy: config,
 			},
 		}
+		mockSaver := newStateStoreMock()
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
 		handler.disableAckFn = func() bool { return true }
 
 		err := handler.Handle(context.Background(), action, tacker)
@@ -186,6 +191,7 @@ func TestPolicyAcked(t *testing.T) {
 
 		actions := tacker.Items()
 		assert.Empty(t, actions)
+		mockSaver.AssertExpectations(t)
 	})
 }
 
@@ -577,14 +583,14 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		agentRootCertPool := x509.NewCertPool()
 		agentRootCertPool.AppendCertsFromPEM(agentRootPair.Cert)
 
-		fleetmTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+		fleetmTLSServer.TLS = &tls.Config{
 			RootCAs:      fleetRootCertPool,
 			Certificates: []tls.Certificate{cert},
 			ClientCAs:    agentRootCertPool,
 			ClientAuth:   tls.RequireAndVerifyClientCert,
 		}
 
-		fleetNomTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+		fleetNomTLSServer.TLS = &tls.Config{
 			RootCAs:      fleetRootCertPool,
 			Certificates: []tls.Certificate{cert},
 		}
@@ -754,7 +760,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
 									CAs: []string{string(fleetRootPair.Cert)},
-									Certificate: tlscommon.CertificateConfig{
+									Certificate: tlscommon.CertificateConfig{ //nolint:gosec // test data
 										Certificate:    "some certificate",
 										Key:            "some key",
 										Passphrase:     "",
@@ -1169,4 +1175,40 @@ func nilLogLevelSet(t *testing.T) *mockLogLevelSetter {
 	logLevelSetter := newMockLogLevelSetter(t)
 	logLevelSetter.EXPECT().SetLogLevel(mock.Anything, nilLogLevel).Return(nil).Once()
 	return logLevelSetter
+}
+
+// mockStateStore implements the package-local stateStore interface to spy on
+// SetAction/Save calls from the policy-change handler.
+type mockStateStore struct {
+	mock.Mock
+}
+
+func (m *mockStateStore) SetAction(a fleetapi.Action) {
+	m.Called(a)
+}
+
+func (m *mockStateStore) Save() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *mockStateStore) AckToken() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+func (m *mockStateStore) SetAckToken(s string) {
+	m.Called(s)
+}
+
+func (m *mockStateStore) Action() fleetapi.Action {
+	args := m.Called()
+	return args.Get(0).(fleetapi.Action)
+}
+
+func newStateStoreMock() *mockStateStore {
+	s := &mockStateStore{}
+	s.On("SetAction", mock.Anything).Return().Once()
+	s.On("Save").Return(nil).Once()
+	return s
 }

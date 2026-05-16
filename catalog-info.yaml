@@ -57,6 +57,12 @@ spec:
       branch_configuration: "main 7.* 8.* 9.*"
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/pipeline.yml"
+      initial_step_plugins:
+      - sparse-checkout#v1.6.0:
+          paths:
+          - .buildkite
+          - .go-version
+          - version/version.go
       provider_settings:
         build_pull_request_forks: false
         build_pull_requests: true
