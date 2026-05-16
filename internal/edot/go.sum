@@ -82,20 +82,14 @@ github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/eventhub/armeventhub v1.3.
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/eventhub/armeventhub v1.3.0/go.mod h1:TSH7DcFItwAufy0Lz+Ft2cyopExCpxbOxI5SkH4dRNo=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/internal/v2 v2.0.0 h1:PTFGRSlMKCQelWwxUyYVEUqseBJVemLyqWJjvMyt0do=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/internal/v2 v2.0.0/go.mod h1:LRr2FzBTQlONPPa5HREE5+RjSCTXl7BwOvYOaWTqCaI=
-github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/internal/v3 v3.1.1 h1:1kpY4qe+BGAH2ykv4baVSqyx+AY5VjXeJ15SldlU6hs=
-github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/internal/v3 v3.1.1/go.mod h1:nT6cWpWdUt+g81yuKmjeYPUtI73Ak3yQIT4PVVsCEEQ=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/managementgroups/armmanagementgroups v1.0.0 h1:pPvTJ1dY0sA35JOeFq6TsY2xj6Z85Yo23Pj4wCCvu4o=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/managementgroups/armmanagementgroups v1.0.0/go.mod h1:mLfWfj8v3jfWKsL9G4eoBoXVcsqcIUTapmdKy7uGOp0=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.11.0 h1:Ds0KRF8ggpEGg4Vo42oX1cIt/IfOhHWJBikksZbVxeg=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.11.0/go.mod h1:jj6P8ybImR+5topJ+eH6fgcemSFBmU6/6bFF8KkwuDI=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4 v4.3.0 h1:bXwSugBiSbgtz7rOtbfGf+woewp4f06orW9OP5BjHLA=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4 v4.3.0/go.mod h1:Y/HgrePTmGy9HjdSGTqZNa+apUpTVIEVKXJyARP2lrk=
-github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armdeployments v0.2.0 h1:bYq3jfB2x36hslKMHyge3+esWzROtJNk/4dCjsKlrl4=
-github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armdeployments v0.2.0/go.mod h1:fewgRjNVE84QVVh798sIMFb7gPXPp7NmnekGnboSnXk=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 h1:Dd+RhdJn0OTtVGaeDLZpcumkIVCtA/3/Fo42+eoYvVM=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0/go.mod h1:5kakwfW5CjC9KK+Q4wjXAg+ShuIm2mBMua0ZFj2C8PE=
-github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/v3 v3.0.1 h1:guyQA4b8XB2sbJZXzUnOF9mn0WDBv/ZT7me9wTipKtE=
-github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/v3 v3.0.1/go.mod h1:8h8yhzh9o+0HeSIhUxYny+rEQajScrfIpNktvgYG3Q8=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0 h1:wxQx2Bt4xzPIKvW59WQf1tJNx/ZZKPfN+EhPX3Z6CYY=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0/go.mod h1:TpiwjwnW/khS0LKs4vW5UmmT9OWcxaveS8U7+tlknzo=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.8.1 h1:/Zt+cDPnpC3OVDm/JKLOs7M2DKmLRIIp3XIx9pHHiig=
@@ -488,8 +482,6 @@ github.com/elastic/elastic-agent-system-metrics v0.14.3 h1:v867kcgCVguOX3AYIHEVn
 github.com/elastic/elastic-agent-system-metrics v0.14.3/go.mod h1:JNfnZrC0viAjlJRUzQKKuMpDlXgjXBn4WdWEXQF7jcA=
 github.com/elastic/elastic-transport-go/v8 v8.11.0 h1:taYmqC2M6+fZt/+W+ENYh/W5L9+KrlJGOSbEJs8egWc=
 github.com/elastic/elastic-transport-go/v8 v8.11.0/go.mod h1:DZQ0szCNywc9F+C9l/Kkd4n69SvJVj0I3yK1Of7s3l8=
-github.com/elastic/entcollect v0.0.0-20260514013106-6d4034497b3d h1:eKAtaQ8G4w9j3LctyOaSoYXnxfSGAcnix8y81esjtJs=
-github.com/elastic/entcollect v0.0.0-20260514013106-6d4034497b3d/go.mod h1:geO9V37Ibo+caL/8JpeqUE5ZJd8jzHjvOcEvAGEaZgI=
 github.com/elastic/fsevents v0.0.0-20181029231046-e1d381a4d270 h1:cWPqxlPtir4RoQVCpGSRXmLqjEHpJKbR60rxh1nQZY4=
 github.com/elastic/fsevents v0.0.0-20181029231046-e1d381a4d270/go.mod h1:Msl1pdboCbArMF/nSCDUXgQuWTeoMmE/z8607X+k7ng=
 github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3 h1:UyNbxdkQiSfyipwsOCWAlO+ju3xXC61Z4prx/HBTtFk=
@@ -919,10 +911,6 @@ github.com/hexops/gotextdiff v1.0.3 h1:gitA9+qJrrTCsiCl7+kh75nPqQt1cx4ZkudSTLoUq
 github.com/hexops/gotextdiff v1.0.3/go.mod h1:pSWU5MAI3yDq+fZBTazCSJysOMbxWL1BSow5/V2vxeg=
 github.com/hpcloud/tail v1.0.0 h1:nfCOvKYfkgYP8hkirhJocXT2+zOD8yUNjXaWfTlyFKI=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
-github.com/huandu/go-assert v1.1.5 h1:fjemmA7sSfYHJD7CUqs9qTwwfdNAx7/j2/ZlHXzNB3c=
-github.com/huandu/go-assert v1.1.5/go.mod h1:yOLvuqZwmcHIC5rIzrBhT7D3Q9c3GFnd0JrPVhn/06U=
-github.com/huandu/go-clone v1.7.3 h1:rtQODA+ABThEn6J5LBTppJfKmZy/FwfpMUWa8d01TTQ=
-github.com/huandu/go-clone v1.7.3/go.mod h1:ReGivhG6op3GYr+UY3lS6mxjKp7MIGTknuU5TbTVaXE=
 github.com/iancoleman/strcase v0.3.0 h1:nTXanmYxhfFAMjZL34Ov6gkzEsSJZ5DbhxWjvSASxEI=
 github.com/iancoleman/strcase v0.3.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47ZCWhYzw7ho=
 github.com/ianlancetaylor/demangle v0.0.0-20230524184225-eabc099b10ab/go.mod h1:gx7rwoVhcfuVKG5uya9Hs3Sxj7EIvldVofAWIUtGouw=
@@ -958,8 +946,6 @@ github.com/jcmturner/gokrb5/v8 v8.4.4/go.mod h1:1btQEpgT6k+unzCwX1KdWMEwPPkkgBtP
 github.com/jcmturner/rpc/v2 v2.0.3 h1:7FXXj8Ti1IaVFpSAziCZWNzbNuZmnvw/i6CqLNdWfZY=
 github.com/jcmturner/rpc/v2 v2.0.3/go.mod h1:VUJYCIDm3PVOEHw8sgt091/20OJjskO/YJki3ELg/Hc=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
-github.com/jimlambrt/gldap v0.1.14 h1:InG9kldhIu6OoQK0hvfkW1Lqpc5eLJhxiiDTNmRnrDM=
-github.com/jimlambrt/gldap v0.1.14/go.mod h1:yobW9JIAmqe23dVNOaMWewPaff6jGaHgYjspPIIgYmg=
 github.com/jmespath/go-jmespath v0.4.0 h1:BEgLn5cpjn8UN1mAw4NjwDrS35OdebyEtFe+9YPoQUg=
 github.com/jmespath/go-jmespath v0.4.0/go.mod h1:T8mJZnbsbmF+m6zOOFylbeCJqk5+pHWvzYPziyZiYoo=
 github.com/jmespath/go-jmespath/internal/testify v1.5.1 h1:shLQSRRSCCPj3f2gpwzGwWFoC7ycTf1rcQZHOlsJ6N8=
@@ -1133,6 +1119,8 @@ github.com/moby/moby/client v0.4.1 h1:DMQgisVoMkmMs7fp3ROSdiBnoAu8+vo3GggFl06M/w
 github.com/moby/moby/client v0.4.1/go.mod h1:z52C9O2POPOsnxZAy//WtKcQ32P+jT/NGeXu/7nfjGQ=
 github.com/moby/patternmatcher v0.6.1 h1:qlhtafmr6kgMIJjKJMDmMWq7WLkKIo23hsrpR3x084U=
 github.com/moby/patternmatcher v0.6.1/go.mod h1:hDPoyOpDY7OrrMDLaYoY3hf52gNCR/YOUYxkhApJIxc=
+github.com/moby/sys/atomicwriter v0.1.0 h1:kw5D/EqkBwsBFi0ss9v1VG3wIkVhzGvLklJ+w3A14Sw=
+github.com/moby/sys/atomicwriter v0.1.0/go.mod h1:Ul8oqv2ZMNHOceF643P6FKPXeCmYtlQMvpizfsSoaWs=
 github.com/moby/sys/sequential v0.6.0 h1:qrx7XFUd/5DxtqcoH1h438hF5TmOvzC/lspjy7zgvCU=
 github.com/moby/sys/sequential v0.6.0/go.mod h1:uyv8EUTrca5PnDsdMGXhZe6CCe8U/UiTWd+lL+7b/Ko=
 github.com/moby/sys/user v0.4.0 h1:jhcMKit7SA80hivmFJcbB1vqmw//wU61Zdui2eQXuMs=
@@ -1151,6 +1139,8 @@ github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee h1:W5t00kpgFd
 github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
 github.com/montanaflynn/stats v0.7.1 h1:etflOAAHORrCC44V+aR6Ftzort912ZU+YLiSTuV8eaE=
 github.com/montanaflynn/stats v0.7.1/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
+github.com/morikuni/aec v1.1.0 h1:vBBl0pUnvi/Je71dsRrhMBtreIqNMYErSAbEeb8jrXQ=
+github.com/morikuni/aec v1.1.0/go.mod h1:xDRgiq/iw5l+zkao76YTKzKttOp2cwPEne25HDkJnBw=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
 github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
@@ -1285,8 +1275,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.151.0 h1
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.151.0/go.mod h1:AMm2G9jT5/sgUqoG13W7RNqHsGJ9RGF1tD8vIVEaul4=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azure v0.151.0 h1:mcZpMnAo/fRcNQTv9IWAhvVim6cmlF9TpRApYZwLs1c=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azure v0.151.0/go.mod h1:SObVgCERjE58xHNHwrdQCu1PDHT8Kc1XStqyDE92tzM=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azurelogs v0.151.0 h1:pkLRTut76nUw/az+F7AWOzxcWBh1h/NhDRZ081VPWTs=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azurelogs v0.151.0/go.mod h1:ZcabtFuYOj4xXYUrrdodIq0iAgQofVIQJvwlF9XwaBY=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.151.0 h1:dkUlWYse808TH8D5oq0w2PocOU9p+ajKvZ1+e7ozmPk=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.151.0/go.mod h1:5ZZnYdhE6xrknH/7s+bSlXCWOJcyhKobaAsVew28TPQ=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.151.0 h1:qZ7jH4UQB+NjEMfgthWYS+pdKNWhLSZ+a69kS02pFU0=
@@ -1327,10 +1315,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceive
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver v0.151.0/go.mod h1:AB/gNBYyS6P0D31CWk6lbAfY+BzZSKT6NmplpNSk5J4=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.151.0 h1:0uPHgMYJbcfv4jYqRHxoxnwaqMcGcx2ZlhnM1bhgcRE=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.151.0/go.mod h1:4saUJXLlOxLTvKZj2BqUhfsgKHAZ8MHOGxbCgF5LJi4=
-github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azureeventhubreceiver v0.151.0 h1:n3qrmY5+8yZlJiHLH4GIr0LUGCDMxBhmQ+i4PRYTR/I=
-github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azureeventhubreceiver v0.151.0/go.mod h1:KK/j34B6OePrUliUBf+OCAxKgdUXSUjLzYXyTSJoVYA=
-github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver v0.151.0 h1:XGEO9aZts5DzW8MX25m5OaJ3QZgWjkNtfIpQoDzW59M=
-github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver v0.151.0/go.mod h1:qOp8iTiTqcNU4BvPzl9zZOohWlB9TSDIjPjLKtBz84Q=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver v0.151.0 h1:D7pA3BudCnozHi11FnQ7J+a2zCcucPAPebsnj0n05CI=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver v0.151.0/go.mod h1:iCgZFzOD3TaSMvZsQ53ZEnhM4wzmwMVE9L/tqUd6Wxc=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.151.0 h1:8+Wg6m5cCnv1T68jNkivkHKx2juaNsq3RmL4noD7ppM=
@@ -1414,8 +1398,6 @@ github.com/openshift/client-go v0.0.0-20251015124057-db0dee36e235/go.mod h1:L49W
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/openzipkin/zipkin-go v0.4.3 h1:9EGwpqkgnwdEIJ+Od7QVSEIH+ocmm5nPat0G7sjsSdg=
 github.com/openzipkin/zipkin-go v0.4.3/go.mod h1:M9wCJZFWCo2RiY+o1eBCEMe0Dp2S5LDHcMZmk3RmK7c=
-github.com/orcaman/concurrent-map/v2 v2.0.1 h1:jOJ5Pg2w1oeB6PeDurIYf6k9PQ+aTITr/6lP/L/zp6c=
-github.com/orcaman/concurrent-map/v2 v2.0.1/go.mod h1:9Eq3TG2oBe5FirmYWQfYO5iH1q0Jv47PLaNK++uCdOM=
 github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde/go.mod h1:nZgzbfBr3hhjoZnS66nKrHmduYNpc34ny7RK4z5/HM0=
 github.com/oschwald/geoip2-golang/v2 v2.1.0 h1:DjnLhNJu9WHwTrmoiQFvgmyJoczhdnm7LB23UBI2Amo=
 github.com/oschwald/geoip2-golang/v2 v2.1.0/go.mod h1:qdVmcPgrTJ4q2eP9tHq/yldMTdp2VMr33uVdFbHBiBc=
