@@ -66,6 +66,17 @@ enum PprofOption {
 message Empty {
 }
 
+// StateWatchRequest is the request message for StateWatch.
+message StateWatchRequest {
+  // If true, the subscriber will always receive the most recent state at the
+  // time of the read, skipping any intermediate states that have accumulated
+  // since the last read. Useful for subscribers that only care about the
+  // current state rather than the full sequence of transitions.
+  // If false (default), the subscriber receives up to 32 buffered states in
+  // order, preserving backward compatibility with the previous Empty request.
+  bool latest_only = 1;
+}
+
 // Version response message.
 message VersionResponse {
   // Current running version.
@@ -395,8 +406,10 @@ service ElasticAgentControl {
   // Streams the current state of the Elastic Agent to the client.
   //
   // Client will continue to get updated StateResponse when any state
-  // of the Elastic Agent has changed.
-  rpc StateWatch(Empty) returns (stream StateResponse);
+  // of the Elastic Agent has changed. Pass StateWatchRequest with
+  // latest_only=true to receive only the most recent state on each read,
+  // skipping intermediate transitions.
+  rpc StateWatch(StateWatchRequest) returns (stream StateResponse);
 
   // Restart restarts the current running Elastic Agent.
   rpc Restart(Empty) returns (RestartResponse);
