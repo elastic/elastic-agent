@@ -22,7 +22,8 @@ if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
 # likely at binary startup when goroutine stacks are freshly allocated.
 $env:GOGC = "1"
 $env:GOTRACEBACK = "crash"
-$env:GODEBUG = "clobberfree=1,gccheckmark=1,invalidptr=1,cgocheck=2,gctrace=1,asyncpreemptoff=1"
+$env:GODEBUG = "clobberfree=1,gccheckmark=1,invalidptr=1,gctrace=1,asyncpreemptoff=1"
+$env:GOEXPERIMENT="cgocheck2"
 
 $maxRuns = 5
 for ($run = 1; $run -le $maxRuns; $run++) {
