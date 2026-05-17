@@ -89,7 +89,10 @@ func TestGetAllComponentState(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
@@ -390,7 +393,7 @@ func TestGetComponentStatus(t *testing.T) {
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
+					fmt.Sprintf("receiver:filebeat/%stest-component/stream-1", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
 					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
@@ -433,34 +436,69 @@ func TestGetComponentStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple receivers should error",
+			name: "multiple receivers matched to unit",
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					fmt.Sprintf("receiver:filebeat/%sotel-input-1", OtelNamePrefix): {
+					fmt.Sprintf("receiver:filebeat/%stest-component/stream-1", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
-					fmt.Sprintf("receiver:filebeat/%sotel-input-2", OtelNamePrefix): {
+					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
 				},
 			},
-			err: "expected at most one receiver",
+			expected: runtime.ComponentComponentState{
+				Component: comp,
+				State: runtime.ComponentState{
+					State:   client.UnitStateHealthy,
+					Message: "Healthy",
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:      OtelComponentName,
+						BuildHash: version.Commit(),
+						Meta: map[string]string{
+							"build_time": version.BuildTime().String(),
+							"commit":     version.Commit(),
+						},
+					},
+					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
+							State:   client.UnitStateHealthy,
+							Message: "Healthy",
+							Payload: map[string]any{
+								"streams": map[string]map[string]string{
+									"stream-1": {
+										"error":  "",
+										"status": client.UnitStateHealthy.String(),
+									},
+								},
+							},
+						},
+						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
+							State:   client.UnitStateHealthy,
+							Message: "Healthy",
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "multiple exporters should error",
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					fmt.Sprintf("receiver:filebeat/%sotel-input-1", OtelNamePrefix): {
+					fmt.Sprintf("receiver:filebeat/%stest-component/stream-1", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
-					fmt.Sprintf("receiver:filebeat/%sotel-input-2", OtelNamePrefix): {
+					fmt.Sprintf("exporter:elasticsearch/%sexporter-1", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+					fmt.Sprintf("exporter:elasticsearch/%sexporter-2", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
 				},
 			},
-			err: "expected at most one receiver",
+			err: "expected at most one exporter",
 		},
 	}
 
@@ -479,6 +517,174 @@ func TestGetComponentStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
+	t.Run("single stream with attributes", func(t *testing.T) {
+		unit := component.Unit{
+			ID:   "input-1",
+			Type: client.UnitTypeInput,
+			Config: &proto.UnitExpectedConfig{
+				Streams: []*proto.Stream{{Id: "stream-1"}},
+			},
+		}
+		comp := &component.Component{
+			ID:    "test-component",
+			Units: []component.Unit{unit},
+		}
+		receivers := map[string]*status.AggregateStatus{
+			"stream-1": aggregateStatusWithAttributes(
+				componentstatus.StatusOK,
+				nil,
+				map[string]any{
+					"inputs": map[string]any{
+						"stream-1": map[string]any{
+							"status": "StatusOK",
+							"error":  "",
+						},
+					},
+				},
+			),
+		}
+		result := getComponentUnitState(nil, receivers, unit, comp)
+		assert.Equal(t, client.UnitStateHealthy, result.State)
+		assert.Equal(t, map[string]any{
+			"streams": map[string]map[string]string{
+				"stream-1": {"error": "", "status": client.UnitStateHealthy.String()},
+			},
+		}, result.Payload)
+	})
+
+	t.Run("multiple streams each with own receiver", func(t *testing.T) {
+		unit := component.Unit{
+			ID:   "input-1",
+			Type: client.UnitTypeInput,
+			Config: &proto.UnitExpectedConfig{
+				Streams: []*proto.Stream{{Id: "stream-1"}, {Id: "stream-2"}},
+			},
+		}
+		comp := &component.Component{
+			ID:    "test-component",
+			Units: []component.Unit{unit},
+		}
+		receivers := map[string]*status.AggregateStatus{
+			"stream-1": aggregateStatusWithAttributes(
+				componentstatus.StatusOK,
+				nil,
+				map[string]any{
+					"inputs": map[string]any{
+						"stream-1": map[string]any{"status": "StatusOK", "error": ""},
+					},
+				},
+			),
+			"stream-2": aggregateStatusWithAttributes(
+				componentstatus.StatusRecoverableError,
+				errors.New("stream error"),
+				map[string]any{
+					"inputs": map[string]any{
+						"stream-2": map[string]any{"status": "StatusRecoverableError", "error": "stream error"},
+					},
+				},
+			),
+		}
+		result := getComponentUnitState(nil, receivers, unit, comp)
+		assert.Equal(t, client.UnitStateDegraded, result.State)
+		assert.Equal(t, "Recoverable: stream error", result.Message)
+		assert.Equal(t, map[string]any{
+			"streams": map[string]map[string]string{
+				"stream-1": {"error": "", "status": client.UnitStateHealthy.String()},
+				"stream-2": {"error": "Recoverable: stream error", "status": client.UnitStateDegraded.String()},
+			},
+		}, result.Payload)
+	})
+
+	t.Run("stream without matching receiver is skipped", func(t *testing.T) {
+		unit := component.Unit{
+			ID:   "input-1",
+			Type: client.UnitTypeInput,
+			Config: &proto.UnitExpectedConfig{
+				Streams: []*proto.Stream{{Id: "stream-1"}},
+			},
+		}
+		comp := &component.Component{
+			ID:    "test-component",
+			Units: []component.Unit{unit},
+		}
+		receivers := map[string]*status.AggregateStatus{
+			"other-stream": aggregateStatusWithAttributes(
+				componentstatus.StatusOK, nil,
+				map[string]any{"inputs": map[string]any{}},
+			),
+		}
+		result := getComponentUnitState(nil, receivers, unit, comp)
+		// No streams matched any receiver, empty state
+		assert.Equal(t, client.UnitState(0), result.State)
+	})
+
+	t.Run("receiver without attributes uses top-level status", func(t *testing.T) {
+		unit := component.Unit{
+			ID:   "input-1",
+			Type: client.UnitTypeInput,
+			Config: &proto.UnitExpectedConfig{
+				Streams: []*proto.Stream{{Id: "stream-1"}},
+			},
+		}
+		comp := &component.Component{
+			ID:    "test-component",
+			Units: []component.Unit{unit},
+		}
+		receivers := map[string]*status.AggregateStatus{
+			"stream-1": {
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
+		}
+		result := getComponentUnitState(nil, receivers, unit, comp)
+		assert.Equal(t, client.UnitStateHealthy, result.State)
+		assert.Equal(t, map[string]any{
+			"streams": map[string]map[string]string{
+				"stream-1": {"error": "", "status": client.UnitStateHealthy.String()},
+			},
+		}, result.Payload)
+	})
+
+	t.Run("beat input ID fallback for filestream without streams", func(t *testing.T) {
+		unit := component.Unit{
+			ID:   "filestream-default-filestream-1",
+			Type: client.UnitTypeInput,
+			Config: &proto.UnitExpectedConfig{
+				Streams: []*proto.Stream{},
+			},
+		}
+		comp := &component.Component{
+			ID:    "filestream-default",
+			Units: []component.Unit{unit},
+			InputSpec: &component.InputRuntimeSpec{
+				BinaryName: "elastic-otel-collector",
+				Spec: component.InputSpec{
+					Command: &component.CommandSpec{
+						Args: []string{"filebeat"},
+					},
+				},
+			},
+		}
+		receivers := map[string]*status.AggregateStatus{
+			"filestream-1": aggregateStatusWithAttributes(
+				componentstatus.StatusRecoverableError,
+				nil,
+				map[string]any{
+					"inputs": map[string]any{
+						"filestream-1": map[string]any{
+							"status": "StatusRecoverableError",
+							"error":  "unit level error",
+						},
+					},
+				},
+			),
+		}
+		result := getComponentUnitState(nil, receivers, unit, comp)
+		assert.Equal(t, client.UnitStateDegraded, result.State)
+		assert.Equal(t, "Recoverable: unit level error", result.Message)
+	})
 }
 
 func TestGetComponentUnitState(t *testing.T) {
@@ -557,7 +763,7 @@ func TestGetComponentUnitState(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getComponentUnitState(tt.status, unit, comp)
+			result := getComponentUnitState(tt.status, nil, unit, comp)
 			assert.Equal(t, tt.expected.State, result.State)
 			assert.Equal(t, tt.expected.Message, result.Message)
 			assert.Equal(t, tt.expected.Payload, result.Payload)
@@ -792,175 +998,108 @@ func TestGetComponentUnitStateWithStreamAttributes(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		status   *status.AggregateStatus
-		expected runtime.ComponentUnitState
+		name      string
+		receivers map[string]*status.AggregateStatus
+		expected  runtime.ComponentUnitState
 	}{
 		{
 			name: "stream statuses from attributes - all healthy",
-			status: aggregateStatusWithAttributes(
-				componentstatus.StatusOK,
-				nil,
-				map[string]any{
-					"inputs": map[string]any{
-						"stream-1": map[string]any{
-							"status": "StatusOK",
-							"error":  "",
-						},
-						"stream-2": map[string]any{
-							"status": "StatusOK",
-							"error":  "",
-						},
-					},
-				},
-			),
-			// When all streams are healthy, unitStateFromStreamStatuses returns (Healthy, "")
+			receivers: map[string]*status.AggregateStatus{
+				"stream-1": aggregateStatusWithAttributes(componentstatus.StatusOK, nil, map[string]any{
+					"inputs": map[string]any{"stream-1": map[string]any{"status": "StatusOK", "error": ""}},
+				}),
+				"stream-2": aggregateStatusWithAttributes(componentstatus.StatusOK, nil, map[string]any{
+					"inputs": map[string]any{"stream-2": map[string]any{"status": "StatusOK", "error": ""}},
+				}),
+			},
 			expected: runtime.ComponentUnitState{
 				State:   client.UnitStateHealthy,
 				Message: "",
 				Payload: map[string]any{
 					"streams": map[string]map[string]string{
-						"stream-1": {
-							"error":  "",
-							"status": client.UnitStateHealthy.String(),
-						},
-						"stream-2": {
-							"error":  "",
-							"status": client.UnitStateHealthy.String(),
-						},
+						"stream-1": {"error": "", "status": client.UnitStateHealthy.String()},
+						"stream-2": {"error": "", "status": client.UnitStateHealthy.String()},
 					},
 				},
 			},
 		},
 		{
 			name: "stream statuses from attributes - one degraded",
-			status: aggregateStatusWithAttributes(
-				componentstatus.StatusOK,
-				nil,
-				map[string]any{
-					"inputs": map[string]any{
-						"stream-1": map[string]any{
-							"status": "StatusOK",
-							"error":  "",
-						},
-						"stream-2": map[string]any{
-							"status": "StatusRecoverableError",
-							"error":  "stream error",
-						},
-					},
-				},
-			),
+			receivers: map[string]*status.AggregateStatus{
+				"stream-1": aggregateStatusWithAttributes(componentstatus.StatusOK, nil, map[string]any{
+					"inputs": map[string]any{"stream-1": map[string]any{"status": "StatusOK", "error": ""}},
+				}),
+				"stream-2": aggregateStatusWithAttributes(componentstatus.StatusRecoverableError, errors.New("stream error"), map[string]any{
+					"inputs": map[string]any{"stream-2": map[string]any{"status": "StatusRecoverableError", "error": "stream error"}},
+				}),
+			},
 			expected: runtime.ComponentUnitState{
 				State:   client.UnitStateDegraded,
 				Message: "Recoverable: stream error",
 				Payload: map[string]any{
 					"streams": map[string]map[string]string{
-						"stream-1": {
-							"error":  "",
-							"status": client.UnitStateHealthy.String(),
-						},
-						"stream-2": {
-							"error":  "Recoverable: stream error",
-							"status": client.UnitStateDegraded.String(),
-						},
+						"stream-1": {"error": "", "status": client.UnitStateHealthy.String()},
+						"stream-2": {"error": "Recoverable: stream error", "status": client.UnitStateDegraded.String()},
 					},
 				},
 			},
 		},
 		{
 			name: "stream statuses from attributes - one failed",
-			status: aggregateStatusWithAttributes(
-				componentstatus.StatusOK,
-				nil,
-				map[string]any{
-					"inputs": map[string]any{
-						"stream-1": map[string]any{
-							"status": "StatusPermanentError",
-							"error":  "permanent error",
-						},
-						"stream-2": map[string]any{
-							"status": "StatusRecoverableError",
-							"error":  "recoverable error",
-						},
-					},
-				},
-			),
+			receivers: map[string]*status.AggregateStatus{
+				"stream-1": aggregateStatusWithAttributes(componentstatus.StatusPermanentError, errors.New("permanent error"), map[string]any{
+					"inputs": map[string]any{"stream-1": map[string]any{"status": "StatusPermanentError", "error": "permanent error"}},
+				}),
+				"stream-2": aggregateStatusWithAttributes(componentstatus.StatusRecoverableError, errors.New("recoverable error"), map[string]any{
+					"inputs": map[string]any{"stream-2": map[string]any{"status": "StatusRecoverableError", "error": "recoverable error"}},
+				}),
+			},
 			expected: runtime.ComponentUnitState{
 				State:   client.UnitStateFailed,
 				Message: "Permanent: permanent error",
 				Payload: map[string]any{
 					"streams": map[string]map[string]string{
-						"stream-1": {
-							"error":  "Permanent: permanent error",
-							"status": client.UnitStateFailed.String(),
-						},
-						"stream-2": {
-							"error":  "Recoverable: recoverable error",
-							"status": client.UnitStateDegraded.String(),
-						},
+						"stream-1": {"error": "Permanent: permanent error", "status": client.UnitStateFailed.String()},
+						"stream-2": {"error": "Recoverable: recoverable error", "status": client.UnitStateDegraded.String()},
 					},
 				},
 			},
 		},
 		{
-			name: "partial stream statuses from attributes - missing stream uses top level for payload",
-			status: aggregateStatusWithAttributes(
-				componentstatus.StatusRecoverableError,
-				errors.New("top level error"),
-				map[string]any{
-					"inputs": map[string]any{
-						"stream-1": map[string]any{
-							"status": "StatusOK",
-							"error":  "",
-						},
-						// stream-2 is missing, uses top level status for payload
-					},
-				},
-			),
-			// Unit state is computed only from reported stream statuses (stream-1 = healthy)
-			// so unit state is Healthy. Payload includes stream-2 with top level status.
-			expected: runtime.ComponentUnitState{
-				State:   client.UnitStateHealthy,
-				Message: "",
-				Payload: map[string]any{
-					"streams": map[string]map[string]string{
-						"stream-1": {
-							"error":  "",
-							"status": client.UnitStateHealthy.String(),
-						},
-						"stream-2": {
-							"error":  "Recoverable: top level error",
-							"status": client.UnitStateDegraded.String(),
-						},
-					},
-				},
+			name: "partial stream statuses from attributes - missing stream receiver uses its top level",
+			receivers: map[string]*status.AggregateStatus{
+				"stream-1": aggregateStatusWithAttributes(componentstatus.StatusOK, nil, map[string]any{
+					"inputs": map[string]any{"stream-1": map[string]any{"status": "StatusOK", "error": ""}},
+				}),
+				// stream-2 receiver has no per-stream attributes, uses top level status
+				"stream-2": aggregateStatusWithAttributes(componentstatus.StatusRecoverableError, errors.New("top level error"), map[string]any{}),
 			},
-		},
-		{
-			name: "no stream statuses in attributes - uses top level state",
-			status: aggregateStatusWithAttributes(
-				componentstatus.StatusRecoverableError,
-				errors.New("top level error"),
-				map[string]any{
-					"inputs": map[string]any{
-						// No stream statuses provided
-					},
-				},
-			),
-			// When no stream statuses are reported, unit state is computed from top level
+			// stream-1 status from attributes (Healthy), stream-2 from receiver top-level (Degraded)
 			expected: runtime.ComponentUnitState{
 				State:   client.UnitStateDegraded,
 				Message: "Recoverable: top level error",
 				Payload: map[string]any{
 					"streams": map[string]map[string]string{
-						"stream-1": {
-							"error":  "Recoverable: top level error",
-							"status": client.UnitStateDegraded.String(),
-						},
-						"stream-2": {
-							"error":  "Recoverable: top level error",
-							"status": client.UnitStateDegraded.String(),
-						},
+						"stream-1": {"error": "", "status": client.UnitStateHealthy.String()},
+						"stream-2": {"error": "Recoverable: top level error", "status": client.UnitStateDegraded.String()},
+					},
+				},
+			},
+		},
+		{
+			name: "no stream attributes - uses receiver top level state",
+			receivers: map[string]*status.AggregateStatus{
+				"stream-1": aggregateStatusWithAttributes(componentstatus.StatusRecoverableError, errors.New("top level error"), map[string]any{}),
+				"stream-2": aggregateStatusWithAttributes(componentstatus.StatusRecoverableError, errors.New("top level error"), map[string]any{}),
+			},
+			// When no per-stream attributes, unit state is computed from receiver top-level statuses
+			expected: runtime.ComponentUnitState{
+				State:   client.UnitStateDegraded,
+				Message: "Recoverable: top level error",
+				Payload: map[string]any{
+					"streams": map[string]map[string]string{
+						"stream-1": {"error": "Recoverable: top level error", "status": client.UnitStateDegraded.String()},
+						"stream-2": {"error": "Recoverable: top level error", "status": client.UnitStateDegraded.String()},
 					},
 				},
 			},
@@ -969,7 +1108,7 @@ func TestGetComponentUnitStateWithStreamAttributes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getComponentUnitState(tt.status, unit, comp)
+			result := getComponentUnitState(nil, tt.receivers, unit, comp)
 			assert.Equal(t, tt.expected.State, result.State)
 			assert.Equal(t, tt.expected.Message, result.Message)
 			assert.Equal(t, tt.expected.Payload, result.Payload)
@@ -1007,18 +1146,20 @@ func TestGetComponentUnitStateWithUnitInputStatus(t *testing.T) {
 		},
 	}
 
-	aggStatus := aggregateStatusWithAttributes(
-		componentstatus.StatusOK,
-		nil,
-		map[string]any{
-			"inputs": map[string]any{
-				"filestream-1": map[string]any{
-					"status": "StatusRecoverableError",
-					"error":  "unit level error",
+	receivers := map[string]*status.AggregateStatus{
+		"filestream-1": aggregateStatusWithAttributes(
+			componentstatus.StatusOK,
+			nil,
+			map[string]any{
+				"inputs": map[string]any{
+					"filestream-1": map[string]any{
+						"status": "StatusRecoverableError",
+						"error":  "unit level error",
+					},
 				},
 			},
-		},
-	)
+		),
+	}
 
 	expectedState := runtime.ComponentUnitState{
 		State:   client.UnitStateDegraded,
@@ -1026,7 +1167,7 @@ func TestGetComponentUnitStateWithUnitInputStatus(t *testing.T) {
 		Payload: nil,
 	}
 
-	result := getComponentUnitState(aggStatus, unit, comp)
+	result := getComponentUnitState(nil, receivers, unit, comp)
 	assert.Equal(t, expectedState.State, result.State)
 	assert.Equal(t, expectedState.Message, result.Message)
 	assert.Equal(t, expectedState.Payload, result.Payload)
@@ -1150,7 +1291,10 @@ func TestOutputStatus(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
@@ -1208,7 +1352,10 @@ func TestOutputStatus(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
@@ -1266,7 +1413,10 @@ func TestOutputStatus(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
@@ -1324,7 +1474,10 @@ func TestOutputStatus(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
@@ -1382,7 +1535,10 @@ func TestOutputStatus(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
