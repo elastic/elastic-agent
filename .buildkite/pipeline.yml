@@ -104,9 +104,5 @@ steps:
         allow_failure: true
       - step: "unit-tests-win11-instrumented"
         allow_failure: true
-      - step: "unit-tests-win2022-fips140-only"
-        allow_failure: true
-      - step: "unit-tests-win11-arm64-fips140-only"
-        allow_failure: true
 
   - wait: ~
