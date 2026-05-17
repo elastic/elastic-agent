@@ -173,7 +173,7 @@ func newEndpointTLSComponentModifier(log *logger.Logger, cache *tlsCache) func(c
 
 		unitCfg, err := component.ExpectedConfig(unitCfgMap)
 		if err != nil {
-			return nil, fmt.Errorf("EndpointTLSComponentModifier: could not covert modified config to expected config: %w", err)
+			return nil, fmt.Errorf("EndpointTLSComponentModifier: could not convert modified config to expected config: %w", err)
 		}
 
 		unit.Config = unitCfg
