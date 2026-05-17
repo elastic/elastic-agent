@@ -32,10 +32,6 @@ Write-Host "WER LocalDumps configured: DumpFolder=$dumpDir DumpType=2 (full) Dum
 
 $mageExit = 0
 try {
-    Write-Host "--- Build"
-    mage build
-    if ($LASTEXITCODE -ne 0) { $mageExit = 1; return }
-
     Write-Host "--- Unit tests (instrumented; asyncpreemptoff NOT set so the bug fires)"
     $env:TEST_COVERAGE = $true
     if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
