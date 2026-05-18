@@ -9,6 +9,12 @@ fi
 
 source "${WORKSPACE}/.buildkite/scripts/common.sh"
 
+# Boot-time noise probe (self-gates on container vs. VM; cheap no-op otherwise).
+if [[ -x "${WORKSPACE}/.buildkite/scripts/boot-probe.sh" ]]; then
+    nohup "${WORKSPACE}/.buildkite/scripts/boot-probe.sh" >/dev/null 2>&1 &
+    disown || true
+fi
+
 if [[ -z "${GO_VERSION-""}" ]]; then
     export GO_VERSION=$(cat "${WORKSPACE}/.go-version")
 fi
