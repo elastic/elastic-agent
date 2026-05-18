@@ -12,6 +12,7 @@ linters:
     - gomoddirectives
     - gomodguard
     - gosec
+    - gosmopolitan
     - govet
     - importas
     - ineffassign
@@ -88,6 +89,8 @@ linters:
     staticcheck:
       checks:
         - all
+    gosmopolitan:
+      allow-time-local: false
   exclusions:
     generated: lax
     presets:
@@ -98,7 +101,7 @@ linters:
     rules:
       - linters:
           - staticcheck
-        text: 'ST1003:'
+        text: "ST1003:"
       - linters:
           - forbidigo
         path: (.*magefile.go|.*dev-tools/mage/.*)
