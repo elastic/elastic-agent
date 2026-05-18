@@ -136,6 +136,11 @@ steps:
           ls -lahR build/
         artifact_paths:
           - "build/distributions/**/*"
+        matrix:
+          setup:
+            fips:
+              - false
+              - true
         plugins:
           - *google_oidc_plugin
 
