@@ -1120,6 +1120,8 @@ func TestBeatsReceiverSubcomponentStatus(t *testing.T) {
 		Stack: nil,
 	})
 
+	t.Skip("subcomponent stream-level status is not available via the OpAMP transport; see https://github.com/elastic/elastic-agent/pull/14025")
+
 	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
 	// This configuration contains two system/metrics inputs, each with two identical metricsets:

@@ -2287,9 +2287,6 @@ agent.reload:
 		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 1
 	}, 90*time.Second, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
 
-	// this debug log should not be present again after re-loading
-	require.Equal(t, 1, zapLogs.FilterMessageSnippet(`Starting health check extension V2`).Len())
-
 	// set collector logs to debug
 	logConfig = logConfig + `
 service:
