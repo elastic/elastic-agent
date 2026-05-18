@@ -18,6 +18,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
+func TestCleanMarker_MissingMarkerIsOK(t *testing.T) {
+	dataDir := t.TempDir()
+
+	log, _ := loggertest.New(t.Name())
+	require.NoError(t, CleanMarker(log, dataDir))
+}
+
 func TestMarkUpgrade(t *testing.T) {
 	log, _ := loggertest.New("test")
 	agent := agentInstall{
