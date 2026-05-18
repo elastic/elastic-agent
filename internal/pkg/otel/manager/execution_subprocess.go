@@ -270,11 +270,46 @@ func cloneCollectorStatus(aStatus *otelstatus.AggregateStatus) *otelstatus.Aggre
 	return st
 }
 
+<<<<<<< HEAD
 func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Context, statusCh chan *otelstatus.AggregateStatus, collectorStatus *otelstatus.AggregateStatus) {
 	// we need to clone the status to prevent any mutation on the receiver side
 	// affecting the original ref
 	clonedStatus := cloneCollectorStatus(collectorStatus)
 	reportCollectorStatus(ctx, statusCh, clonedStatus)
+=======
+func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
+	metricReadersUntyped := conf.Get("service::telemetry::metrics::readers")
+	if metricReadersUntyped == nil {
+		metricReadersUntyped = []any{}
+	}
+	metricsReadersList, ok := metricReadersUntyped.([]any)
+	if !ok {
+		return fmt.Errorf("couldn't convert value of service::telemetry::metrics::readers to a list: %v", metricReadersUntyped)
+	}
+
+	metricsReader := map[string]any{
+		"pull": map[string]any{
+			"exporter": map[string]any{
+				"prometheus": map[string]any{
+					"host": "localhost",
+					"port": port,
+					// without_scope_info=false keeps pipeline-identifying scope attributes (injected by
+					// telemetry.newPipelineTelemetry) as Prometheus labels, preventing label collisions
+					// when the same component type appears in multiple pipelines.
+					"without_scope_info": false,
+				},
+			},
+		},
+	}
+	metricsReadersList = append(metricsReadersList, metricsReader)
+	confMap := map[string]any{
+		"service::telemetry::metrics::readers": metricsReadersList,
+	}
+	if mergeErr := mergeWithExtensions(conf, confmap.NewFromStringMap(confMap)); mergeErr != nil {
+		return fmt.Errorf("failed to merge config: %w", mergeErr)
+	}
+	return nil
+>>>>>>> 53f46e2c5 (fix(otel): preserve Prometheus scope attributes to prevent label collisions (#14353))
 }
 
 // getCollectorPorts returns the ports used by the OTel collector. If the ports set in the execution struct are 0,

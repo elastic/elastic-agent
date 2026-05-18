@@ -2344,11 +2344,17 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 		"pull": map[string]any{
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
+<<<<<<< HEAD
 					"host":                "localhost",
 					"port":                fmt.Sprintf("${env:%s}", componentmonitoring.OtelCollectorMetricsPortEnvVarName),
 					"without_scope_info":  true,
 					"without_units":       true,
 					"without_type_suffix": true,
+=======
+					"host":               "localhost",
+					"port":               0,
+					"without_scope_info": false,
+>>>>>>> 53f46e2c5 (fix(otel): preserve Prometheus scope attributes to prevent label collisions (#14353))
 				},
 			},
 		},
