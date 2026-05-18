@@ -608,13 +608,12 @@ func PackageZip(spec PackageSpec) error {
 	w := zip.NewWriter(buf)
 	baseDir := spec.rootDir()
 
-	// Add files to zip.
-	for _, pkgFile := range spec.Files {
+	// Add files to zip (dirs before files so explicit entries take precedence).
+	for _, pkgFile := range dirsFirst(spec.Files) {
 		if pkgFile.Symlink {
 			// not supported on zip archives
 			continue
 		}
-
 		if err := addFileToZip(w, baseDir, pkgFile); err != nil {
 			p, _ := filepath.Abs(pkgFile.Source)
 			return fmt.Errorf("failed adding file=%+v to zip: %w", p, err)
@@ -715,12 +714,11 @@ func PackageTarGz(spec PackageSpec) error {
 	// 	spec.Files = newFiles
 	// }
 
-	// Add files to tar.
-	for _, pkgFile := range spec.Files {
+	// Add files to tar (dirs before files so explicit entries take precedence).
+	for _, pkgFile := range dirsFirst(spec.Files) {
 		if pkgFile.Symlink {
 			continue
 		}
-
 		if err := addFileToTar(w, baseDir, pkgFile); err != nil {
 			return fmt.Errorf("failed adding file=%+v to tar: %w", pkgFile, err)
 		}
@@ -903,6 +901,24 @@ func addUIDGidEnvArgs(args []string) ([]string, error) {
 	}
 
 	return args, nil
+}
+
+// dirsFirst returns files with directory-source entries (paths ending in "/")
+// before regular-file entries, so explicit files always overwrite any
+// conflicting path laid down by a directory expansion.
+func dirsFirst(files map[string]PackageFile) []PackageFile {
+	out := make([]PackageFile, 0, len(files))
+	for _, f := range files {
+		if strings.HasSuffix(f.Source, "/") {
+			out = append(out, f)
+		}
+	}
+	for _, f := range files {
+		if !strings.HasSuffix(f.Source, "/") {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // addFileToZip adds a file (or directory) to a zip archive.
