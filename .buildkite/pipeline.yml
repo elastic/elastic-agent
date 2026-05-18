@@ -201,6 +201,8 @@ steps:
             limit: 1
           manual:
             allowed: true
+        plugins:
+          - *google_oidc_plugin
 
   - group: "macOS tests"
     key: "macos-unit-tests"
@@ -338,6 +340,8 @@ steps:
             limit: 1
           manual:
             allowed: true
+        plugins:
+          - *google_oidc_plugin
 
   - label: ":junit: Junit annotate"
     agents:
