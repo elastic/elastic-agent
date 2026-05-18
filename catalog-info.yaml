@@ -582,7 +582,6 @@ spec:
           message: Daily trigger of K8s pipeline for all the active branches
           env:
             PIPELINES_TO_TRIGGER: 'elastic-agent-k8s-testing'
-            K8S_SCHEDULED_TIER3: 'true'
       skip_intermediate_builds: true
       provider_settings:
         trigger_mode: none

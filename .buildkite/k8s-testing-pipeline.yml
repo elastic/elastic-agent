@@ -42,3 +42,5 @@ steps:
     depends_on:
       - packaging-containers-amd64
     command: ".buildkite/scripts/upload-k8s-tests.sh"
+    env:
+      K8S_SCHEDULED_TIER3: 'true'
