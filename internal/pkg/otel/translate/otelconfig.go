@@ -547,11 +547,80 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 		} else if _, ok := input["type"]; !ok {
 			input["type"] = inputType
 		}
+
+		// When the beatprocessor runs the default enrichment processors globally for every
+		// event in the pipeline, remove them from per-input processor lists to avoid running
+		// each processor twice per event.
+		if features.DefaultProcessors() {
+			input["processors"] = stripDefaultProcessors(input["processors"])
+		}
 	}
 
 	return inputs, nil
 }
 
+<<<<<<< HEAD
+=======
+// stripDefaultProcessors removes processors from the per-input list that are already
+// applied globally by the beatprocessor in the OTel pipeline. Matching is by processor
+// key name — a processor entry is dropped when its only key matches a default processor name.
+func stripDefaultProcessors(raw any) []any {
+	list, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	defaultKeys := make(map[string]struct{})
+	for _, p := range GetDefaultProcessors() {
+		for k := range p {
+			defaultKeys[k] = struct{}{}
+		}
+	}
+	filtered := list[:0:0]
+	for _, item := range list {
+		p, ok := item.(map[string]any)
+		if ok && len(p) == 1 {
+			key := ""
+			for k := range p {
+				key = k
+			}
+			if _, isDefault := defaultKeys[key]; isDefault {
+				continue
+			}
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
+}
+
+// extractOtelProcessors extracts the processor IDs from the output configuration.
+func extractOtelProcessors(comp *component.Component) ([]string, error) {
+	outputUnit, ok := comp.OutputUnit()
+	if !ok {
+		return nil, nil
+	}
+	unitConfigMap := outputUnit.Config.GetSource().AsMap() // this is what beats do in libbeat/management/generate.go
+	outputConfig, err := config.NewConfigFrom(unitConfigMap)
+	if err != nil {
+		return nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", comp.OutputName, outputUnit.ID, err)
+	}
+
+	if !outputConfig.HasField("processors") {
+		return nil, nil
+	}
+
+	processorIdsC, err := outputConfig.Child("processors", -1)
+	if err != nil {
+		return nil, err
+	}
+
+	var processorIds []string
+	if err := processorIdsC.Unpack(&processorIds); err != nil {
+		return nil, err
+	}
+	return processorIds, nil
+}
+
+>>>>>>> d08fa6012 (otel: remove per-input default processors when global defaults are already loaded (#14308))
 // OutputConfigToExporterConfig translates the output configuration to an exporter configuration.
 func OutputConfigToExporterConfig(logger *logp.Logger, exporterType otelcomponent.Type, outputConfig *config.C) (map[string]any, error) {
 	configTranslationFunc, ok := configTranslationFuncForExporter[exporterType]
