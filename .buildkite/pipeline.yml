@@ -3,6 +3,13 @@
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:
+  - google_oidc_plugin: &google_oidc_plugin
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
+      # This plugin authenticates to Google Cloud using the OIDC token.
+      elastic/oblt-google-auth#v1.3.1:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
   - sparse_checkout_plugin: &sparse_checkout_plugin
       sparse-checkout#v1.6.0:
         paths:
@@ -25,6 +32,7 @@ env:
   IMAGE_WIN_11_VERSION: "1.0.1778806890"
 
 steps:
+
   - label: "check-ci"
     key: "check-ci"
     command: ".buildkite/scripts/steps/check-ci.sh"
@@ -55,6 +63,8 @@ steps:
             limit: 1
           manual:
             allowed: true
+        plugins:
+          - *google_oidc_plugin
 
       - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
         key: "unit-tests-2204-fips-tag"
@@ -75,6 +85,8 @@ steps:
             limit: 1
           manual:
             allowed: true
+        plugins:
+          - *google_oidc_plugin
 
       - label: "Unit tests - fips140=only Ubuntu 22.04"
         key: "unit-tests-2204-fips140-only"
@@ -98,6 +110,8 @@ steps:
             limit: 1
           manual:
             allowed: true
+        plugins:
+          - *google_oidc_plugin
 
       - label: "Unit tests - Ubuntu 22.04 ARM64"
         key: "unit-tests-2204-arm64"
@@ -117,6 +131,8 @@ steps:
             limit: 1
           manual:
             allowed: true
+        plugins:
+          - *google_oidc_plugin
 
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
@@ -137,15 +153,19 @@ steps:
             limit: 1
           manual:
             allowed: true
+        plugins:
+          - *google_oidc_plugin
 
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
         command: .buildkite/scripts/steps/unit-tests.ps1
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
+        # NOTE: we cannot use OIDC for windows-2016, it's not supported by BK
+        #       Therefore we cannot store artifacts on GCP
+        #artifact_paths:
+        #  - "build/TEST-*.html"
+        #  - "build/TEST-*.xml"
+        #  - "build/diagnostics/*"
+        #  - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2016}"
@@ -157,7 +177,38 @@ steps:
             limit: 1
           manual:
             allowed: true
+        # NOTE: we cannot use OIDC for windows-2016, it's not supported by BK
+        #       The Job API is available on Unix agents, and agents running Windows versions after build 17063
+        #plugins:
+        #  - *google_oidc_plugin
 
+<<<<<<< HEAD
+=======
+      - label: "Unit tests - fips140=only Windows 2022"
+        key: "unit-tests-win2022-fips140-only"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          FIPS: "true"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_WIN_2022}"
+          machineType: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+>>>>>>> d68033a5a (bk: use the GCS bucket for artifacts (#14276))
   - group: "macOS tests"
     key: "macos-unit-tests"
     steps:
@@ -176,6 +227,8 @@ steps:
             limit: 1
           manual:
             allowed: true
+        plugins:
+          - *google_oidc_plugin
 
       # Runs only on main and release branches
       - label: "Unit tests - macOS 13"
@@ -195,6 +248,8 @@ steps:
             limit: 1
           manual:
             allowed: true
+        plugins:
+          - *google_oidc_plugin
 
   - group: "Desktop Windows tests"
     key: "extended-windows"
@@ -218,6 +273,8 @@ steps:
             limit: 1
           manual:
             allowed: true
+        plugins:
+          - *google_oidc_plugin
 
       - label: "Unit tests - Windows 11"
         env:
@@ -240,7 +297,60 @@ steps:
             limit: 1
           manual:
             allowed: true
+        plugins:
+          - *google_oidc_plugin
 
+<<<<<<< HEAD
+=======
+      - label: "Unit tests - Windows 11 arm64"
+        env:
+          GODEBUG: "asyncpreemptoff=1"  # see https://github.com/elastic/elastic-agent/issues/13796
+        key: "unit-tests-win11-arm64"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "azure"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "Unit tests - fips140=only Windows 11 arm64"
+        key: "unit-tests-win11-arm64-fips140-only"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          FIPS: "true"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "azure"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+>>>>>>> d68033a5a (bk: use the GCS bucket for artifacts (#14276))
   - label: ":junit: Junit annotate"
     agents:
       # requires at least "bash", "curl" and "git"
@@ -250,6 +360,7 @@ steps:
           artifacts: "**TEST-*.xml"
           always-annotate: true
           run-in-docker: false
+      - *google_oidc_plugin
     depends_on:
       - step: "unit-tests-2204"
         allow_failure: true
