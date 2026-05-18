@@ -15,7 +15,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -104,11 +103,6 @@ func newStateStoreWithMigration(
 	}
 
 	return NewStateStore(log, stateStore)
-}
-
-// NewStateStoreActionAcker creates a new state store backed action acker.
-func NewStateStoreActionAcker(acker acker.Acker, store *StateStore) *StateStoreActionAcker {
-	return &StateStoreActionAcker{acker: acker, store: store}
 }
 
 // NewStateStore creates a new state store.
@@ -285,30 +279,6 @@ func (s *StateStore) AckToken() string {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
 	return s.state.AckToken
-}
-
-// StateStoreActionAcker wraps an existing acker and will set any acked event
-// in the state store. It's up to the state store to decide if we need to
-// persist the event for future replay or just discard the event.
-type StateStoreActionAcker struct {
-	acker acker.Acker
-	store *StateStore
-}
-
-// Ack acks the action using underlying acker.
-// After the action is acked it is stored in the StateStore. The StateStore
-// decides if the action needs to be persisted or not.
-func (a *StateStoreActionAcker) Ack(ctx context.Context, action fleetapi.Action) error {
-	if err := a.acker.Ack(ctx, action); err != nil {
-		return err
-	}
-	a.store.SetAction(action)
-	return a.store.Save()
-}
-
-// Commit commits acks.
-func (a *StateStoreActionAcker) Commit(ctx context.Context) error {
-	return a.acker.Commit(ctx)
 }
 
 func (as *actionSerializer) MarshalJSON() ([]byte, error) {

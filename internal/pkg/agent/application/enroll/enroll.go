@@ -8,8 +8,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	goerrors "errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math/rand/v2"
 	"os"
 	"strings"
@@ -24,13 +26,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -248,15 +250,29 @@ func enroll(
 		return fmt.Errorf("failed to store agent config: %w", err)
 	}
 
-	// clear action store
-	// fail only if file exists and there was a failure
-	if err := os.Remove(paths.AgentActionStoreFile()); !os.IsNotExist(err) {
+	if err := clearAgentStores(paths.AgentActionStoreFile(), paths.AgentStateStoreFile()); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+// clearAgentStores removes the action and state store files left over from
+// previous enrollments. A missing file is the happy case.
+func clearAgentStores(actionStoreFile, stateStoreFile string) error {
 	// clear action store
-	// fail only if file exists and there was a failure
-	if err := os.Remove(paths.AgentStateStoreFile()); !os.IsNotExist(err) {
+	// fail only if file exists and there was a failure.
+	// The leading err != nil guard is load-bearing — errors.Is(nil, fs.ErrNotExist)
+	// returns false, so dropping the guard would cause the success case
+	// (err == nil) to fall into the return branch and skip the state
+	// store removal below.
+	if err := os.Remove(actionStoreFile); err != nil && !goerrors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+
+	// clear state store
+	// fail only if file exists and there was a failure.
+	if err := os.Remove(stateStoreFile); err != nil && !goerrors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 
@@ -420,7 +436,7 @@ func SafelyStoreAgentInfo(s saver, reader io.Reader) error {
 func LoadPersistentConfig(pathConfigFile string) (map[string]interface{}, error) {
 	persistentMap := make(map[string]interface{})
 	rawConfig, err := config.LoadFile(pathConfigFile)
-	if os.IsNotExist(err) {
+	if goerrors.Is(err, fs.ErrNotExist) {
 		return persistentMap, nil
 	}
 	if err != nil {

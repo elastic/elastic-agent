@@ -1,5 +1,16 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - sparse_checkout_plugin: &sparse_checkout_plugin
+      sparse-checkout#v1.6.0:
+        paths:
+        - .buildkite
+        - .go-version
+        - .package-version
+        - version/version.go
+
 env:
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.

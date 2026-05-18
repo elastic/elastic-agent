@@ -13,15 +13,18 @@ kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Stop Windows service promptly while the agent is retrying enrollment
+summary: Agent no longer fails to start when the upgrade marker file is corrupt
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 description: |
-  Stopping the Elastic Agent Windows service while it was retrying
-  enrollment could hang for several minutes and cause MSI uninstall to
-  fail. The service now stops promptly.
+  If the machine lost power while the agent was in the middle of an upgrade,
+  the upgrade marker file could be left in a broken state. This caused the
+  agent to refuse to start on the next boot. The agent now moves the broken
+  file out of the way (keeping it for support diagnostics) and starts up
+  normally as if no upgrade was in progress. The upgrade marker file is also
+  now written more safely, making this situation less likely to occur.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:

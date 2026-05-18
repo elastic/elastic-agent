@@ -137,6 +137,45 @@ func TestTTLMarkerRegistry_Get(t *testing.T) {
 	}
 }
 
+// TestTTLMarkerRegistry_GetAll_PartialReturnsMalformedAlongsideParsed proves
+// that GetAll keeps returning successfully parsed entries even when a sibling
+// .ttl file is unparseable, and surfaces the broken entry via the malformed
+// map instead of discarding the whole read. This is the contract InTTLRollbacks
+// relies on to preserve recoverable installs whose metadata got corrupted.
+func TestTTLMarkerRegistry_GetAll_PartialReturnsMalformedAlongsideParsed(t *testing.T) {
+	tmpDir := t.TempDir()
+	goodHome := filepath.Join("data", "elastic-agent-1.2.3-good")
+	badHome := filepath.Join("data", "elastic-agent-9.9.9-corrupt")
+
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, goodHome), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, badHome), 0755))
+
+	validUntil := time.Now().Add(24 * time.Hour).Truncate(time.Second)
+	goodMarker := strings.TrimSpace(fmt.Sprintf(
+		"version: 1.2.3\nvalid_until: %s",
+		validUntil.Format(time.RFC3339),
+	))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, goodHome, ttlMarkerName), []byte(goodMarker), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, badHome, ttlMarkerName), []byte("this is not yaml"), 0644))
+
+	testLogger, _ := loggertest.New(t.Name())
+	T := NewTTLMarkerRegistry(testLogger, tmpDir)
+
+	markers, malformed, err := T.GetAll()
+	require.NoError(t, err, "GetAll should not return a structural error here")
+
+	assert.Len(t, markers, 1, "expected exactly one parsed marker")
+	if assert.Contains(t, markers, goodHome) {
+		assert.Equal(t, "1.2.3", markers[goodHome].Version)
+		assert.True(t, markers[goodHome].ValidUntil.Equal(validUntil), "ValidUntil mismatch")
+	}
+
+	assert.Len(t, malformed, 1, "expected exactly one malformed entry")
+	if assert.Contains(t, malformed, badHome) {
+		assert.Error(t, malformed[badHome])
+	}
+}
+
 func TestTTLMarkerRegistry_Set(t *testing.T) {
 	const TTLMarkerYAMLTemplate = `
         version: {{ .Version }}

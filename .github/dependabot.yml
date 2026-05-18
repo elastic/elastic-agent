@@ -4,7 +4,9 @@ updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
     labels:
       - automation
       - skip-changelog
@@ -13,6 +15,11 @@ updates:
     allow:
       - dependency-name: "github.com/elastic/*"
       - dependency-name: "helm.sh/helm/*"
+    groups:
+      go-dependencies:
+        patterns:
+          - "github.com/elastic/*"
+          - "helm.sh/helm/*"
     ignore:
       - dependency-name: "github.com/elastic/beats/*"
       # Otel dependency updates are done in lock-step with Otel core framework updates
