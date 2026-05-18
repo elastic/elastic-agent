@@ -314,6 +314,10 @@ shared:
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/endpoint-security-resources.zip:
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/endpoint-security-resources.zip'
+        mode: 0644
+        skip_on_missing: true
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/manifest.yaml:
         mode: 0644
         content: >
@@ -328,7 +332,7 @@ shared:
       mode: 0755
     'otel_samples':
       source: '{{ repo.RootDir }}/internal/pkg/otel/samples/linux/'
-      mode: 0755
+      mode: 0644
 
   - &agent_binary_common_files
     LICENSE.txt:
@@ -412,7 +416,7 @@ shared:
       mode: 0755
     'otel_samples':
       source: '{{ repo.RootDir }}/internal/pkg/otel/samples/darwin/'
-      mode: 0755
+      mode: 0644
     <<: *agent_darwin_app_bundle_files
     <<: *agent_binary_common_files
 
@@ -421,6 +425,10 @@ shared:
       source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
       mode: 0755
       config_mode: 0644
+      skip_on_missing: true
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security-resources.zip':
+      source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/endpoint-security-resources.zip'
+      mode: 0644
       skip_on_missing: true
 
   # Binary package spec (tar.gz for linux) for community beats.
@@ -460,6 +468,10 @@ shared:
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/'
         mode: 0755
         config_mode: 0644
+        skip_on_missing: true
+      'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security-resources.zip':
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/endpoint-security-resources.zip'
+        mode: 0644
         skip_on_missing: true
       'otelcol.ps1':
         source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
