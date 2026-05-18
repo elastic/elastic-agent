@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+#
+# Kubernetes Integration Tests - Pipeline used for running on scheduler
+#
+
+env:
+  ASDF_MAGE_VERSION: 1.14.0
+  ASDF_KIND_VERSION: "0.27.0"
+
+  # The following images are defined here and their values will be updated by updatecli
+  # Please do not change them manually.
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1777597312"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1777597312"
+
+common:
+  - vault_docker_login: &vault_docker_login
+      elastic/vault-docker-login#v0.5.2:
+        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
+steps:
+
+  - label: ":package: amd64: Containers"
+    key: packaging-containers-amd64
+    env:
+      PACKAGES: "docker"
+      PLATFORMS: "linux/amd64"
+    command: |
+      .buildkite/scripts/steps/integration-package.sh
+      .buildkite/scripts/steps/integration-cloud-image-push.sh
+    artifact_paths:
+      - build/distributions/**
+    agents:
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      diskSizeGb: 200
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
+    plugins:
+      - *vault_docker_login
+
+  - key: integration-tests-kubernetes
+    depends_on:
+      - packaging-containers-amd64
+    steps:
+      - label: "Upload k8s tests pipeline"
+        command: ".buildkite/scripts/upload-k8s-tests.sh"
