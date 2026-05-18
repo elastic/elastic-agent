@@ -45,8 +45,7 @@ steps:
       - *vault_docker_login
       - *google_oidc_plugin
 
-  - key: integration-tests-kubernetes
-    label: "Upload k8s tests pipeline"
+  - label: "Upload k8s tests pipeline"
     depends_on:
       - packaging-containers-amd64
     command: ".buildkite/scripts/upload-k8s-tests.sh"
