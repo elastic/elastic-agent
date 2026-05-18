@@ -49,6 +49,13 @@ func TestTryLoadMarker_MissingFile(t *testing.T) {
 	require.Nil(t, marker)
 }
 
+func TestCleanMarker_MissingMarkerIsOK(t *testing.T) {
+	dataDir := t.TempDir()
+
+	log, _ := loggertest.New(t.Name())
+	require.NoError(t, CleanMarker(log, dataDir))
+}
+
 func TestMarkUpgrade(t *testing.T) {
 	type args struct {
 		currentAgent  agentInstall
