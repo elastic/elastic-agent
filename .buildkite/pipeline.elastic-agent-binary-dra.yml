@@ -18,6 +18,13 @@ common:
   - docker_login_plugin: &docker_login_plugin
       elastic/vault-docker-login#v0.5.2:
         secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+  - google_oidc_plugin: &google_oidc_plugin
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
+      # This plugin authenticates to Google Cloud using the OIDC token.
+      elastic/oblt-google-auth#v1.3.1:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
 
 steps:
   - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
@@ -38,6 +45,8 @@ steps:
       env:
         DRA_WORKFLOW: "snapshot"
         PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
+      plugins:
+        - *google_oidc_plugin
 
     - label: ":package: linux/amd64 FIPS Elastic-Agent Core Snapshot"
       commands:
@@ -53,6 +62,8 @@ steps:
         DRA_WORKFLOW: "snapshot"
         PLATFORMS: "linux/amd64"
         FIPS: "true"
+      plugins:
+        - *google_oidc_plugin
 
     - label: ":package: linux/arm64 darwin/arm64 windows/arm64 Elastic-Agent Core Snapshot"
       commands:
@@ -67,6 +78,8 @@ steps:
       env:
         DRA_WORKFLOW: "snapshot"
         PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
+      plugins:
+        - *google_oidc_plugin
 
     - label: ":package: linux/arm64 FIPS Elastic-Agent Core Snapshot"
       commands:
@@ -82,6 +95,9 @@ steps:
         DRA_WORKFLOW: "snapshot"
         PLATFORMS: "linux/arm64"
         FIPS: "true"
+      plugins:
+        - *google_oidc_plugin
+
     - wait
 
     - label: ":hammer: DRA Publish Elastic-Agent Core Snapshot"
@@ -100,6 +116,7 @@ steps:
       env:
         DRA_WORKFLOW: "snapshot"
       plugins:
+        - *google_oidc_plugin
         - *docker_login_plugin
 
     # TODO: this step should be removed as soon as 8.19 or 9.3 are onboarded to the
@@ -133,6 +150,8 @@ steps:
       env:
         DRA_WORKFLOW: "staging"
         PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
+      plugins:
+        - *google_oidc_plugin
 
     - label: ":package: linux/amd64 FIPS Elastic-Agent Core staging"
       commands: |
@@ -149,6 +168,8 @@ steps:
         DRA_WORKFLOW: "staging"
         PLATFORMS: "linux/amd64"
         FIPS: "true"
+      plugins:
+        - *google_oidc_plugin
 
     - label: ":package: linux/arm64 darwin/arm64 windows/arm64 Elastic-Agent Core staging"
       commands: |
@@ -164,6 +185,8 @@ steps:
       env:
         DRA_WORKFLOW: "dra-core-staging"
         PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
+      plugins:
+        - *google_oidc_plugin
 
     - label: ":package: linux/arm64 FIPS Elastic-Agent Core staging"
       commands: |
@@ -180,6 +203,8 @@ steps:
         DRA_WORKFLOW: "dra-core-staging"
         PLATFORMS: "linux/arm64"
         FIPS: "true"
+      plugins:
+        - *google_oidc_plugin
 
     - wait
 
@@ -200,6 +225,7 @@ steps:
       env:
         DRA_WORKFLOW: "staging"
       plugins:
+        - *google_oidc_plugin
         - *docker_login_plugin
 
 notify:
