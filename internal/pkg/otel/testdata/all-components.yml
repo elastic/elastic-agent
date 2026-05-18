@@ -81,6 +81,13 @@ receivers:
           static_configs:
             - targets: ['0.0.0.0:8888']
   elasticapmintake:
+  akamai_siem:
+    endpoint: https://akab-placeholder.luna.akamaiapis.net
+    config_ids: "12345"
+    authentication:
+      client_token: placeholder-client-token
+      client_secret: placeholder-client-secret
+      access_token: placeholder-access-token
   apache:
   mysql:
   postgresql:
