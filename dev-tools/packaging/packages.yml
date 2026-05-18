@@ -50,6 +50,7 @@ settings:
         - *linux-amd64
         - *linux-arm64
         - *windows-amd64
+        - *windows-arm64
 
 # List *all* the components available for packaging in elastic-agent
 components:
