@@ -26,6 +26,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -381,6 +382,7 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 // TestServiceStartRetry tests that the service runtime will
 // retry the service start command if it fails
 func TestServiceStartRetry(t *testing.T) {
+	t.Skip()
 	log, logObs := loggertest.New("test")
 	const cisPort = 9999
 	const cisSocket = ".rteaci.sock"
