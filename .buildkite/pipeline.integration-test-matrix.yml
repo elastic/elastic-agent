@@ -1,9 +1,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
-<<<<<<< HEAD
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
-=======
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:
@@ -14,7 +12,6 @@ common:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
->>>>>>> d68033a5a (bk: use the GCS bucket for artifacts (#14276))
 
 steps:
   - label: "Integration tests: packaging"
