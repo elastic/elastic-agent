@@ -583,10 +583,9 @@ func (Test) Unit(ctx context.Context) error {
 func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 
-	cfg := devtools.SettingsFromContext(ctx)
+	cfg := devtools.SettingsFromContext(ctx).WithFIPSBuild(true)
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	params.Env["FIPS"] = "true"
-	params.Env["GODEBUG"] = "fips140=only"
 	params.Tags = append(params.Tags, "requirefips")
 	return devtools.GoTest(ctx, params)
 }

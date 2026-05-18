@@ -59,6 +59,7 @@ import (
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
+	akamaisiemreceiver "github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver"
 	elasticapmintakereceiver "github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver" // for collecting APM data from Elastic APM agents
 
 	abreceiver "github.com/elastic/beats/v7/x-pack/auditbeat/abreceiver"
@@ -192,6 +193,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			awss3receiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
 			prometheusremotewritereceiver.NewFactory(),
+			akamaisiemreceiver.NewFactory(),
 		}
 
 		// some receivers are only available on certain OS.
