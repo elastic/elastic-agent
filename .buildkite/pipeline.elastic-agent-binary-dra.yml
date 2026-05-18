@@ -77,13 +77,9 @@ steps:
         image: "${IMAGE_UBUNTU_2404_ARM_64}"
       env:
         DRA_WORKFLOW: "snapshot"
-<<<<<<< HEAD
         PLATFORMS: "linux/arm64 darwin/arm64"
-=======
-        PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
       plugins:
         - *google_oidc_plugin
->>>>>>> d68033a5a (bk: use the GCS bucket for artifacts (#14276))
 
     - label: ":package: linux/arm64 FIPS Elastic-Agent Core Snapshot"
       commands:
@@ -188,13 +184,9 @@ steps:
         image: "${IMAGE_UBUNTU_2404_ARM_64}"
       env:
         DRA_WORKFLOW: "dra-core-staging"
-<<<<<<< HEAD
         PLATFORMS: "linux/arm64 darwin/arm64"
-=======
-        PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
       plugins:
         - *google_oidc_plugin
->>>>>>> d68033a5a (bk: use the GCS bucket for artifacts (#14276))
 
     - label: ":package: linux/arm64 FIPS Elastic-Agent Core staging"
       commands: |

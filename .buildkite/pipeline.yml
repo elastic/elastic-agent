@@ -182,33 +182,6 @@ steps:
         #plugins:
         #  - *google_oidc_plugin
 
-<<<<<<< HEAD
-=======
-      - label: "Unit tests - fips140=only Windows 2022"
-        key: "unit-tests-win2022-fips140-only"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_WIN_2022}"
-          machineType: "n2-standard-8"
-          disk_size: 200
-          disk_type: "pd-ssd"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
->>>>>>> d68033a5a (bk: use the GCS bucket for artifacts (#14276))
   - group: "macOS tests"
     key: "macos-unit-tests"
     steps:
@@ -300,57 +273,6 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-<<<<<<< HEAD
-=======
-      - label: "Unit tests - Windows 11 arm64"
-        env:
-          GODEBUG: "asyncpreemptoff=1"  # see https://github.com/elastic/elastic-agent/issues/13796
-        key: "unit-tests-win11-arm64"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11_ARM64}"
-          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
-          vmSize: "Standard_D8ps_v6"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-      - label: "Unit tests - fips140=only Windows 11 arm64"
-        key: "unit-tests-win11-arm64-fips140-only"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11_ARM64}"
-          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
-          vmSize: "Standard_D8ps_v6"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
->>>>>>> d68033a5a (bk: use the GCS bucket for artifacts (#14276))
   - label: ":junit: Junit annotate"
     agents:
       # requires at least "bash", "curl" and "git"
