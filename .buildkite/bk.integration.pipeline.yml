@@ -25,7 +25,7 @@ common:
   - google_oidc_plugin: &google_oidc_plugin
       # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
       # This plugin authenticates to Google Cloud using the OIDC token.
-      elastic/oblt-google-auth#v1.3.0:
+      elastic/oblt-google-auth#v1.3.1:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
@@ -46,7 +46,7 @@ common:
   - google_oidc_observability_plugin: &google_oidc_observability_plugin
       # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
       # This plugin authenticates to Google Cloud using the OIDC token.
-      elastic/oblt-google-auth#v1.3.0:
+      elastic/oblt-google-auth#v1.3.1:
         lifetime: 10800 # seconds
   - oblt_cli_plugin: &oblt_cli_plugin
       elastic/oblt-cli#v0.4.1:
@@ -649,6 +649,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2022}"
         plugins:
+          - *google_oidc_observability_plugin
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
 
@@ -671,6 +672,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
         plugins:
+          - *google_oidc_observability_plugin
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
       - label: "Ubuntu:2404:amd64:sudo"
@@ -691,6 +693,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
+          - *google_oidc_observability_plugin
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
 
@@ -726,7 +729,6 @@ steps:
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "build/*.xml" .
-      buildkite-agent artifact download "build\*.xml" .
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
@@ -742,3 +744,5 @@ steps:
           format: "junit"
           branches: "main"
           debug: true
+      - *google_oidc_observability_plugin
+
