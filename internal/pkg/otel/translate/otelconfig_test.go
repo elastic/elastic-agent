@@ -1862,7 +1862,8 @@ func TestGetOtelConfig(t *testing.T) {
 							},
 						},
 						"http": map[string]any{
-							"enabled": false,
+							"enabled": true,
+							"host":    "localhost",
 						},
 						"management.otel.enabled": true,
 					},
