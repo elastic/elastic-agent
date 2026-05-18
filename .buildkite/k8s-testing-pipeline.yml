@@ -38,8 +38,7 @@ steps:
       - *vault_docker_login
 
   - key: integration-tests-kubernetes
+    label: "Upload k8s tests pipeline"
     depends_on:
       - packaging-containers-amd64
-    steps:
-      - label: "Upload k8s tests pipeline"
-        command: ".buildkite/scripts/upload-k8s-tests.sh"
+    command: ".buildkite/scripts/upload-k8s-tests.sh"
