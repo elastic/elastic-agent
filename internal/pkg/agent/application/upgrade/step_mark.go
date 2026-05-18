@@ -155,7 +155,7 @@ func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile wr
 
 		markerPath := markerFilePath(dataDirPath)
 		log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash)
-		if err := writeFile(markerPath, markerBytes, 0600); err != nil {
+		if err := writeMarkerFile(markerPath, markerBytes, true); err != nil {
 			return goerrors.Join(err, errors.New(errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath)))
 		}
 
@@ -193,6 +193,30 @@ func CleanMarker(log *logger.Logger, dataDirPath string) error {
 // and no error.
 func LoadMarker(dataDirPath string) (*UpdateMarker, error) {
 	return loadMarker(markerFilePath(dataDirPath))
+}
+
+// TryLoadMarker loads the upgrade marker. If the file does not exist it
+// returns nil and no error. Unlike LoadMarker, if the file exists but cannot be
+// parsed (e.g. corrupted by a crash during an upgrade write), it renames the
+// corrupt file and returns nil so startup can proceed without upgrade state.
+func TryLoadMarker(log *logger.Logger, dataDirPath string) (*UpdateMarker, error) {
+	markerFile := markerFilePath(dataDirPath)
+	marker, err := loadMarker(markerFile)
+	if err == nil {
+		return marker, nil
+	}
+
+	// The file exists but could not be parsed. Move it aside so the agent can
+	// start without upgrade state rather than aborting startup entirely.
+	corruptPath := markerFile + ".corrupt"
+	if renameErr := os.Rename(markerFile, corruptPath); renameErr != nil {
+		log.Warnf("corrupt upgrade marker at %s could not be moved to %s (parse error: %v, rename error: %v); starting without upgrade state",
+			markerFile, corruptPath, err, renameErr)
+	} else {
+		log.Warnf("corrupt upgrade marker moved to %s (parse error: %v); starting without upgrade state",
+			corruptPath, err)
+	}
+	return nil, nil
 }
 
 func loadMarker(markerFile string) (*UpdateMarker, error) {
