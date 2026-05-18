@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -32,6 +33,7 @@ import (
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -465,7 +467,7 @@ Moylz3f/lBMBLKFUD19ZzS4Z8c31iZPFXkN+KCjW8B7hNv6qKDSvQo74yvA0NYkv
 ncHUVm1hDPg8p7GUVgwd2m6M7uidGjTtSH1wjZ4=
 -----END CERTIFICATE-----
 `},
-				Certificate: tlscommon.CertificateConfig{
+				Certificate: tlscommon.CertificateConfig{ //nolint:gosec // G101: test-only self-signed cert/key, not a real credential
 					Certificate: `-----BEGIN CERTIFICATE-----
 MIIDQzCCAiugAwIBAgIVAJtAaYlLhZ/4qmigwOyX79az1ZZ3MA0GCSqGSIb3DQEB
 CwUAMDQxMjAwBgNVBAMTKUVsYXN0aWMgQ2VydGlmaWNhdGUgVG9vbCBBdXRvZ2Vu
@@ -1408,6 +1410,84 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				require.FileExists(t, filepath.Join(baseDir, "versionedHome"))
 			}
 		})
+	}
+}
+
+// TestUpgradeSelfHealsCorruptLiveTTL drives Upgrader.Upgrade end-to-end against
+// a real ttl.TTLMarkerRegistry on a TempDir where the live install already
+// carries a corrupt .ttl payload. It catches regressions where a future
+// refactor at the Upgrade -> availableRollbacksSource.Set call site
+// reintroduces the all-or-nothing behavior that a single malformed marker
+// could wedge.
+func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+
+	baseDir := t.TempDir()
+	paths.SetTop(baseDir)
+
+	// Use the package-local helper so the live install lands at the exact path
+	// paths.VersionedHome() will resolve to inside Upgrader.Upgrade — passing
+	// release.VersionWithSnapshot()/release.Commit() makes the on-disk and
+	// production-side paths match without relying on the legacy fallback.
+	currentVersionedHome := createFakeAgentInstall(t, baseDir, release.VersionWithSnapshot(), release.Commit(), true)
+
+	const corruptPayload = "not valid yaml: {"
+	require.NoError(t, os.WriteFile(filepath.Join(baseDir, currentVersionedHome, ".ttl"), []byte(corruptPayload), 0o600))
+
+	newVersionedHome := createFakeAgentInstall(t, baseDir, "99.0.0", "newhsh000000", true)
+
+	mockAgentInfo := info.NewMockAgent(t)
+	mockAgentInfo.EXPECT().Version().Return(release.Version())
+
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+	mockWatcherHelper := NewMockWatcherHelper(t)
+	watcherExecutable := paths.BinaryPath(filepath.Join(baseDir, newVersionedHome), agentExecutableName)
+	mockWatcherHelper.EXPECT().SelectWatcherExecutable(baseDir, mock.Anything, mock.Anything).Return(watcherExecutable)
+	mockWatcherHelper.EXPECT().InvokeWatcher(mock.Anything, watcherExecutable).
+		Return(&exec.Cmd{Path: watcherExecutable}, nil)
+	mockWatcherHelper.EXPECT().WaitForWatcher(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	realRegistry := ttl.NewTTLMarkerRegistry(log, paths.Top())
+
+	// A non-nil UpgradeConfig with a non-zero Rollback.Window is required so
+	// getAvailableRollbacks produces a non-nil map that includes the live
+	// install. With a nil/zero config the map would be empty and Set would take
+	// the sweep path instead of the rewrite path, silently turning this test
+	// vacuous as a regression tripwire for the self-heal contract.
+	upgrader, err := NewUpgrader(log, &artifact.Config{}, configuration.DefaultUpgradeConfig(), mockAgentInfo, mockWatcherHelper, realRegistry)
+	require.NoError(t, err)
+
+	archivePath := filepath.Join(baseDir, "mockArchive")
+	require.NoError(t, os.WriteFile(archivePath, []byte("test"), 0o600))
+
+	upgrader.artifactDownloader = &mockArtifactDownloader{returnArchivePath: archivePath}
+	upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+		return agentVersion{version: upgradeVersion, snapshot: false, hash: metadata.hash}
+	}
+	upgrader.unpacker = &mockUnpacker{
+		returnPackageMetadata: packageMetadata{manifest: &v1.PackageManifest{}, hash: "newhsh"},
+		returnUnpackResult:    UnpackResult{Hash: "newhsh", VersionedHome: newVersionedHome},
+	}
+	upgrader.copyActionStore = func(_ *logger.Logger, _ string) error { return nil }
+	upgrader.copyRunDirectory = func(_ *logger.Logger, _, _ string) error { return nil }
+	upgrader.changeSymlink = func(_ *logger.Logger, _, _, _ string) error { return nil }
+	upgrader.markUpgrade = func(_ *logger.Logger, _ string, _ time.Time, _, _ agentInstall, _ *fleetapi.ActionUpgrade, _ *details.Details, _ map[string]ttl.TTLMarker) error {
+		return nil
+	}
+
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil, details.NewDetails("99.0.0", details.StateRequested, "test"), true, true)
+	require.NoError(t, err, "upgrade must self-heal the corrupt live .ttl and complete")
+
+	markers, malformed, getAllErr := realRegistry.GetAll()
+	require.NoError(t, getAllErr)
+	assert.Empty(t, malformed, "corrupt live .ttl must have been overwritten with valid YAML")
+	if assert.Contains(t, markers, currentVersionedHome, "live install should now hold a valid TTL marker") {
+		assert.Equal(t, release.VersionWithSnapshot(), markers[currentVersionedHome].Version)
+		assert.Equal(t, release.Commit(), markers[currentVersionedHome].Hash)
+		assert.True(t, markers[currentVersionedHome].ValidUntil.After(time.Now()), "rewritten marker should have a future ValidUntil")
 	}
 }
 
