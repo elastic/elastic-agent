@@ -85,22 +85,12 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/gotestsum v1.13.0
-<<<<<<< HEAD
-	helm.sh/helm/v3 v3.20.2
+	helm.sh/helm/v3 v3.21.0
 	k8s.io/api v0.35.4
 	k8s.io/apimachinery v0.35.4
 	k8s.io/cli-runtime v0.35.1
 	k8s.io/client-go v0.35.4
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
-=======
-	helm.sh/helm/v3 v3.21.0
-	howett.net/plist v1.0.1
-	k8s.io/api v0.35.3
-	k8s.io/apimachinery v0.35.3
-	k8s.io/cli-runtime v0.35.2
-	k8s.io/client-go v0.35.3
-	kernel.org/pub/linux/libs/security/libcap/cap v1.2.77
->>>>>>> cf48169ae (build(deps): bump the go-dependencies group across 1 directory with 3 updates (#14352))
 	sigs.k8s.io/e2e-framework v0.7.0
 	sigs.k8s.io/kustomize/api v0.20.1
 	sigs.k8s.io/kustomize/kyaml v0.20.1
@@ -298,14 +288,10 @@ require (
 	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
-<<<<<<< HEAD
 	github.com/eclipse/paho.mqtt.golang v1.5.1 // indirect
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
 	github.com/elastic/apm-data v1.21.0 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
-=======
-	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203 // indirect
->>>>>>> cf48169ae (build(deps): bump the go-dependencies group across 1 directory with 3 updates (#14352))
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.14.1 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect

@@ -7,28 +7,13 @@ replace github.com/elastic/elastic-agent => ../../
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260518205231-3e8873641519
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.42.2
+	github.com/elastic/elastic-agent-libs v0.43.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.47.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.47.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.47.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.47.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.47.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.47.0
-=======
-	github.com/elastic/elastic-agent-libs v0.43.0
-	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
-	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.50.0
-	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.50.0
-	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.50.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.50.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.50.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.50.0
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.50.0
-	github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.50.0
-	github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver v0.1.0
-	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.50.0
->>>>>>> cf48169ae (build(deps): bump the go-dependencies group across 1 directory with 3 updates (#14352))
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.152.0
@@ -455,7 +440,7 @@ require (
 	github.com/leodido/go-syslog/v4 v4.5.0 // indirect
 	github.com/leodido/ragel-machinery v0.0.0-20190525184631-5f46317e436b // indirect
 	github.com/lestrrat-go/strftime v1.1.1 // indirect
-	github.com/lib/pq v1.10.9 // indirect
+	github.com/lib/pq v1.11.2 // indirect
 	github.com/lightstep/go-expohisto v1.0.0 // indirect
 	github.com/linode/go-metadata v0.2.4 // indirect
 	github.com/linode/linodego v1.66.0 // indirect

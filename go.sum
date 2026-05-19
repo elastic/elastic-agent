@@ -2235,15 +2235,10 @@ gotest.tools/gotestsum v1.13.0/go.mod h1:7f0NS5hFb0dWr4NtcsAsF0y1kzjEFfAil0HiBQJ
 gotest.tools/v3 v3.0.2/go.mod h1:3SzNCllyD9/Y+b5r9JIKQ474KzkZyqLqEfYqMsX94Bk=
 gotest.tools/v3 v3.5.2 h1:7koQfIKdy+I8UTetycgUqXWSDwpgv193Ka+qRsmBY8Q=
 gotest.tools/v3 v3.5.2/go.mod h1:LtdLGcnqToBH83WByAAi/wiwSFCArdFIUV/xxN4pcjA=
-<<<<<<< HEAD
-helm.sh/helm/v3 v3.20.2 h1:binM4rvPx5DcNsa1sIt7UZi55lRbu3pZUFmQkSoRh48=
-helm.sh/helm/v3 v3.20.2/go.mod h1:Fl1kBaWCpkUrM6IYXPjQ3bdZQfFrogKArqptvueZ6Ww=
-honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
-honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
-=======
 helm.sh/helm/v3 v3.21.0 h1:9TRbaXQH+BIKLLDYlu++JsyWodS5kBBOLF7C7HY5+cs=
 helm.sh/helm/v3 v3.21.0/go.mod h1:5IvU6Ae6ruB/vasVHhnC1IU5RvqFM349vLYS1BiHqeY=
->>>>>>> cf48169ae (build(deps): bump the go-dependencies group across 1 directory with 3 updates (#14352))
+honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
+honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 howett.net/plist v1.0.1 h1:37GdZ8tP09Q35o9ych3ehygcsL+HqKSwzctveSlarvM=
 howett.net/plist v1.0.1/go.mod h1:lqaXoTrLY4hg8tnEzNru53gicrbv7rrk+2xJA/7hw9g=
 k8s.io/api v0.35.4 h1:P7nFYKl5vo9AGUp1Z+Pmd3p2tA7bX2wbFWCvDeRv988=
