@@ -4,9 +4,9 @@ env:
   ASDF_MAGE_VERSION: 1.14.0
   MS_GOTOOLCHAIN_TELEMETRY_ENABLED: "0"
 
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1777597312"
-  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1777597312"
-  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1777597312"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1779095921"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1779095921"
+  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1779095921"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
@@ -26,6 +26,13 @@ common:
         path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
         field: "apiKey"
         env_var: "EC_API_KEY"
+  - google_oidc_plugin: &google_oidc_plugin
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
+      # This plugin authenticates to Google Cloud using the OIDC token.
+      elastic/oblt-google-auth#v1.3.1:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
 
 steps:
   - label: Start ESS stack for FIPS integration tests
@@ -49,6 +56,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
+      - *google_oidc_plugin
       - *vault_ec_key_prod
 
   - group: "fips:Stateful:Ubuntu"
@@ -81,6 +89,7 @@ steps:
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
         plugins:
+          - *google_oidc_plugin
           - *vault_ec_key_prod
         matrix:
           setup:
@@ -115,6 +124,7 @@ steps:
           image: "${IMAGE_UBUNTU_ARM64_FIPS}"
           instanceType: "m6g.2xlarge"
         plugins:
+          - *google_oidc_plugin
           - *vault_ec_key_prod
         matrix:
           setup:
@@ -144,6 +154,7 @@ steps:
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
         plugins:
+          - *google_oidc_plugin
           - *vault_ec_key_prod
 
   - label: ESS FIPS stack cleanup
@@ -165,6 +176,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
+      - *google_oidc_plugin
       - *vault_ec_key_prod
 
   - label: Aggregate test reports
@@ -188,3 +200,4 @@ steps:
           format: "junit"
           branches: "main"
           debug: true
+      - *google_oidc_plugin
