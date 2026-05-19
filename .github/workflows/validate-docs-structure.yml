@@ -6,6 +6,9 @@ on:
       - 'internal/edot/**'
       - '.github/workflows/validate-docs-structure.yml'
 
+permissions:
+  contents: read
+
 jobs:
   validate-structure:
     runs-on: ubuntu-latest
