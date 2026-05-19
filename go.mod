@@ -40,7 +40,7 @@ require (
 	github.com/josephspurrier/goversioninfo v1.5.0
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
 	github.com/knadh/koanf/maps v0.1.2
-	github.com/magefile/mage v1.15.0
+	github.com/magefile/mage v1.17.2
 	github.com/moby/moby/client v0.4.1
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.152.0
