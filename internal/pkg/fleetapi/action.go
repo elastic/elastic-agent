@@ -251,6 +251,35 @@ func (a *ActionPolicyChange) AckEvent() AckEvent {
 	return newAckEvent(a.ActionID, a.ActionType)
 }
 
+// PolicyID returns the policy ID from the action's policy data, or "" if
+// the action is nil or the data does not include an "id" string field.
+func (a *ActionPolicyChange) PolicyID() string {
+	if a == nil {
+		return ""
+	}
+	v, _ := a.Data.Policy["id"].(string)
+	return v
+}
+
+// PolicyRevisionIDX returns the revision index from the action's policy data,
+// or 0 if the action is nil or the data does not include a numeric "revision"
+// field. The function accepts int, int64, and float64 to tolerate JSON
+// unmarshal types.
+func (a *ActionPolicyChange) PolicyRevisionIDX() int64 {
+	if a == nil {
+		return 0
+	}
+	switch v := a.Data.Policy["revision"].(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
+	}
+	return 0
+}
+
 // ActionUpgrade is a request for agent to upgrade.
 type ActionUpgrade struct {
 	ActionID         string `json:"id" yaml:"id" mapstructure:"id"`

@@ -22,7 +22,7 @@ func TestLogStashToExporter(t *testing.T) {
 	}{{
 		name: "basic translation logic",
 		input: `
-hosts: 
+hosts:
 - localhost:5044
 worker: 3
 loadbalance: true
@@ -53,7 +53,7 @@ proxy_url: socks5://user:password@socks5-proxy:2233
 		{
 			name: "when host is a string and ssl is configured",
 			input: `
-hosts: 
+hosts:
 - localhost:5044
 worker: 3
 ssl.enabled: true
@@ -82,19 +82,20 @@ ssl.curve_types: "P-256"
 				"ttl":                      "0s",
 				"workers":                  int64(0),
 				"ssl": map[string]any{
-					"enabled":                 true,
-					"certificate":             "",
-					"key":                     "",
-					"key_passphrase":          "",
-					"key_passphrase_path":     "",
-					"ca_trusted_fingerprint":  "",
-					"ca_sha256":               []any{},
-					"supported_protocols":     []any{uint64(772)},
-					"certificate_authorities": []any{"/not/a/real/path/ca.pem"},
-					"renegotiation":           int64(0),
-					"cipher_suites":           []any{},
-					"verification_mode":       uint64(0),
-					"curve_types":             []any{uint64(23)},
+					"enabled":                    true,
+					"certificate":                "",
+					"key":                        "",
+					"key_passphrase":             "",
+					"key_passphrase_path":        "",
+					"ca_trusted_fingerprint":     "",
+					"ca_sha256":                  []any{},
+					"supported_protocols":        []any{uint64(772)},
+					"certificate_authorities":    []any{"/not/a/real/path/ca.pem"},
+					"renegotiation":              int64(0),
+					"cipher_suites":              []any{},
+					"disable_legacy_pem_support": false,
+					"verification_mode":          uint64(0),
+					"curve_types":                []any{uint64(23)},
 				},
 			},
 		},

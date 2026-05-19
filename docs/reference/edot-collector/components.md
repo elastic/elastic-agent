@@ -32,7 +32,7 @@ Components marked as "Deprecated" in the table are retained in EDOT Collector 9.
 % start:edot-collector-components-table
 ## List of components
 
-These components are included in EDOT Collector version 9.4.0.
+These components are included in EDOT Collector version 9.4.1.
 
 | Component | GitHub Repo | Support status | Version |
 |:---|:---|:---|:---|

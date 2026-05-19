@@ -13,7 +13,7 @@ kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Clamp non-positive agent.download.retry_sleep_init_duration to default 30s
+summary: fix dangling symlink when rotating to a non-existent target
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change

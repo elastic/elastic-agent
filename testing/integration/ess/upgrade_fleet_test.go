@@ -765,7 +765,12 @@ func copyFile(t *testing.T, srcPath, dstPath string) {
 	require.NoError(t, err, "Failed to sync dst file")
 }
 
-func isFIPSCapableVersion(ver *version.ParsedSemVer) bool {
+func isFIPSCapableVersion(ver *version.ParsedSemVer, os, arch string) bool {
+	// None of the released Windows versions are FIPS capable
+	if os == "windows" {
+		return false
+	}
+
 	// The 8.19.x versions are FIPS-capable
 	if ver.Major() == 8 && ver.Minor() == 19 {
 		return true
