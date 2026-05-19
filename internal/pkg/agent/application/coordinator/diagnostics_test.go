@@ -19,7 +19,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -155,9 +155,9 @@ func TestDiagnosticAgentInfo(t *testing.T) {
 		},
 		LogLevelPolicy:   "info",
 		LogLevelOverride: "trace",
-		meta: &info.ECSMeta{
-			Elastic: &info.ElasticECSMeta{
-				Agent: &info.AgentECSMeta{
+		meta: &ecsmeta.ECSMeta{
+			Elastic: &ecsmeta.ElasticECSMeta{
+				Agent: &ecsmeta.AgentECSMeta{
 					BuildOriginal: "8.14.0-SNAPSHOT",
 					ID:            "agent-id",
 					LogLevel:      "trace",
@@ -167,11 +167,11 @@ func TestDiagnosticAgentInfo(t *testing.T) {
 					Upgradeable:   true,
 				},
 			},
-			Host: &info.HostECSMeta{
+			Host: &ecsmeta.HostECSMeta{
 				Arch:     "arm64",
 				Hostname: "Test-Macbook-Pro.local",
 			},
-			OS: &info.SystemECSMeta{
+			OS: &ecsmeta.SystemECSMeta{
 				Name:     "macos",
 				Platform: "darwin",
 			},
@@ -754,7 +754,7 @@ type fakeAgentInfo struct {
 	version          string
 	unprivileged     bool
 	isStandalone     bool
-	meta             *info.ECSMeta
+	meta             *ecsmeta.ECSMeta
 }
 
 func (a fakeAgentInfo) AgentID() string {
@@ -796,7 +796,7 @@ func (a fakeAgentInfo) IsStandalone() bool {
 	return a.isStandalone
 }
 
-func (a fakeAgentInfo) ECSMetadata(l *logger.Logger) (*info.ECSMeta, error) {
+func (a fakeAgentInfo) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
 	return a.meta, nil
 }
 

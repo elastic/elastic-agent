@@ -23,15 +23,6 @@ import (
 	"github.com/elastic/go-sysinfo/types"
 )
 
-// Type aliases so existing callers within this package continue to compile.
-type (
-	ECSMeta        = ecsmeta.ECSMeta
-	ElasticECSMeta = ecsmeta.ElasticECSMeta
-	AgentECSMeta   = ecsmeta.AgentECSMeta
-	SystemECSMeta  = ecsmeta.SystemECSMeta
-	HostECSMeta    = ecsmeta.HostECSMeta
-)
-
 // List of variables available to be used in constraint definitions.
 const (
 	// `agent.id` is a generated (in standalone) or assigned (in fleet) agent identifier.
@@ -71,7 +62,7 @@ const (
 )
 
 // Metadata loads metadata from disk.
-func Metadata(ctx context.Context, l *logger.Logger) (*ECSMeta, error) {
+func Metadata(ctx context.Context, l *logger.Logger) (*ecsmeta.ECSMeta, error) {
 	agentInfo, err := NewAgentInfo(ctx, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new agent info: %w", err)
@@ -86,7 +77,7 @@ func Metadata(ctx context.Context, l *logger.Logger) (*ECSMeta, error) {
 }
 
 // ECSMetadata returns an agent ECS compliant metadata.
-func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
+func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
 	sysInfo, err := sysinfo.Host()
 	if err != nil {
 		return nil, err
@@ -95,9 +86,9 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 	info := sysInfo.Info()
 	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
 
-	return &ECSMeta{
-		Elastic: &ElasticECSMeta{
-			Agent: &AgentECSMeta{
+	return &ecsmeta.ECSMeta{
+		Elastic: &ecsmeta.ElasticECSMeta{
+			Agent: &ecsmeta.AgentECSMeta{
 				ID:            i.agentID,
 				Version:       release.Version(),
 				Snapshot:      release.Snapshot(),
@@ -111,7 +102,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 				FIPS:         release.FIPSDistribution(),
 			},
 		},
-		Host: &HostECSMeta{
+		Host: &ecsmeta.HostECSMeta{
 			Arch:     info.Architecture,
 			Hostname: hostname,
 			Name:     strings.ToLower(hostname),
@@ -121,7 +112,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 		},
 
 		// Operating system
-		OS: &SystemECSMeta{
+		OS: &ecsmeta.SystemECSMeta{
 			Family:   info.OS.Family,
 			Kernel:   info.KernelVersion,
 			Platform: info.OS.Platform,

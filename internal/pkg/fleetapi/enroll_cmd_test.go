@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
@@ -161,9 +161,9 @@ func TestEnroll(t *testing.T) {
 	))
 }
 
-func testMetadata() *info.ECSMeta {
-	return &info.ECSMeta{
-		OS: &info.SystemECSMeta{
+func testMetadata() *ecsmeta.ECSMeta {
+	return &ecsmeta.ECSMeta{
+		OS: &ecsmeta.SystemECSMeta{
 			Name: "linux",
 		},
 	}

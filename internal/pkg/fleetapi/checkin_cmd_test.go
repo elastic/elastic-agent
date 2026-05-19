@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
@@ -213,7 +213,7 @@ func TestCheckin(t *testing.T) {
 			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				type Request struct {
-					Metadata *info.ECSMeta `json:"local_metadata"`
+					Metadata *ecsmeta.ECSMeta `json:"local_metadata"`
 				}
 
 				var req *Request
@@ -247,7 +247,7 @@ func TestCheckin(t *testing.T) {
 			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				type Request struct {
-					Metadata *info.ECSMeta `json:"local_metadata"`
+					Metadata *ecsmeta.ECSMeta `json:"local_metadata"`
 				}
 
 				var req *Request
@@ -281,7 +281,7 @@ func TestCheckin(t *testing.T) {
 			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				type Request struct {
-					Metadata *info.ECSMeta `json:"local_metadata"`
+					Metadata *ecsmeta.ECSMeta `json:"local_metadata"`
 				}
 
 				var req *Request
