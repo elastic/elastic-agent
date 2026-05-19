@@ -11,6 +11,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+<<<<<<< HEAD
+=======
+	"runtime"
+	"slices"
+>>>>>>> ed5b861e1 (fix: preserve live install during upgrade cleanup and report aborted upgrades to Fleet (#13935))
 	"strings"
 	"time"
 
@@ -78,6 +83,20 @@ func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 	// data directory path
 	dataDirPath := paths.DataFrom(topDirPath)
 
+	// The live versioned home is identified from the top-level agent symlink
+	// — the canonical record of what the daemon launches. If that symlink is
+	// unreadable for any reason, cleanup refuses to proceed: deciding what to
+	// keep without an authoritative live-install reference would risk
+	// deleting the live install, and the loud abort produces a recurring
+	// Error signal that an operator can investigate before the next restart
+	// fails. See
+	// https://github.com/elastic/elastic-agent/issues/13505 for the data-loss
+	// hazard this guard closes.
+	liveHome, err := liveVersionedHome(topDirPath)
+	if err != nil {
+		return fmt.Errorf("cannot identify live versioned home from symlink, refusing to proceed with cleanup: %w", err)
+	}
+
 	// remove upgrade marker
 	if removeMarker {
 		if err := CleanMarker(log, dataDirPath); err != nil {
@@ -107,6 +126,7 @@ func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath(topDirPath))
 	_ = os.Remove(prevSymlink)
 
+<<<<<<< HEAD
 	dirPrefix := fmt.Sprintf("%s-", agentName)
 	var currentDir string
 	if currentVersionedHome != "" {
@@ -116,6 +136,41 @@ func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 		}
 	} else {
 		currentDir = fmt.Sprintf("%s-%s", agentName, currentHash)
+=======
+	dirPrefix := fmt.Sprintf("%s-", AgentName)
+
+	log.Infof("versioned homes to keep: %v", versionedHomesToKeep)
+
+	candidates := append(make([]string, 0, len(versionedHomesToKeep)+1), versionedHomesToKeep...)
+	candidates = append(candidates, liveHome)
+
+	// Normalize each candidate to a dataDir-relative basename, deduplicate,
+	// and drop entries that don't exist on disk so the "Keeping" log line
+	// below reflects what is actually being preserved rather than a phantom
+	// path. A stale entry is harmless to leave in (the cleanup loop only
+	// iterates real subdirs) but misleading on triage; each dropped entry is
+	// surfaced as an Info so the cause — usually a stale
+	// marker.VersionedHome — is visible in logs.
+	var cumulativeError error
+	relativeHomePaths := make([]string, 0, len(candidates))
+	for _, h := range candidates {
+		rel, err := filepath.Rel(dataDirPath, filepath.Join(topDirPath, h))
+		if err != nil {
+			// We can't normalize this entry, and the cleanup loop below
+			// matches dataDir-relative basenames, so an un-normalized path
+			// would never match anyway. Record the failure for the caller
+			// and skip the entry rather than carry a value forward that
+			// can't preserve the directory.
+			cumulativeError = goerrors.Join(cumulativeError, fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", h, err))
+			continue
+		}
+		if _, statErr := os.Stat(filepath.Join(dataDirPath, rel)); statErr != nil {
+			log.Infow("dropping non-existent keep-list entry from cleanup",
+				"path", rel, "error.message", statErr.Error())
+			continue
+		}
+		relativeHomePaths = append(relativeHomePaths, rel)
+>>>>>>> ed5b861e1 (fix: preserve live install during upgrade cleanup and report aborted upgrades to Fleet (#13935))
 	}
 
 	var errs []error
@@ -237,4 +292,53 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 
 	close(signal)
 	return nil
+}
+
+// liveVersionedHome resolves the versioned home that the top-level agent
+// symlink points at, returned as a path relative to topDirPath. Used by
+// cleanup as a defense against stale keep lists deleting the live install
+// (https://github.com/elastic/elastic-agent/issues/13505).
+//
+// Returns the empty string and a non-nil error if the symlink can't be read
+// or doesn't resolve to a path under topDirPath.
+func liveVersionedHome(topDirPath string) (string, error) {
+	symlinkPath := filepath.Join(topDirPath, AgentName)
+	if runtime.GOOS == windowsOSName {
+		symlinkPath += exe
+	}
+	target, err := os.Readlink(symlinkPath)
+	if err != nil {
+		return "", fmt.Errorf("reading symlink %q: %w", symlinkPath, err)
+	}
+	// Resolve a relative symlink target against the symlink's directory.
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(symlinkPath), target)
+	}
+	// target is the binary path; strip down to the versioned home.
+	// On macOS, paths.BinaryPath produces an extra three nested directories
+	// (<versionedHome>/elastic-agent.app/Contents/MacOS/elastic-agent), so
+	// we strip those levels to recover the versioned home.
+	home := filepath.Dir(target)
+	if runtime.GOOS == "darwin" {
+		home = filepath.Dir(filepath.Dir(filepath.Dir(home)))
+	}
+	// os.Readlink returns the literal target even if it dangles, so an
+	// existence check here is what proves the symlink still identifies a
+	// real install.
+	if _, err := os.Stat(home); err != nil {
+		return "", fmt.Errorf("stat versioned home %q: %w", home, err)
+	}
+	rel, err := filepath.Rel(topDirPath, home)
+	if err != nil {
+		return "", fmt.Errorf("computing %q relative to %q: %w", home, topDirPath, err)
+	}
+	// filepath.Rel is purely lexical and happily returns "../foo" when home
+	// is outside topDirPath. Enforce the documented contract here so callers
+	// (cleanup's keep list) never get a path that traverses out of the data
+	// dir, which could let a malicious or corrupt symlink redirect cleanup
+	// decisions.
+	if !filepath.IsLocal(rel) {
+		return "", fmt.Errorf("symlink target %q resolves outside top directory %q", home, topDirPath)
+	}
+	return rel, nil
 }
