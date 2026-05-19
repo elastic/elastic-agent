@@ -104,7 +104,7 @@ To build a local version of the agent for development, run the command below. Th
 # EXTERNAL=true downloads the matching version of the binaries that are packaged with agent, not necessary if only using Beats.
 # SNAPSHOT=true indicates that this is a snapshot version and not a release version.
 # PLATFORMS=linux/amd64 builds an agent that will run on 64 bit X86 Linux systems.
-# PACKAGES=tar.gz produces a tar.gz package
+# PACKAGES is required. Use PACKAGES=all to build all package types, or specify types (e.g. tar.gz,rpm,deb,zip,docker).
 EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz mage -v package
 ```
 

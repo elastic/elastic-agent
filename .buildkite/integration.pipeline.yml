@@ -9,13 +9,28 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1777597312"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1777597312"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1779095921"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1779095921"
 
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:
+  - google_oidc_plugin: &google_oidc_plugin
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
+      # This plugin authenticates to Google Cloud using the OIDC token.
+      elastic/oblt-google-auth#v1.3.1:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
   - vault_docker_login: &vault_docker_login
       elastic/vault-docker-login#v0.5.2:
         secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+  - sparse_checkout_plugin: &sparse_checkout_plugin
+      sparse-checkout#v1.6.0:
+        paths:
+        - .buildkite
+        - .go-version
+        - version/version.go
 
 steps:
   - group: "Integration tests: packaging"
@@ -41,6 +56,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+          - *google_oidc_plugin
 
       - label: ":package: amd64: FIPS tar.gz"
         key: "packaging-amd64-fips"
@@ -58,6 +75,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-4"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+          - *google_oidc_plugin
 
       # Packaging linux and windows for arm64
       - label: ":package: arm64: zip,tar.gz"
@@ -75,6 +94,8 @@ steps:
           provider: "aws"
           instanceType: "c6g.2xlarge"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
+        plugins:
+          - *google_oidc_plugin
 
       - label: ":package: arm64: FIPS tar.gz"
         key: "packaging-arm64-fips"
@@ -92,6 +113,8 @@ steps:
           provider: "aws"
           instanceType: "c6g.2xlarge"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
+        plugins:
+          - *google_oidc_plugin
 
       - label: ":package: amd64: Containers"
         key: packaging-containers-amd64
@@ -109,6 +132,7 @@ steps:
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
+          - *google_oidc_plugin
           - *vault_docker_login
 
       - label: ":package: arm64: Containers"
@@ -125,6 +149,8 @@ steps:
           instanceType: "c6g.4xlarge"
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
+        plugins:
+          - *google_oidc_plugin
 
       - label: ":package: amd64: FIPS Containers"
         key: packaging-containers-amd64-fips
@@ -144,6 +170,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
           - *vault_docker_login
+          - *google_oidc_plugin
 
       - label: ":package: arm64: FIPS Containers"
         key: packaging-containers-arm64-fips
@@ -160,12 +187,35 @@ steps:
           instanceType: "c6g.2xlarge"
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
+        plugins:
+          - *google_oidc_plugin
 
   - label: "Triggering Integration tests"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
+    plugins:
+    - *sparse_checkout_plugin
 
+  ## PRs
   - label: "Triggering custom FIPS integration tests"
+    if: build.pull_request.id != null
+    key: "fips-its-prs"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
+    plugins:
+    - *sparse_checkout_plugin
+    if_changed:
+      include:
+        - .buildkite/**
+        - magefile.go
+        - dev-tools/**
+        - "go.{mod,sum}"
+
+  ## Branches
+  - label: "Triggering custom FIPS integration tests (branches)"
+    if: build.pull_request.id == null
+    key: "fips-its-branches"
+    command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
+    plugins:
+    - *sparse_checkout_plugin
 
   - label: "Test packages"
     depends_on:

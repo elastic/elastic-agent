@@ -80,6 +80,9 @@ var (
 	Docker             = PackageType(pkgcommon.Docker)
 )
 
+// AllPackageTypes contains all available package types.
+var AllPackageTypes = []PackageType{RPM, Deb, Zip, TarGz, Docker}
+
 // OSPackageArgs define a set of package types to build for an operating
 // system using the contained PackageSpec.
 type OSPackageArgs struct {
@@ -606,13 +609,12 @@ func PackageZip(spec PackageSpec) error {
 	w := zip.NewWriter(buf)
 	baseDir := spec.rootDir()
 
-	// Add files to zip.
-	for _, pkgFile := range spec.Files {
+	// Add files to zip (dirs before files so explicit entries take precedence).
+	for _, pkgFile := range dirsFirst(spec.Files) {
 		if pkgFile.Symlink {
 			// not supported on zip archives
 			continue
 		}
-
 		if err := addFileToZip(w, baseDir, pkgFile); err != nil {
 			p, _ := filepath.Abs(pkgFile.Source)
 			return fmt.Errorf("failed adding file=%+v to zip: %w", p, err)
@@ -701,12 +703,11 @@ func PackageTarGz(spec PackageSpec) error {
 	// 	spec.Files = newFiles
 	// }
 
-	// Add files to tar.
-	for _, pkgFile := range spec.Files {
+	// Add files to tar (dirs before files so explicit entries take precedence).
+	for _, pkgFile := range dirsFirst(spec.Files) {
 		if pkgFile.Symlink {
 			continue
 		}
-
 		if err := addFileToTar(w, baseDir, pkgFile); err != nil {
 			return fmt.Errorf("failed adding file=%+v to tar: %w", pkgFile, err)
 		}
@@ -886,10 +887,35 @@ func addUIDGidEnvArgs(args []string) ([]string, error) {
 			"Using UID=%d GID=%d", uid, gid)
 	}
 
-	return append(args,
-		"-e", "EXEC_UID="+strconv.Itoa(uid),
-		"-e", "EXEC_GID="+strconv.Itoa(gid),
-	), nil
+	// In rootless Docker, container UID 0 maps to the host user's UID, so files
+	// created as root inside the container are already owned by the correct user
+	// on the host.
+	if !isRootlessDocker() {
+		args = append(args,
+			"-e", "EXEC_UID="+strconv.Itoa(uid),
+			"-e", "EXEC_GID="+strconv.Itoa(gid),
+		)
+	}
+
+	return args, nil
+}
+
+// dirsFirst returns files with directory-source entries (paths ending in "/")
+// before regular-file entries, so explicit files always overwrite any
+// conflicting path laid down by a directory expansion.
+func dirsFirst(files map[string]PackageFile) []PackageFile {
+	out := make([]PackageFile, 0, len(files))
+	for _, f := range files {
+		if strings.HasSuffix(f.Source, "/") {
+			out = append(out, f)
+		}
+	}
+	for _, f := range files {
+		if !strings.HasSuffix(f.Source, "/") {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // addFileToZip adds a file (or directory) to a zip archive.
@@ -951,7 +977,7 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path comes from WalkDir callback over a controlled source directory, no user input
 		if err != nil {
 			return err
 		}
@@ -1034,7 +1060,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path comes from WalkDir callback over a controlled source directory, no user input
 		if err != nil {
 			return err
 		}
