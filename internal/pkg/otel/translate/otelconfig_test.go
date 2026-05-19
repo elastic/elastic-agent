@@ -1891,7 +1891,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"receivers": map[string]any{
-					"filebeatreceiver/_agent-component/filestream-default": map[string]any{
+					"filebeatreceiver/_agent-component/filestream-default/test-1": map[string]any{
 						"filebeat": map[string]any{
 							"inputs": []map[string]any{
 								{
@@ -1970,7 +1970,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"logs/_agent-component/filestream-default": map[string][]string{
 							"exporters":  {"elasticsearch/_agent-component/default"},
 							"processors": {"beat/_agent-component"},
-							"receivers":  {"filebeatreceiver/_agent-component/filestream-default"},
+							"receivers":  {"filebeatreceiver/_agent-component/filestream-default/test-1"},
 						},
 					},
 				},
