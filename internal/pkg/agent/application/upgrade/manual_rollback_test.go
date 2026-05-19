@@ -144,7 +144,7 @@ func TestManualRollback(t *testing.T) {
 			name: "no update marker - rollback fails",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
 				//do not setup anything here, let the rollback fail
-				rollbacksSource.EXPECT().Get().Return(nil, nil)
+				rollbacksSource.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
@@ -325,13 +325,13 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, available install for rollback with valid TTL - rollback",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
-				rollbacksSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
+				rollbacksSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
 					"data/elastic-agent-1.2.3-oldver": {
 						Version:    "1.2.3",
 						Hash:       "oldver",
 						ValidUntil: aMomentTomorrow,
 					},
-				}, nil)
+				}, nil, nil)
 				newerWatcherExecutable := filepath.Join(topDir, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "elastic-agent")
 				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstallCurrent).Return(newerWatcherExecutable)
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", "data/elastic-agent-1.2.3-oldver").
@@ -375,7 +375,7 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, available install for rollback with expired TTL - error",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
-				rollbacksSource.EXPECT().Get().Return(
+				rollbacksSource.EXPECT().GetAll().Return(
 					map[string]ttl.TTLMarker{
 						"data/elastic-agent-1.2.3-oldver": {
 							Version:    "1.2.3",
@@ -383,7 +383,7 @@ func TestManualRollback(t *testing.T) {
 							ValidUntil: aMomentAgo,
 						},
 					},
-					nil)
+					nil, nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings: &configuration.UpgradeConfig{
@@ -405,7 +405,7 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, no available install for the version - error",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
-				rollbacksSource.EXPECT().Get().Return(
+				rollbacksSource.EXPECT().GetAll().Return(
 					map[string]ttl.TTLMarker{
 						"data/elastic-agent-1.2.3-oldver": {
 							Version:    "1.2.3",
@@ -413,7 +413,7 @@ func TestManualRollback(t *testing.T) {
 							ValidUntil: aMomentTomorrow,
 						},
 					},
-					nil)
+					nil, nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings: &configuration.UpgradeConfig{
@@ -435,7 +435,7 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, error retrieving agent installs",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
-				rollbacksSource.EXPECT().Get().Return(nil, errors.New("error retrieving agent rollbacks"))
+				rollbacksSource.EXPECT().GetAll().Return(nil, nil, errors.New("error retrieving agent rollbacks"))
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings: &configuration.UpgradeConfig{
@@ -450,7 +450,7 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, invoking watcher fails - error",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
-				rollbacksSource.EXPECT().Get().Return(
+				rollbacksSource.EXPECT().GetAll().Return(
 					map[string]ttl.TTLMarker{
 						"data/elastic-agent-1.2.3-oldver": {
 							Version:    "1.2.3",
@@ -458,7 +458,7 @@ func TestManualRollback(t *testing.T) {
 							ValidUntil: aMomentTomorrow,
 						},
 					},
-					nil,
+					nil, nil,
 				)
 				newerWatcherExecutable := filepath.Join(topDir, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "elastic-agent")
 				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstallCurrent).Return(newerWatcherExecutable)

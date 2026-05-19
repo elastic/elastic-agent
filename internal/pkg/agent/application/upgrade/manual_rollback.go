@@ -84,9 +84,13 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 
 func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper, source availableRollbacksSource, topDir string, now time.Time, rollbackVersion string, markUpgrade markUpgradeFunc, action *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the available installs
-	availableRollbacks, err := source.Get()
+	availableRollbacks, malformed, err := source.GetAll()
 	if err != nil {
 		return "", "", fmt.Errorf("retrieving available rollbacks: %w", err)
+	}
+	for versionedHome, parseErr := range malformed {
+		log.Infow("TTL marker is unparseable; skipping as a rollback candidate",
+			"versionedHome", versionedHome, "error.message", parseErr.Error())
 	}
 	// check for the version we want to rollback to
 	var targetInstall string
