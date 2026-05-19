@@ -176,8 +176,13 @@ func triggerFreshTLSConnection(ctx context.Context, t *testing.T, esHost string)
 	resp.Body.Close()
 }
 
-func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Context, agentID string, afterTime time.Time, destDomain string) mapstr.M {
-	t := runner.T()
+// validateNetworkTrafficEvents polls ES until a fully-captured TLS handshake
+// event appears (tls.established:true) for the given agent, destination, and
+// time window. retrigger is called before each ES poll so that fresh TCP+TLS
+// connections are made throughout the wait period — this handles the race where
+// pbreceiver's libpcap is not yet capturing when the first trigger fires.
+func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Context, t *testing.T, agentID string, afterTime time.Time, destDomain string, retrigger func()) mapstr.M {
+	t.Helper()
 
 	now := time.Now()
 	var query map[string]any
@@ -199,6 +204,7 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Con
 		now.Format(time.RFC3339Nano), afterTime.UTC().Format(time.RFC3339Nano), destDomain)
 	require.Eventually(t, func() bool {
 		now = time.Now()
+		retrigger()
 		// Require a fully captured handshake (both ClientHello and ServerHello
 		// seen by packetbeat), scoped to the ES endpoint and only connections
 		// opened after afterTime. This avoids matching partial captures caused
@@ -245,11 +251,9 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	// Validate process mode
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
-		// Trigger a fresh TLS connection to ES so packetbeat captures a complete
-		// handshake (both ClientHello and ServerHello) that we can query for.
 		captureStart := time.Now()
-		triggerFreshTLSConnection(ctx, t, runner.ESHost)
-		processDoc = runner.validateNetworkTrafficEvents(ctx, agentStatus.Info.ID, captureStart, esHostname)
+		processDoc = runner.validateNetworkTrafficEvents(ctx, t, agentStatus.Info.ID, captureStart, esHostname,
+			func() { triggerFreshTLSConnection(ctx, t, runner.ESHost) })
 	})
 
 	// Switch to OTel runtime and validate the same data
@@ -267,11 +271,12 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 			return true
 		}, 2*time.Minute, 5*time.Second)
 
-		// pbreceiver is now capturing. Trigger a fresh TLS connection so
-		// packetbeat sees a complete handshake from this point in time.
+		// Set captureStart before the polling loop. The loop retriggers a fresh
+		// TLS connection on every iteration so that once pbreceiver's libpcap is
+		// ready, the very next poll will find a fully-captured handshake.
 		captureStart := time.Now()
-		triggerFreshTLSConnection(ctx, t, runner.ESHost)
-		otelDoc = runner.validateNetworkTrafficEvents(ctx, agentStatus.Info.ID, captureStart, esHostname)
+		otelDoc = runner.validateNetworkTrafficEvents(ctx, t, agentStatus.Info.ID, captureStart, esHostname,
+			func() { triggerFreshTLSConnection(ctx, t, runner.ESHost) })
 	})
 
 	// Compare documents from process and otel modes have the same keys
