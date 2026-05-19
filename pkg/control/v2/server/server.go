@@ -47,7 +47,7 @@ type TestModeConfigSetter interface {
 }
 
 type RollbacksSource interface {
-	Get() (map[string]ttl.TTLMarker, error)
+	GetAll() (map[string]ttl.TTLMarker, map[string]error, error)
 }
 
 // Server is the daemon side of the control protocol.
@@ -370,11 +370,15 @@ func (s *Server) Configure(ctx context.Context, req *cproto.ConfigureRequest) (*
 }
 
 func (s *Server) AvailableRollbacks(context.Context, *cproto.Empty) (*cproto.AvailableRollbacksResponse, error) {
-	rollbacks, err := s.rollbackSource.Get()
+	rollbacks, malformed, err := s.rollbackSource.GetAll()
 	if err != nil {
 		return &cproto.AvailableRollbacksResponse{
 			Error: fmt.Sprintf("error fetching rollbacks: %s", err.Error()),
 		}, nil
+	}
+	for versionedHome, parseErr := range malformed {
+		s.logger.Infow("TTL marker is unparseable; skipping in available rollbacks response",
+			"versionedHome", versionedHome, "error.message", parseErr.Error())
 	}
 	protoRollbacks := make([]*cproto.AvailableRollback, 0, len(rollbacks))
 	for home, ttlMarker := range rollbacks {
