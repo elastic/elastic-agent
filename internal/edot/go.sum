@@ -445,8 +445,8 @@ github.com/elastic/elastic-agent-autodiscover v0.10.2 h1:fzi+CIcK7FKUQlQHfKP+3Ix
 github.com/elastic/elastic-agent-autodiscover v0.10.2/go.mod h1:qBoYxp3lX3qFRYjEgsOaROC+xL4ItG63GSvOg1SjjsQ=
 github.com/elastic/elastic-agent-client/v7 v7.18.1 h1:WnM53JjaukeysrAuiTyrhDPmFxJG07ZAByc2TrkcKcs=
 github.com/elastic/elastic-agent-client/v7 v7.18.1/go.mod h1:uDpSGZ+YCKgqgtkwCA0qjwX0gU/wmixDsVbPjY3GkPs=
-github.com/elastic/elastic-agent-libs v0.42.2 h1:1VlTCeOm9YYsnPK36rpMJFm3XcSgNWv51WLKB4EqphM=
-github.com/elastic/elastic-agent-libs v0.42.2/go.mod h1:axkpqDCCzAky6G4D/cklgtZQa3jTNGAMVHVkU0u6YbU=
+github.com/elastic/elastic-agent-libs v0.43.0 h1:wcFklHb78d1Wx4anUbKrtAGFNkj6I9mRta2HbyihtU4=
+github.com/elastic/elastic-agent-libs v0.43.0/go.mod h1:axkpqDCCzAky6G4D/cklgtZQa3jTNGAMVHVkU0u6YbU=
 github.com/elastic/elastic-agent-system-metrics v0.14.3 h1:v867kcgCVguOX3AYIHEVn2RNracdH40FqqXiZq71pDU=
 github.com/elastic/elastic-agent-system-metrics v0.14.3/go.mod h1:JNfnZrC0viAjlJRUzQKKuMpDlXgjXBn4WdWEXQF7jcA=
 github.com/elastic/elastic-transport-go/v8 v8.11.0 h1:taYmqC2M6+fZt/+W+ENYh/W5L9+KrlJGOSbEJs8egWc=
@@ -958,8 +958,8 @@ github.com/lestrrat-go/envload v0.0.0-20180220234015-a3eb8ddeffcc h1:RKf14vYWi2t
 github.com/lestrrat-go/envload v0.0.0-20180220234015-a3eb8ddeffcc/go.mod h1:kopuH9ugFRkIXf3YoqHKyrJ9YfUFsckUU9S7B+XP+is=
 github.com/lestrrat-go/strftime v1.1.1 h1:zgf8QCsgj27GlKBy3SU9/8MMgegZ8UCzlCyHYrUF0QU=
 github.com/lestrrat-go/strftime v1.1.1/go.mod h1:YDrzHJAODYQ+xxvrn5SG01uFIQAeDTzpxNVppCz7Nmw=
-github.com/lib/pq v1.10.9 h1:YXG7RB+JIjhP29X+OtkiDnYaXQwpS4JEWq7dtCCRUEw=
-github.com/lib/pq v1.10.9/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
+github.com/lib/pq v1.11.2 h1:x6gxUeu39V0BHZiugWe8LXZYZ+Utk7hSJGThs8sdzfs=
+github.com/lib/pq v1.11.2/go.mod h1:/p+8NSbOcwzAEI7wiMXFlgydTwcgTr3OSKMsD2BitpA=
 github.com/lightstep/go-expohisto v1.0.0 h1:UPtTS1rGdtehbbAF7o/dhkWLTDI73UifG8LbfQI7cA4=
 github.com/lightstep/go-expohisto v1.0.0/go.mod h1:xDXD0++Mu2FOaItXtdDfksfgxfV0z1TMPa+e/EUd0cs=
 github.com/linode/go-metadata v0.2.4 h1:iif+14PN5T0u/wRnu6i/UlLQrlaFlWvDJzm0Wl9Rn0I=

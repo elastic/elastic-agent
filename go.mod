@@ -17,7 +17,7 @@ require (
 	github.com/elastic/cloud-on-k8s/v3 v3.4.0
 	github.com/elastic/elastic-agent-autodiscover v0.10.2
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-	github.com/elastic/elastic-agent-libs v0.42.2
+	github.com/elastic/elastic-agent-libs v0.43.0
 	github.com/elastic/elastic-agent-system-metrics v0.14.3
 	github.com/elastic/elastic-agent/internal/edot v0.0.0-20251114132921-c463803c5568
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
@@ -85,7 +85,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/gotestsum v1.13.0
-	helm.sh/helm/v3 v3.20.2
+	helm.sh/helm/v3 v3.21.0
 	k8s.io/api v0.35.4
 	k8s.io/apimachinery v0.35.4
 	k8s.io/cli-runtime v0.35.1
@@ -456,7 +456,7 @@ require (
 	github.com/leodido/go-syslog/v4 v4.5.0 // indirect
 	github.com/leodido/ragel-machinery v0.0.0-20190525184631-5f46317e436b // indirect
 	github.com/lestrrat-go/strftime v1.1.1 // indirect
-	github.com/lib/pq v1.10.9 // indirect
+	github.com/lib/pq v1.11.2 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/lightstep/go-expohisto v1.0.0 // indirect
 	github.com/linode/go-metadata v0.2.4 // indirect

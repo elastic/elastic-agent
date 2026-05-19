@@ -7,7 +7,7 @@ replace github.com/elastic/elastic-agent => ../../
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260518205231-3e8873641519
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.42.2
+	github.com/elastic/elastic-agent-libs v0.43.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.47.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.47.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.47.0
@@ -440,7 +440,7 @@ require (
 	github.com/leodido/go-syslog/v4 v4.5.0 // indirect
 	github.com/leodido/ragel-machinery v0.0.0-20190525184631-5f46317e436b // indirect
 	github.com/lestrrat-go/strftime v1.1.1 // indirect
-	github.com/lib/pq v1.10.9 // indirect
+	github.com/lib/pq v1.11.2 // indirect
 	github.com/lightstep/go-expohisto v1.0.0 // indirect
 	github.com/linode/go-metadata v0.2.4 // indirect
 	github.com/linode/linodego v1.66.0 // indirect
