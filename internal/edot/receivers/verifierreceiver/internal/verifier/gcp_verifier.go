@@ -19,7 +19,7 @@ import (
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 
-	libbeatgcp "github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation/gcp"
+	"github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation"
 )
 
 // GCPVerifier implements permission verification for GCP.
@@ -64,7 +64,7 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 		// 1. Assume Elastic global AWS role using the OIDC JWT (via FIPS HTTP client)
 		// 2. Supply AWS credentials to GCP STS for WIF token exchange (via FIPS HTTP client)
 		// 3. Impersonate the target GCP service account
-		tokenSource, err := libbeatgcp.NewTokenSource(ctx, libbeatgcp.Params{
+		tokenSource, err := identityfederation.GCPNewTokenSource(ctx, identityfederation.GCPParams{
 			Audience:            authConfig.Audience,
 			GlobalRoleARN:       authConfig.GlobalRoleARN,
 			JWTFilePath:         authConfig.IDTokenFile,

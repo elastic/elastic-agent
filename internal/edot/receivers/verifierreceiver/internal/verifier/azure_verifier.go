@@ -22,7 +22,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"go.uber.org/zap"
 
-	libbeatazure "github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation/azure"
+	"github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation"
 )
 
 // AzureVerifier implements permission verification for Azure.
@@ -84,8 +84,8 @@ func NewAzureVerifier(ctx context.Context, logger *zap.Logger, authConfig AzureA
 	switch {
 	case authConfig.IsIdentityFederation():
 		// Identity federation OIDC flow: use the JWT as a federated client assertion.
-		// The JWT file is re-read on each token refresh via libbeatazure.NewClientAssertionCredential.
-		cred, err = libbeatazure.NewClientAssertionCredential(libbeatazure.Params{
+		// The JWT file is re-read on each token refresh via identityfederation.AzureNewClientAssertionCredential.
+		cred, err = identityfederation.AzureNewClientAssertionCredential(identityfederation.AzureParams{
 			TenantID:    authConfig.TenantID,
 			ClientID:    authConfig.ClientID,
 			JWTFilePath: authConfig.IDTokenFile,

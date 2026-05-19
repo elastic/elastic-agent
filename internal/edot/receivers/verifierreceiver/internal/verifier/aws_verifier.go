@@ -23,7 +23,7 @@ import (
 	"github.com/aws/smithy-go"
 	"go.uber.org/zap"
 
-	libbeatidaws "github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation/aws"
+	"github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation"
 )
 
 const (
@@ -101,12 +101,12 @@ func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthC
 		// ExternalID follows the Cloudbeat/Beats convention: ResourceID-ExternalID.
 		externalID := ""
 		if authConfig.CloudResourceID != "" && authConfig.ExternalID != "" {
-			externalID = libbeatidaws.FormatExternalID(authConfig.CloudResourceID, authConfig.ExternalID)
+			externalID = identityfederation.AWSFormatExternalID(authConfig.CloudResourceID, authConfig.ExternalID)
 		} else if authConfig.ExternalID != "" {
 			externalID = authConfig.ExternalID
 		}
 
-		remoteRoleStep := &libbeatidaws.AssumeRoleStep{
+		remoteRoleStep := &identityfederation.AWSAssumeRoleStep{
 			RoleARN: authConfig.RoleARN,
 			Options: func(aro *stscreds.AssumeRoleOptions) {
 				aro.RoleSessionName = sessionName
@@ -120,8 +120,8 @@ func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthC
 		if irsaTokenFile := os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE"); irsaTokenFile != "" {
 			// IRSA flow: LoadDefaultConfig already picked up the pod's service-account
 			// token via AWS_WEB_IDENTITY_TOKEN_FILE, so baseCfg carries IRSA credentials.
-			chain := []libbeatidaws.AWSRoleChainingStep{
-				&libbeatidaws.AssumeRoleStep{
+			chain := []identityfederation.AWSRoleChainingStep{
+				&identityfederation.AWSAssumeRoleStep{
 					RoleARN: authConfig.GlobalRoleARN,
 					Options: func(aro *stscreds.AssumeRoleOptions) {
 						aro.Duration = defaultIntermediateDuration
@@ -129,7 +129,7 @@ func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthC
 				},
 				remoteRoleStep,
 			}
-			result := libbeatidaws.AWSConfigRoleChaining(baseCfg, chain)
+			result := identityfederation.AWSConfigRoleChaining(baseCfg, chain)
 			baseCfg = *result
 			logger.Info("AWS identity federation IRSA credential chain configured",
 				zap.String("global_role", authConfig.GlobalRoleARN),
@@ -137,8 +137,8 @@ func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthC
 			)
 		} else {
 			// OIDC flow: two-step credential chain using the JWT token file.
-			chain := []libbeatidaws.AWSRoleChainingStep{
-				&libbeatidaws.WebIdentityRoleStep{
+			chain := []identityfederation.AWSRoleChainingStep{
+				&identityfederation.AWSWebIdentityRoleStep{
 					RoleARN:              authConfig.GlobalRoleARN,
 					WebIdentityTokenFile: authConfig.IDTokenFile,
 					Options: func(opt *stscreds.WebIdentityRoleOptions) {
@@ -147,7 +147,7 @@ func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthC
 				},
 				remoteRoleStep,
 			}
-			result := libbeatidaws.AWSConfigRoleChaining(baseCfg, chain)
+			result := identityfederation.AWSConfigRoleChaining(baseCfg, chain)
 			baseCfg = *result
 			logger.Info("AWS identity federation OIDC credential chain configured",
 				zap.String("global_role", authConfig.GlobalRoleARN),
