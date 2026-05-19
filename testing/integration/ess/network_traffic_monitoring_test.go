@@ -204,7 +204,9 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Con
 		now.Format(time.RFC3339Nano), afterTime.UTC().Format(time.RFC3339Nano), destDomain)
 	require.Eventually(t, func() bool {
 		now = time.Now()
-		retrigger()
+		if retrigger != nil {
+			retrigger()
+		}
 		// Require a fully captured handshake (both ClientHello and ServerHello
 		// seen by packetbeat), scoped to the ES endpoint and only connections
 		// opened after afterTime. This avoids matching partial captures caused
@@ -259,9 +261,16 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	// Switch to OTel runtime and validate the same data
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
+		// captureStart is set before the policy switch so that the OTel exporter's
+		// initial TLS connections to ES — captured by pbreceiver as the pipeline
+		// starts — fall within the query window. pbreceiver in-process cannot
+		// capture connections from the test binary (privilege boundary), so we
+		// rely on the exporter's natural traffic rather than a synthetic trigger.
+		captureStart := time.Now()
+
 		runner.switchToOtelRuntime()
 
-		// Wait for the agent to pick up the new policy and become healthy
+		// Wait for the agent to pick up the new policy and become healthy.
 		require.Eventually(t, func() bool {
 			err := runner.agentFixture.IsHealthy(ctx)
 			if err != nil {
@@ -271,12 +280,7 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 			return true
 		}, 2*time.Minute, 5*time.Second)
 
-		// Set captureStart before the polling loop. The loop retriggers a fresh
-		// TLS connection on every iteration so that once pbreceiver's libpcap is
-		// ready, the very next poll will find a fully-captured handshake.
-		captureStart := time.Now()
-		otelDoc = runner.validateNetworkTrafficEvents(ctx, t, agentStatus.Info.ID, captureStart, esHostname,
-			func() { triggerFreshTLSConnection(ctx, t, runner.ESHost) })
+		otelDoc = runner.validateNetworkTrafficEvents(ctx, t, agentStatus.Info.ID, captureStart, esHostname, nil)
 	})
 
 	// Compare documents from process and otel modes have the same keys
