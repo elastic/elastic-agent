@@ -53,6 +53,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
+	"github.com/elastic/go-ucfg"
 )
 
 const (
@@ -899,6 +900,10 @@ func containerCfgOverrides(cfg *config.Config) error {
 
 	uCfg["agent.grpc.port"] = configuration.GetContainerGRPCPort()
 
+	// Always read certs from env.
+	uCfg["fleet.ssl.certificate"] = envWithDefault("", "ELASTIC_AGENT_CERT")
+	uCfg["fleet.ssl.key"] = envWithDefault("", "ELASTIC_AGENT_CERT_KEY")
+
 	return cfg.Merge(uCfg)
 }
 
@@ -1169,6 +1174,15 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	cfg, err := config.NewConfigFrom(reader)
 	if err != nil {
 		return false, fmt.Errorf("failed to read from disk store: %w", err)
+	}
+
+	err = cfg.Agent.SetString("fleet.ssl.certificate", -1, envWithDefault("", "ELASTIC_AGENT_CERT"), ucfg.PathSep("."))
+	if err != nil {
+		return false, fmt.Errorf("failed to override cert: %w", err)
+	}
+	err = cfg.Agent.SetString("fleet.ssl.key", -1, envWithDefault("", "ELASTIC_AGENT_CERT_KEY"), ucfg.PathSep("."))
+	if err != nil {
+		return false, fmt.Errorf("failed to override cert key: %w", err)
 	}
 
 	storedConfig, err := configuration.NewFromConfig(cfg)
