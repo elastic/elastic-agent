@@ -106,6 +106,7 @@ linters:
       - third_party$
       - builtin$
       - examples$
+      - ^beats
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
