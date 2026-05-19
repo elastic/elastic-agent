@@ -16,8 +16,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 )
 
@@ -111,7 +111,7 @@ type EnrollRequest struct {
 
 // Metadata is a all the metadata send or received from the elastic-agent.
 type Metadata struct {
-	Local        *info.ECSMeta          `json:"local"`
+	Local        *ecsmeta.ECSMeta       `json:"local"`
 	UserProvided map[string]interface{} `json:"user_provided"`
 	Tags         []string               `json:"tags"`
 }

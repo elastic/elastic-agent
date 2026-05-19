@@ -35,6 +35,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
@@ -1261,7 +1262,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					LogLevelRuntime  string            `yaml:"log_level"`
 					LogLevelPolicy   string            `yaml:"log_level_policy"`
 					LogLevelOverride string            `yaml:"log_level_override"`
-					Metadata         *info.ECSMeta     `yaml:"metadata"`
+					Metadata         *ecsmeta.ECSMeta  `yaml:"metadata"`
 				}{
 					Headers:          c.agentInfo.Headers(),
 					LogLevelRuntime:  c.agentInfo.GetLogLevelRuntime(),
