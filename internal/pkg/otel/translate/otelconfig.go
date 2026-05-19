@@ -662,9 +662,47 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 		} else if _, ok := input["type"]; !ok {
 			input["type"] = inputType
 		}
+
+		// When the beatprocessor runs the default enrichment processors globally for every
+		// event in the pipeline, remove them from per-input processor lists to avoid running
+		// each processor twice per event.
+		if features.DefaultProcessors() {
+			input["processors"] = stripDefaultProcessors(input["processors"])
+		}
 	}
 
 	return inputs, nil
+}
+
+// stripDefaultProcessors removes processors from the per-input list that are already
+// applied globally by the beatprocessor in the OTel pipeline. Matching is by processor
+// key name — a processor entry is dropped when its only key matches a default processor name.
+func stripDefaultProcessors(raw any) []any {
+	list, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	defaultKeys := make(map[string]struct{})
+	for _, p := range GetDefaultProcessors() {
+		for k := range p {
+			defaultKeys[k] = struct{}{}
+		}
+	}
+	filtered := list[:0:0]
+	for _, item := range list {
+		p, ok := item.(map[string]any)
+		if ok && len(p) == 1 {
+			key := ""
+			for k := range p {
+				key = k
+			}
+			if _, isDefault := defaultKeys[key]; isDefault {
+				continue
+			}
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
 }
 
 // extractOtelProcessors extracts the processor IDs from the output configuration.

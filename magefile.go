@@ -583,10 +583,9 @@ func (Test) Unit(ctx context.Context) error {
 func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 
-	cfg := devtools.SettingsFromContext(ctx)
+	cfg := devtools.SettingsFromContext(ctx).WithFIPSBuild(true)
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	params.Env["FIPS"] = "true"
-	params.Env["GODEBUG"] = "fips140=only"
 	params.Tags = append(params.Tags, "requirefips")
 	return devtools.GoTest(ctx, params)
 }
@@ -2830,7 +2829,7 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
-	cfg := devtools.SettingsFromContext(ctx)
+	cfg := devtools.SettingsFromContextWithOptions(ctx, devtools.LoadOptions{SkipVCS: true})
 	mg.Deps(Build.TestFakeComponent)
 	version := cfg.IntegrationTest.AgentVersion
 	if version == "" {
