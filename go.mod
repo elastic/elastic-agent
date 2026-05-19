@@ -144,14 +144,6 @@ require (
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
-<<<<<<< HEAD
-=======
-	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203 // indirect
-	github.com/elastic/go-concert v0.3.1 // indirect
-	github.com/elastic/go-docappender/v2 v2.14.1 // indirect
-	github.com/elastic/go-freelru v0.16.0 // indirect
-	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
->>>>>>> cf48169ae (build(deps): bump the go-dependencies group across 1 directory with 3 updates (#14352))
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
@@ -213,12 +205,7 @@ require (
 	github.com/knadh/koanf/v2 v2.3.4 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
-<<<<<<< HEAD
-	github.com/lib/pq v1.10.9 // indirect
-=======
-	github.com/lestrrat-go/strftime v1.1.1 // indirect
 	github.com/lib/pq v1.11.2 // indirect
->>>>>>> cf48169ae (build(deps): bump the go-dependencies group across 1 directory with 3 updates (#14352))
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/lufia/plan9stats v0.0.0-20251013123823-9fd1530e3ec3 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
