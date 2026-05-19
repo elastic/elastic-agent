@@ -1079,6 +1079,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		isDiskSpaceErrorResult    bool
 		expectedError             error
 		upgraderMocker            upgraderMocker
+		upgradeOpts               []Option
 		checkArchiveCleanup       bool
 		checkVersionedHomeCleanup bool
 		setupMocks                func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper)
@@ -1357,6 +1358,89 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
 			},
 		},
+		// Regression tests for https://github.com/elastic/elastic-agent/issues/14118:
+		// pre-symlink callback must not fire when the upgrade is aborted before reaching the symlink step.
+		"pre-symlink callback must not be called if download fails": {
+			expectedError: testError,
+			upgradeOpts: []Option{
+				WithPreSymlinkCallback(func(_ context.Context, _ *logger.Logger, _ *fleetapi.ActionUpgrade) error {
+					// This must never be called when the upgrade is aborted early.
+					require.Fail(t, "pre-symlink callback must not be called when download fails")
+					return nil
+				}),
+			},
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnError:       testError,
+					returnArchivePath: archivePath,
+				}
+			},
+			checkArchiveCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+			},
+		},
+		"pre-symlink callback must not be called if unpack fails": {
+			expectedError: testError,
+			upgradeOpts: []Option{
+				WithPreSymlinkCallback(func(_ context.Context, _ *logger.Logger, _ *fleetapi.ActionUpgrade) error {
+					require.Fail(t, "pre-symlink callback must not be called when unpack fails")
+					return nil
+				}),
+			},
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
+				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+					return agentVersion{version: upgradeVersion, hash: metadata.hash}
+				}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadata: packageMetadata{manifest: &v1.PackageManifest{}, hash: "hash"},
+					returnUnpackError:     testError,
+					returnUnpackResult:    UnpackResult{Hash: "hash", VersionedHome: versionedHome},
+				}
+			},
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+			},
+		},
+		"pre-symlink callback error aborts upgrade before changeSymlink and triggers cleanup": {
+			expectedError: testError,
+			upgradeOpts: []Option{
+				WithPreSymlinkCallback(func(_ context.Context, _ *logger.Logger, _ *fleetapi.ActionUpgrade) error {
+					return testError
+				}),
+			},
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
+				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+					return agentVersion{version: upgradeVersion, hash: metadata.hash}
+				}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadata: packageMetadata{manifest: &v1.PackageManifest{}, hash: "hash"},
+					returnUnpackResult:    UnpackResult{Hash: "hash", VersionedHome: versionedHome},
+				}
+				upgrader.copyActionStore = func(_ *logger.Logger, _ string) error { return nil }
+				upgrader.copyRunDirectory = func(_ *logger.Logger, _, _ string) error { return nil }
+				upgrader.changeSymlink = func(_ *logger.Logger, _, _, _ string) error {
+					require.Fail(t, "changeSymlink must not be called when pre-symlink callback fails")
+					return nil
+				}
+			},
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -1391,7 +1475,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				return tc.isDiskSpaceErrorResult
 			}
 
-			_, err = upgrader.Upgrade(context.Background(), "9.0.0", false, "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true)
+			_, err = upgrader.Upgrade(context.Background(), "9.0.0", false, "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true, nil, tc.upgradeOpts...)
 			require.ErrorIs(t, err, tc.expectedError)
 
 			// If the downloaded archive needs to be cleaned up assert that it is indeed cleaned up, if not assert that it still exists. The downloaded archive is a mock file that is created for all tests cases.
