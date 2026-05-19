@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -89,6 +91,7 @@ func (runner *NetworkTrafficRunner) SetupSuite() {
 
 	runner.policyID = policyResp.ID
 	runner.policyName = policyResp.Name
+	runner.ESHost = os.Getenv("ELASTICSEARCH_HOST")
 
 	packageFile := filepath.Join("testdata", "network_traffic_package.json")
 	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "network_traffic",
@@ -137,7 +140,43 @@ func (runner *NetworkTrafficRunner) switchToOtelRuntime() {
 	}
 }
 
-func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Context, agentID string) mapstr.M {
+// extractESHostname returns just the hostname portion of an ES URL like
+// "https://xxxx.es.elastic-cloud.com:9243".
+func extractESHostname(esURL string) string {
+	u, err := url.Parse(esURL)
+	if err != nil || u.Hostname() == "" {
+		return esURL
+	}
+	return u.Hostname()
+}
+
+// triggerFreshTLSConnection opens a single short-lived HTTPS connection to the
+// ES endpoint. Using DisableKeepAlives forces a new TCP connection (and
+// therefore a new TLS handshake) each call, which packetbeat can capture in
+// full once the receiver is running.
+func triggerFreshTLSConnection(ctx context.Context, t *testing.T, esHost string) {
+	t.Helper()
+	client := &http.Client{
+		Transport: &http.Transport{DisableKeepAlives: true},
+		Timeout:   15 * time.Second,
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, esHost, nil)
+	if err != nil {
+		t.Logf("triggerFreshTLSConnection: could not build request: %v", err)
+		return
+	}
+	if u := os.Getenv("ELASTICSEARCH_USERNAME"); u != "" {
+		req.SetBasicAuth(u, os.Getenv("ELASTICSEARCH_PASSWORD"))
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Logf("triggerFreshTLSConnection: request failed (non-fatal): %v", err)
+		return
+	}
+	resp.Body.Close()
+}
+
+func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Context, agentID string, afterTime time.Time, destDomain string) mapstr.M {
 	t := runner.T()
 
 	now := time.Now()
@@ -156,13 +195,30 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Con
 		}
 	}()
 
-	t.Logf("starting to query ES for network traffic events at %s", now.Format(time.RFC3339Nano))
+	t.Logf("starting to query ES for network traffic events at %s (after=%s dest=%s)",
+		now.Format(time.RFC3339Nano), afterTime.UTC().Format(time.RFC3339Nano), destDomain)
 	require.Eventually(t, func() bool {
-		query = genESQuery(agentID,
-			[][]string{
-				{"exists", "field", "tls.client.server_name"},
-			})
 		now = time.Now()
+		// Require a fully captured handshake (both ClientHello and ServerHello
+		// seen by packetbeat), scoped to the ES endpoint and only connections
+		// opened after afterTime. This avoids matching partial captures caused
+		// by the receiver starting after the exporter's TLS handshake completes,
+		// and avoids cross-contamination between process-mode and OTel-mode runs.
+		query = map[string]any{
+			"query": map[string]any{
+				"bool": map[string]any{
+					"must": []map[string]any{
+						{"match": map[string]any{"agent.id": agentID}},
+						{"exists": map[string]any{"field": "tls.client.server_name"}},
+						{"term": map[string]any{"tls.established": true}},
+						{"term": map[string]any{"destination.domain": destDomain}},
+						{"range": map[string]any{"event.start": map[string]any{
+							"gte": afterTime.UTC().Format(time.RFC3339Nano),
+						}}},
+					},
+				},
+			},
+		}
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-network_traffic.tls*", runner.info.ESClient)
 		require.NoError(t, err)
 		if res.Hits.Total.Value < 1 {
@@ -183,10 +239,17 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(t, err, "could not get agent status")
 
+	esHostname := extractESHostname(runner.ESHost)
+	require.NotEmpty(t, esHostname, "could not determine ES hostname from ELASTICSEARCH_HOST")
+
 	// Validate process mode
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
-		processDoc = runner.validateNetworkTrafficEvents(ctx, agentStatus.Info.ID)
+		// Trigger a fresh TLS connection to ES so packetbeat captures a complete
+		// handshake (both ClientHello and ServerHello) that we can query for.
+		captureStart := time.Now()
+		triggerFreshTLSConnection(ctx, t, runner.ESHost)
+		processDoc = runner.validateNetworkTrafficEvents(ctx, agentStatus.Info.ID, captureStart, esHostname)
 	})
 
 	// Switch to OTel runtime and validate the same data
@@ -204,7 +267,11 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 			return true
 		}, 2*time.Minute, 5*time.Second)
 
-		otelDoc = runner.validateNetworkTrafficEvents(ctx, agentStatus.Info.ID)
+		// pbreceiver is now capturing. Trigger a fresh TLS connection so
+		// packetbeat sees a complete handshake from this point in time.
+		captureStart := time.Now()
+		triggerFreshTLSConnection(ctx, t, runner.ESHost)
+		otelDoc = runner.validateNetworkTrafficEvents(ctx, agentStatus.Info.ID, captureStart, esHostname)
 	})
 
 	// Compare documents from process and otel modes have the same keys
@@ -212,6 +279,17 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 		if processDoc == nil || otelDoc == nil {
 			t.Skip("skipping comparison because a previous subtest failed")
 		}
-		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields, "expected network_traffic document keys to be equal between process and otel modes")
+		// tls.detailed.resumption_method is present only for resumed TLS sessions;
+		// whether a session is resumed depends on the TLS session cache state at
+		// the time of the triggered connection and is non-deterministic across runs.
+		// event.duration / event.end depend on connection close timing and are a
+		// known structural difference between process and OTel beat-receiver modes
+		// (see beat_receivers_test.go).
+		ignoredFields := append(RuntimeComparisonIgnoredFields,
+			"event.duration",
+			"event.end",
+			"tls.detailed.resumption_method",
+		)
+		AssertMapstrKeysEqual(t, processDoc, otelDoc, ignoredFields, "expected network_traffic document keys to be equal between process and otel modes")
 	})
 }
