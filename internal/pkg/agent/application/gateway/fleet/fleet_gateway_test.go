@@ -94,7 +94,7 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 		stateStore := newStateStore(t, log)
 
 		mockRollbacksSrc := newMockRollbacksSource(t)
-		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
 		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
 
@@ -227,7 +227,7 @@ func TestFleetGateway(t *testing.T) {
 		stateStore := newStateStore(t, log)
 
 		mockRollbacksSrc := newMockRollbacksSource(t)
-		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
 		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
 		require.NoError(t, err)
@@ -270,7 +270,7 @@ func TestFleetGateway(t *testing.T) {
 		stateStore := newStateStore(t, log)
 
 		mockRollbacksSrc := newMockRollbacksSource(t)
-		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
 		gateway, err := newFleetGatewayWithScheduler(log, &fleetGatewaySettings{
 			Duration: d,
@@ -326,7 +326,7 @@ func TestFleetGateway(t *testing.T) {
 		}
 
 		mockRollbacksSrc := newMockRollbacksSource(t)
-		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
 		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(stateFetcher), mockRollbacksSrc)
 
@@ -389,7 +389,7 @@ func TestFleetGateway(t *testing.T) {
 		require.NoError(t, err)
 
 		mockRollbacksSrc := newMockRollbacksSource(t)
-		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
 		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
 		require.NoError(t, err)
@@ -441,7 +441,7 @@ func TestFleetGateway(t *testing.T) {
 		stateFetcher := NewFastCheckinStateFetcher(log, emptyStateFetcher, stateChannel)
 
 		mockRollbacksSrc := newMockRollbacksSource(t)
-		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
 		gateway, err := newFleetGatewayWithScheduler(log, &fleetGatewaySettings{
 			Duration: 5 * time.Second,
@@ -1120,7 +1120,7 @@ func TestAvailableRollbacks(t *testing.T) {
 		{
 			name: "no available rollbacks - normal checkin",
 			setup: func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient) {
-				rbSource.EXPECT().Get().Return(nil, nil)
+				rbSource.EXPECT().GetAll().Return(nil, nil, nil)
 				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
 					unmarshaled := map[string]interface{}{}
 					err := json.NewDecoder(body).Decode(&unmarshaled)
@@ -1144,13 +1144,13 @@ func TestAvailableRollbacks(t *testing.T) {
 				// truncate to the second to avoid different precision due to marshal/unmarshal
 				validUntil = validUntil.Truncate(time.Second)
 
-				rbSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
+				rbSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
 					"data/elastic-agent-1.2.3-abcdef": {
 						Version:    "1.2.3",
 						Hash:       "abcdef",
 						ValidUntil: validUntil,
 					},
-				}, nil)
+				}, nil, nil)
 				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
 					unmarshaled := map[string]json.RawMessage{}
 					err := json.NewDecoder(body).Decode(&unmarshaled)
@@ -1181,7 +1181,7 @@ func TestAvailableRollbacks(t *testing.T) {
 		{
 			name: "Error getting rollbacks should not make the checkin error out, just omit available_rollbacks",
 			setup: func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient) {
-				rbSource.EXPECT().Get().Return(nil, errors.New("some error getting rollbacks"))
+				rbSource.EXPECT().GetAll().Return(nil, nil, errors.New("some error getting rollbacks"))
 				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
 					unmarshaled := map[string]interface{}{}
 					err := json.NewDecoder(body).Decode(&unmarshaled)

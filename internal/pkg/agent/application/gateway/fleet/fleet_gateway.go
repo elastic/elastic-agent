@@ -81,7 +81,7 @@ type stateStore interface {
 }
 
 type rollbacksSource interface {
-	Get() (map[string]ttl.TTLMarker, error)
+	GetAll() (map[string]ttl.TTLMarker, map[string]error, error)
 }
 
 type FleetGateway struct {
@@ -415,11 +415,14 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get available rollbacks
-	rollbacks, err := f.rollbackSource.Get()
+	rollbacks, malformed, err := f.rollbackSource.GetAll()
 	if err != nil {
 		f.log.Warnf("error getting available rollbacks: %s", err.Error())
-		// this should already be nil but let's make sure that we don't include rollbacks in checkin body when encountering errors
 		rollbacks = nil
+	}
+	for versionedHome, parseErr := range malformed {
+		f.log.Infow("TTL marker is unparseable; skipping in Fleet checkin rollbacks",
+			"versionedHome", versionedHome, "error.message", parseErr.Error())
 	}
 
 	var validRollbacks []fleetapi.CheckinRollback

@@ -41,17 +41,18 @@ func (_m *mockRollbacksSource) EXPECT() *mockRollbacksSource_Expecter {
 	return &mockRollbacksSource_Expecter{mock: &_m.Mock}
 }
 
-// Get provides a mock function for the type mockRollbacksSource
-func (_mock *mockRollbacksSource) Get() (map[string]ttl.TTLMarker, error) {
+// GetAll provides a mock function for the type mockRollbacksSource
+func (_mock *mockRollbacksSource) GetAll() (map[string]ttl.TTLMarker, map[string]error, error) {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for Get")
+		panic("no return value specified for GetAll")
 	}
 
 	var r0 map[string]ttl.TTLMarker
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (map[string]ttl.TTLMarker, error)); ok {
+	var r1 map[string]error
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func() (map[string]ttl.TTLMarker, map[string]error, error)); ok {
 		return returnFunc()
 	}
 	if returnFunc, ok := ret.Get(0).(func() map[string]ttl.TTLMarker); ok {
@@ -61,37 +62,44 @@ func (_mock *mockRollbacksSource) Get() (map[string]ttl.TTLMarker, error) {
 			r0 = ret.Get(0).(map[string]ttl.TTLMarker)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
+	if returnFunc, ok := ret.Get(1).(func() map[string]error); ok {
 		r1 = returnFunc()
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(map[string]error)
+		}
 	}
-	return r0, r1
+	if returnFunc, ok := ret.Get(2).(func() error); ok {
+		r2 = returnFunc()
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
 }
 
-// mockRollbacksSource_Get_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Get'
-type mockRollbacksSource_Get_Call struct {
+// mockRollbacksSource_GetAll_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAll'
+type mockRollbacksSource_GetAll_Call struct {
 	*mock.Call
 }
 
-// Get is a helper method to define mock.On call
-func (_e *mockRollbacksSource_Expecter) Get() *mockRollbacksSource_Get_Call {
-	return &mockRollbacksSource_Get_Call{Call: _e.mock.On("Get")}
+// GetAll is a helper method to define mock.On call
+func (_e *mockRollbacksSource_Expecter) GetAll() *mockRollbacksSource_GetAll_Call {
+	return &mockRollbacksSource_GetAll_Call{Call: _e.mock.On("GetAll")}
 }
 
-func (_c *mockRollbacksSource_Get_Call) Run(run func()) *mockRollbacksSource_Get_Call {
+func (_c *mockRollbacksSource_GetAll_Call) Run(run func()) *mockRollbacksSource_GetAll_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *mockRollbacksSource_Get_Call) Return(stringToTTLMarker map[string]ttl.TTLMarker, err error) *mockRollbacksSource_Get_Call {
-	_c.Call.Return(stringToTTLMarker, err)
+func (_c *mockRollbacksSource_GetAll_Call) Return(markers map[string]ttl.TTLMarker, malformed map[string]error, err error) *mockRollbacksSource_GetAll_Call {
+	_c.Call.Return(markers, malformed, err)
 	return _c
 }
 
-func (_c *mockRollbacksSource_Get_Call) RunAndReturn(run func() (map[string]ttl.TTLMarker, error)) *mockRollbacksSource_Get_Call {
+func (_c *mockRollbacksSource_GetAll_Call) RunAndReturn(run func() (map[string]ttl.TTLMarker, map[string]error, error)) *mockRollbacksSource_GetAll_Call {
 	_c.Call.Return(run)
 	return _c
 }
