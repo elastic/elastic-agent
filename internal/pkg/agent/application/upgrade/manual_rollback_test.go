@@ -541,7 +541,7 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 		{
 			name: "Clear all available rollbacks regardless of ttl when using CleanupAllRollbacks",
 			setup: func(t *testing.T, log *logger.Logger, topDir string, rollbackSource *mockAvailableRollbacksSource) {
-				rollbackSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
+				rollbackSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
 					filepath.Join("data", "elastic-agent-1.2.3-expire"): {
 						Version:    "1.2.3",
 						Hash:       "expire",
@@ -552,7 +552,7 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						Hash:       "valid1",
 						ValidUntil: oneHourFromNow, // still valid
 					},
-				}, nil)
+				}, nil, nil)
 				rollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-1.2.3-expire")).Return(nil)
 				rollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-4.5.6-valid1")).Return(nil)
 
@@ -594,7 +594,7 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 		{
 			name: "Clear expired available rollbacks when using CleanupExpiredRollbacks",
 			setup: func(t *testing.T, log *logger.Logger, topDir string, rollbackSource *mockAvailableRollbacksSource) {
-				rollbackSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
+				rollbackSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
 					filepath.Join("data", "elastic-agent-1.2.3-expire"): {
 						Version:    "1.2.3",
 						Hash:       "expire",
@@ -605,7 +605,7 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						Hash:       "valid1",
 						ValidUntil: oneHourFromNow, // still valid
 					},
-				}, nil)
+				}, nil, nil)
 
 				rollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-1.2.3-expire")).Return(nil)
 
@@ -653,13 +653,13 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 		{
 			name: "Current install should be preserved when using CleanupAllRollbacks even if marked as an available rollback",
 			setup: func(t *testing.T, log *logger.Logger, topDir string, rollbackSource *mockAvailableRollbacksSource) {
-				rollbackSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
+				rollbackSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
 					filepath.Join("data", "elastic-agent-7.8.9-actual"): {
 						Version:    "7.8.9",
 						Hash:       "actual",
 						ValidUntil: oneHourAgo, // expired 1 hour ago
 					},
-				}, nil)
+				}, nil, nil)
 
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
@@ -689,13 +689,13 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 		{
 			name: "Current install should be preserved when using CleanupExpiredRollbacks even if marked as an available rollback",
 			setup: func(t *testing.T, log *logger.Logger, topDir string, rollbackSource *mockAvailableRollbacksSource) {
-				rollbackSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
+				rollbackSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
 					filepath.Join("data", "elastic-agent-7.8.9-actual"): {
 						Version:    "7.8.9",
 						Hash:       "actual",
 						ValidUntil: oneHourAgo, // expired 1 hour ago
 					},
-				}, nil)
+				}, nil, nil)
 
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
@@ -726,13 +726,13 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 			name: "Preserve available rollbacks if involved in an active upgrade",
 			setup: func(t *testing.T, log *logger.Logger, topDir string, rollbackSource *mockAvailableRollbacksSource) {
 
-				rollbackSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
+				rollbackSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
 					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {
 						Version:    "1.2.3",
 						Hash:       "oldver",
 						ValidUntil: oneHourAgo, // expired 1 hour ago
 					},
-				}, nil)
+				}, nil, nil)
 
 				fromVersion := testAgentVersion{
 					version: "1.2.3",
@@ -842,7 +842,7 @@ func TestPerformScheduledCleanup(t *testing.T) {
 		{
 			name: "No available rollbacks: keep checking every cleanupInterval",
 			setup: func(t *testing.T, log *logger.Logger, topDir string, source *mockAvailableRollbacksSource) {
-				source.EXPECT().Get().Return(nil, nil)
+				source.EXPECT().GetAll().Return(nil, nil, nil)
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
 					installedAgents: []testAgentInstall{
@@ -890,7 +890,7 @@ func TestPerformScheduledCleanup(t *testing.T) {
 				)
 
 				// return rollback expiring in the future
-				source.EXPECT().Get().Return(
+				source.EXPECT().GetAll().Return(
 					map[string]ttl.TTLMarker{
 						filepath.Join("data", "elastic-agent-4.5.6-valid1"): {
 							Version:    "4.5.6",
@@ -898,7 +898,7 @@ func TestPerformScheduledCleanup(t *testing.T) {
 							ValidUntil: now.Add(1 * time.Hour),
 						},
 					},
-					nil)
+					nil, nil)
 			},
 			args: args{
 				currentVersionedHome: filepath.Join("data", "elastic-agent-7.8.9-actual"),
@@ -940,7 +940,7 @@ func TestPeriodicallyCleanRollbacks(t *testing.T) {
 		{
 			name: "Goroutine stops when context expires",
 			setup: func(t *testing.T, log *logger.Logger, topDir string, source *mockAvailableRollbacksSource) {
-				source.EXPECT().Get().Return(nil, nil).Maybe()
+				source.EXPECT().GetAll().Return(nil, nil, nil).Maybe()
 			},
 			handleGoroutine: func(t *testing.T, cancel context.CancelFunc, appDone chan bool) {
 				// give some time to get the goroutine running

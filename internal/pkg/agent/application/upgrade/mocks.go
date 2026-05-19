@@ -422,6 +422,69 @@ func (_c *mockAvailableRollbacksSource_Get_Call) RunAndReturn(run func() (map[st
 	return _c
 }
 
+// GetAll provides a mock function for the type mockAvailableRollbacksSource
+func (_mock *mockAvailableRollbacksSource) GetAll() (map[string]ttl.TTLMarker, map[string]error, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAll")
+	}
+
+	var r0 map[string]ttl.TTLMarker
+	var r1 map[string]error
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func() (map[string]ttl.TTLMarker, map[string]error, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() map[string]ttl.TTLMarker); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]ttl.TTLMarker)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() map[string]error); ok {
+		r1 = returnFunc()
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(map[string]error)
+		}
+	}
+	if returnFunc, ok := ret.Get(2).(func() error); ok {
+		r2 = returnFunc()
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+// mockAvailableRollbacksSource_GetAll_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAll'
+type mockAvailableRollbacksSource_GetAll_Call struct {
+	*mock.Call
+}
+
+// GetAll is a helper method to define mock.On call
+func (_e *mockAvailableRollbacksSource_Expecter) GetAll() *mockAvailableRollbacksSource_GetAll_Call {
+	return &mockAvailableRollbacksSource_GetAll_Call{Call: _e.mock.On("GetAll")}
+}
+
+func (_c *mockAvailableRollbacksSource_GetAll_Call) Run(run func()) *mockAvailableRollbacksSource_GetAll_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockAvailableRollbacksSource_GetAll_Call) Return(markers map[string]ttl.TTLMarker, malformed map[string]error, err error) *mockAvailableRollbacksSource_GetAll_Call {
+	_c.Call.Return(markers, malformed, err)
+	return _c
+}
+
+func (_c *mockAvailableRollbacksSource_GetAll_Call) RunAndReturn(run func() (map[string]ttl.TTLMarker, map[string]error, error)) *mockAvailableRollbacksSource_GetAll_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Remove provides a mock function for the type mockAvailableRollbacksSource
 func (_mock *mockAvailableRollbacksSource) Remove(s string) error {
 	ret := _mock.Called(s)

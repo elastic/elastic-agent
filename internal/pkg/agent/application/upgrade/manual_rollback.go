@@ -313,9 +313,13 @@ func PreserveActiveUpgradeVersions(marker *UpdateMarker, innerFilter RollbackCle
 // This function will return the leftover available rollbacks that will survive the cleanup, can be used to schedule another launch
 // of the cleanup in the future
 func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
-	rollbacks, err := source.Get()
+	rollbacks, malformed, err := source.GetAll()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get available rollbacks: %w", err)
+	}
+	for versionedHome, parseErr := range malformed {
+		log.Infow("TTL marker is unparseable; directory will not be protected from cleanup",
+			"versionedHome", versionedHome, "error.message", parseErr.Error())
 	}
 
 	if len(rollbacks) == 0 {

@@ -122,6 +122,7 @@ type WatcherHelper interface {
 type availableRollbacksSource interface {
 	Set(map[string]ttl.TTLMarker) error
 	Get() (map[string]ttl.TTLMarker, error)
+	GetAll() (map[string]ttl.TTLMarker, map[string]error, error)
 	Remove(string) error
 }
 
