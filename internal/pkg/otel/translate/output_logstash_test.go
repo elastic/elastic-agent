@@ -84,6 +84,7 @@ ssl.curve_types: "P-256"
 				"ssl": map[string]any{
 					"enabled":                    true,
 					"certificate":                "",
+					"certificate_reload":         map[string]any{"enabled": nil, "reload_interval": "0s"},
 					"key":                        "",
 					"key_passphrase":             "",
 					"key_passphrase_path":        "",
