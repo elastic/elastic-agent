@@ -5,7 +5,6 @@
 package ttl
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,123 +20,6 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
-
-func TestTTLMarkerRegistry_Get(t *testing.T) {
-	const TTLMarkerYAMLTemplate = `
-        version: {{ .Version }}
-        valid_until: {{ .ValidUntil }}`
-
-	parsedTemplate, err := template.New("ttlMarker").Parse(TTLMarkerYAMLTemplate)
-	require.NoError(t, err, "error parsing ttl marker template")
-
-	now := time.Now()
-	nowString := now.Format(time.RFC3339)
-	// re-parse now to account for loss of fidelity due to marshal/unmarshal
-	now, _ = time.Parse(time.RFC3339, nowString)
-
-	yesterday := now.Add(-24 * time.Hour)
-	yesterdayString := yesterday.Format(time.RFC3339)
-
-	tomorrow := now.Add(24 * time.Hour)
-	tomorrowString := tomorrow.Format(time.RFC3339)
-
-	versions := []string{"1.2.3", "4.5.6", "7.8.9-SNAPSHOT"}
-	versionedHomes := []string{"elastic-agent-1.2.3-past", "elastic-agent-4.5.6-present", "elastic-agent-7.8.9-SNAPSHOT-future"}
-	ttls := []string{yesterdayString, nowString, tomorrowString}
-
-	tests := []struct {
-		name    string
-		setup   func(t *testing.T, tmpDir string)
-		want    map[string]TTLMarker
-		wantErr assert.ErrorAssertionFunc
-	}{
-		{
-			name: "Empty directory - empty map",
-			setup: func(t *testing.T, tmpDir string) {
-				// nothing to do here
-			},
-			want:    map[string]TTLMarker{},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "multiple directories, no marker - empty map",
-			setup: func(t *testing.T, tmpDir string) {
-				for _, versionedHome := range versionedHomes {
-					err := os.MkdirAll(filepath.Join(tmpDir, "data", versionedHome), 0755)
-					require.NoError(t, err, "error setting up fake agent install directory")
-				}
-			},
-			want:    map[string]TTLMarker{},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "multiple directories, ttl on past and present marker - return value",
-			setup: func(t *testing.T, tmpDir string) {
-
-				for i, versionedHome := range versionedHomes {
-					err := os.MkdirAll(filepath.Join(tmpDir, "data", versionedHome), 0755)
-					require.NoError(t, err, "error setting up fake agent install directory")
-
-					if i < 2 {
-						buf := bytes.Buffer{}
-						err = parsedTemplate.Execute(&buf, map[string]string{"Version": versions[i], "ValidUntil": ttls[i]})
-						require.NoError(t, err, "error executing ttl marker template")
-						err = os.WriteFile(filepath.Join(tmpDir, "data", versionedHome, ttlMarkerName), buf.Bytes(), 0644)
-						require.NoError(t, err, "error setting up fake agent ttl marker")
-					}
-				}
-			},
-			want: map[string]TTLMarker{
-				filepath.Join("data", "elastic-agent-1.2.3-past"): {
-					Version:    "1.2.3",
-					ValidUntil: yesterday,
-				},
-				filepath.Join("data", "elastic-agent-4.5.6-present"): {
-					Version:    "4.5.6",
-					ValidUntil: now,
-				},
-			},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "empty marker - error",
-			setup: func(t *testing.T, tmpDir string) {
-				for _, versionedHome := range versionedHomes {
-					err := os.MkdirAll(filepath.Join(tmpDir, "data", versionedHome), 0755)
-					require.NoError(t, err, "error setting up fake agent install directory")
-					err = os.WriteFile(filepath.Join(tmpDir, "data", versionedHome, ttlMarkerName), nil, 0644)
-					require.NoError(t, err, "error setting up fake agent ttl marker")
-				}
-			},
-			want:    nil,
-			wantErr: assert.Error,
-		},
-		{
-			name: "ttl content is not yaml - error",
-			setup: func(t *testing.T, tmpDir string) {
-				err := os.MkdirAll(filepath.Join(tmpDir, "data", versionedHomes[0]), 0755)
-				require.NoError(t, err, "error setting up fake agent install directory")
-				err = os.WriteFile(filepath.Join(tmpDir, "data", versionedHomes[0], ttlMarkerName), []byte("this is not yaml"), 0644)
-				require.NoError(t, err, "error setting up fake agent ttl marker")
-			},
-			want:    nil,
-			wantErr: assert.Error,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			tt.setup(t, tmpDir)
-			testLogger, _ := loggertest.New(t.Name())
-			T := NewTTLMarkerRegistry(testLogger, tmpDir)
-			got, err := T.Get()
-			if !tt.wantErr(t, err, "Get()") {
-				return
-			}
-			assert.Equal(t, tt.want, got, "Get()")
-		})
-	}
-}
 
 // TestTTLMarkerRegistry_GetAll_PartialReturnsMalformedAlongsideParsed proves
 // that GetAll keeps returning successfully parsed entries even when a sibling

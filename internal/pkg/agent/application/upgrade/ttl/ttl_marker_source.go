@@ -133,26 +133,6 @@ func (T TTLMarkerRegistry) GetAll() (map[string]TTLMarker, map[string]error, err
 	return ttlMarkers, malformed, nil
 }
 
-// Get reads all .ttl markers and returns only successfully parsed entries.
-// It preserves the all-or-nothing contract: if any per-entry parse fails,
-// Get returns (nil, joined error) so existing callers continue to see the
-// same behavior. Callers that want partial results plus a list of malformed
-// entries should use GetAll directly.
-func (T TTLMarkerRegistry) Get() (map[string]TTLMarker, error) {
-	markers, malformed, err := T.GetAll()
-	if err != nil {
-		return nil, err
-	}
-	if len(malformed) > 0 {
-		errs := make([]error, 0, len(malformed))
-		for _, e := range malformed {
-			errs = append(errs, e)
-		}
-		return nil, errors.Join(errs...)
-	}
-	return markers, nil
-}
-
 func (T TTLMarkerRegistry) addOrReplace(m map[string]TTLMarker) error {
 	for versionedHome, marker := range m {
 		dstFilePath := filepath.Join(T.baseDir, versionedHome, ttlMarkerName)
