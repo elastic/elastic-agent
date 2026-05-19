@@ -380,8 +380,8 @@ func TestFleetGateway(t *testing.T) {
 			ActionType: fleetapi.ActionTypePolicyChange,
 			Data: fleetapi.ActionPolicyChangeData{
 				Policy: map[string]interface{}{
-					"policy_id":           "test-policy-id",
-					"policy_revision_idx": 1,
+					"id":       "test-policy-id",
+					"revision": 1,
 				},
 			},
 		})

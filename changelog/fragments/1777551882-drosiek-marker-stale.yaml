@@ -6,22 +6,19 @@
 # - enhancement: extends functionality but does not break or fix existing behavior
 # - feature: new functionality
 # - known-issue: problems that we are aware of in a given version
-# - security: impacts on the security of a product or a user's deployment.
+# - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
 kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Stop Windows service promptly while the agent is retrying enrollment
+summary: Preserve live install during upgrade cleanup and report aborted upgrades to Fleet
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: |
-  Stopping the Elastic Agent Windows service while it was retrying
-  enrollment could hang for several minutes and cause MSI uninstall to
-  fail. The service now stops promptly.
+# description:
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:

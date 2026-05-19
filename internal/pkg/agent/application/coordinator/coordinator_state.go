@@ -115,11 +115,11 @@ func (c *Coordinator) setConfigError(err error) {
 	c.stateNeedsRefresh = true
 }
 
-// setComponentGenError updates the error state for generating a component
+// setComponentModelError updates the error state for generating a component
 // model from an AST and variables.
 // Called on the main Coordinator goroutine.
-func (c *Coordinator) setComponentGenError(err error) {
-	c.componentGenErr = err
+func (c *Coordinator) setComponentModelError(err error) {
+	c.componentModelErr = err
 	c.stateNeedsRefresh = true
 }
 
@@ -236,9 +236,9 @@ func (c *Coordinator) generateReportableState() (s State) {
 	} else if c.configErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Invalid policy: %s", c.configErr.Error())
-	} else if c.componentGenErr != nil {
+	} else if c.componentModelErr != nil {
 		s.State = agentclient.Failed
-		s.Message = fmt.Sprintf("Invalid component model: %s", c.componentGenErr.Error())
+		s.Message = fmt.Sprintf("Invalid component model: %s", c.componentModelErr.Error())
 	} else if c.runtimeUpdateErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Runtime update failed: %s", c.runtimeUpdateErr.Error())

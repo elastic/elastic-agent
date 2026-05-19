@@ -1,0 +1,7 @@
+kind: feature
+
+summary: Add Azure Event Hub receiver to EDOT Collector.
+
+component: elastic-agent
+
+pr: https://github.com/elastic/elastic-agent/pull/13418
