@@ -26,6 +26,7 @@ import (
 
 	agentclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent-libs/redact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	agentruntime "github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -34,7 +35,7 @@ import (
 	"github.com/elastic/elastic-agent/version"
 )
 
-const REDACTED_URL_USERNAME_PASSWORD = REDACTED_URL_SAFE + ":" + REDACTED_URL_SAFE
+const REDACTED_URL_USERNAME_PASSWORD = redact.REDACTED + ":" + redact.REDACTED
 
 func TestRedactResults(t *testing.T) {
 	privKey := `-----BEGIN OPENSSH PRIVATE KEY-----
@@ -90,6 +91,7 @@ i4EFZLWrFRsAAAARYWxleGtAZ3JlbWluLm5lc3QBAg==
 	exampleConfig := mapstr.M{
 		"root": mapstr.M{
 			"passphrase": "unredacted",
+			//nolint:gosec // fake credentials for testing
 			"nested1": mapstr.M{
 				"url":         "https://unredacted:unredacted@my-url1",
 				"certificate": "unredacted",
@@ -197,7 +199,7 @@ func TestRedactWithMarkers(t *testing.T) {
 				"inputs": []any{
 					map[string]any{
 						"type":      "test_input",
-						"redactKey": REDACTED,
+						"redactKey": redact.REDACTED,
 						"urls": []any{
 							"https://" + REDACTED_URL_USERNAME_PASSWORD + "@my-url1",
 							"https://" + REDACTED_URL_USERNAME_PASSWORD + "@my-url2",
@@ -208,8 +210,8 @@ func TestRedactWithMarkers(t *testing.T) {
 				"outputs": map[string]any{
 					"default": map[string]any{
 						"type":           "elasticsearch",
-						"api_key":        REDACTED,
-						"redactOtherKey": REDACTED,
+						"api_key":        redact.REDACTED,
+						"redactOtherKey": redact.REDACTED,
 					},
 				},
 			},
@@ -222,6 +224,7 @@ func TestRedactWithMarkers(t *testing.T) {
 					},
 				},
 				"outputs": map[string]any{
+					//nolint:gosec // fake credentials for testing
 					"default": map[string]any{
 						"type":        "elasticsearch",
 						"url":         "https://username:password@my-url",
@@ -245,11 +248,11 @@ func TestRedactWithMarkers(t *testing.T) {
 						"type":        "elasticsearch",
 						"url":         "https://" + REDACTED_URL_USERNAME_PASSWORD + "@my-url",
 						"other_url":   "https://my-unredacted-url",
-						"api_key":     REDACTED,
-						"Certificate": REDACTED,
-						"PassPhrase":  REDACTED,
-						"PASSWORD":    REDACTED,
-						"tOkEn":       REDACTED,
+						"api_key":     redact.REDACTED,
+						"Certificate": redact.REDACTED,
+						"PassPhrase":  redact.REDACTED,
+						"PASSWORD":    redact.REDACTED,
+						"tOkEn":       redact.REDACTED,
 					},
 				},
 			},
@@ -276,14 +279,14 @@ func TestRedactWithMarkers(t *testing.T) {
 				"inputs": []any{
 					map[string]any{
 						"type":      "test_input",
-						"redactKey": REDACTED,
+						"redactKey": redact.REDACTED,
 					},
 				},
 				"outputs": map[string]any{
 					"default": map[string]any{
 						"type":           "elasticsearch",
-						"api_key":        REDACTED,
-						"redactOtherKey": REDACTED,
+						"api_key":        redact.REDACTED,
+						"redactOtherKey": redact.REDACTED,
 					},
 				},
 			},
@@ -346,7 +349,7 @@ func TestRedactWithMarkers(t *testing.T) {
 										map[string]any{
 											"set": map[string]any{
 												"target": "header.Authorization",
-												"value":  REDACTED,
+												"value":  redact.REDACTED,
 											},
 										},
 										map[string]any{
@@ -359,7 +362,7 @@ func TestRedactWithMarkers(t *testing.T) {
 								},
 							},
 							map[string]any{
-								"mock_stream_config": REDACTED,
+								"mock_stream_config": redact.REDACTED,
 							},
 						},
 					},
@@ -834,13 +837,13 @@ func TestRedactSSLKeyInInputs(t *testing.T) {
 	require.NoError(t, err)
 
 	var errOut bytes.Buffer
-	redacted := Redact(unmarshalled, &errOut)
+	redact.Redact(unmarshalled, RedactOpts(&errOut)...)
 	assert.Equalf(t, 0, errOut.Len(), "Unexpected errors written when redacting secrets: %s", errOut.String())
-	require.NotNil(t, redacted)
+	require.NotNil(t, unmarshalled)
 
-	require.Contains(t, redacted, "inputs")
-	inputs, ok := redacted["inputs"].([]any)
-	require.Truef(t, ok, "expected inputs to be slice, detected: %T", redacted["inputs"])
+	require.Contains(t, unmarshalled, "inputs")
+	inputs, ok := unmarshalled["inputs"].([]any)
+	require.Truef(t, ok, "expected inputs to be slice, detected: %T", unmarshalled["inputs"])
 	require.Len(t, inputs, 1)
 	input, ok := inputs[0].(map[string]any)
 	require.True(t, ok, "expected input to be object, detected: %T", inputs[0])
@@ -850,9 +853,9 @@ func TestRedactSSLKeyInInputs(t *testing.T) {
 	top, ok := input["ssl"].(map[string]any)
 	require.True(t, ok, "expected type to be object, detected: %T", input["ssl"])
 	require.Contains(t, top, "certificate")
-	assert.Equal(t, REDACTED, top["certificate"])
+	assert.Equal(t, redact.REDACTED, top["certificate"])
 	require.Contains(t, top, "key")
-	assert.Equal(t, REDACTED, top["key"])
+	assert.Equal(t, redact.REDACTED, top["key"])
 
 	// check nested object
 	require.Contains(t, input, "nested")
@@ -862,9 +865,9 @@ func TestRedactSSLKeyInInputs(t *testing.T) {
 	nestedSSL, ok := nested["ssl"].(map[string]any)
 	require.True(t, ok, "expected type to be object, detected: %T", nested["ssl"])
 	require.Contains(t, nestedSSL, "certificate")
-	assert.Equal(t, REDACTED, nestedSSL["certificate"])
+	assert.Equal(t, redact.REDACTED, nestedSSL["certificate"])
 	require.Contains(t, nestedSSL, "key")
-	assert.Equal(t, REDACTED, nestedSSL["key"])
+	assert.Equal(t, redact.REDACTED, nestedSSL["key"])
 
 	// check nested slice
 	require.Contains(t, input, "slice")
@@ -877,9 +880,102 @@ func TestRedactSSLKeyInInputs(t *testing.T) {
 	sliceSSL, ok := elem["ssl"].(map[string]any)
 	require.True(t, ok, "expected type to be object, detected: %T", elem["ssl"])
 	require.Contains(t, sliceSSL, "certificate")
-	assert.Equal(t, REDACTED, sliceSSL["certificate"])
+	assert.Equal(t, redact.REDACTED, sliceSSL["certificate"])
 	require.Contains(t, sliceSSL, "key")
-	assert.Equal(t, REDACTED, sliceSSL["key"])
+	assert.Equal(t, redact.REDACTED, sliceSSL["key"])
+}
+
+func TestRedactNameValuePair(t *testing.T) {
+	tests := map[string]struct {
+		input  map[string]any
+		expect map[string]any
+	}{
+		"sensitive name redacts sibling value": {
+			input: map[string]any{
+				"headers": []any{
+					map[string]any{
+						"name":  "Authorization",
+						"value": "Bearer SecretValue",
+					},
+				},
+			},
+			expect: map[string]any{
+				"headers": []any{
+					map[string]any{
+						"name":  "Authorization",
+						"value": redact.REDACTED,
+					},
+				},
+			},
+		},
+		"non-sensitive name leaves value untouched": {
+			input: map[string]any{
+				"headers": []any{
+					map[string]any{
+						"name":  "Accept",
+						"value": "application/json",
+					},
+				},
+			},
+			expect: map[string]any{
+				"headers": []any{
+					map[string]any{
+						"name":  "Accept",
+						"value": "application/json",
+					},
+				},
+			},
+		},
+		"case insensitive name key with sensitive value": {
+			input: map[string]any{
+				"Name":  "API-Key",
+				"Value": "actual-secret",
+			},
+			expect: map[string]any{
+				"Name":  "API-Key",
+				"Value": redact.REDACTED,
+			},
+		},
+		"ignored key value is not redacted": {
+			input: map[string]any{
+				"params": []any{
+					map[string]any{
+						"name":  redactionRouteKey,
+						"value": "some-route-id",
+					},
+				},
+			},
+			expect: map[string]any{
+				"params": []any{
+					map[string]any{
+						"name":  redactionRouteKey,
+						"value": "some-route-id",
+					},
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			input, err := yaml.Marshal(tc.input)
+			require.NoError(t, err)
+
+			file := client.DiagnosticFileResult{Content: input, ContentType: "application/yaml"}
+			var out bytes.Buffer
+			var errOut bytes.Buffer
+
+			err = writeRedacted(&errOut, &out, "testPath", file)
+			require.NoError(t, err)
+			require.Empty(t, errOut.String(), "unexpected redaction errors: %s", errOut.String())
+
+			var actual map[string]any
+			err = yaml.Unmarshal(out.Bytes(), &actual)
+			require.NoError(t, err, "failed to unmarshal output")
+
+			assert.Equal(t, tc.expect, actual, "output does not match expected")
+		})
+	}
 }
 
 func TestRedactEnv(t *testing.T) {
@@ -908,11 +1004,12 @@ func TestRedactEnv(t *testing.T) {
 		expect: map[string]any{
 			"TEST_LEVEL":    "test-val",
 			"VAL1":          "a,b,c",
-			"API_KEY":       REDACTED,
-			"SERVICE_TOKEN": REDACTED,
+			"API_KEY":       redact.REDACTED,
+			"SERVICE_TOKEN": redact.REDACTED,
 		},
 	}, {
 		name: "Redacts value based on key and URL",
+		//nolint:gosec // fake credentials for testing
 		env: map[string]string{
 			"TEST_LEVEL":    "test-val",
 			"VAL1":          "a,b,c",
@@ -924,9 +1021,9 @@ func TestRedactEnv(t *testing.T) {
 		expect: map[string]any{
 			"TEST_LEVEL":    "test-val",
 			"VAL1":          "a,b,c",
-			"API_KEY":       REDACTED,
-			"SECRET_URL":    REDACTED, // key name wins
-			"SERVICE_TOKEN": REDACTED,
+			"API_KEY":       redact.REDACTED,
+			"SECRET_URL":    redact.REDACTED, // key name wins
+			"SERVICE_TOKEN": redact.REDACTED,
 			"HTTPS_PROXY":   "https://" + REDACTED_URL_USERNAME_PASSWORD + "@my-proxy",
 		},
 	}}
