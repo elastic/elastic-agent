@@ -306,13 +306,24 @@ func PreserveActiveUpgradeVersions(marker *UpdateMarker, innerFilter RollbackCle
 	}
 }
 
-// CleanAvailableRollbacks will remove the extra agent installs that can be used as manual rollback target. Invoked before triggering
-// an update in order to free disk space for the new agent version or whenever a cleanup should happen.
-// This function has basic protection for the current home and it will remove any available rollback for which the filter function
-// returns true.
-// This function will return the leftover available rollbacks that will survive the cleanup, can be used to schedule another launch
-// of the cleanup in the future
+// CleanAvailableRollbacks removes agent installation directories that are safe to delete. It scans every
+// elastic-agent-* directory under the data path and removes those not in the keep set. The keep set consists of:
+//   - the currently running installation (currentHomeRelPath)
+//   - directories referenced by an active (non-terminal) upgrade marker
+//   - TTL-tracked directories for which filter returns false (e.g. unexpired)
+//
+// Directories with no TTL entry (orphans from failed upgrades) are swept unless they are protected by the keep set.
+// The remaining TTL entries are returned so the caller can schedule the next cleanup.
 func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
+	// Snapshot the directory listing before reading any markers or TTL entries.
+	// Any directory created after this point (e.g. by a concurrent upgrade) will
+	// not appear in the snapshot and therefore cannot be swept this run.
+	allAgentDirs, err := snapshotAgentDirs(topDir)
+	if err != nil {
+		return nil, err
+	}
+
+
 	rollbacks, malformed, err := source.GetAll()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get available rollbacks: %w", err)
@@ -322,48 +333,65 @@ func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir strin
 			"versionedHome", versionedHome, "error.message", parseErr.Error())
 	}
 
-	if len(rollbacks) == 0 {
-		log.Debugf("No available rollbacks returned, exiting cleanup")
-		return nil, nil
+	// Assemble the caller-supplied keep list; buildKeepDirs will add the marker dirs and symlink target on top.
+	extraDirs := []string{filepath.Clean(currentHomeRelPath)}
+	for versionedHome, ttlMarker := range rollbacks {
+		if !filter(log, now, versionedHome, ttlMarker) {
+			extraDirs = append(extraDirs, versionedHome)
+		}
 	}
 
-	// Clean the currentHomeRel path to normalize it
-	currentHomeRelPath = filepath.Clean(currentHomeRelPath)
-
-	log.Debugw("preparing to cleanup rollbacks", "rollbacks", rollbacks)
-	var aggregateErr error
-
-	leftoverRollbacks := map[string]ttl.TTLMarker{}
-
-	for versionedHome, ttlMarker := range rollbacks {
-
-		if currentHomeRelPath == filepath.Clean(versionedHome) {
-			log.Warnf("skipping cleanup of available rollback located in %q as it matches the current home", versionedHome)
-			continue
-		}
-
-		versionedHomeAbsPath := filepath.Join(topDir, versionedHome)
-		_, err = os.Stat(versionedHomeAbsPath)
-		if errors.Is(err, os.ErrNotExist) {
-			log.Warnf("Versioned home %s corresponding to agent TTL marker %+v  is not found on disk", versionedHomeAbsPath, ttlMarker)
-			continue
-		}
-
-		if filter(log, now, versionedHome, ttlMarker) {
-			log.Debugf("cleaning up rollback in %q", versionedHome)
-			if cleanupErr := install.RemoveBut(log, versionedHomeAbsPath, true); cleanupErr != nil {
-				aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing directory %q: %w", versionedHomeAbsPath, cleanupErr))
-			} else {
-				if removeErr := source.Remove(versionedHome); removeErr != nil {
-					aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing TTL for %s: %w", versionedHome, removeErr))
-				}
+	// requireMarkerDetails=false: be conservative, protect from any non-terminal marker.
+	// Both currentHomeRelPath and symlink target are kept: they may differ during transitions.
+	keepDirs, symlinkErr := buildKeepDirs(log, topDir, false, extraDirs)
+	if symlinkErr != nil {
+		log.Warnw("could not read agent symlink during cleanup; skipping removals to avoid sweeping the next-run live home", "error.message", symlinkErr.Error())
+		// Return unexpired rollbacks so the scheduler retries when the next TTL expires.
+		leftoverRollbacks := make(map[string]ttl.TTLMarker)
+		for versionedHome, ttlMarker := range rollbacks {
+			if !filter(log, now, versionedHome, ttlMarker) {
+				leftoverRollbacks[versionedHome] = ttlMarker
 			}
+		}
+		return leftoverRollbacks, nil
+	}
+
+	// Partition the snapshot into directories to keep and directories to remove.
+	var toRemove []string
+	for _, absPath := range allAgentDirs {
+		relPath, relErr := filepath.Rel(topDir, absPath)
+		if relErr != nil {
+			continue
+		}
+		relPath = filepath.Clean(relPath)
+		if keepDirs[relPath] {
+			log.Debugw("leaving agent directory intact", "path", relPath)
 		} else {
-			log.Debugf("leaving rollback in %q intact as it's not been selected by the filter function", versionedHome)
+			toRemove = append(toRemove, relPath)
+		}
+	}
+
+	log.Debugw("preparing to cleanup agent directories", "keep_dirs", keepDirs, "to_remove", len(toRemove))
+	var aggregateErr error
+	for _, relPath := range toRemove {
+		absPath := filepath.Join(topDir, relPath)
+		log.Infow("removing agent directory", "path", relPath)
+		if cleanupErr := install.RemoveBut(log, absPath, true); cleanupErr != nil {
+			aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing directory %q: %w", absPath, cleanupErr))
+		} else if _, inRollbacks := rollbacks[relPath]; inRollbacks {
+			if removeErr := source.Remove(relPath); removeErr != nil {
+				aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing TTL for %s: %w", relPath, removeErr))
+			}
+		}
+	}
+
+	// Return entries the filter kept so the caller can schedule the next cleanup at the earliest expiry.
+	leftoverRollbacks := make(map[string]ttl.TTLMarker)
+	for versionedHome, ttlMarker := range rollbacks {
+		if !filter(log, now, versionedHome, ttlMarker) {
 			leftoverRollbacks[versionedHome] = ttlMarker
 		}
 	}
-
 	return leftoverRollbacks, aggregateErr
 }
 

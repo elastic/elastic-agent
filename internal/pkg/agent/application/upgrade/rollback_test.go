@@ -1124,6 +1124,7 @@ func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
 	t.Run("removeMarker=false: error returned and versioned home untouched", func(t *testing.T) {
 		testLogger, _ := loggertest.New(t.Name())
 		topDir := t.TempDir()
+		require.NoError(t, os.MkdirAll(paths.DataFrom(topDir), 0o750))
 
 		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
 		err := cleanup(testLogger, topDir, false, false, 0, phantomHome)
@@ -1148,4 +1149,48 @@ func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
 		assert.FileExists(t, markerPath,
 			"upgrade marker must survive an aborted cleanup (CleanMarker must not run before resolve)")
 	})
+}
+
+// TestCleanAvailableRollbacks_SkipsRemovalsWhenSymlinkUnresolvable verifies
+// that CleanAvailableRollbacks returns no error and performs no removals when
+// the agent symlink cannot be resolved. Without the symlink we cannot determine
+// which versioned home the next restart will use, so deleting anything risks
+// sweeping the live installation.
+func TestCleanAvailableRollbacks_SkipsRemovalsWhenSymlinkUnresolvable(t *testing.T) {
+	testLogger, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"}
+	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"}
+
+	relA := createFakeAgentInstall(t, topDir, versionA.version, versionA.hash, true)
+	relB := createFakeAgentInstall(t, topDir, versionB.version, versionB.hash, true)
+
+	// No symlink is created — liveVersionedHome will fail.
+
+	now := time.Now()
+	validUntil := now.Add(24 * time.Hour)
+	availableRollbacks := map[string]ttl.TTLMarker{
+		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: validUntil},
+	}
+	registry := ttl.NewTTLMarkerRegistry(testLogger, topDir)
+	require.NoError(t, registry.Set(availableRollbacks), "writing TTL registry")
+
+	leftover, err := CleanAvailableRollbacks(testLogger, registry, topDir, relB, now, CleanupExpiredRollbacks)
+
+	require.NoError(t, err, "must not return error when symlink is unresolvable")
+	if assert.Len(t, leftover, 1, "unexpired rollback must be returned for future cleanup") {
+		m := leftover[relA]
+		assert.Equal(t, versionA.version, m.Version)
+		assert.Equal(t, versionA.hash, m.Hash)
+		assert.True(t, m.ValidUntil.Equal(validUntil) || m.ValidUntil.Sub(validUntil).Abs() < time.Second,
+			"ValidUntil should match (monotonic clock stripped on registry round-trip)")
+	}
+
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+	assertAgentInstallExists(t, filepath.Join(topDir, relA), agentExecutableName)
+	assertAgentInstallExists(t, filepath.Join(topDir, relB), agentExecutableName)
 }

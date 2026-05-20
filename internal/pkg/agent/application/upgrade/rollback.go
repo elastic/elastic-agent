@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"time"
 
@@ -153,56 +152,27 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	log.Infow("Cleaning up upgrade", "remove_marker", removeMarker)
 	<-time.After(delay)
 
-	// data directory path
 	dataDirPath := paths.DataFrom(topDirPath)
 
-	// The live versioned home is identified from the top-level agent symlink
-	// — the canonical record of what the daemon launches. If that symlink is
-	// unreadable for any reason, cleanup refuses to proceed: deciding what to
-	// keep without an authoritative live-install reference would risk
-	// deleting the live install, and the loud abort produces a recurring
-	// Error signal that an operator can investigate before the next restart
-	// fails. See
-	// https://github.com/elastic/elastic-agent/issues/13505 for the data-loss
-	// hazard this guard closes.
-	liveHome, err := liveVersionedHome(topDirPath)
-	if err != nil {
-		return fmt.Errorf("cannot identify live versioned home from symlink, refusing to proceed with cleanup: %w", err)
-	}
-
-	// Snapshot the directory listing before reading any markers so that directories created after this point cannot
-	// be swept: if a new upgrade starts and creates its target directory after the snapshot it won't appear here
-	// and is safe regardless of the keep-list. Directories that do appear in the snapshot are then cross-checked
-	// against a fresh marker read below.
-	dataDir, err := os.Open(dataDirPath)
-	if err != nil {
-		return err
-	}
-	defer func(dataDir *os.File) {
-		if err := dataDir.Close(); err != nil {
-			log.Errorw("Error closing data directory", "file.directory", dataDirPath)
-		}
-	}(dataDir)
-
-	subdirs, err := dataDir.Readdirnames(0)
+	// Snapshot the directory listing before reading any markers so that directories
+	// created after this point cannot be swept this run.
+	allAgentDirs, err := snapshotAgentDirs(topDirPath)
 	if err != nil {
 		return err
 	}
 
-	// Read the upgrade marker and TTL rollbacks fresh after the snapshot. The upgrade marker is always written
-	// before unpacking begins, so any new upgrade whose directory appeared in the snapshot will also have its
-	// marker on disk now. Only protect a fresh marker when it carries explicit non-terminal details (an active
-	// upgrade with a known state). A nil-Details marker is ambiguous legacy state and must not override the
-	// caller's keep-list. Use LoadMarker rather than TryLoadMarker: a parse error here should not rename the
-	// marker to .corrupt as a side effect of cleanup.
-	freshMarker, _ := LoadMarker(dataDirPath)
-	if freshMarker != nil && freshMarker.Details != nil && !IsTerminalState(freshMarker) && freshMarker.VersionedHome != "" {
-		versionedHomesToKeep = append(versionedHomesToKeep, freshMarker.VersionedHome)
-	}
+	// Read TTL rollbacks fresh after the snapshot.
 	if inTTL, ttlErr := InTTLRollbacks(log, topDirPath, time.Now()); ttlErr != nil {
 		log.Infow("could not re-read TTL registry during cleanup; continuing with existing keep-list", "error.message", ttlErr.Error())
 	} else {
 		versionedHomesToKeep = append(versionedHomesToKeep, inTTL...)
+	}
+
+	// requireMarkerDetails=true: reject ambiguous legacy markers (nil Details) so they
+	// can't silently protect dirs that should be swept. Fatal on symlink error: see #13505.
+	keepDirs, symlinkErr := buildKeepDirs(log, topDirPath, true, versionedHomesToKeep)
+	if symlinkErr != nil {
+		return fmt.Errorf("cannot identify live versioned home from symlink, refusing to proceed with cleanup: %w", symlinkErr)
 	}
 
 	// Remove upgrade marker now that its content has been captured above.
@@ -217,59 +187,37 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath(topDirPath))
 	_ = os.Remove(prevSymlink)
 
-	dirPrefix := fmt.Sprintf("%s-", AgentName)
-
-	log.Infof("versioned homes to keep: %v", versionedHomesToKeep)
-
-	candidates := append(make([]string, 0, len(versionedHomesToKeep)+1), versionedHomesToKeep...)
-	candidates = append(candidates, liveHome)
-
-	// Normalize each candidate to a dataDir-relative basename, deduplicate,
-	// and drop entries that don't exist on disk so the "Keeping" log line
-	// below reflects what is actually being preserved rather than a phantom
-	// path. A stale entry is harmless to leave in (the cleanup loop only
-	// iterates real subdirs) but misleading on triage; each dropped entry is
-	// surfaced as an Info so the cause — usually a stale
-	// marker.VersionedHome — is visible in logs.
-	var cumulativeError error
-	relativeHomePaths := make([]string, 0, len(candidates))
-	for _, h := range candidates {
-		rel, err := filepath.Rel(dataDirPath, filepath.Join(topDirPath, h))
-		if err != nil {
-			// We can't normalize this entry, and the cleanup loop below
-			// matches dataDir-relative basenames, so an un-normalized path
-			// would never match anyway. Record the failure for the caller
-			// and skip the entry rather than carry a value forward that
-			// can't preserve the directory.
-			cumulativeError = goerrors.Join(cumulativeError, fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", h, err))
+	// Partition the snapshot. Track which keepDirs entries matched a real dir so
+	// phantom entries (stale marker.VersionedHome etc.) can be logged below.
+	var toRemove, keptDirs []string
+	for _, absPath := range allAgentDirs {
+		relPath, relErr := filepath.Rel(topDirPath, absPath)
+		if relErr != nil {
 			continue
 		}
-		if _, statErr := os.Stat(filepath.Join(dataDirPath, rel)); statErr != nil {
-			log.Infow("dropping non-existent keep-list entry from cleanup",
-				"path", rel, "error.message", statErr.Error())
-			continue
+		relPath = filepath.Clean(relPath)
+		if keepDirs[relPath] {
+			keptDirs = append(keptDirs, relPath)
+			delete(keepDirs, relPath)
+		} else {
+			toRemove = append(toRemove, relPath)
 		}
-		relativeHomePaths = append(relativeHomePaths, rel)
+	}
+	for d := range keepDirs {
+		log.Infow("dropping non-existent keep-list entry from cleanup", "path", d)
 	}
 
-	log.Infof("Starting cleanup of versioned homes. Keeping: %v", relativeHomePaths)
+	log.Infof("Starting cleanup of versioned homes. Keeping: %v", keptDirs)
 
-	for _, dir := range subdirs {
-		if slices.Contains(relativeHomePaths, dir) {
-			continue
-		}
-
-		if !strings.HasPrefix(dir, dirPrefix) {
-			continue
-		}
-
-		hashedDir := filepath.Join(dataDirPath, dir)
-		log.Infow("Removing hashed data directory", "file.path", hashedDir)
+	var cumulativeError error
+	for _, relPath := range toRemove {
+		absPath := filepath.Join(topDirPath, relPath)
+		log.Infow("Removing hashed data directory", "file.path", absPath)
 		var ignoredDirs []string
 		if keepLogs {
 			ignoredDirs = append(ignoredDirs, "logs")
 		}
-		if cleanupErr := install.RemoveBut(log, hashedDir, true, ignoredDirs...); cleanupErr != nil {
+		if cleanupErr := install.RemoveBut(log, absPath, true, ignoredDirs...); cleanupErr != nil {
 			cumulativeError = goerrors.Join(cumulativeError, cleanupErr)
 		}
 	}
@@ -438,10 +386,9 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 	return nil
 }
 
-// snapshotAgentDirs returns the absolute paths of all elastic-agent-* directories
-// present in the data directory at the time of the call. Callers should take the
-// snapshot before reading any markers or TTL entries so that directories created
-// by a concurrent upgrade after this point are not visible to cleanup.
+// snapshotAgentDirs returns absolute paths of all elastic-agent-* dirs in the data directory.
+// Take the snapshot before reading markers or TTL entries: directories created by a concurrent
+// upgrade afterward won't appear and therefore can't be swept by this cleanup run.
 func snapshotAgentDirs(topDir string) ([]string, error) {
 	entries, err := os.ReadDir(paths.DataFrom(topDir))
 	if err != nil {
@@ -456,16 +403,12 @@ func snapshotAgentDirs(topDir string) ([]string, error) {
 	return dirs, nil
 }
 
-// buildKeepDirs constructs the set of topDir-relative paths that cleanup must
-// not remove. extraDirs are caller-supplied (sourced from the TTL registry,
-// currently-running home, etc.). The upgrade marker dirs and live versioned home
-// from the agent symlink are always added on top.
+// buildKeepDirs returns the set of topDir-relative paths that cleanup must not remove.
+// extraDirs are caller-supplied (current running home, unexpired TTL entries, etc.).
+// The upgrade marker dirs and symlink target are always added on top.
 //
-// If requireMarkerDetails is true, marker-protected dirs are only added when the
-// marker carries explicit non-terminal details — guarding against ambiguous
-// legacy state where a nil-Details marker must not override the caller's keep-list.
-// Use LoadMarker not TryLoadMarker: a parse error must not rename the marker to
-// .corrupt as a side effect of cleanup.
+// requireMarkerDetails=true protects marker dirs only when the marker has explicit
+// non-terminal state, preventing ambiguous legacy markers from expanding the keep set.
 //
 // The symlink error is returned so the caller can decide whether it is fatal.
 func buildKeepDirs(log *logger.Logger, topDir string, requireMarkerDetails bool, extraDirs []string) (map[string]bool, error) {
