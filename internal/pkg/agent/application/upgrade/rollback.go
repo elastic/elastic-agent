@@ -170,21 +170,16 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 		return fmt.Errorf("cannot identify live versioned home from symlink, refusing to proceed with cleanup: %w", err)
 	}
 
-	// remove upgrade marker
-	if removeMarker {
-		if err := CleanMarker(log, dataDirPath); err != nil {
-			return err
-		}
-	}
-
-	// remove data/elastic-agent-{hash}
+	// Snapshot the directory listing before reading any markers so that directories created after this point cannot
+	// be swept: if a new upgrade starts and creates its target directory after the snapshot it won't appear here
+	// and is safe regardless of the keep-list. Directories that do appear in the snapshot are then cross-checked
+	// against a fresh marker read below.
 	dataDir, err := os.Open(dataDirPath)
 	if err != nil {
 		return err
 	}
 	defer func(dataDir *os.File) {
-		err := dataDir.Close()
-		if err != nil {
+		if err := dataDir.Close(); err != nil {
 			log.Errorw("Error closing data directory", "file.directory", dataDirPath)
 		}
 	}(dataDir)
@@ -192,6 +187,29 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	subdirs, err := dataDir.Readdirnames(0)
 	if err != nil {
 		return err
+	}
+
+	// Read the upgrade marker and TTL rollbacks fresh after the snapshot. The upgrade marker is always written
+	// before unpacking begins, so any new upgrade whose directory appeared in the snapshot will also have its
+	// marker on disk now. Only protect a fresh marker when it carries explicit non-terminal details (an active
+	// upgrade with a known state). A nil-Details marker is ambiguous legacy state and must not override the
+	// caller's keep-list. Use LoadMarker rather than TryLoadMarker: a parse error here should not rename the
+	// marker to .corrupt as a side effect of cleanup.
+	freshMarker, _ := LoadMarker(dataDirPath)
+	if freshMarker != nil && freshMarker.Details != nil && !IsTerminalState(freshMarker) && freshMarker.VersionedHome != "" {
+		versionedHomesToKeep = append(versionedHomesToKeep, freshMarker.VersionedHome)
+	}
+	if inTTL, ttlErr := InTTLRollbacks(log, topDirPath, time.Now()); ttlErr != nil {
+		log.Infow("could not re-read TTL registry during cleanup; continuing with existing keep-list", "error.message", ttlErr.Error())
+	} else {
+		versionedHomesToKeep = append(versionedHomesToKeep, inTTL...)
+	}
+
+	// Remove upgrade marker now that its content has been captured above.
+	if removeMarker {
+		if err := CleanMarker(log, dataDirPath); err != nil {
+			return err
+		}
 	}
 
 	// remove symlink to avoid upgrade failures, ignore error
@@ -418,6 +436,61 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 
 	close(signal)
 	return nil
+}
+
+// snapshotAgentDirs returns the absolute paths of all elastic-agent-* directories
+// present in the data directory at the time of the call. Callers should take the
+// snapshot before reading any markers or TTL entries so that directories created
+// by a concurrent upgrade after this point are not visible to cleanup.
+func snapshotAgentDirs(topDir string) ([]string, error) {
+	entries, err := os.ReadDir(paths.DataFrom(topDir))
+	if err != nil {
+		return nil, fmt.Errorf("reading data directory: %w", err)
+	}
+	var dirs []string
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), "elastic-agent-") {
+			dirs = append(dirs, filepath.Join(paths.DataFrom(topDir), entry.Name()))
+		}
+	}
+	return dirs, nil
+}
+
+// buildKeepDirs constructs the set of topDir-relative paths that cleanup must
+// not remove. extraDirs are caller-supplied (sourced from the TTL registry,
+// currently-running home, etc.). The upgrade marker dirs and live versioned home
+// from the agent symlink are always added on top.
+//
+// If requireMarkerDetails is true, marker-protected dirs are only added when the
+// marker carries explicit non-terminal details — guarding against ambiguous
+// legacy state where a nil-Details marker must not override the caller's keep-list.
+// Use LoadMarker not TryLoadMarker: a parse error must not rename the marker to
+// .corrupt as a side effect of cleanup.
+//
+// The symlink error is returned so the caller can decide whether it is fatal.
+func buildKeepDirs(log *logger.Logger, topDir string, requireMarkerDetails bool, extraDirs []string) (map[string]bool, error) {
+	keep := make(map[string]bool, len(extraDirs)+3)
+	for _, d := range extraDirs {
+		keep[filepath.Clean(d)] = true
+	}
+
+	marker, markerErr := LoadMarker(paths.DataFrom(topDir))
+	if markerErr != nil {
+		log.Warnw("could not read upgrade marker during cleanup; marker-protected directories will not be swept", "error.message", markerErr.Error())
+	} else if marker != nil && !IsTerminalState(marker) && (!requireMarkerDetails || marker.Details != nil) {
+		if marker.VersionedHome != "" {
+			keep[filepath.Clean(marker.VersionedHome)] = true
+		}
+		if marker.PrevVersionedHome != "" {
+			keep[filepath.Clean(marker.PrevVersionedHome)] = true
+		}
+	}
+
+	symlinkHome, err := liveVersionedHome(topDir)
+	if err == nil {
+		keep[symlinkHome] = true
+	}
+	return keep, err
 }
 
 // liveVersionedHome resolves the versioned home that the top-level agent
