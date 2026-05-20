@@ -8,12 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-<<<<<<< HEAD
-=======
-	"os/exec"
-	"path/filepath"
 	"sync/atomic"
->>>>>>> 41fc7801d (fix: prevent upgrade watcher panic when grace period expires (#14253))
 	"time"
 
 	"google.golang.org/grpc"
@@ -78,14 +73,9 @@ func NewAgentWatcher(ch chan error, log *logger.Logger, checkInterval time.Durat
 func (ch *AgentWatcher) Run(ctx context.Context) {
 	ch.log.Info("Agent watcher started")
 
-<<<<<<< HEAD
-	ch.connectCounter = 0
-	ch.lostCounter = 0
-=======
 	ch.connectCounter.Store(0)
 	ch.lostCounter.Store(0)
 	ch.lastPid = -1
->>>>>>> 41fc7801d (fix: prevent upgrade watcher panic when grace period expires (#14253))
 
 	// tracking of an error runs in a separate goroutine, because
 	// the call to `watch.Recv` blocks and a timer is needed
