@@ -413,7 +413,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		err, agentOutput,
 	)
 
-	assert.Eventually(t, func() bool {
+	found := assert.Eventually(t, func() bool {
 		agentOutputStr := agentOutput.String()
 		scanner := bufio.NewScanner(strings.NewReader(agentOutputStr))
 		for scanner.Scan() {
@@ -424,6 +424,93 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 
 		return false
 	}, 3*time.Minute, 10*time.Second, "cannot find events on stderr")
+	if !found {
+		t.Log(diagnosticSummaryForEventToStderrFailure(t, ctx, agentFixture, env, agentOutput))
+	}
+}
+
+// diagnosticSummaryForEventToStderrFailure collects diagnostic information
+// to help debug TestContainerCMDEventToStderr failures. It reports:
+//   - the filebeat/OTel runtime mode in use (process vs otel)
+//   - any index-error-related lines actually present in the output
+//   - the current agent status (component states)
+func diagnosticSummaryForEventToStderrFailure(
+	t *testing.T,
+	ctx context.Context,
+	agentFixture *atesting.Fixture,
+	env []string,
+	agentOutput *strings.Builder,
+) string {
+	t.Helper()
+	var sb strings.Builder
+
+	// --- 1. Scan output for runtime mode indicator and index-error messages ---
+	agentOutputStr := agentOutput.String()
+	scanner := bufio.NewScanner(strings.NewReader(agentOutputStr))
+
+	var runtimeLine string
+	var indexErrLines []string
+	for scanner.Scan() {
+		line := scanner.Text()
+		// pick up the first line that reveals which runtime is used
+		if runtimeLine == "" && (strings.Contains(line, "supervised collector") ||
+			strings.Contains(line, "Spawned new component") ||
+			strings.Contains(line, "otel manager") ||
+			strings.Contains(line, "process runtime") ||
+			strings.Contains(line, "OpenTelemetry collector runtime")) {
+			runtimeLine = line
+		}
+		// collect lines that mention indexing errors (both modes)
+		if strings.Contains(line, "Cannot index") ||
+			strings.Contains(line, "failed to index") ||
+			strings.Contains(line, "not_acceptable") ||
+			strings.Contains(line, "status=406") {
+			indexErrLines = append(indexErrLines, line)
+		}
+	}
+
+	sb.WriteString("\n--- DIAGNOSTIC SUMMARY ---\n")
+
+	sb.WriteString("\nRuntime indicator line:\n")
+	if runtimeLine != "" {
+		sb.WriteString("  " + runtimeLine + "\n")
+	} else {
+		sb.WriteString("  (none found)\n")
+	}
+
+	sb.WriteString(fmt.Sprintf("\nIndex-error lines found (%d total, first 5 shown):\n", len(indexErrLines)))
+	for i, l := range indexErrLines {
+		if i >= 5 {
+			break
+		}
+		// truncate very long event lines for readability
+		if len(l) > 300 {
+			l = l[:300] + "…"
+		}
+		sb.WriteString("  " + l + "\n")
+	}
+	if len(indexErrLines) == 0 {
+		sb.WriteString("  (none found — events may not be reaching ES)\n")
+	}
+
+	// --- 2. Agent component status ---
+	statusCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	status, statusErr := agentFixture.ExecStatus(statusCtx, atesting.WithCmdOptions(withEnv(env)))
+	if statusErr != nil {
+		sb.WriteString(fmt.Sprintf("\nAgent status error: %v\n", statusErr))
+	} else {
+		sb.WriteString(fmt.Sprintf("\nAgent overall state: %s (%s)\n",
+			cproto.State(status.State).String(), status.Message)) //nolint:gosec
+		sb.WriteString("Agent component states:\n")
+		for _, comp := range status.Components {
+			sb.WriteString(fmt.Sprintf("  %-45s state=%-10s msg=%s\n",
+				comp.Name, cproto.State(comp.State).String(), comp.Message)) //nolint:gosec
+		}
+	}
+
+	sb.WriteString("--- END DIAGNOSTIC ---\n")
+	return sb.String()
 }
 
 // createMockESOutput creates an output configuration pointing to a mockES
