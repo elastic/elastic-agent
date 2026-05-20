@@ -726,9 +726,7 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 	t.Cleanup(func() { paths.SetConfig(cfgPath) })
 	paths.SetConfig(t.TempDir())
 
-	p, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "_meta", "elastic-agent.fleet.yml"))
-	require.NoError(t, err)
-	err = os.WriteFile(paths.ConfigFile(), p, 0640) //nolint:gosec // test fixture writing to controlled temp path
+	err := os.WriteFile(paths.ConfigFile(), DefaultAgentFleetConfig, 0640)
 	require.NoError(t, err)
 
 	isRoot, err := utils.HasRoot()
@@ -764,5 +762,5 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 
 	ymlBytes, err := os.ReadFile(paths.ConfigFile())
 	require.NoError(t, err)
-	require.EqualValues(t, p, ymlBytes, "unexpected contents in elastic-agent.yml")
+	require.EqualValues(t, DefaultAgentFleetConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
 }
