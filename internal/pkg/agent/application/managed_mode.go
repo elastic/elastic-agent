@@ -313,7 +313,7 @@ func fleetServerRunning(state runtime.ComponentState) bool {
 }
 
 func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *handlers.PolicyChangeHandler {
-	settingsHandler := handlers.NewSettings(
+	settingsHandler := handlers.NewSettingsHandler(
 		m.log,
 		m.agentInfo,
 		m.coord,
@@ -325,7 +325,6 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 		m.cfg,
 		m.store,
 		m.ch,
-		settingsHandler,
 		m.coord,
 	)
 
