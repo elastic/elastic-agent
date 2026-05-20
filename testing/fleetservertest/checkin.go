@@ -108,6 +108,28 @@ func NewAction(data ActionTmpl) (AckableAction, error) {
 	}, nil
 }
 
+// NewActionPolicyChangeWithOtelComponent returns an AckableAction where the
+// policy contains a system/metrics input. Metricbeat defaults to the OTel
+// runtime manager, so this input produces a component with OtelRuntimeManager
+// which is required for testing the `inspect otel` subcommand.
+func NewActionPolicyChangeWithOtelComponent(actionID string, data TmplPolicy) (AckableAction, error) {
+	t := template.Must(template.New("actionPolicyChangeWithOtelComponentTmpl").Funcs(funcMap).
+		Parse(actionPolicyChangeWithOtelComponentTmpl))
+
+	buf := &strings.Builder{}
+	err := t.Execute(buf, data)
+	if err != nil {
+		return AckableAction{}, fmt.Errorf("failed building action: %w", err)
+	}
+
+	return NewAction(ActionTmpl{
+		AgentID:  data.AgentID,
+		ActionID: actionID,
+		Data:     buf.String(),
+		Type:     "POLICY_CHANGE",
+	})
+}
+
 // NewActionPolicyChangeWithFakeComponent returns a AckableAction where
 // the policy, AckableAction.data, contains one single integration. The
 // integration uses the fake component. All variable data in the policy
@@ -196,6 +218,82 @@ const (
                   "version": "0.0.1"
                 }
               }
+            }
+          ],
+          "output_permissions": {
+            "default": {}
+          },
+          "outputs": {
+            "default": {
+              "api_key": "{{.Output.APIKey}}",
+              "hosts": [{{.Output.Hosts}}],
+              "type": "{{.Output.Type}}"
+            }
+          },
+          "revision": 2,
+          "secret_references": [],
+          "signed": {
+            "data": "eyJpZCI6IjI0ZTRkMDMwLWZmYTctMTFlZC1iMDQwLTlkZWJhYTVmZWNiOCIsImFnZW50Ijp7InByb3RlY3Rpb24iOnsiZW5hYmxlZCI6ZmFsc2UsInVuaW5zdGFsbF90b2tlbl9oYXNoIjoibE9SU2FESVFxNG5nbFVNSndXaktyd2V4ajRJRFJKQStGdG9RZWVxS0gvST0iLCJzaWduaW5nX2tleSI6Ik1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRVE5QlBvSFVDeUx5RWxWcGZ3dktlRmRVdDZVOXdCYitRbFpOZjRjeTVlQXdLOVhoNEQ4ZkNsZ2NpUGVSczNqNjJpNklFZUd5dk9zOVUzK2ZFbHlVaWdnPT0ifX19",
+            "signature": "MEUCIQCfS6wPj/AvfFA79dwKATnvyFl/ZeyA8eKOLHg1XuA9NgIgNdhjIT+G/GZFqsVoWk5jThONhpqPhfiHLE5OkTdrwT0="
+          }
+        }
+      }`
+
+	// actionPolicyChangeWithOtelComponentTmpl uses a system/metrics input whose
+	// beat is metricbeat. DefaultRuntimeConfig sets Metricbeat.Default =
+	// OtelRuntimeManager, so the resulting component carries OtelRuntimeManager
+	// without any extra runtime overrides. The signed payload is identical to
+	// the one in actionPolicyChangeFakeComponentTmpl because it only encodes
+	// protection metadata, not the policy body.
+	actionPolicyChangeWithOtelComponentTmpl = `
+    {
+        "policy": {
+          "agent": {
+            "download": {
+              "sourceURI": "{{.SourceURI}}"
+            },
+            "monitoring": {
+              "namespace": "default",
+              "use_output": "default",
+              "enabled": true,
+              "logs": true,
+              "metrics": true
+            },
+            "features": {},
+            "protection": {
+              "enabled": false,
+              "uninstall_token_hash": "lORSaDIQq4nglUMJwWjKrwexj4IDRJA+FtoQeeqKH/I=",
+              "signing_key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQ9BPoHUCyLyElVpfwvKeFdUt6U9wBb+QlZNf4cy5eAwK9Xh4D8fClgciPeRs3j62i6IEeGyvOs9U3+fElyUigg=="
+            }
+          },
+          "fleet": {
+            {{ if ne .SSL nil }}
+            "ssl": {{ toJson .SSL}},
+            {{ end }}
+            "hosts": {{ toJson .FleetHosts }}
+          },
+          "id": "{{.PolicyID}}",
+          "inputs": [
+            {
+              "id": "system-metrics-otel",
+              "revision": 1,
+              "name": "system-metrics-otel",
+              "type": "system/metrics",
+              "data_stream": {
+                "namespace": "default"
+              },
+              "use_output": "default",
+              "streams": [
+                {
+                  "id": "system-metrics-otel-cpu",
+                  "data_stream": {
+                    "dataset": "system.cpu",
+                    "type": "metrics"
+                  },
+                  "metricsets": ["cpu"],
+                  "period": "10s"
+                }
+              ]
             }
           ],
           "output_permissions": {
