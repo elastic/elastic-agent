@@ -87,7 +87,7 @@ collectors:
             - key: host.name
               from_attribute: k8s.node.name
               action: upsert
-        # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8s_attributesprocessor)
+        # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
         k8s_attributes:
           passthrough: false # Annotates resources with the pod IP and does not try to extract any other metadata.
           pod_association:
@@ -295,7 +295,7 @@ collectors:
             - key: cloud.instance.id
               from_attribute: host.id
               action: insert
-        # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8s_attributesprocessor)
+        # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
         k8s_attributes:
           filter:
             # Only retrieve pods running on the same node as the collector
@@ -343,7 +343,7 @@ collectors:
               endpoint: 0.0.0.0:4317
             http:
               endpoint: 0.0.0.0:4318
-        # [File Log Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/file_logreceiver)
+        # [File Log Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver)
         file_log:
           retry_on_failure:
             enabled: true
