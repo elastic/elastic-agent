@@ -19,28 +19,27 @@ import (
 const clearLogLevelValue = ""
 
 // Settings handles settings change coming from fleet and updates log level.
-type Settings struct {
-	log              *logger.Logger
-	agentInfo        info.Agent
-	fallbackLogLevel *logp.Level
-	logLevelSetter   logLevelSetter
+type SettingsHandler struct {
+	log                   *logger.Logger
+	agentInfo             info.Agent
+	runtimeLogLevelSetter logLevelSetter
 }
 
-// NewSettings creates a new Settings handler.
-func NewSettings(
+// NewSettingsHandler creates a new SettingsHandler.
+func NewSettingsHandler(
 	log *logger.Logger,
 	agentInfo info.Agent,
-	logLevelSetter logLevelSetter,
-) *Settings {
-	return &Settings{
-		log:            log,
-		agentInfo:      agentInfo,
-		logLevelSetter: logLevelSetter,
+	runtimeLogLevelSetter logLevelSetter,
+) *SettingsHandler {
+	return &SettingsHandler{
+		log:                   log,
+		agentInfo:             agentInfo,
+		runtimeLogLevelSetter: runtimeLogLevelSetter,
 	}
 }
 
 // Handle handles SETTINGS action.
-func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
+func (h *SettingsHandler) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
 	h.log.Debugf("handlerSettings: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionSettings)
 	if !ok {
@@ -51,23 +50,15 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 	return h.handleLogLevel(ctx, logLevel, acker, action)
 }
 
-func (h *Settings) handleLogLevel(ctx context.Context, logLevel string, acker acker.Acker, action *fleetapi.ActionSettings) error {
-	var lvl *logp.Level
+func (h *SettingsHandler) handleLogLevel(ctx context.Context, logLevel string, acker acker.Acker, action *fleetapi.ActionSettings) error {
 	if logLevel != clearLogLevelValue {
-		if !isSupportedLogLevel(logLevel) {
-			return fmt.Errorf("invalid log level, expected debug|info|warning|error and received '%s'", logLevel)
+		var logLevelOverride logp.Level
+		if err := logLevelOverride.Unpack(logLevel); err != nil {
+			return fmt.Errorf("failed to unpack override log level %q: %w", logLevel, err)
 		}
-
-		// parse loglvl from the string
-		parsedLvl := logp.InfoLevel
-		err := parsedLvl.Unpack(logLevel)
-		if err != nil {
-			return fmt.Errorf("failed to unpack log level: %w", err)
-		}
-		lvl = &parsedLvl
 	}
-	if err := h.agentInfo.SetLogLevel(ctx, logLevel); err != nil {
-		return fmt.Errorf("failed to update log level: %w", err)
+	if err := h.agentInfo.SetLogLevelOverride(ctx, logLevel); err != nil {
+		return fmt.Errorf("failed to persist log level override: %w", err)
 	}
 
 	if err := acker.Ack(ctx, action); err != nil {
@@ -76,50 +67,12 @@ func (h *Settings) handleLogLevel(ctx context.Context, logLevel string, acker ac
 		h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", action.ActionID)
 	}
 
-	if lvl != nil {
-		h.log.Infof("Settings action done, setting agent log level to %s", logLevel)
-		return h.logLevelSetter.SetLogLevel(ctx, lvl)
+	// Push the effective log level to the runtime.
+	var logLevelRuntime logp.Level
+	logLevelRuntimeStr := h.agentInfo.GetLogLevelRuntime()
+	if err := logLevelRuntime.Unpack(logLevelRuntimeStr); err != nil {
+		return fmt.Errorf("failed to unpack runtime log level %q: %w", logLevelRuntimeStr, err)
 	}
-
-	if h.fallbackLogLevel != nil {
-		h.log.Infof("Settings action done, setting agent log level to policy default %s", h.fallbackLogLevel)
-		// use fallback log level
-		return h.logLevelSetter.SetLogLevel(ctx, h.fallbackLogLevel)
-	}
-
-	// use default log level
-	defaultLogLevel := logger.DefaultLogLevel
-	h.log.Infof("Settings action done, setting agent log level to default %s", defaultLogLevel)
-	return h.logLevelSetter.SetLogLevel(ctx, &defaultLogLevel)
-}
-
-// SetLogLevel is used to set the fallback log level
-// It propagates this log level in case there's no log level set for this specific agent
-func (h *Settings) SetLogLevel(ctx context.Context, lvl *logp.Level) error {
-	if lvl != nil && !isSupportedLogLevel(lvl.String()) {
-		return fmt.Errorf("invalid log level, expected debug|info|warning|error and received '%s'", lvl.String())
-	}
-
-	h.fallbackLogLevel = lvl
-	rawLogLevel := h.agentInfo.RawLogLevel()
-	h.log.Debugf("received fallback loglevel %s, raw loglevel %s", lvl, rawLogLevel)
-	if rawLogLevel == "" {
-		// There's no log level set for this specific agent
-		if lvl != nil {
-			// log level set on the policy
-			h.log.Debugf("setting log level %s", lvl)
-			// set the runtime log level only if we don't have one set for the specific agent
-			return h.logLevelSetter.SetLogLevel(ctx, lvl)
-		} else {
-			// Both the policy log level and the agent-specific log level are not set: set the default agent level
-			h.log.Debugf("setting log level to default")
-			defaultLogLevel := logger.DefaultLogLevel
-			return h.logLevelSetter.SetLogLevel(ctx, &defaultLogLevel)
-		}
-	}
-	return nil
-}
-
-func isSupportedLogLevel(level string) bool {
-	return level == "error" || level == "debug" || level == "info" || level == "warning"
+	h.log.Infof("Settings action done, setting agent log level to %s", logLevelRuntime)
+	return h.runtimeLogLevelSetter.SetLogLevel(ctx, &logLevelRuntime)
 }
