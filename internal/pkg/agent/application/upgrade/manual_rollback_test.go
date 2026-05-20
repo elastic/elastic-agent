@@ -553,9 +553,6 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourFromNow, // still valid
 					},
 				}, nil, nil)
-				rollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-1.2.3-expire")).Return(nil)
-				rollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-4.5.6-valid1")).Return(nil)
-
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
 					installedAgents: []testAgentInstall{
@@ -606,8 +603,6 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourFromNow, // still valid
 					},
 				}, nil, nil)
-
-				rollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-1.2.3-expire")).Return(nil)
 
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{

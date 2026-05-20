@@ -373,15 +373,11 @@ func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir strin
 
 	log.Debugw("preparing to cleanup agent directories", "keep_dirs", keepDirs, "to_remove", len(toRemove))
 	var aggregateErr error
-	for _, relPath := range toRemove {
-		absPath := filepath.Join(topDir, relPath)
-		log.Infow("removing agent directory", "path", relPath)
-		if cleanupErr := install.RemoveBut(log, absPath, true); cleanupErr != nil {
-			aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing directory %q: %w", absPath, cleanupErr))
-		} else if _, inRollbacks := rollbacks[relPath]; inRollbacks {
-			if removeErr := source.Remove(relPath); removeErr != nil {
-				aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing TTL for %s: %w", relPath, removeErr))
-			}
+	for _, versionedHome := range toRemove {
+		versionedHomeAbsPath := filepath.Join(topDir, versionedHome)
+		log.Infow("removing agent directory", "path", versionedHome)
+		if cleanupErr := install.RemoveBut(log, versionedHomeAbsPath, true); cleanupErr != nil {
+			aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing directory %q: %w", versionedHomeAbsPath, cleanupErr))
 		}
 	}
 

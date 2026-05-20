@@ -211,13 +211,13 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 
 	var cumulativeError error
 	for _, relPath := range toRemove {
-		absPath := filepath.Join(topDirPath, relPath)
-		log.Infow("Removing hashed data directory", "file.path", absPath)
+		hashedDir := filepath.Join(topDirPath, relPath)
+		log.Infow("Removing hashed data directory", "file.path", hashedDir)
 		var ignoredDirs []string
 		if keepLogs {
 			ignoredDirs = append(ignoredDirs, "logs")
 		}
-		if cleanupErr := install.RemoveBut(log, absPath, true, ignoredDirs...); cleanupErr != nil {
+		if cleanupErr := install.RemoveBut(log, hashedDir, true, ignoredDirs...); cleanupErr != nil {
 			cumulativeError = goerrors.Join(cumulativeError, cleanupErr)
 		}
 	}
