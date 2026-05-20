@@ -439,8 +439,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260518205231-3e8873641519 h1:ARDZUXcneLJkuDcPdRQTcXYjIsqOhkUUm8g0Rv6XAtg=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260518205231-3e8873641519/go.mod h1:JGsnnzPrvCBaQZ40TkQqlCdqYsJ46UO8vMhFpa51Ci8=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260519222415-ae2b7ac2706d h1:tziGkgOL1LZ29NGWXUEM3aq+/AlShNLa9Cn4C9/KsKY=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260519222415-ae2b7ac2706d/go.mod h1:JGsnnzPrvCBaQZ40TkQqlCdqYsJ46UO8vMhFpa51Ci8=
 github.com/elastic/elastic-agent-autodiscover v0.10.2 h1:fzi+CIcK7FKUQlQHfKP+3Ixg1wbuEYacaChunmMAP38=
 github.com/elastic/elastic-agent-autodiscover v0.10.2/go.mod h1:qBoYxp3lX3qFRYjEgsOaROC+xL4ItG63GSvOg1SjjsQ=
 github.com/elastic/elastic-agent-client/v7 v7.18.1 h1:WnM53JjaukeysrAuiTyrhDPmFxJG07ZAByc2TrkcKcs=
