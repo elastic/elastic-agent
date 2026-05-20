@@ -23,6 +23,7 @@ import (
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
 	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
+	azureeventhubreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azureeventhubreceiver"
 	azuremonitorreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver"
 	couchdbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver"
 	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
@@ -58,6 +59,7 @@ import (
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
+	akamaisiemreceiver "github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver"
 	elasticapmintakereceiver "github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver" // for collecting APM data from Elastic APM agents
 
 	abreceiver "github.com/elastic/beats/v7/x-pack/auditbeat/abreceiver"
@@ -187,9 +189,11 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			vcenterreceiver.NewFactory(),
 			zookeeperreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
+			azureeventhubreceiver.NewFactory(),
 			awss3receiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
 			prometheusremotewritereceiver.NewFactory(),
+			akamaisiemreceiver.NewFactory(),
 		}
 
 		// some receivers are only available on certain OS.

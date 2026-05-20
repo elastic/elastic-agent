@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	goerrors "errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -184,11 +185,48 @@ func UpdateActiveCommit(log *logger.Logger, topDirPath, hash string, writeFile w
 	return nil
 }
 
+// MarkUpgradeFailed records an upgrade failure both in the in-memory
+// upgrade-details (det.Fail(cause)) and, if a marker is on disk, by saving
+// the marker with state=Failed so the failure is surfaced to Fleet via the
+// next upgrade-details ack.
+//
+// Designed as the single entry point for marking an upgrade as failed across
+// every error path that can run after the upgrade flow has begun, regardless
+// of whether the marker file was ever written. det is always mutated; the
+// marker step is best-effort and a no-op when no marker exists (e.g.
+// markUpgrade failed before writing it, or the failure happened before the
+// marker was created), so callers can invoke it uniformly without first
+// checking marker presence.
+//
+// The on-disk part is what prevents the next agent run from starting a
+// watcher against an upgrade that has already been undone
+// (https://github.com/elastic/elastic-agent/issues/13505).
+func MarkUpgradeFailed(dataDirPath string, det *details.Details, cause error) error {
+	det.Fail(cause)
+	marker, err := LoadMarker(dataDirPath)
+	if err != nil {
+		return errors.New(err, errors.TypeFilesystem, "loading marker after upgrade failure")
+	}
+	if marker == nil {
+		return nil
+	}
+	marker.Details = det
+	if err := SaveMarker(dataDirPath, marker, true); err != nil {
+		return errors.New(err, errors.TypeFilesystem, "saving failed-state marker")
+	}
+	return nil
+}
+
 // CleanMarker removes a marker from disk.
 func CleanMarker(log *logger.Logger, dataDirPath string) error {
 	markerFile := markerFilePath(dataDirPath)
 	log.Infow("Removing marker file", "file.path", markerFile)
-	if err := os.Remove(markerFile); !os.IsNotExist(err) {
+	// The leading err != nil guard is load-bearing — errors.Is(nil, fs.ErrNotExist)
+	// returns false, so dropping the guard would cause the success case
+	// (err == nil) to also enter the return branch. Currently harmless
+	// because there's no work after this block, but brittle to future
+	// additions; keep the guard.
+	if err := os.Remove(markerFile); err != nil && !goerrors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 

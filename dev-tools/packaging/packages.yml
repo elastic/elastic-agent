@@ -319,7 +319,11 @@ shared:
         mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/elastic-otel-collector.spec.yml:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
-        mode: 0755
+        mode: 0644
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/endpoint-security-resources.zip:
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/endpoint-security-resources.zip'
+        mode: 0644
+        skip_on_missing: true
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/module:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
         preserve_mode: true
@@ -349,7 +353,7 @@ shared:
       mode: 0755
     'otel_samples':
       source: '{{ repo.RootDir }}/internal/edot/samples/linux/'
-      mode: 0755
+      mode: 0644
 
   - &agent_binary_common_files
     LICENSE.txt:
@@ -411,7 +415,7 @@ shared:
       mode: 0755
     'otel_samples':
       source: '{{ repo.RootDir }}/internal/edot/samples/darwin/'
-      mode: 0755
+      mode: 0644
     'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/Info.plist':
       template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/Info.plist.tmpl'
       mode: 0644
@@ -435,12 +439,20 @@ shared:
       mode: 0755
       config_mode: 0644
       skip_on_missing: true
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security-resources.zip':
+      source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/endpoint-security-resources.zip'
+      mode: 0644
+      skip_on_missing: true
 
   - &agent_unpacked_windows_components_files
     'data/{{.BeatName}}-{{ core_commit_short }}/components':
       source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/'
       mode: 0755
       config_mode: 0644
+      skip_on_missing: true
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security-resources.zip':
+      source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/endpoint-security-resources.zip'
+      mode: 0644
       skip_on_missing: true
 
   - &agent_windows_otel_scripts_samples
@@ -452,7 +464,7 @@ shared:
       mode: 0755
     'otel_samples':
       source: '{{ repo.RootDir }}/internal/edot/samples/windows/'
-      mode: 0755
+      mode: 0644
 
   - &agent_otel_collector_binary_spec
     'data/{{.BeatName}}-{{ core_commit_short }}/components/elastic-otel-collector{{.BinaryExt}}':
@@ -460,7 +472,7 @@ shared:
       mode: 0755
     'data/{{.BeatName}}-{{ core_commit_short }}/components/elastic-otel-collector.spec.yml':
       source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
-      mode: 0755
+      mode: 0644
 
   - &agent_otel_collector_binary_spec_core
     'components/elastic-otel-collector{{.BinaryExt}}':
@@ -468,7 +480,7 @@ shared:
       mode: 0755
     'components/elastic-otel-collector.spec.yml':
       source: '{{ repo.RootDir }}/internal/edot/spec.yml'
-      mode: 0755
+      mode: 0644
 
   - &metricbeat_lightweight_module
     'data/{{.BeatName}}-{{ core_commit_short }}/components/module':
