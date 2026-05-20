@@ -50,6 +50,7 @@ settings:
         - *linux-amd64
         - *linux-arm64
         - *windows-amd64
+        - *windows-arm64
 
 # List *all* the components available for packaging in elastic-agent
 components:
@@ -83,6 +84,7 @@ components:
       - *linux-amd64
       - *linux-arm64
       - *windows-amd64
+      - *windows-arm64
     packageTypes: *all-package-types
   - &comp-apm_server
     projectName: apm-server
@@ -145,12 +147,7 @@ components:
     rootDir: fleet-server-{{.Version}}-{{.Platform}}
     binaryName: fleet-server
     fips: false
-    platforms:
-      - *linux-amd64
-      - *linux-arm64
-      - *windows-amd64
-      - *darwin-amd64
-      - *darwin-arm64
+    platforms: *all-platforms
     packageTypes: *all-package-types
   - &comp-pf-elastic-collector
     projectName: prodfiler

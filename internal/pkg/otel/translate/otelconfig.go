@@ -733,37 +733,6 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 	return result, nil
 }
 
-// stripDefaultProcessors removes processors from the per-input list that are already
-// applied globally by the beatprocessor in the OTel pipeline. Matching is by processor
-// key name — a processor entry is dropped when its only key matches a default processor name.
-func stripDefaultProcessors(raw any) []any {
-	list, ok := raw.([]any)
-	if !ok {
-		return nil
-	}
-	defaultKeys := make(map[string]struct{})
-	for _, p := range GetDefaultProcessors() {
-		for k := range p {
-			defaultKeys[k] = struct{}{}
-		}
-	}
-	filtered := list[:0:0]
-	for _, item := range list {
-		p, ok := item.(map[string]any)
-		if ok && len(p) == 1 {
-			key := ""
-			for k := range p {
-				key = k
-			}
-			if _, isDefault := defaultKeys[key]; isDefault {
-				continue
-			}
-		}
-		filtered = append(filtered, item)
-	}
-	return filtered
-}
-
 // extractOtelProcessors extracts the processor IDs from the output configuration.
 func extractOtelProcessors(comp *component.Component) ([]string, error) {
 	outputUnit, ok := comp.OutputUnit()
