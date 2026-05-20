@@ -225,7 +225,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 	require.NoError(t, err)
 
 	t.Run("policy with proxy config", func(t *testing.T) {
-		t.Run("rollback client changes when cannot create client",
+		t.Run("fleet config unchanged when fleet client cannot be created",
 			func(t *testing.T) {
 				log, _ := loggertest.New("TestPolicyChangeHandler")
 				var setterCalledCount int
@@ -267,8 +267,9 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					})
 
 				err := h.handlePolicyChange(context.Background(), cfg)
-				require.Error(t, err) // it needs to fail to rollback
+				assert.ErrorContains(t, err, "fail to create API client with updated config")
 
+				// h.config must be unchanged since the error originated in validation, before any mutation.
 				assert.Equal(t, 0, setterCalledCount)
 				assert.Equal(t,
 					originalCfg.Fleet.Client.Host,
@@ -281,7 +282,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					h.config.Fleet.Client.Transport.Proxy.URL)
 			})
 
-		t.Run("rollback client changes when cannot reach fleet-server",
+		t.Run("fleet config unchanged when fleet server is unreachable",
 			func(t *testing.T) {
 				log, _ := loggertest.New("TestPolicyChangeHandler")
 				var setterCalledCount int
@@ -324,8 +325,9 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					})
 
 				err := h.handlePolicyChange(context.Background(), cfg)
-				require.Error(t, err) // it needs to fail to rollback
+				assert.ErrorContains(t, err, "fail to communicate with Fleet Server API client hosts")
 
+				// h.config must be unchanged since the error originated in validation, before any mutation.
 				assert.Equal(t, 0, setterCalledCount)
 				assert.Equal(t,
 					originalCfg.Fleet.Client.Host,
