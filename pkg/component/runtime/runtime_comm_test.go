@@ -52,11 +52,15 @@ func (a agentInfoMock) IsStandalone() bool {
 	return a.isStandalone
 }
 
-func (a agentInfoMock) Headers() map[string]string                          { panic("implement me") }
-func (a agentInfoMock) LogLevel() string                                    { panic("implement me") }
-func (a agentInfoMock) RawLogLevel() string                                 { panic("implement me") }
-func (a agentInfoMock) ReloadID(ctx context.Context) error                  { panic("implement me") }
-func (a agentInfoMock) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }
+func (a agentInfoMock) Headers() map[string]string         { panic("implement me") }
+func (a agentInfoMock) GetLogLevelRuntime() string         { panic("implement me") }
+func (a agentInfoMock) GetLogLevelPolicy() string          { panic("implement me") }
+func (a agentInfoMock) GetLogLevelOverride() string        { panic("implement me") }
+func (a agentInfoMock) ReloadID(ctx context.Context) error { panic("implement me") }
+func (a agentInfoMock) SetLogLevelPolicy(level string)     { panic("implement me") }
+func (a agentInfoMock) SetLogLevelOverride(_ context.Context, _ string) error {
+	panic("implement me")
+}
 func (a agentInfoMock) ECSMetadata(l *logger.Logger) (*info.ECSMeta, error) { panic("implement me") }
 
 func TestCheckinExpected(t *testing.T) {
