@@ -177,6 +177,118 @@ func TestInstallWithBasePath(t *testing.T) {
 		require.Error(t, err, "uninstall should have failed")
 		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 	}
+<<<<<<< HEAD
+=======
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	})
+}
+
+func TestInstallServersWithBasePath(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		// We require sudo for this test to run
+		// `elastic-agent install` (even though it will
+		// be installed as non-root).
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+		// apm-server has no windows/arm64 build
+		// (see dev-tools/packaging/packages.yml: comp-apm_server),
+		// so the "servers" install flavor cannot be exercised on this combination.
+		SkipOS: []define.OS{{Type: define.Windows, Arch: define.ARM64}},
+	})
+
+	// Get path to Elastic Agent executable
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	// When installing with unprivileged using a base path the
+	// base needs to be accessible by the `elastic-agent-user` user that will be
+	// executing the process, but is not created yet. Using a base that exists
+	// and is known to be accessible by standard users, ensures this tests
+	// works correctly and will not hit a permission issue when spawning the
+	// elastic-agent service.
+	var basePath string
+	switch runtime.GOOS {
+	case define.Linux:
+		basePath = `/usr`
+	case define.Windows:
+		basePath = `C:\`
+	default:
+		// Set up random temporary directory to serve as base path for Elastic Agent
+		// installation.
+		tmpDir := t.TempDir()
+		basePath = filepath.Join(tmpDir, strings.ToLower(randStr(8)))
+	}
+
+	// Run `elastic-agent install`.  We use `--force` to prevent interactive
+	// execution.
+	opts := atesting.InstallOpts{
+		BasePath:       basePath,
+		Force:          true,
+		Privileged:     false,
+		InstallServers: true,
+	}
+	out, err := fixture.Install(ctx, &opts)
+	if err != nil {
+		t.Logf("install output: %s", out)
+		require.NoError(t, err)
+	}
+
+	// Check that Agent was installed in the custom base path
+	topPath := filepath.Join(basePath, "Elastic", "Agent")
+	checks := &installtest.CheckOpts{
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
+		TopPath:       topPath,
+	}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
+
+	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
+
+	t.Run("check components set",
+		testComponentsPresence(ctx, fixture,
+			[]componentPresenceDefinition{
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{}))
+
+	// Make sure uninstall from within the topPath fails on Windows
+	if runtime.GOOS == "windows" {
+		cwd, err := os.Getwd()
+		require.NoErrorf(t, err, "GetWd failed: %s", err)
+		err = os.Chdir(topPath)
+		require.NoErrorf(t, err, "Chdir to topPath failed: %s", err)
+		t.Cleanup(func() {
+			_ = os.Chdir(cwd)
+		})
+		out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+		require.Error(t, err, "uninstall should have failed")
+		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
+	}
+
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	})
+>>>>>>> 220f57ba5 (Include fleet-server component for windows/arm64 packages (#14120))
 }
 
 func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
