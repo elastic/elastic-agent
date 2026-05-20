@@ -8,6 +8,8 @@ env:
   IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1779223036"
   IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1779223036"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1779223036"
+  IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
+  IMAGE_WIN_11_ARM64_VERSION: "1.0.1779223036"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
@@ -187,6 +189,37 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+        plugins:
+          - *google_oidc_plugin
+          - *vault_ec_key_prod
+        matrix:
+          setup:
+            groups:
+              - fleet
+
+      - label: "fips:Windows:11:arm64:{{matrix.groups}}"
+        depends_on:
+          - packaging-arm64-fips
+        env:
+          FIPS: "true"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
+          TF_VAR_docker_images_name_suffix: "-fips"
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download "build/distributions/elastic-agent-*-windows-arm64*" . --step 'packaging-arm64-fips'
+          .buildkite/scripts/steps/integration_tests_tf_fips.ps1 {{matrix.groups}} true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "azure"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
         plugins:
           - *google_oidc_plugin
           - *vault_ec_key_prod
