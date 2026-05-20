@@ -341,18 +341,20 @@ func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir strin
 		}
 	}
 
+	// Pre-compute entries the filter kept; used both in the early-return path and at the end.
+	leftoverRollbacks := make(map[string]ttl.TTLMarker)
+	for versionedHome, ttlMarker := range rollbacks {
+		if !filter(log, now, versionedHome, ttlMarker) {
+			leftoverRollbacks[versionedHome] = ttlMarker
+		}
+	}
+
 	// requireMarkerDetails=false: be conservative, protect from any non-terminal marker.
 	// Both currentHomeRelPath and symlink target are kept: they may differ during transitions.
 	keepDirs, symlinkErr := buildKeepDirs(log, topDir, false, extraDirs)
 	if symlinkErr != nil {
-		log.Warnw("could not read agent symlink during cleanup; skipping removals to avoid sweeping the next-run live home", "error.message", symlinkErr.Error())
 		// Return unexpired rollbacks so the scheduler retries when the next TTL expires.
-		leftoverRollbacks := make(map[string]ttl.TTLMarker)
-		for versionedHome, ttlMarker := range rollbacks {
-			if !filter(log, now, versionedHome, ttlMarker) {
-				leftoverRollbacks[versionedHome] = ttlMarker
-			}
-		}
+		log.Warnw("could not read agent symlink during cleanup; skipping removals to avoid sweeping the next-run live home", "error.message", symlinkErr.Error())
 		return leftoverRollbacks, nil
 	}
 
@@ -381,13 +383,6 @@ func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir strin
 		}
 	}
 
-	// Return entries the filter kept so the caller can schedule the next cleanup at the earliest expiry.
-	leftoverRollbacks := make(map[string]ttl.TTLMarker)
-	for versionedHome, ttlMarker := range rollbacks {
-		if !filter(log, now, versionedHome, ttlMarker) {
-			leftoverRollbacks[versionedHome] = ttlMarker
-		}
-	}
 	return leftoverRollbacks, aggregateErr
 }
 
