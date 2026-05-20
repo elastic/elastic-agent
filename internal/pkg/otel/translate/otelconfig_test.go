@@ -1718,6 +1718,7 @@ func TestGetOtelConfig(t *testing.T) {
 			}),
 		},
 		{
+<<<<<<< HEAD
 			name:              "filestream per stream default processors are stripped when DefaultProcessors is enabled",
 			defaultProcessors: func() *bool { b := true; return &b }(),
 			model: &component.Model{
@@ -1725,18 +1726,34 @@ func TestGetOtelConfig(t *testing.T) {
 					{
 						ID:         "filestream-default",
 						InputType:  "filestream",
+=======
+			name: "system/metrics with shared intake queue enabled",
+			runtimeConfig: &component.RuntimeConfig{
+				SharedReceiverQueues: true,
+			},
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "system-metrics",
+						InputType:  "system/metrics",
+>>>>>>> 57a124cff (Revert "otel: remove per-input default processors when global defaults are al…" (#14412))
 						OutputType: "elasticsearch",
 						OutputName: "default",
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
+<<<<<<< HEAD
 									Args: []string{"filebeat"},
+=======
+									Args: []string{"metricbeat"},
+>>>>>>> 57a124cff (Revert "otel: remove per-input default processors when global defaults are al…" (#14412))
 								},
 							},
 						},
 						Units: []component.Unit{
 							{
+<<<<<<< HEAD
 								ID:   "filestream-unit",
 								Type: client.UnitTypeInput,
 								Config: component.MustExpectedConfig(map[string]any{
@@ -1773,6 +1790,14 @@ func TestGetOtelConfig(t *testing.T) {
 							},
 							{
 								ID:     "filestream-default",
+=======
+								ID:     "system/metrics",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(systemMetricsConfig),
+							},
+							{
+								ID:     "system/metrics-default",
+>>>>>>> 57a124cff (Revert "otel: remove per-input default processors when global defaults are al…" (#14412))
 								Type:   client.UnitTypeOutput,
 								Config: component.MustExpectedConfig(esOutputConfig()),
 							},
@@ -1788,12 +1813,16 @@ func TestGetOtelConfig(t *testing.T) {
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
 				"processors": map[string]any{
+<<<<<<< HEAD
 					// Default processors must appear here — applied once globally per event.
+=======
+>>>>>>> 57a124cff (Revert "otel: remove per-input default processors when global defaults are al…" (#14412))
 					"beat/_agent-component": map[string]any{
 						"processors": defaultGlobalProcessors,
 					},
 				},
 				"receivers": map[string]any{
+<<<<<<< HEAD
 					"filebeatreceiver/_agent-component/filestream-default": map[string]any{
 						"filebeat": map[string]any{
 							"inputs": []map[string]any{
@@ -1832,12 +1861,41 @@ func TestGetOtelConfig(t *testing.T) {
 											},
 										},
 									},
+=======
+					"metricbeatreceiver/_agent-component/system-metrics": map[string]any{
+						"metricbeat": map[string]any{
+							"modules": []map[string]any{
+								{
+									"module":      "system",
+									"data_stream": map[string]any{"dataset": "generic-1"},
+									"id":          "test-1",
+									"index":       "metrics-generic-1-default",
+									"metricsets": map[string]any{
+										"cpu": map[string]any{
+											"data_stream.dataset": "system.cpu",
+										},
+										"memory": map[string]any{
+											"data_stream.dataset": "system.memory",
+										},
+										"network": map[string]any{
+											"data_stream.dataset": "system.network",
+										},
+										"filesystem": map[string]any{
+											"data_stream.dataset": "system.filesystem",
+										},
+									},
+									"processors": defaultInputProcessors("test-1", "generic-1", "metrics"),
+>>>>>>> 57a124cff (Revert "otel: remove per-input default processors when global defaults are al…" (#14412))
 								},
 							},
 						},
 						"path": map[string]any{
 							"home": paths.Components(),
+<<<<<<< HEAD
 							"data": filepath.Join(paths.Run(), "filestream-default"),
+=======
+							"data": filepath.Join(paths.Run(), "system-metrics"),
+>>>>>>> 57a124cff (Revert "otel: remove per-input default processors when global defaults are al…" (#14412))
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
@@ -1851,6 +1909,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"logging": map[string]any{
 							"with_fields": map[string]any{
 								"component": map[string]any{
+<<<<<<< HEAD
 									"binary":  "filebeat",
 									"dataset": "elastic_agent.filebeat",
 									"type":    "filestream",
@@ -1858,23 +1917,46 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 								"log": map[string]any{
 									"source": "filestream-default",
+=======
+									"binary":  "metricbeat",
+									"dataset": "elastic_agent.metricbeat",
+									"type":    "system/metrics",
+									"id":      "system-metrics",
+								},
+								"log": map[string]any{
+									"source": "system-metrics",
+>>>>>>> 57a124cff (Revert "otel: remove per-input default processors when global defaults are al…" (#14412))
 								},
 							},
 						},
 						"http": map[string]any{
+<<<<<<< HEAD
 							"enabled": true,
 							"host":    "localhost",
 						},
 						"management.otel.enabled": true,
+=======
+							"enabled": false,
+						},
+						"management.otel.enabled": true,
+						"shared_intake_queue":     "default",
+>>>>>>> 57a124cff (Revert "otel: remove per-input default processors when global defaults are al…" (#14412))
 					},
 				},
 				"service": map[string]any{
 					"extensions": []any{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
+<<<<<<< HEAD
 						"logs/_agent-component/filestream-default": map[string][]string{
 							"exporters":  {"elasticsearch/_agent-component/default"},
 							"processors": {"beat/_agent-component"},
 							"receivers":  {"filebeatreceiver/_agent-component/filestream-default"},
+=======
+						"logs/_agent-component/system-metrics": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"metricbeatreceiver/_agent-component/system-metrics"},
+>>>>>>> 57a124cff (Revert "otel: remove per-input default processors when global defaults are al…" (#14412))
 						},
 					},
 				},
