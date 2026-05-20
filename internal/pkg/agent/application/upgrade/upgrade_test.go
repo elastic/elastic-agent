@@ -1136,13 +1136,14 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
-						manifest: &v1.PackageManifest{},
-						hash:     "hash",
+						manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: versionedHome}},
+						hash:     "abc123",
 					},
 					returnUnpackError: testError,
 				}
 			},
-			checkArchiveCleanup: true,
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
 			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
 				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
@@ -1164,12 +1165,12 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
-						manifest: &v1.PackageManifest{},
-						hash:     "hash",
+						manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: versionedHome}},
+						hash:     "abc123",
 					},
 					returnUnpackError: testError,
 					returnUnpackResult: UnpackResult{
-						Hash:          "hash",
+						Hash:          "abc123",
 						VersionedHome: versionedHome,
 					},
 				}
@@ -1197,11 +1198,11 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
-						manifest: &v1.PackageManifest{},
-						hash:     "hash",
+						manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: versionedHome}},
+						hash:     "abc123",
 					},
 					returnUnpackResult: UnpackResult{
-						Hash:          "hash",
+						Hash:          "abc123",
 						VersionedHome: versionedHome,
 					},
 				}
@@ -1233,11 +1234,11 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
-						manifest: &v1.PackageManifest{},
-						hash:     "hash",
+						manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: versionedHome}},
+						hash:     "abc123",
 					},
 					returnUnpackResult: UnpackResult{
-						Hash:          "hash",
+						Hash:          "abc123",
 						VersionedHome: versionedHome,
 					},
 				}
@@ -1271,11 +1272,11 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
-						manifest: &v1.PackageManifest{},
-						hash:     "hash",
+						manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: versionedHome}},
+						hash:     "abc123",
 					},
 					returnUnpackResult: UnpackResult{
-						Hash:          "hash",
+						Hash:          "abc123",
 						VersionedHome: versionedHome,
 					},
 				}
@@ -1299,7 +1300,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
-		"should return error and cleanup downloaded artifact and extracted archive if markUpgrade fails": {
+		"should return error and cleanup downloaded artifact if markUpgrade fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
@@ -1315,36 +1316,23 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
-						manifest: &v1.PackageManifest{},
-						hash:     "hash",
+						manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: versionedHome}},
+						hash:     "abc123",
 					},
 					returnUnpackResult: UnpackResult{
-						Hash:          "hash",
+						Hash:          "abc123",
 						VersionedHome: versionedHome,
 					},
-				}
-				upgrader.copyActionStore = func(log *logger.Logger, newHome string) error {
-					return nil
-				}
-				upgrader.copyRunDirectory = func(log *logger.Logger, oldRunPath, newRunPath string) error {
-					return nil
-				}
-				upgrader.changeSymlink = func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
-					return nil
-				}
-				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, source ttl.Source) error {
-					return nil
 				}
 				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
 					return testError
 				}
 			},
 			checkArchiveCleanup:       true,
-			checkVersionedHomeCleanup: true,
+			checkVersionedHomeCleanup: false,
 			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
 				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
-				mockRollbackSrc.EXPECT().Set(map[string]ttl.TTLMarker(nil)).Return(nil)
 			},
 		},
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
@@ -1449,6 +1437,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
 			paths.SetTop(baseDir)
+			require.NoError(t, os.MkdirAll(paths.Data(), 0755))
 
 			mockAgentInfo := info.NewMockAgent(t)
 			mockRollbackSource := ttl.NewMockSource(t)
@@ -1554,8 +1543,11 @@ func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
 		return agentVersion{version: upgradeVersion, snapshot: false, hash: metadata.hash}
 	}
 	upgrader.unpacker = &mockUnpacker{
-		returnPackageMetadata: packageMetadata{manifest: &v1.PackageManifest{}, hash: "newhsh"},
-		returnUnpackResult:    UnpackResult{Hash: "newhsh", VersionedHome: newVersionedHome},
+		returnPackageMetadata: packageMetadata{
+			manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: newVersionedHome}},
+			hash:     "newhsh",
+		},
+		returnUnpackResult: UnpackResult{Hash: "newhsh", VersionedHome: newVersionedHome},
 	}
 	upgrader.copyActionStore = func(_ *logger.Logger, _ string) error { return nil }
 	upgrader.copyRunDirectory = func(_ *logger.Logger, _, _ string) error { return nil }

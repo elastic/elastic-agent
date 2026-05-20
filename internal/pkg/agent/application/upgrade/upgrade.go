@@ -289,6 +289,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
+	var markerWritten bool
+	previousCommit := release.Commit() // saved so we can restore active.commit on failure
 	cleanupPaths := []string{}
 	defer func() {
 		if err != nil {
@@ -304,6 +306,19 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 				if rmErr != nil {
 					u.log.Errorw("error removing path during upgrade cleanup", "error.message", rmErr, "path", path)
 					err = goerrors.Join(err, rmErr)
+				}
+			}
+			// Clean up the pre-unpack marker on failure so it doesn't interfere with the next upgrade.
+			// Gap: if markUpgrade fails after writing the marker but before writing active.commit,
+			// markerWritten stays false; the stale marker stays but active.commit still points to the
+			// old version, so consistency is preserved. The marker is overwritten on the next upgrade.
+			if markerWritten {
+				if cleanMarkerErr := CleanMarker(u.log, paths.Data()); cleanMarkerErr != nil {
+					u.log.Warnw("failed to clean upgrade marker during upgrade cleanup", "error.message", cleanMarkerErr)
+				}
+				activeCommitPath := filepath.Join(paths.Top(), agentCommitFile)
+				if restoreErr := os.WriteFile(activeCommitPath, []byte(previousCommit), 0600); restoreErr != nil {
+					u.log.Warnw("failed to restore active commit during upgrade cleanup", "error.message", restoreErr)
 				}
 			}
 		}
@@ -391,12 +406,44 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("cannot upgrade the agent: %w", err)
 	}
 
+	// Derive the target directory from metadata before unpacking. The upgrade marker written below lets
+	// periodic cleanup recognise newVersionedHome as an in-progress target and never sweep it as an orphan.
+	if len(metadata.hash) < HashLen {
+		return nil, fmt.Errorf("archive metadata hash %q is shorter than the expected minimum of %d characters", metadata.hash, HashLen)
+	}
+	newVersionedHome := versionedHomeFromMetadata(metadata)
+	newHome := filepath.Join(paths.Top(), newVersionedHome)
+
+	rollbackWindow := disableRollbackWindow
+	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil {
+		rollbackWindow = u.upgradeSettings.Rollback.Window
+	}
+
+	previousParsedVersion := currentagtversion.GetParsedAgentPackageVersion()
+	previous := agentInstall{
+		parsedVersion: previousParsedVersion,
+		version:       release.VersionWithSnapshot(),
+		hash:          release.Commit(),
+		versionedHome: currentVersionedHome,
+	}
+	current := agentInstall{
+		parsedVersion: parsedVersion,
+		version:       version,
+		hash:          metadata.hash[:HashLen],
+		versionedHome: newVersionedHome,
+	}
+	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), previous, current)
+
+	// Write the marker before unpacking so periodic cleanup protects newVersionedHome even before the directory exists.
+	if err = u.markUpgrade(u.log, paths.Data(), time.Now(), current, previous, action, det, availableRollbacks); err != nil {
+		return nil, fmt.Errorf("writing upgrade marker: %w", err)
+	}
+	markerWritten = true
+	cleanupPaths = append(cleanupPaths, newHome)
+
 	u.log.Infow("Unpacking agent package", "version", newVersion)
 
-	// Nice to have: add check that no archive files end up in the current versioned home
-	// default to no flavor to avoid breaking behavior
-
-	// no default flavor, keep everything in case flavor is not specified
+	// no default flavor, keep everything in case flavor is not specified;
 	// in case of error fallback to keep-all
 	detectedFlavor, err := install.UsedFlavor(paths.Top(), "")
 	if err != nil {
@@ -411,20 +458,13 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, goerrors.Join(err, fmt.Errorf("versionedhome is empty: %v", unpackRes))
 	}
 
-	// If VersionedHome is not empty, it means that the unpack function has
-	// started extracting the archive. It may have failed while extracting.
-	// Setup newHome to be cleanedup.
-	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
-
-	cleanupPaths = append(cleanupPaths, newHome)
+	// Mismatch means the marker written above is protecting the wrong directory.
+	if filepath.Clean(unpackRes.VersionedHome) != filepath.Clean(newVersionedHome) {
+		return nil, fmt.Errorf("unpack placed files at %q but metadata predicted %q", unpackRes.VersionedHome, newVersionedHome)
+	}
 
 	if err != nil {
 		return nil, err
-	}
-
-	newHash := unpackRes.Hash
-	if newHash == "" {
-		return nil, errors.New("unknown hash")
 	}
 
 	if err := u.copyActionStore(u.log, newHome); err != nil {
@@ -440,13 +480,10 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	det.SetState(details.StateReplacing)
 
-	// create symlink to the <new versioned-home>/elastic-agent
-	hashedDir := unpackRes.VersionedHome
-
 	symlinkPath := filepath.Join(paths.Top(), AgentName)
 
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
-	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), AgentName)
+	newPath := paths.BinaryPath(filepath.Join(paths.Top(), newVersionedHome), AgentName)
 
 	// All go/no-go checks have passed; the upgrade is committed to completing.
 	// Notify components (e.g. endpoint-security) that need to act before the
@@ -460,7 +497,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	if err := u.changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
@@ -472,66 +509,37 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		}
 	}
 
-	rollbackWindow := disableRollbackWindow
-	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil {
-		rollbackWindow = u.upgradeSettings.Rollback.Window
-	}
-
-	// We rotated the symlink successfully: prepare the current and previous agent installation details for the update marker
-	// In update marker the `current` agent install is the one where the symlink is pointing (the new one we didn't start yet)
-	// while the `previous` install is the currently executing elastic-agent that is no longer reachable via the symlink.
-	// After the restart at the end of the function, everything lines up correctly.
-	current := agentInstall{
-		parsedVersion: parsedVersion,
-		version:       version,
-		hash:          unpackRes.Hash,
-		versionedHome: unpackRes.VersionedHome,
-	}
-
-	previousParsedVersion := currentagtversion.GetParsedAgentPackageVersion()
-	previous := agentInstall{
-		parsedVersion: previousParsedVersion,
-		version:       release.VersionWithSnapshot(),
-		hash:          release.Commit(),
-		versionedHome: currentVersionedHome,
-	}
-
-	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), previous, current)
-
 	if err = u.availableRollbacksSource.Set(availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: setting ttl markers failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
-		return nil, goerrors.Join(err, rollbackErr)
-	}
-
-	if err = u.markUpgrade(u.log,
-		paths.Data(), // data dir to place the marker in
-		time.Now(),
-		current,  // new agent version data
-		previous, // old agent version data
-		action, det, availableRollbacks); err != nil {
-		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
 	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(paths.Top(), previous, current)
 
+	// Refresh the marker timestamp so the watcher's grace period is measured from now, not before unpack started.
+	// A stale timestamp would give the watcher less than the full grace period to supervise the new version.
+	if err = u.markUpgrade(u.log, paths.Data(), time.Now(), current, previous, action, det, availableRollbacks); err != nil {
+		u.log.Errorw("Rolling back: refreshing upgrade marker failed", "error.message", err)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
+		return nil, goerrors.Join(err, rollbackErr)
+	}
+
 	var watcherCmd *exec.Cmd
 	if watcherCmd, err = u.watcherHelper.InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
 	watcherWaitErr := u.watcherHelper.WaitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
 	if watcherWaitErr != nil {
 		killWatcherErr := watcherCmd.Process.Kill()
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, rollbackErr)
 	}
 
-	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, filepath.Join(paths.Top(), unpackRes.VersionedHome))
+	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, filepath.Join(paths.Top(), newVersionedHome))
 
 	// Clean everything from the downloads dir
 	u.log.Infow("Removing downloads directory", "file.path", paths.Downloads())

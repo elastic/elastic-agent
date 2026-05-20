@@ -769,3 +769,13 @@ func getFilesContentFromTar(archivePath string, files ...string) (map[string]io.
 func createVersionedHomeFromHash(hash string) string {
 	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:HashLen]))
 }
+
+// versionedHomeFromMetadata derives the versioned home path from package metadata without unpacking the archive,
+// using the same logic the unpacker applies.
+func versionedHomeFromMetadata(metadata packageMetadata) string {
+	if metadata.manifest != nil && metadata.manifest.Package.VersionedHome != "" {
+		pm := pathMapper{mappings: metadata.manifest.Package.PathMappings}
+		return filepath.FromSlash(pm.Map(metadata.manifest.Package.VersionedHome))
+	}
+	return createVersionedHomeFromHash(metadata.hash)
+}

@@ -826,3 +826,60 @@ func TestUnpack(t *testing.T) {
 		})
 	}
 }
+
+// TestVersionedHomeFromMetadataMatchesUnpacker verifies that versionedHomeFromMetadata predicts the same path as the
+// unzip/untar functions compute from the same metadata. The upgrade flow writes the marker (using versionedHomeFromMetadata)
+// before unpacking, so a divergence would mean the marker protects the wrong directory.
+func TestVersionedHomeFromMetadataMatchesUnpacker(t *testing.T) {
+	tests := []struct {
+		name     string
+		metadata packageMetadata
+	}{
+		{
+			name:     "no manifest falls back to hash",
+			metadata: packageMetadata{hash: "abcdef1234567890"},
+		},
+		{
+			name: "manifest with VersionedHome, no path mappings",
+			metadata: packageMetadata{
+				hash: "abcdef1234567890",
+				manifest: &v1.PackageManifest{
+					Package: v1.PackageDesc{
+						VersionedHome: "data/elastic-agent-abcdef",
+					},
+				},
+			},
+		},
+		{
+			name: "manifest with VersionedHome and path mappings",
+			metadata: packageMetadata{
+				hash: "abcdef1234567890",
+				manifest: &v1.PackageManifest{
+					Package: v1.PackageDesc{
+						VersionedHome: "data/elastic-agent-abcdef",
+						PathMappings: []map[string]string{
+							{"data/elastic-agent-abcdef": "data/elastic-agent-remapped"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Replicate the path-derivation logic used by both unzip and untar (see unzip/untar in step_unpack.go).
+			pm := pathMapper{}
+			var unpackerVersionedHome string
+			if tt.metadata.manifest != nil {
+				pm.mappings = tt.metadata.manifest.Package.PathMappings
+				unpackerVersionedHome = filepath.FromSlash(pm.Map(tt.metadata.manifest.Package.VersionedHome))
+			} else {
+				unpackerVersionedHome = createVersionedHomeFromHash(tt.metadata.hash)
+			}
+
+			assert.Equal(t, unpackerVersionedHome, versionedHomeFromMetadata(tt.metadata),
+				"versionedHomeFromMetadata must agree with the unpacker for metadata %+v", tt.metadata)
+		})
+	}
+}
