@@ -413,7 +413,8 @@ func snapshotAgentDirs(topDir string) ([]string, error) {
 // requireMarkerDetails=true protects marker dirs only when the marker has explicit
 // non-terminal state, preventing ambiguous legacy markers from expanding the keep set.
 //
-// The symlink error is returned so the caller can decide whether it is fatal.
+// Both the marker error and the symlink error are returned so the caller can decide
+// whether to skip removals entirely.
 func buildKeepDirs(log *logger.Logger, topDir string, requireMarkerDetails bool, extraDirs []string) (map[string]bool, error) {
 	keep := make(map[string]bool, len(extraDirs)+3)
 	for _, d := range extraDirs {
@@ -422,7 +423,11 @@ func buildKeepDirs(log *logger.Logger, topDir string, requireMarkerDetails bool,
 
 	marker, markerErr := LoadMarker(paths.DataFrom(topDir))
 	if markerErr != nil {
-		log.Warnw("could not read upgrade marker during cleanup; marker-protected directories will not be swept", "error.message", markerErr.Error())
+		// The marker exists but cannot be read or parsed. We cannot determine which
+		// directories it references, so we refuse to proceed rather than risk sweeping
+		// a directory that an in-progress upgrade depends on.
+		log.Warnw("could not read upgrade marker during cleanup; skipping removals to avoid sweeping marker-referenced directories", "error.message", markerErr.Error())
+		return keep, markerErr
 	} else if marker != nil && !IsTerminalState(marker) && (!requireMarkerDetails || marker.Details != nil) {
 		if marker.VersionedHome != "" {
 			keep[filepath.Clean(marker.VersionedHome)] = true

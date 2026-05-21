@@ -351,10 +351,9 @@ func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir strin
 
 	// requireMarkerDetails=false: be conservative, protect from any non-terminal marker.
 	// Both currentHomeRelPath and symlink target are kept: they may differ during transitions.
-	keepDirs, symlinkErr := buildKeepDirs(log, topDir, false, extraDirs)
-	if symlinkErr != nil {
+	keepDirs, keepDirsErr := buildKeepDirs(log, topDir, false, extraDirs)
+	if keepDirsErr != nil {
 		// Return unexpired rollbacks so the scheduler retries when the next TTL expires.
-		log.Warnw("could not read agent symlink during cleanup; skipping removals to avoid sweeping the next-run live home", "error.message", symlinkErr.Error())
 		return leftoverRollbacks, nil
 	}
 
