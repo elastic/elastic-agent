@@ -543,15 +543,6 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 	if monitoring.Namespace != "" {
 		namespace = monitoring.Namespace
 	}
-	agentFields := map[string]any{
-		"id":      agentInfo.AgentID(),
-		"version": agentInfo.Version(),
-	}
-	// Add hostname as agent.name if available
-	agentName, err := os.Hostname()
-	if err == nil {
-		agentFields["name"] = agentName
-	}
 
 	result := map[string]any{
 		"data_stream": map[string]any{
@@ -568,7 +559,10 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 			"snapshot": agentInfo.Snapshot(),
 			"version":  agentInfo.Version(),
 		},
-		"agent": agentFields,
+		"agent": map[string]any{
+			"id":      agentInfo.AgentID(),
+			"version": agentInfo.Version(),
+		},
 		"component": map[string]any{
 			"binary": "elastic-otel-collector",
 			"id":     "elastic-otel-collector",
@@ -576,6 +570,14 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 		"metricset": map[string]any{
 			"name": "stats",
 		},
+	}
+
+	hostname, err := os.Hostname()
+	if err == nil {
+		result["agent"].(map[string]any)["name"] = hostname
+		result["host"] = map[string]any{
+			"hostname": hostname,
+		}
 	}
 
 	return result
