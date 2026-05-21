@@ -7,23 +7,21 @@
 package ess
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/http/httputil"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/elastic-agent/pkg/component"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -36,6 +34,7 @@ type OsqueryManagerRunner struct {
 	agentFixture *atesting.Fixture
 
 	ESHost     string
+	agentID    string
 	policyID   string
 	policyName string
 }
@@ -79,9 +78,10 @@ func (runner *OsqueryManagerRunner) SetupSuite() {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
-	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
+	policyResp, agentID, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
+	runner.agentID = agentID
 	runner.policyID = policyResp.ID
 	runner.policyName = policyResp.Name
 
@@ -92,47 +92,26 @@ func (runner *OsqueryManagerRunner) SetupSuite() {
 
 }
 
-func (runner *OsqueryManagerRunner) switchToOtelRuntime() {
-	body := fmt.Sprintf(`
-{
-  "name": "%s",
-  "namespace": "%s",
-  "overrides": {
-    "agent": {
-      "internal": {
-        "runtime": {
-          "default": "otel"
-        }
-      }
-    }
-  }
-}
-`, runner.policyName, runner.info.Namespace)
-	resp, err := runner.info.KibanaClient.Send(
-		http.MethodPut,
-		fmt.Sprintf("/api/fleet/agent_policies/%s", runner.policyID),
-		nil,
-		nil,
-		bytes.NewBufferString(body),
-	)
-	if err != nil {
-		runner.T().Fatalf("could not execute request to Kibana/Fleet: %s", err)
+func (runner *OsqueryManagerRunner) switchToOtelRuntime(ctx context.Context) int {
+	updateReq := kibana.AgentPolicyUpdateRequest{
+		Name:      runner.policyName,
+		Namespace: runner.info.Namespace,
+		Overrides: map[string]interface{}{
+			"agent": map[string]interface{}{
+				"internal": map[string]interface{}{
+					"runtime": map[string]interface{}{
+						"default": "otel",
+					},
+				},
+			},
+		},
 	}
-	if resp.StatusCode != http.StatusOK {
-		runner.T().Errorf("received a non 200-OK when adding overwrite to policy. "+
-			"Status code: %d", resp.StatusCode)
-		respDump, err := httputil.DumpResponse(resp, true)
-		if err != nil {
-			runner.T().Fatalf("could not dump error response from Kibana: %s", err)
-		}
-		runner.T().Log("================================================================================")
-		runner.T().Log("Kibana error response:")
-		runner.T().Log(string(respDump))
-		runner.T().FailNow()
-	}
+	policyResp, err := runner.info.KibanaClient.UpdatePolicy(ctx, runner.policyID, updateReq)
+	require.NoError(runner.T(), err)
+	return policyResp.Revision
 }
 
-func (runner *OsqueryManagerRunner) validateOsqueryEvents(ctx context.Context, agentID string) mapstr.M {
+func (runner *OsqueryManagerRunner) validateOsqueryEvents(ctx context.Context, agentID string, since time.Time) mapstr.M {
 	t := runner.T()
 
 	now := time.Now()
@@ -157,6 +136,13 @@ func (runner *OsqueryManagerRunner) validateOsqueryEvents(ctx context.Context, a
 			[][]string{
 				{"exists", "field", "osquery.physical_memory"},
 			})
+		if !since.IsZero() {
+			query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
+				"range": map[string]any{
+					"@timestamp": map[string]any{"gte": since.UTC().Format("2006-01-02T15:04:05.000Z")},
+				},
+			}
+		}
 		now = time.Now()
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-osquery_manager.result*", runner.info.ESClient)
 		require.NoError(t, err)
@@ -181,25 +167,34 @@ func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
 	// Validate process mode
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
-		processDoc = runner.validateOsqueryEvents(ctx, agentStatus.Info.ID)
+		processDoc = runner.validateOsqueryEvents(ctx, agentStatus.Info.ID, time.Time{})
 	})
 
 	// Switch to OTel runtime and validate the same data
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
-		runner.switchToOtelRuntime()
+		otelSince := time.Now()
+		policyRevision := runner.switchToOtelRuntime(ctx)
 
-		// Wait for the agent to pick up the new policy and become healthy
-		require.Eventually(t, func() bool {
-			err := runner.agentFixture.IsHealthy(ctx)
-			if err != nil {
-				t.Logf("waiting for agent healthy after otel switch: %s", err.Error())
-				return false
+		// Wait for the agent to apply the new policy revision
+		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
+			5*time.Minute, time.Second)
+
+		// Verify the component is running as a beats receiver
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			status, statusErr := runner.agentFixture.ExecStatus(ctx)
+			require.NoError(collect, statusErr)
+			var hasReceiver bool
+			for _, comp := range status.Components {
+				if comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
+					hasReceiver = true
+					break
+				}
 			}
-			return true
-		}, 2*time.Minute, 5*time.Second)
+			assert.True(collect, hasReceiver, "expected a component running as beats receiver")
+		}, 2*time.Minute, 5*time.Second, "component should be running as beats receiver")
 
-		otelDoc = runner.validateOsqueryEvents(ctx, agentStatus.Info.ID)
+		otelDoc = runner.validateOsqueryEvents(ctx, agentStatus.Info.ID, otelSince)
 	})
 
 	// Compare documents from process and otel modes have the same keys
