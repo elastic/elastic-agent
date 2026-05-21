@@ -7,8 +7,11 @@ package gcloud
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -104,6 +107,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 
 // Clean deletes all provisioned instances.
 func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []common.Instance) error {
+	p.logger.Logf("gcloud Clean: %d instance(s) to process", len(instances))
 	p.cleanupInstances(ctx, instances)
 	return nil
 }
@@ -112,6 +116,7 @@ func (p *provisioner) cleanupInstances(ctx context.Context, instances []common.I
 	g, gCtx := errgroup.WithContext(ctx)
 	for _, inst := range instances {
 		if inst.Name == "" {
+			p.logger.Logf("Skipping instance with empty name (id=%s)", inst.ID)
 			continue
 		}
 		g.Go(func() error {
@@ -120,8 +125,10 @@ func (p *provisioner) cleanupInstances(ctx context.Context, instances []common.I
 			err := p.deleteInstance(deleteCtx, inst.Name)
 			if err != nil {
 				p.logger.Logf("Failed to delete instance %s: %s", inst.Name, err)
+				return nil // don't stop other deletions
 			}
-			return nil // don't stop other deletions
+			p.logger.Logf("Deleted instance %s", inst.Name)
+			return nil
 		})
 	}
 	_ = g.Wait()
@@ -147,12 +154,22 @@ func (p *provisioner) createInstance(ctx context.Context, batch common.OSBatch, 
 	}
 
 	publicKey = strings.TrimSpace(publicKey)
-	instanceName := sanitizeInstanceName(batch.ID)
+	instanceName, err := sanitizeInstanceName(batch.ID)
+	if err != nil {
+		return common.Instance{}, fmt.Errorf("failed to generate instance name: %w", err)
+	}
 	sshMeta := fmt.Sprintf("%s:%s", layout.Username, publicKey)
 
-	// Build labels string
+	labels := maps.Clone(instanceLabels)
+	email, err := p.cfg.ClientEmail()
+	if err != nil {
+		return common.Instance{}, fmt.Errorf("failed to read client email for user label: %w", err)
+	}
+	if u := userLabel(email); u != "" {
+		labels["user"] = u
+	}
 	var labelParts []string
-	for k, v := range instanceLabels {
+	for k, v := range labels {
 		labelParts = append(labelParts, fmt.Sprintf("%s=%s", k, v))
 	}
 
@@ -350,22 +367,58 @@ Restart-Service sshd
 `, username, publicKey, publicKey)
 }
 
-// sanitizeInstanceName converts a batch ID into a valid GCE instance name.
 // GCE names must be lowercase, start with a letter, contain only letters/numbers/hyphens, max 63 chars.
 var invalidGCEChars = regexp.MustCompile(`[^a-z0-9-]`)
 
-func sanitizeInstanceName(batchID string) string {
+const (
+	maxGCEInstanceNameLen = 63
+	randomSuffixHexLen    = 8
+)
+
+// sanitizeInstanceName converts a batch ID into a valid GCE instance name,
+// appending a short random hex suffix so repeated runs don't collide.
+func sanitizeInstanceName(batchID string) (string, error) {
 	name := strings.ToLower(batchID)
 	name = invalidGCEChars.ReplaceAllString(name, "-")
-	// ensure starts with a letter
 	if len(name) > 0 && (name[0] < 'a' || name[0] > 'z') {
 		name = "vm-" + name
 	}
-	// truncate to 63 chars
-	if len(name) > 63 {
-		name = name[:63]
+	suffix, err := randomHexSuffix(randomSuffixHexLen)
+	if err != nil {
+		return "", err
 	}
-	// remove trailing hyphens
+	// Reserve room for "-<suffix>" while staying under the GCE limit.
+	maxBase := maxGCEInstanceNameLen - 1 - len(suffix)
+	if len(name) > maxBase {
+		name = name[:maxBase]
+	}
 	name = strings.TrimRight(name, "-")
+	if name == "" {
+		return "", fmt.Errorf("batch ID %q produced an empty sanitized name", batchID)
+	}
+	return name + "-" + suffix, nil
+}
+
+func randomHexSuffix(hexLen int) (string, error) {
+	b := make([]byte, hexLen/2)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// userLabel returns a GCE-label-safe identifier derived from a service account email.
+func userLabel(email string) string {
+	if idx := strings.IndexByte(email, '@'); idx >= 0 {
+		email = email[:idx]
+	}
+	name := strings.ToLower(email)
+	name = invalidGCEChars.ReplaceAllString(name, "-")
+	name = strings.Trim(name, "-")
+	if len(name) > maxGCEInstanceNameLen {
+		name = name[:maxGCEInstanceNameLen]
+		// Truncation can leave a trailing hyphen; GCE labels can't end with one.
+		name = strings.TrimRight(name, "-")
+	}
 	return name
 }

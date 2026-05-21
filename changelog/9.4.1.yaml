@@ -1,0 +1,87 @@
+version: 9.4.1
+entries:
+    - kind: enhancement
+      summary: Update go to v1.26.2
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13683
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1776464382
+      file:
+        name: 1776464382-Update-go-to-v1.26.2.yaml
+        checksum: c54246048c6ad6000a72c457a5eeb604776dd0f1
+    - kind: bug-fix
+      summary: Fix handling of console events on Windows
+      description: |
+        When Elastic Agent runs in a console on Windows and receives an event like CTRL+C/CTRL+BREAK, it now
+        exits gracefully.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13862
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/13586
+      impact: ""
+      action: ""
+      timestamp: 1777295027
+      file:
+        name: 1777295027-fix-windows-otel-signal-handling.yaml
+        checksum: 1cc210b269fe2e4425eeb3562401cbf3f923131c
+    - kind: bug-fix
+      summary: Stop Windows service promptly while the agent is retrying enrollment
+      description: |
+        Stopping the Elastic Agent Windows service while it was retrying
+        enrollment could hang for several minutes and cause MSI uninstall to
+        fail. The service now stops promptly.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13878
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1777366905
+      file:
+        name: 1777366905-fix-windows-service-stop-hang-during-enroll-retry.yaml
+        checksum: b1959433114749afd44ebbb366d4e56ba3be374f
+    - kind: bug-fix
+      summary: fix profiling agent daemonset for K8s versions v1.33+
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13894
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1777410560
+      file:
+        name: 1777410560-k8s-daemonset-fix.yaml
+        checksum: 51f693bc505261146d8312960b8ddc70c4860efa
+    - kind: bug-fix
+      summary: Clamp non-positive agent.download.retry_sleep_init_duration to default 30s
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13974
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1777882926
+      file:
+        name: 1777882926-drosiek-validate-download-retrysleepinit-time.yaml
+        checksum: 27ec3d47a59a67c704792da81f6b9c7b2c90f628
+    - kind: bug-fix
+      summary: Preserve unexpired available rollback agent versions during rollback
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14024
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14021
+      impact: ""
+      action: ""
+      timestamp: 1777976666
+      file:
+        name: 1777976666-drosiek-rollback-prune-issue.yaml
+        checksum: 6d8149f63c6d3d44ce82f9705e2dc2faabc9acd4

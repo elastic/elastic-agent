@@ -139,6 +139,9 @@ func run(override application.CfgOverrider, testingMode bool, fleetInitTimeout t
 	stop := make(chan bool)
 	ctx, cancel := context.WithCancel(context.Background())
 	stopBeat := func() {
+		// Cancel ctx so any ctx-aware work running before the main select
+		// loop on `stop` is reached returns promptly.
+		cancel()
 		close(stop)
 	}
 
@@ -363,7 +366,7 @@ func runElasticAgent(
 
 	// Ensure that the log level now matches what is configured in the agentInfo.
 	var lvl logp.Level
-	err = lvl.Unpack(agentInfo.LogLevel())
+	err = lvl.Unpack(agentInfo.GetLogLevelRuntime())
 	if err != nil {
 		l.Error(errors.New(err, "failed to parse agent information log level"))
 	} else {
@@ -492,6 +495,7 @@ func runElasticAgent(
 	// listen for signals
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	l.Debug("Registered signal handlers")
 	isRex := false
 	logShutdown := true
 LOOP:
@@ -669,6 +673,10 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	}
 	options.DelayEnroll = false
 	options.FleetServer.SpawnAgent = false
+	// Daemon mode: the enrollment token may be fixed externally (e.g. rotated
+	// secret) without restarting the agent, so we keep retrying instead of
+	// failing fast like the interactive `enroll` CLI does.
+	options.RetryOnInvalidToken = true
 	// enrollCmd daemonReloadWithBackoff is broken
 	// see https://github.com/elastic/elastic-agent/issues/4043
 	// SkipDaemonRestart to true avoids running that code.
@@ -693,19 +701,20 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	if err != nil {
 		return nil, err
 	}
-	// perform the enrollment in a loop, it should keep trying to enroll no matter what
-	// the enrollCmd has built in backoff so no need to wrap this in its own backoff as well
-	for {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		err = c.Execute(ctx, cli.NewIOStreams())
-		if err == nil {
-			// enrollment was successful
-			break
-		}
-		logger.Error(fmt.Errorf("failed to perform delayed enrollment (will try again): %w", err))
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
+
+	err = c.Execute(ctx, cli.NewIOStreams())
+	if err != nil {
+		return nil, errors.New(
+			err,
+			"failed to execute delayed enrollment",
+			errors.TypeApplication,
+			errors.M("path", enrollPath))
+	}
+
 	err = os.Remove(enrollPath)
 	if err != nil {
 		logger.Warn(errors.New(
@@ -808,7 +817,7 @@ func setupMetrics(
 // ongoing upgrade operation, i.e. being re-exec'd and performs
 // any upgrade-specific work, if needed.
 func handleUpgrade(log *logger.Logger) (*upgrade.UpdateMarker, error) {
-	upgradeMarker, err := upgrade.LoadMarker(paths.Data())
+	upgradeMarker, err := upgrade.TryLoadMarker(log, paths.Data())
 	if err != nil {
 		return nil, fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
 	}

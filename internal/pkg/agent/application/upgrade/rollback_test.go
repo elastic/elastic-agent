@@ -17,10 +17,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -229,6 +229,61 @@ func TestCleanup(t *testing.T) {
 	}
 }
 
+// TestCleanup_PreservesLiveVersionedHome ensures cleanup() always keeps the
+// directory backing the live agent symlink, even when the caller's keep list
+// does not reference it. Closes the data-loss path described in
+// https://github.com/elastic/elastic-agent/issues/13505.
+func TestCleanup_PreservesLiveVersionedHome(t *testing.T) {
+	testLogger, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	// Two installs; the symlink points at the older one (the live install).
+	liveHome := createFakeAgentInstall(t, topDir, version123Snapshot.version, version123Snapshot.hash, true)
+	otherHome := createFakeAgentInstall(t, topDir, version456Snapshot.version, version456Snapshot.hash, true)
+	createLink(t, topDir, liveHome)
+
+	// Caller passes a keep list that omits the live install.
+	err := cleanup(testLogger, topDir, false, false, 0, otherHome)
+	require.NoError(t, err)
+
+	// Both installs must remain: otherHome because it's in the keep list,
+	// liveHome because the symlink-based guard added it.
+	assert.DirExists(t, filepath.Join(topDir, liveHome),
+		"live versioned home must be preserved by the cleanup guard")
+	assert.DirExists(t, filepath.Join(topDir, otherHome))
+}
+
+// TestCleanup_DropsPhantomKeepListEntry ensures cleanup() drops keep-list
+// entries that don't exist on disk so the "Keeping" log line truthfully
+// reflects what is being preserved. The dropped entry must be reported via
+// an Info log so triage can see why a stale marker.VersionedHome is gone.
+func TestCleanup_DropsPhantomKeepListEntry(t *testing.T) {
+	testLogger, obs := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	// One real install + symlink, plus a phantom path the caller insists on.
+	liveHome := createFakeAgentInstall(t, topDir, version123Snapshot.version, version123Snapshot.hash, true)
+	createLink(t, topDir, liveHome)
+	phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
+
+	err := cleanup(testLogger, topDir, false, false, 0, phantomHome)
+	require.NoError(t, err)
+
+	// Live install is still present (cleanup guard kicked in).
+	assert.DirExists(t, filepath.Join(topDir, liveHome))
+
+	// Phantom entry was reported as dropped.
+	dropLogs := obs.FilterMessageSnippet("dropping non-existent keep-list entry").All()
+	assert.Len(t, dropLogs, 1, "expected exactly one drop log entry")
+
+	// "Keeping" log line must NOT mention the phantom entry.
+	keepLogs := obs.FilterMessageSnippet("Starting cleanup of versioned homes. Keeping:").All()
+	if assert.Len(t, keepLogs, 1) {
+		assert.NotContains(t, keepLogs[0].Message, "deadbeef",
+			"keep-list log must not contain phantom entry")
+	}
+}
+
 func TestRollback(t *testing.T) {
 	tests := map[string]struct {
 		agentInstallsSetup setupAgentInstallations
@@ -369,6 +424,9 @@ func TestRollbackWithOpts(t *testing.T) {
 						useVersionInPath: true,
 					},
 				},
+				upgradeFrom:  version123Snapshot,
+				upgradeTo:    version456Snapshot,
+				currentAgent: version456Snapshot,
 			},
 			setupMocks: func(mockClient *client.MockClient) {
 				mockClient.EXPECT().Connect(
@@ -408,6 +466,9 @@ func TestRollbackWithOpts(t *testing.T) {
 						useVersionInPath: true,
 					},
 				},
+				upgradeFrom:  version123Snapshot,
+				upgradeTo:    version456Snapshot,
+				currentAgent: version456Snapshot,
 			},
 			setupMocks: func(mockClient *client.MockClient) {
 				// nothing to do here, no restart will be issued
@@ -441,6 +502,9 @@ func TestRollbackWithOpts(t *testing.T) {
 						useVersionInPath: true,
 					},
 				},
+				upgradeFrom:  version123Snapshot,
+				upgradeTo:    version456Snapshot,
+				currentAgent: version456Snapshot,
 			},
 			setupMocks: func(mockClient *client.MockClient) {
 				mockClient.EXPECT().Connect(
@@ -470,9 +534,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				assert.NoError(t, err, "reading topPath elastic-agent link")
 				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
 				snippetLogs := logs.FilterMessageSnippet("pre-restart hook error, not fatal").All()
-				if assert.Len(t, snippetLogs, 1) {
-					assert.Equal(t, zapcore.WarnLevel, snippetLogs[0].Level)
-				}
+				assert.Len(t, snippetLogs, 1)
 				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
 			},
 		},
@@ -488,6 +550,9 @@ func TestRollbackWithOpts(t *testing.T) {
 						useVersionInPath: true,
 					},
 				},
+				upgradeFrom:  version123Snapshot,
+				upgradeTo:    version456Snapshot,
+				currentAgent: version456Snapshot,
 			},
 			setupMocks: func(mockClient *client.MockClient) {
 				// no restart request should be made
@@ -525,6 +590,9 @@ func TestRollbackWithOpts(t *testing.T) {
 						useVersionInPath: true,
 					},
 				},
+				upgradeFrom:  version123Snapshot,
+				upgradeTo:    version456Snapshot,
+				currentAgent: version456Snapshot,
 			},
 			setupMocks: func(mockClient *client.MockClient) {
 				mockClient.EXPECT().Connect(
@@ -775,4 +843,309 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		oldAgentInstall,
 		nil, nil, nil)
 	require.NoError(t, err, "error writing fake update marker")
+}
+
+// TestRollbackWithOpts_PreservesInTTLRollbacksAvailable encodes the
+// multi-rollback retention contract for RollbackWithOpts: in-TTL entries in
+// marker.RollbacksAvailable must survive a rollback regardless of which one is
+// chosen as the rollback target.
+//
+// Setup:
+//   - Three on-disk installs A, B, C.
+//   - Symlink points at C (the failing upgrade).
+//   - Update marker records C as new, A as previous, with both A and B listed
+//     in RollbacksAvailable with future TTLs.
+//
+// We roll back to A. B (also unexpired) must survive
+func TestRollbackWithOpts_PreservesInTTLRollbacksAvailable(t *testing.T) {
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+
+	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"}
+	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"}
+	versionC := testAgentVersion{version: "3.0.0", hash: "cccccc"}
+
+	testLogger, _ := loggertest.New(t.Name())
+	testTop := t.TempDir()
+
+	relA := createFakeAgentInstall(t, testTop, versionA.version, versionA.hash, true)
+	relB := createFakeAgentInstall(t, testTop, versionB.version, versionB.hash, true)
+	relC := createFakeAgentInstall(t, testTop, versionC.version, versionC.hash, true)
+
+	createLink(t, testTop, relC)
+
+	validUntil := time.Now().Add(24 * time.Hour)
+	availableRollbacks := map[string]ttl.TTLMarker{
+		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: validUntil},
+		relB: {Version: versionB.version, Hash: versionB.hash, ValidUntil: validUntil},
+	}
+
+	require.NoError(t,
+		ttl.NewTTLMarkerRegistry(testLogger, testTop).Set(availableRollbacks),
+		"writing TTL registry with two valid entries")
+
+	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
+	err := markUpgrade(
+		testLogger,
+		paths.DataFrom(testTop),
+		time.Now(),
+		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
+		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
+		nil, nil, availableRollbacks,
+	)
+	require.NoError(t, err, "writing update marker with two RollbacksAvailable entries")
+
+	mockClient := client.NewMockClient(t)
+	mockClient.EXPECT().Connect(
+		mock.AnythingOfType("*context.timerCtx"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+	).Return(nil)
+	mockClient.EXPECT().Disconnect().Return()
+	mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+
+	err = RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, relA, versionA.hash)
+	require.NoError(t, err, "RollbackWithOpts to A")
+
+	t.Run("rollback target A is preserved", func(t *testing.T) {
+		assertAgentInstallExists(t, filepath.Join(testTop, relA), agentExecutableName)
+	})
+
+	t.Run("failing upgrade C is cleaned up", func(t *testing.T) {
+		assertAgentInstallCleaned(t, filepath.Join(testTop, relC), agentExecutableName)
+	})
+
+	t.Run("other in-TTL rollback target B is preserved", func(t *testing.T) {
+		// B's directory must survive — its TTL has not expired and the live
+		// TTL registry still lists it as a valid rollback target.
+		assertAgentInstallExists(t, filepath.Join(testTop, relB), agentExecutableName)
+	})
+}
+
+// TestRollbackWithOpts_RemovesMalformedTTLRollbacksAvailable verifies that a
+// directory whose .ttl marker is corrupt is NOT preserved by post-rollback
+// cleanup. Under the registry contract a parseable TTL is the only proof an
+// install is a valid rollback target, so a malformed entry is treated like a
+// missing one. This preserves the self-healing property that a corrupt .ttl
+// outside the active install gets reaped at the next rollback, allowing
+// future upgrades to proceed against a clean registry.
+func TestRollbackWithOpts_RemovesMalformedTTLRollbacksAvailable(t *testing.T) {
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+
+	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"}
+	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"}
+	versionC := testAgentVersion{version: "3.0.0", hash: "cccccc"}
+
+	testLogger, _ := loggertest.New(t.Name())
+	testTop := t.TempDir()
+
+	relA := createFakeAgentInstall(t, testTop, versionA.version, versionA.hash, true)
+	relB := createFakeAgentInstall(t, testTop, versionB.version, versionB.hash, true)
+	relC := createFakeAgentInstall(t, testTop, versionC.version, versionC.hash, true)
+
+	createLink(t, testTop, relC)
+
+	// A has a valid in-TTL marker; B has a corrupt one (unparseable YAML).
+	// Both directories must survive the rollback to A.
+	now := time.Now()
+	availableRollbacks := map[string]ttl.TTLMarker{
+		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: now.Add(24 * time.Hour)},
+	}
+	require.NoError(t,
+		ttl.NewTTLMarkerRegistry(testLogger, testTop).Set(availableRollbacks),
+		"writing TTL registry with single valid entry")
+	require.NoError(t,
+		os.WriteFile(filepath.Join(testTop, relB, ".ttl"), []byte("this is not yaml"), 0644),
+		"writing corrupt .ttl for B")
+
+	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
+	err := markUpgrade(
+		testLogger,
+		paths.DataFrom(testTop),
+		now,
+		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
+		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
+		nil, nil, availableRollbacks,
+	)
+	require.NoError(t, err, "writing update marker")
+
+	mockClient := client.NewMockClient(t)
+	mockClient.EXPECT().Connect(
+		mock.AnythingOfType("*context.timerCtx"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+	).Return(nil)
+	mockClient.EXPECT().Disconnect().Return()
+	mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+
+	err = RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, relA, versionA.hash)
+	require.NoError(t, err, "RollbackWithOpts to A")
+
+	t.Run("rollback target A is preserved", func(t *testing.T) {
+		assertAgentInstallExists(t, filepath.Join(testTop, relA), agentExecutableName)
+	})
+
+	t.Run("failing upgrade C is cleaned up", func(t *testing.T) {
+		assertAgentInstallCleaned(t, filepath.Join(testTop, relC), agentExecutableName)
+	})
+
+	t.Run("install B with corrupt .ttl is cleaned up", func(t *testing.T) {
+		// B's .ttl is unparseable, so we cannot prove B is a valid rollback
+		// target. Treat it like a directory with no .ttl and let cleanup
+		// reap it — that's the self-healing path that lets the next upgrade
+		// proceed against a clean registry.
+		assertAgentInstallCleaned(t, filepath.Join(testTop, relB), agentExecutableName)
+	})
+}
+
+// TestRollbackWithOpts_RemovesExpiredRollbacksAvailable verifies that expired
+// entries in marker.RollbacksAvailable are not preserved by the rollback
+// cleanup: the keep list is filtered by ValidUntil so expired directories get
+// swept alongside the failing upgrade target.
+func TestRollbackWithOpts_RemovesExpiredRollbacksAvailable(t *testing.T) {
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+
+	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"}
+	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"}
+	versionC := testAgentVersion{version: "3.0.0", hash: "cccccc"}
+
+	testLogger, _ := loggertest.New(t.Name())
+	testTop := t.TempDir()
+
+	relA := createFakeAgentInstall(t, testTop, versionA.version, versionA.hash, true)
+	relB := createFakeAgentInstall(t, testTop, versionB.version, versionB.hash, true)
+	relC := createFakeAgentInstall(t, testTop, versionC.version, versionC.hash, true)
+
+	createLink(t, testTop, relC)
+
+	now := time.Now()
+	availableRollbacks := map[string]ttl.TTLMarker{
+		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: now.Add(24 * time.Hour)},
+		relB: {Version: versionB.version, Hash: versionB.hash, ValidUntil: now.Add(-1 * time.Hour)},
+	}
+
+	require.NoError(t,
+		ttl.NewTTLMarkerRegistry(testLogger, testTop).Set(availableRollbacks),
+		"writing TTL registry with mixed-TTL entries")
+
+	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
+	err := markUpgrade(
+		testLogger,
+		paths.DataFrom(testTop),
+		now,
+		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
+		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
+		nil, nil, availableRollbacks,
+	)
+	require.NoError(t, err, "writing update marker with mixed TTL RollbacksAvailable entries")
+
+	mockClient := client.NewMockClient(t)
+	mockClient.EXPECT().Connect(
+		mock.AnythingOfType("*context.timerCtx"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+		mock.AnythingOfType("*grpc.funcDialOption"),
+	).Return(nil)
+	mockClient.EXPECT().Disconnect().Return()
+	mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+
+	err = RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, relA, versionA.hash)
+	require.NoError(t, err, "RollbackWithOpts to A")
+
+	t.Run("rollback target A is preserved", func(t *testing.T) {
+		assertAgentInstallExists(t, filepath.Join(testTop, relA), agentExecutableName)
+	})
+
+	t.Run("failing upgrade C is cleaned up", func(t *testing.T) {
+		assertAgentInstallCleaned(t, filepath.Join(testTop, relC), agentExecutableName)
+	})
+
+	t.Run("expired rollback target B is cleaned up", func(t *testing.T) {
+		assertAgentInstallCleaned(t, filepath.Join(testTop, relB), agentExecutableName)
+	})
+}
+
+// TestLiveVersionedHome exercises the helper against a real install layout for
+// the host OS. createFakeAgentInstall + createLink build the on-disk structure
+// using paths.BinaryPath, so on darwin CI this is a real darwin test (the
+// .app/Contents/MacOS bundle is created and resolved); on linux/windows CI it
+// covers the flat layout. If paths.BinaryPath ever changes its layout on a
+// platform without a corresponding update to liveVersionedHome, this test will
+// fail on that platform's CI.
+func TestLiveVersionedHome(t *testing.T) {
+	t.Run("symlink points at versioned-home binary", func(t *testing.T) {
+		topDir := t.TempDir()
+		versionedHome := createFakeAgentInstall(t, topDir, "1.2.3", "abcdef", true)
+		createLink(t, topDir, versionedHome)
+
+		got, err := liveVersionedHome(topDir)
+		require.NoError(t, err)
+		expected, err := filepath.Rel(topDir, filepath.Join(topDir, versionedHome))
+		require.NoError(t, err)
+		require.Equal(t, expected, got)
+	})
+
+	t.Run("missing symlink returns error", func(t *testing.T) {
+		topDir := t.TempDir()
+		_, err := liveVersionedHome(topDir)
+		require.Error(t, err)
+	})
+
+	t.Run("symlink resolving outside topDir returns error", func(t *testing.T) {
+		topDir := t.TempDir()
+		// Place the binary in a separate temp dir so the symlink resolves
+		// outside topDir. liveVersionedHome must reject the result rather
+		// than returning a "../<other>" relative path that would let cleanup
+		// reason about a directory it doesn't own.
+		outsideDir := t.TempDir()
+		binary := filepath.Join(outsideDir, AgentName)
+		require.NoError(t, os.WriteFile(binary, nil, 0o755))
+		require.NoError(t, os.Symlink(binary, filepath.Join(topDir, AgentName)))
+
+		_, err := liveVersionedHome(topDir)
+		require.Error(t, err)
+	})
+}
+
+// TestCleanup_AbortsWhenLiveHomeUnresolvable encodes the
+// refusal-to-proceed contract: when the symlink cannot be resolved, cleanup
+// must return an error and leave the on-disk state untouched rather than risk
+// deleting the live install based on a stale keep list. The resolve runs
+// before any destructive op so neither the versioned home nor the upgrade
+// marker may be mutated when the abort fires.
+func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
+	t.Run("removeMarker=false: error returned and versioned home untouched", func(t *testing.T) {
+		testLogger, _ := loggertest.New(t.Name())
+		topDir := t.TempDir()
+
+		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
+		err := cleanup(testLogger, topDir, false, false, 0, phantomHome)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot identify live versioned home")
+	})
+
+	t.Run("removeMarker=true: marker survives because resolve precedes CleanMarker", func(t *testing.T) {
+		testLogger, _ := loggertest.New(t.Name())
+		topDir := t.TempDir()
+
+		require.NoError(t, os.MkdirAll(paths.DataFrom(topDir), 0o750))
+		markerPath := filepath.Join(paths.DataFrom(topDir), markerFilename)
+		require.NoError(t, os.WriteFile(markerPath, []byte("placeholder upgrade marker"), 0o600),
+			"writing placeholder marker file")
+
+		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
+		err := cleanup(testLogger, topDir, true, false, 0, phantomHome)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot identify live versioned home")
+
+		assert.FileExists(t, markerPath,
+			"upgrade marker must survive an aborted cleanup (CleanMarker must not run before resolve)")
+	})
 }

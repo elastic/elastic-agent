@@ -227,9 +227,7 @@ func getTransformProcessorID(outputName string) otelcomponent.ID {
 // log warning for unsupported config
 func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 
-	if cfg.HasField("partition") {
-		return fmt.Errorf("partition is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("keep_alive") {
+	if cfg.HasField("keep_alive") {
 		return fmt.Errorf("keep_alive is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("timeout") {
 		return fmt.Errorf("timeout is currently not supported: %w", errors.ErrUnsupported)

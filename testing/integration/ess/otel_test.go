@@ -108,10 +108,6 @@ func TestOtelStartShutdown(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,
 		Local: true,
-		OS: []define.OS{
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		},
 	})
 
 	otelConfig := `receivers:
@@ -129,10 +125,11 @@ service:
       exporters:
         - nop
 `
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	output := &bytes.Buffer{}
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithCmdOutput(output))
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -140,29 +137,35 @@ service:
 	err = fixture.ConfigureOtel(t.Context(), []byte(otelConfig))
 	require.NoError(t, err)
 
-	cmd, err := fixture.PrepareAgentCommand(ctx, []string{"otel"})
-	require.NoError(t, err)
-
-	output := strings.Builder{}
-	cmd.Stderr = &output
-	cmd.Stdout = &output
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		assert.NoError(t, fixture.RunOtelWithClient(ctx))
+	}()
 
 	t.Cleanup(func() {
 		if t.Failed() {
-			t.Log("Elastic-Agent output:")
+			t.Log("Otel Collector output:")
 			t.Log(output.String())
 		}
 	})
 
-	require.NoError(t, cmd.Start(), "could not start otel collector")
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		assert.Contains(collect, output.String(), "Everything is ready")
 	}, time.Second*30, time.Second)
 
 	// stop the collector and check that it emitted logs indicating a graceful shutdown
-	require.NoError(t, cmd.Process.Signal(os.Interrupt))
-	require.NoError(t, cmd.Wait())
-	assert.Contains(t, output.String(), "Shutdown complete")
+	fixture.Stop()
+	wg.Wait()
+
+	// Poll briefly: process.Info.Wait (used by RunOtelWithClient) returns as
+	// soon as the agent process exits and does not synchronize with the
+	// exec.Cmd stdio goroutines, so the last few log lines may still be in
+	// the kernel pipe buffer when wg.Wait returns.
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.Contains(collect, output.String(), "Shutdown complete")
+	}, 5*time.Second, 100*time.Millisecond)
 }
 
 func TestOtelFileProcessing(t *testing.T) {
@@ -1363,24 +1366,11 @@ service:
 
 	doc1 := docs.Hits.Hits[0].Source
 	doc2 := docs.Hits.Hits[1].Source
-	ignoredFields := []string{
-		// Expected to change between filebeat and fbreceiver
-		"@timestamp",
-		"agent.ephemeral_id",
-		"agent.id",
-
-		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
-		"agent.version",
-
-		// Missing from fbreceiver doc
-		"elastic_agent.id",
-		"elastic_agent.snapshot",
-		"elastic_agent.version",
-
+	ignoredFields := append(RuntimeComparisonIgnoredFields,
 		// only in fbreceiver doc
 		"agent.otelcol.component.id",
 		"agent.otelcol.component.kind",
-	}
+	)
 
 	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
 	cancel()
@@ -1567,47 +1557,7 @@ processors:
 	require.Equal(t, "custom-value", customFieldValue, "custom_field should be equal to custom-value")
 }
 
-func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
-	t.Helper()
-
-	flatM1 := m1.Flatten()
-	flatM2 := m2.Flatten()
-	for _, f := range ignoredFields {
-		// Checking ignored fields is disabled until we resolve an issue with event.ingested not being set
-		// in some cases.
-		// See https://github.com/elastic/elastic-agent/issues/8486 for details.
-		//hasKeyM1, _ := flatM1.HasKey(f)
-		//hasKeyM2, _ := flatM2.HasKey(f)
-		//
-		//if !hasKeyM1 && !hasKeyM2 {
-		//	assert.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
-		//}
-		flatM1.Delete(f)
-		flatM2.Delete(f)
-	}
-	require.Zero(t, cmp.Diff(flatM1, flatM2), msg)
-}
-
-func AssertMapstrKeysEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
-	t.Helper()
-	// Delete all ignored fields.
-	for _, f := range ignoredFields {
-		_ = m1.Delete(f)
-		_ = m2.Delete(f)
-	}
-
-	flatM1 := m1.Flatten()
-	flatM2 := m2.Flatten()
-
-	for k := range flatM1 {
-		flatM1[k] = ""
-	}
-	for k := range flatM2 {
-		flatM2[k] = ""
-	}
-
-	require.Zero(t, cmp.Diff(flatM1, flatM2), msg)
-}
+// AssertMapsEqual and AssertMapstrKeysEqual are defined in assert_tools.go
 
 func TestFBOtelRestartE2E(t *testing.T) {
 	// This test ensures that filebeatreceiver is able to deliver logs even
@@ -2564,6 +2514,7 @@ func TestOtelElasticsearchStateStore_Agentless(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 	})
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/13822")
 
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
@@ -2925,9 +2876,9 @@ outputs:
     broker_timeout: 30s
     queue.mem.flush.timeout: 1s
     ssl:
-      certificate_authorities: 
+      certificate_authorities:
         - {{.CaCert}}
-      supported_protocols: 
+      supported_protocols:
        - TLSv1.3
       verification_mode: full
     username: beats
@@ -3024,21 +2975,13 @@ agent.monitoring:
 		require.True(t, agentOk, "missing document for agent")
 		require.True(t, otelOk, "missing document for otel")
 
-		ignoredFields := []string{
-			"@timestamp",
-			"agent.id",
-			"agent.ephemeral_id",
-			"elastic_agent.id",
+		ignoredFields := append(RuntimeComparisonIgnoredFields,
 			"data_stream.namespace",
-			"event.ingested",
 			"event.duration",
-
-			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
-			"agent.version",
-		}
-
-		// TODO: @metadata field needs to be be supported
-		delete(agentDoc, "@metadata")
+			// For Kafka, raw_index contains the destination topic which is different between the two runtimes.
+			"@metadata.raw_index",
+			"@metadata.version",
+		)
 
 		agentDoc = agentDoc.Flatten()
 		otelDoc = otelDoc.Flatten()
@@ -3047,10 +2990,277 @@ agent.monitoring:
 		StripNondeterminism(agentDoc, "cpu")
 		StripNondeterminism(otelDoc, "cpu")
 
-		AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for cpu metricset")
+		AssertMapstrKeysEqual(t, agentDoc, otelDoc, []string{}, "expected documents keys to be equal for cpu metricset")
 		AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for cpu metricset")
 
 	})
+}
+
+func TestKafkaOutputPartitioningWithOtelRuntime(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok, "failed to get current file path")
+	kafkaPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "beats", "testing", "environments", "docker", "kafka")
+
+	composeContent := fmt.Sprintf(`
+services:
+  kafka:
+    build: %s
+    ports:
+      - 9092:9092
+      - 9093:9093
+      - 9094:9094
+      - 2181:2181
+    environment:
+      - KAFKA_ADVERTISED_HOST=localhost
+`, kafkaPath)
+
+	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = stack.Down(
+			context.Background(),
+			compose.RemoveOrphans(true),
+			compose.RemoveVolumes(true),
+			compose.RemoveImagesLocal,
+		)
+	})
+
+	err = stack.Up(t.Context(), compose.Wait(true))
+	require.NoError(t, err)
+
+	// Each strategy gets its own topic.
+	// The kafka server is configured with num.partitions=3 so every new topic has 3 partitions.
+	tableTests := []struct {
+		name            string
+		topic           string
+		partitionConfig string
+		validate        func(*testing.T, []sarama.PartitionConsumer, map[int32]int)
+	}{
+		{
+			name:  "random",
+			topic: "metrics-e2e-partition-random",
+			partitionConfig: `
+    partition:
+      random:
+        group_events: 1`,
+			validate: func(t *testing.T, partitionConsumers []sarama.PartitionConsumer, msgsByPartition map[int32]int) {
+				require.Eventually(t,
+					func() bool {
+						for _, pc := range partitionConsumers {
+							select {
+							case msg := <-pc.Messages():
+								msgsByPartition[msg.Partition]++
+								return true
+							default:
+							}
+						}
+						return false
+					},
+					2*time.Minute, 5*time.Second,
+					"expected at least 1 message with random partition strategy")
+			},
+		},
+		{
+			name:  "round_robin",
+			topic: "metrics-e2e-partition-round-robin",
+			partitionConfig: `
+    partition:
+      round_robin:
+        group_events: 1`,
+			validate: func(t *testing.T, partitionConsumers []sarama.PartitionConsumer, msgsByPartition map[int32]int) {
+				require.Eventually(t,
+					func() bool {
+						for _, pc := range partitionConsumers {
+							// Non-blocking drain of all currently buffered messages.
+							for {
+								select {
+								case msg := <-pc.Messages():
+									msgsByPartition[msg.Partition]++
+								default:
+									goto nextPC
+								}
+							}
+						nextPC:
+						}
+						return len(msgsByPartition) >= 2
+					},
+					2*time.Minute, 5*time.Second,
+					"expected round_robin to distribute messages across at least 2 of 3 partitions")
+			},
+		},
+		{
+			name:  "hash",
+			topic: "metrics-e2e-partition-hash",
+			partitionConfig: `
+    partition:
+      hash:
+        random: true`,
+			validate: func(t *testing.T, partitionConsumers []sarama.PartitionConsumer, msgsByPartition map[int32]int) {
+				require.Eventually(t,
+					func() bool {
+						for _, pc := range partitionConsumers {
+							select {
+							case msg := <-pc.Messages():
+								msgsByPartition[msg.Partition]++
+								return true
+							default:
+							}
+						}
+						return false
+					},
+					2*time.Minute, 5*time.Second,
+					"expected at least 1 message with hash partition strategy")
+			},
+		},
+	}
+
+	for _, tt := range tableTests {
+		t.Run(tt.name, func(t *testing.T) {
+			type configOptions struct {
+				Topic           string
+				PartitionConfig string
+				CaCert          string
+			}
+
+			configTemplate := `
+agent.internal.runtime.output:
+  kafka: otel
+agent.grpc.port: 6799
+inputs:
+  - type: system/metrics
+    id: system-metrics-test
+    use_output: default
+    streams:
+    - metricsets:
+       - cpu
+      period: 1s
+      data_stream:
+        dataset: e2e
+        namespace: partitioning
+outputs:
+  default:
+    type: kafka
+    hosts: ["localhost:9093"]
+    topic: '{{.Topic}}'
+    max_message_bytes: 1000000
+    required_acks: 1
+    broker_timeout: 30s
+    queue.mem.flush.timeout: 1s{{.PartitionConfig}}
+    ssl:
+      certificate_authorities:
+        - {{.CaCert}}
+      supported_protocols:
+       - TLSv1.3
+      verification_mode: full
+    username: beats
+    password: KafkaTest
+    protocol: https
+    sasl.mechanism: SCRAM-SHA-256
+agent.monitoring:
+  metrics: false
+  logs: false
+  http:
+    enabled: true
+    port: 6790
+`
+
+			var configBuffer bytes.Buffer
+			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, configOptions{
+				Topic:           tt.topic,
+				PartitionConfig: tt.partitionConfig,
+				CaCert:          filepath.Join(kafkaPath, "certs", "ca-cert"),
+			})
+
+			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+			require.NoError(t, err)
+
+			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+			defer cancel()
+
+			err = fixture.Prepare(ctx)
+			require.NoError(t, err)
+
+			err = fixture.Configure(ctx, configBuffer.Bytes())
+			require.NoError(t, err)
+
+			cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+			require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+			agentOutput := strings.Builder{}
+			cmd.Stderr = &agentOutput
+			cmd.Stdout = &agentOutput
+
+			err = cmd.Start()
+			require.NoError(t, err)
+
+			t.Cleanup(func() {
+				if t.Failed() {
+					t.Logf("Elastic-Agent output for %s partition strategy:", tt.name)
+					t.Log(agentOutput.String())
+				}
+			})
+
+			require.Eventually(t, func() bool {
+				err = fixture.IsHealthy(ctx)
+				if err != nil {
+					t.Logf("waiting for agent healthy: %s", err.Error())
+					return false
+				}
+				return true
+			}, 30*time.Second, 1*time.Second)
+
+			// Connect to the unauthenticated plaintext listener (port 9094) for consuming.
+			consumer, err := sarama.NewConsumer([]string{"localhost:9094"}, sarama.NewConfig())
+			require.NoError(t, err)
+			defer consumer.Close()
+
+			// Wait for the agent to create the topic, then open partition consumers.
+			// The server default num.partitions=3 means every auto-created topic has 3 partitions.
+			var partitionConsumers []sarama.PartitionConsumer
+			require.Eventually(t, func() bool {
+				if len(partitionConsumers) > 0 {
+					return true
+				}
+				pcs := make([]sarama.PartitionConsumer, 0, 3)
+				for p := int32(0); p < 3; p++ {
+					// OffsetOldest so we pick up messages already published while the agent was starting.
+					pc, createErr := consumer.ConsumePartition(tt.topic, p, sarama.OffsetOldest)
+					if createErr != nil {
+						for _, existing := range pcs {
+							existing.Close()
+						}
+						t.Logf("waiting for topic %s partition %d: %v", tt.topic, p, createErr)
+						return false
+					}
+					pcs = append(pcs, pc)
+				}
+				partitionConsumers = pcs
+				return true
+			}, 2*time.Minute, 5*time.Second, "topic %s should be created by the agent", tt.topic)
+
+			defer func() {
+				for _, pc := range partitionConsumers {
+					pc.Close()
+				}
+			}()
+
+			tt.validate(t, partitionConsumers, make(map[int32]int))
+
+			cancel()
+			cmd.Wait()
+		})
+	}
 }
 
 //go:embed testdata/pipelines.yml
@@ -3271,25 +3481,13 @@ agent.monitoring:
 	require.True(t, agentOk, "missing document for agent")
 	require.True(t, otelOk, "missing document for otel")
 
-	ignoredFields := []string{
-		"@timestamp",
-		"agent.id",
-		"agent.ephemeral_id",
-		"elastic_agent.id",
+	ignoredFields := append(RuntimeComparisonIgnoredFields,
 		"data_stream.namespace",
-		"event.ingested",
 		"event.duration",
-
 		// testcase is different for both agent and otel
 		"testcase",
-		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
-		"agent.version",
 		"metadata.version",
-
-		// TODO: See issue https://github.com/elastic/beats/issues/50085
-		"metadata.input_id",
-		"metadata.raw_index",
-	}
+	)
 
 	agentDoc = agentDoc.Flatten()
 	otelDoc = otelDoc.Flatten()
@@ -3298,7 +3496,7 @@ agent.monitoring:
 	StripNondeterminism(agentDoc, "cpu")
 	StripNondeterminism(otelDoc, "cpu")
 
-	AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for cpu metricset")
+	AssertMapstrKeysEqual(t, agentDoc, otelDoc, []string{}, "expected documents keys to be equal for cpu metricset")
 	AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for cpu metricset")
 
 }

@@ -8,7 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -58,7 +60,7 @@ func TestRetryEnroll_SucceedsAfterOneRetry(t *testing.T) {
 
 	l := logger.NewWithoutConfig("")
 
-	err := retryEnroll(t.Context(), initialErr, 5, l, enrollFn, "http://localhost", fb)
+	err := retryEnroll(t.Context(), initialErr, 5, l, enrollFn, "http://localhost", fb, false)
 	require.NoError(t, err)
 	require.Equal(t, 1, called)
 }
@@ -76,7 +78,7 @@ func TestRetryEnroll_StopsAfterMaxAttempts(t *testing.T) {
 
 	l := logger.NewWithoutConfig("")
 
-	err := retryEnroll(t.Context(), initialErr, maxAttempts, l, enrollFn, "http://localhost", fb)
+	err := retryEnroll(t.Context(), initialErr, maxAttempts, l, enrollFn, "http://localhost", fb, false)
 	require.Equal(t, maxAttempts-1, called)
 	require.Error(t, err)                  // error is expected
 	require.NotErrorIs(t, err, initialErr) // subsequent failures are different
@@ -94,7 +96,7 @@ func TestRetryEnroll_ExitsOnBackoffStop(t *testing.T) {
 
 	l := logger.NewWithoutConfig("")
 
-	err := retryEnroll(t.Context(), initialErr, -1, l, enrollFn, "http://localhost", fb)
+	err := retryEnroll(t.Context(), initialErr, -1, l, enrollFn, "http://localhost", fb, false)
 	require.Equal(t, 0, called)
 	require.ErrorIs(t, err, initialErr) // error is expected
 }
@@ -119,11 +121,31 @@ func TestRetryEnroll_ExitsOnTerminalEnrollError(t *testing.T) {
 			fb := &fakeBackoff{}
 			l := logger.NewWithoutConfig("")
 
-			err := retryEnroll(t.Context(), tc.err, 5, l, enrollFn, "http://localhost", fb)
+			err := retryEnroll(t.Context(), tc.err, 5, l, enrollFn, "http://localhost", fb, false)
 			require.ErrorIs(t, err, tc.err)
 			require.Equal(t, 0, called)
 		})
 	}
+}
+
+func TestRetryEnroll_RetriesOnInvalidTokenWhenEnabled(t *testing.T) {
+	called := 0
+	enrollFn := func() error {
+		called++
+		return fleetapi.ErrInvalidToken
+	}
+	// Allow two waits, then stop the loop so the test terminates.
+	fb := &fakeBackoff{results: []bool{true, true, false}}
+	l := logger.NewWithoutConfig("")
+
+	err := retryEnroll(
+		t.Context(), fleetapi.ErrInvalidToken, -1, l, enrollFn, "http://localhost", fb,
+		true,
+	)
+	// With RetryOnInvalidToken=true, ErrInvalidToken must not short-circuit the loop;
+	// we should see retries happen until the backoff itself signals stop.
+	require.Equal(t, 2, called)
+	require.ErrorIs(t, err, fleetapi.ErrInvalidToken)
 }
 
 func TestRetryEnroll_InterruptsBackoffWaitOnCtxCancel(t *testing.T) {
@@ -140,7 +162,7 @@ func TestRetryEnroll_InterruptsBackoffWaitOnCtxCancel(t *testing.T) {
 
 		errCh := make(chan error, 1)
 		go func() {
-			errCh <- retryEnroll(ctx, errors.New("initial"), -1, l, enrollFn, "http://localhost", fb)
+			errCh <- retryEnroll(ctx, errors.New("initial"), -1, l, enrollFn, "http://localhost", fb, false)
 		}()
 
 		// retryEnroll should return when the caller's context is canceled, even if the retry
@@ -151,6 +173,37 @@ func TestRetryEnroll_InterruptsBackoffWaitOnCtxCancel(t *testing.T) {
 		err := <-errCh
 		require.ErrorIs(t, err, context.Canceled)
 	})
+}
+
+// TestClearAgentStores_RemovesBothFiles is a regression test for the
+// !os.IsNotExist(err) antipattern that previously lived inline in enroll().
+// When the action store file existed and was successfully removed, the
+// subsequent os.IsNotExist(nil) returned false and the function returned
+// early without ever attempting to remove the state store file — leaving
+// stale state-store data behind across enrollments.
+func TestClearAgentStores_RemovesBothFiles(t *testing.T) {
+	dir := t.TempDir()
+	actionStore := filepath.Join(dir, "action_store.yml")
+	stateStore := filepath.Join(dir, "state.enc")
+
+	require.NoError(t, os.WriteFile(actionStore, []byte("stale-action"), 0o600))
+	require.NoError(t, os.WriteFile(stateStore, []byte("stale-state"), 0o600))
+
+	require.NoError(t, clearAgentStores(actionStore, stateStore))
+
+	_, err := os.Stat(actionStore)
+	require.True(t, errors.Is(err, fs.ErrNotExist), "action store file must be removed, got err=%v", err)
+
+	_, err = os.Stat(stateStore)
+	require.True(t, errors.Is(err, fs.ErrNotExist), "state store file must be removed, got err=%v", err)
+}
+
+func TestClearAgentStores_MissingFilesAreOK(t *testing.T) {
+	dir := t.TempDir()
+	actionStore := filepath.Join(dir, "action_store.yml")
+	stateStore := filepath.Join(dir, "state.enc")
+
+	require.NoError(t, clearAgentStores(actionStore, stateStore))
 }
 
 func TestLoadPersistentConfig_FleetCheckin(t *testing.T) {

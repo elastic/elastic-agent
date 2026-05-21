@@ -33,7 +33,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
@@ -256,10 +255,7 @@ func (Build) GenerateConfig() error {
 func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch string) error {
 	fmt.Printf("--- Compiling root binary for %s windows archive\n", goarch)
 	cfg := devtools.SettingsFromContext(ctx)
-	hashShort, err := cfg.Build.CommitHashShort()
-	if err != nil {
-		return fmt.Errorf("error getting commit hash: %w", err)
-	}
+	hashShort := cfg.AgentCoreCommitHashShort()
 
 	outputName := "elastic-agent-archive-root"
 	if runtime.GOOS != "windows" {
@@ -290,11 +286,22 @@ func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch strin
 	}
 
 	if cfg.Build.FIPSBuild {
-		// there is no actual FIPS relevance for this particular binary
-		// but better safe than sorry
-		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
-		args.Env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
-		args.CGO = true
+		fipsConfig := packaging.Settings().FIPS
+		supported := false
+		for _, p := range fipsConfig.Compile.Platforms {
+			if p.Platform() == "windows/"+goarch {
+				supported = true
+				break
+			}
+		}
+
+		if supported {
+			// there is no actual FIPS relevance for this particular binary
+			// but better safe than sorry
+			args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
+			args.Env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
+			args.CGO = true
+		}
 	}
 
 	return devtools.Build(ctx, cfg, args)
@@ -350,14 +357,21 @@ func (Build) Clean() error {
 		return fmt.Errorf("cannot remove build dir '%s': %w", absBuildDir, err)
 	}
 
-	testBinariesPath, err := getTestBinariesPath()
+	unitBinariesPath, err := getUnitTestBinariesPath()
 	if err != nil {
-		return fmt.Errorf("cannot remove test binaries: %w", err)
+		return fmt.Errorf("cannot remove unit test binaries: %w", err)
+	}
+	integrationBinariesPath, err := getIntegrationTestBinariesPath()
+	if err != nil {
+		return fmt.Errorf("cannot remove integration test binaries: %w", err)
 	}
 
 	if mg.Verbose() {
 		fmt.Println("removed", absBuildDir)
-		for _, b := range testBinariesPath {
+		for _, b := range unitBinariesPath {
+			fmt.Println("removed", b)
+		}
+		for _, b := range integrationBinariesPath {
 			fmt.Println("removed", b)
 		}
 	}
@@ -367,26 +381,34 @@ func (Build) Clean() error {
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
-	testBinaryPkgs, err := getTestBinariesPath()
+	mg.SerialDeps(Build.UnitTestBinaries, Build.IntegrationTestBinaries)
+	return nil
+}
+
+// UnitTestBinaries builds only the binaries needed for unit tests.
+func (Build) UnitTestBinaries() error {
+	testBinaryPkgs, err := getUnitTestBinariesPath()
 	if err != nil {
-		return fmt.Errorf("cannot build test binaries: %w", err)
+		return fmt.Errorf("cannot build unit test binaries: %w", err)
+	}
+	return buildTestBinaries(testBinaryPkgs)
+}
+
+// IntegrationTestBinaries builds only the binaries needed for integration tests.
+func (Build) IntegrationTestBinaries() error {
+	testBinaryPkgs, err := getIntegrationTestBinariesPath()
+	if err != nil {
+		return fmt.Errorf("cannot build integration test binaries: %w", err)
 	}
 	return buildTestBinaries(testBinaryPkgs)
 }
 
 // TestFakeComponent build just the test fake component.
 func (Build) TestFakeComponent() error {
-	wd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("could not get working directory: %w", err)
-	}
-	testBinaryPkgs := []string{
-		filepath.Join(wd, "pkg", "component", "fake", "component"),
-	}
-	return buildTestBinaries(testBinaryPkgs)
+	return Build{}.IntegrationTestBinaries()
 }
 
-func getTestBinariesPath() ([]string, error) {
+func getUnitTestBinariesPath() ([]string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("could not get working directory: %w", err)
@@ -398,6 +420,18 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
 		filepath.Join(wd, "internal", "pkg", "agent", "application", "filelock", "testlocker"),
 		filepath.Join(wd, "internal", "edot", "testing"),
+	}
+	return testBinaryPkgs, nil
+}
+
+func getIntegrationTestBinariesPath() ([]string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("could not get working directory: %w", err)
+	}
+
+	testBinaryPkgs := []string{
+		filepath.Join(wd, "pkg", "component", "fake", "component"),
 	}
 	return testBinaryPkgs, nil
 }
@@ -539,7 +573,7 @@ func (Test) All() {
 
 // Unit runs all the unit tests.
 func (Test) Unit(ctx context.Context) error {
-	mg.Deps(Prepare.Env, Build.TestBinaries)
+	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 	cfg := devtools.SettingsFromContext(ctx)
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	return devtools.GoTest(ctx, params)
@@ -547,25 +581,18 @@ func (Test) Unit(ctx context.Context) error {
 
 // FIPSOnlyUnit runs all the unit tests with GODEBUG=fips140=only.
 func (Test) FIPSOnlyUnit(ctx context.Context) error {
-	mg.Deps(Prepare.Env, Build.TestBinaries)
+	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 
-	cfg := devtools.SettingsFromContext(ctx)
+	cfg := devtools.SettingsFromContext(ctx).WithFIPSBuild(true)
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	params.Env["FIPS"] = "true"
-
-	// We also set GODEBUG=tlsmlkem=0 to disable the X25519MLKEM768 TLS key
-	// exchange mechanism; without this setting and with the GODEBUG=fips140=only
-	// setting, we get errors in tests like so:
-	// Failed to connect: crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
-	// Note that we are only disabling this TLS key exchange mechanism in tests!
-	params.Env["GODEBUG"] = "fips140=only,tlsmlkem=0"
 	params.Tags = append(params.Tags, "requirefips")
 	return devtools.GoTest(ctx, params)
 }
 
 // Coverage takes the coverages report from running all the tests and display the results in the browser.
 func (Test) Coverage() error {
-	mg.Deps(Prepare.Env, Build.TestBinaries)
+	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 	return RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
 }
 
@@ -588,6 +615,10 @@ func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
@@ -1062,11 +1093,10 @@ func Clean(ctx context.Context) error {
 }
 
 func dockerCommitHash(cfg *devtools.Settings) string {
-	commit, err := cfg.Build.CommitHash()
-	if err == nil && len(commit) > commitLen {
+	commit := cfg.Build.CommitHash()
+	if len(commit) > commitLen {
 		return commit[:commitLen]
 	}
-
 	return ""
 }
 
@@ -1242,7 +1272,6 @@ func collectPackageDependencies(cfg *devtools.Settings, platforms []string, pack
 			downloads.LogLevel.Set(downloads.FatalLevel)
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
-			completedDownloads := &atomic.Int32{}
 
 			for _, spec := range dependencies {
 				for _, platform := range platforms {
@@ -1262,7 +1291,7 @@ func collectPackageDependencies(cfg *devtools.Settings, platforms []string, pack
 						if mg.Verbose() {
 							log.Printf(">>> Downloading package %s component %s/%s", packageName, spec.BinaryName, platform)
 						}
-						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
+						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath))
 					}
 				}
 			}
@@ -1270,9 +1299,6 @@ func collectPackageDependencies(cfg *devtools.Settings, platforms []string, pack
 			err = errGroup.Wait()
 			if err != nil {
 				panic(err)
-			}
-			if completedDownloads.Load() == 0 {
-				panic(fmt.Sprintf("No packages were successfully downloaded. You may be building against an invalid or unreleased version. version=%s. If this is an unreleased version, try SNAPSHOT=true or EXTERNAL=false", packageVersion))
 			}
 		}
 	} else {
@@ -1479,6 +1505,10 @@ func PackageUsingDRA(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
@@ -1690,14 +1720,13 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, man
 
 // Helper that wraps the fetchBinaryFromArtifactsApi in a way that is compatible with the errgroup.Go() function.
 // Ensures the arguments are captured by value before starting the goroutine.
-func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string, compl *atomic.Int32) func() error {
+func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string) func() error {
 	return func() error {
 		_, err := downloads.FetchProjectBinary(ctx, project, packageName, binary, version, 3, false, targetPath, true)
 		if err != nil {
 			return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
 		}
 
-		compl.Add(1)
 		fmt.Printf("Done downloading %s into %s\n", packageName, targetPath)
 		return nil
 	}
@@ -2052,19 +2081,22 @@ func (Integration) Clean(ctx context.Context) error {
 	defer os.RemoveAll(".integration-cache")
 
 	_, err := os.Stat(".integration-cache")
-	if err == nil {
-		// .integration-cache exists; need to run `Clean` from the runner
-		cfg := devtools.SettingsFromContext(ctx)
-		r, err := createTestRunner(cfg, false, "", "")
-		if err != nil {
-			return fmt.Errorf("error creating test runner: %w", err)
-		}
-		err = r.Clean()
-		if err != nil {
-			return fmt.Errorf("error running clean: %w", err)
-		}
+	if err != nil {
+		fmt.Println(">>> No .integration-cache found; nothing to clean via the runner (orphaned VMs or stacks will not be touched)")
+		return nil
 	}
+	fmt.Println(">>> Found .integration-cache; running runner.Clean")
 
+	cfg := devtools.SettingsFromContext(ctx)
+	r, err := createTestRunner(cfg, false, "", "")
+	if err != nil {
+		return fmt.Errorf("error creating test runner: %w", err)
+	}
+	err = r.Clean()
+	if err != nil {
+		return fmt.Errorf("error running clean: %w", err)
+	}
+	fmt.Println(">>> runner.Clean completed")
 	return nil
 }
 
@@ -2525,8 +2557,8 @@ func generateEnvFile(stack tcommon.Stack) error {
 			return fmt.Errorf("write KIBANA_PASSWORD: %w", err)
 		}
 
-		if _, err := fmt.Fprintf(w, "export INTEGRATIONS_SERVER_HOST=\"%s\"\n", stack.IntegrationsServer); err != nil {
-			return fmt.Errorf("write INTEGRATIONS_SERVER_HOST: %w", err)
+		if _, err := fmt.Fprintf(w, "export ELASTIC_APM_SERVER_URL=\"%s\"\n", stack.IntegrationsServer); err != nil {
+			return fmt.Errorf("write ELASTIC_APM_SERVER_URL: %w", err)
 		}
 		return nil
 	}); err != nil {
@@ -2554,8 +2586,8 @@ func generateEnvFile(stack tcommon.Stack) error {
 			return fmt.Errorf("write KIBANA_PASSWORD: %w", err)
 		}
 
-		if _, err := fmt.Fprintf(w, "$env:INTEGRATIONS_SERVER_HOST=\"%s\"\n", stack.IntegrationsServer); err != nil {
-			return fmt.Errorf("write INTEGRATIONS_SERVER_HOST: %w", err)
+		if _, err := fmt.Fprintf(w, "$env:ELASTIC_APM_SERVER_URL=\"%s\"\n", stack.IntegrationsServer); err != nil {
+			return fmt.Errorf("write ELASTIC_APM_SERVER_URL: %w", err)
 		}
 		return nil
 	})
@@ -2797,7 +2829,7 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
-	cfg := devtools.SettingsFromContext(ctx)
+	cfg := devtools.SettingsFromContextWithOptions(ctx, devtools.LoadOptions{SkipVCS: true})
 	mg.Deps(Build.TestFakeComponent)
 	version := cfg.IntegrationTest.AgentVersion
 	if version == "" {
@@ -3748,6 +3780,24 @@ func (Otel) PrepareBeats() error {
 		if sh.ExitStatus(err) != 5 {
 			return fmt.Errorf("failed to unset core.worktree in copied git config: %w", err)
 		}
+	}
+
+	// If the CI checkout used a pre-baked git mirror (BUILDKITE_GIT_MIRRORS_PATH /opt/git-mirrors),
+	// git sets up the submodule with an alternates reference so objects are stored in the mirror,
+	// not locally. The beats crossbuild mage target launches Docker mounting only the beats directory,
+	// so the mirror path is not accessible inside the container and git commands fail with exit 128.
+	// Repack all reachable objects into a local pack file and remove the alternates entry so the
+	// copied .git directory is fully self-sufficient when mounted into Docker.
+	alternatesPath := filepath.Join(beatsGitPath, "objects", "info", "alternates")
+	if _, err := os.Stat(alternatesPath); err == nil {
+		fmt.Println(">> Repacking beats git objects to remove git-mirror alternates dependency")
+		if err := sh.Run("git", "-C", "beats", "repack", "-a", "-d"); err != nil {
+			return fmt.Errorf("failed to repack beats git objects: %w", err)
+		}
+		if err := os.Remove(alternatesPath); err != nil {
+			return fmt.Errorf("failed to remove beats git alternates file: %w", err)
+		}
+		fmt.Println(">> Beats git objects are now self-sufficient (alternates removed)")
 	}
 
 	fmt.Println(">> Successfully converted beats/.git to a directory")

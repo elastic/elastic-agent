@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	goerrors "errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -21,6 +22,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
+
+func TestCleanMarker_MissingMarkerIsOK(t *testing.T) {
+	dataDir := t.TempDir()
+
+	log, _ := loggertest.New(t.Name())
+	require.NoError(t, CleanMarker(log, dataDir))
+}
 
 func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
 	// Create a temporary directory for the test
@@ -79,6 +87,35 @@ func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
 	// Clean up the temporary file
 	err = os.Remove(markerFile)
 	require.NoError(t, err, "Failed to clean up marker file")
+}
+
+func TestTryLoadMarker_CorruptMarker(t *testing.T) {
+	// Simulate a power loss mid-write: the action line is cut off inside a
+	// flow mapping, leaving an unclosed string that yaml.Unmarshal rejects.
+	const truncatedMarkerYAML = `version: 9.0.0
+hash: a1b2c3
+versioned_home: data/elastic-agent-9.0.0-a1b2c3
+updated_on: 2026-04-20T10:00:00Z
+prev_version: 8.17.6
+action: {id: "fleet-action-abc1`
+
+	log, _ := loggertest.New(t.Name())
+	dataDir := t.TempDir()
+	markerFile := markerFilePath(dataDir)
+	require.NoError(t, os.WriteFile(markerFile, []byte(truncatedMarkerYAML), 0600))
+
+	marker, err := TryLoadMarker(log, dataDir)
+	require.NoError(t, err, "truncated marker must not cause a startup error")
+	require.Nil(t, marker, "truncated marker must return nil so startup can continue")
+	require.NoFileExists(t, markerFile, "corrupt marker file must have been moved aside")
+	require.FileExists(t, markerFile+".corrupt", "corrupt marker must be preserved for diagnostics")
+}
+
+func TestTryLoadMarker_MissingFile(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+	marker, err := TryLoadMarker(log, t.TempDir())
+	require.NoError(t, err)
+	require.Nil(t, marker)
 }
 
 func TestMarkUpgrade(t *testing.T) {
@@ -264,4 +301,54 @@ func TestMarkUpgrade(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMarkUpgradeFailed(t *testing.T) {
+	cause := goerrors.New("upgrade boom")
+
+	t.Run("no marker on disk: det is failed and no error", func(t *testing.T) {
+		dataDir := t.TempDir()
+		det := details.NewDetails("8.5.0", details.StateReplacing, "action-1")
+
+		err := MarkUpgradeFailed(dataDir, det, cause)
+		require.NoError(t, err)
+		require.Equal(t, details.StateFailed, det.State, "in-memory details must reflect failure")
+		require.NoFileExists(t, filepath.Join(dataDir, markerFilename))
+	})
+
+	t.Run("marker on disk is rewritten with state=Failed", func(t *testing.T) {
+		dataDir := t.TempDir()
+		det := details.NewDetails("8.5.0", details.StateReplacing, "action-2")
+		original := &UpdateMarker{
+			Version:       "8.5.0",
+			Hash:          "abc123",
+			VersionedHome: "data/elastic-agent-abc123",
+			UpdatedOn:     time.Now(),
+			Details:       det,
+		}
+		require.NoError(t, SaveMarker(dataDir, original, true), "seed marker")
+
+		err := MarkUpgradeFailed(dataDir, det, cause)
+		require.NoError(t, err)
+		require.Equal(t, details.StateFailed, det.State)
+
+		loaded, err := LoadMarker(dataDir)
+		require.NoError(t, err)
+		require.NotNil(t, loaded)
+		require.NotNil(t, loaded.Details)
+		require.Equal(t, details.StateFailed, loaded.Details.State,
+			"on-disk marker must carry the failed state")
+	})
+
+	t.Run("LoadMarker error: still fails det in memory", func(t *testing.T) {
+		// markerFilename as a directory makes LoadMarker fail with a read error.
+		dataDir := t.TempDir()
+		require.NoError(t, os.Mkdir(filepath.Join(dataDir, markerFilename), 0o755))
+
+		det := details.NewDetails("8.5.0", details.StateReplacing, "action-3")
+		err := MarkUpgradeFailed(dataDir, det, cause)
+		require.Error(t, err, "load failure must be surfaced")
+		require.Equal(t, details.StateFailed, det.State,
+			"det must still reflect failure even when persistence fails")
+	})
 }

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -18,9 +19,10 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -127,8 +129,19 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return nil
 	}
 
-	// cleanup everything except version we're rolling back into
-	return Cleanup(log, topDirPath, settings.RemoveMarker, true, prevVersionedHome)
+	// cleanup everything except the version we're rolling back into and any
+	// in-TTL rollback targets recorded in the live TTL registry. The registry
+	// read is best-effort: if it fails we fall back to preserving only
+	// prevVersionedHome rather than aborting the rollback.
+	versionedHomesToKeep := []string{prevVersionedHome}
+	inTTL, err := InTTLRollbacks(log, topDirPath, time.Now())
+	if err != nil {
+		log.Infow("could not read TTL registry; cleanup will only preserve the rollback target",
+			"error.message", err.Error())
+	} else {
+		versionedHomesToKeep = append(versionedHomesToKeep, inTTL...)
+	}
+	return Cleanup(log, topDirPath, settings.RemoveMarker, true, versionedHomesToKeep...)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
@@ -142,6 +155,20 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 
 	// data directory path
 	dataDirPath := paths.DataFrom(topDirPath)
+
+	// The live versioned home is identified from the top-level agent symlink
+	// — the canonical record of what the daemon launches. If that symlink is
+	// unreadable for any reason, cleanup refuses to proceed: deciding what to
+	// keep without an authoritative live-install reference would risk
+	// deleting the live install, and the loud abort produces a recurring
+	// Error signal that an operator can investigate before the next restart
+	// fails. See
+	// https://github.com/elastic/elastic-agent/issues/13505 for the data-loss
+	// hazard this guard closes.
+	liveHome, err := liveVersionedHome(topDirPath)
+	if err != nil {
+		return fmt.Errorf("cannot identify live versioned home from symlink, refusing to proceed with cleanup: %w", err)
+	}
 
 	// remove upgrade marker
 	if removeMarker {
@@ -176,16 +203,35 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 
 	log.Infof("versioned homes to keep: %v", versionedHomesToKeep)
 
+	candidates := append(make([]string, 0, len(versionedHomesToKeep)+1), versionedHomesToKeep...)
+	candidates = append(candidates, liveHome)
+
+	// Normalize each candidate to a dataDir-relative basename, deduplicate,
+	// and drop entries that don't exist on disk so the "Keeping" log line
+	// below reflects what is actually being preserved rather than a phantom
+	// path. A stale entry is harmless to leave in (the cleanup loop only
+	// iterates real subdirs) but misleading on triage; each dropped entry is
+	// surfaced as an Info so the cause — usually a stale
+	// marker.VersionedHome — is visible in logs.
 	var cumulativeError error
-	relativeHomePaths := make([]string, 0, len(versionedHomesToKeep))
-	for _, h := range versionedHomesToKeep {
-		relHomePath, err := filepath.Rel(dataDirPath, filepath.Join(topDirPath, h))
+	relativeHomePaths := make([]string, 0, len(candidates))
+	for _, h := range candidates {
+		rel, err := filepath.Rel(dataDirPath, filepath.Join(topDirPath, h))
 		if err != nil {
+			// We can't normalize this entry, and the cleanup loop below
+			// matches dataDir-relative basenames, so an un-normalized path
+			// would never match anyway. Record the failure for the caller
+			// and skip the entry rather than carry a value forward that
+			// can't preserve the directory.
 			cumulativeError = goerrors.Join(cumulativeError, fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", h, err))
-			// best effort: try to use the entry as-is, without calculating the path relative to `data`
-			relHomePath = h
+			continue
 		}
-		relativeHomePaths = append(relativeHomePaths, relHomePath)
+		if _, statErr := os.Stat(filepath.Join(dataDirPath, rel)); statErr != nil {
+			log.Infow("dropping non-existent keep-list entry from cleanup",
+				"path", rel, "error.message", statErr.Error())
+			continue
+		}
+		relativeHomePaths = append(relativeHomePaths, rel)
 	}
 
 	log.Infof("Starting cleanup of versioned homes. Keeping: %v", relativeHomePaths)
@@ -205,12 +251,46 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 		if keepLogs {
 			ignoredDirs = append(ignoredDirs, "logs")
 		}
-		if cleanupErr := install.RemoveBut(hashedDir, true, ignoredDirs...); cleanupErr != nil {
+		if cleanupErr := install.RemoveBut(log, hashedDir, true, ignoredDirs...); cleanupErr != nil {
 			cumulativeError = goerrors.Join(cumulativeError, cleanupErr)
 		}
 	}
 
 	return cumulativeError
+}
+
+// InTTLRollbacks reads the live TTL registry under topDir and returns the
+// versioned homes whose .ttl is parseable AND not expired (i.e. that
+// CleanupExpiredRollbacks would NOT remove). Reusing the cleanup predicate
+// keeps the keep-list and the periodic cleanup in lock-step.
+//
+// Directories whose .ttl is unparseable are deliberately NOT included: under
+// the current registry contract a parseable TTL is the only proof an install
+// is a valid rollback target, so a malformed entry is treated like a missing
+// one — the directory is unprotected and will be swept by Cleanup. This
+// preserves the self-healing property that a corrupt .ttl outside the active
+// install gets reaped at the next rollback.
+//
+// GetAll (vs. Get) is used so that one corrupt .ttl file does not prevent the
+// other in-TTL entries from being preserved.
+func InTTLRollbacks(log *logger.Logger, topDir string, now time.Time) ([]string, error) {
+	markers, malformed, err := ttl.NewTTLMarkerRegistry(log, topDir).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("getting available rollbacks: %w", err)
+	}
+	var inTTL []string
+	for versionedHome, ttlMarker := range markers {
+		if CleanupExpiredRollbacks(log, now, versionedHome, ttlMarker) {
+			continue
+		}
+		log.Debugf("Adding rollback %s:%+v to the directories to keep during cleanup", versionedHome, ttlMarker)
+		inTTL = append(inTTL, versionedHome)
+	}
+	for versionedHome, parseErr := range malformed {
+		log.Infow("rollback directory has unparseable TTL marker; not protecting it from cleanup",
+			"versionedHome", versionedHome, "error.message", parseErr.Error())
+	}
+	return inTTL, nil
 }
 
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of
@@ -338,4 +418,53 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 
 	close(signal)
 	return nil
+}
+
+// liveVersionedHome resolves the versioned home that the top-level agent
+// symlink points at, returned as a path relative to topDirPath. Used by
+// cleanup as a defense against stale keep lists deleting the live install
+// (https://github.com/elastic/elastic-agent/issues/13505).
+//
+// Returns the empty string and a non-nil error if the symlink can't be read
+// or doesn't resolve to a path under topDirPath.
+func liveVersionedHome(topDirPath string) (string, error) {
+	symlinkPath := filepath.Join(topDirPath, AgentName)
+	if runtime.GOOS == windowsOSName {
+		symlinkPath += exe
+	}
+	target, err := os.Readlink(symlinkPath)
+	if err != nil {
+		return "", fmt.Errorf("reading symlink %q: %w", symlinkPath, err)
+	}
+	// Resolve a relative symlink target against the symlink's directory.
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(symlinkPath), target)
+	}
+	// target is the binary path; strip down to the versioned home.
+	// On macOS, paths.BinaryPath produces an extra three nested directories
+	// (<versionedHome>/elastic-agent.app/Contents/MacOS/elastic-agent), so
+	// we strip those levels to recover the versioned home.
+	home := filepath.Dir(target)
+	if runtime.GOOS == "darwin" {
+		home = filepath.Dir(filepath.Dir(filepath.Dir(home)))
+	}
+	// os.Readlink returns the literal target even if it dangles, so an
+	// existence check here is what proves the symlink still identifies a
+	// real install.
+	if _, err := os.Stat(home); err != nil {
+		return "", fmt.Errorf("stat versioned home %q: %w", home, err)
+	}
+	rel, err := filepath.Rel(topDirPath, home)
+	if err != nil {
+		return "", fmt.Errorf("computing %q relative to %q: %w", home, topDirPath, err)
+	}
+	// filepath.Rel is purely lexical and happily returns "../foo" when home
+	// is outside topDirPath. Enforce the documented contract here so callers
+	// (cleanup's keep list) never get a path that traverses out of the data
+	// dir, which could let a malicious or corrupt symlink redirect cleanup
+	// decisions.
+	if !filepath.IsLocal(rel) {
+		return "", fmt.Errorf("symlink target %q resolves outside top directory %q", home, topDirPath)
+	}
+	return rel, nil
 }
