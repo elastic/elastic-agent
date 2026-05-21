@@ -208,7 +208,8 @@ type Client interface {
 	State(ctx context.Context) (*AgentState, error)
 	// StateWatch watches the current state of the running agent.
 	// Pass WithLatestOnly() to skip intermediate states and always receive
-	// the most recent state at the time of each read.
+	// the most recent state at the time of each read. Pass WithAllAvailable()
+	// (or no option) to receive all buffered transitions in order.
 	StateWatch(ctx context.Context, opts ...StateWatchOption) (ClientStateWatch, error)
 	// Restart triggers restarting the current running daemon.
 	Restart(ctx context.Context) error
@@ -255,6 +256,13 @@ type stateWatchConfig struct {
 // matters and replaying every transition would be wasteful.
 func WithLatestOnly() StateWatchOption {
 	return WithBufferSize(StateWatchBufferSizeLatestOnly)
+}
+
+// WithAllAvailable configures StateWatch to receive all buffered state
+// transitions in order, up to the server's internal maximum. This is the
+// default behaviour when no buffer size is specified.
+func WithAllAvailable() StateWatchOption {
+	return WithBufferSize(StateWatchBufferSizeAllAvailable)
 }
 
 // WithBufferSize configures the number of recent state transitions buffered per
