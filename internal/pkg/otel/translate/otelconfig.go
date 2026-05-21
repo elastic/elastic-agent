@@ -722,12 +722,6 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 		}
 		streamID := resolveStreamID(protoStreamID, input, unit.ID, i)
 		result[i] = receiverInput{streamID: streamID, config: input}
-		// When the beatprocessor runs the default enrichment processors globally for every
-		// event in the pipeline, remove them from per-input processor lists to avoid running
-		// each processor twice per event.
-		if features.DefaultProcessors() {
-			input["processors"] = stripDefaultProcessors(input["processors"])
-		}
 	}
 
 	return result, nil
