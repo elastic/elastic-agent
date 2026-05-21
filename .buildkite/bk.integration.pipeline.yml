@@ -291,6 +291,7 @@ steps:
 
   - group: "Stateful: Windows (tier 3)"
     key: integration-tests-win-tier3
+    if: build.source == "schedule"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Windows - tier 3"
