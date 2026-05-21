@@ -12,7 +12,7 @@ Review important information about the  8.19.16 release.
 
 
 
-* Upgrade npm to v11 in non-wolfi elastic-agent-complete Docker images. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
+* Upgrade npm to v11 in non-wolfi elastic-agent-complete Docker images. https://github.com/elastic/elastic-agent/pull/14167[#14167] 
 
 
 
@@ -39,10 +39,10 @@ The 8.19.16 release adds the following new and notable features.
 
 
 
-* Update go to v1.26.2. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
+* Update go to v1.26.2. https://github.com/elastic/elastic-agent/pull/13683[#13683] 
 * Update EDOT SDK k8s auto-instrumentation images to their latest versions. https://github.com/elastic/elastic-agent/pull/12685[#12685] 
-* Update OTel components to v0.150.0. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
-* Update OTel Collector components to v0.152.0. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
+* Update OTel components to v0.150.0. https://github.com/elastic/elastic-agent/pull/14077[#14077] 
+* Update OTel Collector components to v0.152.0. https://github.com/elastic/elastic-agent/pull/14366[#14366] 
 
 
 
@@ -54,16 +54,16 @@ The 8.19.16 release adds the following new and notable features.
 
 
 
-* Make enrollment retry backoff respect context cancellation. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
-* Clean up leftover artifacts when `elastic-agent install` fails. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
-* Stop Windows service promptly while the agent is retrying enrollment. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
-* Fix profiling agent daemonset for K8s versions v1.33&#43;. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
-* Clamp non-positive agent.download.retry_sleep_init_duration to default 30s. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
-* Redact sensitive values in slice maps. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent-libs/issues/415[#415]
+* Make enrollment retry backoff respect context cancellation. https://github.com/elastic/elastic-agent/pull/13698[#13698] 
+* Clean up leftover artifacts when `elastic-agent install` fails. https://github.com/elastic/elastic-agent/pull/13705[#13705] 
+* Stop Windows service promptly while the agent is retrying enrollment. https://github.com/elastic/elastic-agent/pull/13878[#13878] 
+* Fix profiling agent daemonset for K8s versions v1.33&#43;. https://github.com/elastic/elastic-agent/pull/13894[#13894] 
+* Clamp non-positive agent.download.retry_sleep_init_duration to default 30s. https://github.com/elastic/elastic-agent/pull/13974[#13974] 
+* Redact sensitive values in slice maps. https://github.com/elastic/elastic-agent/pull/14007[#14007] https://github.com/elastic/elastic-agent-libs/issues/415[#415]
 * Ship config samples and endpoint resources zip without executable bits. https://github.com/elastic/elastic-agent/pull/14117[#14117] https://github.com/elastic/elastic-agent/issues/13960[#13960]
-* Agent no longer fails to start when the upgrade marker file is corrupt. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
-* Fix silent early-return when removing stale enrollment and upgrade artifacts. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
-* Fix dangling symlink when rotating to a non-existent target. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
-* Prevent upgrade watcher panic when grace period expires. https://github.com/elastic/elastic-agent/pull/14253[#14253] https://github.com/elastic/elastic-agent/pull/12919[#12919] https://github.com/elastic/elastic-agent/issues/14252[#14252]
+* Agent no longer fails to start when the upgrade marker file is corrupt. https://github.com/elastic/elastic-agent/pull/14194[#14194] 
+* Fix silent early-return when removing stale enrollment and upgrade artifacts. https://github.com/elastic/elastic-agent/pull/14234[#14234] 
+* Fix dangling symlink when rotating to a non-existent target. https://github.com/elastic/elastic-agent/pull/14238[#14238] 
+* Prevent upgrade watcher panic when grace period expires. https://github.com/elastic/elastic-agent/pull/14253[#14253] 
 
 // end 8.19.16 relnotes
