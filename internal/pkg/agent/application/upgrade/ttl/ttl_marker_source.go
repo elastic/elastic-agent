@@ -98,7 +98,7 @@ func (T TTLMarkerRegistry) Remove(versionedHome string) error {
 //   - malformed: per-entry errors keyed by versioned home for entries whose
 //     .ttl file could not be read or parsed (e.g. corrupt YAML, permissions,
 //     ENOENT during read). Entries whose path cannot be made relative to
-//     baseDir are keyed by the original glob match instead.
+//     baseDir are silently skipped (unreachable in practice — see inline comment).
 //
 // The returned error is non-nil only on structural failures (e.g. a glob
 // failure) where no scan could be performed. Callers that need to be
@@ -115,10 +115,12 @@ func (T TTLMarkerRegistry) GetAll() (map[string]TTLMarker, map[string]error, err
 	malformed := map[string]error{}
 	for _, match := range matches {
 		T.log.Debugf("Reading marker from versionedHome: %s", match)
+		// relErr is unreachable in practice: every match is produced by a glob
+		// rooted at T.baseDir, so filepath.Dir(match) is always under T.baseDir
+		// and filepath.Rel cannot fail. The branch is kept as a defensive guard.
 		relPath, relErr := filepath.Rel(T.baseDir, filepath.Dir(match))
 		if relErr != nil {
 			T.log.Infof("skipping marker %q: failed to compute path relative to %q: %s", match, T.baseDir, relErr)
-			malformed[match] = fmt.Errorf("computing path relative to %q: %w", T.baseDir, relErr)
 			continue
 		}
 		marker, readErr := readTTLMarker(match)
