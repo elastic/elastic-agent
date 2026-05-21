@@ -353,8 +353,10 @@ func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir strin
 	// Both currentHomeRelPath and symlink target are kept: they may differ during transitions.
 	keepDirs, keepDirsErr := buildKeepDirs(log, topDir, false, extraDirs)
 	if keepDirsErr != nil {
-		// Return unexpired rollbacks so the scheduler retries when the next TTL expires.
-		return leftoverRollbacks, nil
+		// buildKeepDirs already logged the reason. Return unexpired rollbacks alongside
+		// the error so the scheduler knows to retry sooner rather than waiting for the
+		// next TTL expiry.
+		return leftoverRollbacks, keepDirsErr
 	}
 
 	// Partition the snapshot into directories to keep and directories to remove.

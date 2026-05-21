@@ -1152,10 +1152,10 @@ func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
 }
 
 // TestCleanAvailableRollbacks_SkipsRemovalsWhenSymlinkUnresolvable verifies
-// that CleanAvailableRollbacks returns no error and performs no removals when
+// that CleanAvailableRollbacks returns an error and performs no removals when
 // the agent symlink cannot be resolved. Without the symlink we cannot determine
 // which versioned home the next restart will use, so deleting anything risks
-// sweeping the live installation.
+// sweeping the live installation. The error lets the scheduler retry sooner.
 func TestCleanAvailableRollbacks_SkipsRemovalsWhenSymlinkUnresolvable(t *testing.T) {
 	testLogger, _ := loggertest.New(t.Name())
 	topDir := t.TempDir()
@@ -1178,7 +1178,7 @@ func TestCleanAvailableRollbacks_SkipsRemovalsWhenSymlinkUnresolvable(t *testing
 
 	leftover, err := CleanAvailableRollbacks(testLogger, registry, topDir, relB, now, CleanupExpiredRollbacks)
 
-	require.NoError(t, err, "must not return error when symlink is unresolvable")
+	require.Error(t, err, "must return error when symlink is unresolvable so the scheduler retries sooner")
 	if assert.Len(t, leftover, 1, "unexpired rollback must be returned for future cleanup") {
 		m := leftover[relA]
 		assert.Equal(t, versionA.version, m.Version)
