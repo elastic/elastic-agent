@@ -602,7 +602,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"data_stream": map[string]any{
 						"dataset": "generic-1",
 					},
-					"ports":      []any{443, 8443},
+					"ports":      []any{float64(443), float64(8443)},
 					"index":      "logs-generic-1-default",
 					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
 					"type":       "packet",
