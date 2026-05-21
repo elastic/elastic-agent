@@ -8,11 +8,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/elastic/elastic-agent/pkg/utils"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewAgentInfoWithLog(t *testing.T) {
@@ -37,11 +35,11 @@ func TestNewAgentInfoWithLog(t *testing.T) {
 				MonitoringHTTP: nil,
 			},
 			expected: &AgentInfo{
-				agentID:      "testID",
-				logLevel:     "debug",
-				unprivileged: !hasRoot,
-				esHeaders:    nil,
-				isStandalone: true,
+				agentID:        "testID",
+				logLevelPolicy: "debug",
+				unprivileged:   !hasRoot,
+				esHeaders:      nil,
+				isStandalone:   true,
 			},
 		},
 		{
@@ -55,11 +53,31 @@ func TestNewAgentInfoWithLog(t *testing.T) {
 				MonitoringHTTP: nil,
 			},
 			expected: &AgentInfo{
-				agentID:      "testID",
-				logLevel:     "info",
-				unprivileged: !hasRoot,
-				esHeaders:    nil,
-				isStandalone: false,
+				agentID:        "testID",
+				logLevelPolicy: "info",
+				unprivileged:   !hasRoot,
+				esHeaders:      nil,
+				isStandalone:   false,
+			},
+		},
+		{
+			name:            "fleet managed agent with per-agent override",
+			levelFromConfig: "debug",
+			isStandalone:    false,
+			persistentAgentInfo: &persistentAgentInfo{
+				ID:               "testID",
+				Headers:          nil,
+				LogLevel:         "info",
+				LogLevelOverride: "warning",
+				MonitoringHTTP:   nil,
+			},
+			expected: &AgentInfo{
+				agentID:          "testID",
+				logLevelPolicy:   "info",
+				logLevelOverride: "warning",
+				unprivileged:     !hasRoot,
+				esHeaders:        nil,
+				isStandalone:     false,
 			},
 		},
 	} {
@@ -73,8 +91,8 @@ func TestNewAgentInfoWithLog(t *testing.T) {
 			}
 
 			ai, err := NewAgentInfoWithLog(context.Background(), tc.levelFromConfig, true)
-			assert.NoError(t, err, "could not create agent info")
-			assert.Equal(t, tc.expected, ai, "agent info does not match")
+			require.NoError(t, err, "could not create agent info")
+			require.Equal(t, tc.expected, ai, "agent info does not match")
 		})
 	}
 }
