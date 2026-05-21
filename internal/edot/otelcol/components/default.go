@@ -21,11 +21,7 @@ import (
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
 	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
-<<<<<<< HEAD
-=======
 	azuremonitorreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver"
-	couchdbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver"
->>>>>>> fd9699b70 (Add Azure Monitor receiver to EDOT Collector (#12919))
 	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
@@ -157,12 +153,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
-<<<<<<< HEAD
-=======
 			azuremonitorreceiver.NewFactory(),
-			couchdbreceiver.NewFactory(),
-			haproxyreceiver.NewFactory(),
->>>>>>> fd9699b70 (Add Azure Monitor receiver to EDOT Collector (#12919))
 			iisreceiver.NewFactory(),
 			mysqlreceiver.NewFactory(),
 			postgresqlreceiver.NewFactory(),
