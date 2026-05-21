@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -182,19 +183,24 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
 			5*time.Minute, time.Second)
 
-		// Verify the component is running as a beats receiver
+		// Verify the user beat component (not monitoring components) is running as a beats receiver.
+		// Monitoring components are excluded because they may independently run as process-based
+		// beats regardless of the agent.internal.runtime.default override.
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			status, statusErr := runner.agentFixture.ExecStatus(ctx)
 			require.NoError(collect, statusErr)
-			var hasReceiver bool
+			var hasUserReceiver bool
 			for _, comp := range status.Components {
+				if strings.HasSuffix(comp.ID, "-monitoring") {
+					continue
+				}
 				if comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
-					hasReceiver = true
+					hasUserReceiver = true
 					break
 				}
 			}
-			assert.True(collect, hasReceiver, "expected a component running as beats receiver")
-		}, 2*time.Minute, 5*time.Second, "component should be running as beats receiver")
+			assert.True(collect, hasUserReceiver, "expected the user beat component to be running as beats receiver")
+		}, 2*time.Minute, 5*time.Second, "user beat component should be running as beats receiver")
 
 		otelDoc = runner.validateAuditdEvents(ctx, agentStatus.Info.ID, otelSince)
 	})
