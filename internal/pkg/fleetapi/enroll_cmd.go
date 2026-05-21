@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
 // EnrollType is the type of enrollment to do with the elastic-agent.

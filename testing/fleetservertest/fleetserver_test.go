@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
 // TestRunFleetServer shows how to configure and run a fleet-server capable of
