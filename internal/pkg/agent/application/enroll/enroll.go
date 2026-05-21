@@ -325,6 +325,12 @@ func CreateFleetServerBootstrapConfig(
 			Key:         esClientCertKey,
 		}
 	}
+	// Hot reloading of TLS certificates is intentionally disabled in this release branch;
+	// it will be enabled by default starting from the next minor release.
+	if es.TLS != nil {
+		disabled := false
+		es.TLS.CertificateReload = tlscommon.CertificateReload{Enabled: &disabled}
+	}
 	if host == "" {
 		host = defaultFleetServerHost
 	}
@@ -380,6 +386,10 @@ func CreateFleetServerBootstrapConfig(
 		if err := cfg.Server.TLS.ClientAuth.Unpack(clientAuth); err != nil {
 			return nil, errors.New(err, "failed to unpack --fleet-server-client-auth", errors.TypeConfig)
 		}
+		// Hot reloading of TLS certificates is intentionally disabled in this release branch;
+		// it will be enabled by default starting from the next minor release.
+		disabled := false
+		cfg.Server.TLS.CertificateReload = tlscommon.CertificateReload{Enabled: &disabled}
 	}
 
 	if localFleetServer {

@@ -661,8 +661,12 @@ func kibanaFetchToken(cfg setupConfig, client *kibana.Client, policy *kibanaPoli
 func kibanaClient(cfg kibanaConfig, headers map[string]string) (*kibana.Client, error) {
 	var tls *tlscommon.Config
 	if cfg.Fleet.CA != "" {
+		// Hot reloading of TLS certificates is intentionally disabled in this release branch;
+		// it will be enabled by default starting from the next minor release.
+		disabled := false
 		tls = &tlscommon.Config{
-			CAs: []string{cfg.Fleet.CA},
+			CAs:               []string{cfg.Fleet.CA},
+			CertificateReload: tlscommon.CertificateReload{Enabled: &disabled},
 		}
 	}
 

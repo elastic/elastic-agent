@@ -5,6 +5,7 @@
 package configuration
 
 import (
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/go-ucfg"
@@ -31,7 +32,30 @@ func NewFromConfig(cfg *config.Config) (*Configuration, error) {
 		return nil, errors.New(err, errors.TypeConfig)
 	}
 
+	// Hot reloading of TLS certificates is intentionally disabled in this release branch;
+	// it will be enabled by default starting from the next minor release.
+	disableTLSCertReload(c)
+
 	return c, nil
+}
+
+func disableTLSCertReload(c *Configuration) {
+	if c.Fleet == nil {
+		return
+	}
+	disabled := false
+	noReload := tlscommon.CertificateReload{Enabled: &disabled}
+	if c.Fleet.Client.Transport.TLS != nil {
+		c.Fleet.Client.Transport.TLS.CertificateReload = noReload
+	}
+	if c.Fleet.Server != nil {
+		if c.Fleet.Server.TLS != nil {
+			c.Fleet.Server.TLS.CertificateReload = noReload
+		}
+		if c.Fleet.Server.Output.Elasticsearch.TLS != nil {
+			c.Fleet.Server.Output.Elasticsearch.TLS.CertificateReload = noReload
+		}
+	}
 }
 
 // NewPartialFromConfigNoDefaults creates a configuration based on common Config.

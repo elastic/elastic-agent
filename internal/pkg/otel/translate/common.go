@@ -209,7 +209,12 @@ func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any
 		certPem = string(certBytes)
 	}
 
-	tlsCfg, err := tlscommon.LoadTLSConfig(tlsConfig, logger)
+	// Hot reloading of TLS certificates is intentionally disabled in this release branch;
+	// it will be enabled by default starting from the next minor release.
+	tlsConfigCopy := *tlsConfig
+	disabled := false
+	tlsConfigCopy.CertificateReload = tlscommon.CertificateReload{Enabled: &disabled}
+	tlsCfg, err := tlscommon.LoadTLSConfig(&tlsConfigCopy, logger)
 	if err != nil {
 		return nil, fmt.Errorf("cannot load SSL configuration: %w", err)
 	}

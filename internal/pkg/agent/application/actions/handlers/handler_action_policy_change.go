@@ -237,6 +237,10 @@ func updateFleetConfig(log *logger.Logger, policyConfig remote.Config, agentConf
 		}
 
 		agentConfig.Transport.TLS = &tlsCopy
+		// Hot reloading of TLS certificates is intentionally disabled in this release branch;
+		// it will be enabled by default starting from the next minor release.
+		disabled := false
+		agentConfig.Transport.TLS.CertificateReload = tlscommon.CertificateReload{Enabled: &disabled}
 	}
 }
 

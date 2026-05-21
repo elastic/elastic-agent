@@ -104,6 +104,10 @@ func (e *EnrollOptions) RemoteConfig(failOnInsecureMismatch bool) (remote.Config
 		}
 	}
 
+	// Hot reloading of TLS certificates is intentionally disabled in this release branch;
+	// it will be enabled by default starting from the next minor release.
+	disabled := false
+	tlsCfg.CertificateReload = tlscommon.CertificateReload{Enabled: &disabled}
 	cfg.Transport.TLS = &tlsCfg
 
 	proxySettings, err := httpcommon.NewHTTPClientProxySettings(e.ProxyURL, e.ProxyHeaders, e.ProxyDisabled)
