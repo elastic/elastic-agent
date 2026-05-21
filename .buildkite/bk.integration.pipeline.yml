@@ -217,18 +217,14 @@ steps:
               - "true"
               - "false"
             variant:
-            - default
-            - fleet
-            - fleet-endpoint-security
-            - fleet-privileged
-            - standalone-upgrade
-            - upgrade
-            - upgrade-flavor
-            - install-uninstall
-          adjustments:
-            - with:
-                sudo: "false"
-                variant: default
+              - "default"
+              - "fleet"
+              - "fleet-endpoint-security"
+              - "fleet-privileged"
+              - "install-uninstall"
+              - "standalone-upgrade"
+              - "upgrade"
+              - "upgrade-flavor"
 
   - group: "Stateful: Windows (tier 2)"
     if_changed:
@@ -276,19 +272,14 @@ steps:
               - "true"
               - "false"
             variant:
-              - default
-              - fleet
-              - fleet-endpoint-security
-              - fleet-privileged
-              - standalone-upgrade
-              - upgrade
-              - upgrade-flavor
-              - install-uninstall
-            adjustments:
-              - with:
-                  sudo: "false"
-                  variant:
-                    - default
+              - "default"
+              - "fleet"
+              - "fleet-endpoint-security"
+              - "fleet-privileged"
+              - "install-uninstall"
+              - "standalone-upgrade"
+              - "upgrade"
+              - "upgrade-flavor"
 
   - group: "Stateful: Windows (tier 3)"
     key: integration-tests-win-tier3
@@ -331,19 +322,14 @@ steps:
               - "true"
               - "false"
             variant:
-              - default
-              - fleet
-              - fleet-endpoint-security
-              - fleet-privileged
-              - standalone-upgrade
-              - upgrade
-              - upgrade-flavor
-              - install-uninstall
-            adjustments:
-              - with:
-                  sudo: "false"
-                  variant:
-                    - default
+              - "default"
+              - "fleet"
+              - "fleet-endpoint-security"
+              - "fleet-privileged"
+              - "install-uninstall"
+              - "standalone-upgrade"
+              - "upgrade"
+              - "upgrade-flavor"
 
       - label: "Win:amd64:Tier3:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
@@ -378,18 +364,14 @@ steps:
               - "true"
               - "false"
             variant:
-              - default
-              - fleet
-              - fleet-endpoint-security
-              - fleet-privileged
-              - standalone-upgrade
-              - upgrade
-              - upgrade-flavor
-              - install-uninstall
-          adjustments:
-            - with:
-                sudo: "false"
-                variant: default
+              - "default"
+              - "fleet"
+              - "fleet-endpoint-security"
+              - "fleet-privileged"
+              - "install-uninstall"
+              - "standalone-upgrade"
+              - "upgrade"
+              - "upgrade-flavor"
 
       - label: "Win:arm64:Tier3:{{matrix.sudo}}:{{matrix.variant}}"
         depends_on:
