@@ -267,7 +267,7 @@ steps:
         matrix:
           setup:
             os:
-              - "${IMAGE_WIN_2016}"
+              - "${IMAGE_WIN_2025}"
             sudo:
               - "true"
               - "false"
@@ -315,7 +315,6 @@ steps:
         matrix:
           setup:
             os:
-              - "${IMAGE_WIN_2016}"
               - "${IMAGE_WIN_2022}"
               - "${IMAGE_WIN_2025}"
             sudo:
