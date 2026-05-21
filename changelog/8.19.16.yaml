@@ -14,11 +14,11 @@ entries:
         name: 1775846688-add-azure-encoding-extension-to-edot-collector.yaml
         checksum: 167a439379bd61e3e6db7c46c7a9732fd7cd23e9
     - kind: enhancement
-      summary: Update go to v1.26.2
+      summary: Update go to v1.26.3
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/13683
+        - https://github.com/elastic/elastic-agent/pull/14168
       issue: []
       impact: ""
       action: ""
@@ -146,19 +146,6 @@ entries:
       file:
         name: 1778020336-fix-non-executable-package-file-permissions.yaml
         checksum: 01a8d8c7338d46c5430a1ac752efe7adcea28de5
-    - kind: enhancement
-      summary: Update OTel components to v0.150.0
-      description: ""
-      component: elastic-agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/14077
-      issue: []
-      impact: ""
-      action: ""
-      timestamp: 1778232664
-      file:
-        name: 1778232664-update-otel-components-to-v0.150.0.yaml
-        checksum: 85551106680404bab3f2f61751c2b21461b85b70
     - kind: security
       summary: Upgrade npm to v11 in non-wolfi elastic-agent-complete Docker images
       description: ""

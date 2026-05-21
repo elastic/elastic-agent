@@ -39,9 +39,8 @@ The 8.19.16 release adds the following new and notable features.
 
 
 
-* Update go to v1.26.2. https://github.com/elastic/elastic-agent/pull/13683[#13683] 
+* Update go to v1.26.3. https://github.com/elastic/elastic-agent/pull/14168[#14168] 
 * Update EDOT SDK k8s auto-instrumentation images to their latest versions. https://github.com/elastic/elastic-agent/pull/12685[#12685] 
-* Update OTel components to v0.150.0. https://github.com/elastic/elastic-agent/pull/14077[#14077] 
 * Update OTel Collector components to v0.152.0. https://github.com/elastic/elastic-agent/pull/14366[#14366] 
 
 
