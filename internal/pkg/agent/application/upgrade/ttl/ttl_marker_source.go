@@ -57,7 +57,7 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 		}
 		T.log.Debugf("Removing marker for versionedHome: %s", versionedHome)
 		err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
-		if err != nil {
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
 		}
 	}
@@ -68,7 +68,7 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 		}
 		T.log.Debugf("Removing malformed marker for versionedHome: %s", versionedHome)
 		err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
-		if err != nil {
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
 		}
 	}
@@ -77,16 +77,12 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 }
 
 func (T TTLMarkerRegistry) Remove(versionedHome string) error {
-	markerFilePath := filepath.Join(T.baseDir, versionedHome, ttlMarkerName)
-	if _, err := os.Stat(markerFilePath); errors.Is(err, os.ErrNotExist) {
-		// marker file does not exist, nothing to do
-		return nil
-	}
-
-	T.log.Debugf("Removing marker for versionedHome: %s", versionedHome)
-	err := os.Remove(markerFilePath)
-	if err != nil {
+	err := os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
+	}
+	if err == nil {
+		T.log.Debugf("Removing marker for versionedHome: %s", versionedHome)
 	}
 	return nil
 }
