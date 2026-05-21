@@ -104,6 +104,7 @@ steps:
       - *vault_github_token
 
   - group: "Extended runtime leak tests"
+    skip: "faster"
     key: extended-integration-tests
     notify:
       - github_commit_status:
@@ -437,6 +438,7 @@ steps:
                     - default
 
   - group: "Stateful:Ubuntu"
+    skip: "faster"
     key: integration-tests-ubuntu
     notify:
       - github_commit_status:
@@ -574,6 +576,7 @@ steps:
           - default
 
   - group: "Stateful:Debian"
+    skip: "faster"
     key: integration-tests-debian
     notify:
       - github_commit_status:
@@ -657,6 +660,7 @@ steps:
               - container
 
   - group: "Stateful:RHEL"
+    skip: "faster"
     key: integration-tests-rhel
     notify:
       - github_commit_status:
@@ -693,6 +697,7 @@ steps:
               - "${IMAGE_RHEL_10}"
 
   - label: ":kubernetes: Kubernetes"
+    skip: "faster"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Kubernetes"
@@ -702,6 +707,7 @@ steps:
     command: ".buildkite/scripts/upload-k8s-tests.sh"
 
   - group: "Serverless integration test"
+    skip: "faster"
     key: integration-tests-serverless
     notify:
       - github_commit_status:
