@@ -247,6 +247,9 @@ steps:
           - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+          # Disable redaction for Windows 2016 when using OIDC plugin due to some unsupported Windows build system
+          # https://buildkite.com/resources/changelog/329-agent-v3-dot-104-oidc-token-requests-now-require-job-api-socket-for-redaction/#main-content
+          BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
         command: |
           buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} {{matrix.sudo}}
@@ -267,7 +270,7 @@ steps:
         matrix:
           setup:
             os:
-              - "${IMAGE_WIN_2025}"
+              - "${IMAGE_WIN_2016}"
             sudo:
               - "true"
               - "false"
@@ -295,6 +298,9 @@ steps:
           - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+          # Disable redaction for Windows 2016 when using OIDC plugin due to some unsupported Windows build system
+          # https://buildkite.com/resources/changelog/329-agent-v3-dot-104-oidc-token-requests-now-require-job-api-socket-for-redaction/#main-content
+          BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
         command: |
           buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} {{matrix.sudo}}
@@ -315,6 +321,7 @@ steps:
         matrix:
           setup:
             os:
+              - "${IMAGE_WIN_2016}"
               - "${IMAGE_WIN_2022}"
               - "${IMAGE_WIN_2025}"
             sudo:
