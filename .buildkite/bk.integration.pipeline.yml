@@ -214,8 +214,8 @@ steps:
         matrix:
           setup:
             sudo:
-              - true
-              - false
+              - "true"
+              - "false"
             variant:
             - default
             - fleet
@@ -225,11 +225,10 @@ steps:
             - upgrade
             - upgrade-flavor
             - install-uninstall
-            adjustments:
-              - with:
-                  sudo: false
-                  variant:
-                    - default
+          adjustments:
+            - with:
+                sudo: "false"
+                variant: default
 
   - group: "Stateful: Windows (tier 2)"
     if_changed:
@@ -274,8 +273,8 @@ steps:
             os:
               - "${IMAGE_WIN_2016}"
             sudo:
-              - true
-              - false
+              - "true"
+              - "false"
             variant:
               - default
               - fleet
@@ -287,7 +286,7 @@ steps:
               - install-uninstall
             adjustments:
               - with:
-                  sudo: false
+                  sudo: "false"
                   variant:
                     - default
 
@@ -329,8 +328,8 @@ steps:
               - "${IMAGE_WIN_2022}"
               - "${IMAGE_WIN_2025}"
             sudo:
-              - true
-              - false
+              - "true"
+              - "false"
             variant:
               - default
               - fleet
@@ -342,7 +341,7 @@ steps:
               - install-uninstall
             adjustments:
               - with:
-                  sudo: false
+                  sudo: "false"
                   variant:
                     - default
 
@@ -376,8 +375,8 @@ steps:
               - "${IMAGE_WIN_10}"
               - "${IMAGE_WIN_11}"
             sudo:
-              - true
-              - false
+              - "true"
+              - "false"
             variant:
               - default
               - fleet
@@ -387,11 +386,10 @@ steps:
               - upgrade
               - upgrade-flavor
               - install-uninstall
-            adjustments:
-              - with:
-                  sudo: false
-                  variant:
-                    - default
+          adjustments:
+            - with:
+                sudo: "false"
+                variant: default
 
       - label: "Win:arm64:Tier3:{{matrix.sudo}}:{{matrix.variant}}"
         depends_on:
@@ -420,8 +418,8 @@ steps:
         matrix:
           setup:
             sudo:
-              - true
-              - false
+              - "true"
+              - "false"
             variant:
               - default
               - fleet
@@ -431,11 +429,10 @@ steps:
               - upgrade
               - upgrade-flavor
               - install-uninstall
-            adjustments:
-              - with:
-                  sudo: false
-                  variant:
-                    - default
+          adjustments:
+            - with:
+                sudo: "false"
+                variant: default
 
   - group: "Stateful:Ubuntu"
     skip: "faster"
