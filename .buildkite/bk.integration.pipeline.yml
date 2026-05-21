@@ -231,7 +231,6 @@ steps:
                     - default
 
   - group: "Stateful: Windows (tier 2)"
-    if: build.pull_request.id != null
     if_changed:
       include:
         - .buildkite/**
@@ -273,7 +272,6 @@ steps:
           setup:
             os:
               - "${IMAGE_WIN_2016}"
-              - "${IMAGE_WIN_2022}"
             sudo:
               - true
               - false
