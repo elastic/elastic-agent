@@ -209,7 +209,7 @@ func TestApplyCustomLogsPath(t *testing.T) {
 	})
 
 	for name, tt := range tests {
-		flag.CommandLine.Set("path.logs", "") // reset flag before each test
+		require.NoError(t, flag.CommandLine.Set("path.logs", "")) // reset flag before each test
 		t.Run(name, func(t *testing.T) {
 			if tt.flagValue != "" {
 				require.NoError(t, flag.CommandLine.Set("path.logs", tt.flagValue))
