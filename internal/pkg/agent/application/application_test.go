@@ -408,12 +408,17 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 		{
 			name: "Expired installs still existing on disk will be removed from the install list and removed from disk",
 			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, ttl.Source) {
-				_ = createFakeAgentInstall(t, topDir, "4.5.6", "newversionhash", true)
+				newAgentInstallPath := createFakeAgentInstall(t, topDir, "4.5.6", "newversionhash", true)
 				oldAgentInstallPath := createFakeAgentInstall(t, topDir, "1.2.3", "oldversionhash", true)
 
 				// assert that the versionedHome of the old install is the same we check in postNormalizeAssertions
 				assert.Equal(t, oldAgentInstallPath, filepath.Join("data", "elastic-agent-1.2.3-oldver"),
 					"Unexpected old install versioned home. Post normalize assertions may not be working")
+
+				// The symlink is required so that liveVersionedHome can identify the running install and
+				// allow CleanAvailableRollbacks to proceed with removals (it skips removals when the
+				// symlink is unresolvable to avoid accidentally deleting the live installation).
+				createSymlinkForFakeInstall(t, topDir, newAgentInstallPath)
 
 				mockRollbackSource := ttl.NewMockSource(t)
 				mockRollbackSource.EXPECT().GetAll().Return(
@@ -427,7 +432,6 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 					nil, nil,
 				)
 
-				mockRollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-1.2.3-oldver")).Return(nil)
 				return nil, mockRollbackSource
 			},
 			postNormalizeAssertions: func(t *testing.T, topDir string, _ *upgrade.UpdateMarker) {
@@ -494,6 +498,21 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 
 	// return the path relative to top exactly like the step_unpack does
 	return relVersionedHomePath
+}
+
+// createSymlinkForFakeInstall creates the top-level elastic-agent symlink pointing at the binary
+// inside the given versioned home (relative to topDir). This is required by liveVersionedHome so
+// that CleanAvailableRollbacks can identify which install is live and proceed with removals.
+func createSymlinkForFakeInstall(t *testing.T, topDir string, relVersionedHomePath string) {
+	t.Helper()
+	linkName := upgrade.AgentName
+	linkTarget := paths.BinaryPath(relVersionedHomePath, upgrade.AgentName)
+	if runtime.GOOS == "windows" {
+		linkName += ".exe"
+		linkTarget += ".exe"
+	}
+	err := os.Symlink(linkTarget, filepath.Join(topDir, linkName))
+	require.NoError(t, err, "error creating symlink for fake agent install")
 }
 
 func TestApplicationStandaloneEncrypted(t *testing.T) {

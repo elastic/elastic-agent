@@ -392,6 +392,9 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 func snapshotAgentDirs(topDir string) ([]string, error) {
 	entries, err := os.ReadDir(paths.DataFrom(topDir))
 	if err != nil {
+		if goerrors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("reading data directory: %w", err)
 	}
 	var dirs []string
