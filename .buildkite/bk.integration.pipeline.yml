@@ -380,7 +380,14 @@ steps:
               - true
               - false
             variant:
-              *windows_variants
+              - default
+              - fleet
+              - fleet-endpoint-security
+              - fleet-privileged
+              - standalone-upgrade
+              - upgrade
+              - upgrade-flavor
+              - install-uninstall
             adjustments:
               - with:
                   sudo: false
@@ -417,7 +424,14 @@ steps:
               - true
               - false
             variant:
-              *windows_variants
+              - default
+              - fleet
+              - fleet-endpoint-security
+              - fleet-privileged
+              - standalone-upgrade
+              - upgrade
+              - upgrade-flavor
+              - install-uninstall
             adjustments:
               - with:
                   sudo: false
