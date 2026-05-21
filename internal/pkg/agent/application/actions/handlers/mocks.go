@@ -16,6 +16,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -636,6 +637,65 @@ type mockLogLevelSetter_Expecter struct {
 
 func (_m *mockLogLevelSetter) EXPECT() *mockLogLevelSetter_Expecter {
 	return &mockLogLevelSetter_Expecter{mock: &_m.Mock}
+}
+
+// ReExec provides a mock function for the type mockLogLevelSetter
+func (_mock *mockLogLevelSetter) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string) {
+	// string
+	_va := make([]interface{}, len(argOverrides))
+	for _i := range argOverrides {
+		_va[_i] = argOverrides[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, callback)
+	_ca = append(_ca, _va...)
+	_mock.Called(_ca...)
+	return
+}
+
+// mockLogLevelSetter_ReExec_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReExec'
+type mockLogLevelSetter_ReExec_Call struct {
+	*mock.Call
+}
+
+// ReExec is a helper method to define mock.On call
+//   - callback reexec.ShutdownCallbackFn
+//   - argOverrides ...string
+func (_e *mockLogLevelSetter_Expecter) ReExec(callback interface{}, argOverrides ...interface{}) *mockLogLevelSetter_ReExec_Call {
+	return &mockLogLevelSetter_ReExec_Call{Call: _e.mock.On("ReExec",
+		append([]interface{}{callback}, argOverrides...)...)}
+}
+
+func (_c *mockLogLevelSetter_ReExec_Call) Run(run func(callback reexec.ShutdownCallbackFn, argOverrides ...string)) *mockLogLevelSetter_ReExec_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 reexec.ShutdownCallbackFn
+		if args[0] != nil {
+			arg0 = args[0].(reexec.ShutdownCallbackFn)
+		}
+		var arg1 []string
+		variadicArgs := make([]string, len(args)-1)
+		for i, a := range args[1:] {
+			if a != nil {
+				variadicArgs[i] = a.(string)
+			}
+		}
+		arg1 = variadicArgs
+		run(
+			arg0,
+			arg1...,
+		)
+	})
+	return _c
+}
+
+func (_c *mockLogLevelSetter_ReExec_Call) Return() *mockLogLevelSetter_ReExec_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *mockLogLevelSetter_ReExec_Call) RunAndReturn(run func(callback reexec.ShutdownCallbackFn, argOverrides ...string)) *mockLogLevelSetter_ReExec_Call {
+	_c.Run(run)
+	return _c
 }
 
 // SetLogLevel provides a mock function for the type mockLogLevelSetter

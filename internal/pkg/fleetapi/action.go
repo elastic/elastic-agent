@@ -13,31 +13,22 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	api "github.com/elastic/fleet-server/pkg/api"
 )
 
 const (
-	// ActionTypeUnknown is used to indicate that the elastic-agent does not know how to handle the action
-	ActionTypeUnknown = "UNKNOWN"
-	// ActionTypeUpgrade specifies upgrade action.
-	ActionTypeUpgrade = "UPGRADE"
-	// ActionTypeUnenroll specifies unenroll action.
-	ActionTypeUnenroll = "UNENROLL"
-	// ActionTypePolicyChange specifies policy change action.
-	ActionTypePolicyChange = "POLICY_CHANGE"
-	// ActionTypePolicyReassign specifies policy reassign action.
-	ActionTypePolicyReassign = "POLICY_REASSIGN"
-	// ActionTypeSettings specifies change of agent settings.
-	ActionTypeSettings = "SETTINGS"
-	// ActionTypeInputAction specifies agent action.
-	ActionTypeInputAction = "INPUT_ACTION"
-	// ActionTypeCancel specifies a cancel action.
-	ActionTypeCancel = "CANCEL"
-	// ActionTypeDiagnostics specifies a diagnostics action.
-	ActionTypeDiagnostics = "REQUEST_DIAGNOSTICS"
-	// ActionTypeDiagnostics specifies a diagnostics action.
-	ActionTypeMigrate = "MIGRATE"
-	// ActionTypeDiagnostics specifies a diagnostics action.
-	ActionTypePrivilegeLevelChange = "PRIVILEGE_LEVEL_CHANGE"
+	// ActionTypeUnknown is a client-side catch-all for unrecognized action types (not in Fleet Server spec).
+	ActionTypeUnknown              = "UNKNOWN"
+	ActionTypeUpgrade              = string(api.UPGRADE)
+	ActionTypeUnenroll             = string(api.UNENROLL)
+	ActionTypePolicyChange         = string(api.POLICYCHANGE)
+	ActionTypePolicyReassign       = string(api.POLICYREASSIGN)
+	ActionTypeSettings             = string(api.SETTINGS)
+	ActionTypeInputAction          = string(api.INPUTACTION)
+	ActionTypeCancel               = string(api.CANCEL)
+	ActionTypeDiagnostics          = string(api.REQUESTDIAGNOSTICS)
+	ActionTypeMigrate              = string(api.MIGRATE)
+	ActionTypePrivilegeLevelChange = string(api.PRIVILEGELEVELCHANGE)
 )
 
 // Error values that the Action interface can return
