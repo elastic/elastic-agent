@@ -176,26 +176,21 @@ func TestApplyCustomLogsPath(t *testing.T) {
     to_stderr: true
 `)
 
-	tests := []struct {
-		name          string
+	tests := map[string]struct {
 		flagValue     string // non-empty: set --path.logs to this value via flag.CommandLine
 		wantToStderr  bool
 		wantToFiles   bool
 		wantFilesPath string
 	}{
-		{
+		"--path.logs not set: config unchanged": {
 			// Without --path.logs, applyCustomLogsPath is a no-op.
 			// The raw loaded config has both ToStderr=true (from yaml) and
 			// ToFiles=true (default); applyFlags in logp resolves the conflict
 			// later when the logger is actually constructed.
-			name:         "--path.logs not set: config unchanged",
 			wantToStderr: true,
 			wantToFiles:  true,
 		},
-		{
-			// "set" case must run after the "not-set" case because setting the flag
-			// is a one-way operation (isCustomLogsPath cannot be reset from this package).
-			name:          "--path.logs set: overrides yaml to_stderr, forces file output",
+		"--path.logs set: overrides yaml to_stderr, forces file output": {
 			flagValue:     customPath,
 			wantToStderr:  false,
 			wantToFiles:   true,
@@ -213,8 +208,9 @@ func TestApplyCustomLogsPath(t *testing.T) {
 		paths.SetLogs(origLogsPath)
 	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		flag.CommandLine.Set("path.logs", "") // reset flag before each test
+		t.Run(name, func(t *testing.T) {
 			if tt.flagValue != "" {
 				require.NoError(t, flag.CommandLine.Set("path.logs", tt.flagValue))
 			}
@@ -236,6 +232,8 @@ func TestApplyCustomLogsPath(t *testing.T) {
 				// the to_stderr/to_files flags are forced.
 				assert.False(t, cfg.Settings.EventLoggingConfig.ToStderr)
 				assert.True(t, cfg.Settings.EventLoggingConfig.ToFiles)
+			} else {
+				assert.Equal(t, paths.Top(), cfg.Settings.LoggingConfig.Files.Path)
 			}
 		})
 	}

@@ -98,6 +98,12 @@ func SetupFlags() {
 		fs.StringVar(&configFilePath, "config", DefaultConfigName, "Configuration file, relative to path.config")
 		fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
 		fs.Func("path.logs", "Logs path contains Agent log output", func(s string) error {
+			// empty string resets to initial values - this is used by testing
+			if s == "" {
+				logsPath = topPath
+				isCustomLogsPath = false
+				return nil
+			}
 			logsPath = s
 			isCustomLogsPath = true
 			return nil
