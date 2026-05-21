@@ -134,7 +134,7 @@ func (runner *AuditDRunner) validateAuditdEvents(ctx context.Context, agentID st
 	}()
 
 	t.Logf("starting to query ES for auditd events at %s", now.Format(time.RFC3339Nano))
-	require.Eventually(t, func() bool {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		query = genESQuery(agentID,
 			[][]string{
 				{"exists", "field", "auditd.summary.actor.primary"},
@@ -148,12 +148,9 @@ func (runner *AuditDRunner) validateAuditdEvents(ctx context.Context, agentID st
 		}
 		now = time.Now()
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-auditd_manager.auditd*", runner.info.ESClient)
-		require.NoError(t, err)
-		if res.Hits.Total.Value < 1 {
-			return false
-		}
+		require.NoError(collect, err)
+		require.NotEmpty(collect, res.Hits.Hits)
 		doc = res.Hits.Hits[0].Source
-		return true
 	}, time.Minute*10, time.Second*10, "could not fetch events for auditd_manager")
 	return doc
 }

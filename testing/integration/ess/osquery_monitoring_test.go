@@ -132,7 +132,7 @@ func (runner *OsqueryManagerRunner) validateOsqueryEvents(ctx context.Context, a
 	}()
 
 	t.Logf("starting to query ES for osquery events at %s", now.Format(time.RFC3339Nano))
-	require.Eventually(t, func() bool {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		query = genESQuery(agentID,
 			[][]string{
 				{"exists", "field", "osquery.physical_memory"},
@@ -146,12 +146,9 @@ func (runner *OsqueryManagerRunner) validateOsqueryEvents(ctx context.Context, a
 		}
 		now = time.Now()
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-osquery_manager.result*", runner.info.ESClient)
-		require.NoError(t, err)
-		if res.Hits.Total.Value < 1 {
-			return false
-		}
+		require.NoError(collect, err)
+		require.NotEmpty(collect, res.Hits.Hits)
 		doc = res.Hits.Hits[0].Source
-		return true
 	}, time.Minute*15, time.Second*10, "could not fetch events for osquery_manager")
 	return doc
 }

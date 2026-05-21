@@ -137,7 +137,7 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Con
 	}()
 
 	t.Logf("starting to query ES for network traffic events at %s", now.Format(time.RFC3339Nano))
-	require.Eventually(t, func() bool {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		query = genESQuery(agentID,
 			[][]string{
 				{"exists", "field", "tls.client.server_name"},
@@ -151,12 +151,9 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Con
 		}
 		now = time.Now()
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-network_traffic.tls*", runner.info.ESClient)
-		require.NoError(t, err)
-		if res.Hits.Total.Value < 1 {
-			return false
-		}
+		require.NoError(collect, err)
+		require.NotEmpty(collect, res.Hits.Hits)
 		doc = res.Hits.Hits[0].Source
-		return true
 	}, time.Minute*10, time.Second*10, "could not fetch events for network_traffic")
 	return doc
 }
