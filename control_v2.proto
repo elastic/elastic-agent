@@ -413,7 +413,7 @@ service ElasticAgentControl {
   //
   // Client will continue to get updated StateResponse when any state
   // of the Elastic Agent has changed. Pass StateWatchRequest with
-  // latest_only=true to receive only the most recent state on each read,
+  // buffer_size=0 to receive only the most recent state on each read,
   // skipping intermediate transitions.
   rpc StateWatch(StateWatchRequest) returns (stream StateResponse);
 
