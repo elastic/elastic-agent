@@ -54,14 +54,9 @@ collectors:
             insecure: true
       processors:
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
-        resourcedetection/env:
-          # Detects resources from environment variables.
-          detectors: [env]
-          timeout: 2s
-          override: false
         resourcedetection/eks:
-          # Detects resources from EKS (Elastic Kubernetes Service).
-          detectors: [eks]
+          # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          detectors: [env, eks]
           timeout: 15s
           override: true
           eks:
@@ -69,13 +64,13 @@ collectors:
               k8s.cluster.name:
                 enabled: true
         resourcedetection/gcp:
-          # Detects resources from GCP (Google Cloud Platform).
-          detectors: [gcp]
+          # Detects resources from environment variables and GCP (Google Cloud Platform).
+          detectors: [env, gcp]
           timeout: 2s
           override: true
         resourcedetection/aks:
-          # Detects resources from AKS (Azure Kubernetes Service).
-          detectors: [aks]
+          # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          detectors: [env, aks]
           timeout: 2s
           override: true
           aks:
@@ -91,18 +86,13 @@ collectors:
         k8sattributes:
           passthrough: false # Annotates resources with the pod IP and does not try to extract any other metadata.
           pod_association:
-            # Below association takes a look at the k8s.pod.ip, then k8s.pod.uid, then k8s.pod.name + k8s.namespace.name, and tries to match it with the pod having the same attribute. If all three fail, it will use the connection's context.
+            # Below association takes a look at the k8s.pod.ip and k8s.pod.uid resource attributes or connection's context, and tries to match it with the pod having the same attribute.
             - sources:
                 - from: resource_attribute
                   name: k8s.pod.ip
             - sources:
                 - from: resource_attribute
                   name: k8s.pod.uid
-            - sources:
-                - from: resource_attribute
-                  name: k8s.pod.name
-                - from: resource_attribute
-                  name: k8s.namespace.name
             - sources:
                 - from: connection
           extract:
@@ -160,7 +150,6 @@ collectors:
               - otlp/gateway
             processors:
               - k8sattributes
-              - resourcedetection/env
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
@@ -171,7 +160,6 @@ collectors:
             receivers:
               - k8s_events
             processors:
-              - resourcedetection/env
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
@@ -217,14 +205,9 @@ collectors:
           send_batch_max_size: 0
           timeout: 1s
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
-        resourcedetection/env:
-          # Detects resources from environment variables.
-          detectors: [env]
-          timeout: 2s
-          override: false
         resourcedetection/eks:
-          # Detects resources from EKS (Elastic Kubernetes Service).
-          detectors: [eks]
+          # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          detectors: [env, eks]
           timeout: 15s
           override: true
           eks:
@@ -232,13 +215,13 @@ collectors:
               k8s.cluster.name:
                 enabled: true
         resourcedetection/gcp:
-          # Detects resources from GCP (Google Cloud Platform).
-          detectors: [gcp]
+          # Detects resources from environment variables and GCP (Google Cloud Platform).
+          detectors: [env, gcp]
           timeout: 2s
           override: true
         resourcedetection/aks:
-          # Detects resources from AKS (Azure Kubernetes Service).
-          detectors: [aks]
+          # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          detectors: [env, aks]
           timeout: 2s
           override: true
           aks:
@@ -309,11 +292,6 @@ collectors:
             - sources:
                 - from: resource_attribute
                   name: k8s.pod.uid
-            - sources:
-                - from: resource_attribute
-                  name: k8s.pod.name
-                - from: resource_attribute
-                  name: k8s.namespace.name
             - sources:
                 - from: connection
           extract:
@@ -478,7 +456,6 @@ collectors:
             processors:
               - batch
               - k8sattributes
-              - resourcedetection/env
               - resourcedetection/system
               - resourcedetection/eks
               - resourcedetection/gcp
@@ -494,7 +471,6 @@ collectors:
             processors:
               - batch/metrics
               - k8sattributes
-              - resourcedetection/env
               - resourcedetection/system
               - resourcedetection/eks
               - resourcedetection/gcp
