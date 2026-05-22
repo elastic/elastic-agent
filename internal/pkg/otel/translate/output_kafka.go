@@ -41,6 +41,14 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		requiredAcks = *kConfig.RequiredACKs
 	}
 
+	var headers []map[string]any
+	for _, header := range kConfig.Headers {
+		headers = append(headers, map[string]any{
+			"name":  header.Key,
+			"value": header.Value,
+		})
+	}
+
 	kafkaExporter := map[string]any{
 		"brokers":          kConfig.Hosts,
 		"client_id":        kConfig.ClientID,
@@ -68,11 +76,6 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		},
 		"metadata": map[string]any{
 			"refresh_interval": kConfig.Metadata.RefreshFreq,
-			"full":             kConfig.Metadata.Full,
-			"retry": map[string]any{
-				"max":     kConfig.Metadata.Retry.Max,
-				"backoff": kConfig.Metadata.Retry.Backoff,
-			},
 		},
 		"timeout": kConfig.BrokerTimeout,
 		"logs": map[string]any{
@@ -100,6 +103,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 	}
 
 	setIfNotNil(kafkaExporter, "tls", tlsCfg)
+	setIfNotNil(kafkaExporter, "record_headers", headers)
 
 	// compiles topic and validates against any malformed strings
 	fmtstr, err := fmtstr.CompileEvent(kConfig.Topic)
@@ -225,8 +229,6 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 
 	if cfg.HasField("keep_alive") {
 		return fmt.Errorf("keep_alive is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("headers") {
-		return fmt.Errorf("headers is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("timeout") {
 		return fmt.Errorf("timeout is currently not supported: %w", errors.ErrUnsupported)
 	} else if value, err := cfg.Child("ssl", -1); err == nil {

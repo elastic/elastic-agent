@@ -30,7 +30,13 @@ hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
 topic: static-topic
 required_acks: 1
 compression: gzip
-max_message_bytes: 1000000`,
+max_message_bytes: 1000000
+headers:
+- key: "some-key"
+  value: "some value"
+- key: "some-key"
+  value: "another value"
+`,
 		expectedMap: map[string]any{
 			"brokers": []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
 			"logs": map[string]any{
@@ -39,12 +45,7 @@ max_message_bytes: 1000000`,
 			},
 			"client_id": "beats",
 			"metadata": map[string]any{
-				"full":             false,
 				"refresh_interval": 10 * time.Minute,
-				"retry": map[string]any{
-					"backoff": 250 * time.Millisecond,
-					"max":     3,
-				},
 			},
 			"producer": map[string]any{
 				"compression": "gzip",
@@ -69,6 +70,16 @@ max_message_bytes: 1000000`,
 				"queue_size": 3200,
 			},
 			"timeout": 10 * time.Second,
+			"record_headers": []map[string]any{
+				{
+					"name":  "some-key",
+					"value": "some value",
+				},
+				{
+					"name":  "some-key",
+					"value": "another value",
+				},
+			},
 		},
 	},
 		{
@@ -89,12 +100,7 @@ max_message_bytes: 1000000`,
 				},
 				"client_id": "beats",
 				"metadata": map[string]any{
-					"full":             false,
 					"refresh_interval": 10 * time.Minute,
-					"retry": map[string]any{
-						"backoff": 250 * time.Millisecond,
-						"max":     3,
-					},
 				},
 				"producer": map[string]any{
 					"compression": "gzip",
@@ -141,12 +147,7 @@ max_message_bytes: 1000000`,
 				"topic_from_attribute": "topic", // this field is an the addition
 				"client_id":            "beats",
 				"metadata": map[string]any{
-					"full":             false,
 					"refresh_interval": 10 * time.Minute,
-					"retry": map[string]any{
-						"backoff": 250 * time.Millisecond,
-						"max":     3,
-					},
 				},
 				"producer": map[string]any{
 					"compression": "gzip",
