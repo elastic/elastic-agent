@@ -20,114 +20,83 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
-func TestSettings_SetLogLevel(t *testing.T) {
-
-	// test log level we use in testcases
-	testWarnLevel := logp.WarnLevel
-	defaultLogLevel := logger.DefaultLogLevel
-
-	type fields struct {
-		fallbackLogLevel *logp.Level
-	}
-	type args struct {
-		lvl *logp.Level
-	}
-	tests := []struct {
-		name                 string
-		fields               fields
-		args                 args
-		setupMocks           func(*testing.T, *mockLogLevelSetter, *info.MockAgent)
-		wantErr              assert.ErrorAssertionFunc
-		wantFallbackLogLevel *logp.Level
-	}{
-		{
-			name:   "fallbackLogLevel set without an override at agent level",
-			fields: fields{},
-			args: args{
-				lvl: &testWarnLevel,
-			},
-			setupMocks: func(t *testing.T, setter *mockLogLevelSetter, agent *info.MockAgent) {
-				agent.EXPECT().RawLogLevel().Return("").Once()
-				setter.EXPECT().SetLogLevel(mock.Anything, &testWarnLevel).Return(nil).Once()
-			},
-			wantErr:              assert.NoError,
-			wantFallbackLogLevel: &testWarnLevel,
-		},
-		{
-			name:   "Nil fallbackLogLevel without an override at agent level is not propagated",
-			fields: fields{},
-			args: args{
-				lvl: nil,
-			},
-			setupMocks: func(t *testing.T, setter *mockLogLevelSetter, agent *info.MockAgent) {
-				agent.EXPECT().RawLogLevel().Return("").Once()
-				setter.EXPECT().SetLogLevel(mock.Anything, &defaultLogLevel).Return(nil).Once()
-			},
-			wantErr:              assert.NoError,
-			wantFallbackLogLevel: nil,
-		},
-		{
-			name:   "fallbackLogLevel set while there's an override at agent level",
-			fields: fields{},
-			args: args{
-				lvl: &testWarnLevel,
-			},
-			setupMocks: func(t *testing.T, setter *mockLogLevelSetter, agent *info.MockAgent) {
-				agent.EXPECT().RawLogLevel().Return("info").Once()
-			},
-			wantErr:              assert.NoError,
-			wantFallbackLogLevel: &testWarnLevel,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockAgentInfo := info.NewMockAgent(t)
-			mockLogLevelSetter := newMockLogLevelSetter(t)
-
-			if tt.setupMocks != nil {
-				tt.setupMocks(t, mockLogLevelSetter, mockAgentInfo)
-			}
-
-			log, _ := loggertest.New(tt.name)
-
-			ctx := context.Background()
-
-			h := &Settings{
-				log:              log,
-				agentInfo:        mockAgentInfo,
-				fallbackLogLevel: tt.fields.fallbackLogLevel,
-				logLevelSetter:   mockLogLevelSetter,
-			}
-			tt.wantErr(t, h.SetLogLevel(ctx, tt.args.lvl), fmt.Sprintf("SetLogLevel(%v, %v)", ctx, tt.args.lvl))
-			assert.Equal(t, tt.wantFallbackLogLevel, h.fallbackLogLevel)
-		})
-	}
-}
-
 func TestSettings_handleLogLevel(t *testing.T) {
-
-	testWarnLogLevel := logp.WarnLevel
-	testDebugLogLevel := logp.DebugLevel
-	testDefaultLogLevel := logger.DefaultLogLevel
-	type fields struct {
-		fallbackLogLevel *logp.Level
+	expectLogLevelApplied := func(override string, runtime logp.Level) func(*testing.T, *info.MockAgent, *mockLogLevelSetter, *acker.MockAcker) {
+		return func(t *testing.T, agent *info.MockAgent, setter *mockLogLevelSetter, acker *acker.MockAcker) {
+			agent.EXPECT().SetLogLevelOverride(mock.Anything, override).Return(nil)
+			acker.EXPECT().Ack(mock.Anything, mock.Anything).Return(nil)
+			acker.EXPECT().Commit(mock.Anything).Return(nil)
+			agent.EXPECT().GetLogLevelRuntime().Return(runtime.String())
+			setter.EXPECT().SetLogLevel(mock.Anything, &runtime).Return(nil)
+		}
 	}
+
 	type args struct {
 		logLevel string
 		action   *fleetapi.ActionSettings
 	}
 	tests := []struct {
 		name       string
-		fields     fields
 		args       args
 		setupMocks func(*testing.T, *info.MockAgent, *mockLogLevelSetter, *acker.MockAcker)
 		wantErr    assert.ErrorAssertionFunc
 	}{
 		{
-			name: "Set debug log level, disregard fallback level warning",
-			fields: fields{
-				fallbackLogLevel: &testWarnLogLevel,
+			name: "Set log level, runtime follows override",
+			args: args{
+				logLevel: "debug",
+				action: &fleetapi.ActionSettings{
+					ActionID:   "someactionid",
+					ActionType: fleetapi.ActionTypeSettings,
+					Data:       fleetapi.ActionSettingsData{LogLevel: "debug"},
+				},
 			},
+			setupMocks: expectLogLevelApplied("debug", logp.DebugLevel),
+			wantErr:    assert.NoError,
+		},
+		{
+			name: "Clear log level, runtime falls back to policy level",
+			args: args{
+				logLevel: clearLogLevelValue,
+				action: &fleetapi.ActionSettings{
+					ActionID:   "someactionid",
+					ActionType: fleetapi.ActionTypeSettings,
+					Data:       fleetapi.ActionSettingsData{LogLevel: clearLogLevelValue},
+				},
+			},
+			setupMocks: expectLogLevelApplied(clearLogLevelValue, logp.WarnLevel),
+			wantErr:    assert.NoError,
+		},
+		{
+			name: "Clear log level with no policy level, runtime falls back to default",
+			args: args{
+				logLevel: clearLogLevelValue,
+				action: &fleetapi.ActionSettings{
+					ActionID:   "someactionid",
+					ActionType: fleetapi.ActionTypeSettings,
+					Data:       fleetapi.ActionSettingsData{LogLevel: clearLogLevelValue},
+				},
+			},
+			setupMocks: expectLogLevelApplied(clearLogLevelValue, logger.DefaultLogLevel),
+			wantErr:    assert.NoError,
+		},
+		{
+			name: "Invalid log level rejected before any state change",
+			args: args{
+				logLevel: "verbose",
+				action: &fleetapi.ActionSettings{
+					ActionID:   "someactionid",
+					ActionType: fleetapi.ActionTypeSettings,
+					Data:       fleetapi.ActionSettingsData{LogLevel: "verbose"},
+				},
+			},
+			setupMocks: func(t *testing.T, agent *info.MockAgent, setter *mockLogLevelSetter, acker *acker.MockAcker) {
+				// no calls expected: validation fails before SetLogLevelOverride / acker / setter
+			},
+			wantErr: assert.Error,
+		},
+		{
+			name: "Persistence failure surfaces as error",
 			args: args{
 				logLevel: "debug",
 				action: &fleetapi.ActionSettings{
@@ -137,56 +106,9 @@ func TestSettings_handleLogLevel(t *testing.T) {
 				},
 			},
 			setupMocks: func(t *testing.T, agent *info.MockAgent, setter *mockLogLevelSetter, acker *acker.MockAcker) {
-				agent.EXPECT().SetLogLevel(mock.Anything, "debug").Return(nil)
-				setter.EXPECT().SetLogLevel(mock.Anything, &testDebugLogLevel).Return(nil)
-				acker.EXPECT().Ack(mock.Anything, mock.Anything).Return(nil)
-				acker.EXPECT().Commit(mock.Anything).Return(nil)
+				agent.EXPECT().SetLogLevelOverride(mock.Anything, "debug").Return(fmt.Errorf("disk write failed"))
 			},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "Clear log level, switch to fallback level warning",
-			fields: fields{
-				fallbackLogLevel: &testWarnLogLevel,
-			},
-			args: args{
-				logLevel: clearLogLevelValue,
-				action: &fleetapi.ActionSettings{
-					ActionID:   "someactionid",
-					ActionType: fleetapi.ActionTypeSettings,
-					Data: fleetapi.ActionSettingsData{
-						LogLevel: clearLogLevelValue},
-				},
-			},
-			setupMocks: func(t *testing.T, agent *info.MockAgent, setter *mockLogLevelSetter, acker *acker.MockAcker) {
-				agent.EXPECT().SetLogLevel(mock.Anything, "").Return(nil)
-				setter.EXPECT().SetLogLevel(mock.Anything, &testWarnLogLevel).Return(nil)
-				acker.EXPECT().Ack(mock.Anything, mock.Anything).Return(nil)
-				acker.EXPECT().Commit(mock.Anything).Return(nil)
-			},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "Clear log level, no fallback level, go with default log level",
-			fields: fields{
-				fallbackLogLevel: nil,
-			},
-			args: args{
-				logLevel: clearLogLevelValue,
-				action: &fleetapi.ActionSettings{
-					ActionID:   "someactionid",
-					ActionType: fleetapi.ActionTypeSettings,
-					Data: fleetapi.ActionSettingsData{
-						LogLevel: clearLogLevelValue},
-				},
-			},
-			setupMocks: func(t *testing.T, agent *info.MockAgent, setter *mockLogLevelSetter, acker *acker.MockAcker) {
-				agent.EXPECT().SetLogLevel(mock.Anything, "").Return(nil)
-				setter.EXPECT().SetLogLevel(mock.Anything, &testDefaultLogLevel).Return(nil)
-				acker.EXPECT().Ack(mock.Anything, mock.Anything).Return(nil)
-				acker.EXPECT().Commit(mock.Anything).Return(nil)
-			},
-			wantErr: assert.NoError,
+			wantErr: assert.Error,
 		},
 	}
 	for _, tt := range tests {
@@ -202,11 +124,10 @@ func TestSettings_handleLogLevel(t *testing.T) {
 
 			ctx := context.Background()
 
-			h := &Settings{
-				log:              log,
-				agentInfo:        mockAgentInfo,
-				fallbackLogLevel: tt.fields.fallbackLogLevel,
-				logLevelSetter:   mockLogLevelSetter,
+			h := &SettingsHandler{
+				log:                   log,
+				agentInfo:             mockAgentInfo,
+				runtimeLogLevelSetter: mockLogLevelSetter,
 			}
 			tt.wantErr(t, h.handleLogLevel(ctx, tt.args.logLevel, mockAcker, tt.args.action), fmt.Sprintf("handleLogLevel(%v, %v, %v, %v)", ctx, tt.args.logLevel, mockAcker, tt.args.action))
 		})

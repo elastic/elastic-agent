@@ -24,3 +24,4 @@
 {"name": "github.com/elastic/ebpfevents", "licenceType": "Apache-2.0"}
 {"name": "github.com/spdx/tools-golang", "licenceFile": "LICENSE.code", "licenceType": "Apache-2.0"}
 {"name": "github.com/elastic/entcollect", "licenceFile": "LICENSE.txt", "licenceType": "Elastic"}
+{"name": "github.com/elastic/fleet-server/pkg/api", "licenceFile": "LICENSE.txt", "licenceType": "Elastic"}
