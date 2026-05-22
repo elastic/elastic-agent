@@ -56,6 +56,15 @@ common:
         version-file: .oblt-cli-version
   - vault_github_token: &vault_github_token
       elastic/vault-github-token#v0.1.0:
+  - windows_variants: &windows_variants
+      - "default"
+      - "fleet"
+      - "fleet-endpoint-security"
+      - "fleet-privileged"
+      - "install-uninstall"
+      - "standalone-upgrade"
+      - "upgrade"
+      - "upgrade-flavor"
 
 steps:
   - label: "Custom ECH Testing"
@@ -216,15 +225,7 @@ steps:
             sudo:
               - "true"
               - "false"
-            variant:
-              - "default"
-              - "fleet"
-              - "fleet-endpoint-security"
-              - "fleet-privileged"
-              - "install-uninstall"
-              - "standalone-upgrade"
-              - "upgrade"
-              - "upgrade-flavor"
+            variant: *windows_variants
 
   - group: "Stateful: Windows (tier 2)"
     if_changed:
@@ -274,15 +275,7 @@ steps:
             sudo:
               - "true"
               - "false"
-            variant:
-              - "default"
-              - "fleet"
-              - "fleet-endpoint-security"
-              - "fleet-privileged"
-              - "install-uninstall"
-              - "standalone-upgrade"
-              - "upgrade"
-              - "upgrade-flavor"
+            variant: *windows_variants
 
   - group: "Stateful: Windows (tier 3)"
     key: integration-tests-win-tier3
@@ -327,15 +320,7 @@ steps:
             sudo:
               - "true"
               - "false"
-            variant:
-              - "default"
-              - "fleet"
-              - "fleet-endpoint-security"
-              - "fleet-privileged"
-              - "install-uninstall"
-              - "standalone-upgrade"
-              - "upgrade"
-              - "upgrade-flavor"
+            variant: *windows_variants
 
       - label: "Win:amd64:Tier3:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
@@ -369,15 +354,7 @@ steps:
             sudo:
               - "true"
               - "false"
-            variant:
-              - "default"
-              - "fleet"
-              - "fleet-endpoint-security"
-              - "fleet-privileged"
-              - "install-uninstall"
-              - "standalone-upgrade"
-              - "upgrade"
-              - "upgrade-flavor"
+            variant: *windows_variants
 
       - label: "Win:arm64:Tier3:{{matrix.sudo}}:{{matrix.variant}}"
         depends_on:
@@ -408,15 +385,7 @@ steps:
             sudo:
               - "true"
               - "false"
-            variant:
-              - default
-              - fleet
-              - fleet-endpoint-security
-              - fleet-privileged
-              - standalone-upgrade
-              - upgrade
-              - upgrade-flavor
-              - install-uninstall
+            variant: *windows_variants
           adjustments:
             - with:
                 sudo: "false"
