@@ -13,7 +13,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260520220705-fc31b6e5a5fd
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.43.0
+	github.com/elastic/elastic-agent-libs v0.43.2-0.20260522055308-d8eb8a8ffa76
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.50.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.50.0
@@ -102,6 +102,7 @@ require (
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
+	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/elastic/ebpfevents v0.9.0 // indirect
 	github.com/elastic/entcollect v0.0.0-20260514013106-6d4034497b3d // indirect
 	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
