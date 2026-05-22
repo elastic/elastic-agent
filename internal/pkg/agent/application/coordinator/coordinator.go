@@ -835,7 +835,7 @@ type upgradeOpts struct {
 	skipVerifyOverride bool
 	skipDefaultPgp     bool
 	pgpBytes           []string
-	preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error
+	upgradeOpts        []upgrade.Option
 	rollback           bool
 }
 
@@ -861,7 +861,7 @@ func WithPgpBytes(pgpBytes []string) UpgradeOpt {
 
 func WithPreUpgradeCallback(preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
-		opts.preUpgradeCallback = preUpgradeCallback
+		opts.upgradeOpts = append(opts.upgradeOpts, upgrade.WithPreSymlinkCallback(preUpgradeCallback))
 	}
 }
 
@@ -945,12 +945,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		}
 	}
 
-	var upgradeOpts []upgrade.Option
-	if uOpts.preUpgradeCallback != nil {
-		upgradeOpts = append(upgradeOpts, upgrade.WithPreSymlinkCallback(uOpts.preUpgradeCallback))
-	}
-
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes, upgradeOpts...)
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes, uOpts.upgradeOpts...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
