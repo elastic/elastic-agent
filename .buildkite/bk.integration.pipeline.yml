@@ -52,7 +52,7 @@ common:
       elastic/oblt-google-auth#v1.3.1:
         lifetime: 10800 # seconds
   - oblt_cli_plugin: &oblt_cli_plugin
-      elastic/oblt-cli#v0.4.1:
+      elastic/oblt-cli#copilot/add-windows-2016-support:
         version-file: .oblt-cli-version
   - vault_github_token: &vault_github_token
       elastic/vault-github-token#v0.1.0:
