@@ -477,7 +477,6 @@ steps:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
-          buildkite-agent artifact download build/distributions/elastic-agent-*-x86_64.rpm* . --step packaging-amd64
           buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
           .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} false
         artifact_paths:
@@ -498,7 +497,6 @@ steps:
           setup:
             os:
               - "${IMAGE_DEBIAN_13}"
-              - "${IMAGE_RHEL_10}"
             variant:
               - default
 
@@ -510,7 +508,6 @@ steps:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
-          buildkite-agent artifact download build/distributions/elastic-agent-*-x86_64.rpm* . --step packaging-amd64
           buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
           .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} true
         artifact_paths:
@@ -531,8 +528,38 @@ steps:
           setup:
             os:
               - "${IMAGE_DEBIAN_13}"
-              - "${IMAGE_RHEL_10}"
             variant: *linux_variants
+
+      - label: "linux:amd64:tier2:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
+        depends_on: packaging-amd64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/elastic-agent-*-x86_64.rpm* . --step packaging-amd64
+          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} {{matrix.sudo}}
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "{{matrix.os}}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            os:
+              - "${IMAGE_RHEL_10}"
+            sudo:
+              - "true"
+              - "false"
+            variant:
+              - rpm
 
   - group: "Stateful: Linux (tier 3)"
     key: integration-tests-linux-tier3
