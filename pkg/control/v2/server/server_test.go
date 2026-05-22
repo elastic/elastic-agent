@@ -63,11 +63,11 @@ func TestStateWatch_BufferSize(t *testing.T) {
 				agentInfo: new(info.AgentInfo),
 			}
 
-			lis, err := net.Listen("tcp", "localhost:0")
+			lis, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "localhost:0")
 			require.NoError(t, err)
 			grpcSrv := grpc.NewServer()
 			cproto.RegisterElasticAgentControlServer(grpcSrv, s)
-			go grpcSrv.Serve(lis) //nolint:errcheck
+			go grpcSrv.Serve(lis) //nolint:errcheck // server stops via grpcSrv.Stop() in defer
 			defer grpcSrv.Stop()
 
 			conn, err := grpc.NewClient(lis.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
