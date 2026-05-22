@@ -426,7 +426,7 @@ steps:
         matrix:
           - default
 
-      - label: "linux:amd64:sudo: {{matrix}}"
+      - label: "linux:amd64:tier1:sudo: {{matrix}}"
         depends_on:
           - packaging-amd64
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
@@ -610,7 +610,7 @@ steps:
               - "${IMAGE_RHEL_10}"
             variant: *linux_variants
 
-      - label: "linux:arm64:sudo:tier3:{{matrix}}"
+      - label: "linux:arm64:tier3:sudo:{{matrix}}"
         depends_on:
           - packaging-arm64
         env:
@@ -634,7 +634,7 @@ steps:
           - *vault_github_token
         matrix: *linux_arm_variants
 
-      - label: "linux:arm64:non-sudo:tier3:{{matrix}}"
+      - label: "linux:arm64:tier3:non-sudo:{{matrix}}"
         skip: true
         depends_on:
           - packaging-arm64
