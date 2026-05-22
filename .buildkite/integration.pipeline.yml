@@ -202,7 +202,6 @@ steps:
 
   ## PRs
   - label: "Triggering custom FIPS integration tests"
-    skip: "faster"
     if: build.pull_request.id != null
     key: "fips-its-prs"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
@@ -217,7 +216,6 @@ steps:
 
   ## Branches
   - label: "Triggering custom FIPS integration tests (branches)"
-    skip: "faster"
     if: build.pull_request.id == null
     key: "fips-its-branches"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
