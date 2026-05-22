@@ -512,7 +512,7 @@ steps:
           buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
           buildkite-agent artifact download build/distributions/elastic-agent-*-x86_64.rpm* . --step packaging-amd64
           buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
-          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix}} true
+          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} true
         artifact_paths:
           - build/*
           - build/diagnostics/**
@@ -588,7 +588,7 @@ steps:
           buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
           buildkite-agent artifact download build/distributions/elastic-agent-*-x86_64.rpm* . --step packaging-amd64
           buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
-          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix}} true
+          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} true
         artifact_paths:
           - build/*
           - build/diagnostics/**
@@ -614,14 +614,14 @@ steps:
               - "${IMAGE_RHEL_10}"
             variant: *linux_variants
 
-      - label: "linux:arm64:tier3:sudo:{{matrix}}"
+      - label: "linux:arm64:tier3:sudo:{{matrix.variant}}"
         depends_on:
           - packaging-arm64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/elastic-agent-*-linux-arm64* . --step 'packaging-arm64'
-          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix}} true
+          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} true
         artifact_paths:
           - build/*
           - build/diagnostics/**
@@ -636,9 +636,11 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
-        matrix: *linux_arm_variants
+        matrix:
+          setup:
+            variant: *linux_arm_variants
 
-      - label: "linux:arm64:tier3:non-sudo:{{matrix}}"
+      - label: "linux:arm64:tier3:non-sudo:{{matrix.variant}}"
         skip: true
         depends_on:
           - packaging-arm64
@@ -646,7 +648,7 @@ steps:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/elastic-agent-*-linux-arm64* . --step 'packaging-arm64'
-          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix}} false
+          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} false
         artifact_paths:
           - build/*
           - build/diagnostics/**
@@ -662,7 +664,9 @@ steps:
           - *oblt_cli_plugin
           - *vault_github_token
         matrix:
-          - default
+          setup:
+            variant:
+              - default
 
   - label: ":kubernetes: Kubernetes"
     notify:
