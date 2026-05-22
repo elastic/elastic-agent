@@ -1190,15 +1190,17 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				}
 
 				output := struct {
-					Headers     map[string]string `yaml:"headers"`
-					LogLevel    string            `yaml:"log_level"`
-					RawLogLevel string            `yaml:"log_level_raw"`
-					Metadata    *info.ECSMeta     `yaml:"metadata"`
+					Headers          map[string]string `yaml:"headers"`
+					LogLevelRuntime  string            `yaml:"log_level"`
+					LogLevelPolicy   string            `yaml:"log_level_policy"`
+					LogLevelOverride string            `yaml:"log_level_override"`
+					Metadata         *info.ECSMeta     `yaml:"metadata"`
 				}{
-					Headers:     c.agentInfo.Headers(),
-					LogLevel:    c.agentInfo.LogLevel(),
-					RawLogLevel: c.agentInfo.RawLogLevel(),
-					Metadata:    meta,
+					Headers:          c.agentInfo.Headers(),
+					LogLevelRuntime:  c.agentInfo.GetLogLevelRuntime(),
+					LogLevelPolicy:   c.agentInfo.GetLogLevelPolicy(),
+					LogLevelOverride: c.agentInfo.GetLogLevelOverride(),
+					Metadata:         meta,
 				}
 				o, err := yaml.Marshal(output)
 				if err != nil {

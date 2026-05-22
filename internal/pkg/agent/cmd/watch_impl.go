@@ -44,11 +44,11 @@ func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	//cleanup
-	defer func() {
-		cancel()
-		close(errChan)
-	}()
+	// Cancel the context to signal Run() to stop. errChan is intentionally not
+	// closed here: per the channel-closing principle, only the sender should
+	// close a channel. Run() uses ctx.Done() on every send to avoid blocking
+	// after this cancel fires, so no close is needed.
+	defer cancel()
 
 	agtWatcher := upgrade.NewAgentWatcher(errChan, log, errorCheckInterval)
 	go agtWatcher.Run(ctx)
