@@ -117,7 +117,7 @@ func NewAWSVerifier(ctx context.Context, logger *zap.Logger, authConfig AWSAuthC
 			},
 		}
 
-		if irsaTokenFile := os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE"); irsaTokenFile != "" {
+		if irsaTokenFile := os.Getenv(identityfederation.AWSIRSATokenFileEnvVar); irsaTokenFile != "" {
 			// IRSA flow: LoadDefaultConfig already picked up the pod's service-account
 			// token via AWS_WEB_IDENTITY_TOKEN_FILE, so baseCfg carries IRSA credentials.
 			chain := []identityfederation.AWSRoleChainingStep{
