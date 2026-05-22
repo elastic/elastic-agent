@@ -74,7 +74,7 @@ func TestStateWatch_BufferSize(t *testing.T) {
 			require.NoError(t, err)
 			defer conn.Close()
 
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 			defer cancel()
 
 			stream, err := cproto.NewElasticAgentControlClient(conn).StateWatch(ctx, &cproto.StateWatchRequest{BufferSize: tc.bufferSize})
