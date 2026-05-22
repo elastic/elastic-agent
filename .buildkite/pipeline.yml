@@ -163,7 +163,8 @@ steps:
           - "build/diagnostics/*"
           - "coverage-*.out"
         env:
-          BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true" # Windows 2016 image doesn't have the latest version of the OIDC agent, so we need to skip token redaction to avoid OIDC token issues
+          # NOTE: We need to skip token redaction to avoid OIDC token issues. Only for version <= Windows build 17063
+          BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2016}"
