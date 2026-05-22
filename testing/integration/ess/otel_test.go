@@ -2938,6 +2938,9 @@ outputs:
     password: KafkaTest
     protocol: https
     sasl.mechanism: SCRAM-SHA-256
+    headers:
+    - some-key: some-value
+    - some-key: another-value 
 agent.monitoring:
   metrics: false
   logs: false
