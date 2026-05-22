@@ -163,7 +163,7 @@ require (
 	code.cloudfoundry.org/go-loggregator v7.4.0+incompatible // indirect
 	code.cloudfoundry.org/gofileutils v0.0.0-20170111115228-4d0c80011a0f // indirect
 	code.cloudfoundry.org/rfc5424 v0.0.0-20180905210152-236a6d29298a // indirect
-	filippo.io/edwards25519 v1.1.0 // indirect
+	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/Azure/azure-amqp-common-go/v4 v4.2.0 // indirect
 	github.com/Azure/azure-event-hubs-go/v3 v3.6.1 // indirect
 	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
@@ -354,7 +354,7 @@ require (
 	github.com/go-openapi/validate v0.25.2 // indirect
 	github.com/go-resty/resty/v2 v2.17.2 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
-	github.com/go-sql-driver/mysql v1.9.3 // indirect
+	github.com/go-sql-driver/mysql v1.10.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-zookeeper/zk v1.0.4 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
