@@ -159,13 +159,14 @@ steps:
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
         command: .buildkite/scripts/steps/unit-tests.ps1
-        # NOTE: we cannot use OIDC for windows-2016, it's not supported by BK
-        #       Therefore we cannot store artifacts on GCP
-        #artifact_paths:
-        #  - "build/TEST-*.html"
-        #  - "build/TEST-*.xml"
-        #  - "build/diagnostics/*"
-        #  - "coverage-*.out"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        env:
+          # NOTE: We need to skip token redaction to avoid OIDC token issues. Only for version <= Windows build 17063
+          BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2016}"
@@ -177,10 +178,8 @@ steps:
             limit: 1
           manual:
             allowed: true
-        # NOTE: we cannot use OIDC for windows-2016, it's not supported by BK
-        #       The Job API is available on Unix agents, and agents running Windows versions after build 17063
-        #plugins:
-        #  - *google_oidc_plugin
+        plugins:
+          - *google_oidc_plugin
 
   - group: "macOS tests"
     key: "macos-unit-tests"
