@@ -108,10 +108,6 @@ func TestOtelStartShutdown(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,
 		Local: true,
-		OS: []define.OS{
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		},
 	})
 
 	otelConfig := `receivers:
@@ -129,10 +125,11 @@ service:
       exporters:
         - nop
 `
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	output := &bytes.Buffer{}
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithCmdOutput(output))
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -140,29 +137,35 @@ service:
 	err = fixture.ConfigureOtel(t.Context(), []byte(otelConfig))
 	require.NoError(t, err)
 
-	cmd, err := fixture.PrepareAgentCommand(ctx, []string{"otel"})
-	require.NoError(t, err)
-
-	output := strings.Builder{}
-	cmd.Stderr = &output
-	cmd.Stdout = &output
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		assert.NoError(t, fixture.RunOtelWithClient(ctx))
+	}()
 
 	t.Cleanup(func() {
 		if t.Failed() {
-			t.Log("Elastic-Agent output:")
+			t.Log("Otel Collector output:")
 			t.Log(output.String())
 		}
 	})
 
-	require.NoError(t, cmd.Start(), "could not start otel collector")
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		assert.Contains(collect, output.String(), "Everything is ready")
 	}, time.Second*30, time.Second)
 
 	// stop the collector and check that it emitted logs indicating a graceful shutdown
-	require.NoError(t, cmd.Process.Signal(os.Interrupt))
-	require.NoError(t, cmd.Wait())
-	assert.Contains(t, output.String(), "Shutdown complete")
+	fixture.Stop()
+	wg.Wait()
+
+	// Poll briefly: process.Info.Wait (used by RunOtelWithClient) returns as
+	// soon as the agent process exits and does not synchronize with the
+	// exec.Cmd stdio goroutines, so the last few log lines may still be in
+	// the kernel pipe buffer when wg.Wait returns.
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.Contains(collect, output.String(), "Shutdown complete")
+	}, 5*time.Second, 100*time.Millisecond)
 }
 
 func TestOtelFileProcessing(t *testing.T) {
@@ -1363,24 +1366,11 @@ service:
 
 	doc1 := docs.Hits.Hits[0].Source
 	doc2 := docs.Hits.Hits[1].Source
-	ignoredFields := []string{
-		// Expected to change between filebeat and fbreceiver
-		"@timestamp",
-		"agent.ephemeral_id",
-		"agent.id",
-
-		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
-		"agent.version",
-
-		// Missing from fbreceiver doc
-		"elastic_agent.id",
-		"elastic_agent.snapshot",
-		"elastic_agent.version",
-
+	ignoredFields := append(RuntimeComparisonIgnoredFields,
 		// only in fbreceiver doc
 		"agent.otelcol.component.id",
 		"agent.otelcol.component.kind",
-	}
+	)
 
 	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
 	cancel()
@@ -1567,47 +1557,7 @@ processors:
 	require.Equal(t, "custom-value", customFieldValue, "custom_field should be equal to custom-value")
 }
 
-func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
-	t.Helper()
-
-	flatM1 := m1.Flatten()
-	flatM2 := m2.Flatten()
-	for _, f := range ignoredFields {
-		// Checking ignored fields is disabled until we resolve an issue with event.ingested not being set
-		// in some cases.
-		// See https://github.com/elastic/elastic-agent/issues/8486 for details.
-		//hasKeyM1, _ := flatM1.HasKey(f)
-		//hasKeyM2, _ := flatM2.HasKey(f)
-		//
-		//if !hasKeyM1 && !hasKeyM2 {
-		//	assert.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
-		//}
-		flatM1.Delete(f)
-		flatM2.Delete(f)
-	}
-	require.Zero(t, cmp.Diff(flatM1, flatM2), msg)
-}
-
-func AssertMapstrKeysEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
-	t.Helper()
-	// Delete all ignored fields.
-	for _, f := range ignoredFields {
-		_ = m1.Delete(f)
-		_ = m2.Delete(f)
-	}
-
-	flatM1 := m1.Flatten()
-	flatM2 := m2.Flatten()
-
-	for k := range flatM1 {
-		flatM1[k] = ""
-	}
-	for k := range flatM2 {
-		flatM2[k] = ""
-	}
-
-	require.Zero(t, cmp.Diff(flatM1, flatM2), msg)
-}
+// AssertMapsEqual and AssertMapstrKeysEqual are defined in assert_tools.go
 
 func TestFBOtelRestartE2E(t *testing.T) {
 	// This test ensures that filebeatreceiver is able to deliver logs even
@@ -2564,6 +2514,7 @@ func TestOtelElasticsearchStateStore_Agentless(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 	})
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/13822")
 
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
@@ -3021,21 +2972,13 @@ agent.monitoring:
 		require.True(t, agentOk, "missing document for agent")
 		require.True(t, otelOk, "missing document for otel")
 
-		ignoredFields := []string{
-			"@timestamp",
-			"agent.id",
-			"agent.ephemeral_id",
-			"elastic_agent.id",
+		ignoredFields := append(RuntimeComparisonIgnoredFields,
 			"data_stream.namespace",
-			"event.ingested",
 			"event.duration",
 			// For Kafka, raw_index contains the destination topic which is different between the two runtimes.
 			"@metadata.raw_index",
-
-			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
-			"agent.version",
 			"@metadata.version",
-		}
+		)
 
 		agentDoc = agentDoc.Flatten()
 		otelDoc = otelDoc.Flatten()
@@ -3535,21 +3478,13 @@ agent.monitoring:
 	require.True(t, agentOk, "missing document for agent")
 	require.True(t, otelOk, "missing document for otel")
 
-	ignoredFields := []string{
-		"@timestamp",
-		"agent.id",
-		"agent.ephemeral_id",
-		"elastic_agent.id",
+	ignoredFields := append(RuntimeComparisonIgnoredFields,
 		"data_stream.namespace",
-		"event.ingested",
 		"event.duration",
-
 		// testcase is different for both agent and otel
 		"testcase",
-		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
-		"agent.version",
 		"metadata.version",
-	}
+	)
 
 	agentDoc = agentDoc.Flatten()
 	otelDoc = otelDoc.Flatten()

@@ -12,14 +12,13 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net/url"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime/pprof"
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/redact"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/go-ucfg"
@@ -35,11 +34,10 @@ import (
 
 const (
 	// ContentTypeDirectory should be used to indicate that a directory should be made in the resulting bundle
-	ContentTypeDirectory = "directory"
-	// REDACTED is used to replace sensative fields
-	REDACTED          = "<REDACTED>"
-	REDACTED_URL_SAFE = "REDACTED"
-	agentName         = "elastic-agent"
+	ContentTypeDirectory  = "directory"
+	agentName             = "elastic-agent"
+	redactionMarkerPrefix = "__mark_redact_"
+	redactionRouteKey     = "routekey"
 )
 
 // DiagCPU* are contstants to describe the CPU profile that is collected when the --cpu-profile flag is used with the diagnostics command, or the diagnostics action contains "CPU" in the additional_metrics list.
@@ -342,6 +340,15 @@ func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
 	return nil
 }
 
+// RedactOpts returns a slice of RedactOptions with the error output set to w, skip keys set, and marker prefixes set
+func RedactOpts(w io.Writer) []redact.RedactOption {
+	return []redact.RedactOption{
+		redact.WithErrorOutput(w),
+		redact.WithMarkerPrefix(redactionMarkerPrefix),
+		redact.WithIgnoreKeys(redactionRouteKey),
+	}
+}
+
 func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResult client.DiagnosticFileResult) error {
 	out := &fileResult.Content
 
@@ -355,7 +362,7 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 		} else {
 			switch t := unmarshalled.(type) { // could be a plain string, we only redact if this is a proper map
 			case map[string]any:
-				t = Redact(t, errOut)
+				redact.Redact(t, RedactOpts(errOut)...)
 				redacted, err := yaml.Marshal(t)
 				if err != nil {
 					// Best effort, output a warning but still include the file
@@ -370,141 +377,6 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 
 	_, err := resultWriter.Write(*out)
 	return err
-}
-
-const redactionMarkerPrefix = "__mark_redact_"
-
-// redactMap sensitive values from the underlying map
-// the whole generic function here is out of paranoia. Although extremely unlikely,
-// we have no way of guaranteeing we'll get a "normal" map[string]interface{},
-// since the diagnostic interface is a bit of a free-for-all
-func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}) map[K]interface{} {
-	if inputMap == nil {
-		return nil
-	}
-
-	redactionMarkers := []string{}
-	for rootKey, rootValue := range inputMap {
-		if rootValue != nil {
-			switch cast := rootValue.(type) {
-			case map[string][]string:
-				var newMap map[string]any = make(map[string]any, len(cast))
-				for k, v := range cast {
-					newSlice := make([]interface{}, len(v))
-					for i, s := range v {
-						newSlice[i] = s
-					}
-					newMap[k] = newSlice
-				}
-				rootValue = redactMap(errOut, newMap)
-			case []map[string]interface{}:
-				updatedRootValue := make([]map[string]interface{}, len(cast))
-				for i, item := range cast {
-					updatedRootValue[i] = redactMap(errOut, item)
-				}
-				rootValue = updatedRootValue
-			case map[string]interface{}:
-				rootValue = redactMap(errOut, cast)
-			case map[interface{}]interface{}:
-				rootValue = redactMap(errOut, cast)
-			case map[int]interface{}:
-				rootValue = redactMap(errOut, cast)
-			case []interface{}:
-				newArray := make([]interface{}, len(cast))
-				// Recursively process each element in the slice so that we also walk
-				// through lists (e.g. inputs[4].streams[0]). This is required to
-				// reach redaction markers that are inside slice items. Set SliceElem to true
-				// to avoid global redaction of slice elements.
-				for i, value := range cast {
-					switch m := value.(type) {
-					case map[string]interface{}:
-						newArray[i] = redactMap(errOut, m)
-					case map[interface{}]interface{}:
-						newArray[i] = redactMap(errOut, m)
-					case map[int]interface{}:
-						newArray[i] = redactMap(errOut, m)
-					case string:
-						if redactedValue, redact := redactString(m); redact {
-							newArray[i] = redactedValue
-						} else {
-							newArray[i] = m
-						}
-					default:
-						newArray[i] = value
-					}
-				}
-				rootValue = newArray
-			case string:
-				if keyString, ok := any(rootKey).(string); ok && redactKey(keyString) {
-					rootValue = REDACTED
-				} else if redactedValue, redact := redactString(cast); redact {
-					rootValue = redactedValue
-				}
-			case bool: // redaction marker values are always going to be bool, process redaction markers in this case
-				if keyString, ok := any(rootKey).(string); ok {
-					// Find siblings that have the redaction marker.
-					if strings.HasPrefix(keyString, redactionMarkerPrefix) {
-						redactionMarkers = append(redactionMarkers, keyString)
-						delete(inputMap, rootKey)
-					}
-				}
-			default:
-				// in cases where we got some weird kind of map we couldn't parse, print a warning
-				if reflect.TypeOf(rootValue).Kind() == reflect.Map {
-					fmt.Fprintf(errOut, "[WARNING]: file may be partly redacted, could not cast value %v of type %T", rootKey, rootValue)
-				}
-
-			}
-		}
-		inputMap[rootKey] = rootValue
-	}
-
-	for _, redactionMarker := range redactionMarkers {
-		keyToRedact := strings.TrimPrefix(redactionMarker, redactionMarkerPrefix)
-		for rootKey := range inputMap {
-			if keyString, ok := any(rootKey).(string); ok {
-				if keyString == keyToRedact {
-					inputMap[rootKey] = REDACTED
-				}
-
-				if keyString == redactionMarker {
-					delete(inputMap, rootKey)
-				}
-			}
-		}
-	}
-
-	return inputMap
-}
-
-func redactKey(k string) bool {
-	// "routekey" shouldn't be redacted.
-	// Add any other exceptions here.
-	if k == "routekey" {
-		return false
-	}
-
-	k = strings.ToLower(k)
-	return strings.Contains(k, "auth") ||
-		strings.Contains(k, "certificate") ||
-		strings.Contains(k, "passphrase") ||
-		strings.Contains(k, "password") ||
-		strings.Contains(k, "token") ||
-		strings.Contains(k, "key") ||
-		strings.Contains(k, "secret")
-}
-
-// This currently only redacts credentials embedded in URLs, but if we find other patterns of sensitive strings in the future we can add them here
-func redactString(v string) (string, bool) {
-	u, err := url.Parse(v)
-
-	if err != nil || u.User == nil {
-		return v, false
-	}
-
-	u.User = url.UserPassword(REDACTED_URL_SAFE, REDACTED_URL_SAFE)
-
-	return u.String(), true
 }
 
 func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) error {
@@ -686,11 +558,6 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 	return nil
 }
 
-// Redact redacts sensitive values from the passed mapStr.
-func Redact(mapStr map[string]any, errOut io.Writer) map[string]any {
-	return redactMap(errOut, mapStr)
-}
-
 // AddSecretMarkers adds secret redaction markers to the config by looking at the secret_paths field.
 // It will add a marker to the config for each secret path.
 // The marker is added to the config as a boolean field with the name of the
@@ -766,9 +633,9 @@ func redactEnv() (map[string]any, error) {
 		envMap[pair[0]] = pair[1]
 	}
 	var errOut bytes.Buffer
-	redacted := Redact(envMap, &errOut)
+	redact.Redact(envMap, RedactOpts(&errOut)...)
 	if errOut.Len() > 0 {
 		return nil, errors.New(errOut.String())
 	}
-	return redacted, nil
+	return envMap, nil
 }

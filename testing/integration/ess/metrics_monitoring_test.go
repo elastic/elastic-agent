@@ -138,20 +138,46 @@ func (runner *MetricsRunner) addMonitoringToOtelRuntimeOverwrite() {
 func (runner *MetricsRunner) TestBeatsMetrics() {
 	t := runner.T()
 
-	UnitOutputName := "default"
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
 	defer cancel()
 
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(t, err, "could not to get agent status")
 
-	componentIds := []string{
-		fmt.Sprintf("system/metrics-%s", UnitOutputName),
-		fmt.Sprintf("log-%s", UnitOutputName),
-		"beat/metrics-monitoring",
-		"elastic-agent",
-		"http/metrics-monitoring",
-		"filestream-monitoring",
+	// In OTel mode (the default), monitoring metrics come from different sources than
+	// classic process mode. The http/metrics-monitoring metricbeat receiver only scrapes
+	// the elastic-agent and elastic-otel-collector endpoints. User components (system/metrics,
+	// log) and other monitoring components are not scraped via unix sockets. Instead, the
+	// elasticmonitoringreceiver provides exporter-level stats and per-receiver pipeline metrics.
+	type componentCheck struct {
+		name   string
+		fields [][]string
+	}
+	componentChecks := []componentCheck{
+		// elastic-agent process metrics: scraped by http/metrics-monitoring metricbeat receiver
+		{
+			name: "elastic-agent",
+			fields: [][]string{
+				{"match", "component.id", "elastic-agent"},
+				{"match", "agent.type", "metricbeat"},
+			},
+		},
+		// exporter-level beat stats from elasticmonitoringreceiver
+		{
+			name: "elasticsearch-monitoring",
+			fields: [][]string{
+				{"match", "component.id", "elasticsearch-monitoring"},
+				{"exists", "field", "beat.stats.libbeat.output.events.acked"},
+			},
+		},
+		// per-input metrics for filestream-monitoring from elasticmonitoringreceiver
+		{
+			name: "filestream-monitoring",
+			fields: [][]string{
+				{"match", "component.id", "filestream-monitoring"},
+				{"match", "metricset.name", "stats"},
+			},
+		},
 	}
 
 	now := time.Now()
@@ -160,7 +186,6 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 		if t.Failed() {
 			bs, err := json.Marshal(query)
 			if err != nil {
-				// nothing we can do, just log the map
 				t.Errorf("executed at %s: %v",
 					now.Format(time.RFC3339Nano), query)
 				return
@@ -170,24 +195,20 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 		}
 	}()
 
-	t.Logf("starting to ES for metrics at %s", now.Format(time.RFC3339Nano))
+	t.Logf("starting to query ES for metrics at %s", now.Format(time.RFC3339Nano))
 	require.Eventually(t, func() bool {
-		for _, cid := range componentIds {
-			query = genESQuery(agentStatus.Info.ID,
-				[][]string{
-					{"match", "component.id", cid},
-					{"match", "agent.type", "metricbeat"},
-				})
+		for _, check := range componentChecks {
+			query = genESQuery(agentStatus.Info.ID, check.fields)
 			now = time.Now()
 			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
 			require.NoError(t, err)
-			t.Logf("Fetched metrics for %s, got %d hits", cid, res.Hits.Total.Value)
+			t.Logf("Fetched metrics for %s, got %d hits", check.name, res.Hits.Total.Value)
 			if res.Hits.Total.Value < 1 {
 				return false
 			}
 		}
 		return true
-	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install: %v", componentIds)
+	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install")
 
 	// Add a policy overwrite to change the agent monitoring to use Otel runtime
 	runner.addMonitoringToOtelRuntimeOverwrite()

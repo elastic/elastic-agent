@@ -13,31 +13,22 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	api "github.com/elastic/fleet-server/pkg/api"
 )
 
 const (
-	// ActionTypeUnknown is used to indicate that the elastic-agent does not know how to handle the action
-	ActionTypeUnknown = "UNKNOWN"
-	// ActionTypeUpgrade specifies upgrade action.
-	ActionTypeUpgrade = "UPGRADE"
-	// ActionTypeUnenroll specifies unenroll action.
-	ActionTypeUnenroll = "UNENROLL"
-	// ActionTypePolicyChange specifies policy change action.
-	ActionTypePolicyChange = "POLICY_CHANGE"
-	// ActionTypePolicyReassign specifies policy reassign action.
-	ActionTypePolicyReassign = "POLICY_REASSIGN"
-	// ActionTypeSettings specifies change of agent settings.
-	ActionTypeSettings = "SETTINGS"
-	// ActionTypeInputAction specifies agent action.
-	ActionTypeInputAction = "INPUT_ACTION"
-	// ActionTypeCancel specifies a cancel action.
-	ActionTypeCancel = "CANCEL"
-	// ActionTypeDiagnostics specifies a diagnostics action.
-	ActionTypeDiagnostics = "REQUEST_DIAGNOSTICS"
-	// ActionTypeDiagnostics specifies a diagnostics action.
-	ActionTypeMigrate = "MIGRATE"
-	// ActionTypeDiagnostics specifies a diagnostics action.
-	ActionTypePrivilegeLevelChange = "PRIVILEGE_LEVEL_CHANGE"
+	// ActionTypeUnknown is a client-side catch-all for unrecognized action types (not in Fleet Server spec).
+	ActionTypeUnknown              = "UNKNOWN"
+	ActionTypeUpgrade              = string(api.UPGRADE)
+	ActionTypeUnenroll             = string(api.UNENROLL)
+	ActionTypePolicyChange         = string(api.POLICYCHANGE)
+	ActionTypePolicyReassign       = string(api.POLICYREASSIGN)
+	ActionTypeSettings             = string(api.SETTINGS)
+	ActionTypeInputAction          = string(api.INPUTACTION)
+	ActionTypeCancel               = string(api.CANCEL)
+	ActionTypeDiagnostics          = string(api.REQUESTDIAGNOSTICS)
+	ActionTypeMigrate              = string(api.MIGRATE)
+	ActionTypePrivilegeLevelChange = string(api.PRIVILEGELEVELCHANGE)
 )
 
 // Error values that the Action interface can return
@@ -249,6 +240,35 @@ func (a *ActionPolicyChange) ID() string {
 
 func (a *ActionPolicyChange) AckEvent() AckEvent {
 	return newAckEvent(a.ActionID, a.ActionType)
+}
+
+// PolicyID returns the policy ID from the action's policy data, or "" if
+// the action is nil or the data does not include an "id" string field.
+func (a *ActionPolicyChange) PolicyID() string {
+	if a == nil {
+		return ""
+	}
+	v, _ := a.Data.Policy["id"].(string)
+	return v
+}
+
+// PolicyRevisionIDX returns the revision index from the action's policy data,
+// or 0 if the action is nil or the data does not include a numeric "revision"
+// field. The function accepts int, int64, and float64 to tolerate JSON
+// unmarshal types.
+func (a *ActionPolicyChange) PolicyRevisionIDX() int64 {
+	if a == nil {
+		return 0
+	}
+	switch v := a.Data.Policy["revision"].(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
+	}
+	return 0
 }
 
 // ActionUpgrade is a request for agent to upgrade.
