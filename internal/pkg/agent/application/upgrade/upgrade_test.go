@@ -465,7 +465,7 @@ Moylz3f/lBMBLKFUD19ZzS4Z8c31iZPFXkN+KCjW8B7hNv6qKDSvQo74yvA0NYkv
 ncHUVm1hDPg8p7GUVgwd2m6M7uidGjTtSH1wjZ4=
 -----END CERTIFICATE-----
 `},
-				Certificate: tlscommon.CertificateConfig{
+				Certificate: tlscommon.CertificateConfig{ //nolint:gosec // test-only fake credentials
 					Certificate: `-----BEGIN CERTIFICATE-----
 MIIDQzCCAiugAwIBAgIVAJtAaYlLhZ/4qmigwOyX79az1ZZ3MA0GCSqGSIb3DQEB
 CwUAMDQxMjAwBgNVBAMTKUVsYXN0aWMgQ2VydGlmaWNhdGUgVG9vbCBBdXRvZ2Vu
