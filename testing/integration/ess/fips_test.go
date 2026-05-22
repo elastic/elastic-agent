@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -79,12 +80,17 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 	t.Logf("statusUrl = %s", statusUrl)
 	require.NoError(t, err)
 
-	require.Eventually(t, func() bool {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		resp, err := http.Get(statusUrl)
-		require.NoError(t, err)
+		require.NoError(collect, err)
+		if err != nil {
+			return
+		}
 		defer resp.Body.Close()
 
-		require.Equal(t, http.StatusOK, resp.StatusCode)
+		if !assert.Equal(collect, http.StatusOK, resp.StatusCode) {
+			return
+		}
 
 		var body struct {
 			Name   string `json:"name"`
@@ -92,13 +98,16 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 		}
 		decoder := json.NewDecoder(resp.Body)
 		err = decoder.Decode(&body)
-		require.NoError(t, err)
+		require.NoError(collect, err)
+		if err != nil {
+			return
+		}
 
 		t.Logf("body.Status = %s", body.Status)
-		return body.Status == "HEALTHY"
+		assert.Equal(collect, "HEALTHY", body.Status)
 	}, 5*time.Minute, 10*time.Second, "Fleet Server in ECH deployment is not healthy")
 
-	require.Eventually(t, func() bool {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
@@ -115,9 +124,14 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 				}
 			}`,
 			)))
-		require.NoError(t, err)
+		require.NoError(collect, err)
+		if err != nil {
+			return
+		}
 		defer searchResp.Body.Close()
-		require.Equal(t, http.StatusOK, searchResp.StatusCode)
+		if !assert.Equal(collect, http.StatusOK, searchResp.StatusCode) {
+			return
+		}
 
 		respObj := struct {
 			Hits struct {
@@ -140,14 +154,20 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 		}{}
 
 		err = json.NewDecoder(searchResp.Body).Decode(&respObj)
-		require.NoError(t, err)
-		require.Equal(t, 1, respObj.Hits.Total.Value, "expected only one hit from the ES query")
+		require.NoError(collect, err)
+		if err != nil {
+			return
+		}
+		if !assert.Equal(collect, 1, respObj.Hits.Total.Value, "expected only one hit from the ES query") || len(respObj.Hits.Hits) == 0 {
+			return
+		}
 
 		// Check that this Agent is online (i.e. healthy) and is FIPS-capable. This
 		// will prove that a FIPS-capable Agent is able to connect to a FIPS-capable
 		// Fleet Server, with both running in ECH.
 		t.Logf("FIPS: %v, Status: %s", respObj.Hits.Hits[0].Source.LocalMetadata.Elastic.Agent.FIPS, respObj.Hits.Hits[0].Source.LastCheckinStatus)
-		return respObj.Hits.Hits[0].Source.LocalMetadata.Elastic.Agent.FIPS && respObj.Hits.Hits[0].Source.LastCheckinStatus == "online"
+		assert.True(collect, respObj.Hits.Hits[0].Source.LocalMetadata.Elastic.Agent.FIPS, "expected Fleet Server's Agent to be FIPS-capable")
+		assert.Equal(collect, "online", respObj.Hits.Hits[0].Source.LastCheckinStatus, "expected Fleet Server's Agent to be online")
 	}, 10*time.Second, 200*time.Millisecond, "Fleet Server's Elastic Agent should be healthy and FIPS-capable")
 }
 
@@ -200,12 +220,14 @@ func addIntegrationAndCheckData(t *testing.T, info *define.Info, fixture *atesti
 	t.Logf("status: %v", status)
 
 	// Check that system metrics show up in Elasticsearch
-	require.Eventually(t, func() bool {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		docs, err := estools.GetResultsForAgentAndDatastream(ctx, info.ESClient, "system.cpu", status.Info.ID)
-		require.NoError(t, err, "error fetching system metrics")
+		require.NoError(collect, err, "error fetching system metrics")
+		if err != nil {
+			return
+		}
 		t.Logf("Generated %d system events", docs.Hits.Total.Value)
-
-		return docs.Hits.Total.Value > 0
+		assert.True(collect, docs.Hits.Total.Value > 0)
 	}, 2*time.Minute, 5*time.Second, "no system.cpu data received in Elasticsearch")
 
 	// Check that system logs show up in Elasticsearch
@@ -215,12 +237,14 @@ func addIntegrationAndCheckData(t *testing.T, info *define.Info, fixture *atesti
 	} else {
 		dataStreamName = "system.syslog"
 	}
-	require.Eventually(t, func() bool {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		docs, err := estools.GetResultsForAgentAndDatastream(ctx, info.ESClient, dataStreamName, status.Info.ID)
-		require.NoError(t, err, "error fetching system logs")
+		require.NoError(collect, err, "error fetching system logs")
+		if err != nil {
+			return
+		}
 		t.Logf("Generated %d system events", docs.Hits.Total.Value)
-
-		return docs.Hits.Total.Value > 0
+		assert.True(collect, docs.Hits.Total.Value > 0)
 	}, 2*time.Minute, 5*time.Second, "no system.syslog data received in Elasticsearch")
 }
 

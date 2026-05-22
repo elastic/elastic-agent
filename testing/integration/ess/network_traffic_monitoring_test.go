@@ -81,7 +81,9 @@ func (runner *NetworkTrafficRunner) SetupSuite() {
 		Privileged:     true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	// 5 minutes: agent install can take 2+ minutes on slow machines, leaving
+	// insufficient time for the subsequent package install with a 3-minute budget.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	policyResp, agentID, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
