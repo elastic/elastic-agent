@@ -197,14 +197,14 @@ steps:
     depends_on:
       - integration-ess
     steps:
-      - label: "Win:amd64:Tier1:{{matrix.sudo}}:{{matrix.variant}}"
+      - label: "windows:amd64:tier1:sudo:{{matrix.variant}}"
         depends_on:
           - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
-          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} {{matrix.sudo}}
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} true
         artifact_paths:
           - build/*
           - build/diagnostics/**
@@ -221,10 +221,34 @@ steps:
           - *vault_github_token
         matrix:
           setup:
-            sudo:
-              - "true"
-              - "false"
             variant: *windows_variants
+
+      - label: "windows:amd64:tier1:non-sudo:{{matrix.variant}}"
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} false
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2022}"
+        retry:
+          automatic:
+            limit: 1
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            variant:
+              - default
 
   - group: "Stateful: Windows (tier 2)"
     if_changed:
@@ -241,8 +265,7 @@ steps:
     depends_on:
       - integration-ess
     steps:
-
-      - label: "Win:amd64:Tier2:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
+      - label: "windows:amd64:tier2:sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
           - packaging-amd64
         env:
@@ -252,7 +275,7 @@ steps:
           BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
         command: |
           buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
-          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} {{matrix.sudo}}
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} true
         artifact_paths:
           - build/*
           - build/diagnostics/**
@@ -271,10 +294,39 @@ steps:
           setup:
             os:
               - "${IMAGE_WIN_2016}"
-            sudo:
-              - "true"
-              - "false"
             variant: *windows_variants
+
+      - label: "windows:amd64:tier2:non-sudo:{{matrix.variant}}:{{matrix.os}}"
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+          # Disable redaction for Windows 2016 when using OIDC plugin due to some unsupported Windows build system
+          # https://buildkite.com/resources/changelog/329-agent-v3-dot-104-oidc-token-requests-now-require-job-api-socket-for-redaction/#main-content
+          BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
+        command: |
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} false
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "{{matrix.os}}"
+        retry:
+          automatic:
+            limit: 1
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            os:
+              - "${IMAGE_WIN_2016}"
+            variant:
+              - default
 
   - group: "Stateful: Windows (tier 3)"
     key: integration-tests-win-tier3
@@ -285,7 +337,7 @@ steps:
     depends_on:
       - integration-ess
     steps:
-      - label: "Win:amd64:Tier3:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
+      - label: "windows:amd64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
           - packaging-amd64
         env:
@@ -295,7 +347,7 @@ steps:
           BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
         command: |
           buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
-          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} {{matrix.sudo}}
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} true
         artifact_paths:
           - build/*
           - build/diagnostics/**
@@ -316,19 +368,16 @@ steps:
               - "${IMAGE_WIN_2016}"
               - "${IMAGE_WIN_2022}"
               - "${IMAGE_WIN_2025}"
-            sudo:
-              - "true"
-              - "false"
             variant: *windows_variants
 
-      - label: "Win:amd64:Tier3:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
+      - label: "windows:amd64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
           - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
-          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} {{matrix.sudo}}
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} true
         artifact_paths:
           - build/*
           - build/diagnostics/**
@@ -350,19 +399,48 @@ steps:
             os:
               - "${IMAGE_WIN_10}"
               - "${IMAGE_WIN_11}"
-            sudo:
-              - "true"
-              - "false"
             variant: *windows_variants
 
-      - label: "Win:arm64:Tier3:{{matrix.sudo}}:{{matrix.variant}}"
+      - label: "windows:amd64:tier3:non-sudo:{{matrix.variant}}:{{matrix.os}}"
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} false
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        agents:
+          provider: "azure"
+          image: "{{matrix.os}}"
+          imageVersion: "${IMAGE_WIN_VERSION}"
+          vmSize: "Standard_D8s_v5"
+          diskSizeGb: "256"
+        retry:
+          automatic:
+            limit: 1
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            os:
+              - "${IMAGE_WIN_10}"
+              - "${IMAGE_WIN_11}"
+            variant:
+              - default
+
+      - label: "windows:arm64:tier3:sudo:{{matrix.variant}}"
         depends_on:
           - packaging-arm64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/elastic-agent-*-windows-arm64* . --step 'packaging-arm64'
-          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} {{matrix.sudo}}
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} true
         artifact_paths:
           - build/*
           - build/diagnostics/**
@@ -381,14 +459,36 @@ steps:
           - *vault_github_token
         matrix:
           setup:
-            sudo:
-              - "true"
-              - "false"
             variant: *windows_variants
-          adjustments:
-            - with:
-                sudo: "false"
-                variant: default
+
+      - label: "windows:arm64:tier3:non-sudo:{{matrix.variant}}"
+        depends_on:
+          - packaging-arm64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-arm64* . --step 'packaging-arm64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} false
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        agents:
+          provider: "azure"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
+        retry:
+          automatic:
+            limit: 1
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            variant:
+              - default
 
   - group: "Stateful:Ubuntu"
     key: integration-tests-ubuntu
