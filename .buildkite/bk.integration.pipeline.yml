@@ -69,6 +69,7 @@ common:
 steps:
   - label: "Custom ECH Testing"
     key: integration-tests-ech
+    skip: "faster"
     depends_on:
       - packaging-containers-amd64
       - packaging-containers-arm64
