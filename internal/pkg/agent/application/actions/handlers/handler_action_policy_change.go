@@ -39,30 +39,13 @@ const (
 
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
 type PolicyChangeHandler struct {
-<<<<<<< HEAD
-	log                  *logger.Logger
-	agentInfo            info.Agent
-	config               *configuration.Configuration
-	store                storage.Store
-	ch                   chan coordinator.ConfigChange
-	setters              []actions.ClientSetter
-	policyLogLevelSetter logLevelSetter
-	coordinator          *coordinator.Coordinator
-=======
 	log                   *logger.Logger
 	agentInfo             info.Agent
 	config                *configuration.Configuration
 	store                 storage.Store
-	stateStore            stateStore
 	ch                    chan coordinator.ConfigChange
 	setters               []actions.ClientSetter
 	runtimeLogLevelSetter logLevelSetter
-	disableAckFn          func() bool
->>>>>>> 269908f5c (fix: apply policy log-level changes after agent restart (#14078))
-	// Disabled for 8.8.0 release in order to limit the surface
-	// https://github.com/elastic/security-team/issues/6501
-	// // Last known valid signature validation key
-	// signatureValidationKey []byte
 }
 
 // NewPolicyChangeHandler creates a new PolicyChange handler.
@@ -76,26 +59,13 @@ func NewPolicyChangeHandler(
 	setters ...actions.ClientSetter,
 ) *PolicyChangeHandler {
 	return &PolicyChangeHandler{
-<<<<<<< HEAD
-		log:                  log,
-		agentInfo:            agentInfo,
-		config:               config,
-		store:                store,
-		ch:                   ch,
-		setters:              setters,
-		coordinator:          coordinator,
-		policyLogLevelSetter: policyLogLevelSetter,
-=======
 		log:                   log,
 		agentInfo:             agentInfo,
 		config:                config,
 		store:                 store,
-		stateStore:            stateStore,
 		ch:                    ch,
 		setters:               setters,
 		runtimeLogLevelSetter: runtimeLogLevelSetter,
-		disableAckFn:          features.DisablePolicyChangeAcks,
->>>>>>> 269908f5c (fix: apply policy log-level changes after agent restart (#14078))
 	}
 }
 

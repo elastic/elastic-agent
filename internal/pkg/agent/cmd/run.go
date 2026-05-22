@@ -310,22 +310,10 @@ func runElasticAgent(
 	}
 
 	// Ensure that the log level now matches what is configured in the agentInfo.
-<<<<<<< HEAD
-	if agentInfo.LogLevel() != "" {
-		var lvl logp.Level
-		err = lvl.Unpack(agentInfo.LogLevel())
-		if err != nil {
-			l.Error(errors.New(err, "failed to parse agent information log level"))
-		} else {
-			logLvl = lvl
-			logger.SetLevel(lvl)
-		}
-=======
 	var lvl logp.Level
 	err = lvl.Unpack(agentInfo.GetLogLevelRuntime())
 	if err != nil {
 		l.Error(errors.New(err, "failed to parse agent information log level"))
->>>>>>> 269908f5c (fix: apply policy log-level changes after agent restart (#14078))
 	} else {
 		// Set the initial log level (either default or from config file)
 		logger.SetLevel(logLvl)
