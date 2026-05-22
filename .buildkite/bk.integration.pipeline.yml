@@ -55,7 +55,7 @@ common:
       elastic/oblt-cli#v0.4.2:
         version-file: .oblt-cli-version
   - vault_github_token: &vault_github_token
-      elastic/vault-github-token#v0.1.0:
+      elastic/vault-github-token#v0.1.1:
   - windows_variants: &windows_variants
       - "default"
       - "fleet"
