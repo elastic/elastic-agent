@@ -126,29 +126,21 @@ get_test_config() {
   echo "${versions_yaml}|${variants_yaml}"
 }
 
-# Generate the complete pipeline YAML with matrix embedded
-generate_pipeline() {
-  local versions_yaml=$1
+# Generate a single group step for one k8s version
+generate_version_group() {
+  local version=$1
   local variants_yaml=$2
+  # Create a safe YAML key from the version (e.g., v1.27.16 -> v1-27-16)
+  local version_key
+  version_key=$(echo "${version}" | tr '.' '-')
 
   cat <<EOF
-common:
-  - google_oidc_observability_plugin: &google_oidc_observability_plugin
-      elastic/oblt-google-auth#v1.3.0:
-        lifetime: 10800
-  - oblt_cli_plugin: &oblt_cli_plugin
-      elastic/oblt-cli#v0.4.1:
-        version-file: .oblt-cli-version
-  - vault_github_token: &vault_github_token
-      elastic/vault-github-token#v0.1.0:
-
-steps:
-  - group: ":kubernetes: Kubernetes"
-    key: integration-tests-kubernetes
+  - group: ":kubernetes: ${version}"
+    key: "integration-tests-kubernetes-${version_key}"
     steps:
-      - label: ":kubernetes: {{matrix.version}}:amd64:{{matrix.variant}}"
+      - label: ":kubernetes: ${version}:amd64:{{matrix.variant}}"
         env:
-          K8S_VERSION: "{{matrix.version}}"
+          K8S_VERSION: "${version}"
           DOCKER_VARIANTS: "{{matrix.variant}}"
           TARGET_ARCH: "amd64"
         command: |
@@ -172,10 +164,55 @@ steps:
           - *vault_github_token
         matrix:
           setup:
-            version: ${versions_yaml}
             variant: ${variants_yaml}
 EOF
+}
 
+# Generate the complete pipeline YAML with one group step per k8s version.
+# For tier3 runs a wait step is inserted between version groups to reduce
+# the number of concurrent cluster requests hitting the API at once.
+generate_pipeline() {
+  local versions_yaml=$1
+  local variants_yaml=$2
+  local tier=${3:-"tier1"}
+
+  cat <<EOF
+common:
+  - google_oidc_observability_plugin: &google_oidc_observability_plugin
+      elastic/oblt-google-auth#v1.3.0:
+        lifetime: 10800
+  - oblt_cli_plugin: &oblt_cli_plugin
+      elastic/oblt-cli#v0.4.1:
+        version-file: .oblt-cli-version
+  - vault_github_token: &vault_github_token
+      elastic/vault-github-token#v0.1.0:
+
+steps:
+EOF
+
+  local versions
+  versions=$(echo "${versions_yaml}" | jq -r '.[]') || {
+    echo "ERROR: Failed to parse versions JSON: ${versions_yaml}" >&2
+    exit 1
+  }
+
+  if [[ -z "${versions}" ]]; then
+    echo "ERROR: No versions found in: ${versions_yaml}" >&2
+    exit 1
+  fi
+
+  # One group step per k8s version. A wait step is inserted between groups
+  # only for tier3 (all versions) to serialise execution and reduce the
+  # number of concurrent cluster requests hitting the API at once.
+  local first=true
+  while IFS= read -r version; do
+    if [[ "${first}" == "false" ]] && [[ "${tier}" == "tier3" ]]; then
+      echo "  - wait"
+      echo ""
+    fi
+    first=false
+    generate_version_group "${version}" "${variants_yaml}"
+  done <<< "${versions}"
 }
 
 # Main
@@ -197,7 +234,7 @@ main() {
   PIPELINE_FILE=$(mktemp)
   trap 'rm -f ${PIPELINE_FILE}' EXIT
 
-  generate_pipeline "${VERSIONS_YAML}" "${VARIANTS_YAML}" > "${PIPELINE_FILE}"
+  generate_pipeline "${VERSIONS_YAML}" "${VARIANTS_YAML}" "${K8S_TEST_TIER}" > "${PIPELINE_FILE}"
 
   echo "Generated pipeline:" >&2
   cat "${PIPELINE_FILE}" >&2
