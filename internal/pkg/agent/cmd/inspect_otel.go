@@ -56,7 +56,7 @@ func inspectOtelCmd(ctx context.Context, cfgPath string, streams *cli.IOStreams,
 	}
 
 	if err := diagnostics.AddSecretMarkers(l, fullCfg); err != nil {
-		return fmt.Errorf("failed to add diagnostics marker: %v", err)
+		return fmt.Errorf("failed to add diagnostics marker: %w", err)
 	}
 
 	cfg, err := fullCfg.ToMapStr()
@@ -126,6 +126,9 @@ func inspectOtelCmd(ctx context.Context, cfgPath string, streams *cli.IOStreams,
 	}
 
 	components, err := specs.ToComponents(cfg, agentCfg.Settings.Internal.Runtime, nil, nil, lvl, agentInfo, map[string]uint64{}, map[string]bool{})
+	if err != nil {
+		return fmt.Errorf("failed to get components: %w", err)
+	}
 
 	otelComponents := make([]component.Component, 0, len(components))
 	for _, c := range components {
@@ -140,7 +143,7 @@ func inspectOtelCmd(ctx context.Context, cfgPath string, streams *cli.IOStreams,
 	}
 
 	model := &component.Model{Components: otelComponents}
-	componentOtelCfg, err := translate.GetOtelConfig(model, agentInfo, agentCfg.Settings.Internal.Runtime, nil, l)
+	componentOtelCfg, err := translate.GetOtelConfig(model, agentInfo, agentCfg.Settings.Internal.Runtime, l)
 	if err != nil {
 		return fmt.Errorf("failed to generate otel config: %w", err)
 	}
