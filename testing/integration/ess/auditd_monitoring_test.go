@@ -114,9 +114,7 @@ func (runner *AuditDRunner) switchToOtelRuntime(ctx context.Context) int {
 	return policyResp.Revision
 }
 
-func (runner *AuditDRunner) validateAuditdEvents(ctx context.Context, agentID string, since time.Time) mapstr.M {
-	t := runner.T()
-
+func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) mapstr.M {
 	now := time.Now()
 	var query map[string]any
 	var doc mapstr.M
@@ -167,7 +165,7 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 	// Validate process mode
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
-		processDoc = runner.validateAuditdEvents(ctx, agentStatus.Info.ID, time.Time{})
+		processDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, time.Time{})
 	})
 
 	// Switch to OTel runtime and validate the same data
@@ -201,7 +199,7 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 			assert.True(collect, hasUserReceiver, "expected the user beat component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "user beat component should be running as beats receiver")
 
-		otelDoc = runner.validateAuditdEvents(ctx, agentStatus.Info.ID, otelSince)
+		otelDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, otelSince)
 	})
 
 	// Compare documents from process and otel modes have the same keys

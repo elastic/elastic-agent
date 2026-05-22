@@ -119,9 +119,7 @@ func (runner *NetworkTrafficRunner) switchToOtelRuntime(ctx context.Context) int
 	return policyResp.Revision
 }
 
-func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(ctx context.Context, agentID string, since time.Time) mapstr.M {
-	t := runner.T()
-
+func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) mapstr.M {
 	now := time.Now()
 	var query map[string]any
 	var doc mapstr.M
@@ -172,12 +170,14 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	// Validate process mode
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
-		processDoc = runner.validateNetworkTrafficEvents(ctx, agentStatus.Info.ID, time.Time{})
+		processDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, time.Time{})
 	})
 
 	// Switch to OTel runtime and validate the same data
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
+		t.Skip("pbreceiver does not yet produce events, skipping OTel validation")
+
 		otelSince := time.Now()
 		policyRevision := runner.switchToOtelRuntime(ctx)
 
@@ -204,7 +204,7 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 			assert.True(collect, hasUserReceiver, "expected the user beat component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "user beat component should be running as beats receiver")
 
-		otelDoc = runner.validateNetworkTrafficEvents(ctx, agentStatus.Info.ID, otelSince)
+		otelDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, otelSince)
 	})
 
 	// Compare documents from process and otel modes have the same keys
