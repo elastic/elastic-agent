@@ -86,39 +86,25 @@ func init() {
 	downloadsPath = filepath.Join(versionedHome, "downloads")
 	componentsPath = filepath.Join(versionedHome, "components")
 
-<<<<<<< HEAD
 	fs := flag.CommandLine
 	fs.StringVar(&topPath, "path.home", topPath, "Agent root path")
 	fs.BoolVar(&unversionedHome, "path.home.unversioned", unversionedHome, "Agent root path is not versioned based on build")
 	fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
 	fs.StringVar(&configFilePath, "config", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
-	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
+	fs.Func("path.logs", "Logs path contains Agent log output", func(s string) error {
+		// empty string resets to initial values - this is used by testing
+		if s == "" {
+			logsPath = topPath
+			isCustomLogsPath = false
+			return nil
+		}
+		logsPath = s
+		isCustomLogsPath = true
+		return nil
+	})
 	fs.StringVar(&installPath, "path.install", installPath, "DEPRECATED, setting this flag has no effect since v8.6.0")
 	fs.StringVar(&controlSocketPath, "path.socket", controlSocketPath, "Control protocol socket path for the Agent")
-=======
-// SetupFlags sets up global flags for path adjustment.
-func SetupFlags() {
-	setupFlagsOnce.Do(func() {
-		fs := flag.CommandLine
-		fs.StringVar(&topPath, "path.home", topPath, "Agent root path")
-		fs.BoolVar(&unversionedHome, "path.home.unversioned", unversionedHome, "Agent root path is not versioned based on build")
-		fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
-		fs.StringVar(&configFilePath, "config", DefaultConfigName, "Configuration file, relative to path.config")
-		fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
-		fs.Func("path.logs", "Logs path contains Agent log output", func(s string) error {
-			// empty string resets to initial values - this is used by testing
-			if s == "" {
-				logsPath = topPath
-				isCustomLogsPath = false
-				return nil
-			}
-			logsPath = s
-			isCustomLogsPath = true
-			return nil
-		})
-		fs.StringVar(&controlSocketPath, "path.socket", controlSocketPath, "Control protocol socket path for the Agent")
->>>>>>> 48df2a8c2 (fix: honour --path.logs for elastic-agent run (#14410))
 
 	// enable user to download update artifacts to alternative place
 	// TODO: remove path.downloads support on next major (this can be configured using `agent.download.targetDirectory`)
