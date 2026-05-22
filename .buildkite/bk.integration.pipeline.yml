@@ -54,7 +54,7 @@ common:
   - vault_github_token: &vault_github_token
       elastic/vault-github-token#v0.1.0:
   # Variants/Groups for the Linux AMD64 ITs
-  - linux_variants: &linux_variants
+  - linux_deb_variants: &linux_deb_variants
     - container
     - deb
     - default
@@ -69,6 +69,10 @@ common:
     - standalone-upgrade
     - upgrade
     - upgrade-flavor
+
+  # Variants/Groups for the Linux AMD64 ITs
+  - linux_rpm_variants: &linux_rpm_variants
+    - rpm
 
   # Variants/Groups for the Linux ARM ITs
   - linux_arm_variants: &linux_arm_variants
@@ -454,7 +458,7 @@ steps:
           - *vault_github_token
         matrix:
           setup:
-            variant: *linux_variants
+            variant: *linux_deb_variants
 
   - group: "Stateful: Linux (tier 2)"
     if_changed:
@@ -528,7 +532,7 @@ steps:
           setup:
             os:
               - "${IMAGE_DEBIAN_13}"
-            variant: *linux_variants
+            variant: *linux_deb_variants
 
       - label: "linux:amd64:tier2:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
         depends_on: packaging-amd64
@@ -558,8 +562,7 @@ steps:
             sudo:
               - "true"
               - "false"
-            variant:
-              - rpm
+            variant: *linux_rpm_variants
 
   - group: "Stateful: Linux (tier 3)"
     key: integration-tests-linux-tier3
@@ -633,7 +636,7 @@ steps:
               - "${IMAGE_UBUNTU_2404_X86_64}"
               - "${IMAGE_DEBIAN_11}"
               - "${IMAGE_DEBIAN_13}"
-            variant: *linux_variants
+            variant: *linux_deb_variants
 
       - label: "linux:amd64:tier3:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
@@ -666,8 +669,7 @@ steps:
             sudo:
               - "true"
               - "false"
-            variant:
-              - rpm
+            variant: *linux_rpm_variants
 
       - label: "linux:arm64:tier3:sudo:{{matrix.variant}}"
         depends_on:
