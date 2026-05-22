@@ -102,7 +102,6 @@ require (
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
-	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/elastic/ebpfevents v0.9.0 // indirect
 	github.com/elastic/entcollect v0.0.0-20260514013106-6d4034497b3d // indirect
 	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
