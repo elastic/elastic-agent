@@ -169,10 +169,10 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	}
 
 	// requireMarkerDetails=true: reject ambiguous legacy markers (nil Details) so they
-	// can't silently protect dirs that should be swept. Fatal on symlink error: see #13505.
-	keepDirs, symlinkErr := buildKeepDirs(log, topDirPath, true, versionedHomesToKeep)
-	if symlinkErr != nil {
-		return fmt.Errorf("cannot identify live versioned home from symlink, refusing to proceed with cleanup: %w", symlinkErr)
+	// can't silently protect dirs that should be swept. Fatal on marker or symlink error: see #13505.
+	keepDirs, keepDirsErr := buildKeepDirs(log, topDirPath, true, versionedHomesToKeep)
+	if keepDirsErr != nil {
+		return fmt.Errorf("refusing to proceed with cleanup: %w", keepDirsErr)
 	}
 
 	// Remove upgrade marker now that its content has been captured above.
@@ -437,11 +437,13 @@ func buildKeepDirs(log *logger.Logger, topDir string, requireMarkerDetails bool,
 		}
 	}
 
-	symlinkHome, err := liveVersionedHome(topDir)
-	if err == nil {
-		keep[symlinkHome] = true
+	symlinkHome, symlinkErr := liveVersionedHome(topDir)
+	if symlinkErr != nil {
+		log.Warnw("could not resolve live versioned home symlink during cleanup; skipping removals to avoid sweeping the live install", "error.message", symlinkErr.Error())
+		return keep, symlinkErr
 	}
-	return keep, err
+	keep[symlinkHome] = true
+	return keep, nil
 }
 
 // liveVersionedHome resolves the versioned home that the top-level agent

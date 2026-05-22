@@ -1129,7 +1129,7 @@ func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
 		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
 		err := cleanup(testLogger, topDir, false, false, 0, phantomHome)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot identify live versioned home")
+		assert.Contains(t, err.Error(), "refusing to proceed with cleanup")
 	})
 
 	t.Run("removeMarker=true: marker survives because resolve precedes CleanMarker", func(t *testing.T) {
@@ -1138,13 +1138,14 @@ func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
 
 		require.NoError(t, os.MkdirAll(paths.DataFrom(topDir), 0o750))
 		markerPath := filepath.Join(paths.DataFrom(topDir), markerFilename)
-		require.NoError(t, os.WriteFile(markerPath, []byte("placeholder upgrade marker"), 0o600),
-			"writing placeholder marker file")
+		require.NoError(t,
+			SaveMarker(paths.DataFrom(topDir), &UpdateMarker{Version: "1.2.3", Hash: "deadbeef"}, true),
+			"writing valid upgrade marker so the cleanup path reaches the symlink check")
 
 		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
 		err := cleanup(testLogger, topDir, true, false, 0, phantomHome)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot identify live versioned home")
+		assert.Contains(t, err.Error(), "refusing to proceed with cleanup")
 
 		assert.FileExists(t, markerPath,
 			"upgrade marker must survive an aborted cleanup (CleanMarker must not run before resolve)")
@@ -1183,8 +1184,8 @@ func TestCleanAvailableRollbacks_SkipsRemovalsWhenSymlinkUnresolvable(t *testing
 		m := leftover[relA]
 		assert.Equal(t, versionA.version, m.Version)
 		assert.Equal(t, versionA.hash, m.Hash)
-		assert.True(t, m.ValidUntil.Equal(validUntil) || m.ValidUntil.Sub(validUntil).Abs() < time.Second,
-			"ValidUntil should match (monotonic clock stripped on registry round-trip)")
+		assert.WithinDuration(t, validUntil, m.ValidUntil, time.Second,
+			"ValidUntil should round-trip cleanly (monotonic clock stripped by YAML)")
 	}
 
 	agentExecutableName := AgentName
