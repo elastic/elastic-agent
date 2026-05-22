@@ -103,6 +103,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/cgroupruntimeextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension"
+	otlpencodingextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otlpencodingextension"
 	headersetterextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
 	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
@@ -281,6 +282,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			kafkapartitionerextension.NewFactory(),
 			awslogsencodingextension.NewFactory(),
 			azureencodingextension.NewFactory(),
+			otlpencodingextension.NewFactory(),
 			opampextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)

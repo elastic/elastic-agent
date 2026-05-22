@@ -2540,6 +2540,56 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	assert.ElementsMatch(t, expectedPipelineProcessors, actualPipelineProcessors, "monitoring receiver pipeline processors should match default")
 }
 
+func TestMonitoringReceiverFileExporter(t *testing.T) {
+	exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
+	pipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
+	fileExporterName := "file/" + translate.OtelNamePrefix + internalTelemetryDiagnosticsName
+	encodingExtName := "otlp_encoding/" + translate.OtelNamePrefix + internalTelemetryDiagnosticsName
+
+	baseConfig := map[string]any{
+		"exporters": map[string]any{
+			exporterName: nil,
+		},
+	}
+	cfg := confmap.NewFromStringMap(baseConfig)
+	monitoringConfig := &config.MonitoringConfig{}
+	agentInfo := &info.AgentInfo{}
+	components := []component.Component{}
+	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components)
+	require.NoError(t, err, "injectMonitoringReceiver should succeed")
+	result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+	// The file exporter should appear in the pipeline's exporters list alongside
+	// the elasticsearch exporter.
+	pipelineExporters := result["service.pipelines."+pipelineName+".exporters"]
+	require.NotNil(t, pipelineExporters, "pipeline exporters should not be nil")
+	assert.ElementsMatch(t,
+		[]string{exporterName, fileExporterName},
+		pipelineExporters,
+		"pipeline should export to both elasticsearch and the diagnostics file exporter",
+	)
+
+	// The file exporter should be configured with the correct path.
+	expectedPath := filepath.Join(paths.Logs(), internalTelemetryDiagnosticsName+".jsonl")
+	assert.Equal(t, expectedPath, result["exporters."+fileExporterName+".path"], "file exporter path should be in the logs directory")
+
+	// Rotation settings should match the defaults: same file size as the agent
+	// logger, but only one backup.
+	assert.Equal(t, defaultDiagnosticsFileSizeMB, result["exporters."+fileExporterName+".rotation.max_megabytes"])
+	assert.Equal(t, 1, result["exporters."+fileExporterName+".rotation.max_backups"])
+
+	// The encoding extension should be referenced by the file exporter.
+	assert.Equal(t, encodingExtName, result["exporters."+fileExporterName+".encoding"])
+
+	// The OTLP encoding extension should be configured with the JSON protocol.
+	assert.Equal(t, "otlp_json", result["extensions."+encodingExtName+".protocol"])
+
+	// The encoding extension should appear in service::extensions.
+	serviceExtensions := result["service.extensions"]
+	require.NotNil(t, serviceExtensions, "service extensions should not be nil")
+	assert.Contains(t, serviceExtensions, encodingExtName, "encoding extension should be registered in service extensions")
+}
+
 // fakeCloseListener is a wrapper around a net.Listener that ignores the Close() method. This is used in a very particular
 // port conflict test to ensure ports are not unbound while the otel collector tries to use them.
 type fakeCloseListener struct {

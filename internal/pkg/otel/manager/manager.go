@@ -614,6 +614,14 @@ func exporterIDToOutputNameLookup(components []component.Component) (map[string]
 	return lookup, nil
 }
 
+// internalTelemetryDiagnosticsName is the name suffix for the file exporter and encoding extension
+// used to write internal telemetry diagnostics to disk.
+const internalTelemetryDiagnosticsName = "internal-telemetry-diagnostics"
+
+// defaultDiagnosticsFileSizeMB is the max size in megabytes for the internal telemetry
+// diagnostics file. It matches the default elastic-agent log file size.
+const defaultDiagnosticsFileSizeMB = 20
+
 func injectMonitoringReceiver(
 	config *confmap.Conf,
 	monitoring *monitoringCfg.MonitoringConfig,
@@ -646,9 +654,19 @@ func injectMonitoringReceiver(
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
 	processorID := translate.GetProcessorID().String()
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
+
+	// Build a file exporter and OTLP encoding extension for writing internal
+	// telemetry to disk as a diagnostics artifact. The file is rotated when it
+	// reaches defaultDiagnosticsFileSizeMB, keeping one backup — this gives
+	// between 1× and 2× the size in recent telemetry without unbounded growth.
+	diagName := translate.OtelNamePrefix + internalTelemetryDiagnosticsName
+	fileExporterID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("file"), diagName).String()
+	encodingExtID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("otlp_encoding"), diagName).String()
+	diagFilePath := filepath.Join(paths.Logs(), internalTelemetryDiagnosticsName+".jsonl")
+
 	pipelineCfg := map[string]any{
 		"receivers": []string{receiverID},
-		"exporters": []string{exporterID},
+		"exporters": []string{exporterID, fileExporterID},
 	}
 	collectorCfg := map[string]any{
 		"receivers": map[string]any{
@@ -659,10 +677,26 @@ func injectMonitoringReceiver(
 				"exporter_names":       outputNameLookup,
 			},
 		},
+		"exporters": map[string]any{
+			fileExporterID: map[string]any{
+				"path": diagFilePath,
+				"rotation": map[string]any{
+					"max_megabytes": defaultDiagnosticsFileSizeMB,
+					"max_backups":   1,
+				},
+				"encoding": encodingExtID,
+			},
+		},
+		"extensions": map[string]any{
+			encodingExtID: map[string]any{
+				"protocol": "otlp_json",
+			},
+		},
 		"service": map[string]any{
 			"pipelines": map[string]any{
 				pipelineID: pipelineCfg,
 			},
+			"extensions": []any{encodingExtID},
 		},
 	}
 	if features.DefaultProcessors() {
