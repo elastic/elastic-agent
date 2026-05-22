@@ -614,9 +614,14 @@ func exporterIDToOutputNameLookup(components []component.Component) (map[string]
 	return lookup, nil
 }
 
-// internalTelemetryDiagnosticsName is the name suffix for the file exporter and encoding extension
-// used to write internal telemetry diagnostics to disk.
+// internalTelemetryDiagnosticsName is the component ID suffix used for the diagnostics
+// file exporter injected into the internal telemetry monitoring pipeline.
 const internalTelemetryDiagnosticsName = "internal-telemetry-diagnostics"
+
+// internalTelemetryDiagnosticsFileName is the filename for the diagnostics NDJSON file.
+// It is written to filepath.Join(paths.Home(), "logs") so that it sits alongside the
+// other elastic-agent log files and is automatically included in diagnostics bundles.
+const internalTelemetryDiagnosticsFileName = "elastic-agent-metrics.ndjson"
 
 // defaultDiagnosticsFileSizeMB is the max size in megabytes for the internal telemetry
 // diagnostics file. It matches the default elastic-agent log file size.
@@ -656,13 +661,17 @@ func injectMonitoringReceiver(
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
 
 	// Build a file exporter and OTLP encoding extension for writing internal
-	// telemetry to disk as a diagnostics artifact. The file is rotated when it
-	// reaches defaultDiagnosticsFileSizeMB, keeping one backup — this gives
-	// between 1× and 2× the size in recent telemetry without unbounded growth.
+	// telemetry to disk as a diagnostics artifact.
+	// The file is written to paths.Home()/logs/ — the same directory where
+	// MakeInternalFileOutput writes the agent's own log files and where the
+	// diagnostics bundle collector walks to find files to include.
+	// The file is rotated when it reaches defaultDiagnosticsFileSizeMB, keeping
+	// one backup — this gives between 1× and 2× the size in recent telemetry
+	// without unbounded growth.
 	diagName := translate.OtelNamePrefix + internalTelemetryDiagnosticsName
 	fileExporterID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("file"), diagName).String()
 	encodingExtID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("otlp_encoding"), diagName).String()
-	diagFilePath := filepath.Join(paths.Logs(), internalTelemetryDiagnosticsName+".jsonl")
+	diagFilePath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
 
 	pipelineCfg := map[string]any{
 		"receivers": []string{receiverID},

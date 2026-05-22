@@ -2569,9 +2569,11 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 		"pipeline should export to both elasticsearch and the diagnostics file exporter",
 	)
 
-	// The file exporter should be configured with the correct path.
-	expectedPath := filepath.Join(paths.Logs(), internalTelemetryDiagnosticsName+".jsonl")
-	assert.Equal(t, expectedPath, result["exporters."+fileExporterName+".path"], "file exporter path should be in the logs directory")
+	// The file exporter path must be in paths.Home()/logs/ — the same directory
+	// that MakeInternalFileOutput writes to and that the diagnostics collector walks.
+	expectedPath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
+	assert.Equal(t, expectedPath, result["exporters."+fileExporterName+".path"],
+		"file exporter path should be in paths.Home()/logs/")
 
 	// Rotation settings should match the defaults: same file size as the agent
 	// logger, but only one backup.
