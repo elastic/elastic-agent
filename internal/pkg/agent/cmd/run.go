@@ -366,7 +366,7 @@ func runElasticAgent(
 
 	// Ensure that the log level now matches what is configured in the agentInfo.
 	var lvl logp.Level
-	err = lvl.Unpack(agentInfo.LogLevel())
+	err = lvl.Unpack(agentInfo.GetLogLevelRuntime())
 	if err != nil {
 		l.Error(errors.New(err, "failed to parse agent information log level"))
 	} else {
