@@ -264,7 +264,7 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 
 	p, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "_meta", "elastic-agent.fleet.yml"))
 	require.NoError(t, err)
-	err = os.WriteFile(paths.ConfigFile(), p, 0640)
+	err = os.WriteFile(paths.ConfigFile(), p, 0640) //nolint:gosec // test fixture writing to controlled temp path
 	require.NoError(t, err)
 
 	isRoot, err := utils.HasRoot()
