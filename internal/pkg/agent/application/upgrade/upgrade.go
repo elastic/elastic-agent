@@ -242,21 +242,14 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-<<<<<<< HEAD
-func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
-=======
-func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...Option) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...Option) (_ reexec.ShutdownCallbackFn, err error) {
 
 	var uOpts upgradeOptions
 	for _, opt := range opts {
 		opt(&uOpts)
 	}
 
-	if rollback {
-		return u.rollbackToPreviousVersion(ctx, paths.Top(), time.Now(), version, action)
-	}
 
->>>>>>> d350a4065 (fix: notify endpoint-security just before symlink swap, not before upgrade attempt (#14397))
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	cleanupPaths := []string{}
 	defer func() {

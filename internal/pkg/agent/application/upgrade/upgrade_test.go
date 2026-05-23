@@ -1575,10 +1575,6 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 			checkArchiveCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
-				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
-			},
 		},
 		"pre-symlink callback must not be called if unpack fails": {
 			expectedError: testError,
@@ -1603,10 +1599,6 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
-				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
-			},
 		},
 		"pre-symlink callback error aborts upgrade before changeSymlink and triggers cleanup": {
 			expectedError: testError,
@@ -1635,10 +1627,6 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
-				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
-			},
 		},
 	}
 
@@ -1666,11 +1654,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				return tc.isDiskSpaceErrorResult
 			}
 
-<<<<<<< HEAD
-			_, err = upgrader.Upgrade(context.Background(), "9.0.0", "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true)
-=======
-			_, err = upgrader.Upgrade(context.Background(), "9.0.0", false, "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true, nil, tc.upgradeOpts...)
->>>>>>> d350a4065 (fix: notify endpoint-security just before symlink swap, not before upgrade attempt (#14397))
+			_, err = upgrader.Upgrade(context.Background(), "9.0.0", "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true, nil, tc.upgradeOpts...)
 			require.ErrorIs(t, err, tc.expectedError)
 
 			// If the downloaded archive needs to be cleaned up assert that it is indeed cleaned up, if not assert that it still exists. The downloaded archive is a mock file that is created for all tests cases.

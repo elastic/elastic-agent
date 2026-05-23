@@ -1207,11 +1207,7 @@ func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-<<<<<<< HEAD
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
-=======
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
->>>>>>> d350a4065 (fix: notify endpoint-security just before symlink swap, not before upgrade attempt (#14397))
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	f.upgradeCalled = true
 	if cbErr := upgrade.InvokePreSymlinkCallback(opts, ctx, nil, action); cbErr != nil {
 		return nil, cbErr
