@@ -249,7 +249,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		opt(&uOpts)
 	}
 
-
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	cleanupPaths := []string{}
 	defer func() {
