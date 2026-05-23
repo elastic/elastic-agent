@@ -5,6 +5,7 @@
 package define
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -213,7 +214,7 @@ func TestBatch(t *testing.T) {
 		},
 	}
 
-	actual, err := DetermineBatches("testdata", "", "batch_test")
+	actual, err := DetermineBatches(context.Background(), "testdata", "", "batch_test")
 	require.NoError(t, err)
 	require.EqualValues(t, expected, actual)
 }
@@ -293,7 +294,7 @@ func TestGoTestFlags(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := DetermineBatches("testdata", tc.flags, "batch_test")
+			actual, err := DetermineBatches(context.Background(), "testdata", tc.flags, "batch_test")
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expected, actual)
 		})

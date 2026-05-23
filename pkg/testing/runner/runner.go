@@ -796,33 +796,120 @@ func (r *Runner) addOrUpdateStack(stack common.Stack) error {
 }
 
 func (r *Runner) loadState() error {
-	data, err := os.ReadFile(r.getStatePath())
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("failed to read state file %s: %w", r.getStatePath(), err)
-	}
-	var state State
-	err = yaml.Unmarshal(data, &state)
+	state, err := readStateFile(r.cfg.StateDir)
 	if err != nil {
-		return fmt.Errorf("failed unmarshal state file %s: %w", r.getStatePath(), err)
+		return err
 	}
 	r.state = state
 	return nil
 }
 
 func (r *Runner) writeState() error {
-	data, err := yaml.Marshal(&r.state)
+	return writeStateFile(r.cfg.StateDir, r.state)
+}
+
+// statePath returns the path to the state file within the given state directory.
+func statePath(stateDir string) string {
+	return filepath.Join(stateDir, "state.yml")
+}
+
+// readStateFile reads the provisioning state from the state directory. A missing
+// state file is not an error; it returns an empty State.
+func readStateFile(stateDir string) (State, error) {
+	path := statePath(stateDir)
+	data, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return State{}, fmt.Errorf("failed to read state file %s: %w", path, err)
+	}
+	var state State
+	if err := yaml.Unmarshal(data, &state); err != nil {
+		return State{}, fmt.Errorf("failed unmarshal state file %s: %w", path, err)
+	}
+	return state, nil
+}
+
+// writeStateFile persists the provisioning state to the state directory.
+func writeStateFile(stateDir string, state State) error {
+	path := statePath(stateDir)
+	data, err := yaml.Marshal(&state)
 	if err != nil {
 		return fmt.Errorf("failed to marshal state: %w", err)
 	}
-	err = os.WriteFile(r.getStatePath(), data, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write state file %s: %w", r.getStatePath(), err)
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write state file %s: %w", path, err)
 	}
 	return nil
 }
 
-func (r *Runner) getStatePath() string {
-	return filepath.Join(r.cfg.StateDir, "state.yml")
+// ProvisionStack provisions a single stack at the given version, reusing a matching
+// stack from the local state cache (stateDir/state.yml) when present and persisting
+// any newly created stack back to it. The state cache is shared with the full
+// integration runner, so a stack created here is reused by `mage integration:test`
+// and can be torn down with `mage integration:clean`.
+//
+// It is intended for local test runs that need a stack but do not provision any
+// instances (and therefore should not require instance-provisioner credentials).
+func ProvisionStack(ctx context.Context, logger common.Logger, sp common.StackProvisioner, stateDir string, version string) (common.Stack, error) {
+	sp.SetLogger(logger)
+	id := strings.ReplaceAll(version, ".", "")
+
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+		return common.Stack{}, fmt.Errorf("failed to create state dir %s: %w", stateDir, err)
+	}
+
+	state, err := readStateFile(stateDir)
+	if err != nil {
+		return common.Stack{}, err
+	}
+
+	upsert := func(stack common.Stack) error {
+		found := false
+		for idx, existing := range state.Stacks {
+			if existing.Same(stack) {
+				state.Stacks[idx] = stack
+				found = true
+				break
+			}
+		}
+		if !found {
+			state.Stacks = append(state.Stacks, stack)
+		}
+		return writeStateFile(stateDir, state)
+	}
+
+	var stack common.Stack
+	found := false
+	for _, existing := range state.Stacks {
+		if existing.Same(common.Stack{ID: id, Provisioner: sp.Name()}) {
+			stack = existing
+			found = true
+			break
+		}
+	}
+	if !found {
+		logger.Logf("Creating stack %s (%s)", id, version)
+		stack, err = sp.Create(ctx, common.StackRequest{ID: id, Version: version})
+		if err != nil {
+			return common.Stack{}, err
+		}
+		if err := upsert(stack); err != nil {
+			return common.Stack{}, err
+		}
+	}
+
+	if stack.Ready {
+		return stack, nil
+	}
+
+	logger.Logf("Waiting for stack %s to be ready", id)
+	stack, err = sp.WaitForReady(ctx, stack)
+	if err != nil {
+		return common.Stack{}, err
+	}
+	if err := upsert(stack); err != nil {
+		return common.Stack{}, err
+	}
+	return stack, nil
 }
 
 func (r *Runner) mergeResults(results map[string]common.OSRunnerResult) (Result, error) {

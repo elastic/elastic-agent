@@ -43,7 +43,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 
 	echApiKey := os.Getenv("EC_API_KEY")
 	if echApiKey == "" {
-		t.Fatal("ECH API key missing")
+		t.Skip("ECH API key missing; set EC_API_KEY to run this test")
 	}
 
 	startVersions := getUpgradeableFIPSVersions(t, runtime.GOOS, runtime.GOARCH)

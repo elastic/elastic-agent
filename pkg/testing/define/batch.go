@@ -7,6 +7,7 @@ package define
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -76,9 +77,37 @@ type BatchPackageTest struct {
 	Stack bool `json:"stack"`
 }
 
+// TestRequirement pairs a discovered test with its parsed define.Requirements.
+type TestRequirement struct {
+	// Package is the Go package import path the test belongs to.
+	Package string
+	// Name is the test function name.
+	Name string
+	// Requirements are the requirements declared by the test's define.Require call.
+	Requirements Requirements
+}
+
 // DetermineBatches parses the package directory with the possible extra build
 // tags to determine the set of batches for the package.
-func DetermineBatches(dir string, testFlags string, buildTags ...string) ([]Batch, error) {
+func DetermineBatches(ctx context.Context, dir string, testFlags string, buildTags ...string) ([]Batch, error) {
+	discovered, err := DiscoverTests(ctx, dir, testFlags, buildTags...)
+	if err != nil {
+		return nil, err
+	}
+
+	// determine the batches that each test belongs in
+	var batches []Batch
+	for _, dt := range discovered {
+		batches = appendTest(batches, testActionResult{Package: dt.Package, Test: dt.Name}, dt.Requirements)
+	}
+	return batches, nil
+}
+
+// DiscoverTests parses the package directory (with the possible extra build tags) and
+// returns every test together with its parsed define.Requirements. This is the same
+// discovery mechanism used by DetermineBatches, but it returns the raw requirements
+// (including the Local flag) instead of grouping them into batches.
+func DiscoverTests(ctx context.Context, dir string, testFlags string, buildTags ...string) ([]TestRequirement, error) {
 	const (
 		defineMatcher = "define skip; requirements: "
 	)
@@ -102,7 +131,7 @@ func DetermineBatches(dir string, testFlags string, buildTags ...string) ([]Batc
 	}
 
 	cmdArgs = append(cmdArgs, dir)
-	testCmd := exec.Command("go", cmdArgs...)
+	testCmd := exec.CommandContext(ctx, "go", cmdArgs...)
 	output, err := testCmd.Output()
 	if err != nil {
 		// format cmdArgs to make the error message more coherent
@@ -119,8 +148,8 @@ func DetermineBatches(dir string, testFlags string, buildTags ...string) ([]Batc
 			err, string(output), cmdArgs)
 	}
 
-	// parses each test and determine the batches that each test belongs in
-	var batches []Batch
+	// parse each test's logged requirements
+	var discovered []TestRequirement
 	sc := bufio.NewScanner(bytes.NewReader(output))
 	for sc.Scan() {
 		var tar testActionResult
@@ -139,10 +168,14 @@ func DetermineBatches(dir string, testFlags string, buildTags ...string) ([]Batc
 			if err != nil {
 				return nil, fmt.Errorf("parsed requirements are invalid JSON from test %s/%s: %w", tar.Package, tar.Test, err)
 			}
-			batches = appendTest(batches, tar, req)
+			discovered = append(discovered, TestRequirement{
+				Package:      tar.Package,
+				Name:         tar.Test,
+				Requirements: req,
+			})
 		}
 	}
-	return batches, nil
+	return discovered, nil
 }
 
 func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch {

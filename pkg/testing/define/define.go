@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -80,6 +81,23 @@ func (i *Info) KubeClient() (klient.Client, error) {
 	}
 
 	return c, nil
+}
+
+// allowLocalSudo reports whether privileged (sudo) tests are permitted to run on
+// the local host. It is false by default to keep local runs non-invasive and is
+// enabled by setting TEST_RUN_LOCAL_SUDO=true.
+func allowLocalSudo() bool {
+	v, _ := strconv.ParseBool(os.Getenv("TEST_RUN_LOCAL_SUDO"))
+	return v
+}
+
+// localSudoBlocked reports whether a sudo test must be skipped because it is being
+// run in local mode on the bare host. Sudo tests perform a privileged, invasive
+// install (e.g. registering a systemd service), so by default they are not run
+// locally and belong on an isolated container or VM instead. The TEST_RUN_LOCAL_SUDO
+// override (see allowLocalSudo) opts back in to running them on the local host.
+func localSudoBlocked(req Requirements, local bool) bool {
+	return req.Sudo && local && !allowLocalSudo()
 }
 
 // Version returns the version of the Elastic Agent the tests should be using.
@@ -182,6 +200,11 @@ func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 			t.Skip("test requires kubernetes")
 			return nil
 		}
+	}
+	if localSudoBlocked(req, local) {
+		t.Skip("test requires a privileged install; not run on the bare host in local mode " +
+			"(run it via a container or VM provisioner, or set TEST_RUN_LOCAL_SUDO=true to override)")
+		return nil
 	}
 	if req.Sudo {
 		// we can run sudo tests if we are being executed as root

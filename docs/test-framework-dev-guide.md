@@ -181,6 +181,26 @@ SNAPSHOT=true INSTANCE_PROVISIONER=kind mage -v integration:testKubernetesSingle
   `all` is passed as argument, or it'll pass `[testName]` to `go test` as
   `--run=[testName]`. These tests are executed on your local machine.
 
+  Before running, the target prints a **preview** listing which tests will actually
+  run on the current machine and which will be skipped (and why), so it is clear up
+  front what local execution will cover.
+
+  If any of the tests that will run need a stack, the target **provisions one the
+  same way `mage integration:test` does** (honouring `STACK_PROVISIONER`, defaulting
+  to stateful ESS) and injects the `ELASTICSEARCH_*`/`KIBANA_*` environment variables
+  for you. The stack is cached in `.integration-cache` and shared with
+  `mage integration:test`, and can be torn down with `mage integration:clean`. This
+  needs ESS credentials (`mage integration:auth`) but does **not** require GCE
+  credentials, since no instances are provisioned. If `ELASTICSEARCH_HOST` and
+  `KIBANA_HOST` are already set, the target uses those and provisions nothing. Tests
+  that don't need a stack (e.g. the fake-component tests) run without provisioning.
+
+  To keep local runs non-invasive, tests that set `Sudo: true` (these perform a
+  privileged install of the Elastic Agent, e.g. registering a systemd service) are
+  **not** run on the bare host in local mode — they are reported as skipped and are
+  meant to run on an isolated container or VM instead. Set `TEST_RUN_LOCAL_SUDO=true`
+  to override and run them on the local host (this will modify your machine).
+
 - `mage integration:single [testName]` to execute a single test under the `testing/integration/ess` folder. Only the selected test will be executed on remote VMs.
 
 - `mage integration:matrix` to run all tests under the `testing/integration/ess` folder on the complete matrix of supported operating systems and architectures of the Elastic Agent.

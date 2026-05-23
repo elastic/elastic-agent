@@ -52,6 +52,7 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -2138,12 +2139,159 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	}
 	params.ExtraFlags = goTestFlags
 
+	// Match the remote runner's test timeout (instead of `go test`'s 10m default), so
+	// running the whole local suite doesn't get killed mid-run. Respect a timeout
+	// already provided via GOTEST_FLAGS.
+	hasTimeout := false
+	for _, f := range goTestFlags {
+		if strings.HasPrefix(f, "-test.timeout") || strings.HasPrefix(f, "-timeout") {
+			hasTimeout = true
+			break
+		}
+	}
+	if !hasTimeout {
+		params.ExtraFlags = append(params.ExtraFlags, "-test.timeout", goIntegTestTimeout.String())
+	}
+
+	// Default AGENT_VERSION to the version that was actually packaged into
+	// build/distributions, so the tests find the local build (otherwise a SNAPSHOT
+	// build won't match the default non-snapshot version).
+	if os.Getenv("AGENT_VERSION") == "" {
+		detected, err := detectLocalAgentVersion(cfg)
+		if err != nil {
+			return err
+		}
+		if detected != "" {
+			fmt.Printf("Using locally built Elastic Agent version %q (set AGENT_VERSION to override).\n", detected)
+			params.Env["AGENT_VERSION"] = detected
+		}
+	}
+
 	if testName == "all" {
 		params.RunExpr = ""
 	} else {
 		params.RunExpr = testName
 	}
+
+	// Print a preview so it is clear up front which tests will actually run locally
+	// on this machine and which will be skipped (and why), and learn whether any of
+	// them need a stack. A preview failure is non-fatal: fall through to the real
+	// run, which will surface any compilation error itself.
+	needStack, err := localTestPreview(ctx, params.RunExpr, params.Tags)
+	if err != nil {
+		fmt.Printf("⚠️  could not generate local test preview: %s\n", err)
+	}
+
+	// Provision (or reuse) a stack for the tests that need one, mirroring how
+	// `mage integration:test` provisions the stack. Tests that don't need a stack
+	// (e.g. the fake-component tests) run without provisioning anything.
+	if needStack {
+		stackEnv, err := ensureLocalStack(ctx, cfg)
+		if err != nil {
+			return err
+		}
+		for k, v := range stackEnv {
+			params.Env[k] = v
+		}
+	}
+
 	return devtools.GoTest(ctx, params)
+}
+
+// localTestPreview discovers the integration tests and prints a summary of which
+// ones will actually run on this machine in local mode and which will be skipped
+// (with the reason). It reuses the same 'define'-tag discovery that the remote
+// runner uses to build batches, so the requirements it reports are authoritative.
+//
+// Note: a required Elasticsearch/Kibana stack is not validated here; stack-dependent
+// tests are annotated "(needs stack)" and skip at run time if ELASTICSEARCH_*/
+// KIBANA_* are unset.
+func localTestPreview(ctx context.Context, runExpr string, tags []string) (bool, error) {
+	testFlags := ""
+	if runExpr != "" {
+		testFlags = "-run " + runExpr
+	}
+	// DiscoverTests adds the 'define' build tag itself; the tags passed in include
+	// 'integration' (and 'local'/fips) so the test files compile.
+	discovered, err := define.DiscoverTests(ctx, "testing/integration/...", testFlags, tags...)
+	if err != nil {
+		return false, err
+	}
+
+	goos, goarch := runtime.GOOS, runtime.GOARCH
+	platformMatches := func(req define.Requirements) bool {
+		if len(req.OS) == 0 {
+			return true // no OS constraint means it supports all platforms
+		}
+		for _, o := range req.OS {
+			if o.Type == goos && (o.Arch == "" || o.Arch == goarch) {
+				return true
+			}
+		}
+		return false
+	}
+	annotate := func(name string, needsStack bool) string {
+		if needsStack {
+			return name + " (needs stack)"
+		}
+		return name
+	}
+
+	var willRun, sudoSkip, platformSkip []string
+	nonLocal := 0
+	needStack := false
+	for _, dt := range discovered {
+		req := dt.Requirements
+		if !req.Local {
+			nonLocal++
+			continue
+		}
+		switch {
+		case !platformMatches(req):
+			platformSkip = append(platformSkip, dt.Name)
+		case req.Sudo:
+			sudoSkip = append(sudoSkip, dt.Name)
+		default:
+			willRun = append(willRun, annotate(dt.Name, req.Stack != nil))
+			if req.Stack != nil {
+				needStack = true
+			}
+		}
+	}
+	sort.Strings(willRun)
+	sort.Strings(sudoSkip)
+	sort.Strings(platformSkip)
+
+	fmt.Printf("\nLocal integration test preview (%s/%s): %d will run, %d will skip\n\n",
+		goos, goarch, len(willRun), len(sudoSkip)+len(platformSkip))
+
+	if len(willRun) > 0 {
+		fmt.Println("WILL RUN:")
+		for _, n := range willRun {
+			fmt.Printf("  • %s\n", n)
+		}
+		fmt.Println()
+	}
+	if len(sudoSkip) > 0 {
+		fmt.Printf("WILL SKIP — requires a privileged install, not run on the bare host (set TEST_RUN_LOCAL_SUDO=true to override) (%d):\n", len(sudoSkip))
+		for _, n := range sudoSkip {
+			fmt.Printf("  - %s\n", n)
+		}
+		fmt.Println()
+	}
+	if len(platformSkip) > 0 {
+		fmt.Printf("WILL SKIP — not supported on %s/%s (%d):\n", goos, goarch, len(platformSkip))
+		for _, n := range platformSkip {
+			fmt.Printf("  - %s\n", n)
+		}
+		fmt.Println()
+	}
+	if nonLocal > 0 {
+		fmt.Printf("(%d non-local tests are not eligible for local execution and are not listed.)\n\n", nonLocal)
+	}
+	fmt.Println("Note: tests marked \"(needs stack)\" require a running Elasticsearch/Kibana stack.")
+	fmt.Println()
+	return needStack, nil
 }
 
 // Auth authenticates users who run it to various IaaS CSPs and ESS
@@ -2901,7 +3049,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 func (Integration) Buildkite(ctx context.Context) error {
 	envCfg := devtools.SettingsFromContext(ctx)
 	goTestFlags := envCfg.IntegrationTest.GoTestFlags
-	batches, err := define.DetermineBatches("testing/integration/ess", goTestFlags, "integration")
+	batches, err := define.DetermineBatches(ctx, "testing/integration/ess", goTestFlags, "integration")
 	if err != nil {
 		return fmt.Errorf("failed to determine batches: %w", err)
 	}
@@ -2980,7 +3128,7 @@ func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTes
 	cfg := devtools.SettingsFromContext(ctx)
 	goTestFlags := cfg.IntegrationTest.GoTestFlags
 
-	batches, err := define.DetermineBatches(testDir, goTestFlags, "integration")
+	batches, err := define.DetermineBatches(ctx, testDir, goTestFlags, "integration")
 	if err != nil {
 		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}
@@ -3054,21 +3202,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	if agentBuildDir == "" {
 		agentBuildDir = filepath.Join("build", "distributions")
 	}
-	essToken, ok, err := ess.GetESSAPIKey()
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
-	}
-
-	// Possible to change the region for deployment, default is gcp-us-west2 which is
-	// the CFT region.
-	essRegion := cfg.IntegrationTest.ESSRegion
-	if essRegion == "" {
-		essRegion = "gcp-us-west2"
-	}
-
 	serviceTokenPath, ok, err := getGCEServiceTokenPath(cfg)
 	if err != nil {
 		return nil, err
@@ -3107,33 +3240,13 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		return nil, err
 	}
 
-	provisionCfg := ess.ProvisionerConfig{
-		Identifier: fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-")),
-		APIKey:     essToken,
-		Region:     essRegion,
+	provisionCfg, err := essProvisionerConfig(cfg, essIdentifier(strings.Split(email, "@")[0]))
+	if err != nil {
+		return nil, err
 	}
-
-	var stackProvisioner tcommon.StackProvisioner
-	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
-	switch stackProvisionerMode {
-	case "", ess.ProvisionerStateful:
-		stackProvisionerMode = ess.ProvisionerStateful
-		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
-		if err != nil {
-			return nil, err
-		}
-	case ess.ProvisionerServerless:
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
-			ess.ProvisionerStateful,
-			ess.ProvisionerServerless,
-			stackProvisionerMode)
+	stackProvisioner, _, err := newStackProvisioner(cfg, provisionCfg)
+	if err != nil {
+		return nil, err
 	}
 
 	timestamp := cfg.IntegrationTest.TimestampEnabled
@@ -3190,6 +3303,169 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		return nil, fmt.Errorf("failed to create runner: %w", err)
 	}
 	return r, nil
+}
+
+// essIdentifier builds an ESS deployment identifier prefix from the given name
+// (e.g. a user name or the local part of an email address).
+func essIdentifier(name string) string {
+	if name == "" {
+		name = "local"
+	}
+	return fmt.Sprintf("at-%s", strings.ReplaceAll(name, ".", "-"))
+}
+
+// essProvisionerConfig builds the ESS provisioner configuration (API key + region)
+// used by both the stateful and serverless stack provisioners.
+func essProvisionerConfig(cfg *devtools.Settings, identifier string) (ess.ProvisionerConfig, error) {
+	essToken, ok, err := ess.GetESSAPIKey()
+	if err != nil {
+		return ess.ProvisionerConfig{}, err
+	}
+	if !ok {
+		return ess.ProvisionerConfig{}, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
+	}
+
+	// Possible to change the region for deployment, default is gcp-us-west2 which is
+	// the CFT region.
+	essRegion := cfg.IntegrationTest.ESSRegion
+	if essRegion == "" {
+		essRegion = "gcp-us-west2"
+	}
+
+	return ess.ProvisionerConfig{
+		Identifier: identifier,
+		APIKey:     essToken,
+		Region:     essRegion,
+	}, nil
+}
+
+// newStackProvisioner creates the stack provisioner selected by STACK_PROVISIONER
+// (defaulting to stateful), returning the provisioner and its resolved mode.
+func newStackProvisioner(cfg *devtools.Settings, provisionCfg ess.ProvisionerConfig) (tcommon.StackProvisioner, string, error) {
+	mode := cfg.IntegrationTest.StackProvisioner
+	switch mode {
+	case "", ess.ProvisionerStateful:
+		mode = ess.ProvisionerStateful
+		sp, err := ess.NewProvisioner(provisionCfg)
+		return sp, mode, err
+	case ess.ProvisionerServerless:
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		sp, err := ess.NewServerlessProvisioner(ctx, provisionCfg)
+		return sp, mode, err
+	default:
+		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
+			ess.ProvisionerStateful,
+			ess.ProvisionerServerless,
+			mode)
+	}
+}
+
+// ensureLocalStack makes a stack available for local test runs, mirroring how
+// `mage integration:test` provisions one. If ELASTICSEARCH_HOST and KIBANA_HOST are
+// already set, it respects them and provisions nothing. Otherwise it provisions (or
+// reuses from .integration-cache) a stack via the configured stack provisioner and
+// returns the environment variables the tests use to reach it.
+func ensureLocalStack(ctx context.Context, cfg *devtools.Settings) (map[string]string, error) {
+	if os.Getenv("ELASTICSEARCH_HOST") != "" && os.Getenv("KIBANA_HOST") != "" {
+		fmt.Println("Using stack from existing ELASTICSEARCH_*/KIBANA_* environment variables.")
+		return nil, nil
+	}
+
+	_, stackVersion, err := getTestRunnerVersions(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	provisionCfg, err := essProvisionerConfig(cfg, essIdentifier(localStackUser()))
+	if err != nil {
+		return nil, err
+	}
+	sp, mode, err := newStackProvisioner(cfg, provisionCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	logger := &simpleLogger{}
+	logger.Logf("Provisioning %q stack (version %s) for local tests; this can take several minutes...", mode, stackVersion)
+
+	provisionCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+	defer cancel()
+	stack, err := runner.ProvisionStack(provisionCtx, logger, sp, ".integration-cache", stackVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to provision stack for local tests: %w", err)
+	}
+
+	logger.Logf("Stack ready: Elasticsearch=%s Kibana=%s", stack.Elasticsearch, stack.Kibana)
+	return map[string]string{
+		"ELASTICSEARCH_HOST":     stack.Elasticsearch,
+		"ELASTICSEARCH_USERNAME": stack.Username,
+		"ELASTICSEARCH_PASSWORD": stack.Password,
+		"KIBANA_HOST":            stack.Kibana,
+		"KIBANA_USERNAME":        stack.Username,
+		"KIBANA_PASSWORD":        stack.Password,
+	}, nil
+}
+
+// detectLocalAgentVersion inspects build/distributions for a packaged Elastic Agent
+// tar.gz matching the current platform and returns its version (e.g. "9.5.0-SNAPSHOT").
+// It is used to default AGENT_VERSION so local tests find the build that was packaged,
+// avoiding the common mismatch where SNAPSHOT artifacts don't match the default
+// non-snapshot version. It returns "" when it cannot unambiguously determine one.
+func detectLocalAgentVersion(cfg *devtools.Settings) (string, error) {
+	suffix, err := atesting.GetPackageSuffix(runtime.GOOS, runtime.GOARCH, "targz")
+	if err != nil {
+		return "", err
+	}
+	prefix := "elastic-agent-" + atesting.GetPackagePrefix(cfg.Build.FIPSBuild)
+	matches, err := filepath.Glob(filepath.Join("build", "distributions", prefix+"*-"+suffix))
+	if err != nil {
+		return "", err
+	}
+
+	seen := map[string]struct{}{}
+	var versions []string
+	for _, m := range matches {
+		base := filepath.Base(m)
+		v := strings.TrimSuffix(strings.TrimPrefix(base, prefix), "-"+suffix)
+		if _, err := version.ParseVersion(v); err != nil {
+			// not a plain agent build (e.g. elastic-agent-core-...)
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		versions = append(versions, v)
+	}
+
+	switch len(versions) {
+	case 0:
+		return "", nil
+	case 1:
+		return versions[0], nil
+	default:
+		return "", fmt.Errorf("multiple agent builds found in build/distributions (%s); set AGENT_VERSION to choose one",
+			strings.Join(versions, ", "))
+	}
+}
+
+// localStackUser returns a stable name used to derive the ESS deployment identifier
+// for local runs, without requiring instance-provisioner (GCE) credentials.
+func localStackUser() string {
+	for _, env := range []string{"USER", "USERNAME", "LOGNAME"} {
+		if v := os.Getenv(env); v != "" {
+			return v
+		}
+	}
+	return "local"
+}
+
+// simpleLogger is a minimal common.Logger implementation for local stack provisioning.
+type simpleLogger struct{}
+
+func (simpleLogger) Logf(format string, args ...any) {
+	fmt.Printf(format+"\n", args...)
 }
 
 func shouldBuildAgent(cfg *devtools.Settings) bool {
