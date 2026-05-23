@@ -197,9 +197,6 @@ func TestApplyCustomLogsPath(t *testing.T) {
 		},
 	}
 
-	// Ensure the path.logs flag is registered before we try to Set it.
-	paths.SetupFlags()
-
 	origCfgDir := paths.Config()
 	origLogsPath := paths.Logs()
 	t.Cleanup(func() {

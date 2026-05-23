@@ -31,8 +31,6 @@ func validTestPath(useVersionInPath bool) string {
 }
 
 func TestIsCustomLogsPath(t *testing.T) {
-	SetupFlags()
-
 	origLogsPath := logsPath
 	t.Cleanup(func() {
 		logsPath = origLogsPath
