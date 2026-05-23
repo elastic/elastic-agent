@@ -21,7 +21,7 @@ actions:
   elastic-agent:
     kind: github/pullrequest
     scmid: githubConfig
-    sourceid: latestGoVersion
+    sourceid: latestVersion
     spec:
       automerge: false
       labels:
@@ -50,7 +50,7 @@ conditions:
 #       to include the new file for the approval and automatic merge
 targets:
   update-buildkite-pipelines:
-    name: "Update all Buildkite pipeline files (GCP/AWS)"
+    name: "Update all Buildkite pipeline files"
     sourceid: latestVersion
     scmid: githubConfig
     kind: file
@@ -63,18 +63,5 @@ targets:
         - .buildkite/pipeline.elastic-agent-binary-dra.yml
         - .buildkite/pipeline.elastic-agent-package.yml
         - .buildkite/k8s-testing-pipeline.yml
-      matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-([0-9]+)"'
-      replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
-
-  update-azure-buildkite-pipelines:
-    name: "Update all Buildkite pipeline files (Azure)"
-    sourceid: latestVersion
-    scmid: githubConfig
-    kind: file
-    spec:
-      files:
-        - .buildkite/pipeline.yml
-        - .buildkite/bk.integration.pipeline.yml
-        - .buildkite/bk.integration-fips.pipeline.yml
-      matchpattern: '(IMAGE_.+): "1.0.([\d]+)"'
-      replacepattern: '$1: "1.0.{{ source "latestVersion" }}"'
+      matchpattern: '([ \t]*IMAGE_[A-Z0-9_]+): "(platform-ingest-elastic-agent-[^"]+-|1\.0\.)[0-9]+"'
+      replacepattern: '$1: "$2{{ source "latestVersion" }}"'
