@@ -129,12 +129,19 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	// The additional arguments given via GoTestArgs are applied to `go test` only. Callers cannot
 	// modify any of the gotestsum arguments.
 
-	gotestsumArgs := []string{"--no-color", "--junitfile-hide-skipped-tests"}
-	if mg.Verbose() {
-		gotestsumArgs = append(gotestsumArgs, "-f", "standard-verbose")
-	} else {
-		gotestsumArgs = append(gotestsumArgs, "-f", "standard-quiet")
+	// Pick the gotestsum output format. GOTESTSUM_FORMAT wins if set (e.g.
+	// "standard-verbose" to stream each test's progress live, or "testname" for a
+	// line per test as it finishes); otherwise fall back to the verbose-driven
+	// default. See `gotestsum --help` for the full list of formats.
+	format := os.Getenv("GOTESTSUM_FORMAT")
+	if format == "" {
+		if mg.Verbose() {
+			format = "standard-verbose"
+		} else {
+			format = "standard-quiet"
+		}
 	}
+	gotestsumArgs := []string{"--no-color", "--junitfile-hide-skipped-tests", "-f", format}
 	if params.JUnitReportFile != "" {
 		CreateDir(params.JUnitReportFile)
 		gotestsumArgs = append(gotestsumArgs, "--junitfile", params.JUnitReportFile)
@@ -257,6 +264,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 }
 
 func makeCommand(ctx context.Context, env map[string]string, cmd string, args ...string) *exec.Cmd {
+	//nolint:gosec // G702: makeCommand runs the build tool's own commands; cmd/args are developer-controlled, not external input.
 	c := exec.CommandContext(ctx, cmd, args...)
 	c.Env = os.Environ()
 	for k, v := range env {
@@ -268,6 +276,7 @@ func makeCommand(ctx context.Context, env map[string]string, cmd string, args ..
 	}
 	c.Stderr = os.Stderr
 	c.Stdin = os.Stdin
+	//nolint:gosec // G706: logging the command about to run; cmd/args are developer-controlled, not external input.
 	log.Println("exec:", cmd, strings.Join(args, " "))
 	fmt.Println("exec:", cmd, strings.Join(args, " "))
 	return c

@@ -163,10 +163,20 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 			return Result{}, err
 		}
 		for _, i := range provisionedInstances {
-			instances = append(instances, StateInstance{
+			si := StateInstance{
 				Instance: i,
-				Prepared: false,
-			})
+				// honor a provisioner that ships a ready-to-use image
+				// (toolchain baked in) so Prepare can be skipped.
+				Prepared: i.Prepared,
+			}
+			// Persist right after provisioning so the instance is recorded for
+			// `integration:clean` even if the run is cancelled before/while tests
+			// execute, and for provisioners that ship a pre-prepared image (which
+			// otherwise never reach the Prepare-time save in runInstance).
+			if err := r.addOrUpdateInstance(si); err != nil {
+				return Result{}, fmt.Errorf("failed to save provisioned instance %s to state: %w", si.Name, err)
+			}
+			instances = append(instances, si)
 		}
 	}
 
