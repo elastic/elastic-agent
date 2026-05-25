@@ -468,7 +468,7 @@ steps:
         - dev-tools/**
         - go.mod
         - go.sum
-    key: integration-tests-linux-tier2
+    key: integration-tests-linux-tier-2
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Linux - tier 2"
@@ -565,7 +565,7 @@ steps:
             variant: *linux_rpm_variants
 
   - group: "Stateful: Linux (tier 3)"
-    key: integration-tests-linux-tier3
+    key: integration-tests-linux-tier-3
     if: build.source == "schedule"
     notify:
       - github_commit_status:
