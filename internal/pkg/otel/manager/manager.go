@@ -657,20 +657,18 @@ func injectMonitoringReceiver(
 	processorID := translate.GetProcessorID().String()
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
 
-	// Build a file exporter and OTLP encoding extension for writing internal
-	// telemetry to disk as a diagnostics artifact.
-	// The file is written to paths.Home()/logs/ — the same directory where
+	// Build a file exporter for writing internal telemetry to disk as a diagnostics
+	// artifact. The file is written to paths.Home()/logs/ — the same directory where
 	// MakeInternalFileOutput writes the agent's own log files and where the
 	// diagnostics bundle collector walks to find files to include.
-	// Records are encoded as OTLP JSON and compressed with zstd; this combination
-	// is smaller than otlp_proto+zstd because the highly repetitive JSON field names
-	// compress very efficiently in a streaming zstd context.
-	// The file is rotated when it reaches defaultDiagnosticsFileSizeMB, keeping
-	// one backup — this gives between 1× and 2× the size in recent telemetry
-	// without unbounded growth.
+	// Records are encoded as OTLP JSON (format: json) and compressed with zstd; this
+	// combination is smaller than otlp_proto+zstd because the highly repetitive JSON
+	// field names compress very efficiently in a streaming zstd context.
+	// The file is rotated when it reaches defaultDiagnosticsFileSizeMB, keeping one
+	// backup — this gives between 1× and 2× the size in recent telemetry without
+	// unbounded growth.
 	diagName := translate.OtelNamePrefix + receiverName
 	fileExporterID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("file"), diagName).String()
-	encodingExtID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("otlp_encoding"), diagName).String()
 	diagFilePath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
 
 	pipelineCfg := map[string]any{
@@ -688,25 +686,19 @@ func injectMonitoringReceiver(
 		},
 		"exporters": map[string]any{
 			fileExporterID: map[string]any{
-				"path": diagFilePath,
+				"path":   diagFilePath,
+				"format": "json",
 				"rotation": map[string]any{
 					"max_megabytes": defaultDiagnosticsFileSizeMB,
 					"max_backups":   1,
 				},
-				"encoding":    encodingExtID,
 				"compression": "zstd",
-			},
-		},
-		"extensions": map[string]any{
-			encodingExtID: map[string]any{
-				"protocol": "otlp_json",
 			},
 		},
 		"service": map[string]any{
 			"pipelines": map[string]any{
 				pipelineID: pipelineCfg,
 			},
-			"extensions": []any{encodingExtID},
 		},
 	}
 	if features.DefaultProcessors() {

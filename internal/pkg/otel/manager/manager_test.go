@@ -2545,7 +2545,6 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 	pipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
 	receiverName := "internal-telemetry-monitoring"
 	fileExporterName := "file/" + translate.OtelNamePrefix + receiverName
-	encodingExtName := "otlp_encoding/" + translate.OtelNamePrefix + receiverName
 
 	baseConfig := map[string]any{
 		"exporters": map[string]any{
@@ -2576,25 +2575,17 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 	assert.Equal(t, expectedPath, result["exporters."+fileExporterName+".path"],
 		"file exporter path should be in paths.Home()/logs/")
 
-	// Rotation settings should match the defaults: same file size as the agent
-	// logger, but only one backup.
+	// Records are written as OTLP JSON — format: json uses the same plog.JSONMarshaler
+	// as the otlp_encoding extension, without needing a separate extension component.
+	assert.Equal(t, "json", result["exporters."+fileExporterName+".format"])
+
+	// Rotation settings: 10 MB cap with one backup.
 	assert.Equal(t, defaultDiagnosticsFileSizeMB, result["exporters."+fileExporterName+".rotation.max_megabytes"])
 	assert.Equal(t, 1, result["exporters."+fileExporterName+".rotation.max_backups"])
-
-	// The encoding extension should be referenced by the file exporter.
-	assert.Equal(t, encodingExtName, result["exporters."+fileExporterName+".encoding"])
 
 	// zstd compression should be enabled — it gives ~5x size reduction over plain
 	// otlp_json and is smaller than otlp_proto+zstd due to JSON's repetitive field names.
 	assert.Equal(t, "zstd", result["exporters."+fileExporterName+".compression"])
-
-	// The OTLP encoding extension should be configured with the JSON protocol.
-	assert.Equal(t, "otlp_json", result["extensions."+encodingExtName+".protocol"])
-
-	// The encoding extension should appear in service::extensions.
-	serviceExtensions := result["service.extensions"]
-	require.NotNil(t, serviceExtensions, "service extensions should not be nil")
-	assert.Contains(t, serviceExtensions, encodingExtName, "encoding extension should be registered in service extensions")
 }
 
 // fakeCloseListener is a wrapper around a net.Listener that ignores the Close() method. This is used in a very particular
