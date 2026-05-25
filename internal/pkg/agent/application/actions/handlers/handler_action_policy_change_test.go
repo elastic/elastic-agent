@@ -1205,6 +1205,21 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *tes
 	}
 }
 
+// captureStore is a storage.Store that records the bytes passed to Save so a
+// test can assert on the yaml that fleetToReader produced.
+type captureStore struct {
+	saved []byte
+}
+
+func (c *captureStore) Save(r io.Reader) error {
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	c.saved = b
+	return nil
+}
+
 func TestFleetToReaderPersistsLoggingOutputFlags(t *testing.T) {
 	agentInfo := &info.AgentInfo{}
 
@@ -1213,7 +1228,7 @@ func TestFleetToReaderPersistsLoggingOutputFlags(t *testing.T) {
 		cfg.Settings.LoggingConfig.ToStderr = true
 		cfg.Settings.LoggingConfig.ToFiles = false
 
-		reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), cfg)
+		reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), "", cfg)
 		require.NoError(t, err)
 
 		reloaded, err := config.NewConfigFrom(reader)
@@ -1233,7 +1248,7 @@ func TestFleetToReaderPersistsLoggingOutputFlags(t *testing.T) {
 		cfg.Settings.LoggingConfig.ToStderr = true
 		cfg.Settings.LoggingConfig.ToFiles = false
 
-		reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), cfg)
+		reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), "", cfg)
 		require.NoError(t, err)
 
 		reloaded, err := config.NewConfigFrom(reader)
@@ -1253,19 +1268,6 @@ func TestFleetToReaderPersistsLoggingOutputFlags(t *testing.T) {
 		assert.False(t, h.hasLoggingConfigChanged(policyWithSameLogging),
 			"after re-exec + reload the same policy must not be detected as a logging change, which would cause an infinite re-exec loop")
 	})
-}
-
-func nilLogLevelSet(t *testing.T) *mockLogLevelSetter {
-	// nilLogLevel is a variable used to match nil policy log level being set
-	var nilLogLevel *logger.Level = nil
-
-func (c *captureStore) Save(r io.Reader) error {
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return err
-	}
-	c.saved = b
-	return nil
 }
 
 func defaultLogLevelSet(t *testing.T) *mockLogLevelSetter {

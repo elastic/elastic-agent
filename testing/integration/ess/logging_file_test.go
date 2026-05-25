@@ -148,9 +148,6 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 		return waitForAgentAndFleetHealthy(ctx, t, f)
 	}, 2*time.Minute, 5*time.Second, "agent never became healthy before logging path change")
 
-	// Capture the default log directory so we can confirm the agent moves away from it.
-	defaultLogGlob := filepath.Join(f.WorkDir(), "data", "elastic-agent-*", "logs", "*.ndjson")
-
 	// Create a custom directory that the agent (running as root) can write to.
 	customLogDir := filepath.Join("/tmp", "ea-test-logs-"+uuid.Must(uuid.NewV4()).String())
 	require.NoError(t, os.MkdirAll(customLogDir, 0o755), "create custom log directory")
