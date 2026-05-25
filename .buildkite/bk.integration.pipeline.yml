@@ -8,33 +8,20 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-<<<<<<< HEAD
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1779464011"
   IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1779464011"
   IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1779464011"
   IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1779464011"
   IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1779464011"
   IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1779464011"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1779464011"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1779464011"
-  ASDF_TERRAFORM_VERSION: 1.9.2
-=======
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1779223036"
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1779223036"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1779223036"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1779223036"
-  IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1779223036"
-  IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1779223036"
-  IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1779223036"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
   IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1779223036"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1779223036"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1779223036"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1779464011"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1779464011"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1779464011"
   # Same version for all the azure images
-  IMAGE_WIN_VERSION: "1.0.1779223036"
->>>>>>> 0cf2a817d (bk: split windows ITs in tiers (no-fips) (#14445))
+  IMAGE_WIN_VERSION: "1.0.1779464011"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -66,13 +53,10 @@ common:
       elastic/oblt-google-auth#v1.3.1:
         lifetime: 10800 # seconds
   - oblt_cli_plugin: &oblt_cli_plugin
-      elastic/oblt-cli#v0.4.2:
+      elastic/oblt-cli#v0.4.1:
         version-file: .oblt-cli-version
   - vault_github_token: &vault_github_token
-<<<<<<< HEAD
       elastic/vault-github-token#v0.1.0:
-=======
-      elastic/vault-github-token#v0.2.1:
   # Variants/Groups for the Windows ITs
   - windows_variants: &windows_variants
       - "default"
@@ -121,7 +105,6 @@ common:
     # - fqdn
     # - deb
     # - container
->>>>>>> 0cf2a817d (bk: split windows ITs in tiers (no-fips) (#14445))
 
 steps:
   - label: "Custom ECH Testing"
@@ -277,18 +260,8 @@ steps:
           - *oblt_cli_plugin
           - *vault_github_token
         matrix:
-<<<<<<< HEAD
-          - default
-          - fleet
-          - fleet-endpoint-security
-          - fleet-privileged
-          - standalone-upgrade
-          - upgrade
-          - install-uninstall
-=======
           setup:
             variant: *windows_variants
->>>>>>> 0cf2a817d (bk: split windows ITs in tiers (no-fips) (#14445))
 
       - label: "windows:amd64:tier1:non-sudo:{{matrix.variant}}"
         depends_on:
@@ -325,7 +298,7 @@ steps:
         - dev-tools/**
         - go.mod
         - go.sum
-    key: integration-tests-win-tier2
+    key: integration-tests-win-tier-2
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Windows - tier 2"
@@ -396,7 +369,7 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 3)"
-    key: integration-tests-win-tier3
+    key: integration-tests-win-tier-3
     if: build.source == "schedule"
     notify:
       - github_commit_status:
@@ -468,10 +441,6 @@ steps:
               - "${IMAGE_WIN_11}"
             variant: *windows_variants
 
-<<<<<<< HEAD
-  - group: "Stateful:Ubuntu"
-    key: integration-tests-ubuntu
-=======
       - label: "windows:amd64:tier3:non-sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
           - packaging-amd64
@@ -561,10 +530,8 @@ steps:
             variant:
               - default
 
-  - group: "Stateful: Linux (tier 1)"
-    if: build.pull_request.id != null
-    key: integration-tests-linux-tier-1
->>>>>>> 0cf2a817d (bk: split windows ITs in tiers (no-fips) (#14445))
+  - group: "Stateful:Ubuntu"
+    key: integration-tests-ubuntu
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Ubuntu"
@@ -951,4 +918,3 @@ steps:
           branches: "main"
           debug: true
       - *google_oidc_observability_plugin
-
