@@ -17,7 +17,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -306,85 +305,19 @@ func PreserveActiveUpgradeVersions(marker *UpdateMarker, innerFilter RollbackCle
 	}
 }
 
-// CleanAvailableRollbacks removes agent installation directories that are safe to delete. It scans every
-// elastic-agent-* directory under the data path and removes those not in the keep set. The keep set consists of:
-//   - the currently running installation (currentHomeRelPath)
-//   - directories referenced by an active (non-terminal) upgrade marker
-//   - TTL-tracked directories for which filter returns false (e.g. unexpired)
-//
-// Directories with no TTL entry (orphans from failed upgrades) are swept unless they are protected by the keep set.
-// The remaining TTL entries are returned so the caller can schedule the next cleanup.
+// CleanAvailableRollbacks removes agent installation directories that are safe to delete.
+// It scans every elastic-agent-* directory under the data path and delegates the
+// keep-or-remove decision per directory to cleanupAgentDirectories, which applies the
+// 9-row classifier in cleanup_agent_directories.go. Only directories that the classifier
+// positively identifies as safe (e.g. orphans with all verification passing, or TTL
+// entries the filter marked removable) are deleted. This caller passes
+// requireMarkerDetails=false: it runs in the lenient posture (legacy markers with nil
+// Details still protect dirs), unlike the post-upgrade cleanup which uses the strict
+// posture. The leftover TTL-tracked rollbacks are returned so the scheduler can pick
+// the next wake-up time.
 func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
-	// Snapshot the directory listing before reading any markers or TTL entries.
-	// Any directory created after this point (e.g. by a concurrent upgrade) will
-	// not appear in the snapshot and therefore cannot be swept this run.
-	allAgentDirs, err := snapshotAgentDirs(topDir)
-	if err != nil {
-		return nil, err
-	}
-
-
-	rollbacks, malformed, err := source.GetAll()
-	if err != nil {
-		return nil, fmt.Errorf("unable to get available rollbacks: %w", err)
-	}
-	for versionedHome, parseErr := range malformed {
-		log.Infow("TTL marker is unparseable; directory will not be protected from cleanup",
-			"versionedHome", versionedHome, "error.message", parseErr.Error())
-	}
-
-	// Assemble the caller-supplied keep list; buildKeepDirs will add the marker dirs and symlink target on top.
-	extraDirs := []string{filepath.Clean(currentHomeRelPath)}
-	for versionedHome, ttlMarker := range rollbacks {
-		if !filter(log, now, versionedHome, ttlMarker) {
-			extraDirs = append(extraDirs, versionedHome)
-		}
-	}
-
-	// Pre-compute entries the filter kept; used both in the early-return path and at the end.
-	leftoverRollbacks := make(map[string]ttl.TTLMarker)
-	for versionedHome, ttlMarker := range rollbacks {
-		if !filter(log, now, versionedHome, ttlMarker) {
-			leftoverRollbacks[versionedHome] = ttlMarker
-		}
-	}
-
-	// requireMarkerDetails=false: be conservative, protect from any non-terminal marker.
-	// Both currentHomeRelPath and symlink target are kept: they may differ during transitions.
-	keepDirs, keepDirsErr := buildKeepDirs(log, topDir, false, extraDirs)
-	if keepDirsErr != nil {
-		// buildKeepDirs already logged the reason. Return unexpired rollbacks alongside
-		// the error so the scheduler knows to retry sooner rather than waiting for the
-		// next TTL expiry.
-		return leftoverRollbacks, keepDirsErr
-	}
-
-	// Partition the snapshot into directories to keep and directories to remove.
-	var toRemove []string
-	for _, absPath := range allAgentDirs {
-		relPath, relErr := filepath.Rel(topDir, absPath)
-		if relErr != nil {
-			continue
-		}
-		relPath = filepath.Clean(relPath)
-		if keepDirs[relPath] {
-			log.Debugw("leaving agent directory intact", "path", relPath)
-		} else {
-			toRemove = append(toRemove, relPath)
-		}
-	}
-
-	log.Debugw("preparing to cleanup agent directories", "keep_dirs", keepDirs, "to_remove", len(toRemove))
-	var aggregateErr error
-	for _, versionedHome := range toRemove {
-		versionedHomeAbsPath := filepath.Join(topDir, versionedHome)
-		log.Infow("removing agent directory", "path", versionedHome)
-		if cleanupErr := install.RemoveBut(log, versionedHomeAbsPath, true); cleanupErr != nil {
-			aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing directory %q: %w", versionedHomeAbsPath, cleanupErr))
-		}
-	}
-
-	return leftoverRollbacks, aggregateErr
+	callerProtected := map[string]bool{filepath.Clean(currentHomeRelPath): true}
+	return cleanupAgentDirectories(log, topDir, now, source, filter, callerProtected, false, false)
 }
 
 func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir, currentVersionedHome string, source ttl.Source, minInterval time.Duration) {

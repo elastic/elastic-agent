@@ -128,19 +128,11 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return nil
 	}
 
-	// cleanup everything except the version we're rolling back into and any
-	// in-TTL rollback targets recorded in the live TTL registry. The registry
-	// read is best-effort: if it fails we fall back to preserving only
-	// prevVersionedHome rather than aborting the rollback.
-	versionedHomesToKeep := []string{prevVersionedHome}
-	inTTL, err := InTTLRollbacks(log, topDirPath, time.Now())
-	if err != nil {
-		log.Infow("could not read TTL registry; cleanup will only preserve the rollback target",
-			"error.message", err.Error())
-	} else {
-		versionedHomesToKeep = append(versionedHomesToKeep, inTTL...)
-	}
-	return Cleanup(log, topDirPath, settings.RemoveMarker, true, versionedHomesToKeep...)
+	// cleanup() reads the live TTL registry internally, so the caller only
+	// needs to protect the rollback target. In-TTL entries are protected by
+	// row 2 of the classifier (unexpired-TTL -> KEEP) in
+	// cleanup_agent_directories.go.
+	return Cleanup(log, topDirPath, settings.RemoveMarker, true, prevVersionedHome)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
@@ -152,111 +144,37 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	log.Infow("Cleaning up upgrade", "remove_marker", removeMarker)
 	<-time.After(delay)
 
-	dataDirPath := paths.DataFrom(topDirPath)
-
-	// Snapshot the directory listing before reading any markers so that directories
-	// created after this point cannot be swept this run.
-	allAgentDirs, err := snapshotAgentDirs(topDirPath)
-	if err != nil {
-		return err
+	callerProtected := make(map[string]bool, len(versionedHomesToKeep))
+	for _, d := range versionedHomesToKeep {
+		callerProtected[filepath.Clean(d)] = true
 	}
 
-	// Read TTL rollbacks fresh after the snapshot.
-	if inTTL, ttlErr := InTTLRollbacks(log, topDirPath, time.Now()); ttlErr != nil {
-		log.Infow("could not re-read TTL registry during cleanup; continuing with existing keep-list", "error.message", ttlErr.Error())
-	} else {
-		versionedHomesToKeep = append(versionedHomesToKeep, inTTL...)
-	}
+	source := ttl.NewTTLMarkerRegistry(log, topDirPath)
+	// requireMarkerDetails=true: reject ambiguous legacy markers (nil Details)
+	// so they can't silently protect dirs that should be swept.
+	_, err := cleanupAgentDirectories(log, topDirPath, time.Now(), source, CleanupExpiredRollbacks, callerProtected, true, keepLogs)
 
-	// requireMarkerDetails=true: reject ambiguous legacy markers (nil Details) so they
-	// can't silently protect dirs that should be swept. Fatal on marker or symlink error: see #13505.
-	keepDirs, keepDirsErr := buildKeepDirs(log, topDirPath, true, versionedHomesToKeep)
-	if keepDirsErr != nil {
-		return fmt.Errorf("refusing to proceed with cleanup: %w", keepDirsErr)
-	}
-
-	// Remove upgrade marker now that its content has been captured above.
+	// Marker preservation WARN is gated to the "would-have-deleted" path:
+	// when removeMarker is false the caller never intended to remove it,
+	// so there is nothing to log about preserving it.
 	if removeMarker {
-		if err := CleanMarker(log, dataDirPath); err != nil {
-			return err
+		if goerrors.Is(err, errCleanupDegraded) {
+			// Marker preservation: when verification was degraded we cannot
+			// be sure CleanMarker is safe to run, so skip it. The marker will
+			// be revisited by the next run.
+			log.Warnw("preserving upgrade marker because verification was incomplete; skipping CleanMarker",
+				"degraded_error", err.Error())
+		} else if cmErr := CleanMarker(log, paths.DataFrom(topDirPath)); cmErr != nil {
+			return goerrors.Join(err, cmErr)
 		}
 	}
 
-	// remove symlink to avoid upgrade failures, ignore error
+	// remove previous symlink to avoid upgrade failures, ignore error.
 	prevSymlink := prevSymlinkPath(topDirPath)
-	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath(topDirPath))
+	log.Infow("Removing previous symlink path", "file.path", prevSymlink)
 	_ = os.Remove(prevSymlink)
 
-	// Partition the snapshot. Track which keepDirs entries matched a real dir so
-	// phantom entries (stale marker.VersionedHome etc.) can be logged below.
-	var toRemove, keptDirs []string
-	for _, absPath := range allAgentDirs {
-		relPath, relErr := filepath.Rel(topDirPath, absPath)
-		if relErr != nil {
-			continue
-		}
-		relPath = filepath.Clean(relPath)
-		if keepDirs[relPath] {
-			keptDirs = append(keptDirs, relPath)
-			delete(keepDirs, relPath)
-		} else {
-			toRemove = append(toRemove, relPath)
-		}
-	}
-	for d := range keepDirs {
-		log.Infow("dropping non-existent keep-list entry from cleanup", "path", d)
-	}
-
-	log.Infof("Starting cleanup of versioned homes. Keeping: %v", keptDirs)
-
-	var cumulativeError error
-	for _, relPath := range toRemove {
-		hashedDir := filepath.Join(topDirPath, relPath)
-		log.Infow("Removing hashed data directory", "file.path", hashedDir)
-		var ignoredDirs []string
-		if keepLogs {
-			ignoredDirs = append(ignoredDirs, "logs")
-		}
-		if cleanupErr := install.RemoveBut(log, hashedDir, true, ignoredDirs...); cleanupErr != nil {
-			cumulativeError = goerrors.Join(cumulativeError, cleanupErr)
-		}
-	}
-
-	return cumulativeError
-}
-
-// InTTLRollbacks reads the live TTL registry under topDir and returns the
-// versioned homes whose .ttl is parseable AND not expired (i.e. that
-// CleanupExpiredRollbacks would NOT remove). Reusing the cleanup predicate
-// keeps the keep-list and the periodic cleanup in lock-step.
-//
-// Directories whose .ttl is unparseable are deliberately NOT included: under
-// the current registry contract a parseable TTL is the only proof an install
-// is a valid rollback target, so a malformed entry is treated like a missing
-// one — the directory is unprotected and will be swept by Cleanup. This
-// preserves the self-healing property that a corrupt .ttl outside the active
-// install gets reaped at the next rollback.
-//
-// GetAll (vs. Get) is used so that one corrupt .ttl file does not prevent the
-// other in-TTL entries from being preserved.
-func InTTLRollbacks(log *logger.Logger, topDir string, now time.Time) ([]string, error) {
-	markers, malformed, err := ttl.NewTTLMarkerRegistry(log, topDir).GetAll()
-	if err != nil {
-		return nil, fmt.Errorf("getting available rollbacks: %w", err)
-	}
-	var inTTL []string
-	for versionedHome, ttlMarker := range markers {
-		if CleanupExpiredRollbacks(log, now, versionedHome, ttlMarker) {
-			continue
-		}
-		log.Debugf("Adding rollback %s:%+v to the directories to keep during cleanup", versionedHome, ttlMarker)
-		inTTL = append(inTTL, versionedHome)
-	}
-	for versionedHome, parseErr := range malformed {
-		log.Infow("rollback directory has unparseable TTL marker; not protecting it from cleanup",
-			"versionedHome", versionedHome, "error.message", parseErr.Error())
-	}
-	return inTTL, nil
+	return err
 }
 
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of
@@ -404,46 +322,6 @@ func snapshotAgentDirs(topDir string) ([]string, error) {
 		}
 	}
 	return dirs, nil
-}
-
-// buildKeepDirs returns the set of topDir-relative paths that cleanup must not remove.
-// extraDirs are caller-supplied (current running home, unexpired TTL entries, etc.).
-// The upgrade marker dirs and symlink target are always added on top.
-//
-// requireMarkerDetails=true protects marker dirs only when the marker has explicit
-// non-terminal state, preventing ambiguous legacy markers from expanding the keep set.
-//
-// Both the marker error and the symlink error are returned so the caller can decide
-// whether to skip removals entirely.
-func buildKeepDirs(log *logger.Logger, topDir string, requireMarkerDetails bool, extraDirs []string) (map[string]bool, error) {
-	keep := make(map[string]bool, len(extraDirs)+3)
-	for _, d := range extraDirs {
-		keep[filepath.Clean(d)] = true
-	}
-
-	marker, markerErr := LoadMarker(paths.DataFrom(topDir))
-	if markerErr != nil {
-		// The marker exists but cannot be read or parsed. We cannot determine which
-		// directories it references, so we refuse to proceed rather than risk sweeping
-		// a directory that an in-progress upgrade depends on.
-		log.Warnw("could not read upgrade marker during cleanup; skipping removals to avoid sweeping marker-referenced directories", "error.message", markerErr.Error())
-		return keep, markerErr
-	} else if marker != nil && !IsTerminalState(marker) && (!requireMarkerDetails || marker.Details != nil) {
-		if marker.VersionedHome != "" {
-			keep[filepath.Clean(marker.VersionedHome)] = true
-		}
-		if marker.PrevVersionedHome != "" {
-			keep[filepath.Clean(marker.PrevVersionedHome)] = true
-		}
-	}
-
-	symlinkHome, symlinkErr := liveVersionedHome(topDir)
-	if symlinkErr != nil {
-		log.Warnw("could not resolve live versioned home symlink during cleanup; skipping removals to avoid sweeping the live install", "error.message", symlinkErr.Error())
-		return keep, symlinkErr
-	}
-	keep[symlinkHome] = true
-	return keep, nil
 }
 
 // liveVersionedHome resolves the versioned home that the top-level agent

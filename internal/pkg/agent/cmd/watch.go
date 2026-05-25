@@ -215,11 +215,8 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			versionedHomesToKeep = append(versionedHomesToKeep, currentVersionedHome)
 		}
 
-		if inTTL, err := upgrade.InTTLRollbacks(log, topDir, time.Now()); err != nil {
-			log.Infow("could not read TTL registry; cleanup will only preserve the current versioned home", "error.message", err.Error())
-		} else {
-			versionedHomesToKeep = append(versionedHomesToKeep, inTTL...)
-		}
+		// Cleanup reads the live TTL registry internally; the caller only
+		// needs to pass the current/previous versioned home.
 		log.Infof("About to clean up upgrade. Keeping versioned homes: %v", versionedHomesToKeep)
 		if err := installModifier.Cleanup(log, paths.Top(), true, false, versionedHomesToKeep...); err != nil {
 			log.Error("clean up of prior watcher run failed", err)
@@ -293,15 +290,9 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
 		newVersionedHome = filepath.Join("data", fmt.Sprintf("elastic-agent-%s", marker.Hash[:6]))
 	}
-	versionedHomesToKeep := make([]string, 0, len(marker.RollbacksAvailable)+1)
-	versionedHomesToKeep = append(versionedHomesToKeep, newVersionedHome)
-	if inTTL, keepErr := upgrade.InTTLRollbacks(log, topDir, time.Now()); keepErr != nil {
-		log.Infow("could not read TTL registry; cleanup will only preserve the new versioned home", "error.message", keepErr.Error())
-	} else {
-		versionedHomesToKeep = append(versionedHomesToKeep, inTTL...)
-	}
-
-	err = installModifier.Cleanup(log, topDir, removeMarker, false, versionedHomesToKeep...)
+	// Cleanup reads the live TTL registry internally; the caller only needs
+	// to pass the new versioned home.
+	err = installModifier.Cleanup(log, topDir, removeMarker, false, newVersionedHome)
 	if err != nil {
 		log.Error("cleanup after successful watch failed", err)
 	}

@@ -253,11 +253,10 @@ func TestCleanup_PreservesLiveVersionedHome(t *testing.T) {
 	assert.DirExists(t, filepath.Join(topDir, otherHome))
 }
 
-// TestCleanup_DropsPhantomKeepListEntry ensures cleanup() drops keep-list
-// entries that don't exist on disk so the "Keeping" log line truthfully
-// reflects what is being preserved. The dropped entry must be reported via
-// an Info log so triage can see why a stale marker.VersionedHome is gone.
-func TestCleanup_DropsPhantomKeepListEntry(t *testing.T) {
+// TestCleanup_IgnoresNonExistentKeepListEntry ensures cleanup() treats a
+// non-existent keep-list entry as a no-op: the live install survives, and the
+// "Keeping" log line only mentions directories that actually exist on disk.
+func TestCleanup_IgnoresNonExistentKeepListEntry(t *testing.T) {
 	testLogger, obs := loggertest.New(t.Name())
 	topDir := t.TempDir()
 
@@ -269,14 +268,11 @@ func TestCleanup_DropsPhantomKeepListEntry(t *testing.T) {
 	err := cleanup(testLogger, topDir, false, false, 0, phantomHome)
 	require.NoError(t, err)
 
-	// Live install is still present (cleanup guard kicked in).
+	// Live install is still present (the symlink-based guard kept it).
 	assert.DirExists(t, filepath.Join(topDir, liveHome))
 
-	// Phantom entry was reported as dropped.
-	dropLogs := obs.FilterMessageSnippet("dropping non-existent keep-list entry").All()
-	assert.Len(t, dropLogs, 1, "expected exactly one drop log entry")
-
-	// "Keeping" log line must NOT mention the phantom entry.
+	// "Keeping" log line must NOT mention the phantom entry; only the real
+	// live install should be listed.
 	keepLogs := obs.FilterMessageSnippet("Starting cleanup of versioned homes. Keeping:").All()
 	if assert.Len(t, keepLogs, 1) {
 		assert.NotContains(t, keepLogs[0].Message, "deadbeef",
@@ -1114,25 +1110,44 @@ func TestLiveVersionedHome(t *testing.T) {
 	})
 }
 
-// TestCleanup_AbortsWhenLiveHomeUnresolvable encodes the
-// refusal-to-proceed contract: when the symlink cannot be resolved, cleanup
-// must return an error and leave the on-disk state untouched rather than risk
-// deleting the live install based on a stale keep list. The resolve runs
-// before any destructive op so neither the versioned home nor the upgrade
-// marker may be mutated when the abort fires.
-func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
-	t.Run("removeMarker=false: error returned and versioned home untouched", func(t *testing.T) {
+// TestCleanup_DegradesGracefullyWhenLiveHomeUnresolvable encodes the
+// graceful-degradation contract: when the symlink cannot be resolved, cleanup
+// must still proceed (sweeping directories that the parsed TTL marks as
+// removable) but flag the run as degraded via errCleanupDegraded. The upgrade
+// marker is preserved so that the next run can revisit cleanup with full
+// verification.
+func TestCleanup_DegradesGracefullyWhenLiveHomeUnresolvable(t *testing.T) {
+	t.Run("removeMarker=false: degraded error returned, expired TTL swept, orphan kept", func(t *testing.T) {
 		testLogger, _ := loggertest.New(t.Name())
 		topDir := t.TempDir()
-		require.NoError(t, os.MkdirAll(paths.DataFrom(topDir), 0o750))
 
-		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
-		err := cleanup(testLogger, topDir, false, false, 0, phantomHome)
+		// Two installs:
+		// - expired: has an expired TTL, no symlink target -> should be swept
+		// - orphan : has no TTL, no symlink target          -> must be kept (row 5)
+		expiredHome := createFakeAgentInstall(t, topDir, "1.2.3", "expire", true)
+		orphanHome := createFakeAgentInstall(t, topDir, "4.5.6", "orphan", true)
+		now := time.Now()
+		require.NoError(t,
+			ttl.NewTTLMarkerRegistry(testLogger, topDir).Set(map[string]ttl.TTLMarker{
+				expiredHome: {Version: "1.2.3", Hash: "expire", ValidUntil: now.Add(-1 * time.Hour)},
+			}),
+			"writing TTL registry with expired entry")
+
+		// No symlink — liveVersionedHome will fail.
+
+		err := cleanup(testLogger, topDir, false, false, 0)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "refusing to proceed with cleanup")
+		require.ErrorIs(t, err, errCleanupDegraded)
+
+		// Expired TTL is swept (row 4: parsed TTL says remove, no symlink to defend it).
+		assert.NoDirExists(t, filepath.Join(topDir, expiredHome),
+			"expired TTL entry should be swept even when symlink is unresolvable")
+		// Orphan is preserved because we cannot verify it isn't the live install.
+		assert.DirExists(t, filepath.Join(topDir, orphanHome),
+			"orphan must be preserved when symlink is unresolvable")
 	})
 
-	t.Run("removeMarker=true: marker survives because resolve precedes CleanMarker", func(t *testing.T) {
+	t.Run("removeMarker=true: marker survives because verification was degraded", func(t *testing.T) {
 		testLogger, _ := loggertest.New(t.Name())
 		topDir := t.TempDir()
 
@@ -1142,30 +1157,34 @@ func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
 			SaveMarker(paths.DataFrom(topDir), &UpdateMarker{Version: "1.2.3", Hash: "deadbeef"}, true),
 			"writing valid upgrade marker so the cleanup path reaches the symlink check")
 
-		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
-		err := cleanup(testLogger, topDir, true, false, 0, phantomHome)
+		err := cleanup(testLogger, topDir, true, false, 0)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "refusing to proceed with cleanup")
+		require.ErrorIs(t, err, errCleanupDegraded)
 
 		assert.FileExists(t, markerPath,
-			"upgrade marker must survive an aborted cleanup (CleanMarker must not run before resolve)")
+			"upgrade marker must survive a degraded cleanup so the next run can verify with full info")
 	})
 }
 
-// TestCleanAvailableRollbacks_SkipsRemovalsWhenSymlinkUnresolvable verifies
-// that CleanAvailableRollbacks returns an error and performs no removals when
-// the agent symlink cannot be resolved. Without the symlink we cannot determine
-// which versioned home the next restart will use, so deleting anything risks
-// sweeping the live installation. The error lets the scheduler retry sooner.
-func TestCleanAvailableRollbacks_SkipsRemovalsWhenSymlinkUnresolvable(t *testing.T) {
+// TestCleanAvailableRollbacks_DegradesGracefullyWhenSymlinkUnresolvable
+// verifies that CleanAvailableRollbacks proceeds with degraded verification
+// when the agent symlink cannot be resolved: expired TTL entries are swept,
+// orphans are kept conservatively, the unexpired TTL entry is returned for
+// the scheduler, and the error wraps errCleanupDegraded so the scheduler can
+// fast-retry.
+func TestCleanAvailableRollbacks_DegradesGracefullyWhenSymlinkUnresolvable(t *testing.T) {
 	testLogger, _ := loggertest.New(t.Name())
 	topDir := t.TempDir()
 
-	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"}
-	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"}
+	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"} // unexpired TTL -> keep
+	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"} // caller-protected
+	versionC := testAgentVersion{version: "3.0.0", hash: "cccccc"} // expired TTL -> sweep
+	versionD := testAgentVersion{version: "4.0.0", hash: "dddddd"} // orphan -> keep (row 5)
 
 	relA := createFakeAgentInstall(t, topDir, versionA.version, versionA.hash, true)
 	relB := createFakeAgentInstall(t, topDir, versionB.version, versionB.hash, true)
+	relC := createFakeAgentInstall(t, topDir, versionC.version, versionC.hash, true)
+	relD := createFakeAgentInstall(t, topDir, versionD.version, versionD.hash, true)
 
 	// No symlink is created — liveVersionedHome will fail.
 
@@ -1173,13 +1192,16 @@ func TestCleanAvailableRollbacks_SkipsRemovalsWhenSymlinkUnresolvable(t *testing
 	validUntil := now.Add(24 * time.Hour)
 	availableRollbacks := map[string]ttl.TTLMarker{
 		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: validUntil},
+		relC: {Version: versionC.version, Hash: versionC.hash, ValidUntil: now.Add(-1 * time.Hour)},
 	}
 	registry := ttl.NewTTLMarkerRegistry(testLogger, topDir)
 	require.NoError(t, registry.Set(availableRollbacks), "writing TTL registry")
 
 	leftover, err := CleanAvailableRollbacks(testLogger, registry, topDir, relB, now, CleanupExpiredRollbacks)
 
-	require.Error(t, err, "must return error when symlink is unresolvable so the scheduler retries sooner")
+	require.Error(t, err)
+	require.ErrorIs(t, err, errCleanupDegraded,
+		"must wrap errCleanupDegraded so the scheduler triggers a fast retry")
 	if assert.Len(t, leftover, 1, "unexpired rollback must be returned for future cleanup") {
 		m := leftover[relA]
 		assert.Equal(t, versionA.version, m.Version)
@@ -1192,6 +1214,13 @@ func TestCleanAvailableRollbacks_SkipsRemovalsWhenSymlinkUnresolvable(t *testing
 	if runtime.GOOS == "windows" {
 		agentExecutableName += ".exe"
 	}
+	// Unexpired TTL (row 2) — keep.
 	assertAgentInstallExists(t, filepath.Join(topDir, relA), agentExecutableName)
+	// Caller-protected (row 1) — keep.
 	assertAgentInstallExists(t, filepath.Join(topDir, relB), agentExecutableName)
+	// Expired TTL (row 4) — swept even though symlink is unresolvable.
+	assert.NoDirExists(t, filepath.Join(topDir, relC),
+		"expired TTL entry should be swept even when symlink is unresolvable")
+	// Orphan (row 5) — kept because we cannot prove it is not the live install.
+	assertAgentInstallExists(t, filepath.Join(topDir, relD), agentExecutableName)
 }
