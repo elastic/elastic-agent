@@ -638,25 +638,8 @@ steps:
           - *oblt_cli_plugin
           - *vault_github_token
         matrix:
-<<<<<<< HEAD
-          - default
-          - upgrade
-          - standalone-upgrade
-          - fleet
-          # ARM tests are enabled for only selected groups in order to save resources
-          # - fleet-endpoint-security
-          # - fleet-airgapped
-          # - fleet-airgapped-privileged
-          # - fleet-privileged
-          # - fleet-upgrade-to-pr-build
-          # - install-uninstall
-          # - fqdn
-          # - deb
-          # - container
-=======
           setup:
             variant: *linux_arm_variants
->>>>>>> eaf077681 (bk: split linux ITs in tiers (no-fips) (#14465))
 
       - label: "linux:arm64:tier3:non-sudo:{{matrix.variant}}"
         skip: true
