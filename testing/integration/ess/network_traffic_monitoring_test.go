@@ -100,25 +100,6 @@ func (runner *NetworkTrafficRunner) SetupSuite() {
 
 }
 
-func (runner *NetworkTrafficRunner) switchToOtelRuntime(ctx context.Context) int {
-	updateReq := kibana.AgentPolicyUpdateRequest{
-		Name:      runner.policyName,
-		Namespace: runner.info.Namespace,
-		Overrides: map[string]interface{}{
-			"agent": map[string]interface{}{
-				"internal": map[string]interface{}{
-					"runtime": map[string]interface{}{
-						"default": "otel",
-					},
-				},
-			},
-		},
-	}
-	policyResp, err := runner.info.KibanaClient.UpdatePolicy(ctx, runner.policyID, updateReq)
-	require.NoError(runner.T(), err)
-	return policyResp.Revision
-}
-
 func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) mapstr.M {
 	now := time.Now()
 	var query map[string]any
@@ -142,12 +123,10 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, c
 			[][]string{
 				{"exists", "field", "tls.client.server_name"},
 			})
-		if !since.IsZero() {
-			query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
-				"range": map[string]any{
-					"@timestamp": map[string]any{"gte": since.UTC().Format("2006-01-02T15:04:05.000Z")},
-				},
-			}
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
+			"range": map[string]any{
+				"@timestamp": map[string]any{"gte": since.UTC().Format("2006-01-02T15:04:05.000Z")},
+			},
 		}
 		now = time.Now()
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-network_traffic.tls*", runner.info.ESClient)
@@ -167,10 +146,12 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(t, err, "could not get agent status")
 
+	testStart := time.Now()
+
 	// Validate process mode
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
-		processDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, time.Time{})
+		processDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, testStart)
 	})
 
 	// Switch to OTel runtime and validate the same data
@@ -178,31 +159,40 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	t.Run("otel", func(t *testing.T) {
 		t.Skip("pbreceiver does not yet produce events, skipping OTel validation")
 
+		// Identify the network_traffic integration component before switching runtime so
+		// we can verify that specific component transitions to the OTel receiver.
+		status, err := runner.agentFixture.ExecStatus(ctx)
+		require.NoError(t, err)
+		var integrationComponentID string
+		for _, comp := range status.Components {
+			if !strings.HasSuffix(comp.ID, "-monitoring") {
+				integrationComponentID = comp.ID
+				break
+			}
+		}
+		require.NotEmpty(t, integrationComponentID, "could not find integration component ID before OTel switch")
+
 		otelSince := time.Now()
-		policyRevision := runner.switchToOtelRuntime(ctx)
+		policyRevision := switchPolicyToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
 
 		// Wait for the agent to apply the new policy revision
 		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
 			5*time.Minute, time.Second)
 
-		// Verify the user beat component (not monitoring components) is running as a beats receiver.
-		// Monitoring components are excluded because they may independently run as process-based
-		// beats regardless of the agent.internal.runtime.default override.
+		// Verify the network_traffic integration component is now running as a beats receiver.
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			status, statusErr := runner.agentFixture.ExecStatus(ctx)
 			require.NoError(collect, statusErr)
-			var hasUserReceiver bool
+			var isReceiver bool
 			for _, comp := range status.Components {
-				if strings.HasSuffix(comp.ID, "-monitoring") {
-					continue
-				}
-				if comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
-					hasUserReceiver = true
+				if comp.ID == integrationComponentID &&
+					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
+					isReceiver = true
 					break
 				}
 			}
-			assert.True(collect, hasUserReceiver, "expected the user beat component to be running as beats receiver")
-		}, 2*time.Minute, 5*time.Second, "user beat component should be running as beats receiver")
+			assert.True(collect, isReceiver, "expected component %s to be running as beats receiver", integrationComponentID)
+		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
 		otelDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, otelSince)
 	})

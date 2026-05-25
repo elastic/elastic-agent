@@ -79,13 +79,6 @@ func TestCheckinCompress(t *testing.T) {
 		},
 	}
 
-	// NOTE: Privileged is intentionally unset (defaults to false = unprivileged install).
-	// If this test starts failing with "dial unix /opt/Elastic/Agent/elastic-agent.sock:
-	// connect: no such file or directory" during enrollment, the root cause is that the
-	// elastic-agent-user service account does not have write access to the install
-	// directory and therefore cannot create the control socket. Fix by ensuring the
-	// agent writes its socket to a path writable by elastic-agent-user in unprivileged
-	// mode (see internal/pkg/agent/cmd/enroll_cmd.go daemonReloadWithBackoff).
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,

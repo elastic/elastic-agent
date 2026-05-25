@@ -83,14 +83,9 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		resp, err := http.Get(statusUrl)
 		require.NoError(collect, err)
-		if err != nil {
-			return
-		}
 		defer resp.Body.Close()
 
-		if !assert.Equal(collect, http.StatusOK, resp.StatusCode) {
-			return
-		}
+		require.Equal(collect, http.StatusOK, resp.StatusCode)
 
 		var body struct {
 			Name   string `json:"name"`
@@ -99,9 +94,6 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 		decoder := json.NewDecoder(resp.Body)
 		err = decoder.Decode(&body)
 		require.NoError(collect, err)
-		if err != nil {
-			return
-		}
 
 		t.Logf("body.Status = %s", body.Status)
 		assert.Equal(collect, "HEALTHY", body.Status)
@@ -125,13 +117,8 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 			}`,
 			)))
 		require.NoError(collect, err)
-		if err != nil {
-			return
-		}
 		defer searchResp.Body.Close()
-		if !assert.Equal(collect, http.StatusOK, searchResp.StatusCode) {
-			return
-		}
+		require.Equal(collect, http.StatusOK, searchResp.StatusCode)
 
 		respObj := struct {
 			Hits struct {
@@ -155,12 +142,7 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 
 		err = json.NewDecoder(searchResp.Body).Decode(&respObj)
 		require.NoError(collect, err)
-		if err != nil {
-			return
-		}
-		if !assert.Equal(collect, 1, respObj.Hits.Total.Value, "expected only one hit from the ES query") || len(respObj.Hits.Hits) == 0 {
-			return
-		}
+		require.Equal(collect, 1, respObj.Hits.Total.Value, "expected only one hit from the ES query")
 
 		// Check that this Agent is online (i.e. healthy) and is FIPS-capable. This
 		// will prove that a FIPS-capable Agent is able to connect to a FIPS-capable
