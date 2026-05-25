@@ -491,7 +491,7 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 				// injects a file exporter that writes zstd-compressed OTLP JSON
 				// telemetry alongside the agent's own log files.
 				extraPatterns = append(extraPatterns, filePattern{
-					pattern:  path.Join("logs", "*", "elastic-agent-metrics.ndjson.zst"),
+					pattern:  path.Join("logs", "*", "elastic-agent-metrics.ndjson"),
 					optional: false,
 				})
 			}

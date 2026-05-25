@@ -2583,9 +2583,11 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 	assert.Equal(t, defaultDiagnosticsFileSizeMB, result["exporters."+fileExporterName+".rotation.max_megabytes"])
 	assert.Equal(t, 1, result["exporters."+fileExporterName+".rotation.max_backups"])
 
-	// zstd compression should be enabled — it gives ~5x size reduction over plain
-	// otlp_json and is smaller than otlp_proto+zstd due to JSON's repetitive field names.
-	assert.Equal(t, "zstd", result["exporters."+fileExporterName+".compression"])
+	// No on-disk compression: the diagnostics collector packages files into a zip using
+	// deflate, and repetitive JSON compresses to ~4% of its original size in that
+	// context — far better than the ~94% stored ratio of a pre-compressed zstd file.
+	assert.Nil(t, result["exporters."+fileExporterName+".compression"],
+		"compression should not be set; plain NDJSON deflates better inside the diagnostics zip")
 }
 
 // fakeCloseListener is a wrapper around a net.Listener that ignores the Close() method. This is used in a very particular

@@ -617,8 +617,12 @@ func exporterIDToOutputNameLookup(components []component.Component) (map[string]
 // internalTelemetryDiagnosticsFileName is the filename for the diagnostics file.
 // It is written to filepath.Join(paths.Home(), "logs") so that it sits alongside the
 // other elastic-agent log files and is automatically included in diagnostics bundles.
-// The file contains OTLP JSON records compressed with zstd, hence the .zst extension.
-const internalTelemetryDiagnosticsFileName = "elastic-agent-metrics.ndjson.zst"
+// The file contains uncompressed OTLP JSON records (one per line). Plain NDJSON is
+// used here deliberately: the diagnostics collector packages files into a zip archive
+// using deflate, and repetitive JSON compresses to roughly 4% of its original size —
+// far better than the ~94% stored size of a pre-zstd file. Keeping the file
+// uncompressed also makes individual records immediately readable with standard tools.
+const internalTelemetryDiagnosticsFileName = "elastic-agent-metrics.ndjson"
 
 // defaultDiagnosticsFileSizeMB is the max size in megabytes for the internal telemetry
 // diagnostics file.
@@ -661,9 +665,11 @@ func injectMonitoringReceiver(
 	// artifact. The file is written to paths.Home()/logs/ — the same directory where
 	// MakeInternalFileOutput writes the agent's own log files and where the
 	// diagnostics bundle collector walks to find files to include.
-	// Records are encoded as OTLP JSON (format: json) and compressed with zstd; this
-	// combination is smaller than otlp_proto+zstd because the highly repetitive JSON
-	// field names compress very efficiently in a streaming zstd context.
+	// Records are written as plain OTLP JSON (one record per line). The file is NOT
+	// compressed on disk: the diagnostics collector packages everything into a zip
+	// archive using deflate, and this highly repetitive JSON deflates to ~4% of its
+	// original size, so the net contribution to the bundle is small (~890 KB for a
+	// max-size file+backup) while keeping the file immediately readable.
 	// The file is rotated when it reaches defaultDiagnosticsFileSizeMB, keeping one
 	// backup — this gives between 1× and 2× the size in recent telemetry without
 	// unbounded growth.
@@ -692,7 +698,6 @@ func injectMonitoringReceiver(
 					"max_megabytes": defaultDiagnosticsFileSizeMB,
 					"max_backups":   1,
 				},
-				"compression": "zstd",
 			},
 		},
 		"service": map[string]any{
