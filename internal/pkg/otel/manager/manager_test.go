@@ -2543,8 +2543,9 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 func TestMonitoringReceiverFileExporter(t *testing.T) {
 	exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
 	pipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
-	fileExporterName := "file/" + translate.OtelNamePrefix + internalTelemetryDiagnosticsName
-	encodingExtName := "otlp_encoding/" + translate.OtelNamePrefix + internalTelemetryDiagnosticsName
+	receiverName := "internal-telemetry-monitoring"
+	fileExporterName := "file/" + translate.OtelNamePrefix + receiverName
+	encodingExtName := "otlp_encoding/" + translate.OtelNamePrefix + receiverName
 
 	baseConfig := map[string]any{
 		"exporters": map[string]any{
@@ -2582,6 +2583,10 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 
 	// The encoding extension should be referenced by the file exporter.
 	assert.Equal(t, encodingExtName, result["exporters."+fileExporterName+".encoding"])
+
+	// zstd compression should be enabled — it gives ~5x size reduction over plain
+	// otlp_json and is smaller than otlp_proto+zstd due to JSON's repetitive field names.
+	assert.Equal(t, "zstd", result["exporters."+fileExporterName+".compression"])
 
 	// The OTLP encoding extension should be configured with the JSON protocol.
 	assert.Equal(t, "otlp_json", result["extensions."+encodingExtName+".protocol"])

@@ -614,18 +614,15 @@ func exporterIDToOutputNameLookup(components []component.Component) (map[string]
 	return lookup, nil
 }
 
-// internalTelemetryDiagnosticsName is the component ID suffix used for the diagnostics
-// file exporter injected into the internal telemetry monitoring pipeline.
-const internalTelemetryDiagnosticsName = "internal-telemetry-diagnostics"
-
-// internalTelemetryDiagnosticsFileName is the filename for the diagnostics NDJSON file.
+// internalTelemetryDiagnosticsFileName is the filename for the diagnostics file.
 // It is written to filepath.Join(paths.Home(), "logs") so that it sits alongside the
 // other elastic-agent log files and is automatically included in diagnostics bundles.
-const internalTelemetryDiagnosticsFileName = "elastic-agent-metrics.ndjson"
+// The file contains OTLP JSON records compressed with zstd, hence the .zst extension.
+const internalTelemetryDiagnosticsFileName = "elastic-agent-metrics.ndjson.zst"
 
 // defaultDiagnosticsFileSizeMB is the max size in megabytes for the internal telemetry
-// diagnostics file. It matches the default elastic-agent log file size.
-const defaultDiagnosticsFileSizeMB = 20
+// diagnostics file.
+const defaultDiagnosticsFileSizeMB = 10
 
 func injectMonitoringReceiver(
 	config *confmap.Conf,
@@ -665,10 +662,13 @@ func injectMonitoringReceiver(
 	// The file is written to paths.Home()/logs/ — the same directory where
 	// MakeInternalFileOutput writes the agent's own log files and where the
 	// diagnostics bundle collector walks to find files to include.
+	// Records are encoded as OTLP JSON and compressed with zstd; this combination
+	// is smaller than otlp_proto+zstd because the highly repetitive JSON field names
+	// compress very efficiently in a streaming zstd context.
 	// The file is rotated when it reaches defaultDiagnosticsFileSizeMB, keeping
 	// one backup — this gives between 1× and 2× the size in recent telemetry
 	// without unbounded growth.
-	diagName := translate.OtelNamePrefix + internalTelemetryDiagnosticsName
+	diagName := translate.OtelNamePrefix + receiverName
 	fileExporterID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("file"), diagName).String()
 	encodingExtID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("otlp_encoding"), diagName).String()
 	diagFilePath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
@@ -693,7 +693,8 @@ func injectMonitoringReceiver(
 					"max_megabytes": defaultDiagnosticsFileSizeMB,
 					"max_backups":   1,
 				},
-				"encoding": encodingExtID,
+				"encoding":    encodingExtID,
+				"compression": "zstd",
 			},
 		},
 		"extensions": map[string]any{
