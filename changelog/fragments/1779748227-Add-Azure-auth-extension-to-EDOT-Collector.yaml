@@ -8,7 +8,7 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: enhancement
+kind: feature
 
 # Change summary; a 80ish characters long description of the change.
 summary: Add Azure auth extension to EDOT Collector
@@ -19,7 +19,7 @@ summary: Add Azure auth extension to EDOT Collector
 #description:
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
-component:
+component: elastic-agent
 
 # PR URL; optional; the PR number that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
