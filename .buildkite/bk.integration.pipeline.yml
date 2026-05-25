@@ -395,7 +395,6 @@ steps:
           - *oblt_cli_plugin
           - *vault_github_token
         matrix:
-<<<<<<< HEAD
           - default
           - upgrade
           - standalone-upgrade
