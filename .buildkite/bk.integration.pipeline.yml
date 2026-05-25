@@ -298,7 +298,7 @@ steps:
         - dev-tools/**
         - go.mod
         - go.sum
-    key: integration-tests-win-tier2
+    key: integration-tests-win-tier-2
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Windows - tier 2"
@@ -369,7 +369,7 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 3)"
-    key: integration-tests-win-tier3
+    key: integration-tests-win-tier-3
     if: build.source == "schedule"
     notify:
       - github_commit_status:
@@ -601,7 +601,7 @@ steps:
         - dev-tools/**
         - go.mod
         - go.sum
-    key: integration-tests-linux-tier2
+    key: integration-tests-linux-tier-2
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Linux - tier 2"
@@ -698,7 +698,7 @@ steps:
             variant: *linux_rpm_variants
 
   - group: "Stateful: Linux (tier 3)"
-    key: integration-tests-linux-tier3
+    key: integration-tests-linux-tier-3
     if: build.source == "schedule"
     notify:
       - github_commit_status:
@@ -942,14 +942,14 @@ steps:
 
   - label: ESS stack cleanup
     depends_on:
-      - integration-tests-ubuntu
+      - integration-tests-linux-tier-1
+      - integration-tests-linux-tier-2
+      - integration-tests-linux-tier-3
       - integration-tests-win-tier-1
       - integration-tests-win-tier-2
       - integration-tests-win-tier-3
-      - integration-tests-rhel
       - integration-tests-kubernetes
       - extended-integration-tests
-      - integration-tests-debian
     allow_dependency_failure: true
     command: |
       .buildkite/scripts/steps/ess_cleanup_all.sh
@@ -965,14 +965,14 @@ steps:
     key: aggregate-reports
     depends_on:
       - integration-tests-ech
-      - integration-tests-ubuntu
+      - integration-tests-linux-tier-1
+      - integration-tests-linux-tier-2
+      - integration-tests-linux-tier-3
       - integration-tests-win-tier-1
       - integration-tests-win-tier-2
       - integration-tests-win-tier-3
-      - integration-tests-rhel
       - integration-tests-kubernetes
       - integration-tests-serverless
-      - integration-tests-debian
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "build/*.xml" .
