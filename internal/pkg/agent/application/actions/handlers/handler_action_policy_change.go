@@ -483,6 +483,8 @@ func fleetToReader(agentID string, headers map[string]string, cfg *configuration
 			"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
 			"monitoring.pprof":             cfg.Settings.MonitoringConfig.Pprof,
 			"logging.files":                cfg.Settings.LoggingConfig.Files,
+			"logging.to_files":             cfg.Settings.LoggingConfig.ToFiles,
+			"logging.to_stderr":            cfg.Settings.LoggingConfig.ToStderr,
 		},
 	}
 
