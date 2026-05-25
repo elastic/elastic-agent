@@ -130,21 +130,28 @@ func TestCleanupAgentDirectories_Row8_Orphan_MarkerReferencesIt(t *testing.T) {
 			wantRemove:           true,
 		},
 	}
+	// Build paths via filepath.Join so the test works on both Unix and
+	// Windows: shouldRemove calls filepath.Clean on marker.VersionedHome and
+	// PrevVersionedHome, which normalizes separators on Windows. Hardcoded
+	// forward-slash strings would fail to match the cleaned form.
+	targetHome := filepath.Join("data", "elastic-agent-target")
+	prevHome := filepath.Join("data", "elastic-agent-prev")
+	liveHome := filepath.Join("data", "elastic-agent-live")
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			dc := newTestDirClassifier(t)
-			dc.symlinkTarget = "data/elastic-agent-live"
+			dc.symlinkTarget = liveHome
 			dc.requireMarkerDetails = tc.requireMarkerDetails
 			marker := &UpdateMarker{
-				VersionedHome:     "data/elastic-agent-target",
-				PrevVersionedHome: "data/elastic-agent-prev",
+				VersionedHome:     targetHome,
+				PrevVersionedHome: prevHome,
 			}
 			if tc.detailsPresent {
 				marker.Details = &details.Details{State: tc.state}
 			}
 			dc.marker = marker
 
-			assert.Equal(t, tc.wantRemove, dc.shouldRemove("data/elastic-agent-target"))
+			assert.Equal(t, tc.wantRemove, dc.shouldRemove(targetHome))
 		})
 	}
 }
