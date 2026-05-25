@@ -19,7 +19,7 @@ require (
 	github.com/elastic/cloud-on-k8s/v3 v3.4.0
 	github.com/elastic/elastic-agent-autodiscover v0.10.3-0.20260423154939-e990715f9426
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-	github.com/elastic/elastic-agent-libs v0.43.0
+	github.com/elastic/elastic-agent-libs v0.43.2-0.20260522055308-d8eb8a8ffa76
 	github.com/elastic/elastic-agent-system-metrics v0.14.3
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-20260515154942-99dc973fd52e
@@ -190,7 +190,7 @@ require (
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203 // indirect
-	github.com/elastic/go-concert v0.3.1 // indirect
+	github.com/elastic/go-concert v0.3.0 // indirect
 	github.com/elastic/go-docappender/v2 v2.14.1 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
