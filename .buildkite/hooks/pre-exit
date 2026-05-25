@@ -8,6 +8,12 @@ if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   fi
   source "${WORKSPACE}/.buildkite/scripts/common.sh"
 
+  # Disable exit on error for Kubernetes integration tests
+  # integration-tests-kubernetes step is used as a parent step for all k8s version
+  # therefore it does not have any resources to clean up.
+  if [[ "$BUILDKITE_STEP_KEY" == "integration-tests-kubernetes" ]]; then
+    set +e
+  fi
   # Perform cleanup of integration tests resources
   echo "--- Cleaning up integration test resources"
   STACK_PROVISIONER=serverless SNAPSHOT=true mage integration:clean
