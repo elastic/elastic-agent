@@ -157,20 +157,19 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	// Switch to OTel runtime and validate the same data
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
-		t.Skip("pbreceiver does not yet produce events, skipping OTel validation")
-
-		// Identify the network_traffic integration component before switching runtime so
-		// we can verify that specific component transitions to the OTel receiver.
+		// Identify the network_traffic integration component (input type "packet") before
+		// switching runtime so we can verify that specific component transitions to the
+		// OTel receiver.
 		status, err := runner.agentFixture.ExecStatus(ctx)
 		require.NoError(t, err)
 		var integrationComponentID string
 		for _, comp := range status.Components {
-			if !strings.HasSuffix(comp.ID, "-monitoring") {
+			if strings.HasPrefix(comp.ID, "packet") {
 				integrationComponentID = comp.ID
 				break
 			}
 		}
-		require.NotEmpty(t, integrationComponentID, "could not find integration component ID before OTel switch")
+		require.NotEmpty(t, integrationComponentID, "could not find packet (network_traffic) integration component before OTel switch")
 
 		otelSince := time.Now()
 		policyRevision := switchPolicyToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
@@ -194,6 +193,7 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 			assert.True(collect, isReceiver, "expected component %s to be running as beats receiver", integrationComponentID)
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
+		t.Skip("pbreceiver does not yet produce events, skipping OTel data validation")
 		otelDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, otelSince)
 	})
 
