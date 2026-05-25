@@ -17,7 +17,14 @@ if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   # Perform cleanup of integration tests resources
   echo "--- Cleaning up integration test resources"
   STACK_PROVISIONER=serverless SNAPSHOT=true mage integration:clean
-  SNAPSHOT=true mage integration:clean
+# Disable exit on error for Kubernetes integration tests
+# pre-exit runs after running the ITs, so if something went wrong the tear-down steps or 
+# automated clean-up should be the ones in charge of.
+set +e
+# Perform cleanup of integration tests resources
+echo "--- Cleaning up integration test resources"
+STACK_PROVISIONER=serverless SNAPSHOT=true mage integration:clean
+SNAPSHOT=true mage integration:clean
 fi
 
 if [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]; then
