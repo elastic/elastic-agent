@@ -7,7 +7,6 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-<<<<<<< HEAD
   IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1779223036"
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1779223036"
   IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1779223036"
