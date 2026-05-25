@@ -205,9 +205,6 @@ func addIntegrationAndCheckData(t *testing.T, info *define.Info, fixture *atesti
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		docs, err := estools.GetResultsForAgentAndDatastream(ctx, info.ESClient, "system.cpu", status.Info.ID)
 		require.NoError(collect, err, "error fetching system metrics")
-		if err != nil {
-			return
-		}
 		t.Logf("Generated %d system events", docs.Hits.Total.Value)
 		assert.True(collect, docs.Hits.Total.Value > 0)
 	}, 2*time.Minute, 5*time.Second, "no system.cpu data received in Elasticsearch")
