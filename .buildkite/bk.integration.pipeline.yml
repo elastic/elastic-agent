@@ -810,12 +810,12 @@ steps:
 
   - label: ESS stack cleanup
     depends_on:
-      - integration-tests-ubuntu
+      - integration-tests-linux-tier-1
+      - integration-tests-linux-tier-2
+      - integration-tests-linux-tier-3
       - integration-tests-win
-      - integration-tests-rhel
       - integration-tests-kubernetes
       - extended-integration-tests
-      - integration-tests-debian
     allow_dependency_failure: true
     command: |
       .buildkite/scripts/steps/ess_cleanup_all.sh
@@ -831,12 +831,12 @@ steps:
     key: aggregate-reports
     depends_on:
       - integration-tests-ech
-      - integration-tests-ubuntu
+      - integration-tests-linux-tier-1
+      - integration-tests-linux-tier-2
+      - integration-tests-linux-tier-3
       - integration-tests-win
-      - integration-tests-rhel
       - integration-tests-kubernetes
       - integration-tests-serverless
-      - integration-tests-debian
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "build/*.xml" .
