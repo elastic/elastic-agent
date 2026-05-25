@@ -262,7 +262,8 @@ agent.logging.to_stderr: true
 #agent.logging.metrics.period: 30s
 
 # Logging to rotating files. Set logging.to_files to false to disable logging to
-# files.
+# files. Note that agent.logging.to_stderr must be set to false for file logging
+# to take effect.
 #agent.logging.to_files: true
 #agent.logging.files:
   # Configure the path where the logs are written. The default is the logs directory

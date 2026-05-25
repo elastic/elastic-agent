@@ -962,6 +962,7 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	t.Cleanup(proxy.Close)
 
 	fleetProxyResp, err := kibClient.CreateFleetProxy(ctx, kibana.ProxiesRequest{
+		ID:   "fleet-upgrade-test-proxy-" + testUUID.String(),
 		Name: "fleet-upgrade-test-proxy-" + testUUID.String(),
 		URL:  proxy.LocalhostURL,
 	})
