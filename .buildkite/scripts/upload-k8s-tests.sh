@@ -168,6 +168,29 @@ generate_version_group() {
 EOF
 }
 
+# Generate a single last step, to help with the teardown of clusters after all tests have run.
+generate_last_step() {
+  local versions=$1
+  cat <<EOF
+
+  - wait:
+
+  - label: ":kubernetes: last step - cluster teardown notifier"
+    key: "integration-tests-kubernetes"
+    depends_on:
+EOF
+
+  while IFS= read -r version; do
+    echo "      - \"integration-tests-kubernetes-${version}\""
+  done <<< "${versions}"
+
+  cat <<EOF
+    command: true
+    allow_dependency_failure: true
+
+EOF
+}
+
 # Generate the complete pipeline YAML with one group step per k8s version.
 # For tier3 runs a wait step is inserted between version groups to reduce
 # the number of concurrent cluster requests hitting the API at once.
@@ -213,6 +236,8 @@ EOF
     first=false
     generate_version_group "${version}" "${variants_yaml}"
   done <<< "${versions}"
+
+  generate_last_step "${versions}"
 }
 
 # Main
