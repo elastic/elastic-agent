@@ -335,75 +335,10 @@ steps:
         matrix:
           - default
 
-<<<<<<< HEAD
-  - group: "Stateful:Ubuntu"
-    key: integration-tests-ubuntu
-=======
-      - label: "Win11ARM64:sudo:{{matrix}}"
-        depends_on:
-          - packaging-arm64
-        env:
-          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
-        command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-arm64* . --step 'packaging-arm64'
-          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
-        artifact_paths:
-          - build/*
-          - build/diagnostics/**
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11_ARM64}"
-          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
-          vmSize: "Standard_D8ps_v6"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-        plugins:
-          - *google_oidc_observability_plugin
-          - *oblt_cli_plugin
-          - *vault_github_token
-        matrix:
-          - default
-          - fleet
-          - fleet-endpoint-security
-          - fleet-privileged
-          - standalone-upgrade
-          - upgrade
-          - upgrade-flavor
-          - install-uninstall
-
-      - label: "Win11ARM64:non-sudo:{{matrix}}"
-        depends_on:
-          - packaging-arm64
-        env:
-          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
-        command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-arm64* . --step 'packaging-arm64'
-          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
-        artifact_paths:
-          - build/*
-          - build/diagnostics/**
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11_ARM64}"
-          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
-          vmSize: "Standard_D8ps_v6"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-        plugins:
-          - *google_oidc_observability_plugin
-          - *oblt_cli_plugin
-          - *vault_github_token
-        matrix:
-          - default
 
   - group: "Stateful: Linux (tier 1)"
     if: build.pull_request.id != null
     key: integration-tests-linux-tier-1
->>>>>>> eaf077681 (bk: split linux ITs in tiers (no-fips) (#14465))
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Linux - tier 1"
