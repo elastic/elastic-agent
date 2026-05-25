@@ -608,6 +608,23 @@ agent.internal.runtime.filebeat.filestream: otel
 
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string, extraPatterns ...filePattern) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
+		// If any required extra patterns are present (e.g. the metrics file
+		// written by the OTel file exporter after the first collection cycle),
+		// wait long enough for at least one cycle to complete before gathering
+		// diagnostics. The metrics period configured in the test is 5 s, so
+		// 10 s gives a comfortable margin while remaining well within the
+		// 10-minute test deadline.
+		for _, p := range extraPatterns {
+			if !p.optional {
+				select {
+				case <-time.After(10 * time.Second):
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				break
+			}
+		}
+
 		diagZip, err := fix.ExecDiagnostics(ctx, cmd...)
 
 		// get the version of the running agent
