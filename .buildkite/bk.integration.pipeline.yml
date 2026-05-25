@@ -395,11 +395,6 @@ steps:
           - *oblt_cli_plugin
           - *vault_github_token
         matrix:
-          - default
-          - upgrade
-          - standalone-upgrade
-          - fleet
-          - fleet-endpoint-security
           setup:
             variant: *linux_deb_variants
 
