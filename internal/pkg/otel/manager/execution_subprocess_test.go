@@ -648,6 +648,60 @@ func TestProcHandle_MonitorHealth(t *testing.T) {
 		})
 	})
 
+	t.Run("force_fetch_uses_current_status_not_stale_map_value", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			// Use a mutable status pointer that the fetch function returns.
+			// This allows us to change what the fetch function returns mid-test.
+			var mu sync.Mutex
+			currentFetchStatus := internalstatus.AggregateStatus(componentstatus.StatusOK, nil)
+			fetchFn := func(_ context.Context, _ http.Client, _ int) (*otelstatus.AggregateStatus, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				return currentFetchStatus, nil
+			}
+
+			h, captured, waitCh := newMonitorTestHandle(t, fetchFn)
+			// forceFetchStatusCh must be a bubble channel.
+			h.forceFetchStatusCh = make(chan struct{}, 1)
+			ctx, cancel := context.WithCancel(t.Context())
+			h.startMonitoring(ctx, cancel)
+			synctest.Wait()
+
+			// After the first iteration: StatusStarting + StatusOK (first poll, changed).
+			statuses, _ := captured.snapshot()
+			require.Len(t, statuses, 2)
+			assert.Equal(t, componentstatus.StatusStarting, statuses[0].Status())
+			assert.Equal(t, componentstatus.StatusOK, statuses[1].Status())
+
+			// Change the status that the fetch function returns (simulating a status change).
+			mu.Lock()
+			currentFetchStatus = internalstatus.AggregateStatus(componentstatus.StatusRecoverableError, errors.New("test error"))
+			mu.Unlock()
+
+			// Advance time past one poll interval to allow the new status to be fetched.
+			time.Sleep(1500 * time.Millisecond)
+			synctest.Wait()
+
+			// The new status should have been fetched and reported (changed from OK to RecoverableError).
+			statuses, _ = captured.snapshot()
+			require.Len(t, statuses, 3)
+			assert.Equal(t, componentstatus.StatusRecoverableError, statuses[2].Status())
+
+			// Now trigger a force-fetch; it must emit the current (new) status,
+			// not a stale value that might have been cached elsewhere.
+			h.forceFetchStatusCh <- struct{}{}
+			synctest.Wait()
+
+			statuses, _ = captured.snapshot()
+			require.Len(t, statuses, 4)
+			require.NotNil(t, statuses[3])
+			assert.Equal(t, componentstatus.StatusRecoverableError, statuses[3].Status())
+			assert.EqualError(t, statuses[3].Err(), "test error")
+
+			t.Cleanup(func() { close(waitCh) })
+		})
+	})
+
 	t.Run("max_failures_timer_reports_recoverable_error", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			h, captured, waitCh := newMonitorTestHandle(t, alwaysError)

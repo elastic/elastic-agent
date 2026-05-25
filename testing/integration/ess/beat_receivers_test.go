@@ -141,6 +141,47 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		},
 	}
 
+	// otelTests mirrors the classic tests but replaces the per-component beat stats test cases
+	// (elastic_agent.filebeat, elastic_agent.metricbeat) with their OTel equivalents.
+	// In OTel mode there is no beat/metrics-monitoring component doing unix-socket scraping,
+	// so per-component beat stats are not written to those datasets. Instead the
+	// elasticmonitoringreceiver collects OTel internal telemetry and emits:
+	//   - per-exporter stats into elastic_agent.elastic_agent (component.id varies per exporter;
+	//     the test below checks "elasticsearch-monitoring", the default monitoring exporter)
+	//   - per-receiver pipeline metrics into elastic_agent.elastic_agent (component.id: <receiver component>)
+	otelTests := []test{
+		// logs: identical to classic
+		tests[0],
+		// beat stats in OTel mode: exporter-level stats collected via OTel internal telemetry.
+		// In OTel mode the elasticmonitoringreceiver aggregates OTel exporter metrics and writes
+		// them to elastic_agent.elastic_agent with component.id set to the exporter name.
+		{
+			dsType:    "metrics",
+			dsDataset: "elastic_agent.elastic_agent",
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "stats"}},
+				{"match_phrase": map[string]any{"component.id": "elasticsearch-monitoring"}},
+				{"exists": map[string]any{"field": "beat.stats.libbeat.output.events.acked"}},
+			},
+			onlyCompareKeys: true,
+		},
+		// agent process metrics: identical to classic
+		tests[3],
+		// filebeat input metrics: in OTel mode the elasticmonitoringreceiver emits per-input
+		// metrics with metricset.name "stats" (from its event template), not "json" which is
+		// what the classic http/metrics-monitoring metricbeat uses when scraping /inputs/.
+		{
+			dsType:          "metrics",
+			dsDataset:       "elastic_agent.filebeat_input",
+			onlyCompareKeys: true,
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "stats"}},
+				{"match_phrase": map[string]any{"component.id": "filestream-monitoring"}},
+				{"exists": map[string]any{"field": "filebeat_input.bytes_processed_total"}},
+			},
+		},
+	}
+
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Privileged:     true,
@@ -319,11 +360,11 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		var statusErr error
 		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 3)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 2)
 	}, 1*time.Minute, 1*time.Second)
 
 	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
-	for _, tc := range tests {
+	for _, tc := range otelTests {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 			defer findCancel()
@@ -362,22 +403,15 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	combinedOutput, err = beatReceiverFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 
-	// 7. Compare both documents are equivalent
-	for _, tc := range tests[:3] {
+	// 7. Compare both documents are equivalent.
+	// Only test cases that produce the same dataset/shape in both modes are compared here.
+	// Beat stats (elastic_agent.filebeat, elastic_agent.metricbeat) are not comparable: in classic
+	// mode they come from unix-socket scraping per component, while in OTel mode the
+	// elasticmonitoringreceiver writes aggregated exporter stats into elastic_agent.elastic_agent.
+	for _, tc := range tests[:1] {
 		agent := agentDocs[tc.dsType+"-"+tc.dsDataset+"-"+processNamespace].Hits.Hits[0].Source
 		otel := otelDocs[tc.dsType+"-"+tc.dsDataset+"-"+receiverNamespace].Hits.Hits[0].Source
-		ignoredFields := []string{
-			// Expected to change between agentDocs and OtelDocs
-			"@timestamp",
-			"agent.ephemeral_id",
-			// agent.id is different because it's the id of the underlying beat
-			"agent.id",
-			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
-			"agent.version",
-			"data_stream.namespace",
-			"elastic_agent.id",
-			"event.ingested",
-		}
+		ignoredFields := append(RuntimeComparisonIgnoredFields, "data_stream.namespace")
 		switch tc.onlyCompareKeys {
 		case true:
 			AssertMapstrKeysEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), "expected document keys to be equal for "+tc.dsType+"-"+tc.dsDataset)
@@ -617,18 +651,7 @@ outputs:
 		otelDocs := esDocs["otel"]
 
 		// Fields that are present in both agent and otel documents, but are expected to change
-		ignoredFields := []string{
-			"@timestamp",
-			"agent.id",
-			"agent.ephemeral_id",
-			"elastic_agent.id",
-			"data_stream.namespace",
-			"event.ingested",
-			"event.duration",
-
-			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
-			"agent.version",
-		}
+		ignoredFields := append(RuntimeComparisonIgnoredFields, "data_stream.namespace", "event.duration")
 
 		testCases := []struct {
 			metricset     string
@@ -1973,7 +1996,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	healthCheck(ctx,
 		"Everything is ready. Begin running and processing data.",
 		component.OtelRuntimeManager,
-		3,
+		2,
 		otelTimestamp)
 
 	// restart 3 times, checks path definition is stable
@@ -1988,7 +2011,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		healthCheck(ctx,
 			"Everything is ready. Begin running and processing data.",
 			component.OtelRuntimeManager,
-			3,
+			2,
 			restartTimestamp)
 	}
 

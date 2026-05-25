@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/josephspurrier/goversioninfo"
@@ -83,13 +84,13 @@ func DefaultBuildArgs(cfg *Settings) BuildArgs {
 		CGO:  build.Default.CgoEnabled,
 		Env:  map[string]string{},
 		Vars: map[string]string{
-			elasticAgentModulePath + "/version.buildTime": "{{ date }}",
-			elasticAgentModulePath + "/version.commit":    "{{ commit }}",
+			elasticAgentModulePath + "/version.buildTime": cfg.BuildDateString(),
+			elasticAgentModulePath + "/version.commit":    cfg.Build.CommitHash(),
 		},
 		WinMetadata: true,
 	}
 	if cfg.Build.VersionQualified {
-		args.Vars[elasticAgentModulePath+"/version.qualifier"] = "{{ .Qualifier }}"
+		args.Vars[elasticAgentModulePath+"/version.qualifier"] = cfg.Build.VersionQualifier
 	}
 
 	if positionIndependentCodeSupported(cfg) {
@@ -98,13 +99,25 @@ func DefaultBuildArgs(cfg *Settings) BuildArgs {
 
 	if cfg.Build.FIPSBuild {
 		fipsConfig := packaging.Settings().FIPS
-
-		for _, tag := range fipsConfig.Compile.Tags {
-			args.ExtraFlags = append(args.ExtraFlags, "-tags="+tag)
-		}
-		args.CGO = args.CGO || fipsConfig.Compile.CGO
-		for varName, value := range fipsConfig.Compile.Env {
-			args.Env[varName] = value
+		platform := cfg.Platform()
+		if slices.ContainsFunc(fipsConfig.Compile.Platforms, func(p packaging.Platform) bool {
+			return p.Platform() == platform.Name
+		}) {
+			for _, tag := range fipsConfig.Compile.Tags {
+				args.ExtraFlags = append(args.ExtraFlags, "-tags="+tag)
+			}
+			args.CGO = args.CGO || fipsConfig.Compile.CGO
+			for varName, value := range fipsConfig.Compile.Env {
+				args.Env[varName] = value
+			}
+			// windows FIPS builds use the upstream FIPS module
+			if platform.GOOS == "windows" {
+				delete(args.Env, "GOEXPERIMENT")
+				// See https://go.dev/doc/security/fips140#go-cryptographic-module-v100
+				// CMVP Certificate #5247: https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/5247
+				// CAVP Certificate A6650: https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/details?product=19371
+				args.Env["GOFIPS140"] = "v1.0.0"
+			}
 		}
 	}
 
@@ -301,10 +314,7 @@ func Run(ctx context.Context, env map[string]string, stdout, stderr io.Writer, c
 func MakeWindowsSysoFile(cfg *Settings) (string, error) {
 	version := cfg.BeatQualifiedVersion()
 
-	commit, err := cfg.Build.CommitHash()
-	if err != nil {
-		return "", err
-	}
+	commit := cfg.Build.CommitHash()
 
 	major, minor, patch, err := ParseVersion(version)
 	if err != nil {

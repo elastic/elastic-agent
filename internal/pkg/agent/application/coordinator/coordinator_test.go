@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"go.uber.org/zap/zapcore"
@@ -579,68 +580,76 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 }
 
 func TestReplayedRollbackActionAcked(t *testing.T) {
-	coordCh := make(chan error, 1)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	synctest.Test(t, func(t *testing.T) {
+		coordCh := make(chan error, 1)
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
 
-	upgradeManager := &fakeUpgradeManager{
-		upgradeable: true,
-	}
-
-	acker := &fakeActionAcker{}
-	coord, _, _ := createCoordinator(t, ctx,
-		ManagedCoordinator(true),
-		WithUpgradeManager(upgradeManager),
-		WithActionAcker(acker))
-
-	var coordWait sync.WaitGroup
-	coordWait.Add(1)
-	go func() {
-		coordWait.Done()
-		err := coord.Run(ctx)
-		if errors.Is(err, context.Canceled) {
-			// allowed error
-			err = nil
+		upgradeManager := &fakeUpgradeManager{
+			upgradeable: true,
 		}
-		coordCh <- err
-	}()
 
-	coordWait.Wait()
+		acker := &fakeActionAcker{}
+		coord, _, _ := createCoordinator(t, ctx,
+			ManagedCoordinator(true),
+			WithUpgradeManager(upgradeManager),
+			WithActionAcker(acker),
+			WithRuntimeManager(&fakeRuntimeManager{}))
 
-	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
-	actionUpgrade, ok := action.(*fleetapi.ActionUpgrade)
-	require.True(t, ok)
-	actionUpgrade.Data.Rollback = true
-	actionUpgrade.Data.Version = release.VersionWithSnapshot()
+		go func() {
+			err := coord.Run(ctx)
+			if errors.Is(err, context.Canceled) {
+				// allowed error
+				err = nil
+			}
+			coordCh <- err
+		}()
 
-	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
-	acker.On("Commit", mock.Anything).Return(nil)
+		// Wait for the coordinator goroutine to be durably blocked in its run loop.
+		synctest.Wait()
 
-	// A rollback targeting the current version should be detected as replayed and acked without processing
-	require.NoError(t, coord.Upgrade(t.Context(), release.VersionWithSnapshot(), "", actionUpgrade, WithRollback(true)))
+		action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
+		actionUpgrade, ok := action.(*fleetapi.ActionUpgrade)
+		require.True(t, ok)
+		actionUpgrade.Data.Rollback = true
+		actionUpgrade.Data.Version = release.VersionWithSnapshot()
 
-	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
-	acker.AssertCalled(t, "Commit", mock.Anything)
-	assert.False(t, upgradeManager.upgradeCalled, "upgrade should not have been called for a replayed rollback action")
+		acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
+		acker.On("Commit", mock.Anything).Return(nil)
 
-	// Replayed rollback should report UpgradeDetails with StateRollback so that
-	// Fleet knows the agent completed the rollback (not empty/nil details).
-	state := coord.State()
-	require.NotNil(t, state.UpgradeDetails, "upgrade details should be present after replayed rollback is handled")
-	assert.Equal(t, details.StateRollback, state.UpgradeDetails.State, "upgrade details state should be rollback")
+		// A rollback targeting the current version should be detected as replayed and acked without processing
+		require.NoError(t, coord.Upgrade(t.Context(), release.VersionWithSnapshot(), "", actionUpgrade, WithRollback(true)))
 
-	cancel()
-	require.NoError(t, <-coordCh)
+		acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
+		acker.AssertCalled(t, "Commit", mock.Anything)
+		assert.False(t, upgradeManager.upgradeCalled, "upgrade should not have been called for a replayed rollback action")
+
+		// Replayed rollback should report UpgradeDetails with StateRollback so that
+		// Fleet knows the agent completed the rollback (not empty/nil details).
+		// State propagation from Upgrade() to the stateBroadcaster happens on the
+		// coordinator goroutine; synctest.Wait blocks until that propagation is done.
+		synctest.Wait()
+		state := coord.State()
+		require.NotNil(t, state.UpgradeDetails, "upgrade details should be present after replayed rollback is handled")
+		assert.Equal(t, details.StateRollback, state.UpgradeDetails.State, "upgrade details state should be rollback")
+
+		cancel()
+		require.NoError(t, <-coordCh)
+	})
 }
 
 func TestPreUpgradeCallback(t *testing.T) {
+	// Verify that WithPreUpgradeCallback is forwarded to upgradeMgr.Upgrade as an
+	// upgrade.WithPreSymlinkCallback option. The callback is invoked by the
+	// upgrader (not by the coordinator directly); if it returns an error the
+	// whole upgrade fails and the error is propagated back to the caller.
 	coordCh := make(chan error)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	upgradeManager := &fakeUpgradeManager{
 		upgradeable: true,
-		upgradeErr:  upgrade.ErrUpgradeSameVersion,
+		// No upgradeErr — the error comes from the pre-symlink callback itself.
 	}
 
 	acker := acker.NewMockAcker(t)
@@ -670,9 +679,8 @@ func TestPreUpgradeCallback(t *testing.T) {
 			return preUpgradeCallbackErr
 		}))
 
-	assert.ErrorIs(t, preUpgradeCallbackErr, upgradeErr)
+	assert.ErrorIs(t, upgradeErr, preUpgradeCallbackErr)
 	assert.Nil(t, coord.overrideState)
-	assert.Equal(t, preUpgradeCallbackErr, upgradeErr, "expected pre upgrade callback error")
 	assert.Eventually(t, func() bool {
 		ud := coord.State().UpgradeDetails
 		return ud != nil && ud.State == details.StateFailed
@@ -1439,6 +1447,7 @@ type createCoordinatorOpts struct {
 	upgradeManager UpgradeManager
 	compInputSpec  component.InputSpec
 	acker          acker.Acker
+	runtimeManager RuntimeManager
 }
 
 type CoordinatorOpt func(o *createCoordinatorOpts)
@@ -1464,6 +1473,12 @@ func WithActionAcker(acker acker.Acker) CoordinatorOpt {
 func WithComponentInputSpec(spec component.InputSpec) CoordinatorOpt {
 	return func(o *createCoordinatorOpts) {
 		o.compInputSpec = spec
+	}
+}
+
+func WithRuntimeManager(rm RuntimeManager) CoordinatorOpt {
+	return func(o *createCoordinatorOpts) {
+		o.runtimeManager = rm
 	}
 }
 
@@ -1499,10 +1514,16 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 
 	monitoringMgr := newTestMonitoringMgr()
 	cfg := configuration.DefaultConfiguration()
-	grpcCfg := cfg.Settings.GRPC
-	grpcCfg.Port = 0
-	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, grpcCfg)
-	require.NoError(t, err)
+	var rm RuntimeManager
+	if o.runtimeManager != nil {
+		rm = o.runtimeManager
+	} else {
+		grpcCfg := cfg.Settings.GRPC
+		grpcCfg.Port = 0
+		realRM, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, grpcCfg)
+		require.NoError(t, err)
+		rm = realRM
+	}
 	otelMgr := &fakeOTelManager{}
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
 	require.NoError(t, err)
@@ -1585,8 +1606,11 @@ func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	f.upgradeCalled = true
+	if cbErr := upgrade.InvokePreSymlinkCallback(opts, ctx, nil, action); cbErr != nil {
+		return nil, cbErr
+	}
 	if f.upgradeErr != nil {
 		return nil, f.upgradeErr
 	}
@@ -1869,8 +1893,8 @@ func (r *fakeRuntimeManager) PerformAction(_ context.Context, _ component.Compon
 }
 
 // SubscribeAll provides an interface to watch for changes in all components.
-func (r *fakeRuntimeManager) SubscribeAll(context.Context) *runtime.SubscriptionAll {
-	return nil
+func (r *fakeRuntimeManager) SubscribeAll(ctx context.Context) *runtime.SubscriptionAll {
+	return runtime.NewSubscriptionAll(ctx)
 }
 
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then

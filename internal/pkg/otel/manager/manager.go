@@ -23,6 +23,7 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap"
 
+	"github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -80,9 +81,8 @@ type OTelManager struct {
 	// they should be reported as failed components to the elastic-agent
 	errCh chan error
 
-	// Agent info and monitoring config getter for otel config generation
-	agentInfo                  info.Agent
-	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter
+	// Agent info for otel config generation
+	agentInfo info.Agent
 
 	healthCheckExtComponentID string
 	collectorMetricsPort      int
@@ -142,7 +142,6 @@ func NewOTelManager(
 	collectorLogger *logger.Logger,
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
-	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
 	execFactory ExecutionFactory,
 ) (*OTelManager, error) {
@@ -193,14 +192,13 @@ func NewOTelManager(
 	}
 
 	return &OTelManager{
-		managerLogger:              logger,
-		collectorLogger:            collectorLogger,
-		agentInfo:                  agentInfo,
-		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
-		healthCheckExtComponentID:  healthCheckExtComponentID,
-		collectorMetricsPort:       collectorMetricsPort,
-		errCh:                      make(chan error, 1), // holds at most one error
-		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
+		managerLogger:             logger,
+		collectorLogger:           collectorLogger,
+		agentInfo:                 agentInfo,
+		healthCheckExtComponentID: healthCheckExtComponentID,
+		collectorMetricsPort:      collectorMetricsPort,
+		errCh:                     make(chan error, 1), // holds at most one error
+		collectorStatusCh:         make(chan *status.AggregateStatus, 1),
 		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
 		// any possible case of deadlock, 5 is used just to give a small buffer.
 		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
@@ -302,7 +300,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := m.buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.managerLogger)
+			mergedCfg, err := m.buildMergedConfig(cfgUpdate, m.agentInfo, m.managerLogger)
 			if err != nil {
 				// critical error, merging the configuration should always work
 				reportErr(ctx, m.errCh, err)
@@ -437,7 +435,6 @@ func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Con
 func (m *OTelManager) buildMergedConfig(
 	cfgUpdate configUpdate,
 	agentInfo info.Agent,
-	monitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
@@ -452,7 +449,7 @@ func (m *OTelManager) buildMergedConfig(
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, runtimeCfg, monitoringConfigGetter, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, runtimeCfg, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
@@ -585,6 +582,19 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 	return result
 }
 
+func monitoringInputEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent) map[string]any {
+	tmpl := monitoringEventTemplate(monitoring, agentInfo)
+	tmpl["data_stream"] = map[string]any{
+		"dataset":   "elastic_agent.filebeat_input",
+		"namespace": tmpl["data_stream"].(map[string]any)["namespace"],
+		"type":      "metrics",
+	}
+	tmpl["event"] = map[string]any{
+		"dataset": "elastic_agent.filebeat_input",
+	}
+	return tmpl
+}
+
 // exporterIDToOutputNameLookup compiles the mapping from raw collector
 // exporter IDs to the policy output names that generated them, so internal
 // telemetry monitoring can associate metrics with the user-defined name.
@@ -643,9 +653,10 @@ func injectMonitoringReceiver(
 	collectorCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
-				"event_template": monitoringEventTemplate(monitoring, agentInfo),
-				"interval":       monitoring.MetricsPeriod,
-				"exporter_names": outputNameLookup,
+				"event_template":       monitoringEventTemplate(monitoring, agentInfo),
+				"input_event_template": monitoringInputEventTemplate(monitoring, agentInfo),
+				"interval":             monitoring.MetricsPeriod,
+				"exporter_names":       outputNameLookup,
 			},
 		},
 		"service": map[string]any{
@@ -770,6 +781,8 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case extensionKey == "extension:"+m.healthCheckExtComponentID:
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				case strings.HasPrefix(extensionKey, "extension:"+kafkapartitionerextension.Type.String()):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}

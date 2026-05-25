@@ -58,9 +58,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 	pkgcomponent "github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -590,7 +590,7 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 	// and produces a valid AST, but can't be converted into a valid
 	// component model (which we trigger with invalid conditional
 	// expressions). In this case the resulting error should be stored
-	// in Coordinator.componentGenErr, and reported by Coordinator.State.
+	// in Coordinator.componentModelErr, and reported by Coordinator.State.
 
 	// Set a one-second timeout -- nothing here should block, but if it
 	// does let's report a failure instead of timing out the test runner.
@@ -630,7 +630,7 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 	}
 
 	// This configuration produces a valid AST but its EQL condition is
-	// invalid, so its failure should be reported in componentGenErr.
+	// invalid, so its failure should be reported in componentModelErr.
 	cfg := config.MustNewConfigFrom(`
 inputs:
   - type: filestream
@@ -640,8 +640,8 @@ inputs:
 	configChan <- cfgChange
 	coord.runLoopIteration(ctx)
 
-	require.Error(t, coord.componentGenErr)
-	require.Contains(t, coord.componentGenErr.Error(), "rendering inputs failed:")
+	require.Error(t, coord.componentModelErr)
+	require.Contains(t, coord.componentModelErr.Error(), "rendering inputs failed:")
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "Failed component generation should cause failed state")
@@ -659,7 +659,7 @@ inputs:
 	varsChan <- emptyVars(t)
 	coord.runLoopIteration(ctx)
 
-	assert.Error(t, coord.componentGenErr, "Vars update shouldn't affect componentGenErr")
+	assert.Error(t, coord.componentModelErr, "Vars update shouldn't affect componentModelErr")
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "Variable update should not overwrite component generation error")
@@ -676,6 +676,7 @@ inputs:
 	coord.runLoopIteration(ctx)
 
 	assert.NoError(t, coord.configErr, "Valid policy change should clear configErr")
+	assert.NoError(t, coord.componentModelErr, "Valid component model rebuild should clear componentModelErr")
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Healthy, state.State, "Valid policy change should produce healthy state")
@@ -1020,6 +1021,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 				"darwin/amd64",
 				"darwin/arm64",
 				"windows/amd64",
+				"windows/arm64",
 				"container/amd64",
 				"container/arm64",
 			},
@@ -1532,6 +1534,72 @@ func TestCoordinatorReportsOTelManagerUpdateFailure(t *testing.T) {
 	state := coord.State()
 	assert.Equal(t, agentclient.Failed, state.State, "Failed policy update should cause failed Coordinator")
 	assert.Contains(t, state.Message, errorStr, "Failed policy update should be reported in Coordinator state message")
+}
+
+type ackErrConfigChange struct {
+	cfg *config.Config
+	err error
+}
+
+func (l *ackErrConfigChange) Config() *config.Config { return l.cfg }
+func (l *ackErrConfigChange) Ack() error             { return l.err }
+func (l *ackErrConfigChange) Fail(err error)         {}
+
+func TestCoordinatorReportsConfigChangeAckFailure(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	stateChan := make(chan State, 1)
+	configChan := make(chan ConfigChange, 1)
+
+	coord := &Coordinator{
+		logger:    logger,
+		agentInfo: &info.AgentInfo{},
+		state: State{
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
+		},
+
+		stateBroadcaster: &broadcaster.Broadcaster[State]{InputChan: stateChan},
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+		},
+		runtimeMgr:         &fakeRuntimeManager{},
+		otelMgr:            &fakeOTelManager{},
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+		isManaged:          true,
+	}
+
+	const errorStr = "ack failed for testing reasons"
+	configChan <- &ackErrConfigChange{
+		cfg: config.MustNewConfigFrom(nil),
+		err: errors.New(errorStr),
+	}
+	coord.runLoopIteration(ctx)
+	require.Error(t, coord.actionsErr, "Ack failure should be saved in actionsErr")
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Failed, state.State, "Ack failure should cause failed Coordinator")
+		assert.Contains(t, state.Message, errorStr, "Ack failure should be reported in Coordinator state message")
+	default:
+		assert.Fail(t, "Policy change should cause state update")
+	}
+
+	// A subsequent successful policy change ack should clear actionsErr.
+	configChan <- &configChange{cfg: config.MustNewConfigFrom(nil)}
+	coord.runLoopIteration(ctx)
+
+	assert.NoError(t, coord.actionsErr, "Successful Ack should clear actionsErr")
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Healthy, state.State, "Successful Ack should restore healthy state")
+		assert.Equal(t, state.Message, "Running", "Successful Ack should restore previous state message")
+	default:
+		assert.Fail(t, "Policy change should cause state update")
+	}
 }
 
 func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
@@ -2518,7 +2586,7 @@ func (m *mockUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	return nil, m.upgradeErr
 }
 

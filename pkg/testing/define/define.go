@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -203,6 +204,10 @@ func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 		t.Skipf("platform: %s, architecture: %s, version: %s, and distro: %s combination is not supported by test.  required: %v", runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, req.OS)
 		return nil
 	}
+	if skipped, ok := req.runtimeSkipped(runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, dockerVariant); ok {
+		t.Skipf("platform: %s, architecture: %s, version: %s, and distro: %s matches skip_os entry %+v. Skipping", runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, skipped)
+		return nil
+	}
 
 	if DryRun {
 		return dryRun(t, req)
@@ -309,6 +314,16 @@ func getKibanaClient() (*kibana.Client, error) {
 		Username:      kibanaUser,
 		Password:      kibanaPass,
 		IgnoreVersion: false,
+		Retry: kibana.RetryConfig{
+			MaxRetries:    5,
+			RetryOnStatus: []int{429, 500, 502, 503, 504},
+			RetryBackoff: func(attempt int) time.Duration {
+				base := time.Second
+				maxWait := 10 * time.Second
+				wait := (1 << (attempt - 1)) * base
+				return min(wait, maxWait)
+			},
+		},
 	}, 0, "Elastic-Agent-Test-Define", version.GetDefaultVersion(), version.Commit(), version.BuildTime().String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kibana client: %w", err)

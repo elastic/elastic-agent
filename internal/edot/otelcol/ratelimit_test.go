@@ -32,7 +32,7 @@ import (
 
 	mockes "github.com/elastic/mock-es/pkg/api"
 
-	"github.com/elastic/elastic-agent/testing/integration"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
 )
 
 // newLogExportRequest creates a minimal log export request with a
@@ -86,7 +86,7 @@ service:
       exporters: [elasticsearch]
 `, port, processorsBlock, esURL)
 
-	settings := NewSettings("test", []string{"yaml:" + cfg})
+	settings := NewSettings("test", []string{"yaml:" + cfg}, WithComponents(components.Default()))
 	collector, err := otelcol.NewCollector(*settings)
 	require.NoError(t, err)
 
@@ -136,7 +136,7 @@ func TestRatelimitProcessor(t *testing.T) {
 			eventsReceived.Add(1)
 			return http.StatusOK
 		}
-		esURL := integration.StartMockESDeterministic(t, handler)
+		esURL := startMockESDeterministic(t, handler)
 
 		client, cleanup := startCollectorWithRatelimit(t, esURL, `processors:
   ratelimit:
@@ -179,7 +179,7 @@ func TestRatelimitProcessor(t *testing.T) {
 			arrivals <- time.Now()
 			return http.StatusOK
 		}
-		esURL := integration.StartMockESDeterministic(t, handler)
+		esURL := startMockESDeterministic(t, handler)
 
 		client, cleanup := startCollectorWithRatelimit(t, esURL, `processors:
   ratelimit:

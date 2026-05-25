@@ -7,16 +7,11 @@ git reset --quiet --hard
 
 $env:GOTMPDIR = "$env:BUILDKITE_BUILD_CHECKOUT_PATH"
 
-Write-Host "--- Build"
-mage build
-
-if ($LASTEXITCODE -ne 0) {
-  exit 1
-}
-
 Write-Host "--- Unit tests"
 $env:TEST_COVERAGE = $true
-$env:RACE_DETECTOR = $true
+if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
+  $env:RACE_DETECTOR = $true
+}
 mage unitTest
 # Copy coverage file to build directory so it can be downloaded as an artifact
 Write-Host "--- Prepare artifacts"

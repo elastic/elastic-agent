@@ -205,6 +205,13 @@ func (r *Runner) Clean() error {
 	stacks := make([]common.Stack, len(r.state.Stacks))
 	copy(stacks, r.state.Stacks)
 	r.state.Stacks = nil
+	r.logger.Logf("Cleaning up %d instance(s) and %d stack(s) from state", len(instances), len(stacks))
+	for _, inst := range instances {
+		r.logger.Logf("  - instance: name=%s provisioner=%s ip=%s", inst.Name, inst.Provisioner, inst.IP)
+	}
+	for _, st := range stacks {
+		r.logger.Logf("  - stack: id=%s provisioner=%s", st.ID, st.Provisioner)
+	}
 	err := r.writeState()
 	if err != nil {
 		return err
@@ -261,7 +268,7 @@ func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance)
 			env["KIBANA_HOST"] = stack.Kibana
 			env["KIBANA_USERNAME"] = stack.Username
 			env["KIBANA_PASSWORD"] = stack.Password
-			env["INTEGRATIONS_SERVER_HOST"] = stack.IntegrationsServer
+			env["ELASTIC_APM_SERVER_URL"] = stack.IntegrationsServer
 			logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
 		}
 
@@ -387,7 +394,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		env["KIBANA_HOST"] = stack.Kibana
 		env["KIBANA_USERNAME"] = stack.Username
 		env["KIBANA_PASSWORD"] = stack.Password
-		env["INTEGRATIONS_SERVER_HOST"] = stack.IntegrationsServer
+		env["ELASTIC_APM_SERVER_URL"] = stack.IntegrationsServer
 		logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
 	}
 

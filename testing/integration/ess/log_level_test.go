@@ -176,15 +176,17 @@ func TestSetLogLevelFleetManagedSurvivesRestart(t *testing.T) {
 	}, 5*time.Minute, 500*time.Millisecond, "service never started (status: %v, err: %v)", svcStatus, svcStatusErr)
 
 	// Step 3: wait for the agent to reconnect to Fleet and be healthy again
+	// Give this a minute beyond Fleet Server's default 5 minute checkin poll timeout.
+	// See https://github.com/elastic/elastic-agent/issues/13986.
 	require.Eventuallyf(t, func() bool {
 		return waitForAgentAndFleetHealthy(ctx, t, f)
-	}, 5*time.Minute, time.Second, "agent never became healthy again after restart")
+	}, 6*time.Minute, time.Second, "agent never became healthy again after restart")
 
 	// Step 4: verify the log level reported to Fleet is still the policy level,
 	// not the startup default "info". This is the regression check — before the
 	// fix, fleet.enc held "info" so the agent would restart at "info" and report
 	// "info" on its first checkin.
-	assert.Eventuallyf(t, func() bool {
+	require.Eventuallyf(t, func() bool {
 		fleetLevel, err := getLogLevelFromFleetMetadata(ctx, t, info.KibanaClient, agentID)
 		if err != nil {
 			t.Logf("error getting log level from Fleet metadata after restart: %v", err)
@@ -194,6 +196,27 @@ func TestSetLogLevelFleetManagedSurvivesRestart(t *testing.T) {
 		return fleetLevel == policyLogLevel.String()
 	}, 6*time.Minute, 30*time.Second,
 		"agent reported wrong log level to Fleet after restart (expected %q, got \"info\")", policyLogLevel)
+
+	// Step 5: change the policy log level to a different value and verify the
+	// agent adopts the new value, ensuring subsequent policy log-level changes
+	// continue to take effect on an agent that has already loaded a
+	// previously-persisted policy level.
+	newPolicyLogLevel := logp.WarnLevel
+
+	t.Logf("Setting policy log level to %q", newPolicyLogLevel)
+	err = updatePolicyLogLevel(ctx, t, info.KibanaClient, policyResp.AgentPolicy, newPolicyLogLevel.String())
+	require.NoError(t, err, "error updating policy log level")
+
+	require.Eventuallyf(t, func() bool {
+		fleetLevel, err := getLogLevelFromFleetMetadata(ctx, t, info.KibanaClient, agentID)
+		if err != nil {
+			t.Logf("error getting log level from Fleet metadata after policy change: %v", err)
+			return false
+		}
+		t.Logf("Fleet metadata log level after policy change: %q (want %q)", fleetLevel, newPolicyLogLevel)
+		return fleetLevel == newPolicyLogLevel.String()
+	}, 6*time.Minute, 30*time.Second,
+		"agent reported wrong log level to Fleet after policy change (expected %q, got \"info\")", newPolicyLogLevel)
 }
 
 func testLogLevelSetViaFleet(ctx context.Context, f *atesting.Fixture, agentID string, t *testing.T, info *define.Info, policyResp kibana.PolicyResponse) {
