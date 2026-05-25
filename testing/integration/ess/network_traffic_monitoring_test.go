@@ -157,20 +157,6 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	// Switch to OTel runtime and validate the same data
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
-		// Identify the network_traffic integration component (input type "packet") before
-		// switching runtime so we can verify that specific component transitions to the
-		// OTel receiver.
-		status, err := runner.agentFixture.ExecStatus(ctx)
-		require.NoError(t, err)
-		var integrationComponentID string
-		for _, comp := range status.Components {
-			if strings.HasPrefix(comp.ID, "packet") {
-				integrationComponentID = comp.ID
-				break
-			}
-		}
-		require.NotEmpty(t, integrationComponentID, "could not find packet (network_traffic) integration component before OTel switch")
-
 		otelSince := time.Now()
 		policyRevision := switchPolicyToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
 
@@ -178,19 +164,21 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
 			5*time.Minute, time.Second)
 
-		// Verify the network_traffic integration component is now running as a beats receiver.
+		// Verify that a packet (network_traffic) component is running as a beats receiver.
+		// The component may not appear immediately after the policy switch, so we
+		// look for it inside the loop rather than capturing its ID up front.
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			status, statusErr := runner.agentFixture.ExecStatus(ctx)
 			require.NoError(collect, statusErr)
-			var isReceiver bool
+			var foundReceiver bool
 			for _, comp := range status.Components {
-				if comp.ID == integrationComponentID &&
+				if strings.HasPrefix(comp.ID, "packet") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
-					isReceiver = true
+					foundReceiver = true
 					break
 				}
 			}
-			assert.True(collect, isReceiver, "expected component %s to be running as beats receiver", integrationComponentID)
+			assert.True(collect, foundReceiver, "expected a packet (network_traffic) component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
 		t.Skip("pbreceiver does not yet produce events, skipping OTel data validation")
