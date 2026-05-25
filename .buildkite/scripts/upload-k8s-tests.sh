@@ -132,7 +132,7 @@ generate_version_group() {
   local variants_yaml=$2
   # Create a safe YAML key from the version (e.g., v1.27.16 -> v1-27-16)
   local version_key
-  version_key=$(echo "${version}" | tr '.' '-')
+  version_key=$(normalise_name "${version}")
 
   cat <<EOF
   - group: ":kubernetes: ${version}"
@@ -181,7 +181,9 @@ generate_last_step() {
 EOF
 
   while IFS= read -r version; do
-    echo "      - \"integration-tests-kubernetes-${version}\""
+    local version_key
+    version_key=$(normalise_name "${version}")
+    echo "      - \"integration-tests-kubernetes-${version_key}\""
   done <<< "${versions}"
 
   cat <<EOF
@@ -189,6 +191,12 @@ EOF
     allow_dependency_failure: true
 
 EOF
+}
+
+# Convert a version string into a safe YAML key by replacing dots and underscores with dashes.
+normalise_name() {
+  local name=$1
+  echo "${name}" | tr '._' '-'
 }
 
 # Generate the complete pipeline YAML with one group step per k8s version.
