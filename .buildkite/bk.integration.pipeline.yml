@@ -401,18 +401,8 @@ steps:
           - standalone-upgrade
           - fleet
           - fleet-endpoint-security
-          - fleet-airgapped
-          - fleet-airgapped-privileged
-          - fleet-privileged
-          - fleet-upgrade-to-pr-build
-          - install-uninstall
-          - fqdn
-          - deb
-          - container
-=======
           setup:
             variant: *linux_deb_variants
->>>>>>> eaf077681 (bk: split linux ITs in tiers (no-fips) (#14465))
 
   - group: "Stateful: Linux (tier 2)"
     if_changed:
