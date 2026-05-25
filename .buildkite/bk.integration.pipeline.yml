@@ -298,7 +298,7 @@ steps:
         - dev-tools/**
         - go.mod
         - go.sum
-    key: integration-tests-win-tier2
+    key: integration-tests-win-tier-2
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Windows - tier 2"
@@ -369,7 +369,7 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 3)"
-    key: integration-tests-win-tier3
+    key: integration-tests-win-tier-3
     if: build.source == "schedule"
     notify:
       - github_commit_status:
@@ -945,7 +945,9 @@ steps:
       - integration-tests-linux-tier-1
       - integration-tests-linux-tier-2
       - integration-tests-linux-tier-3
-      - integration-tests-win
+      - integration-tests-win-tier-1
+      - integration-tests-win-tier-2
+      - integration-tests-win-tier-3
       - integration-tests-kubernetes
       - extended-integration-tests
     allow_dependency_failure: true
@@ -966,7 +968,9 @@ steps:
       - integration-tests-linux-tier-1
       - integration-tests-linux-tier-2
       - integration-tests-linux-tier-3
-      - integration-tests-win
+      - integration-tests-win-tier-1
+      - integration-tests-win-tier-2
+      - integration-tests-win-tier-3
       - integration-tests-kubernetes
       - integration-tests-serverless
     allow_dependency_failure: true
