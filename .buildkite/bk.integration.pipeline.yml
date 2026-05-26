@@ -918,8 +918,6 @@ steps:
       - packaging-containers-amd64
     steps:
       - label: ":kubernetes:tier1:{{matrix.version}}:amd64:{{matrix.variants}}"
-        # Run this step only if we are **not** building a PR (we use all supported k8s versions)
-        if: build.pull_request.id == null
         env:
           *k8s_test_env
         command: *k8s_test_command
@@ -958,8 +956,6 @@ steps:
       - packaging-containers-amd64
     steps:
       - label: ":kubernetes:tier2:{{matrix.version}}:amd64:{{matrix.variants}}"
-        # Run this step only if we are **not** building a PR (we use all supported k8s versions)
-        if: build.pull_request.id == null
         env:
           *k8s_test_env
         command: *k8s_test_command
