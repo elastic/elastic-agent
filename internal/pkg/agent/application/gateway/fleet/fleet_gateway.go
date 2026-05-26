@@ -80,17 +80,6 @@ type stateStore interface {
 	Action() fleetapi.Action
 }
 
-// rollbacksSource is the persistence layer for TTL-based rollback markers.
-type rollbacksSource interface {
-	// GetAll reads all on-disk TTL markers and returns three values:
-	//   - markers (map[string]TTLMarker): successfully parsed entries, keyed by versioned home path.
-	//   - malformed (map[string]error): per-entry parse errors for entries that could not be read
-	//     or parsed, also keyed by versioned home path.
-	//   - err: non-nil only on structural failures (e.g. glob error) where no scan could be
-	//     performed; in that case both maps are nil.
-	GetAll() (map[string]ttl.TTLMarker, map[string]error, error)
-}
-
 type FleetGateway struct {
 	log                *logger.Logger
 	client             client.Sender
@@ -104,7 +93,7 @@ type FleetGateway struct {
 	stateFetcher       StateFetcher
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
-	rollbackSource     rollbacksSource
+	rollbackSource     ttl.ReadOnlySource
 	compression        string
 }
 
@@ -117,7 +106,7 @@ func New(
 	stateStore stateStore,
 	stateFetcher StateFetcher,
 	cfg *configuration.FleetCheckin,
-	source rollbacksSource,
+	source ttl.ReadOnlySource,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
@@ -149,7 +138,7 @@ func newFleetGatewayWithScheduler(
 	acker acker.Acker,
 	stateStore stateStore,
 	stateFetcher StateFetcher,
-	source rollbacksSource,
+	source ttl.ReadOnlySource,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
 		log:            log,

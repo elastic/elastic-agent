@@ -46,17 +46,6 @@ type TestModeConfigSetter interface {
 	SetConfig(ctx context.Context, cfg string) error
 }
 
-// RollbacksSource is the persistence layer for TTL-based rollback markers.
-type RollbacksSource interface {
-	// GetAll reads all on-disk TTL markers and returns three values:
-	//   - markers (map[string]TTLMarker): successfully parsed entries, keyed by versioned home path.
-	//   - malformed (map[string]error): per-entry parse errors for entries that could not be read
-	//     or parsed, also keyed by versioned home path.
-	//   - err: non-nil only on structural failures (e.g. glob error) where no scan could be
-	//     performed; in that case both maps are nil.
-	GetAll() (map[string]ttl.TTLMarker, map[string]error, error)
-}
-
 // Server is the daemon side of the control protocol.
 type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
@@ -71,11 +60,11 @@ type Server struct {
 	grpcConfig *configuration.GRPCConfig
 
 	tmSetter       TestModeConfigSetter
-	rollbackSource RollbacksSource
+	rollbackSource ttl.ReadOnlySource
 }
 
 // New creates a new control protocol server.
-func New(log *logger.Logger, agentInfo info.Agent, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks, grpcConfig *configuration.GRPCConfig, rollbackSource RollbacksSource) *Server {
+func New(log *logger.Logger, agentInfo info.Agent, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks, grpcConfig *configuration.GRPCConfig, rollbackSource ttl.ReadOnlySource) *Server {
 	return &Server{
 		logger:         log,
 		agentInfo:      agentInfo,

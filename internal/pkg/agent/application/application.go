@@ -49,19 +49,6 @@ import (
 	"github.com/elastic/elastic-agent/version"
 )
 
-// rollbacksSource is the persistence layer for TTL-based rollback markers.
-type rollbacksSource interface {
-	Set(map[string]ttl.TTLMarker) error
-	// GetAll reads all on-disk TTL markers and returns three values:
-	//   - markers (map[string]TTLMarker): successfully parsed entries, keyed by versioned home path.
-	//   - malformed (map[string]error): per-entry parse errors for entries that could not be read
-	//     or parsed, also keyed by versioned home path.
-	//   - err: non-nil only on structural failures (e.g. glob error) where no scan could be
-	//     performed; in that case both maps are nil.
-	GetAll() (map[string]ttl.TTLMarker, map[string]error, error)
-	Remove(string) error
-}
-
 // CfgOverrider allows for application driven overrides of configuration read from disk.
 type CfgOverrider func(cfg *configuration.Configuration)
 
@@ -79,7 +66,7 @@ func New(
 	disableMonitoring bool,
 	override CfgOverrider,
 	initialUpdateMarker *upgrade.UpdateMarker,
-	availableRollbacksSource rollbacksSource,
+	availableRollbacksSource ttl.Source,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -332,7 +319,7 @@ func New(
 //   - check if the agent install: if it is no longer valid collect the versioned home and the TTL marker for deletion
 //
 // This function will NOT error out, it will log any errors it encounters as warnings but any error must be treated as non-fatal
-func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource rollbacksSource) {
+func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource ttl.Source) {
 	// Check if we rolled back and update the TTL markers
 	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil && initialUpdateMarker.Details.State == details.StateRollback {
 		// Reset the TTL for the current version if we are coming off a rollback

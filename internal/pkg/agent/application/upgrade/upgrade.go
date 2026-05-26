@@ -95,7 +95,7 @@ type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string
 type fileDirCopyFunc func(from, to string, opts ...filecopy.Options) error
 type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error
 type changeSymlinkFunc func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
-type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource availableRollbacksSource) error
+type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource ttl.Source) error
 
 // Types used to abstract stdlib functions
 type mkdirAllFunc func(name string, perm fs.FileMode) error
@@ -119,19 +119,6 @@ type WatcherHelper interface {
 	TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error)
 }
 
-// availableRollbacksSource is the persistence layer for TTL-based rollback markers.
-type availableRollbacksSource interface {
-	Set(map[string]ttl.TTLMarker) error
-	// GetAll reads all on-disk TTL markers and returns three values:
-	//   - markers (map[string]TTLMarker): successfully parsed entries, keyed by versioned home path.
-	//   - malformed (map[string]error): per-entry parse errors for entries that could not be read
-	//     or parsed, also keyed by versioned home path.
-	//   - err: non-nil only on structural failures (e.g. glob error) where no scan could be
-	//     performed; in that case both maps are nil.
-	GetAll() (map[string]ttl.TTLMarker, map[string]error, error)
-	Remove(string) error
-}
-
 // Upgrader performs an upgrade
 type Upgrader struct {
 	log                      *logger.Logger
@@ -142,7 +129,7 @@ type Upgrader struct {
 	fleetServerURI           string
 	markerWatcher            MarkerWatcher
 	watcherHelper            WatcherHelper
-	availableRollbacksSource availableRollbacksSource
+	availableRollbacksSource ttl.Source
 
 	// The following are abstractions for testability
 	artifactDownloader   artifactDownloadHandler
@@ -164,7 +151,7 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper, ars availableRollbacksSource) (*Upgrader, error) {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper, ars ttl.Source) (*Upgrader, error) {
 	return &Upgrader{
 		log:                      log,
 		settings:                 settings,
@@ -633,7 +620,7 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 	return current == newVersion
 }
 
-func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource availableRollbacksSource) error {
+func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource ttl.Source) error {
 	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), AgentName)
 	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, AgentName), oldAgentPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
