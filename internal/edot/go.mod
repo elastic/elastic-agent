@@ -13,11 +13,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260522194308-e98b93df5a91
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.42.2
-=======
 	github.com/elastic/elastic-agent-libs v0.43.1
->>>>>>> 933767197 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.43.0 to 0.43.1 in the go-dependencies group across 1 directory (#14516))
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.50.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.50.0
