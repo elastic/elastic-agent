@@ -256,7 +256,7 @@ func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartioner"), extensionName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartitioner"), extensionName)
 }
 
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
