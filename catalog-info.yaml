@@ -576,12 +576,6 @@ spec:
           message: Daily trigger of Extended pipeline for all the active branches
           env:
             PIPELINES_TO_TRIGGER: 'elastic-agent-extended-testing'
-        K8s Tests:
-          branch: main
-          cronline: "@daily"
-          message: Daily trigger of K8s pipeline for all the active branches
-          env:
-            PIPELINES_TO_TRIGGER: 'elastic-agent-k8s-testing'
       skip_intermediate_builds: true
       provider_settings:
         trigger_mode: none
