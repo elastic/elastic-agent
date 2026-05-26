@@ -23,7 +23,6 @@ env:
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1779464011"
   # Same version for all the azure images
   IMAGE_WIN_VERSION: "1.0.1779464011"
-  ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
