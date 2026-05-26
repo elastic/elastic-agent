@@ -64,7 +64,7 @@ processors:
 
 exporters:
   # Exporter to send logs and metrics to Elasticsearch Managed OTLP Input
-  otlp/ingest:
+  otlp_grpc/ingest:
     endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
     headers:
       Authorization: ApiKey ${env:ELASTIC_API_KEY}
@@ -83,8 +83,8 @@ service:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
       processors: [resourcedetection]
-      exporters: [otlp/ingest]
+      exporters: [otlp_grpc/ingest]
     logs/platformlogs:
       receivers: [windowseventlog]
       processors: [resourcedetection]
-      exporters: [otlp/ingest]
+      exporters: [otlp_grpc/ingest]
