@@ -99,6 +99,7 @@ To build a local version of the agent for development, run the command below. Th
 * linux/amd64
 * linux/arm64
 * windows/amd64
+* windows/arm64
 
 ```sh
 # EXTERNAL=true downloads the matching version of the binaries that are packaged with agent, not necessary if only using Beats.
