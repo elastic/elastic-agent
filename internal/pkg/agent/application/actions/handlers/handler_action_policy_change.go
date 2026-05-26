@@ -268,6 +268,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	}
 
 	hasEventLoggingOutputChanged := h.hasEventLoggingOutputChanged(cfg)
+	hasLoggingConfigChanged := h.hasLoggingConfigChanged(cfg, loggingConfig)
 
 	// Step 3: Update in-memory caches.
 	if validatedFleetConfig != nil {
@@ -276,7 +277,6 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	if hasEventLoggingOutputChanged {
 		h.config.Settings.EventLoggingConfig = cfg.Settings.EventLoggingConfig
 	}
-	hasLoggingConfigChanged := h.hasLoggingConfigChanged(cfg, loggingConfig)
 	if hasLoggingConfigChanged {
 		h.config.Settings.LoggingConfig = cfg.Settings.LoggingConfig
 	}
@@ -466,9 +466,7 @@ func fleetToReader(agentID string, headers map[string]string, logLevelOverride s
 		"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
 		"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
 		"monitoring.pprof":             cfg.Settings.MonitoringConfig.Pprof,
-		"logging.files":                cfg.Settings.LoggingConfig.Files,
-		"logging.to_files":             cfg.Settings.LoggingConfig.ToFiles,
-		"logging.to_stderr":            cfg.Settings.LoggingConfig.ToStderr,
+		"logging":                      cfg.Settings.LoggingConfig,
 	}
 	if logLevelOverride != "" {
 		agentConfig["logging.level_override"] = logLevelOverride
