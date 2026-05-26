@@ -634,22 +634,19 @@ func injectMonitoringReceiver(
 	agentInfo info.Agent,
 	components []component.Component,
 ) error {
-	// Find the monitoring exporter that this pipeline will be writing to
+	// Check whether OTel-based monitoring is configured — it produces an ES exporter
+	// named "monitoring" that the internal telemetry pipeline can share.
 	exporterType := otelcomponent.MustNewType("elasticsearch")
 	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
 	monitoringExporterFound := false
 	if config.IsSet("exporters") {
-		// Search the defined exporters for one with the expected id for monitoring
 		for exporter := range config.Get("exporters").(map[string]any) {
 			if exporter == exporterID {
 				monitoringExporterFound = true
 			}
 		}
 	}
-	if !monitoringExporterFound {
-		// We can't monitor OTel metrics without OTel-based monitoring
-		return nil
-	}
+
 	outputNameLookup, err := exporterIDToOutputNameLookup(components)
 	if err != nil {
 		return fmt.Errorf("couldn't map exporter IDs to output names: %w", err)
@@ -677,9 +674,16 @@ func injectMonitoringReceiver(
 	fileExporterID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("file"), diagName).String()
 	diagFilePath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
 
+	// The pipeline always writes to the file exporter (for diagnostics). When
+	// OTel-based monitoring is also configured, the ES monitoring exporter is
+	// included too so that the data flows to Elasticsearch as well.
+	pipelineExporters := []string{fileExporterID}
+	if monitoringExporterFound {
+		pipelineExporters = append(pipelineExporters, exporterID)
+	}
 	pipelineCfg := map[string]any{
 		"receivers": []string{receiverID},
-		"exporters": []string{exporterID, fileExporterID},
+		"exporters": pipelineExporters,
 	}
 	collectorCfg := map[string]any{
 		"receivers": map[string]any{
