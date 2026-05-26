@@ -372,8 +372,11 @@ func TestBeatDiagnostics(t *testing.T) {
 	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
 	// configTemplate is parameterised by Runtime (process/otel) and MonitoringEnabled.
-	// When monitoring is enabled the metrics collection period is shortened to 5 s so
+	// When monitoring is enabled the metrics collection period is shortened to 2 s so
 	// that at least one collection cycle completes before diagnostics are gathered.
+	// 2 s keeps the first write well within the 10 s pre-diagnostics sleep even if
+	// the OTel monitoring collector takes a few seconds to start after the agent
+	// reports HEALTHY.
 	configTemplate := `
 inputs:
   - id: filestream-filebeat
@@ -389,7 +392,7 @@ outputs:
     hosts: [{{ .ESHost }}]
     api_key: placeholder
 agent.monitoring.enabled: {{ .MonitoringEnabled }}
-{{ if .MonitoringEnabled }}agent.monitoring.metrics_period: 5s{{ end }}
+{{ if .MonitoringEnabled }}agent.monitoring.metrics_period: 2s{{ end }}
 agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 `
 
@@ -611,9 +614,9 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 		// If any required extra patterns are present (e.g. the metrics file
 		// written by the OTel file exporter after the first collection cycle),
 		// wait long enough for at least one cycle to complete before gathering
-		// diagnostics. The metrics period configured in the test is 5 s, so
-		// 10 s gives a comfortable margin while remaining well within the
-		// 10-minute test deadline.
+		// diagnostics. The metrics period configured in the test is 2 s, so
+		// 10 s gives a comfortable margin even if the OTel monitoring collector
+		// takes a few seconds to start after the agent reports HEALTHY.
 		for _, p := range extraPatterns {
 			if !p.optional {
 				select {
