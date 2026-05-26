@@ -51,7 +51,7 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 		// If upgrade marker is available, we need to gracefully stop any watcher process, read the available rollbacks from
 		// the upgrade marker and then proceed with rollback
 		updateMarkerExistsBeforeRollback = true
-		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingUpgradeMarker(ctx, u.log, u.watcherHelper, topDir, now, version, action)
+		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingUpgradeMarker(ctx, u.log, u.watcherHelper, u.availableRollbacksSource, topDir, now, version, action)
 	}
 
 	if err != nil {
@@ -151,7 +151,7 @@ func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper,
 	return watcherExecutable, targetInstall, nil
 }
 
-func rollbackUsingUpgradeMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, topDir string, now time.Time, version string, _ *fleetapi.ActionUpgrade) (string, string, error) {
+func rollbackUsingUpgradeMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, source availableRollbacksSource, topDir string, now time.Time, version string, _ *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the upgrade marker
 	updateMarker, err := LoadMarker(paths.DataFrom(topDir))
 	if err != nil {
@@ -172,21 +172,15 @@ func rollbackUsingUpgradeMarker(ctx context.Context, log *logger.Logger, watcher
 	var selectedRollbackVersionedHome string
 
 	err = withTakeOverWatcher(ctx, log, topDir, watcherHelper, func() error {
-		// read the upgrade marker
-		updateMarker, err = LoadMarker(paths.DataFrom(topDir))
+		rollbacks, _, err := source.GetAll()
 		if err != nil {
-			return fmt.Errorf("loading marker: %w", err)
+			return fmt.Errorf("reading TTL markers: %w", err)
 		}
-
-		if updateMarker == nil {
-			return ErrNilUpdateMarker
-		}
-
-		if len(updateMarker.RollbacksAvailable) == 0 {
+		if len(rollbacks) == 0 {
 			return ErrNoRollbacksAvailable
 		}
 
-		for versionedHome, rollback := range updateMarker.RollbacksAvailable {
+		for versionedHome, rollback := range rollbacks {
 			if rollback.Version == version && now.Before(rollback.ValidUntil) {
 				selectedRollbackVersionedHome = versionedHome
 				break
@@ -195,6 +189,9 @@ func rollbackUsingUpgradeMarker(ctx context.Context, log *logger.Logger, watcher
 		if selectedRollbackVersionedHome == "" {
 			return fmt.Errorf("version %q not listed among the available rollbacks: %w", version, ErrNoRollbacksAvailable)
 		}
+		// There is a small window between selecting the target here and InvokeWatcher in the caller, but the risk is
+		// limited: cleanup only removes expired entries and the entry chosen above is non-expired at this point.
+		// Fully closing the race would require holding the watcher applock past InvokeWatcher.
 		return nil
 	})
 
