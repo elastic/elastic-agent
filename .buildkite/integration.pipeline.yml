@@ -30,8 +30,6 @@ common:
         - .buildkite
         - .go-version
         - version/version.go
-        post_checkout:
-          unshallow: true
 
 steps:
   - group: "Integration tests: packaging"

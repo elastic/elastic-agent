@@ -26,6 +26,17 @@ checkout_merge() {
         echo "${fetched_sha}"
     })
 
+    # Sparse-checkout pipeline-upload steps use a shallow clone: they have the
+    # working-tree files they need but lack the history required for a 3-way
+    # merge.  Unshallow so git can locate the merge base and access the blob
+    # versions it needs for conflict resolution.  git only downloads objects
+    # absent from the local store, so tip blobs already present from the
+    # depth-1 fetch are not re-transferred.  Full checkouts skip this block.
+    if [[ "$(git rev-parse --is-shallow-repository 2>/dev/null)" == "true" ]]; then
+        echo "Shallow repository detected; unshallowing to enable merge"
+        git fetch --unshallow origin
+    fi
+
     # Create the merge branch directly from the pinned base SHA.  This works
     # whether HEAD is currently on a symbolic ref (normal checkout) or detached
     # (sparse-checkout steps that do git checkout <sha>).
