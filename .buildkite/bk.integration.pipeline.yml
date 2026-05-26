@@ -7,21 +7,21 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1779223036"
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1779223036"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1779223036"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1779223036"
-  IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1779223036"
-  IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1779223036"
-  IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1779223036"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1779464011"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1779464011"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1779464011"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1779464011"
+  IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1779464011"
+  IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1779464011"
+  IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1779464011"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1779464011"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1779464011"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1779464011"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
   IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1779223036"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1779223036"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1779223036"
   # Same version for all the azure images
-  IMAGE_WIN_VERSION: "1.0.1779223036"
+  IMAGE_WIN_VERSION: "1.0.1779464011"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -298,7 +298,7 @@ steps:
         - dev-tools/**
         - go.mod
         - go.sum
-    key: integration-tests-win-tier2
+    key: integration-tests-win-tier-2
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Windows - tier 2"
@@ -369,7 +369,7 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 3)"
-    key: integration-tests-win-tier3
+    key: integration-tests-win-tier-3
     if: build.source == "schedule"
     notify:
       - github_commit_status:
@@ -601,7 +601,7 @@ steps:
         - dev-tools/**
         - go.mod
         - go.sum
-    key: integration-tests-linux-tier2
+    key: integration-tests-linux-tier-2
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Linux - tier 2"
@@ -698,7 +698,7 @@ steps:
             variant: *linux_rpm_variants
 
   - group: "Stateful: Linux (tier 3)"
-    key: integration-tests-linux-tier3
+    key: integration-tests-linux-tier-3
     if: build.source == "schedule"
     notify:
       - github_commit_status:
@@ -942,14 +942,14 @@ steps:
 
   - label: ESS stack cleanup
     depends_on:
-      - integration-tests-ubuntu
+      - integration-tests-linux-tier-1
+      - integration-tests-linux-tier-2
+      - integration-tests-linux-tier-3
       - integration-tests-win-tier-1
       - integration-tests-win-tier-2
       - integration-tests-win-tier-3
-      - integration-tests-rhel
       - integration-tests-kubernetes
       - extended-integration-tests
-      - integration-tests-debian
     allow_dependency_failure: true
     command: |
       .buildkite/scripts/steps/ess_cleanup_all.sh
@@ -965,14 +965,14 @@ steps:
     key: aggregate-reports
     depends_on:
       - integration-tests-ech
-      - integration-tests-ubuntu
+      - integration-tests-linux-tier-1
+      - integration-tests-linux-tier-2
+      - integration-tests-linux-tier-3
       - integration-tests-win-tier-1
       - integration-tests-win-tier-2
       - integration-tests-win-tier-3
-      - integration-tests-rhel
       - integration-tests-kubernetes
       - integration-tests-serverless
-      - integration-tests-debian
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "build/*.xml" .
@@ -992,4 +992,3 @@ steps:
           branches: "main"
           debug: true
       - *google_oidc_observability_plugin
-
