@@ -15,7 +15,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -48,8 +47,6 @@ type UpdateMarker struct {
 	Action *fleetapi.ActionUpgrade `json:"action" yaml:"action"`
 
 	Details *details.Details `json:"details,omitempty" yaml:"details,omitempty"`
-
-	RollbacksAvailable map[string]ttl.TTLMarker `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
 }
 
 // GetActionID returns the Fleet Action ID associated with the
@@ -96,32 +93,30 @@ func convertToActionUpgrade(a *MarkerActionUpgrade) *fleetapi.ActionUpgrade {
 }
 
 type updateMarkerSerializer struct {
-	Version            string                   `yaml:"version"`
-	Hash               string                   `yaml:"hash"`
-	VersionedHome      string                   `yaml:"versioned_home"`
-	UpdatedOn          time.Time                `yaml:"updated_on"`
-	PrevVersion        string                   `yaml:"prev_version"`
-	PrevHash           string                   `yaml:"prev_hash"`
-	PrevVersionedHome  string                   `yaml:"prev_versioned_home"`
-	Acked              bool                     `yaml:"acked"`
-	Action             *MarkerActionUpgrade     `yaml:"action"`
-	Details            *details.Details         `yaml:"details"`
-	RollbacksAvailable map[string]ttl.TTLMarker `yaml:"rollbacks_available,omitempty"`
+	Version           string               `yaml:"version"`
+	Hash              string               `yaml:"hash"`
+	VersionedHome     string               `yaml:"versioned_home"`
+	UpdatedOn         time.Time            `yaml:"updated_on"`
+	PrevVersion       string               `yaml:"prev_version"`
+	PrevHash          string               `yaml:"prev_hash"`
+	PrevVersionedHome string               `yaml:"prev_versioned_home"`
+	Acked             bool                 `yaml:"acked"`
+	Action            *MarkerActionUpgrade `yaml:"action"`
+	Details           *details.Details     `yaml:"details"`
 }
 
 func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
 	return &updateMarkerSerializer{
-		Version:            m.Version,
-		Hash:               m.Hash,
-		VersionedHome:      m.VersionedHome,
-		UpdatedOn:          m.UpdatedOn,
-		PrevVersion:        m.PrevVersion,
-		PrevHash:           m.PrevHash,
-		PrevVersionedHome:  m.PrevVersionedHome,
-		Acked:              m.Acked,
-		Action:             convertToMarkerAction(m.Action),
-		Details:            m.Details,
-		RollbacksAvailable: m.RollbacksAvailable,
+		Version:           m.Version,
+		Hash:              m.Hash,
+		VersionedHome:     m.VersionedHome,
+		UpdatedOn:         m.UpdatedOn,
+		PrevVersion:       m.PrevVersion,
+		PrevHash:          m.PrevHash,
+		PrevVersionedHome: m.PrevVersionedHome,
+		Acked:             m.Acked,
+		Action:            convertToMarkerAction(m.Action),
+		Details:           m.Details,
 	}
 }
 
@@ -136,23 +131,22 @@ type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, wr
 
 // markUpgrade marks update happened so we can handle grace period
 func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
-	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
+	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
 
 		if len(previousAgent.hash) > HashLen {
 			previousAgent.hash = previousAgent.hash[:HashLen]
 		}
 
 		marker := &UpdateMarker{
-			Version:            agent.version,
-			Hash:               agent.hash,
-			VersionedHome:      agent.versionedHome,
-			UpdatedOn:          updatedOn,
-			PrevVersion:        previousAgent.version,
-			PrevHash:           previousAgent.hash,
-			PrevVersionedHome:  previousAgent.versionedHome,
-			Action:             action,
-			Details:            upgradeDetails,
-			RollbacksAvailable: availableRollbacks,
+			Version:           agent.version,
+			Hash:              agent.hash,
+			VersionedHome:     agent.versionedHome,
+			UpdatedOn:         updatedOn,
+			PrevVersion:       previousAgent.version,
+			PrevHash:          previousAgent.hash,
+			PrevVersionedHome: previousAgent.versionedHome,
+			Action:            action,
+			Details:           upgradeDetails,
 		}
 
 		markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
@@ -279,17 +273,16 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 	}
 
 	return &UpdateMarker{
-		Version:            marker.Version,
-		Hash:               marker.Hash,
-		VersionedHome:      marker.VersionedHome,
-		UpdatedOn:          marker.UpdatedOn,
-		PrevVersion:        marker.PrevVersion,
-		PrevHash:           marker.PrevHash,
-		PrevVersionedHome:  marker.PrevVersionedHome,
-		Acked:              marker.Acked,
-		Action:             convertToActionUpgrade(marker.Action),
-		Details:            marker.Details,
-		RollbacksAvailable: marker.RollbacksAvailable,
+		Version:           marker.Version,
+		Hash:              marker.Hash,
+		VersionedHome:     marker.VersionedHome,
+		UpdatedOn:         marker.UpdatedOn,
+		PrevVersion:       marker.PrevVersion,
+		PrevHash:          marker.PrevHash,
+		PrevVersionedHome: marker.PrevVersionedHome,
+		Acked:             marker.Acked,
+		Action:            convertToActionUpgrade(marker.Action),
+		Details:           marker.Details,
 	}, nil
 }
 
@@ -302,17 +295,16 @@ func SaveMarker(dataDirPath string, marker *UpdateMarker, shouldFsync bool) erro
 
 func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool) error {
 	makerSerializer := &updateMarkerSerializer{
-		Version:            marker.Version,
-		Hash:               marker.Hash,
-		VersionedHome:      marker.VersionedHome,
-		UpdatedOn:          marker.UpdatedOn,
-		PrevVersion:        marker.PrevVersion,
-		PrevHash:           marker.PrevHash,
-		PrevVersionedHome:  marker.PrevVersionedHome,
-		Acked:              marker.Acked,
-		Action:             convertToMarkerAction(marker.Action),
-		Details:            marker.Details,
-		RollbacksAvailable: marker.RollbacksAvailable,
+		Version:           marker.Version,
+		Hash:              marker.Hash,
+		VersionedHome:     marker.VersionedHome,
+		UpdatedOn:         marker.UpdatedOn,
+		PrevVersion:       marker.PrevVersion,
+		PrevHash:          marker.PrevHash,
+		PrevVersionedHome: marker.PrevVersionedHome,
+		Acked:             marker.Acked,
+		Action:            convertToMarkerAction(marker.Action),
+		Details:           marker.Details,
 	}
 	markerBytes, err := yaml.Marshal(makerSerializer)
 	if err != nil {

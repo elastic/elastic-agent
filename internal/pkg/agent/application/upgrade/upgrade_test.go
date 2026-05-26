@@ -1335,7 +1335,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, source ttl.Source) error {
 					return nil
 				}
-				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
+				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
 					return testError
 				}
 			},
@@ -1560,7 +1560,7 @@ func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
 	upgrader.copyActionStore = func(_ *logger.Logger, _ string) error { return nil }
 	upgrader.copyRunDirectory = func(_ *logger.Logger, _, _ string) error { return nil }
 	upgrader.changeSymlink = func(_ *logger.Logger, _, _, _ string) error { return nil }
-	upgrader.markUpgrade = func(_ *logger.Logger, _ string, _ time.Time, _, _ agentInstall, _ *fleetapi.ActionUpgrade, _ *details.Details, _ map[string]ttl.TTLMarker) error {
+	upgrader.markUpgrade = func(_ *logger.Logger, _ string, _ time.Time, _, _ agentInstall, _ *fleetapi.ActionUpgrade, _ *details.Details) error {
 		return nil
 	}
 

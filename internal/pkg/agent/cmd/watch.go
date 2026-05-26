@@ -200,7 +200,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
 		// hash is the same as hash of agent which initiated watcher.
-		versionedHomesToKeep := make([]string, 0)
+		var versionedHomesToKeep []string
 		// current version needs to be kept
 		if marker.Details != nil && marker.Details.State == details.StateRollback {
 			// we need to keep the previous versioned home (we have rolled back)
@@ -293,7 +293,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
 		newVersionedHome = filepath.Join("data", fmt.Sprintf("elastic-agent-%s", marker.Hash[:6]))
 	}
-	versionedHomesToKeep := make([]string, 0)
+	var versionedHomesToKeep []string
 	versionedHomesToKeep = append(versionedHomesToKeep, newVersionedHome)
 	if inTTL, keepErr := upgrade.InTTLRollbacks(log, topDir, time.Now()); keepErr != nil {
 		log.Infow("could not read TTL registry; cleanup will only preserve the new versioned home", "error.message", keepErr.Error())

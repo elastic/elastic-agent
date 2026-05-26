@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -121,18 +120,15 @@ func TestTryLoadMarker_MissingFile(t *testing.T) {
 func TestMarkUpgrade(t *testing.T) {
 	var parsed123SNAPSHOT = agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
 	var parsed456SNAPSHOT = agtversion.NewParsedSemVer(4, 5, 6, "SNAPSHOT", "")
-	var parsed920SNAPSHOT = agtversion.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")
 	// fix a timestamp (truncated to the second because of loss of precision during marshalling/unmarshalling)
 	updatedOnNow := time.Now().UTC().Truncate(time.Second)
-	twentyFourHoursFromNow := updatedOnNow.Add(24 * time.Hour)
 
 	type args struct {
-		updatedOn          time.Time
-		currentAgent       agentInstall
-		previousAgent      agentInstall
-		action             *fleetapi.ActionUpgrade
-		details            *details.Details
-		availableRollbacks map[string]ttl.TTLMarker
+		updatedOn     time.Time
+		currentAgent  agentInstall
+		previousAgent agentInstall
+		action        *fleetapi.ActionUpgrade
+		details       *details.Details
 	}
 	type workingDirHook func(t *testing.T, dataDir string)
 
@@ -169,9 +165,8 @@ func TestMarkUpgrade(t *testing.T) {
 					hash:          "prvagt",
 					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
 				},
-				action:             nil,
-				details:            details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
-				availableRollbacks: nil,
+				action:  nil,
+				details: details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
 			},
 			wantErr: assert.Error,
 		},
@@ -191,9 +186,8 @@ func TestMarkUpgrade(t *testing.T) {
 					hash:          "prvagt",
 					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
 				},
-				action:             nil,
-				details:            details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
-				availableRollbacks: nil,
+				action:  nil,
+				details: details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
 			},
 			wantErr: assert.NoError,
 			assertAfterMark: func(t *testing.T, dataDir string) {
@@ -220,62 +214,6 @@ func TestMarkUpgrade(t *testing.T) {
 				assert.Equal(t, expectedMarker, actualMarker)
 			},
 		},
-		{
-			name: "available rollbacks passed in - available rollbacks must be present in upgrade marker",
-			args: args{
-				updatedOn: updatedOnNow,
-				currentAgent: agentInstall{
-					parsedVersion: parsed920SNAPSHOT,
-					version:       "9.2.0-SNAPSHOT",
-					hash:          "newagt",
-					versionedHome: filepath.Join("data", "elastic-agent-9.2.0-SNAPSHOT-newagt"),
-				},
-				previousAgent: agentInstall{
-					parsedVersion: parsed123SNAPSHOT,
-					version:       "1.2.3-SNAPSHOT",
-					hash:          "prvagt",
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
-				},
-				action:  nil,
-				details: details.NewDetails("9.2.0-SNAPSHOT", details.StateReplacing, ""),
-				availableRollbacks: map[string]ttl.TTLMarker{
-					filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"): {
-						Version:    "1.2.3-SNAPSHOT",
-						ValidUntil: twentyFourHoursFromNow,
-					},
-				},
-			},
-			wantErr: assert.NoError,
-			assertAfterMark: func(t *testing.T, dataDir string) {
-				actualMarker, err := LoadMarker(dataDir)
-				require.NoError(t, err, "error reading actualMarker content after writing")
-
-				expectedMarker := &UpdateMarker{
-					Version:           "9.2.0-SNAPSHOT",
-					Hash:              "newagt",
-					VersionedHome:     filepath.Join("data", "elastic-agent-9.2.0-SNAPSHOT-newagt"),
-					UpdatedOn:         updatedOnNow,
-					PrevVersion:       "1.2.3-SNAPSHOT",
-					PrevHash:          "prvagt",
-					PrevVersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
-					Acked:             false,
-					Action:            nil,
-					Details: &details.Details{
-						TargetVersion: "9.2.0-SNAPSHOT",
-						State:         "UPG_REPLACING",
-						ActionID:      "",
-						Metadata:      details.Metadata{},
-					},
-					RollbacksAvailable: map[string]ttl.TTLMarker{
-						filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"): {
-							Version:    "1.2.3-SNAPSHOT",
-							ValidUntil: twentyFourHoursFromNow,
-						},
-					},
-				}
-				assert.Equal(t, expectedMarker, actualMarker)
-			},
-		},
 	}
 
 	// use the regular markUpgrade function, disabling the updateActiveCommitFunction that is bundled together
@@ -294,7 +232,7 @@ func TestMarkUpgrade(t *testing.T) {
 				tc.setupBeforeMark(t, dataDir)
 			}
 
-			err := markUpgrade(log, dataDir, tc.args.updatedOn, tc.args.currentAgent, tc.args.previousAgent, tc.args.action, tc.args.details, tc.args.availableRollbacks)
+			err := markUpgrade(log, dataDir, tc.args.updatedOn, tc.args.currentAgent, tc.args.previousAgent, tc.args.action, tc.args.details)
 			tc.wantErr(t, err)
 			if tc.assertAfterMark != nil {
 				tc.assertAfterMark(t, dataDir)
