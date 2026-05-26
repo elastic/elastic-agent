@@ -46,7 +46,10 @@ type TestModeConfigSetter interface {
 	SetConfig(ctx context.Context, cfg string) error
 }
 
+// RollbacksSource is the persistence layer for TTL-based rollback markers.
 type RollbacksSource interface {
+	// GetAll returns all TTL markers. The second return value contains per-entry
+	// parse errors; a non-nil third value means the scan itself failed entirely.
 	GetAll() (map[string]ttl.TTLMarker, map[string]error, error)
 }
 
@@ -370,15 +373,11 @@ func (s *Server) Configure(ctx context.Context, req *cproto.ConfigureRequest) (*
 }
 
 func (s *Server) AvailableRollbacks(context.Context, *cproto.Empty) (*cproto.AvailableRollbacksResponse, error) {
-	rollbacks, malformed, err := s.rollbackSource.GetAll()
+	rollbacks, _, err := s.rollbackSource.GetAll()
 	if err != nil {
 		return &cproto.AvailableRollbacksResponse{
 			Error: fmt.Sprintf("error fetching rollbacks: %s", err.Error()),
 		}, nil
-	}
-	for versionedHome, parseErr := range malformed {
-		s.logger.Infow("TTL marker is unparseable; skipping in available rollbacks response",
-			"versionedHome", versionedHome, "error.message", parseErr.Error())
 	}
 	protoRollbacks := make([]*cproto.AvailableRollback, 0, len(rollbacks))
 	for home, ttlMarker := range rollbacks {

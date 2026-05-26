@@ -49,8 +49,11 @@ import (
 	"github.com/elastic/elastic-agent/version"
 )
 
+// rollbacksSource is the persistence layer for TTL-based rollback markers.
 type rollbacksSource interface {
 	Set(map[string]ttl.TTLMarker) error
+	// GetAll returns all TTL markers. The second return value contains per-entry
+	// parse errors; a non-nil third value means the scan itself failed entirely.
 	GetAll() (map[string]ttl.TTLMarker, map[string]error, error)
 	Remove(string) error
 }
@@ -329,14 +332,10 @@ func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, in
 	// Check if we rolled back and update the TTL markers
 	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil && initialUpdateMarker.Details.State == details.StateRollback {
 		// Reset the TTL for the current version if we are coming off a rollback
-		rollbacks, malformed, err := rollbackSource.GetAll()
+		rollbacks, _, err := rollbackSource.GetAll()
 		if err != nil {
 			log.Warnf("Error getting available rollbacks from rollbackSource during startup check: %s", err)
 			return
-		}
-		for versionedHome, parseErr := range malformed {
-			log.Infow("TTL marker is unparseable; skipping during startup normalization",
-				"versionedHome", versionedHome, "error.message", parseErr.Error())
 		}
 
 		// remove the current versioned home TTL marker

@@ -119,8 +119,11 @@ type WatcherHelper interface {
 	TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error)
 }
 
+// availableRollbacksSource is the persistence layer for TTL-based rollback markers.
 type availableRollbacksSource interface {
 	Set(map[string]ttl.TTLMarker) error
+	// GetAll returns all TTL markers. The second return value contains per-entry
+	// parse errors; a non-nil third value means the scan itself failed entirely.
 	GetAll() (map[string]ttl.TTLMarker, map[string]error, error)
 	Remove(string) error
 }

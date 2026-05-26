@@ -80,7 +80,10 @@ type stateStore interface {
 	Action() fleetapi.Action
 }
 
+// rollbacksSource is the persistence layer for TTL-based rollback markers.
 type rollbacksSource interface {
+	// GetAll returns all TTL markers. The second return value contains per-entry
+	// parse errors; a non-nil third value means the scan itself failed entirely.
 	GetAll() (map[string]ttl.TTLMarker, map[string]error, error)
 }
 
@@ -415,14 +418,10 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get available rollbacks
-	rollbacks, malformed, err := f.rollbackSource.GetAll()
+	rollbacks, _, err := f.rollbackSource.GetAll()
 	if err != nil {
 		f.log.Warnf("error getting available rollbacks: %s", err.Error())
 		rollbacks = nil
-	}
-	for versionedHome, parseErr := range malformed {
-		f.log.Infow("TTL marker is unparseable; skipping in Fleet checkin rollbacks",
-			"versionedHome", versionedHome, "error.message", parseErr.Error())
 	}
 
 	var validRollbacks []fleetapi.CheckinRollback

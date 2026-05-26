@@ -202,7 +202,7 @@ func TestTTLMarkerRegistry_Set_TolerateMalformedExisting(t *testing.T) {
 
 	assertMalformedMarkerLogged := func(t *testing.T, entries []observer.LoggedEntry, wantVersionedHome string) {
 		t.Helper()
-		const wantMsg = "existing TTL marker is unparseable; overwriting or sweeping it"
+		const wantMsg = "Overwriting malformed TTL marker with valid entry"
 		for _, e := range entries {
 			if e.Message != wantMsg {
 				continue

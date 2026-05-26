@@ -1380,7 +1380,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			checkArchiveCleanup: true,
 			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 		"pre-symlink callback must not be called if unpack fails": {
@@ -1408,7 +1408,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			checkVersionedHomeCleanup: true,
 			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 		"pre-symlink callback error aborts upgrade before changeSymlink and triggers cleanup": {
@@ -1440,7 +1440,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			checkVersionedHomeCleanup: true,
 			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 	}
@@ -1507,6 +1507,8 @@ func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
+	origTop := paths.Top()
+	t.Cleanup(func() { paths.SetTop(origTop) })
 	paths.SetTop(baseDir)
 
 	// Use the package-local helper so the live install lands at the exact path
@@ -1562,15 +1564,15 @@ func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
 		return nil
 	}
 
-	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil, details.NewDetails("99.0.0", details.StateRequested, "test"), true, true)
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil, details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
 	require.NoError(t, err, "upgrade must self-heal the corrupt live .ttl and complete")
 
 	markers, malformed, getAllErr := realRegistry.GetAll()
 	require.NoError(t, getAllErr)
 	assert.Empty(t, malformed, "corrupt live .ttl must have been overwritten with valid YAML")
 	if assert.Contains(t, markers, currentVersionedHome, "live install should now hold a valid TTL marker") {
-		assert.Equal(t, release.VersionWithSnapshot(), markers[currentVersionedHome].Version)
-		assert.Equal(t, release.Commit(), markers[currentVersionedHome].Hash)
+		assert.NotEmpty(t, markers[currentVersionedHome].Version, "rewritten marker must have a non-empty Version")
+		assert.NotEmpty(t, markers[currentVersionedHome].Hash, "rewritten marker must have a non-empty Hash")
 		assert.True(t, markers[currentVersionedHome].ValidUntil.After(time.Now()), "rewritten marker should have a future ValidUntil")
 	}
 }

@@ -46,27 +46,25 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 		return fmt.Errorf("accessing existing markers: %w", err)
 	}
 
-	for versionedHome, parseErr := range malformed {
-		T.log.Infow("existing TTL marker is unparseable; overwriting or sweeping it",
-			"versionedHome", versionedHome, "error.message", parseErr.Error())
-	}
-
 	for versionedHome := range existingMarkers {
 		if _, ok := m[versionedHome]; ok {
 			continue
 		}
-		T.log.Debugf("Removing marker for versionedHome: %s", versionedHome)
+		T.log.Infof("Removing TTL marker for %s: not in new desired state", versionedHome)
 		err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
 		}
 	}
 
-	for versionedHome := range malformed {
+	for versionedHome, parseErr := range malformed {
 		if _, ok := m[versionedHome]; ok {
+			T.log.Infow("Overwriting malformed TTL marker with valid entry",
+				"versionedHome", versionedHome, "error.message", parseErr.Error())
 			continue
 		}
-		T.log.Debugf("Removing malformed marker for versionedHome: %s", versionedHome)
+		T.log.Infow("Sweeping malformed TTL marker: not in new desired state",
+			"versionedHome", versionedHome, "error.message", parseErr.Error())
 		err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
