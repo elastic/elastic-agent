@@ -908,7 +908,7 @@ steps:
               - default
 
   - group: ":kubernetes: Kubernetes (tier 1)"
-    key: integration-tests-linux-tier-1
+    key: integration-tests-kubernetes-tier-1
     if: build.pull_request.id != null
     notify:
       - github_commit_status:
@@ -942,7 +942,7 @@ steps:
               *k8s_test_versions
 
   - group: ":kubernetes: Kubernetes (tier 2)"
-    key: integration-tests-linux-tier-2
+    key: integration-tests-kubernetes-tier-2
     if_changed:
       include:
         - .buildkite/**
@@ -983,7 +983,7 @@ steps:
               - *k8s_max_test_version
 
   - group: ":kubernetes: Kubernetes (tier 3)"
-    key: integration-tests-linux-tier-3
+    key: integration-tests-kubernetes-tier-3
     if: build.source == "schedule"
     notify:
       - github_commit_status:
