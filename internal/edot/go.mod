@@ -7,28 +7,13 @@ replace github.com/elastic/elastic-agent => ../../
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260525193801-d5823810f9f3
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.43.0
+	github.com/elastic/elastic-agent-libs v0.43.1
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.47.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.47.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.47.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.47.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.47.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.47.0
-=======
-	github.com/elastic/elastic-agent-libs v0.43.1
-	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
-	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.50.0
-	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.50.0
-	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.50.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.50.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.50.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.50.0
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.50.0
-	github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.50.0
-	github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver v0.1.0
-	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.50.0
->>>>>>> 933767197 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.43.0 to 0.43.1 in the go-dependencies group across 1 directory (#14516))
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.152.0
