@@ -61,15 +61,14 @@ common:
       elastic/vault-github-token#v0.2.1:
   # Variants/Groups for the Windows ITs
   - windows_variants: &windows_variants
-      - "default"
-      - "fleet"
-      - "fleet-endpoint-security"
-      - "fleet-privileged"
-      - "install-uninstall"
-      - "standalone-upgrade"
-      - "upgrade"
-      - "upgrade-flavor"
-      elastic/vault-github-token#v0.1.0:
+    - "default"
+    - "fleet"
+    - "fleet-endpoint-security"
+    - "fleet-privileged"
+    - "install-uninstall"
+    - "standalone-upgrade"
+    - "upgrade"
+    - "upgrade-flavor"
   # Variants/Groups for the Linux AMD64 ITs
   - linux_deb_variants: &linux_deb_variants
     - container
