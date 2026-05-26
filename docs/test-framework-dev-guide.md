@@ -20,7 +20,8 @@ The integration testing framework spins up resources in GCP.  To achieve this, i
 [GCloud CLI](https://cloud.google.com/sdk/gcloud) to be installed on the system where the tests are initiated from.
 
 #### Beats
-The Elastic Agent package that is used for integration tests packages Beats built from the Unified Release (as opposed to DRA).  There is no explicit action needed for this prerequisite but just keep in mind that if any Agent integration tests rely on certain Beats features or bugfixes, they may not be available in the integration tests yet because a unified release containing those features or bugfixes may not have happened yet.
+The Elastic Agent package that is used for integration tests packages Beats from the beats submodule in this repository. The submodule must be explicitly intialized with `git submodule update --init` on first checkout. The commit of beats packaged and tested in this repository is the commit of
+beats pinned in the submodule.
 
 #### Helm & Helm charts
 To run the Kubernetes integration tests you need to install

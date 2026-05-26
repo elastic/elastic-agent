@@ -8,9 +8,11 @@ import (
 	"context"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 )
 
 // logLevelSetter interface represents an actor able to set the global log level in agent
 type logLevelSetter interface {
 	SetLogLevel(ctx context.Context, lvl *logp.Level) error
+	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
 }

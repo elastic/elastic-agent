@@ -1,0 +1,12 @@
+kind: bug-fix
+
+summary: Honour --path.logs when running elastic-agent run
+
+description: >
+  When --path.logs is explicitly set on the CLI, the agent now writes logs to
+  the specified path even if the configuration file has
+  agent.logging.to_stderr: true (the shipped default).
+
+component: elastic-agent
+
+issue: https://github.com/elastic/elastic-agent/issues/13320

@@ -39,7 +39,7 @@ collectors:
     fullnameOverride: "opentelemetry-kube-stack-daemon"
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: "true"
+        value: '"true"'
     presets:
       kubeletMetrics:
         enabled: false
@@ -58,7 +58,7 @@ collectors:
         # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
         debug:
           verbosity: basic
-        otlp/gateway:
+        otlp_grpc/gateway:
           endpoint: "http://opentelemetry-kube-stack-gateway-collector-headless:4317"
           tls:
             insecure: true
@@ -66,8 +66,12 @@ collectors:
         # [Batch Processor](https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/batchprocessor)
         batch: {}
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
+        resourcedetection/env:
+          detectors: [env] # Detects resources from environment variables.
+          timeout: 2s
+          override: false
         resourcedetection/eks:
-          detectors: [env, eks] # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          detectors: [eks] # Detects resources from EKS (Elastic Kubernetes Service).
           timeout: 15s
           override: true
           eks:
@@ -75,11 +79,11 @@ collectors:
               k8s.cluster.name:
                 enabled: true
         resourcedetection/gcp:
-          detectors: [env, gcp] # Detects resources from environment variables and GCP (Google Cloud Platform).
+          detectors: [gcp] # Detects resources from GCP (Google Cloud Platform).
           timeout: 2s
           override: true
         resourcedetection/aks:
-          detectors: [env, aks] # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          detectors: [aks] # Detects resources from AKS (Azure Kubernetes Service).
           timeout: 2s
           override: true
           aks:
@@ -136,19 +140,24 @@ collectors:
               from_attribute: host.id
               action: insert
         # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
-        k8sattributes:
+        k8s_attributes:
           filter:
             # Only retrieve pods running on the same node as the collector
             node_from_env_var: OTEL_K8S_NODE_NAME
           passthrough: false
           pod_association:
-            # Below association takes a look at the k8s.pod.ip and k8s.pod.uid resource attributes or connection's context, and tries to match it with the pod having the same attribute.
+            # Below association takes a look at the k8s.pod.ip, then k8s.pod.uid, then k8s.pod.name + k8s.namespace.name, and tries to match it with the pod having the same attribute. If all three fail, it will use the connection's context.
             - sources:
                 - from: resource_attribute
                   name: k8s.pod.ip
             - sources:
                 - from: resource_attribute
                   name: k8s.pod.uid
+            - sources:
+                - from: resource_attribute
+                  name: k8s.pod.name
+                - from: resource_attribute
+                  name: k8s.namespace.name
             - sources:
                 - from: connection
           extract:
@@ -172,25 +181,26 @@ collectors:
       receivers:
         otlp: null
         # [File Log Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver)
-        filelog:
+        file_log:
           exclude:
             # exlude opentelemetry-kube-stack pod logs
             - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
       extensions:
-        cgroupruntime: {}
+        cgroup_runtime: {}
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-        extensions: [cgroupruntime]
+        extensions: [cgroup_runtime]
         pipelines:
           logs: null
           metrics: null
           traces: null
           logs/node:
             receivers:
-              - filelog
+              - file_log
             processors:
               - batch
-              - k8sattributes
+              - k8s_attributes
+              - resourcedetection/env
               - resourcedetection/system
               - resourcedetection/eks
               - resourcedetection/gcp
@@ -198,7 +208,7 @@ collectors:
               - resource/hostname
               - resource/cloud
             exporters:
-              - otlp/gateway
+              - otlp_grpc/gateway
   #  Gateway is a K8s deployment EDOT collector focused on processing and
   #  forwarding telemetry to an Elasticsearch endpoint.
   gateway:
@@ -220,7 +230,7 @@ collectors:
     enabled: true
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: "true"
+        value: '"true"'
       - name: ELASTIC_OTLP_ENDPOINT
         valueFrom:
           secretKeyRef:
@@ -243,7 +253,7 @@ collectors:
       exporters:
         debug:
           verbosity: basic
-        otlp/ingest:
+        otlp_grpc/ingest:
           endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
           headers:
             Authorization: ApiKey ${env:ELASTIC_API_KEY}
@@ -258,14 +268,14 @@ collectors:
               max_size: 4_000_000 # 4MB uncompressed
           timeout: 15s
       extensions:
-        cgroupruntime: {}
+        cgroup_runtime: {}
       service:
-        extensions: [cgroupruntime]
+        extensions: [cgroup_runtime]
         pipelines:
           logs:
             receivers: [otlp]
             processors: []
-            exporters: [debug, otlp/ingest]
+            exporters: [debug, otlp_grpc/ingest]
 # For more details on OpenTelemetry's zero-code instrumentation, see:
 # https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
 instrumentation:

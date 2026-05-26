@@ -153,10 +153,12 @@ func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
 		"pull": map[string]any{
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
-					"host":                "localhost",
-					"port":                port,
-					"without_units":       true,
-					"without_type_suffix": true,
+					"host": "localhost",
+					"port": port,
+					// without_scope_info=false keeps pipeline-identifying scope attributes (injected by
+					// telemetry.newPipelineTelemetry) as Prometheus labels, preventing label collisions
+					// when the same component type appears in multiple pipelines.
+					"without_scope_info": false,
 				},
 			},
 		},
