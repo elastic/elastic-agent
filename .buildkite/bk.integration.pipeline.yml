@@ -300,7 +300,7 @@ steps:
         - dev-tools/**
         - go.mod
         - go.sum
-    key: integration-tests-win-tier2
+    key: integration-tests-win-tier-2
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Windows - tier 2"
@@ -371,7 +371,7 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 3)"
-    key: integration-tests-win-tier3
+    key: integration-tests-win-tier-3
     if: build.source == "schedule"
     notify:
       - github_commit_status:
