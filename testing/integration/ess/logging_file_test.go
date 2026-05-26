@@ -17,7 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -57,6 +56,7 @@ func TestLoggingFileConfigViaFleet(t *testing.T) {
 	installOutput, err := f.Install(ctx, &atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
+		Privileged:     true,
 		EnrollOpts: atesting.EnrollOpts{
 			URL:             fleetServerURL,
 			EnrollmentToken: enrollmentTokenResp.APIKey,
@@ -137,6 +137,7 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 	installOutput, err := f.Install(ctx, &atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
+		Privileged:     true,
 		EnrollOpts: atesting.EnrollOpts{
 			URL:             fleetServerURL,
 			EnrollmentToken: enrollmentTokenResp.APIKey,
@@ -149,7 +150,7 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 	}, 2*time.Minute, 5*time.Second, "agent never became healthy before logging path change")
 
 	// Create a custom directory that the agent (running as root) can write to.
-	customLogDir := filepath.Join("/tmp", "ea-test-logs-"+uuid.Must(uuid.NewV4()).String())
+	customLogDir := filepath.Join(t.TempDir(), "logs")
 	require.NoError(t, os.MkdirAll(customLogDir, 0o755), "create custom log directory")
 	t.Cleanup(func() { _ = os.RemoveAll(customLogDir) })
 
@@ -169,8 +170,6 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 		"no log files found in custom log directory %s after path change", customLogDir)
 }
 
-// applyLoggingFilePathPolicy overrides agent.logging.files.path in the Fleet policy.
-// to_files is left at its default (true) so the agent continues writing to disk.
 func applyLoggingFilePathPolicy(t *testing.T, info *define.Info, policy kibana.AgentPolicy, logPath string) {
 	t.Helper()
 
@@ -181,6 +180,8 @@ func applyLoggingFilePathPolicy(t *testing.T, info *define.Info, policy kibana.A
   "overrides": {
     "agent": {
       "logging": {
+        "to_stderr": false,
+        "to_files": true,
         "files": {
           "path": %q
         }
