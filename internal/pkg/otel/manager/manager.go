@@ -659,17 +659,9 @@ func injectMonitoringReceiver(
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
 
 	// Build a file exporter for writing internal telemetry to disk as a diagnostics
-	// artifact. The file is written to paths.Home()/logs/ — the same directory where
-	// MakeInternalFileOutput writes the agent's own log files and where the
-	// diagnostics bundle collector walks to find files to include.
-	// Records are written as plain OTLP JSON (one record per line). The file is NOT
-	// compressed on disk: the diagnostics collector packages everything into a zip
-	// archive using deflate, and this highly repetitive JSON deflates to ~4% of its
-	// original size, so the net contribution to the bundle is small (~890 KB for a
-	// max-size file+backup) while keeping the file immediately readable.
-	// The file is rotated when it reaches defaultDiagnosticsFileSizeMB, keeping one
-	// backup — this gives between 1× and 2× the size in recent telemetry without
-	// unbounded growth.
+	// artifact. The file is written to the default logs directory.
+	// Records are written as plain OTLP JSON (one record per line). No compression.
+	// This data format compresses very well, so impact on diagnostics is minimal.
 	diagName := translate.OtelNamePrefix + receiverName
 	fileExporterID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("file"), diagName).String()
 	diagFilePath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)

@@ -371,12 +371,6 @@ func TestBeatDiagnostics(t *testing.T) {
 
 	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
-	// configTemplate is parameterised by Runtime (process/otel) and MonitoringEnabled.
-	// When monitoring is enabled the metrics collection period is shortened to 2 s so
-	// that at least one collection cycle completes before diagnostics are gathered.
-	// 2 s keeps the first write well within the 10 s pre-diagnostics sleep even if
-	// the OTel monitoring collector takes a few seconds to start after the agent
-	// reports HEALTHY.
 	configTemplate := `
 inputs:
   - id: filestream-filebeat
