@@ -2523,7 +2523,7 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	monitoringConfig := &config.MonitoringConfig{}
 	agentInfo := &info.AgentInfo{}
 	components := []component.Component{}
-	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components)
+	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components, logp.NewNopLogger())
 	require.NoError(t, err, "injectMonitoringReceiver should succeed")
 	result := mapstr.M(cfg.ToStringMap()).Flatten()
 
@@ -2555,7 +2555,7 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 			},
 		}
 		cfg := confmap.NewFromStringMap(baseConfig)
-		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{})
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
 		require.NoError(t, err, "injectMonitoringReceiver should succeed")
 		result := mapstr.M(cfg.ToStringMap()).Flatten()
 
@@ -2573,7 +2573,7 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 		// monitoring is in use), the pipeline should still be injected so that
 		// internal telemetry is captured in the diagnostics file.
 		cfg := confmap.NewFromStringMap(map[string]any{})
-		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{})
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
 		require.NoError(t, err, "injectMonitoringReceiver should succeed without monitoring exporter")
 		result := mapstr.M(cfg.ToStringMap()).Flatten()
 
@@ -2588,7 +2588,7 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 
 	t.Run("file exporter config", func(t *testing.T) {
 		cfg := confmap.NewFromStringMap(map[string]any{})
-		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{})
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
 		require.NoError(t, err, "injectMonitoringReceiver should succeed")
 		result := mapstr.M(cfg.ToStringMap()).Flatten()
 
