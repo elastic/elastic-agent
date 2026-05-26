@@ -2540,6 +2540,80 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	assert.ElementsMatch(t, expectedPipelineProcessors, actualPipelineProcessors, "monitoring receiver pipeline processors should match default")
 }
 
+func TestMonitoringReceiverFileExporter(t *testing.T) {
+	pipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
+	receiverName := "internal-telemetry-monitoring"
+	fileExporterName := "file/" + translate.OtelNamePrefix + receiverName
+
+	t.Run("with OTel monitoring exporter", func(t *testing.T) {
+		// When an OTel-based monitoring exporter is present, the pipeline should
+		// export to both the file and the ES monitoring exporter.
+		exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
+		baseConfig := map[string]any{
+			"exporters": map[string]any{
+				exporterName: nil,
+			},
+		}
+		cfg := confmap.NewFromStringMap(baseConfig)
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{})
+		require.NoError(t, err, "injectMonitoringReceiver should succeed")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+		pipelineExporters := result["service.pipelines."+pipelineName+".exporters"]
+		require.NotNil(t, pipelineExporters, "pipeline exporters should not be nil")
+		assert.ElementsMatch(t,
+			[]string{exporterName, fileExporterName},
+			pipelineExporters,
+			"pipeline should export to both elasticsearch and the diagnostics file exporter",
+		)
+	})
+
+	t.Run("without OTel monitoring exporter", func(t *testing.T) {
+		// When no OTel-based monitoring exporter exists (e.g. classic HTTP-based
+		// monitoring is in use), the pipeline should still be injected so that
+		// internal telemetry is captured in the diagnostics file.
+		cfg := confmap.NewFromStringMap(map[string]any{})
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{})
+		require.NoError(t, err, "injectMonitoringReceiver should succeed without monitoring exporter")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+		pipelineExporters := result["service.pipelines."+pipelineName+".exporters"]
+		require.NotNil(t, pipelineExporters, "pipeline should still be created with file-only exporters")
+		assert.ElementsMatch(t,
+			[]string{fileExporterName},
+			pipelineExporters,
+			"pipeline should export only to the diagnostics file exporter when no OTel monitoring exporter is present",
+		)
+	})
+
+	t.Run("file exporter config", func(t *testing.T) {
+		cfg := confmap.NewFromStringMap(map[string]any{})
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{})
+		require.NoError(t, err, "injectMonitoringReceiver should succeed")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+		// The file exporter path must be in paths.Home()/logs/ — the same directory
+		// that MakeInternalFileOutput writes to and that the diagnostics collector walks.
+		expectedPath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
+		assert.Equal(t, expectedPath, result["exporters."+fileExporterName+".path"],
+			"file exporter path should be in paths.Home()/logs/")
+
+		// Records are written as OTLP JSON — format: json uses the same plog.JSONMarshaler
+		// as the otlp_encoding extension, without needing a separate extension component.
+		assert.Equal(t, "json", result["exporters."+fileExporterName+".format"])
+
+		// Rotation settings: 10 MB cap with one backup.
+		assert.Equal(t, defaultDiagnosticsFileSizeMB, result["exporters."+fileExporterName+".rotation.max_megabytes"])
+		assert.Equal(t, 1, result["exporters."+fileExporterName+".rotation.max_backups"])
+
+		// No on-disk compression: the diagnostics collector packages files into a zip using
+		// deflate, and repetitive JSON compresses to ~4% of its original size in that
+		// context — far better than the ~94% stored ratio of a pre-compressed zstd file.
+		assert.Nil(t, result["exporters."+fileExporterName+".compression"],
+			"compression should not be set; plain NDJSON deflates better inside the diagnostics zip")
+	})
+}
+
 // fakeCloseListener is a wrapper around a net.Listener that ignores the Close() method. This is used in a very particular
 // port conflict test to ensure ports are not unbound while the otel collector tries to use them.
 type fakeCloseListener struct {
