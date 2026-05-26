@@ -1,6 +1,6 @@
 receivers:
   # Receiver for platform specific log files
-  filelog/platformlogs:
+  file_log/platformlogs:
     include: [ /var/log/*.log ]
     retry_on_failure:
       enabled: true
@@ -63,6 +63,6 @@ service:
   extensions: [file_storage]
   pipelines:
     logs/platformlogs:
-      receivers: [filelog/platformlogs]
+      receivers: [file_log/platformlogs]
       processors: [resourcedetection]
       exporters: [debug, elasticsearch/otel]
