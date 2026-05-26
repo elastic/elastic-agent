@@ -122,8 +122,12 @@ type WatcherHelper interface {
 // availableRollbacksSource is the persistence layer for TTL-based rollback markers.
 type availableRollbacksSource interface {
 	Set(map[string]ttl.TTLMarker) error
-	// GetAll returns all TTL markers. The second return value contains per-entry
-	// parse errors; a non-nil third value means the scan itself failed entirely.
+	// GetAll reads all on-disk TTL markers and returns three values:
+	//   - markers (map[string]TTLMarker): successfully parsed entries, keyed by versioned home path.
+	//   - malformed (map[string]error): per-entry parse errors for entries that could not be read
+	//     or parsed, also keyed by versioned home path.
+	//   - err: non-nil only on structural failures (e.g. glob error) where no scan could be
+	//     performed; in that case both maps are nil.
 	GetAll() (map[string]ttl.TTLMarker, map[string]error, error)
 	Remove(string) error
 }
