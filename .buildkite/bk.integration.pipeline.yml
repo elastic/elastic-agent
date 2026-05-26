@@ -8,18 +8,6 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-<<<<<<< HEAD
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1779464011"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1779464011"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1779464011"
-  IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1779464011"
-  IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1779464011"
-  IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1779464011"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1779464011"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1779464011"
-  ASDF_TERRAFORM_VERSION: 1.9.2
-=======
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1779223036"
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1779223036"
   IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1779223036"
   IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1779223036"
@@ -34,7 +22,6 @@ env:
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1779223036"
   # Same version for all the azure images
   IMAGE_WIN_VERSION: "1.0.1779223036"
->>>>>>> 0cf2a817d (bk: split windows ITs in tiers (no-fips) (#14445))
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -69,20 +56,19 @@ common:
       elastic/oblt-cli#v0.4.2:
         version-file: .oblt-cli-version
   - vault_github_token: &vault_github_token
-<<<<<<< HEAD
-      elastic/vault-github-token#v0.1.0:
-=======
       elastic/vault-github-token#v0.2.1:
+
   # Variants/Groups for the Windows ITs
   - windows_variants: &windows_variants
-      - "default"
-      - "fleet"
-      - "fleet-endpoint-security"
-      - "fleet-privileged"
-      - "install-uninstall"
-      - "standalone-upgrade"
-      - "upgrade"
-      - "upgrade-flavor"
+    - "default"
+    - "fleet"
+    - "fleet-endpoint-security"
+    - "fleet-privileged"
+    - "install-uninstall"
+    - "standalone-upgrade"
+    - "upgrade"
+    - "upgrade-flavor"
+
   # Variants/Groups for the Linux AMD64 ITs
   - linux_deb_variants: &linux_deb_variants
     - container
@@ -120,8 +106,7 @@ common:
     # - install-uninstall
     # - fqdn
     # - deb
-    # - container
->>>>>>> 0cf2a817d (bk: split windows ITs in tiers (no-fips) (#14445))
+-     # - container
 
 steps:
   - label: "Custom ECH Testing"
@@ -277,18 +262,8 @@ steps:
           - *oblt_cli_plugin
           - *vault_github_token
         matrix:
-<<<<<<< HEAD
-          - default
-          - fleet
-          - fleet-endpoint-security
-          - fleet-privileged
-          - standalone-upgrade
-          - upgrade
-          - install-uninstall
-=======
           setup:
             variant: *windows_variants
->>>>>>> 0cf2a817d (bk: split windows ITs in tiers (no-fips) (#14445))
 
       - label: "windows:amd64:tier1:non-sudo:{{matrix.variant}}"
         depends_on:
@@ -468,103 +443,8 @@ steps:
               - "${IMAGE_WIN_11}"
             variant: *windows_variants
 
-<<<<<<< HEAD
   - group: "Stateful:Ubuntu"
     key: integration-tests-ubuntu
-=======
-      - label: "windows:amd64:tier3:non-sudo:{{matrix.variant}}:{{matrix.os}}"
-        depends_on:
-          - packaging-amd64
-        env:
-          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
-        command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
-          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} false
-        artifact_paths:
-          - build/*
-          - build/diagnostics/**
-        agents:
-          provider: "azure"
-          image: "{{matrix.os}}"
-          imageVersion: "${IMAGE_WIN_VERSION}"
-          vmSize: "Standard_D8s_v5"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-        plugins:
-          - *google_oidc_observability_plugin
-          - *oblt_cli_plugin
-          - *vault_github_token
-        matrix:
-          setup:
-            os:
-              - "${IMAGE_WIN_10}"
-              - "${IMAGE_WIN_11}"
-            variant:
-              - default
-
-      - label: "windows:arm64:tier3:sudo:{{matrix.variant}}"
-        depends_on:
-          - packaging-arm64
-        env:
-          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
-        command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-arm64* . --step 'packaging-arm64'
-          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} true
-        artifact_paths:
-          - build/*
-          - build/diagnostics/**
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11_ARM64}"
-          imageVersion: "${IMAGE_WIN_VERSION}"
-          vmSize: "Standard_D8ps_v6"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-        plugins:
-          - *google_oidc_observability_plugin
-          - *oblt_cli_plugin
-          - *vault_github_token
-        matrix:
-          setup:
-            variant: *windows_variants
-
-      - label: "windows:arm64:tier3:non-sudo:{{matrix.variant}}"
-        depends_on:
-          - packaging-arm64
-        env:
-          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
-        command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-arm64* . --step 'packaging-arm64'
-          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} false
-        artifact_paths:
-          - build/*
-          - build/diagnostics/**
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11_ARM64}"
-          imageVersion: "${IMAGE_WIN_VERSION}"
-          vmSize: "Standard_D8ps_v6"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-        plugins:
-          - *google_oidc_observability_plugin
-          - *oblt_cli_plugin
-          - *vault_github_token
-        matrix:
-          setup:
-            variant:
-              - default
-
-  - group: "Stateful: Linux (tier 1)"
-    if: build.pull_request.id != null
-    key: integration-tests-linux-tier-1
->>>>>>> 0cf2a817d (bk: split windows ITs in tiers (no-fips) (#14445))
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Ubuntu"
