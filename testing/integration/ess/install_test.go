@@ -209,8 +209,8 @@ func TestInstallServersWithBasePath(t *testing.T) {
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
-		// apm-server and fleet-server have no windows/arm64 build
-		// (see dev-tools/packaging/packages.yml: comp-apm_server, comp-fleet-server),
+		// apm-server has no windows/arm64 build
+		// (see dev-tools/packaging/packages.yml: comp-apm_server),
 		// so the "servers" install flavor cannot be exercised on this combination.
 		SkipOS: []define.OS{{Type: define.Windows, Arch: define.ARM64}},
 	})

@@ -4,10 +4,12 @@ env:
   ASDF_MAGE_VERSION: 1.14.0
   MS_GOTOOLCHAIN_TELEMETRY_ENABLED: "0"
 
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1778605951"
-  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1778605951"
-  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1778605951"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1778605951"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1779464011"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1779464011"
+  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1779464011"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1779464011"
+  IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
+  IMAGE_WIN_11_ARM64_VERSION: "1.0.1779464011"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
@@ -27,6 +29,13 @@ common:
         path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
         field: "apiKey"
         env_var: "EC_API_KEY"
+  - google_oidc_plugin: &google_oidc_plugin
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
+      # This plugin authenticates to Google Cloud using the OIDC token.
+      elastic/oblt-google-auth#v1.3.1:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
 
 steps:
   - label: Start ESS stack for FIPS integration tests
@@ -50,6 +59,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
+      - *google_oidc_plugin
       - *vault_ec_key_prod
 
   - group: "fips:Stateful:Ubuntu"
@@ -82,6 +92,7 @@ steps:
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
         plugins:
+          - *google_oidc_plugin
           - *vault_ec_key_prod
         matrix:
           setup:
@@ -116,6 +127,7 @@ steps:
           image: "${IMAGE_UBUNTU_ARM64_FIPS}"
           instanceType: "m6g.2xlarge"
         plugins:
+          - *google_oidc_plugin
           - *vault_ec_key_prod
         matrix:
           setup:
@@ -145,6 +157,7 @@ steps:
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
         plugins:
+          - *google_oidc_plugin
           - *vault_ec_key_prod
 
   - group: "fips:Stateful:Windows"
@@ -177,6 +190,38 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
         plugins:
+          - *google_oidc_plugin
+          - *vault_ec_key_prod
+        matrix:
+          setup:
+            groups:
+              - fleet
+
+      - label: "fips:Windows:11:arm64:{{matrix.groups}}"
+        depends_on:
+          - packaging-arm64-fips
+        env:
+          FIPS: "true"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
+          TF_VAR_docker_images_name_suffix: "-fips"
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download "build/distributions/elastic-agent-*-windows-arm64*" . --step 'packaging-arm64-fips'
+          .buildkite/scripts/steps/integration_tests_tf_fips.ps1 {{matrix.groups}} true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "azure"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
+        plugins:
+          - *google_oidc_plugin
           - *vault_ec_key_prod
         matrix:
           setup:
@@ -203,6 +248,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
+      - *google_oidc_plugin
       - *vault_ec_key_prod
 
   - label: Aggregate test reports
@@ -227,3 +273,4 @@ steps:
           format: "junit"
           branches: "main"
           debug: true
+      - *google_oidc_plugin

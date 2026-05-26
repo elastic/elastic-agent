@@ -583,10 +583,9 @@ func (Test) Unit(ctx context.Context) error {
 func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 
-	cfg := devtools.SettingsFromContext(ctx)
+	cfg := devtools.SettingsFromContext(ctx).WithFIPSBuild(true)
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	params.Env["FIPS"] = "true"
-	params.Env["GODEBUG"] = "fips140=only"
 	params.Tags = append(params.Tags, "requirefips")
 	return devtools.GoTest(ctx, params)
 }
@@ -3779,6 +3778,24 @@ func (Otel) PrepareBeats() error {
 		if sh.ExitStatus(err) != 5 {
 			return fmt.Errorf("failed to unset core.worktree in copied git config: %w", err)
 		}
+	}
+
+	// If the CI checkout used a pre-baked git mirror (BUILDKITE_GIT_MIRRORS_PATH /opt/git-mirrors),
+	// git sets up the submodule with an alternates reference so objects are stored in the mirror,
+	// not locally. The beats crossbuild mage target launches Docker mounting only the beats directory,
+	// so the mirror path is not accessible inside the container and git commands fail with exit 128.
+	// Repack all reachable objects into a local pack file and remove the alternates entry so the
+	// copied .git directory is fully self-sufficient when mounted into Docker.
+	alternatesPath := filepath.Join(beatsGitPath, "objects", "info", "alternates")
+	if _, err := os.Stat(alternatesPath); err == nil {
+		fmt.Println(">> Repacking beats git objects to remove git-mirror alternates dependency")
+		if err := sh.Run("git", "-C", "beats", "repack", "-a", "-d"); err != nil {
+			return fmt.Errorf("failed to repack beats git objects: %w", err)
+		}
+		if err := os.Remove(alternatesPath); err != nil {
+			return fmt.Errorf("failed to remove beats git alternates file: %w", err)
+		}
+		fmt.Println(">> Beats git objects are now self-sufficient (alternates removed)")
 	}
 
 	fmt.Println(">> Successfully converted beats/.git to a directory")

@@ -10,8 +10,19 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1778605951"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1778605951"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1779464011"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1779464011"
+
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - google_oidc_plugin: &google_oidc_plugin
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
+      # This plugin authenticates to Google Cloud using the OIDC token.
+      elastic/oblt-google-auth#v1.3.1:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
 
 steps:
   - input: "Build parameters"
@@ -81,6 +92,7 @@ steps:
         plugins:
           - elastic/vault-docker-login#v0.5.2:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+          - *google_oidc_plugin
 
       - label: ":package: FIPS=true Cross Building and package elastic-agent"
         key: package_elastic-agent_fips
@@ -106,6 +118,7 @@ steps:
         plugins:
           - elastic/vault-docker-login#v0.5.2:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+          - *google_oidc_plugin
 
       - label: ":package: FIPS=false Package ARM elastic-agent"
         key: package_elastic-agent_arm
@@ -132,6 +145,8 @@ steps:
           ls -lahR build/
         artifact_paths:
           - "build/distributions/**/*"
+        plugins:
+          - *google_oidc_plugin
 
       - label: ":package: FIPS=true Package ARM elastic-agent"
         key: package_elastic-agent_arm_fips
@@ -158,6 +173,8 @@ steps:
           ls -lahR build/
         artifact_paths:
           - "build/distributions/**/*"
+        plugins:
+          - *google_oidc_plugin
 
   - label: ":elastic-stack: Publishing to DRA"
     if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
@@ -205,6 +222,8 @@ steps:
         fi
       fi
       .buildkite/scripts/steps/dra-publish.sh
+    plugins:
+      - *google_oidc_plugin
 
   - label: "Publishing via BK API for Independent Agent Release"
     if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "independent-agent-release-staging"
@@ -254,6 +273,8 @@ steps:
         buildkite-agent meta-data set "triggered_build_id" "$BUILDKITE_BUILD_ID" --job $TRIGGER_JOB_ID
         buildkite-agent meta-data set "triggered_commit_hash" "$BUILDKITE_COMMIT" --job $TRIGGER_JOB_ID
       fi
+    plugins:
+      - *google_oidc_plugin
 
 notify:
 - slack:

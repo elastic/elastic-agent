@@ -250,6 +250,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"ca_trusted_fingerprint":     "",
 				"certificate":                "",
 				"certificate_authorities":    []interface{}{},
+				"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
 				"cipher_suites":              []interface{}{},
 				"disable_legacy_pem_support": false,
 				"curve_types":                []interface{}{},
@@ -835,12 +836,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"topic_from_attribute": "topic",
 						"client_id":            "beats",
 						"metadata": map[string]any{
-							"full":             false,
 							"refresh_interval": 10 * time.Minute,
-							"retry": map[string]any{
-								"backoff": 250 * time.Millisecond,
-								"max":     3,
-							},
 						},
 						"producer": map[string]any{
 							"compression": "gzip",
@@ -959,12 +955,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"encoding": "raw",
 						},
 						"metadata": map[string]any{
-							"full":             false,
 							"refresh_interval": 10 * time.Minute,
-							"retry": map[string]any{
-								"backoff": 250 * time.Millisecond,
-								"max":     3,
-							},
 						},
 						"producer": map[string]any{
 							"compression": "gzip",
@@ -1076,12 +1067,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"encoding": "raw",
 						},
 						"metadata": map[string]any{
-							"full":             false,
 							"refresh_interval": 10 * time.Minute,
-							"retry": map[string]any{
-								"backoff": 250 * time.Millisecond,
-								"max":     3,
-							},
 						},
 						"producer": map[string]any{
 							"compression": "gzip",
@@ -1231,12 +1217,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"encoding": "raw",
 						},
 						"metadata": map[string]any{
-							"full":             false,
 							"refresh_interval": 10 * time.Minute,
-							"retry": map[string]any{
-								"backoff": 250 * time.Millisecond,
-								"max":     3,
-							},
 						},
 						"producer": map[string]any{
 							"compression": "gzip",
@@ -1273,12 +1254,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"encoding": "raw",
 						},
 						"metadata": map[string]any{
-							"full":             false,
 							"refresh_interval": 10 * time.Minute,
-							"retry": map[string]any{
-								"backoff": 250 * time.Millisecond,
-								"max":     3,
-							},
 						},
 						"producer": map[string]any{
 							"compression": "gzip",
@@ -2200,6 +2176,7 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 					"ca_trusted_fingerprint":     "",
 					"certificate":                "",
 					"certificate_authorities":    []interface{}{},
+					"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
 					"cipher_suites":              []interface{}{},
 					"disable_legacy_pem_support": false,
 					"curve_types":                []interface{}{},
@@ -2229,6 +2206,7 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 					"ca_trusted_fingerprint":     "",
 					"certificate":                "",
 					"certificate_authorities":    []interface{}{},
+					"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
 					"cipher_suites":              []interface{}{},
 					"disable_legacy_pem_support": false,
 					"curve_types":                []interface{}{},
@@ -2547,12 +2525,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 					"encoding": "raw",
 				},
 				"metadata": map[string]any{
-					"full":             false,
 					"refresh_interval": 10 * time.Minute,
-					"retry": map[string]any{
-						"backoff": 250 * time.Millisecond,
-						"max":     3,
-					},
 				},
 				"producer": map[string]any{
 					"compression": "gzip",
@@ -2616,12 +2589,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 					"encoding": "raw",
 				},
 				"metadata": map[string]any{
-					"full":             false,
 					"refresh_interval": 10 * time.Minute,
-					"retry": map[string]any{
-						"backoff": 250 * time.Millisecond,
-						"max":     3,
-					},
 				},
 				"producer": map[string]any{
 					"compression": "gzip",
@@ -2684,12 +2652,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 					"encoding": "raw",
 				},
 				"metadata": map[string]any{
-					"full":             false,
 					"refresh_interval": 10 * time.Minute,
-					"retry": map[string]any{
-						"backoff": 250 * time.Millisecond,
-						"max":     3,
-					},
 				},
 				"producer": map[string]any{
 					"compression": "gzip",
