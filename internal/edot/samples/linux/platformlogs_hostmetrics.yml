@@ -1,6 +1,6 @@
 receivers:
   # Receiver for platform specific log files
-  filelog/platformlogs:
+  file_log/platformlogs:
     include: [ /var/log/*.log ]
     retry_on_failure:
       enabled: true
@@ -103,7 +103,7 @@ service:
       processors: [resourcedetection]
       exporters: [elasticsearch/otel]
     logs/platformlogs:
-      receivers: [filelog/platformlogs]
+      receivers: [file_log/platformlogs]
       processors: [resourcedetection]
       exporters: [elasticsearch/otel]
     # Uncomment the following lines only if the profiling receiver and
