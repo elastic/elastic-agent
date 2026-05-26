@@ -1192,7 +1192,9 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *tes
 			require.NoError(t, yaml.Unmarshal(capture.saved, &got))
 			agentSection, ok := got["agent"].(map[any]any)
 			require.True(t, ok, "saved yaml must contain agent section")
-			assert.Equal(t, tt.policyLevel, agentSection["logging.level"], "agent.logging.level should be persisted to fleet.enc")
+			loggingSection, ok := agentSection["logging"].(map[any]any)
+			require.True(t, ok, "saved yaml must contain logging section")
+			assert.Equal(t, tt.policyLevel, loggingSection["level"], "agent.logging.level should be persisted to fleet.enc")
 
 			override, present := agentSection["logging.level_override"]
 			if tt.overrideLevel != "" {
@@ -1265,7 +1267,7 @@ func TestFleetToReaderPersistsLoggingOutputFlags(t *testing.T) {
 		}))
 		require.NoError(t, err)
 
-		assert.False(t, h.hasLoggingConfigChanged(policyWithSameLogging),
+		assert.False(t, h.hasLoggingConfigChanged(policyWithSameLogging, nil),
 			"after re-exec + reload the same policy must not be detected as a logging change, which would cause an infinite re-exec loop")
 	})
 }

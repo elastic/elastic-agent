@@ -461,7 +461,6 @@ func fleetToReader(agentID string, headers map[string]string, logLevelOverride s
 	agentConfig := map[string]interface{}{
 		"id":                           agentID,
 		"headers":                      headers,
-		"logging.level":                cfg.Settings.LoggingConfig.Level,
 		"logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
 		"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
 		"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
