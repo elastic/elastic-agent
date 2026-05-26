@@ -107,6 +107,11 @@ receivers:
           value_type: int
         scalar_oids:
           - oid: ".1.3.6.1.2.1.1.8.0"
+  azuremonitor:
+    subscription_ids:
+      - 00000000-0000-0000-0000-000000000000
+    cloud: AzureCloud
+    credentials: default_credentials
 
 connectors:
   spanmetrics:
@@ -205,6 +210,7 @@ service:
         - postgresql
         - prometheusremotewrite
         - snmp
+        - azuremonitor
         - statsd
 
     metrics/aggregated:
