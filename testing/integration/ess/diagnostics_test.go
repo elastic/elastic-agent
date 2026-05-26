@@ -385,7 +385,8 @@ outputs:
     type: elasticsearch
     hosts: [{{ .ESHost }}]
     api_key: placeholder
-agent.monitoring.enabled: false
+agent.monitoring.enabled: {{ .MonitoringEnabled }}
+{{ if .MonitoringEnabled }}agent.monitoring.metrics_period: 2s{{ end }}
 agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 `
 
@@ -415,11 +416,13 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 	testCases := []struct {
 		name                         string
 		runtime                      string
+		monitoringEnabled            bool
 		expectedCompDiagnosticsFiles []string
 	}{
 		{
-			name:    "filebeat process",
-			runtime: "process",
+			name:              "filebeat process",
+			runtime:           "process",
+			monitoringEnabled: false,
 			expectedCompDiagnosticsFiles: append(compDiagnosticsFiles,
 				"registry.tar.gz",
 				"input_metrics.json",
@@ -429,8 +432,9 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 			),
 		},
 		{
-			name:    "filebeat receiver",
-			runtime: "otel",
+			name:              "filebeat receiver",
+			runtime:           "otel",
+			monitoringEnabled: true,
 			expectedCompDiagnosticsFiles: []string{
 				"registry.tar.gz",
 				"beat_metrics.json",
@@ -460,11 +464,13 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 			var configBuffer bytes.Buffer
 			require.NoError(t,
 				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
-					"Runtime":   tc.runtime,
-					"InputFile": inputFile.Name(),
-					"ESHost":    esURL.Host,
+					"Runtime":           tc.runtime,
+					"InputFile":         inputFile.Name(),
+					"ESHost":            esURL.Host,
+					"MonitoringEnabled": tc.monitoringEnabled,
 				}))
 			expDiagFiles := append([]string{}, diagnosticsFiles...)
+			var extraPatterns []filePattern
 			if tc.runtime == "otel" {
 				// EDOT adds these extra files.
 				// TestBeatDiagnostics is quite strict about what it expects to see in the archive.
@@ -477,11 +483,20 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 					"edot/threadcreate.profile.gz",
 					"edot/otel-merged-actual.yaml")
 			}
+			if tc.monitoringEnabled {
+				// When OTel-based elasticsearch monitoring is active, the manager
+				// injects a file exporter that writes zstd-compressed OTLP JSON
+				// telemetry alongside the agent's own log files.
+				extraPatterns = append(extraPatterns, filePattern{
+					pattern:  path.Join("logs", "*", "elastic-agent-metrics.ndjson"),
+					optional: false,
+				})
+			}
 			err = f.Run(ctx, integrationtest.State{
 				Configure:  configBuffer.String(),
 				AgentState: expectedAgentState,
 				Components: expectedComponentState,
-				After:      testDiagnosticsFactory(t, filebeatSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+				After:      testDiagnosticsFactory(t, filebeatSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}, extraPatterns...),
 			})
 			assert.NoError(t, err)
 		})
@@ -588,15 +603,32 @@ agent.internal.runtime.filebeat.filestream: otel
 	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
 }
 
-func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
+func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string, extraPatterns ...filePattern) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
+		// If any required extra patterns are present (e.g. the metrics file
+		// written by the OTel file exporter after the first collection cycle),
+		// wait long enough for at least one cycle to complete before gathering
+		// diagnostics. The metrics period configured in the test is 2 s, so
+		// 10 s gives a comfortable margin even if the OTel monitoring collector
+		// takes a few seconds to start after the agent reports HEALTHY.
+		for _, p := range extraPatterns {
+			if !p.optional {
+				select {
+				case <-time.After(10 * time.Second):
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				break
+			}
+		}
+
 		diagZip, err := fix.ExecDiagnostics(ctx, cmd...)
 
 		// get the version of the running agent
 		avi, err := getRunningAgentVersion(ctx, fix)
 		require.NoError(t, err)
 
-		verifyDiagnosticArchive(t, compSetup, diagZip, diagFiles, diagCompFiles, avi)
+		verifyDiagnosticArchive(t, compSetup, diagZip, diagFiles, diagCompFiles, avi, extraPatterns...)
 
 		// preserve the diagnostic archive if the test failed
 		if t.Failed() {
@@ -607,7 +639,7 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 	}
 }
 
-func verifyDiagnosticArchive(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagArchive string, diagFiles []string, diagCompFiles []string, avi *client.Version) {
+func verifyDiagnosticArchive(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagArchive string, diagFiles []string, diagCompFiles []string, avi *client.Version, extraPatterns ...filePattern) {
 	// check that the archive is not an empty file
 	stat, err := os.Stat(diagArchive)
 	require.NoErrorf(t, err, "stat file %q failed", diagArchive)
@@ -620,6 +652,7 @@ func verifyDiagnosticArchive(t *testing.T, compSetup map[string]integrationtest.
 
 	compAndUnitNames := extractComponentAndUnitNames(compSetup)
 	expectedDiagArchiveFilePatterns := compileExpectedDiagnosticFilePatterns(avi, diagFiles, diagCompFiles, compAndUnitNames)
+	expectedDiagArchiveFilePatterns = append(expectedDiagArchiveFilePatterns, extraPatterns...)
 
 	expectedExtractedFiles := map[string]struct{}{}
 	for _, filePattern := range expectedDiagArchiveFilePatterns {
