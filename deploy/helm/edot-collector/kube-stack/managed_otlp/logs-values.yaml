@@ -58,7 +58,7 @@ collectors:
         # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
         debug:
           verbosity: basic
-        otlp/gateway:
+        otlp_grpc/gateway:
           endpoint: "http://opentelemetry-kube-stack-gateway-collector-headless:4317"
           tls:
             insecure: true
@@ -134,7 +134,7 @@ collectors:
               from_attribute: host.id
               action: insert
         # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
-        k8sattributes:
+        k8s_attributes:
           filter:
             # Only retrieve pods running on the same node as the collector
             node_from_env_var: OTEL_K8S_NODE_NAME
@@ -170,22 +170,35 @@ collectors:
       receivers:
         otlp: null
         # [File Log Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver)
-        filelog:
+        file_log:
           exclude:
             # exlude opentelemetry-kube-stack pod logs
             - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
+<<<<<<< HEAD
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+=======
+      extensions:
+        cgroup_runtime: {}
+      # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
+      service:
+        extensions: [cgroup_runtime]
+>>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
         pipelines:
           logs: null
           metrics: null
           traces: null
           logs/node:
             receivers:
-              - filelog
+              - file_log
             processors:
               - batch
+<<<<<<< HEAD
               - k8sattributes
+=======
+              - k8s_attributes
+              - resourcedetection/env
+>>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
               - resourcedetection/system
               - resourcedetection/eks
               - resourcedetection/gcp
@@ -193,7 +206,7 @@ collectors:
               - resource/hostname
               - resource/cloud
             exporters:
-              - otlp/gateway
+              - otlp_grpc/gateway
   #  Gateway is a K8s deployment EDOT collector focused on processing and
   #  forwarding telemetry to an Elasticsearch endpoint.
   gateway:
@@ -237,7 +250,12 @@ collectors:
       processors: {}
       exporters:
         debug:
+<<<<<<< HEAD
         otlp/ingest:
+=======
+          verbosity: basic
+        otlp_grpc/ingest:
+>>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
           endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
           headers:
             Authorization: ApiKey ${env:ELASTIC_API_KEY}
@@ -251,12 +269,19 @@ collectors:
               min_size: 1_000_000 # 1MB uncompressed
               max_size: 4_000_000 # 4MB uncompressed
           timeout: 15s
+<<<<<<< HEAD
       service:
+=======
+      extensions:
+        cgroup_runtime: {}
+      service:
+        extensions: [cgroup_runtime]
+>>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
         pipelines:
           logs:
             receivers: [otlp]
             processors: []
-            exporters: [debug, otlp/ingest]
+            exporters: [debug, otlp_grpc/ingest]
 # For more details on OpenTelemetry's zero-code instrumentation, see:
 # https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
 instrumentation:
