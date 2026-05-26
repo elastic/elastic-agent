@@ -17,6 +17,8 @@ common:
         - .go-version
         - .package-version
         - version/version.go
+        post_checkout:
+          unshallow: true
 
 env:
   # The following images are defined here and their values will be updated by updatecli
@@ -494,6 +496,8 @@ steps:
         - .package-version
         - magefile.go
         - dev-tools
+        post_checkout:
+          unshallow: true
     if_changed:
       include:
         - .buildkite/pipeline.elastic-agent-package.yml
