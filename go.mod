@@ -288,11 +288,6 @@ require (
 	github.com/morikuni/aec v1.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-<<<<<<< HEAD
-	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.152.0 // indirect
-=======
-	github.com/oapi-codegen/runtime v1.4.0 // indirect
->>>>>>> dfacb7ca3 (Remove franz-go dependency from elastic-agent to shrink binary size (#14533))
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.152.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.152.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
