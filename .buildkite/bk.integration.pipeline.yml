@@ -931,7 +931,9 @@ steps:
         agents:
           *k8s_test_agent
         plugins:
-          - *vault_ec_key_prod
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
         matrix:
           setup:
             variants:
@@ -969,7 +971,9 @@ steps:
         agents:
           *k8s_test_agent
         plugins:
-          - *vault_ec_key_prod
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
         matrix:
           setup:
             variants:
@@ -1000,7 +1004,9 @@ steps:
         agents:
           *k8s_test_agent
         plugins:
-          - *vault_ec_key_prod
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
         matrix:
           setup:
             variants:
