@@ -93,12 +93,8 @@ func (mr *monitoringReceiver) updateMetrics() {
 		mr.logger.Info("couldn't collect metrics", zap.Error(err))
 		return
 	}
-	// Log the new metrics data so there is a record for troubleshooting in the logs / diagnostics.
-	// OpenMetrics text format is used instead of a JSON-reflected dump so the line stays small
-	// even when there are many scopes/data points — JSON reflection grows linearly with both the
-	// number of points and the verbose Go struct field names; OpenMetrics emits metadata once
-	// per metric. See openmetrics.go for the format and its tradeoffs.
-	mr.logger.Info("Collector internal telemetry metrics updated", zap.String("metrics", formatOpenMetrics(resourceMetrics.ScopeMetrics)))
+	// Log the new metrics data so there is a record for troubleshooting in the logs / diagnostics
+	mr.logger.Info("Collector internal telemetry metrics updated", zap.Reflect("metrics", resourceMetrics.ScopeMetrics))
 
 	exporterMetrics := convertScopeMetrics(resourceMetrics.ScopeMetrics)
 	for exporter, metrics := range exporterMetrics {
