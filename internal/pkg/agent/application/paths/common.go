@@ -59,6 +59,7 @@ var (
 	configPath                 string
 	configFilePath             string
 	logsPath                   string
+	isCustomLogsPath           bool
 	downloadsPath              string
 	componentsPath             string
 	installPath                string
@@ -67,6 +68,9 @@ var (
 	unversionedHome            bool
 	tmpCreator                 sync.Once
 )
+
+// IsCustomLogsPath reports whether --path.logs was explicitly set on the CLI.
+func IsCustomLogsPath() bool { return isCustomLogsPath }
 
 func init() {
 	// this is the first call where we need version information (it calls isInsideData())
@@ -88,7 +92,17 @@ func init() {
 	fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
 	fs.StringVar(&configFilePath, "config", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
-	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
+	fs.Func("path.logs", "Logs path contains Agent log output", func(s string) error {
+		// empty string resets to initial values - this is used by testing
+		if s == "" {
+			logsPath = topPath
+			isCustomLogsPath = false
+			return nil
+		}
+		logsPath = s
+		isCustomLogsPath = true
+		return nil
+	})
 	fs.StringVar(&installPath, "path.install", installPath, "DEPRECATED, setting this flag has no effect since v8.6.0")
 	fs.StringVar(&controlSocketPath, "path.socket", controlSocketPath, "Control protocol socket path for the Agent")
 

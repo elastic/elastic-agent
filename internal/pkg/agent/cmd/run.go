@@ -191,6 +191,8 @@ func runElasticAgentCritical(
 		cfg = configuration.DefaultConfiguration()
 	}
 
+	applyCustomLogsPath(cfg)
+
 	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig, true)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to create logger: %w", err))
@@ -550,6 +552,27 @@ func getOverwrites(ctx context.Context, rawConfig *config.Config) error {
 	}
 
 	return nil
+}
+
+// applyCustomLogsPath overrides the logging config to write to the user-specified
+// --path.logs location when that flag was explicitly set on the CLI. This ensures
+// the flag takes precedence over yaml settings such as agent.logging.to_stderr.
+// The internal file output (consumed by diagnostics) is always written to
+// paths.Home() and is unaffected.
+// See https://github.com/elastic/elastic-agent/issues/13320
+func applyCustomLogsPath(cfg *configuration.Configuration) {
+	if !paths.IsCustomLogsPath() {
+		return
+	}
+	if cfg.Settings.LoggingConfig != nil {
+		cfg.Settings.LoggingConfig.ToStderr = false
+		cfg.Settings.LoggingConfig.ToFiles = true
+		cfg.Settings.LoggingConfig.Files.Path = paths.Logs()
+	}
+	if cfg.Settings.EventLoggingConfig != nil {
+		cfg.Settings.EventLoggingConfig.ToStderr = false
+		cfg.Settings.EventLoggingConfig.ToFiles = true
+	}
 }
 
 func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) string {
