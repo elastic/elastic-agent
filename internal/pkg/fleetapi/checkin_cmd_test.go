@@ -16,9 +16,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+=======
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+>>>>>>> e4b05c00b (Extract ECSMeta types to pkg/ecsmeta for cross-repo sharing (#14396))
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
 type agentinfo struct{}
@@ -210,7 +215,7 @@ func TestCheckin(t *testing.T) {
 			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				type Request struct {
-					Metadata *info.ECSMeta `json:"local_metadata"`
+					Metadata *ecsmeta.ECSMeta `json:"local_metadata"`
 				}
 
 				var req *Request
@@ -244,7 +249,7 @@ func TestCheckin(t *testing.T) {
 			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				type Request struct {
-					Metadata *info.ECSMeta `json:"local_metadata"`
+					Metadata *ecsmeta.ECSMeta `json:"local_metadata"`
 				}
 
 				var req *Request
@@ -278,7 +283,7 @@ func TestCheckin(t *testing.T) {
 			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				type Request struct {
-					Metadata *info.ECSMeta `json:"local_metadata"`
+					Metadata *ecsmeta.ECSMeta `json:"local_metadata"`
 				}
 
 				var req *Request
