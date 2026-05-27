@@ -155,7 +155,7 @@ collectors:
               - debug
               - otlp_grpc/gateway
             processors:
-              - k8sattributes
+              - k8s_attributes
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
@@ -457,7 +457,7 @@ collectors:
               - file_log
             processors:
               - batch
-              - k8sattributes
+              - k8s_attributes
               - resourcedetection/system
               - resourcedetection/eks
               - resourcedetection/gcp
@@ -472,7 +472,7 @@ collectors:
               - hostmetrics
             processors:
               - batch/metrics
-              - k8sattributes
+              - k8s_attributes
               - resourcedetection/system
               - resourcedetection/eks
               - resourcedetection/gcp
