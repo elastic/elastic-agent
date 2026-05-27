@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -86,6 +87,19 @@ func isRetryableError(err error) bool {
 // between makes dispose fail with ACCESS DENIED because the kernel re-applies
 // the image-section check on a freshly opened handle.
 func removeBlockingExe(blockingErr error) error {
+	// Trim the working set before touching the file so that any resident pages
+	// of the mapped executable are evicted. This is a diagnostic aid: a
+	// trimmed working set makes memory-corruption symptoms (stale image pages
+	// still in RAM after the file is deleted) appear earlier and more
+	// reproducibly.
+	if err := trimCurrentProcessWorkingSet(); err != nil {
+		return fmt.Errorf("trim working set: %w", err)
+	}
+	// Run the GC when we return so that any Go-managed references to the
+	// deleted file object are released promptly, which can surface use-after-
+	// free bugs sooner.
+	defer runtime.GC()
+
 	path, _ := getPathFromError(blockingErr)
 	if path == "" {
 		return fmt.Errorf("could not determine blocked path from error: %w", blockingErr)
@@ -104,6 +118,14 @@ func removeBlockingExe(blockingErr error) error {
 		return fmt.Errorf("mark %q for delete-on-close: %w", path, err)
 	}
 	return nil
+}
+
+// trimCurrentProcessWorkingSet asks the kernel to evict all resident pages
+// from the current process's working set. Passing ^uintptr(0) for both the
+// minimum and maximum working-set sizes is the documented Windows technique
+// for an immediate trim (see SetProcessWorkingSetSizeEx docs).
+func trimCurrentProcessWorkingSet() error {
+	return windows.SetProcessWorkingSetSizeEx(windows.CurrentProcess(), ^uintptr(0), ^uintptr(0), 0)
 }
 
 // getPathFromError extracts the file path and underlying syscall.Errno from
