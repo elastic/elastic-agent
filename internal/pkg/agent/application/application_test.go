@@ -64,7 +64,7 @@ func TestLimitsLog(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	rollbackSrc := newMockRollbacksSource(t)
+	rollbackSrc := ttl.NewMockSource(t)
 
 	_, _, _, err := New(
 		ctx,
@@ -326,14 +326,14 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 
 	tests := []struct {
 		name                    string
-		setup                   func(t *testing.T, topDir string) (*upgrade.UpdateMarker, rollbacksSource)
+		setup                   func(t *testing.T, topDir string) (*upgrade.UpdateMarker, ttl.Source)
 		postNormalizeAssertions func(t *testing.T, topDir string, initialUpdateMarker *upgrade.UpdateMarker)
 	}{
 		{
 			name: "happy path: single install, no rollbacks, no modifications needed",
-			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, rollbacksSource) {
-				mockRollbackSource := newMockRollbacksSource(t)
-				mockRollbackSource.EXPECT().Get().Return(nil, nil)
+			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, ttl.Source) {
+				mockRollbackSource := ttl.NewMockSource(t)
+				mockRollbackSource.EXPECT().GetAll().Return(nil, nil, nil)
 				return nil, mockRollbackSource
 			},
 
@@ -341,18 +341,18 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 		},
 		{
 			name: "Agent was manually rolled back: rolled back install is removed from the list",
-			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, rollbacksSource) {
+			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, ttl.Source) {
 				newAgentInstallPath := createFakeAgentInstall(t, topDir, "4.5.6", "newversionhash", true)
 				oldAgentInstallPath := createFakeAgentInstall(t, topDir, "1.2.3", "oldversionhash", true)
 
-				mockRollbackSource := newMockRollbacksSource(t)
-				mockRollbackSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
+				mockRollbackSource := ttl.NewMockSource(t)
+				mockRollbackSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
 					oldAgentInstallPath: {
 						Version:    "1.2.3",
 						Hash:       "oldversionhash",
 						ValidUntil: tomorrow,
 					},
-				}, nil)
+				}, nil, nil)
 
 				updateMarker := &upgrade.UpdateMarker{
 					Version:           "4.5.6",
@@ -382,13 +382,13 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 		},
 		{
 			name: "Entries not having a matching install directory will be removed from the list",
-			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, rollbacksSource) {
+			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, ttl.Source) {
 				_ = createFakeAgentInstall(t, topDir, "4.5.6", "newversionhash", true)
 				oldAgentInstallPath := createFakeAgentInstall(t, topDir, "1.2.3", "oldversionhash", true)
 
-				mockRollbackSource := newMockRollbacksSource(t)
+				mockRollbackSource := ttl.NewMockSource(t)
 				nonExistingVersionedHome := filepath.Join("data", "thisdirectorydoesnotexist")
-				mockRollbackSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
+				mockRollbackSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
 					oldAgentInstallPath: {
 						Version:    "1.2.3",
 						Hash:       "oldversionhash",
@@ -399,7 +399,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 						Hash:       "nonExistingHash",
 						ValidUntil: tomorrow,
 					},
-				}, nil)
+				}, nil, nil)
 
 				return nil, mockRollbackSource
 			},
@@ -407,7 +407,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 		},
 		{
 			name: "Expired installs still existing on disk will be removed from the install list and removed from disk",
-			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, rollbacksSource) {
+			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, ttl.Source) {
 				_ = createFakeAgentInstall(t, topDir, "4.5.6", "newversionhash", true)
 				oldAgentInstallPath := createFakeAgentInstall(t, topDir, "1.2.3", "oldversionhash", true)
 
@@ -415,8 +415,8 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 				assert.Equal(t, oldAgentInstallPath, filepath.Join("data", "elastic-agent-1.2.3-oldver"),
 					"Unexpected old install versioned home. Post normalize assertions may not be working")
 
-				mockRollbackSource := newMockRollbacksSource(t)
-				mockRollbackSource.EXPECT().Get().Return(
+				mockRollbackSource := ttl.NewMockSource(t)
+				mockRollbackSource.EXPECT().GetAll().Return(
 					map[string]ttl.TTLMarker{
 						oldAgentInstallPath: {
 							Version:    "1.2.3",
@@ -424,7 +424,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 							ValidUntil: yesterday,
 						},
 					},
-					nil,
+					nil, nil,
 				)
 
 				mockRollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-1.2.3-oldver")).Return(nil)

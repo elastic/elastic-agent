@@ -80,10 +80,6 @@ type stateStore interface {
 	Action() fleetapi.Action
 }
 
-type rollbacksSource interface {
-	Get() (map[string]ttl.TTLMarker, error)
-}
-
 type FleetGateway struct {
 	log                *logger.Logger
 	client             client.Sender
@@ -97,7 +93,7 @@ type FleetGateway struct {
 	stateFetcher       StateFetcher
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
-	rollbackSource     rollbacksSource
+	rollbackSource     ttl.ReadOnlySource
 	compression        string
 }
 
@@ -110,7 +106,7 @@ func New(
 	stateStore stateStore,
 	stateFetcher StateFetcher,
 	cfg *configuration.FleetCheckin,
-	source rollbacksSource,
+	source ttl.ReadOnlySource,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
@@ -142,7 +138,7 @@ func newFleetGatewayWithScheduler(
 	acker acker.Acker,
 	stateStore stateStore,
 	stateFetcher StateFetcher,
-	source rollbacksSource,
+	source ttl.ReadOnlySource,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
 		log:            log,
@@ -415,10 +411,9 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get available rollbacks
-	rollbacks, err := f.rollbackSource.Get()
+	rollbacks, _, err := f.rollbackSource.GetAll()
 	if err != nil {
 		f.log.Warnf("error getting available rollbacks: %s", err.Error())
-		// this should already be nil but let's make sure that we don't include rollbacks in checkin body when encountering errors
 		rollbacks = nil
 	}
 
