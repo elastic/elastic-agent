@@ -839,7 +839,7 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		time.Now(),
 		newAgentInstall,
 		oldAgentInstall,
-		nil, nil)
+		nil, nil, nil)
 	require.NoError(t, err, "error writing fake update marker")
 }
 
@@ -890,7 +890,7 @@ func TestRollbackWithOpts_PreservesInTTLRollbacks(t *testing.T) {
 		time.Now(),
 		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
 		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
-		nil, nil,
+		nil, nil, nil,
 	)
 	require.NoError(t, err, "writing update marker")
 
@@ -967,7 +967,7 @@ func TestRollbackWithOpts_RemovesMalformedTTLEntries(t *testing.T) {
 		now,
 		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
 		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
-		nil, nil,
+		nil, nil, nil,
 	)
 	require.NoError(t, err, "writing update marker")
 
@@ -1040,7 +1040,7 @@ func TestRollbackWithOpts_RemovesExpiredTTLEntries(t *testing.T) {
 		now,
 		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
 		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
-		nil, nil,
+		nil, nil, nil,
 	)
 	require.NoError(t, err, "writing update marker")
 

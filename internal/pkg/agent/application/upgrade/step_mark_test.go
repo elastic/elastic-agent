@@ -232,7 +232,7 @@ func TestMarkUpgrade(t *testing.T) {
 				tc.setupBeforeMark(t, dataDir)
 			}
 
-			err := markUpgrade(log, dataDir, tc.args.updatedOn, tc.args.currentAgent, tc.args.previousAgent, tc.args.action, tc.args.details)
+			err := markUpgrade(log, dataDir, tc.args.updatedOn, tc.args.currentAgent, tc.args.previousAgent, tc.args.action, tc.args.details, nil)
 			tc.wantErr(t, err)
 			if tc.assertAfterMark != nil {
 				tc.assertAfterMark(t, dataDir)

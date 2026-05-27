@@ -141,7 +141,7 @@ func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper,
 		actionId = action.ActionID
 	}
 	upgradeDetails := details.NewDetails(release.VersionWithSnapshot(), details.StateRequested, actionId)
-	err = markUpgrade(log, paths.DataFrom(topDir), now, curAgentInstall, prevAgentInstall, action, upgradeDetails)
+	err = markUpgrade(log, paths.DataFrom(topDir), now, curAgentInstall, prevAgentInstall, action, upgradeDetails, nil)
 	if err != nil {
 		return "", "", fmt.Errorf("creating upgrade marker: %w", err)
 	}
