@@ -132,7 +132,6 @@ common:
       - complete-wolfi
     env: &k8s_test_env
       K8S_VERSION: "{{matrix.version}}"
-      ASDF_KIND_VERSION: "0.27.0"
       DOCKER_VARIANTS: "{{matrix.variants}}"
       TARGET_ARCH: "amd64"
     agent: &k8s_test_agent
@@ -142,14 +141,14 @@ common:
       diskSizeGb: 80
     command: &k8s_test_command |
       buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
-      .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
+      .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
     command: &k8s_test_command_with_sleep |
       MIN=0
       MAX=9
       # echo let's avoid running multiple requests at the same time to avoid overwhelming the cluster and causing deployment issues
       sleep $(( MIN + RANDOM % (MAX - MIN + 1) ))
       buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
-      .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
+      .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
     artifact_paths: &k8s_test_artifact_paths
       - build/*
       - build/diagnostics/**
