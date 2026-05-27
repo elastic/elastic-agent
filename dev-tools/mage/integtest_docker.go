@@ -211,7 +211,7 @@ func integTestDockerComposeEnvVars(cfg *Settings) map[string]string {
 // environment variable.
 func (d *DockerIntegrationTester) dockerComposeProjectName(cfg *Settings) string {
 	commit := cfg.Build.CommitHash()
-	version := strings.NewReplacer(".", "_").Replace(cfg.BeatQualifiedVersion())
+	version := strings.NewReplacer(".", "_").Replace(cfg.AgentQualifiedCoreVersion())
 
 	projectName := "{{.BeatName}}_{{.Version}}_{{.ShortCommit}}-{{.StackEnvironment}}"
 	projectName = MustExpand(cfg, projectName, map[string]interface{}{
