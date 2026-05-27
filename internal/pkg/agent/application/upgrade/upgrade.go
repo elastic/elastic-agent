@@ -290,7 +290,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	var markerWritten bool
-	previousCommit := release.Commit() // saved so we can restore active.commit on failure
+	previousCommit := release.Commit() // captured here so the defer can restore active.commit on failure
 	cleanupPaths := []string{}
 	defer func() {
 		if err != nil {
@@ -308,14 +308,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 					err = goerrors.Join(err, rmErr)
 				}
 			}
-			// Clean up the pre-unpack marker on failure so it doesn't interfere with the next upgrade.
-			// Gap: if markUpgrade fails after writing the marker but before writing active.commit,
-			// markerWritten stays false; the stale marker stays but active.commit still points to the
-			// old version, so consistency is preserved. The marker is overwritten on the next upgrade.
+			// Remove the pre-unpack marker so it doesn't block the next upgrade attempt.
+			// If markUpgrade itself failed, markerWritten is false and the partial marker is left;
+			// active.commit still points to the old version so consistency is preserved.
 			if markerWritten {
 				if cleanMarkerErr := CleanMarker(u.log, paths.Data()); cleanMarkerErr != nil {
 					u.log.Warnw("failed to clean upgrade marker during upgrade cleanup", "error.message", cleanMarkerErr)
 				}
+				// Restore the previous active.commit so the running binary is still recognized after a failed upgrade.
 				activeCommitPath := filepath.Join(paths.Top(), agentCommitFile)
 				if restoreErr := os.WriteFile(activeCommitPath, []byte(previousCommit), 0600); restoreErr != nil {
 					u.log.Warnw("failed to restore active commit during upgrade cleanup", "error.message", restoreErr)
@@ -406,8 +406,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("cannot upgrade the agent: %w", err)
 	}
 
-	// Derive the target directory from metadata before unpacking. The upgrade marker written below lets
-	// periodic cleanup recognise newVersionedHome as an in-progress target and never sweep it as an orphan.
+	// Derive the target directory from metadata before unpacking so the marker written below protects it
+	// from cleanup before the directory exists.
 	if len(metadata.hash) < HashLen {
 		return nil, fmt.Errorf("archive metadata hash %q is shorter than the expected minimum of %d characters", metadata.hash, HashLen)
 	}
@@ -434,11 +434,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), previous, current)
 
-	// Write the marker before unpacking so periodic cleanup protects newVersionedHome even before the directory exists.
+	// Write the marker before unpacking so newVersionedHome is protected from cleanup before it exists on disk.
 	if err = u.markUpgrade(u.log, paths.Data(), time.Now(), current, previous, action, det, availableRollbacks); err != nil {
 		return nil, fmt.Errorf("writing upgrade marker: %w", err)
 	}
 	markerWritten = true
+	// newHome may not exist yet; os.RemoveAll in the defer is a no-op on a missing path.
 	cleanupPaths = append(cleanupPaths, newHome)
 
 	u.log.Infow("Unpacking agent package", "version", newVersion)
@@ -458,7 +459,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, goerrors.Join(err, fmt.Errorf("versionedhome is empty: %v", unpackRes))
 	}
 
-	// Mismatch means the marker written above is protecting the wrong directory.
+	// The pre-unpack marker was written for newVersionedHome; a mismatch would leave it protecting the wrong directory.
 	if filepath.Clean(unpackRes.VersionedHome) != filepath.Clean(newVersionedHome) {
 		return nil, fmt.Errorf("unpack placed files at %q but metadata predicted %q", unpackRes.VersionedHome, newVersionedHome)
 	}
@@ -509,6 +510,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		}
 	}
 
+	// Write TTL files only after the symlink has flipped, so the new install becomes a rollback target only once it is the live one.
 	if err = u.availableRollbacksSource.Set(availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: setting ttl markers failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
@@ -517,8 +519,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(paths.Top(), previous, current)
 
-	// Refresh the marker timestamp so the watcher's grace period is measured from now, not before unpack started.
-	// A stale timestamp would give the watcher less than the full grace period to supervise the new version.
+	// Refresh the marker timestamp so the grace period starts now, not from before unpack.
 	if err = u.markUpgrade(u.log, paths.Data(), time.Now(), current, previous, action, det, availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: refreshing upgrade marker failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)

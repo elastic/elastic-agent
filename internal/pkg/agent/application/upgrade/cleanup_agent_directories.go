@@ -18,15 +18,11 @@ import (
 
 // errCleanupDegraded signals that cleanupAgentDirectories completed but with
 // degraded verification (symlink and/or upgrade marker could not be read).
-// The scheduler's fast-retry logic detects it via errors.Is. The message text
-// is part of the contract: SRE alerting and dashboards may key on it.
+// Callers detect it via errors.Is.
 var errCleanupDegraded = errors.New("rollback cleanup completed with degraded verification")
 
-// dirClassifier holds the inputs needed to classify each agent directory during
-// cleanup. It is built once per cleanup run by cleanupAgentDirectories and
-// then queried per directory via shouldRemove. Splitting the classifier into
-// a method on this struct lets the 9-row decision matrix be unit-tested
-// directly without a filesystem fixture.
+// dirClassifier holds the inputs needed to decide whether each agent directory
+// should be removed during cleanup. Built once per cleanup run and queried per directory.
 type dirClassifier struct {
 	log                  *logger.Logger
 	callerProtected      map[string]bool
@@ -42,63 +38,56 @@ type dirClassifier struct {
 	expiredTTL map[string]bool
 }
 
-// shouldRemove returns true when the directory at relPath (relative to topDir)
-// is safe to delete. The decision follows a 9-row matrix:
-//
-//  1. caller-protected wins everything (current install, rollback target, ...)
-//  2. parsed TTL says keep (unexpired) -> keep
-//  3. parsed TTL says remove, but it's the live symlink target -> keep (defense in depth)
-//  4. parsed TTL says remove, and not the live symlink target -> remove
-//  5. no parsed TTL, symlink unreadable -> keep (cannot verify it isn't live)
-//  6. no parsed TTL, IS the live symlink target -> keep
-//  7. no parsed TTL, marker unreadable -> keep (cannot verify marker doesn't reference)
-//  8. no parsed TTL, active marker references it -> keep
-//  9. no parsed TTL, all verification passes -> remove (confirmed orphan)
+// shouldRemove returns true when the directory at relPath (relative to topDir) is safe to delete.
+// Decision order:
+//   - caller-protected: never remove
+//   - parsed TTL, unexpired: keep
+//   - parsed TTL, expired, live symlink target: keep (defense in depth)
+//   - parsed TTL, expired, not symlink target: remove
+//   - no TTL, symlink unreadable: keep (cannot verify it isn't live)
+//   - no TTL, IS the live symlink target: keep
+//   - no TTL, marker unreadable: keep (cannot verify marker doesn't reference it)
+//   - no TTL, active marker references it: keep
+//   - no TTL, all verification passes: remove (confirmed orphan)
 func (dc *dirClassifier) shouldRemove(relPath string) bool {
-	// Row 1: caller-protected wins everything.
 	if dc.callerProtected[relPath] {
 		return false
 	}
-	// Rows 2-4: parsed TTL.
 	if expired, hasTTL := dc.expiredTTL[relPath]; hasTTL {
 		if !expired {
-			return false // row 2: unexpired
+			return false
 		}
-		// Row 3: expired but the live symlink target. Defense in depth.
+		// Defense in depth: expired TTL but still the live symlink target — keep.
 		if dc.symlinkErr == nil && relPath == dc.symlinkTarget {
 			dc.log.Warnw("TTL is expired but directory is the live install symlink target; preserving",
 				"versionedHome", relPath)
 			return false
 		}
-		return true // row 4
+		return true
 	}
-	// Rows 5-9: no parsed TTL. Orphan candidate.
+	// No TTL entry — treat as orphan candidate; keep unless all verification passes.
 	if dc.symlinkErr != nil {
-		return false // row 5
+		return false
 	}
 	if relPath == dc.symlinkTarget {
-		return false // row 6
+		return false
 	}
 	if dc.markerErr != nil {
-		return false // row 7
+		return false
 	}
+	// In strict mode (requireMarkerDetails=true), a marker with nil Details cannot confirm an active upgrade, so it does not protect directories.
 	if dc.marker != nil && !IsTerminalState(dc.marker) && (!dc.requireMarkerDetails || dc.marker.Details != nil) {
 		if relPath == filepath.Clean(dc.marker.VersionedHome) || relPath == filepath.Clean(dc.marker.PrevVersionedHome) {
-			return false // row 8
+			return false
 		}
 	}
-	return true // row 9
+	return true
 }
 
-// cleanupAgentDirectories is the unified core of post-upgrade and periodic
-// rollback cleanup. It snapshots agent dirs, reads TTL markers, the upgrade
-// marker and the live install symlink, classifies each directory via
-// shouldRemove and sweeps the ones the classifier marks for removal.
-//
-// Returns the set of TTL-tracked rollbacks the filter chose to keep (so the
-// scheduler can pick the next wake-up time) and an aggregate error. If
-// verification was degraded (symlink and/or marker unreadable) the returned
-// error wraps errCleanupDegraded so callers can react conservatively.
+// cleanupAgentDirectories removes agent directories that are safe to delete and
+// returns the TTL-tracked rollbacks the filter chose to keep.
+// If the symlink or upgrade marker could not be read, the returned error wraps
+// errCleanupDegraded so callers can react conservatively.
 func cleanupAgentDirectories(
 	log *logger.Logger,
 	topDir string,
@@ -123,11 +112,7 @@ func cleanupAgentDirectories(
 			"versionedHome", versionedHome, "error.message", parseErr.Error())
 	}
 
-	// Single pass over parsed TTL markers: call the filter exactly once per
-	// entry, producing both the expiredTTL lookup used by shouldRemove and
-	// the leftoverRollbacks map returned to the scheduler. Calling the
-	// filter twice would cause CleanupExpiredRollbacks to log "expired,
-	// removing directory" twice per cleanup run.
+	// Reuse each filter result for both the removal map and the leftover set.
 	expiredTTL := make(map[string]bool, len(parsedRaw))
 	leftoverRollbacks := make(map[string]ttl.TTLMarker)
 	for versionedHome, m := range parsedRaw {
@@ -198,10 +183,6 @@ func cleanupAgentDirectories(
 	var aggregateErr error
 	for _, relPath := range toRemove {
 		hashedDir := filepath.Join(topDir, relPath)
-		// Unified per-removal log line for both callers (post-upgrade and
-		// periodic cleanup). The previous periodic-only string
-		// "removing agent directory" is intentionally gone; SRE alerts that
-		// keyed on either string should key on "Removing hashed data directory".
 		log.Infow("Removing hashed data directory", "file.path", hashedDir)
 		var ignoredDirs []string
 		if keepLogs {

@@ -128,10 +128,6 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return nil
 	}
 
-	// cleanup() reads the live TTL registry internally, so the caller only
-	// needs to protect the rollback target. In-TTL entries are protected by
-	// row 2 of the classifier (unexpired-TTL -> KEEP) in
-	// cleanup_agent_directories.go.
 	return Cleanup(log, topDirPath, settings.RemoveMarker, true, prevVersionedHome)
 }
 
@@ -150,13 +146,9 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	}
 
 	source := ttl.NewTTLMarkerRegistry(log, topDirPath)
-	// requireMarkerDetails=true: reject ambiguous legacy markers (nil Details)
-	// so they can't silently protect dirs that should be swept.
+	// requireMarkerDetails=true so legacy markers with nil Details cannot silently protect directories.
 	_, err := cleanupAgentDirectories(log, topDirPath, time.Now(), source, CleanupExpiredRollbacks, callerProtected, true, keepLogs)
 
-	// Marker preservation WARN is gated to the "would-have-deleted" path:
-	// when removeMarker is false the caller never intended to remove it,
-	// so there is nothing to log about preserving it.
 	if removeMarker {
 		if goerrors.Is(err, errCleanupDegraded) {
 			// Marker preservation: when verification was degraded we cannot

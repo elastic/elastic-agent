@@ -415,9 +415,6 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 				assert.Equal(t, oldAgentInstallPath, filepath.Join("data", "elastic-agent-1.2.3-oldver"),
 					"Unexpected old install versioned home. Post normalize assertions may not be working")
 
-				// The symlink is required so that liveVersionedHome can identify the running install and
-				// allow CleanAvailableRollbacks to proceed with removals (it skips removals when the
-				// symlink is unresolvable to avoid accidentally deleting the live installation).
 				createSymlinkForFakeInstall(t, topDir, newAgentInstallPath)
 
 				mockRollbackSource := ttl.NewMockSource(t)
@@ -501,8 +498,7 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 }
 
 // createSymlinkForFakeInstall creates the top-level elastic-agent symlink pointing at the binary
-// inside the given versioned home (relative to topDir). This is required by liveVersionedHome so
-// that CleanAvailableRollbacks can identify which install is live and proceed with removals.
+// inside the given versioned home (relative to topDir).
 func createSymlinkForFakeInstall(t *testing.T, topDir string, relVersionedHomePath string) {
 	t.Helper()
 	linkName := upgrade.AgentName

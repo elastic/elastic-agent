@@ -770,8 +770,7 @@ func createVersionedHomeFromHash(hash string) string {
 	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:HashLen]))
 }
 
-// versionedHomeFromMetadata derives the versioned home path from package metadata without unpacking the archive,
-// using the same logic the unpacker applies.
+// versionedHomeFromMetadata derives the versioned home path from package metadata without unpacking the archive.
 func versionedHomeFromMetadata(metadata packageMetadata) string {
 	if metadata.manifest != nil && metadata.manifest.Package.VersionedHome != "" {
 		pm := pathMapper{mappings: metadata.manifest.Package.PathMappings}

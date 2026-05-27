@@ -21,8 +21,8 @@ import (
 )
 
 // shouldRemove unit tests. These build a dirClassifier literal directly — no
-// filesystem fixture is needed — so each of the 9 decision-matrix rows can
-// be exercised in isolation.
+// filesystem fixture is needed — so each decision-matrix case can be exercised
+// in isolation.
 
 func newTestDirClassifier(t *testing.T) *dirClassifier {
 	t.Helper()
@@ -32,7 +32,7 @@ func newTestDirClassifier(t *testing.T) *dirClassifier {
 	}
 }
 
-func TestCleanupAgentDirectories_Row1_CallerProtected(t *testing.T) {
+func TestCleanupAgentDirectories_CallerProtected(t *testing.T) {
 	dc := newTestDirClassifier(t)
 	dc.callerProtected = map[string]bool{"data/elastic-agent-keep": true}
 	// Even an expired TTL must not flip this — caller-protected wins.
@@ -40,14 +40,14 @@ func TestCleanupAgentDirectories_Row1_CallerProtected(t *testing.T) {
 	assert.False(t, dc.shouldRemove("data/elastic-agent-keep"))
 }
 
-func TestCleanupAgentDirectories_Row2_UnexpiredTTL(t *testing.T) {
+func TestCleanupAgentDirectories_UnexpiredTTL(t *testing.T) {
 	dc := newTestDirClassifier(t)
 	// Has TTL, filter said NOT removable (unexpired) -> keep.
 	dc.expiredTTL = map[string]bool{"data/elastic-agent-keep": false}
 	assert.False(t, dc.shouldRemove("data/elastic-agent-keep"))
 }
 
-func TestCleanupAgentDirectories_Row3_ExpiredTTLOnSymlinkTarget(t *testing.T) {
+func TestCleanupAgentDirectories_ExpiredTTLOnSymlinkTarget(t *testing.T) {
 	dc := newTestDirClassifier(t)
 	dc.symlinkTarget = "data/elastic-agent-live"
 	dc.expiredTTL = map[string]bool{"data/elastic-agent-live": true}
@@ -55,31 +55,29 @@ func TestCleanupAgentDirectories_Row3_ExpiredTTLOnSymlinkTarget(t *testing.T) {
 	assert.False(t, dc.shouldRemove("data/elastic-agent-live"))
 }
 
-func TestCleanupAgentDirectories_Row4_ExpiredTTL_SymlinkUnresolvable(t *testing.T) {
+func TestCleanupAgentDirectories_ExpiredTTL_SymlinkUnresolvable(t *testing.T) {
 	dc := newTestDirClassifier(t)
 	dc.symlinkErr = errors.New("boom")
 	dc.expiredTTL = map[string]bool{"data/elastic-agent-expired": true}
-	// Expired TTL with no symlink to defend it -> remove (row 4).
-	// This is the Windows regression case: an unreadable symlink must not
-	// block the sweep of clearly-expired entries.
+	// Windows regression: an unreadable symlink must not block the sweep of expired entries.
 	assert.True(t, dc.shouldRemove("data/elastic-agent-expired"))
 }
 
-func TestCleanupAgentDirectories_Row5_Orphan_SymlinkUnresolvable(t *testing.T) {
+func TestCleanupAgentDirectories_Orphan_SymlinkUnresolvable(t *testing.T) {
 	dc := newTestDirClassifier(t)
 	dc.symlinkErr = errors.New("boom")
 	// Orphan dir, symlink unreadable -> keep conservatively.
 	assert.False(t, dc.shouldRemove("data/elastic-agent-orphan"))
 }
 
-func TestCleanupAgentDirectories_Row6_Orphan_IsSymlinkTarget(t *testing.T) {
+func TestCleanupAgentDirectories_Orphan_IsSymlinkTarget(t *testing.T) {
 	dc := newTestDirClassifier(t)
 	dc.symlinkTarget = "data/elastic-agent-live"
 	// Orphan dir but it IS the live install -> keep.
 	assert.False(t, dc.shouldRemove("data/elastic-agent-live"))
 }
 
-func TestCleanupAgentDirectories_Row7_Orphan_MarkerUnreadable(t *testing.T) {
+func TestCleanupAgentDirectories_Orphan_MarkerUnreadable(t *testing.T) {
 	dc := newTestDirClassifier(t)
 	dc.symlinkTarget = "data/elastic-agent-live"
 	dc.markerErr = errors.New("marker unreadable")
@@ -88,7 +86,7 @@ func TestCleanupAgentDirectories_Row7_Orphan_MarkerUnreadable(t *testing.T) {
 	assert.False(t, dc.shouldRemove("data/elastic-agent-orphan"))
 }
 
-func TestCleanupAgentDirectories_Row8_Orphan_MarkerReferencesIt(t *testing.T) {
+func TestCleanupAgentDirectories_Orphan_MarkerReferencesIt(t *testing.T) {
 	tests := []struct {
 		name                 string
 		requireMarkerDetails bool
@@ -130,10 +128,6 @@ func TestCleanupAgentDirectories_Row8_Orphan_MarkerReferencesIt(t *testing.T) {
 			wantRemove:           true,
 		},
 	}
-	// Build paths via filepath.Join so the test works on both Unix and
-	// Windows: shouldRemove calls filepath.Clean on marker.VersionedHome and
-	// PrevVersionedHome, which normalizes separators on Windows. Hardcoded
-	// forward-slash strings would fail to match the cleaned form.
 	targetHome := filepath.Join("data", "elastic-agent-target")
 	prevHome := filepath.Join("data", "elastic-agent-prev")
 	liveHome := filepath.Join("data", "elastic-agent-live")
@@ -156,7 +150,7 @@ func TestCleanupAgentDirectories_Row8_Orphan_MarkerReferencesIt(t *testing.T) {
 	}
 }
 
-func TestCleanupAgentDirectories_Row9_Orphan_AllVerificationPasses(t *testing.T) {
+func TestCleanupAgentDirectories_Orphan_AllVerificationPasses(t *testing.T) {
 	dc := newTestDirClassifier(t)
 	dc.symlinkTarget = "data/elastic-agent-live"
 	dc.marker = &UpdateMarker{
@@ -174,11 +168,10 @@ func TestCleanupAgentDirectories_ReturnsDegradedSentinel_OnSymlinkErr(t *testing
 	log, _ := loggertest.New(t.Name())
 	topDir := t.TempDir()
 
-	// One install, no symlink. liveVersionedHome will fail.
+	// One install, no symlink.
 	relHome := createFakeAgentInstall(t, topDir, "1.0.0", "aaaaaa", true)
 
-	// Unexpired TTL on the install so the scheduler can still compute the
-	// next wake-up from leftoverRollbacks even when cleanup is degraded.
+	// Unexpired TTL on the install — must be returned in leftoverRollbacks even when cleanup is degraded.
 	validUntil := time.Now().Add(24 * time.Hour)
 	wantMarker := ttl.TTLMarker{Version: "1.0.0", Hash: "aaaaaa", ValidUntil: validUntil}
 	source := ttl.NewTTLMarkerRegistry(log, topDir)
@@ -190,8 +183,7 @@ func TestCleanupAgentDirectories_ReturnsDegradedSentinel_OnSymlinkErr(t *testing
 	require.Error(t, err)
 	require.ErrorIs(t, err, errCleanupDegraded)
 
-	// Degraded must still return populated leftoverRollbacks so the scheduler
-	// can compute the next wake-up time (see manual_rollback.go scheduler).
+	// Degraded state must not drop unexpired rollbacks — the caller uses them to schedule the next cleanup.
 	require.NotNil(t, leftover)
 	got, ok := leftover[relHome]
 	require.True(t, ok, "unexpired TTL entry must be in leftoverRollbacks")
@@ -208,8 +200,7 @@ func TestCleanupAgentDirectories_ReturnsDegradedSentinel_OnMarkerErr(t *testing.
 	live := createFakeAgentInstall(t, topDir, "1.0.0", "aaaaaa", true)
 	createLink(t, topDir, live)
 
-	// Second install with an unexpired TTL: this is the entry whose presence
-	// in leftoverRollbacks the scheduler depends on for the next wake-up.
+	// Second install with an unexpired TTL.
 	rollbackHome := createFakeAgentInstall(t, topDir, "0.9.0", "bbbbbb", true)
 	validUntil := time.Now().Add(24 * time.Hour)
 	wantMarker := ttl.TTLMarker{Version: "0.9.0", Hash: "bbbbbb", ValidUntil: validUntil}
@@ -218,7 +209,7 @@ func TestCleanupAgentDirectories_ReturnsDegradedSentinel_OnMarkerErr(t *testing.
 		source.Set(map[string]ttl.TTLMarker{rollbackHome: wantMarker}),
 		"writing unexpired TTL marker for fixture")
 
-	// Write a malformed upgrade marker so LoadMarker returns an error.
+	// Write a malformed upgrade marker.
 	require.NoError(t, os.MkdirAll(filepath.Join(topDir, "data"), 0o750))
 	require.NoError(t,
 		os.WriteFile(filepath.Join(topDir, "data", markerFilename), []byte("not: valid: yaml: ["), 0o600),
@@ -248,7 +239,7 @@ func TestCleanup_PreservesMarker_WhenSymlinkUnresolvable(t *testing.T) {
 	require.NoError(t,
 		SaveMarker(filepath.Join(topDir, "data"), &UpdateMarker{Version: "1.2.3", Hash: "abc"}, true))
 
-	// No symlink. liveVersionedHome will fail.
+	// No symlink.
 
 	err := cleanup(log, topDir, true, false, 0)
 	require.Error(t, err)

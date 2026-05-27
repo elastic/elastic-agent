@@ -306,15 +306,10 @@ func PreserveActiveUpgradeVersions(marker *UpdateMarker, innerFilter RollbackCle
 }
 
 // CleanAvailableRollbacks removes agent installation directories that are safe to delete.
-// It scans every elastic-agent-* directory under the data path and delegates the
-// keep-or-remove decision per directory to cleanupAgentDirectories, which applies the
-// 9-row classifier in cleanup_agent_directories.go. Only directories that the classifier
-// positively identifies as safe (e.g. orphans with all verification passing, or TTL
-// entries the filter marked removable) are deleted. This caller passes
-// requireMarkerDetails=false: it runs in the lenient posture (legacy markers with nil
-// Details still protect dirs), unlike the post-upgrade cleanup which uses the strict
-// posture. The leftover TTL-tracked rollbacks are returned so the scheduler can pick
-// the next wake-up time.
+// It protects the current install and any unexpired TTL-tracked rollback targets.
+// Orphan directories (no TTL, no active marker reference) are swept.
+// Legacy upgrade markers with nil Details still protect referenced directories.
+// The remaining TTL entries are returned so the caller can schedule the next cleanup.
 func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
 	callerProtected := map[string]bool{filepath.Clean(currentHomeRelPath): true}
 	return cleanupAgentDirectories(log, topDir, now, source, filter, callerProtected, false, false)

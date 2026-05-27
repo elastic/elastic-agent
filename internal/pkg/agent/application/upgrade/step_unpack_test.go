@@ -868,7 +868,7 @@ func TestVersionedHomeFromMetadataMatchesUnpacker(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Replicate the path-derivation logic used by both unzip and untar (see unzip/untar in step_unpack.go).
+			// Derive the expected versioned home the same way the unpacker does.
 			pm := pathMapper{}
 			var unpackerVersionedHome string
 			if tt.metadata.manifest != nil {
