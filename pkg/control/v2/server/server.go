@@ -46,10 +46,6 @@ type TestModeConfigSetter interface {
 	SetConfig(ctx context.Context, cfg string) error
 }
 
-type RollbacksSource interface {
-	Get() (map[string]ttl.TTLMarker, error)
-}
-
 // Server is the daemon side of the control protocol.
 type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
@@ -64,11 +60,11 @@ type Server struct {
 	grpcConfig *configuration.GRPCConfig
 
 	tmSetter       TestModeConfigSetter
-	rollbackSource RollbacksSource
+	rollbackSource ttl.ReadOnlySource
 }
 
 // New creates a new control protocol server.
-func New(log *logger.Logger, agentInfo info.Agent, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks, grpcConfig *configuration.GRPCConfig, rollbackSource RollbacksSource) *Server {
+func New(log *logger.Logger, agentInfo info.Agent, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks, grpcConfig *configuration.GRPCConfig, rollbackSource ttl.ReadOnlySource) *Server {
 	return &Server{
 		logger:         log,
 		agentInfo:      agentInfo,
@@ -370,7 +366,7 @@ func (s *Server) Configure(ctx context.Context, req *cproto.ConfigureRequest) (*
 }
 
 func (s *Server) AvailableRollbacks(context.Context, *cproto.Empty) (*cproto.AvailableRollbacksResponse, error) {
-	rollbacks, err := s.rollbackSource.Get()
+	rollbacks, _, err := s.rollbackSource.GetAll()
 	if err != nil {
 		return &cproto.AvailableRollbacksResponse{
 			Error: fmt.Sprintf("error fetching rollbacks: %s", err.Error()),

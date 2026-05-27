@@ -49,12 +49,6 @@ import (
 	"github.com/elastic/elastic-agent/version"
 )
 
-type rollbacksSource interface {
-	Set(map[string]ttl.TTLMarker) error
-	Get() (map[string]ttl.TTLMarker, error)
-	Remove(string) error
-}
-
 // CfgOverrider allows for application driven overrides of configuration read from disk.
 type CfgOverrider func(cfg *configuration.Configuration)
 
@@ -72,7 +66,7 @@ func New(
 	disableMonitoring bool,
 	override CfgOverrider,
 	initialUpdateMarker *upgrade.UpdateMarker,
-	availableRollbacksSource rollbacksSource,
+	availableRollbacksSource ttl.Source,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -325,11 +319,11 @@ func New(
 //   - check if the agent install: if it is no longer valid collect the versioned home and the TTL marker for deletion
 //
 // This function will NOT error out, it will log any errors it encounters as warnings but any error must be treated as non-fatal
-func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource rollbacksSource) {
+func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource ttl.Source) {
 	// Check if we rolled back and update the TTL markers
 	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil && initialUpdateMarker.Details.State == details.StateRollback {
 		// Reset the TTL for the current version if we are coming off a rollback
-		rollbacks, err := rollbackSource.Get()
+		rollbacks, _, err := rollbackSource.GetAll()
 		if err != nil {
 			log.Warnf("Error getting available rollbacks from rollbackSource during startup check: %s", err)
 			return
