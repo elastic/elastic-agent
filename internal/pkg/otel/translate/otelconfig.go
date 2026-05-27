@@ -27,7 +27,6 @@ import (
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
-	"github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -262,7 +261,7 @@ func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(kafkapartitionerextension.Type.String()), extensionName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartitioner"), extensionName)
 }
 
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
