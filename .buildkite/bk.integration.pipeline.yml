@@ -130,6 +130,7 @@ common:
     default_variants: &k8s_test_default_variants
       - complete
       - complete-wolfi
+      - elastic-otel-collector
     env: &k8s_test_env
       K8S_VERSION: "{{matrix.version}}"
       DOCKER_VARIANTS: "{{matrix.variants}}"
@@ -944,6 +945,7 @@ steps:
       include:
         - .buildkite/**
         - magefile.go
+        - deploy/**
         - dev-tools/**
         - go.mod
         - go.sum
