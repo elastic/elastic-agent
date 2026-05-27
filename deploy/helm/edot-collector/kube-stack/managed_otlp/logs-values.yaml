@@ -170,7 +170,12 @@ collectors:
       receivers:
         otlp: null
         # [File Log Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver)
-        file_log:
+        # Note: using the deprecated name "filelog" intentionally. The logsCollection preset
+        # in the kube-stack chart injects a base filelog: config (include paths, operators,
+        # etc.) that this block merges into via mustMergeOverwrite. If the canonical name
+        # "file_log" is used instead, the preset config lands under a different map key and
+        # the merge doesn't happen, leaving the receiver with no include: paths configured.
+        filelog:
           exclude:
             # exlude opentelemetry-kube-stack pod logs
             - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
@@ -182,7 +187,7 @@ collectors:
           traces: null
           logs/node:
             receivers:
-              - file_log
+              - filelog
             processors:
               - batch
               - k8s_attributes
