@@ -1387,9 +1387,12 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					return agentVersion{version: upgradeVersion, hash: metadata.hash}
 				}
 				upgrader.unpacker = &mockUnpacker{
-					returnPackageMetadata: packageMetadata{manifest: &v1.PackageManifest{}, hash: "hash"},
-					returnUnpackError:     testError,
-					returnUnpackResult:    UnpackResult{Hash: "hash", VersionedHome: versionedHome},
+					returnPackageMetadata: packageMetadata{
+						manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: versionedHome}},
+						hash:     "abcdef",
+					},
+					returnUnpackError:  testError,
+					returnUnpackResult: UnpackResult{Hash: "abcdef", VersionedHome: versionedHome},
 				}
 			},
 			checkArchiveCleanup:       true,
@@ -1414,8 +1417,11 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					return agentVersion{version: upgradeVersion, hash: metadata.hash}
 				}
 				upgrader.unpacker = &mockUnpacker{
-					returnPackageMetadata: packageMetadata{manifest: &v1.PackageManifest{}, hash: "hash"},
-					returnUnpackResult:    UnpackResult{Hash: "hash", VersionedHome: versionedHome},
+					returnPackageMetadata: packageMetadata{
+						manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: versionedHome}},
+						hash:     "abcdef",
+					},
+					returnUnpackResult: UnpackResult{Hash: "abcdef", VersionedHome: versionedHome},
 				}
 				upgrader.copyActionStore = func(_ *logger.Logger, _ string) error { return nil }
 				upgrader.copyRunDirectory = func(_ *logger.Logger, _, _ string) error { return nil }
