@@ -37,12 +37,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-	"github.com/elastic/elastic-agent/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/scheduler"
 )
 
 type clientCallbackFunc func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error)
