@@ -17,18 +17,10 @@
 
 * Upgrade npm to v11 in non-wolfi `elastic-agent-complete` Docker images. [#14167](https://github.com/elastic/elastic-agent/pull/14167) 
 * Fix `rpm --prefix` installation service file not being found after reboot. [#13284](https://github.com/elastic/elastic-agent/pull/13284) 
-* Make enrollment retry backoff respect context cancellation. [#13698](https://github.com/elastic/elastic-agent/pull/13698) 
-
-  The enrollment retry loop&#39;s backoff wait was not context-aware, so a
-  canceled context could not interrupt the current sleep. This caused
-  `elastic-agent uninstall` and graceful shutdown to block for up to
-  EnrollBackoffMax (10 minutes) while the agent was retrying enrollment
-  against an unreachable Fleet Server. The retry loop now exits
-  immediately when the caller&#39;s context is canceled.
-  
+* Make enrollment retry backoff respect context cancellation. [#13698](https://github.com/elastic/elastic-agent/pull/13698)
 * Clean up leftover artifacts when `elastic-agent install` fails. [#13705](https://github.com/elastic/elastic-agent/pull/13705) 
 * Stop MIGRATE action from inheriting the source cluster's Fleet configuration. [#13756](https://github.com/elastic/elastic-agent/pull/13756) 
-* Report policy id and revision in checkin when acks are disabled. [#13938](https://github.com/elastic/elastic-agent/pull/13938) [#264983](https://github.com/elastic/kibana/issues/264983)
+* Report policy ID and revision in checkin when policy change acknowledgements are disabled. [#13938](https://github.com/elastic/elastic-agent/pull/13938) [#264983](https://github.com/elastic/kibana/issues/264983)
 * Fix handling of console events on Windows. [#13862](https://github.com/elastic/elastic-agent/pull/13862) [#13586](https://github.com/elastic/elastic-agent/issues/13586)
 * Retry delayed enrollment on invalid token instead of failing fast. [#13861](https://github.com/elastic/elastic-agent/pull/13861) 
 * Stop the Windows service promptly during enrollment retries. [#13878](https://github.com/elastic/elastic-agent/pull/13878) 
