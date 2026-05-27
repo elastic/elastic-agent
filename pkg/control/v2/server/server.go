@@ -54,6 +54,7 @@ type stateSubscriber interface {
 type RollbacksSource interface {
 	Get() (map[string]ttl.TTLMarker, error)
 }
+
 // Server is the daemon side of the control protocol.
 type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
