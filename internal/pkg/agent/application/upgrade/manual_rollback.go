@@ -233,7 +233,7 @@ func extractAgentInstallsFromMarker(updateMarker *UpdateMarker) (previous agentI
 		parsedVersion: previousParsedVersion,
 		version:       updateMarker.PrevVersion,
 		hash:          updateMarker.PrevHash,
-		versionedHome: updateMarker.PrevVersionedHome,
+		versionedHome: filepath.FromSlash(updateMarker.PrevVersionedHome),
 	}
 
 	currentParsedVersion, err := version.ParseVersion(updateMarker.Version)
@@ -244,7 +244,7 @@ func extractAgentInstallsFromMarker(updateMarker *UpdateMarker) (previous agentI
 		parsedVersion: currentParsedVersion,
 		version:       updateMarker.Version,
 		hash:          updateMarker.Hash,
-		versionedHome: updateMarker.VersionedHome,
+		versionedHome: filepath.FromSlash(updateMarker.VersionedHome),
 	}
 
 	return previous, current, nil

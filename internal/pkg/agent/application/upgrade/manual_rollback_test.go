@@ -127,14 +127,14 @@ func TestManualRollback(t *testing.T) {
 		parsedVersion: parsed123Version,
 		version:       "1.2.3",
 		hash:          "oldver",
-		versionedHome: "data/elastic-agent-1.2.3-oldver",
+		versionedHome: filepath.Join("data", "elastic-agent-1.2.3-oldver"),
 	}
 
 	agentInstall456 := agentInstall{
 		parsedVersion: parsed456Version,
 		version:       "4.5.6",
 		hash:          "newver",
-		versionedHome: "data/elastic-agent-4.5.6-newver",
+		versionedHome: filepath.Join("data", "elastic-agent-4.5.6-newver"),
 	}
 
 	agentInstallCurrent := agentInstall{
@@ -505,7 +505,7 @@ func TestManualRollback(t *testing.T) {
 					UpdatedOn:         aMomentInTime,
 					PrevVersion:       "1.2.3",
 					PrevHash:          "oldver",
-					PrevVersionedHome: "data/elastic-agent-1.2.3-oldver",
+					PrevVersionedHome: filepath.Join("data", "elastic-agent-1.2.3-oldver"),
 					Details: &details.Details{
 						TargetVersion: release.VersionWithSnapshot(),
 						State:         details.StateRequested,
