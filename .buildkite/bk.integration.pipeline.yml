@@ -118,7 +118,6 @@ steps:
       INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
     command: |
       #!/usr/bin/env bash
-      buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh ech true
     artifact_paths:
       - build/*
