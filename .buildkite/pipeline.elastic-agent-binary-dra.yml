@@ -9,8 +9,8 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1779223036"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1779223036"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1779464011"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1779464011"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -48,7 +48,7 @@ steps:
       plugins:
         - *google_oidc_plugin
 
-    - label: ":package: linux/amd64 FIPS Elastic-Agent Core Snapshot"
+    - label: ":package: linux/amd64 windows/amd64 FIPS Elastic-Agent Core Snapshot"
       commands:
         - .buildkite/scripts/steps/build-agent-core.sh
       key: "build-dra-snapshot-x86-fips"
@@ -60,7 +60,7 @@ steps:
         image: "${IMAGE_UBUNTU_2404_X86_64}"
       env:
         DRA_WORKFLOW: "snapshot"
-        PLATFORMS: "linux/amd64"
+        PLATFORMS: "linux/amd64 windows/amd64"
         FIPS: "true"
       plugins:
         - *google_oidc_plugin
@@ -81,7 +81,7 @@ steps:
       plugins:
         - *google_oidc_plugin
 
-    - label: ":package: linux/arm64 FIPS Elastic-Agent Core Snapshot"
+    - label: ":package: linux/arm64 windows/arm64 FIPS Elastic-Agent Core Snapshot"
       commands:
         - .buildkite/scripts/steps/build-agent-core.sh
       key: "build-dra-snapshot-arm-fips"
@@ -93,7 +93,7 @@ steps:
         image: "${IMAGE_UBUNTU_2404_ARM_64}"
       env:
         DRA_WORKFLOW: "snapshot"
-        PLATFORMS: "linux/arm64"
+        PLATFORMS: "linux/arm64 windows/arm64"
         FIPS: "true"
       plugins:
         - *google_oidc_plugin
@@ -153,7 +153,7 @@ steps:
       plugins:
         - *google_oidc_plugin
 
-    - label: ":package: linux/amd64 FIPS Elastic-Agent Core staging"
+    - label: ":package: linux/amd64 windows/amd64 FIPS Elastic-Agent Core staging"
       commands: |
         source .buildkite/scripts/version_qualifier.sh
         .buildkite/scripts/steps/build-agent-core.sh
@@ -166,7 +166,7 @@ steps:
         image: "${IMAGE_UBUNTU_2404_X86_64}"
       env:
         DRA_WORKFLOW: "staging"
-        PLATFORMS: "linux/amd64"
+        PLATFORMS: "linux/amd64 windows/amd64"
         FIPS: "true"
       plugins:
         - *google_oidc_plugin
@@ -188,7 +188,7 @@ steps:
       plugins:
         - *google_oidc_plugin
 
-    - label: ":package: linux/arm64 FIPS Elastic-Agent Core staging"
+    - label: ":package: linux/arm64 windows/arm64 FIPS Elastic-Agent Core staging"
       commands: |
         source .buildkite/scripts/version_qualifier.sh
         .buildkite/scripts/steps/build-agent-core.sh
@@ -201,7 +201,7 @@ steps:
         image: "${IMAGE_UBUNTU_2404_ARM_64}"
       env:
         DRA_WORKFLOW: "dra-core-staging"
-        PLATFORMS: "linux/arm64"
+        PLATFORMS: "linux/arm64 windows/arm64"
         FIPS: "true"
       plugins:
         - *google_oidc_plugin

@@ -93,9 +93,6 @@ func (mr *monitoringReceiver) updateMetrics() {
 		mr.logger.Info("couldn't collect metrics", zap.Error(err))
 		return
 	}
-	// Log the new metrics data so there is a record for troubleshooting in the logs / diagnostics
-	mr.logger.Info("Collector internal telemetry metrics updated", zap.Reflect("metrics", resourceMetrics.ScopeMetrics))
-
 	exporterMetrics := convertScopeMetrics(resourceMetrics.ScopeMetrics)
 	for exporter, metrics := range exporterMetrics {
 		componentID, ok := mr.config.ExporterNames[exporter]

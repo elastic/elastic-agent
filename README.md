@@ -99,6 +99,7 @@ To build a local version of the agent for development, run the command below. Th
 * linux/amd64
 * linux/arm64
 * windows/amd64
+* windows/arm64
 
 ```sh
 # EXTERNAL=true downloads the matching version of the binaries that are packaged with agent, not necessary if only using Beats.
@@ -115,10 +116,10 @@ To install the agent extract the package and run the install command:
 cd build/distributions
 tar xvfz elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64.tar.gz
 cd elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64
-sudo elastic-agent install
+sudo ./elastic-agent install
 ```
 
-For basic use the agent binary can be run directly, with the `sudo elastic-agent run` command.
+For basic use the agent binary can be run directly, with the `./elastic-agent run` command.
 
 #### Packaging for other architectures
 When packaging for an architecture different than the host machine,
