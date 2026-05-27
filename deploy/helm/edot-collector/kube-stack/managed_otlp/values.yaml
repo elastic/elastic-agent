@@ -150,9 +150,10 @@ collectors:
               enabled: true
       extensions:
         cgroup_runtime: {}
+        health_check: {}
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-        extensions: [cgroup_runtime]
+        extensions: [cgroup_runtime, health_check]
         pipelines:
           metrics:
             exporters:
@@ -465,9 +466,10 @@ collectors:
             - container.id
       extensions:
         cgroup_runtime: {}
+        health_check: {}
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-        extensions: [cgroup_runtime]
+        extensions: [cgroup_runtime, health_check]
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -606,8 +608,9 @@ collectors:
           timeout: 15s
       extensions:
         cgroup_runtime: {}
+        health_check: {}
       service:
-        extensions: [cgroup_runtime]
+        extensions: [cgroup_runtime, health_check]
         pipelines:
           metrics:
             receivers: [otlp]

@@ -192,9 +192,10 @@ collectors:
             - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
       extensions:
         cgroup_runtime: {}
+        health_check: {}
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-        extensions: [cgroup_runtime]
+        extensions: [cgroup_runtime, health_check]
         pipelines:
           logs: null
           metrics: null
@@ -274,8 +275,9 @@ collectors:
           timeout: 15s
       extensions:
         cgroup_runtime: {}
+        health_check: {}
       service:
-        extensions: [cgroup_runtime]
+        extensions: [cgroup_runtime, health_check]
         pipelines:
           logs:
             receivers: [otlp]

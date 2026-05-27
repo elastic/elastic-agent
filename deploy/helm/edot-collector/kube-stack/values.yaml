@@ -54,6 +54,7 @@ collectors:
             insecure: true
       extensions:
         cgroup_runtime: {}
+        health_check: {}
       processors:
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
         resourcedetection/env:
@@ -152,7 +153,7 @@ collectors:
               enabled: true
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-        extensions: [cgroup_runtime]
+        extensions: [cgroup_runtime, health_check]
         pipelines:
           metrics:
             exporters:
@@ -466,9 +467,10 @@ collectors:
             - container.id
       extensions:
         cgroup_runtime: {}
+        health_check: {}
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-        extensions: [cgroup_runtime]
+        extensions: [cgroup_runtime, health_check]
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -603,8 +605,9 @@ collectors:
             mode: otel
       extensions:
         cgroup_runtime: {}
+        health_check: {}
       service:
-        extensions: [cgroup_runtime]
+        extensions: [cgroup_runtime, health_check]
         pipelines:
           metrics:
             receivers: [otlp]
