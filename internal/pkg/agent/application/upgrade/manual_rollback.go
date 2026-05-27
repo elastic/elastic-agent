@@ -151,7 +151,7 @@ func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper,
 	return watcherExecutable, targetInstall, nil
 }
 
-func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, source availableRollbacksSource, topDir string, now time.Time, version string, _ *fleetapi.ActionUpgrade) (string, string, error) {
+func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, now time.Time, version string, _ *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the upgrade marker
 	updateMarker, err := LoadMarker(paths.DataFrom(topDir))
 	if err != nil {
