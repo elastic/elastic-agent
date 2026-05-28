@@ -112,12 +112,14 @@ steps:
     depends_on:
       - packaging-containers-amd64
       - packaging-containers-arm64
+      - packaging-amd64
     env:
       TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
       FORCE_ESS_CREATE: "true"
       INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
     command: |
       #!/usr/bin/env bash
+      buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh ech true
     artifact_paths:
       - build/*
