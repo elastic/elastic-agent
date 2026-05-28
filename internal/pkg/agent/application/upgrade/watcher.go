@@ -179,7 +179,7 @@ LOOP:
 			}
 
 			stateCtx, stateCancel := context.WithCancel(ctx)
-			watch, err := ch.agentClient.StateWatch(stateCtx)
+			watch, err := ch.agentClient.StateWatch(stateCtx, client.WithLatestOnly())
 			if err != nil {
 				// considered a connect error
 				stateCancel()
