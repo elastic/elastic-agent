@@ -28,6 +28,7 @@ important observation: it is not a logic bug in any one data structure.
 | 40511 | `found pointer to free object` (3 of 5 parallel jobs) | GC mark bitmap | 16 B, 64 B, 208 B |
 | 40516 | `found pointer to free object` | GC mark bitmap | 112 B |
 | 40519 | `fatal error: sync: Unlock of unlocked RWMutex` | `sync.RWMutex` internal state word | n/a |
+| 40520 | `fatal error: s.allocCount != s.nelems && freeIndex == s.nelems` | `mspan` allocator bookkeeping | thrown from `mcache.nextFree` |
 
 Earlier observed (pre-procdump) secondary effect: a recoverable
 `EXCEPTION_ACCESS_VIOLATION` reading a nil receiver in
@@ -37,23 +38,57 @@ the test framework's panic-recovery path.
 
 Across all of these:
 
-- The corruption hits **different size classes** (16/64/112/208 B) and
-  **different kinds of memory** (GC mark bitmap, mutex state, pointer fields).
+- The corruption hits **different size classes** (16/64/112/208 B), **GC
+  metadata** (mark bitmap and `mspan` allocator bookkeeping), and **live
+  structures** (mutex state, pointer fields).
 - That breadth is the signature of a **stray single-word write landing in
   whatever memory happens to be recycled at that address**, not a type-specific
   bug.
 
+## Fully symbolicated crash (build 40520, `upgrade.test.exe`)
+
+Once the binary-rebuild step produced a symbol-rich binary (see fix #4 below),
+the throwing goroutine resolved cleanly:
+
+```
+goroutine 133 [running]:
+runtime.throw("s.allocCount != s.nelems && freeIndex == s.nelems")  panic.go:1229
+runtime.(*mcache).nextFree(...)            malloc.go:1004   ← throw site
+runtime.mallocgcSmallNoscan(...)           malloc.go:1397
+runtime.mallocgc(0x160, ...)               malloc.go:1143
+runtime.growslice(...)                     slice.go:265
+  strings.(*Builder).WriteString           builder.go:114
+  filepath.Join                            path.go:131
+upgrade.checkFilesAfterRollback(...)       rollback_test.go:707
+upgrade.TestRollback.func1(...)            rollback_test.go:314
+upgrade.TestRollback.func4(...)            rollback_test.go:389
+```
+
+This is the strongest evidence to date:
+
+- The victim goroutine is doing nothing unsafe — `rollback_test.go:707` is
+  `os.Readlink` followed by `filepath.Join(topDir, oldAgentHome)`, i.e. a
+  filesystem read and a string build.
+- The throw fires inside the **allocator** (`mcache.nextFree`): it pulled a
+  span whose `freeIndex == s.nelems` (looks full) yet `s.allocCount != s.nelems`
+  (bookkeeping says not full). The `mspan` metadata is internally inconsistent.
+- So the corruption is of **runtime allocator metadata**, detected during a
+  routine string allocation — not application use-after-free.
+
 ## Where and when it fires
 
-- Always during a **`TestCleanup` subtest** in
-  `internal/pkg/agent/application/upgrade` (`rollback_test.go`).
+- During filesystem-heavy tests in `internal/pkg/agent/application/upgrade`
+  (`rollback_test.go`) — observed in both **`TestCleanup`** and
+  **`TestRollback`**. It is *not* one specific test; it is the whole package's
+  filesystem-burst workload.
 - Always within a few **milliseconds of `=== RUN`** for the subtest —
-  specifically during the `setupAgents` → `createUpdateMarker` → `cleanup()`
-  burst, *not* during any long-running activity.
-- That burst is a tight sequence of Windows filesystem syscalls:
-  `os.MkdirAll` ×4 per fake install (×2 installs), `os.WriteFile` ×2 each,
-  `os.Symlink`, a JSON marker marshal+write+read, then `cleanup()` does
-  `os.Open` + `Readdirnames` + recursive `os.RemoveAll`.
+  during the `setupAgents` / `createUpdateMarker` / `cleanup()` /
+  `checkFilesAfterRollback` filesystem bursts, *not* during any long-running
+  activity.
+- Those bursts are tight sequences of Windows filesystem syscalls:
+  `os.MkdirAll`, `os.WriteFile`, `os.Symlink`, `os.Readlink`, `os.ReadFile`,
+  `os.Open` + `Readdirnames` + recursive `os.RemoveAll`, plus JSON marker
+  marshal/write/read.
 - On Windows every one of those goes through an **IO completion port (IOCP)**.
 
 ## What we have ruled out / established

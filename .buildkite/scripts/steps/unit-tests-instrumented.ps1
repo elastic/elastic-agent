@@ -202,17 +202,34 @@ try {
         $binsDir = Join-Path $env:BUILDKITE_BUILD_CHECKOUT_PATH "build\bins"
         New-Item -ItemType Directory -Force -Path $binsDir | Out-Null
 
-        # Enumerate import paths once so we can map a dump's binary basename
-        # to a package path.  `go list ./...` skips packages with no Go
-        # files, which is fine - they wouldn't produce a *.test.exe anyway.
-        # Relax EAP around the native call so any stderr output (build
-        # warnings, module download chatter) is not treated as terminating.
-        $prevEAP = $ErrorActionPreference
-        $ErrorActionPreference = "Continue"
-        try {
-            $allPackages = & go list ./... 2>$null
-        } finally {
-            $ErrorActionPreference = $prevEAP
+        # Map a dump's binary basename (e.g. "upgrade" from upgrade.test.exe)
+        # to a package import path so we can rebuild it.  This repo has more
+        # than one Go module (the root module and internal/edot), and `go list
+        # ./...` only sees the module it runs in - so we enumerate each module
+        # and remember which module dir each package belongs to (needed for
+        # `go test -C <dir>` at rebuild time).  Basenames are not unique
+        # (e.g. several packages produce <x>.test); we keep every candidate and
+        # try each until one actually compiles.  A package with no test files
+        # produces no output from `go test -c`, so it's skipped naturally.
+        #
+        # Relax EAP around the native calls so stderr chatter (download
+        # progress, build warnings) is not treated as terminating.
+        $moduleDirs = @("", "internal\edot")
+        $pkgCandidates = @()
+        foreach ($mod in $moduleDirs) {
+            $listArgs = @("list")
+            if ($mod -ne "") { $listArgs += @("-C", $mod) }
+            $listArgs += "./..."
+            $prevEAP = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            try {
+                $pkgs = & go @listArgs 2>$null
+            } finally {
+                $ErrorActionPreference = $prevEAP
+            }
+            foreach ($p in $pkgs) {
+                $pkgCandidates += [pscustomobject]@{ ImportPath = $p; ModuleDir = $mod; Base = (Split-Path $p -Leaf) }
+            }
         }
 
         foreach ($dump in $dumps) {
@@ -222,36 +239,45 @@ try {
             }
             $pkgBase = $Matches[1]
             $binName = "$pkgBase.test.exe"
-            $matchedPkgs = $allPackages | Where-Object { (Split-Path $_ -Leaf) -eq $pkgBase }
-            if (-not $matchedPkgs) {
-                Write-Host "  WARNING: no package in 'go list ./...' has basename '$pkgBase'; skipping $binName"
+            $dest = Join-Path $binsDir $binName
+
+            $candMatches = @($pkgCandidates | Where-Object { $_.Base -eq $pkgBase })
+            if ($candMatches.Count -eq 0) {
+                Write-Host "  WARNING: no package in any module has basename '$pkgBase'; cannot rebuild $binName"
                 continue
             }
-            $pkgPath = $matchedPkgs | Select-Object -First 1
-            if (@($matchedPkgs).Count -gt 1) {
-                Write-Host "  Multiple packages match basename '$pkgBase'; using $pkgPath (others: $(@($matchedPkgs)[1..(@($matchedPkgs).Count-1)] -join ', '))"
-            }
 
-            $dest = Join-Path $binsDir $binName
-            $compileArgs = @("test", "-c", "-covermode=atomic", "-coverpkg=./...", "-o", $dest)
-            if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
-                $compileArgs += "-race"
-            }
-            $compileArgs += $pkgPath
+            $built = $false
+            foreach ($cand in $candMatches) {
+                $compileArgs = @("test", "-c", "-covermode=atomic", "-coverpkg=./...", "-o", $dest)
+                if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
+                    $compileArgs += "-race"
+                }
+                if ($cand.ModuleDir -ne "") {
+                    # -C changes go's working dir to the submodule before the
+                    # rest of the args are interpreted; the -o path is absolute
+                    # so output still lands in build\bins.
+                    $compileArgs = @("-C", $cand.ModuleDir) + $compileArgs
+                }
+                $compileArgs += $cand.ImportPath
 
-            $prevEAP = $ErrorActionPreference
-            $ErrorActionPreference = "Continue"
-            try {
-                Write-Host "  Compiling $binName from $pkgPath ..."
-                & go @compileArgs 2>&1 | Out-Host
-            } finally {
-                $ErrorActionPreference = $prevEAP
+                $prevEAP = $ErrorActionPreference
+                $ErrorActionPreference = "Continue"
+                try {
+                    Write-Host "  Compiling $binName from $($cand.ImportPath) (module '$($cand.ModuleDir)') ..."
+                    & go @compileArgs 2>&1 | Out-Host
+                } finally {
+                    $ErrorActionPreference = $prevEAP
+                }
+                if (Test-Path $dest) {
+                    $size = (Get-Item $dest).Length
+                    Write-Host "  Saved binary for $binName ($([math]::Round($size/1MB,1)) MB) compiled from $($cand.ImportPath)"
+                    $built = $true
+                    break
+                }
             }
-            if (Test-Path $dest) {
-                $size = (Get-Item $dest).Length
-                Write-Host "  Saved binary for $binName ($([math]::Round($size/1MB,1)) MB) compiled from $pkgPath"
-            } else {
-                Write-Host "  WARNING: failed to compile $binName from $pkgPath"
+            if (-not $built) {
+                Write-Host "  WARNING: none of the $($candMatches.Count) candidate package(s) for '$pkgBase' produced a test binary: $(($candMatches | ForEach-Object { $_.ImportPath }) -join ', ')"
             }
         }
     } elseif (-not $crashed) {
