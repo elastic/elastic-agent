@@ -123,8 +123,6 @@ common:
       - basic
       - complete
       - complete-wolfi
-      - elastic-otel-collector
-      - elastic-otel-collector-wolfi
       - service
       - slim
       - slim-wolfi
@@ -132,7 +130,6 @@ common:
     default_variants: &k8s_test_default_variants
       - complete
       - complete-wolfi
-      - elastic-otel-collector
     env: &k8s_test_env
       K8S_VERSION: "{{matrix.version}}"
       DOCKER_VARIANTS: "{{matrix.variants}}"
