@@ -632,7 +632,7 @@ func Package(ctx context.Context) error {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 	// only take the snapshot and version from the manifest, we don't want the commit hash or dependency version
-	cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithBeatVersion(cfgWithManifest.BeatVersion())
+	cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithAgentCoreVersion(cfgWithManifest.AgentCoreVersion())
 
 	if cfg.Packaging.ManifestURL != "" {
 		// don't download the elastic-agent-core components; built above
@@ -1164,14 +1164,12 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 	fmt.Println("--- Package elastic-agent")
 
 	if dependenciesVersion == "" {
-		// Get beat version - first check BEAT_VERSION env var, then fall back to default
-		beatVersion := cfg.BeatQualifiedVersion()
-		if beatVersion == "" {
+		agentCoreVersion := cfg.AgentQualifiedCoreVersion()
+		if agentCoreVersion == "" {
 			dependenciesVersion = bversion.GetDefaultVersion()
 		} else {
-			dependenciesVersion = beatVersion
+			dependenciesVersion = agentCoreVersion
 		}
-		// add the snapshot suffix if needed
 		dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
 	}
 	log.Printf("Packaging with dependenciesVersion: %s", dependenciesVersion)
@@ -2016,7 +2014,7 @@ func saveIronbank(cfg *devtools.Settings) error {
 }
 
 func getIronbankContextName(cfg *devtools.Settings) string {
-	ver := cfg.BeatQualifiedVersion()
+	ver := cfg.AgentPackageVersion()
 	defaultBinaryName := "{{.Name}}-ironbank-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}"
 	outputDir, _ := devtools.Expand(cfg, defaultBinaryName+"-docker-build-context", map[string]interface{}{
 		"Name":    "elastic-agent",
@@ -2061,7 +2059,7 @@ func prepareIronbankBuild(cfg *devtools.Settings) error {
 }
 
 func majorMinor(cfg *devtools.Settings) string {
-	if v := cfg.BeatQualifiedVersion(); v != "" {
+	if v := cfg.AgentPackageVersion(); v != "" {
 		parts := strings.SplitN(v, ".", 3)
 		return parts[0] + "." + parts[1]
 	}
@@ -3021,7 +3019,7 @@ func getTestRunnerVersions(cfg *devtools.Settings) (string, string, error) {
 	agentStackVersion := cfg.IntegrationTest.AgentStackVersion
 	agentVersion := cfg.IntegrationTest.AgentVersion
 	if agentVersion == "" {
-		agentVersion = cfg.BeatVersion()
+		agentVersion = cfg.AgentPackageVersion()
 		if agentStackVersion == "" {
 			// always use snapshot for stack version
 			agentStackVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
@@ -4246,9 +4244,9 @@ func (h Helm) Package(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
-	agentCoreVersion := cfg.BeatVersion()
-	agentImageTag := agentCoreVersion
-	agentChartVersion := agentCoreVersion
+	agentPackageVersion := cfg.AgentPackageVersion()
+	agentImageTag := agentPackageVersion
+	agentChartVersion := agentPackageVersion
 	if !productionPackage {
 		// always use the SNAPSHOT version for image tag if not a production package
 		agentImageTag = agentImageTag + devtools.SnapshotSuffix
@@ -4261,14 +4259,14 @@ func (h Helm) Package(ctx context.Context) error {
 	}{
 		// values file for elastic-agent Helm Chart
 		filepath.Join(helmChartPath, "values.yaml"): {
-			{"agent.version", agentCoreVersion},
+			{"agent.version", agentPackageVersion},
 			// always use the SNAPSHOT version for image tag
 			// for the chart that resides in the git repo
 			{"agent.image.tag", agentImageTag},
 		},
 		// Chart.yaml for elastic-agent Helm Chart
 		filepath.Join(helmChartPath, "Chart.yaml"): {
-			{"appVersion", agentCoreVersion},
+			{"appVersion", agentPackageVersion},
 			{"version", agentChartVersion},
 		},
 	} {

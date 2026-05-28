@@ -118,10 +118,10 @@ components:
     projectName: connectors
     packageName: connectors-{{.Version}}.zip
     # FIXME: connectors use only <major>.<minor>.<patch> in the root directory name so the definition should be something
-    # using the beat_version or similar
+    # using the agent_package_version or similar
     # We don't support that yet, so we are defining a rootDir that will error out if rendered. This is not a problem since
     # we don't extract/manipulate the archive during packaging, it has its own special handling in the 'service' docker image
-    rootDir: connectors-{{beat_version}}
+    rootDir: connectors-{{agent_package_version}}
     binaryName: connectors
     fips: false
     platforms:
@@ -761,8 +761,8 @@ shared:
     extra_tags:
       - 'git-{{ substring core_commit 0 12 }}'
     files:
-      'data/service/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip':
-        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip'
+      'data/service/connectors-{{ agent_package_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip':
+        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/connectors-{{ agent_package_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip'
         mode: 0755
       'data/{{.BeatName}}-{{ core_commit_short }}/components/connectors':
         source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/connectors.sh'
@@ -1264,7 +1264,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
-        version: '{{ beat_version }}'
+        version: '{{ agent_core_version }}'
         # this is a way to place 'core' in the correct place for both the archive and the root dir, see defaultRootDir in dev-tools/mage/pkgtypes.go
         qualifier: core
         files:
@@ -1283,7 +1283,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
-        version: '{{ beat_version }}'
+        version: '{{ agent_core_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -1300,7 +1300,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
-        version: '{{ beat_version }}'
+        version: '{{ agent_core_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -1317,7 +1317,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
-        version: '{{ beat_version }}'
+        version: '{{ agent_core_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -1336,7 +1336,7 @@ specs:
         <<: *common_fips
         <<: *elastic_license_for_binaries
         name: '{{.BeatName}}'
-        version: '{{ beat_version }}'
+        version: '{{ agent_core_version }}'
         qualifier: 'core-fips'
         files:
           '{{.BeatName}}{{.BinaryExt}}':
