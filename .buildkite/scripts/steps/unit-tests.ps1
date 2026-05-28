@@ -28,7 +28,17 @@ Write-Host "--- Unit tests"
 # likely at binary startup when goroutine stacks are freshly allocated.
 $env:GOGC = "1"
 $env:GOTRACEBACK = "crash"
-$env:GODEBUG = "clobberfree=1,gccheckmark=1,invalidptr=1,gctrace=1,asyncpreemptoff=1"
+$baseGodebug = "clobberfree=1,gccheckmark=1,invalidptr=1,gctrace=1,asyncpreemptoff=1"
+# Optional extra GODEBUG knobs injected by the pipeline (e.g. the
+# shrinkstackoff variant sets EXTRA_GODEBUG=gcshrinkstackoff=1 to test whether
+# disabling stack shrinking suppresses the crash - if it does, that pins the
+# corruption to the shrinkstack/copystack-vs-IOCP race for the upstream report).
+if ($env:EXTRA_GODEBUG) {
+  $env:GODEBUG = "$baseGodebug,$env:EXTRA_GODEBUG"
+} else {
+  $env:GODEBUG = $baseGodebug
+}
+Write-Host "GODEBUG=$env:GODEBUG"
 $env:GOEXPERIMENT="cgocheck2"
 
 # Bypass `mage unitTest` / gotestsum.  gotestsum (v1.13) treats every non-JSON

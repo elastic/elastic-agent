@@ -50,6 +50,36 @@ steps:
     plugins:
       - *google_oidc_plugin
 
+  - label: "Unit tests - Windows 11 (shrinkstackoff run %n)"
+    key: "unit-tests-win11-shrinkstackoff"
+    # Same diagnostic config as unit-tests-win11, plus gcshrinkstackoff=1, which
+    # disables moving goroutines onto smaller stacks (runtime/stack.go:1280
+    # guards the shrinkstack->copystack path).  The d9 crash in build 40529
+    # faulted inside copystack (stack.go:1305) during a GC stack scan, so if
+    # this variant stops reproducing the crash while the plain diagnostic
+    # variant keeps crashing, that isolates the bug to the shrinkstack/
+    # copystack-vs-IOCP race - the specific evidence to attach to golang/go#77975.
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
+    env:
+      EXTRA_GODEBUG: "gcshrinkstackoff=1"
+    artifact_paths:
+      - "build/TEST-*.html"
+      - "build/TEST-*.xml"
+      - "build/diagnostics/*"
+      - "coverage-*.out"
+    agents:
+      provider: "azure"
+      image: "${IMAGE_WIN_11}"
+      imageVersion: "${IMAGE_WIN_11_VERSION}"
+      vmSize: "Standard_D8s_v5"
+      diskSizeGb: "256"
+    retry:
+      manual:
+        allowed: true
+    plugins:
+      - *google_oidc_plugin
+
   - label: "Unit tests - Windows 11 (instrumented run %n)"
     key: "unit-tests-win11-instrumented"
     command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
@@ -84,6 +114,8 @@ steps:
       - *google_oidc_plugin
     depends_on:
       - step: "unit-tests-win11"
+        allow_failure: true
+      - step: "unit-tests-win11-shrinkstackoff"
         allow_failure: true
       - step: "unit-tests-win11-instrumented"
         allow_failure: true
