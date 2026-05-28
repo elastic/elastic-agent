@@ -11,7 +11,18 @@ checkout_merge() {
         exit 1
     fi
 
-    git fetch -v origin "${target_branch}"
+    # The sparse-checkout plugin creates a blobless partial clone that leaves
+    # an empty beats/ stub in the working tree but no beats/.git inside it.
+    # With the Buildkite agent's global submodule.recurse=true, every git
+    # command below would attempt submodule operations on that stub and fail
+    # with "Could not access submodule 'beats'".  Override it for the entire
+    # function when beats is not an initialized repository.
+    local -a git=( git )
+    if [[ ! -e beats/.git ]]; then
+        git=( git -c submodule.recurse=false )
+    fi
+
+    "${git[@]}" fetch -v origin "${target_branch}"
     local fetched_sha
     fetched_sha=$(git rev-parse FETCH_HEAD)
 
@@ -33,7 +44,7 @@ checkout_merge() {
     # depth-1 fetch are not re-transferred.  Full checkouts skip this block.
     if [[ "$(git rev-parse --is-shallow-repository 2>/dev/null)" == "true" ]]; then
         echo "Shallow repository detected; unshallowing to enable merge"
-        git fetch --unshallow origin
+        "${git[@]}" fetch --unshallow origin
     fi
 
     # Create the merge branch from the current HEAD (the PR commit Buildkite
@@ -43,21 +54,14 @@ checkout_merge() {
     # commit, which would trigger submodule working-tree updates that fail
     # when the submodule directory is absent (e.g. beats/ in sparse-checkout
     # pipeline-upload steps).
-    git checkout -b "${merge_branch}"
+    "${git[@]}" checkout -b "${merge_branch}"
     echo "New branch created: $(git rev-parse --abbrev-ref HEAD)"
 
     # set author identity so it can be run git merge
     git config user.name "github-merged-pr-post-checkout"
     git config user.email "auto-merge@buildkite"
 
-    # When the beats submodule directory is absent (sparse-checkout steps),
-    # suppress the submodule working-tree update that would otherwise fail.
-    local -a merge_flags=()
-    if [[ ! -e beats ]]; then
-        merge_flags+=(-c submodule.recurse=false)
-    fi
-
-    git "${merge_flags[@]}" merge --no-edit "${pinned_sha}" || {
+    "${git[@]}" merge --no-edit "${pinned_sha}" || {
         local merge_result=$?
         echo "Merge failed: ${merge_result}"
         git merge --abort
