@@ -4,8 +4,7 @@ set -euo pipefail
 
 checkout_merge() {
     local target_branch=$1
-    local pr_commit=$2
-    local merge_branch=$3
+    local merge_branch=$2
 
     if [[ -z "${target_branch}" ]]; then
         echo "No pull request target branch"
@@ -37,17 +36,28 @@ checkout_merge() {
         git fetch --unshallow origin
     fi
 
-    # Create the merge branch directly from the pinned base SHA.  This works
-    # whether HEAD is currently on a symbolic ref (normal checkout) or detached
-    # (sparse-checkout steps that do git checkout <sha>).
-    git -c submodule.recurse=false checkout -b "${merge_branch}" "${pinned_sha}"
+    # Create the merge branch from the current HEAD (the PR commit Buildkite
+    # already checked out) and merge the pinned base into it, rather than
+    # checking out the base and merging the PR in.  The resulting tree is
+    # identical, but this avoids a full working-tree switch to a different
+    # commit, which would trigger submodule working-tree updates that fail
+    # when the submodule directory is absent (e.g. beats/ in sparse-checkout
+    # pipeline-upload steps).
+    git checkout -b "${merge_branch}"
     echo "New branch created: $(git rev-parse --abbrev-ref HEAD)"
 
     # set author identity so it can be run git merge
     git config user.name "github-merged-pr-post-checkout"
     git config user.email "auto-merge@buildkite"
 
-    git -c submodule.recurse=false merge --no-edit "${pr_commit}" || {
+    # When the beats submodule directory is absent (sparse-checkout steps),
+    # suppress the submodule working-tree update that would otherwise fail.
+    local -a merge_flags=()
+    if [[ ! -e beats ]]; then
+        merge_flags+=(-c submodule.recurse=false)
+    fi
+
+    git "${merge_flags[@]}" merge --no-edit "${pinned_sha}" || {
         local merge_result=$?
         echo "Merge failed: ${merge_result}"
         git merge --abort
@@ -63,11 +73,10 @@ if [[ "${pull_request}" == "false" ]]; then
 fi
 
 TARGET_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-master}"
-PR_COMMIT="${BUILDKITE_COMMIT}"
 PR_ID=${BUILDKITE_PULL_REQUEST}
 MERGE_BRANCH="pr_merge_${PR_ID}"
 
-checkout_merge "${TARGET_BRANCH}" "${PR_COMMIT}" "${MERGE_BRANCH}"
+checkout_merge "${TARGET_BRANCH}" "${MERGE_BRANCH}"
 
 echo "Commit information"
 git --no-pager log --format=%B -n 1
