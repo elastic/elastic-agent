@@ -1310,13 +1310,13 @@ func TestUpgradeErrorHandling(t *testing.T) {
 	log, _ := loggertest.New("test")
 	testError := errors.New("test error")
 
-	type upgraderMocker func(upgrader *Upgrader, archivePath string, versionedHome string)
+	type upgraderMocker func(t *testing.T, upgrader *Upgrader, archivePath string, versionedHome string)
 
 	type testCase struct {
 		isDiskSpaceErrorResult    bool
 		expectedError             error
 		upgraderMocker            upgraderMocker
-		upgradeOpts               []Option
+		upgradeOpts               func(t *testing.T) []Option
 		checkArchiveCleanup       bool
 		checkVersionedHomeCleanup bool
 	}
@@ -1325,7 +1325,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should return error and cleanup downloaded archive if downloadArtifact fails after download is complete": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+			upgraderMocker: func(_ *testing.T, upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnError:       testError,
 					returnArchivePath: archivePath,
@@ -1336,7 +1336,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should return error if getPackageMetadata fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+			upgraderMocker: func(_ *testing.T, upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
@@ -1349,7 +1349,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should return error and cleanup downloaded archive if unpack fails before extracting": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+			upgraderMocker: func(_ *testing.T, upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
@@ -1373,7 +1373,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should return error and cleanup downloaded archive if unpack fails after extracting": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+			upgraderMocker: func(_ *testing.T, upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
@@ -1402,7 +1402,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should return error and cleanup downloaded artifact and extracted archive if copyActionStore fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+			upgraderMocker: func(_ *testing.T, upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
@@ -1433,7 +1433,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should return error and cleanup downloaded artifact and extracted archive if copyRunDirectory fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+			upgraderMocker: func(_ *testing.T, upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{}
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1468,7 +1468,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should return error and cleanup downloaded artifact and extracted archive if changeSymlink fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+			upgraderMocker: func(_ *testing.T, upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
@@ -1508,7 +1508,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should return error and cleanup downloaded artifact and extracted archive if markUpgrade fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+			upgraderMocker: func(_ *testing.T, upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
@@ -1551,7 +1551,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
 			isDiskSpaceErrorResult: true,
 			expectedError:          upgradeErrors.ErrInsufficientDiskSpace,
-			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+			upgraderMocker: func(_ *testing.T, upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnError: testError,
 				}
@@ -1561,14 +1561,16 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		// pre-symlink callback must not fire when the upgrade is aborted before reaching the symlink step.
 		"pre-symlink callback must not be called if download fails": {
 			expectedError: testError,
-			upgradeOpts: []Option{
-				WithPreSymlinkCallback(func(_ context.Context, _ *logger.Logger, _ *fleetapi.ActionUpgrade) error {
-					// This must never be called when the upgrade is aborted early.
-					require.Fail(t, "pre-symlink callback must not be called when download fails")
-					return nil
-				}),
+			upgradeOpts: func(t *testing.T) []Option {
+				return []Option{
+					WithPreSymlinkCallback(func(_ context.Context, _ *logger.Logger, _ *fleetapi.ActionUpgrade) error {
+						// This must never be called when the upgrade is aborted early.
+						require.Fail(t, "pre-symlink callback must not be called when download fails")
+						return nil
+					}),
+				}
 			},
-			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+			upgraderMocker: func(_ *testing.T, upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnError:       testError,
 					returnArchivePath: archivePath,
@@ -1578,13 +1580,15 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		},
 		"pre-symlink callback must not be called if unpack fails": {
 			expectedError: testError,
-			upgradeOpts: []Option{
-				WithPreSymlinkCallback(func(_ context.Context, _ *logger.Logger, _ *fleetapi.ActionUpgrade) error {
-					require.Fail(t, "pre-symlink callback must not be called when unpack fails")
-					return nil
-				}),
+			upgradeOpts: func(t *testing.T) []Option {
+				return []Option{
+					WithPreSymlinkCallback(func(_ context.Context, _ *logger.Logger, _ *fleetapi.ActionUpgrade) error {
+						require.Fail(t, "pre-symlink callback must not be called when unpack fails")
+						return nil
+					}),
+				}
 			},
-			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+			upgraderMocker: func(_ *testing.T, upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
@@ -1602,12 +1606,14 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		},
 		"pre-symlink callback error aborts upgrade before changeSymlink and triggers cleanup": {
 			expectedError: testError,
-			upgradeOpts: []Option{
-				WithPreSymlinkCallback(func(_ context.Context, _ *logger.Logger, _ *fleetapi.ActionUpgrade) error {
-					return testError
-				}),
+			upgradeOpts: func(*testing.T) []Option {
+				return []Option{
+					WithPreSymlinkCallback(func(_ context.Context, _ *logger.Logger, _ *fleetapi.ActionUpgrade) error {
+						return testError
+					}),
+				}
 			},
-			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+			upgraderMocker: func(t *testing.T, upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
@@ -1641,7 +1647,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			upgrader, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo)
 			require.NoError(t, err)
 
-			tc.upgraderMocker(upgrader, filepath.Join(baseDir, "mockArchive"), "versionedHome")
+			tc.upgraderMocker(t, upgrader, filepath.Join(baseDir, "mockArchive"), "versionedHome")
 
 			// Create the test files for all the cases
 			err = os.WriteFile(filepath.Join(baseDir, "mockArchive"), []byte("test"), 0o600)
@@ -1654,7 +1660,11 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				return tc.isDiskSpaceErrorResult
 			}
 
-			_, err = upgrader.Upgrade(context.Background(), "9.0.0", "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true, nil, tc.upgradeOpts...)
+			var upgradeOpts []Option
+			if tc.upgradeOpts != nil {
+				upgradeOpts = tc.upgradeOpts(t)
+			}
+			_, err = upgrader.Upgrade(context.Background(), "9.0.0", "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true, nil, upgradeOpts...)
 			require.ErrorIs(t, err, tc.expectedError)
 
 			// If the downloaded archive needs to be cleaned up assert that it is indeed cleaned up, if not assert that it still exists. The downloaded archive is a mock file that is created for all tests cases.
