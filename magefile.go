@@ -610,8 +610,8 @@ func Package(ctx context.Context) error {
 	}
 
 	var dependenciesVersion string
-	if cfg.Build.BeatVersion != "" {
-		dependenciesVersion = cfg.Build.BeatVersion
+	if cfg.AgentPackageVersion() != "" {
+		dependenciesVersion = cfg.AgentPackageVersion()
 	} else {
 		dependenciesVersion = bversion.GetDefaultVersion()
 	}
@@ -1084,8 +1084,8 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	// docker does not exists for this commit, build it
 	if !strings.Contains(dockerImageOut, tag) {
 		var dependenciesVersion string
-		if cfg.Build.BeatVersion != "" {
-			dependenciesVersion = cfg.Build.BeatVersion
+		if cfg.AgentPackageVersion() != "" {
+			dependenciesVersion = cfg.AgentPackageVersion()
 		} else {
 			dependenciesVersion = bversion.GetDefaultVersion()
 		}
