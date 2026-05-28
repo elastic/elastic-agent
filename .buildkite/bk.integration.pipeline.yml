@@ -999,15 +999,6 @@ steps:
 
   - label: ESS stack cleanup
     depends_on:
-<<<<<<< HEAD
-      - integration-tests-win-tier-1
-      - integration-tests-win-tier-2
-      - integration-tests-win-tier-3
-      - integration-tests-linux-tier-1
-      - integration-tests-linux-tier-2
-      - integration-tests-linux-tier-3
-      - integration-tests-kubernetes
-=======
       - integration-tests-kubernetes-tier-1
       - integration-tests-kubernetes-tier-2
       - integration-tests-kubernetes-tier-3
@@ -1017,7 +1008,6 @@ steps:
       - integration-tests-win-tier-1
       - integration-tests-win-tier-2
       - integration-tests-win-tier-3
->>>>>>> 5d79f71a6 (bk: k8s ITs in tiers in the BK pipeline itself (#14546))
       - extended-integration-tests
     allow_dependency_failure: true
     command: |
@@ -1035,15 +1025,6 @@ steps:
     key: aggregate-reports
     depends_on:
       - integration-tests-ech
-<<<<<<< HEAD
-      - integration-tests-win-tier-1
-      - integration-tests-win-tier-2
-      - integration-tests-win-tier-3
-      - integration-tests-linux-tier-1
-      - integration-tests-linux-tier-2
-      - integration-tests-linux-tier-3
-      - integration-tests-kubernetes
-=======
       - integration-tests-kubernetes-tier-1
       - integration-tests-kubernetes-tier-2
       - integration-tests-kubernetes-tier-3
@@ -1053,7 +1034,6 @@ steps:
       - integration-tests-win-tier-1
       - integration-tests-win-tier-2
       - integration-tests-win-tier-3
->>>>>>> 5d79f71a6 (bk: k8s ITs in tiers in the BK pipeline itself (#14546))
       - integration-tests-serverless
     allow_dependency_failure: true
     command: |
