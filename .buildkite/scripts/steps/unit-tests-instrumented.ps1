@@ -177,16 +177,27 @@ try {
         # rather than every test binary in the work tree.
         $binsDir = Join-Path $env:BUILDKITE_BUILD_CHECKOUT_PATH "build\bins"
         New-Item -ItemType Directory -Force -Path $binsDir | Out-Null
+        # go test -work creates a fresh `go-build<N>` directory per invocation
+        # under GOTMPDIR.  Restrict the search to those so we never pick up a
+        # stale binary from a different mage/build step.  For each matching
+        # name we then pick the LARGEST file - the race+coverage instrumented
+        # test binary is consistently the biggest by a wide margin, so this
+        # cleanly filters out earlier-stage compiles that may share the name.
+        $workDirs = Get-ChildItem -Path $env:GOTMPDIR -Filter "go-build*" -Directory -ErrorAction SilentlyContinue
         foreach ($dump in $dumps) {
             if ($dump.Name -match '^(.+\.exe)_\d+_\d+\.dmp$') {
                 $binName = $Matches[1]
-                $found = Get-ChildItem -Path $env:GOTMPDIR -Recurse -Filter $binName -ErrorAction SilentlyContinue | Select-Object -First 1
+                $candidates = @()
+                foreach ($wd in $workDirs) {
+                    $candidates += Get-ChildItem -Path $wd.FullName -Recurse -Filter $binName -File -ErrorAction SilentlyContinue
+                }
+                $found = $candidates | Sort-Object Length -Descending | Select-Object -First 1
                 if ($found) {
                     $dest = Join-Path $binsDir $binName
                     Copy-Item -Path $found.FullName -Destination $dest -Force
-                    Write-Host "  Saved binary for $binName ($([math]::Round($found.Length/1MB,1)) MB)"
+                    Write-Host "  Saved binary for $binName ($([math]::Round($found.Length/1MB,1)) MB) from $($found.FullName)"
                 } else {
-                    Write-Host "  WARNING: could not find $binName under $env:GOTMPDIR"
+                    Write-Host "  WARNING: could not find $binName under any go-build* dir in $env:GOTMPDIR"
                 }
             }
         }
