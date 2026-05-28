@@ -40,14 +40,14 @@ checkout_merge() {
     # Create the merge branch directly from the pinned base SHA.  This works
     # whether HEAD is currently on a symbolic ref (normal checkout) or detached
     # (sparse-checkout steps that do git checkout <sha>).
-    git checkout -b "${merge_branch}" "${pinned_sha}"
+    git -c submodule.recurse=false checkout -b "${merge_branch}" "${pinned_sha}"
     echo "New branch created: $(git rev-parse --abbrev-ref HEAD)"
 
     # set author identity so it can be run git merge
     git config user.name "github-merged-pr-post-checkout"
     git config user.email "auto-merge@buildkite"
 
-    git merge --no-edit "${pr_commit}" || {
+    git -c submodule.recurse=false merge --no-edit "${pr_commit}" || {
         local merge_result=$?
         echo "Merge failed: ${merge_result}"
         git merge --abort
