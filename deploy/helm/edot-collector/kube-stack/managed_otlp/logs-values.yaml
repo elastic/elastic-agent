@@ -174,16 +174,8 @@ collectors:
           exclude:
             # exlude opentelemetry-kube-stack pod logs
             - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
-<<<<<<< HEAD
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-=======
-      extensions:
-        cgroup_runtime: {}
-      # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
-      service:
-        extensions: [cgroup_runtime]
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
         pipelines:
           logs: null
           metrics: null
@@ -193,12 +185,7 @@ collectors:
               - file_log
             processors:
               - batch
-<<<<<<< HEAD
-              - k8sattributes
-=======
               - k8s_attributes
-              - resourcedetection/env
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
               - resourcedetection/system
               - resourcedetection/eks
               - resourcedetection/gcp
@@ -250,12 +237,7 @@ collectors:
       processors: {}
       exporters:
         debug:
-<<<<<<< HEAD
-        otlp/ingest:
-=======
-          verbosity: basic
         otlp_grpc/ingest:
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
           endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
           headers:
             Authorization: ApiKey ${env:ELASTIC_API_KEY}
@@ -269,14 +251,7 @@ collectors:
               min_size: 1_000_000 # 1MB uncompressed
               max_size: 4_000_000 # 4MB uncompressed
           timeout: 15s
-<<<<<<< HEAD
       service:
-=======
-      extensions:
-        cgroup_runtime: {}
-      service:
-        extensions: [cgroup_runtime]
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
         pipelines:
           logs:
             receivers: [otlp]
