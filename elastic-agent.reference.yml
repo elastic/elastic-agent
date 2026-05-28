@@ -104,6 +104,11 @@ inputs:
 #     #ssl.supported_protocols: [TLSv1.0, TLSv1.1, TLSv1.2]
 #     #ssl.cipher_suites: []
 #     #ssl.curve_types: []
+#     #ssl.certificate_reload:
+#     #  enabled: false    # Disabled by default; set to true to enable periodic reload
+#     #  reload_interval: 5s  # How often to re-read cert/key files from disk.
+#     #                       # After rotation, new certs are picked up within
+#     #                       # this interval on the next TLS handshake.
 #   reporting:
 #     # Reporting threshold indicates how many events should be kept in-memory before reporting them to fleet.
 #     #reporting_threshold: 10000
