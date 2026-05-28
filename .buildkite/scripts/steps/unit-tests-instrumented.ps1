@@ -30,7 +30,7 @@ Set-ItemProperty -Path $werKey -Name "DumpCount"  -Value 3 -Type DWord
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting" -Name "DontShowUI" -Value 1 -Type DWord
 Write-Host "WER LocalDumps configured: DumpFolder=$dumpDir DumpType=2 (full) DumpCount=3"
 
-$testExit = 0
+$crashed = $false
 try {
     Write-Host "--- Build unit test helper binaries"
     # Some unit tests exec helper binaries (pkg/component/fake/component,
@@ -38,9 +38,8 @@ try {
     # own, so reuse the existing mage target for prep.
     mage build:unitTestBinaries
     if ($LASTEXITCODE -ne 0) {
-        $testExit = $LASTEXITCODE
-        Write-Host "build:unitTestBinaries failed with $testExit"
-        exit $testExit
+        Write-Host "build:unitTestBinaries failed with $LASTEXITCODE"
+        exit $LASTEXITCODE
     }
 
     Write-Host "--- Unit tests (instrumented; asyncpreemptoff NOT set so the bug fires)"
@@ -74,13 +73,26 @@ try {
         "./..."
     )
 
+    # Patterns that indicate the Go runtime tripped a sanity check or crashed
+    # mid-GC (the bug we're hunting).  Normal test failures - t.Fatal, assertion
+    # mismatches, even user-level panics - do NOT match these.  This script's
+    # whole purpose is to catch those runtime crashes, so the job is treated as
+    # "passing" unless one of these markers shows up (a runtime crash is what
+    # we want to surface; everything else is unrelated noise).
+    $crashRegex = 'runtime: marked free object|runtime: found pointer to free object|fatal error: '
+
+    New-Item -ItemType Directory -Force -Path "build" | Out-Null
+    $runLog = Join-Path $env:BUILDKITE_BUILD_CHECKOUT_PATH "build\test-output.log"
+
     $maxRuns = 5
     for ($run = 1; $run -le $maxRuns; $run++) {
         Write-Host "--- Unit test run $run of $maxRuns"
-        & go @testArgs
-        $testExit = $LASTEXITCODE
-        if ($testExit -ne 0) {
-            Write-Host "Test binary exited with code $testExit on run $run"
+        & go @testArgs 2>&1 | Tee-Object -FilePath $runLog -Append
+        Write-Host "go test exited with code $LASTEXITCODE on run $run"
+
+        if (Select-String -Path $runLog -Pattern $crashRegex -Quiet) {
+            Write-Host "*** Runtime crash marker detected on run $run - stopping further runs ***"
+            $crashed = $true
             break
         }
     }
@@ -94,7 +106,11 @@ try {
     if ($dumps) {
         Write-Host "Captured $($dumps.Count) crash dump(s):"
         $dumps | ForEach-Object { Write-Host "  $($_.FullName) ($([math]::Round($_.Length/1MB,1)) MB)" }
-    } else {
+        # A WER dump is also a real crash, regardless of whether we matched a
+        # text marker (the Go runtime may exit before its diagnostic prints
+        # flush all the way through Tee-Object).
+        $crashed = $true
+    } elseif (-not $crashed) {
         Write-Host "No crash dumps captured (test suite did not crash, or WER did not fire)."
     }
 } finally {
@@ -122,4 +138,10 @@ try {
     Write-Host "WER LocalDumps restored."
 }
 
-exit $testExit
+if ($crashed) {
+    Write-Host "Runtime crash reproduced - failing job."
+    exit 1
+} else {
+    Write-Host "No runtime crash across $maxRuns runs - passing job (unrelated test failures are ignored)."
+    exit 0
+}
