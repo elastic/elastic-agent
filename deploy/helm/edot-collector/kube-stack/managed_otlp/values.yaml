@@ -509,10 +509,6 @@ collectors:
               - otlp
             processors:
               - batch/metrics
-<<<<<<< HEAD
-=======
-              - k8s_attributes
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
               - resource/hostname
             exporters:
               - otlp_grpc/gateway
@@ -521,10 +517,6 @@ collectors:
               - otlp
             processors:
               - batch
-<<<<<<< HEAD
-=======
-              - k8s_attributes
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
               - resource/hostname
             exporters:
               - otlp_grpc/gateway
@@ -533,10 +525,6 @@ collectors:
               - otlp
             processors:
               - batch
-<<<<<<< HEAD
-=======
-              - k8s_attributes
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
               - resource/hostname
             exporters:
               - otlp_grpc/gateway
