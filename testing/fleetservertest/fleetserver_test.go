@@ -16,11 +16,6 @@ import (
 	"testing"
 	"time"
 
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-=======
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
->>>>>>> e4b05c00b (Extract ECSMeta types to pkg/ecsmeta for cross-repo sharing (#14396))
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
