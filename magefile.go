@@ -1147,11 +1147,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs, dependenciesVersion string, manifestResponse *manifest.Build, agentBinaryTargets ...interface{}) error {
 	fmt.Println("--- Package Elastic-Agent")
 
-<<<<<<< HEAD
 	platforms := cfg.GetPlatforms()
-	if mg.Verbose() {
-		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, platforms)
-=======
 	if dependenciesVersion == "" {
 		agentCoreVersion := cfg.AgentQualifiedCoreVersion()
 		if agentCoreVersion == "" {
@@ -1160,7 +1156,9 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 			dependenciesVersion = agentCoreVersion
 		}
 		dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
->>>>>>> 014ac3482 ([mage] Distinguish between core version and package version (#14247))
+	}
+	if mg.Verbose() {
+		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, platforms)
 	}
 
 	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(cfg, pkgSpecs)

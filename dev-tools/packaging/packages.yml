@@ -108,11 +108,7 @@ components:
     # using the agent_package_version or similar
     # We don't support that yet, so we are defining a rootDir that will error out if rendered. This is not a problem since
     # we don't extract/manipulate the archive during packaging, it has its own special handling in the 'service' docker image
-<<<<<<< HEAD
-    rootDir: elasticsearch_connectors-{{beat_version}}
-=======
     rootDir: connectors-{{agent_package_version}}
->>>>>>> 014ac3482 ([mage] Distinguish between core version and package version (#14247))
     binaryName: connectors
     fips: false
     platforms:
@@ -1587,10 +1583,6 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-<<<<<<< HEAD
-=======
-          <<: *agent_otel_collector_binary_spec_core
-          <<: *metricbeat_lightweight_module_core
 
     - os: windows
       types: [ zip ]
@@ -1605,7 +1597,4 @@ specs:
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
           'elastic-agent-archive-root.exe':
             source: ./build/windows-{{.Platform.Arch}}-archive-root-binary/elastic-agent-archive-root.exe
-          <<: *agent_otel_collector_binary_spec_core
-          <<: *metricbeat_lightweight_module_core
     ######## End FIPS Specs ########
->>>>>>> 014ac3482 ([mage] Distinguish between core version and package version (#14247))
