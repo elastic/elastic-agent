@@ -79,7 +79,7 @@ var BeatProjectType ProjectType
 func FuncMap(cfg *Settings) map[string]interface{} {
 	return map[string]interface{}{
 		"beat_doc_branch":                func() string { return cfg.DocBranch() },
-		"beat_version":                   func() string { return cfg.BeatQualifiedVersion() },
+		"agent_core_version":             func() string { return cfg.AgentQualifiedCoreVersion() },
 		"core_commit":                    func() string { return cfg.AgentCoreCommitHash() },
 		"core_commit_short":              func() string { return cfg.AgentCoreCommitHashShort() },
 		"date":                           func() string { return cfg.BuildDateString() },
@@ -185,7 +185,7 @@ CI               = {{.CI}}
 ## Functions
 
 beat_doc_branch              = {{ beat_doc_branch }}
-beat_version                 = {{ beat_version }}
+agent_core_version           = {{ agent_core_version }}
 core_commit                  = {{ core_commit }}
 date                         = {{ date }}
 elastic_beats_dir            = {{ elastic_beats_dir }}
@@ -219,7 +219,7 @@ func (s *Settings) AgentPackageVersion() string {
 		return s.Packaging.AgentPackageVersion
 	}
 
-	return s.BeatQualifiedVersion()
+	return s.AgentQualifiedCoreVersion()
 }
 
 // PackageManifest generates the package manifest using the provided config.
@@ -277,10 +277,10 @@ func GenerateSnapshotSuffix(snapshot bool) string {
 	return SnapshotSuffix
 }
 
-// BeatQualifiedVersion returns the Beat's qualified version.
-// If a version qualifier is set, it appends it to the version.
-func (s *Settings) BeatQualifiedVersion() string {
-	version := s.BeatVersion()
+// AgentQualifiedCoreVersion returns the agent-core version with the version qualifier appended,
+// if a version qualifier is set.
+func (s *Settings) AgentQualifiedCoreVersion() string {
+	version := s.AgentCoreVersion()
 	// version qualifier can intentionally be set to "" to override build time var
 	if !s.Build.VersionQualified || s.Build.VersionQualifier == "" {
 		return version
@@ -289,18 +289,18 @@ func (s *Settings) BeatQualifiedVersion() string {
 }
 
 var (
-	beatVersionRegex       = regexp.MustCompile(`(?m)^const defaultBeatVersion = "(.+)"\r?$`)
+	agentCoreVersionRegex  = regexp.MustCompile(`(?m)^const defaultBeatVersion = "(.+)"\r?$`)
 	beatDocBranchRegex     = regexp.MustCompile(`(?m)doc-branch:\s*([^\s]+)\r?$`)
 	beatDocSiteBranchRegex = regexp.MustCompile(`(?m)doc-site-branch:\s*([^\s]+)\r?$`)
 )
 
-func parseBeatVersion(data []byte) (string, error) {
-	matches := beatVersionRegex.FindSubmatch(data)
+func parseAgentCoreVersion(data []byte) (string, error) {
+	matches := agentCoreVersionRegex.FindSubmatch(data)
 	if len(matches) == 2 {
 		return string(matches[1]), nil
 	}
 
-	return "", errors.New("failed to parse beat version file")
+	return "", errors.New("failed to parse agent-core version from version/version.go")
 }
 
 func parseDocBranch(data []byte) (string, error) {
@@ -659,9 +659,9 @@ type Settings struct {
 	// Initialized during LoadSettings().
 	docBranch string
 
-	// beatVersion is the Beat version read from version/version.go.
+	// agentCoreVersion is the agent-core version read from version/version.go.
 	// Initialized during LoadSettings().
-	beatVersion string
+	agentCoreVersion string
 
 	// FlavorsRegistry is the map of flavors read from _meta/.flavors.
 	// Initialized during LoadSettings().
@@ -863,15 +863,15 @@ func (s *Settings) WithAddedPackageType(pkgType PackageType) *Settings {
 	return clone
 }
 
-// WithBeatVersion returns a copy of the settings with the specified beat version.
-func (s *Settings) WithBeatVersion(version string) *Settings {
+// WithAgentCoreVersion returns a copy of the settings with the specified agent-core version.
+func (s *Settings) WithAgentCoreVersion(version string) *Settings {
 	clone := s.Clone()
-	clone.Build.BeatVersion = version
+	clone.Build.AgentCoreVersion = version
 	return clone
 }
 
 // WithManifestInfo downloads the manifest at ManifestURL and applies version information to a copy of
-// the settings. It sets Build.Snapshot, Build.BeatVersion, Build.AgentCoreCommitHash,
+// the settings. It sets Build.Snapshot, Build.AgentCoreVersion, Build.AgentCoreCommitHash,
 // Build.DependenciesVersion, and Packaging.Manifest. It is a no-op if ManifestURL is empty.
 func (s *Settings) WithManifestInfo(ctx context.Context) (*Settings, error) {
 	if s.Packaging.ManifestURL == "" {
@@ -896,7 +896,8 @@ func (s *Settings) WithManifestInfo(ctx context.Context) (*Settings, error) {
 	clone := s.Clone()
 	clone.Packaging.Manifest = &resp
 	clone.Build.Snapshot = parsedVersion.IsSnapshot()
-	clone.Build.BeatVersion = parsedVersion.CoreVersion()
+	clone.Build.AgentCoreVersion = parsedVersion.CoreVersion()
+	clone.Packaging.AgentPackageVersion = parsedVersion.CoreVersion()
 	clone.Build.AgentCoreCommitHash = agentCoreProject.CommitHash
 	clone.Build.DependenciesVersion = parsedVersion.VersionWithPrerelease()
 	return clone, nil
@@ -984,8 +985,8 @@ type BuildSettings struct {
 	// MaxParallel is the maximum number of parallel jobs (from MAX_PARALLEL env var)
 	MaxParallel int
 
-	// BeatVersion overrides the beat version (from BEAT_VERSION or set programmatically)
-	BeatVersion string
+	// AgentCoreVersion overrides the agent-core version (from BEAT_VERSION env var or set programmatically)
+	AgentCoreVersion string
 
 	// AgentCoreCommitHash holds the commit hash of the elastic-agent-core package being wrapped into a
 	// full elastic-agent package. The agent-core hash appears in the package's "versioned home" directory
@@ -1418,7 +1419,7 @@ func (s *Settings) loadBuildSettingsFromEnv() error {
 	}
 
 	if v := os.Getenv("BEAT_VERSION"); v != "" {
-		s.Build.BeatVersion = v
+		s.Build.AgentCoreVersion = v
 	}
 
 	s.Build.GolangCrossBuild = os.Getenv("GOLANG_CROSSBUILD") == "1"
@@ -1541,11 +1542,12 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 	}
 
 	// Apply .package-version overrides when USE_PACKAGE_VERSION is set.
-	// This mirrors the old initPackageVersion() behavior: read the file,
-	// set ManifestURL / AgentDropPath so the
-	// packaging path downloads components from the manifest instead of
-	// fetching them individually. Values from the .package-version file
-	// take precedence over environment variables.
+	// AgentPackageVersion and AgentCoreVersion are both set from pv.CoreVersion
+	// because the full package's agent_package_version must match the core
+	// archive's agent_core_version (extractAgentCoreForPackage looks up the
+	// core archive by the same version). For standalone packageAgentCore, this
+	// means the core archive is named with .package-version's version rather
+	// than version/version.go's; that is intentional.
 	if s.Packaging.UsePackageVersion {
 		pv, err := GetPackageVersionInfo(s)
 		if err != nil {
@@ -1554,7 +1556,7 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 		if pv != nil {
 			s.Packaging.ManifestURL = pv.ManifestURL
 			s.Packaging.AgentPackageVersion = pv.CoreVersion
-			s.Build.BeatVersion = pv.CoreVersion
+			s.Build.AgentCoreVersion = pv.CoreVersion
 			s.Build.Snapshot = true
 			s.IntegrationTest.AgentVersion = pv.Version
 			s.IntegrationTest.AgentStackVersion = pv.StackVersion
@@ -1762,15 +1764,15 @@ func (s *Settings) initBuildVariables() error {
 		return fmt.Errorf("failed to parse doc branch: %w", err)
 	}
 
-	// Load beat version from version/version.go
-	beatVersionFile := filepath.Join(s.ElasticBeatsDir, "version", "version.go")
-	data, err = os.ReadFile(beatVersionFile)
+	// Load agent-core version from version/version.go
+	agentCoreVersionFile := filepath.Join(s.ElasticBeatsDir, "version", "version.go")
+	data, err = os.ReadFile(agentCoreVersionFile)
 	if err != nil {
-		return fmt.Errorf("failed to read beat version file=%v: %w", beatVersionFile, err)
+		return fmt.Errorf("failed to read agent-core version file=%v: %w", agentCoreVersionFile, err)
 	}
-	s.beatVersion, err = parseBeatVersion(data)
+	s.agentCoreVersion, err = parseAgentCoreVersion(data)
 	if err != nil {
-		return fmt.Errorf("failed to parse beat version: %w", err)
+		return fmt.Errorf("failed to parse agent-core version: %w", err)
 	}
 
 	// Load flavors registry from _meta/.flavors
@@ -1839,14 +1841,14 @@ func (s *Settings) DocBranch() string {
 	return s.docBranch
 }
 
-// BeatVersion returns the Beat version.
-// If Build.BeatVersion override is set, it returns that value.
-// Otherwise returns the value loaded from the version file.
-func (s *Settings) BeatVersion() string {
-	if s.Build.BeatVersion != "" {
-		return s.Build.BeatVersion
+// AgentCoreVersion returns the agent-core version.
+// If Build.AgentCoreVersion override is set, it returns that value.
+// Otherwise returns the value loaded from version/version.go.
+func (s *Settings) AgentCoreVersion() string {
+	if s.Build.AgentCoreVersion != "" {
+		return s.Build.AgentCoreVersion
 	}
-	return s.beatVersion
+	return s.agentCoreVersion
 }
 
 // BuildDateString returns a formatted build date.
