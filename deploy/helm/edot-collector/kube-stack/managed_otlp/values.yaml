@@ -147,16 +147,8 @@ collectors:
               enabled: true
             k8s.container.status.last_terminated_reason:
               enabled: true
-<<<<<<< HEAD
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-=======
-      extensions:
-        cgroup_runtime: {}
-      # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
-      service:
-        extensions: [cgroup_runtime]
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
         pipelines:
           metrics:
             exporters:
@@ -453,16 +445,8 @@ collectors:
               enabled: true
           extra_metadata_labels:
             - container.id
-<<<<<<< HEAD
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-=======
-      extensions:
-        cgroup_runtime: {}
-      # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
-      service:
-        extensions: [cgroup_runtime]
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -503,10 +487,6 @@ collectors:
               - otlp
             processors:
               - batch/metrics
-<<<<<<< HEAD
-=======
-              - k8s_attributes
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
               - resource/hostname
             exporters:
               - otlp_grpc/gateway
@@ -515,10 +495,6 @@ collectors:
               - otlp
             processors:
               - batch
-<<<<<<< HEAD
-=======
-              - k8s_attributes
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
               - resource/hostname
             exporters:
               - otlp_grpc/gateway
@@ -527,10 +503,6 @@ collectors:
               - otlp
             processors:
               - batch
-<<<<<<< HEAD
-=======
-              - k8s_attributes
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
               - resource/hostname
             exporters:
               - otlp_grpc/gateway
@@ -577,12 +549,7 @@ collectors:
       processors: {}
       exporters:
         debug:
-<<<<<<< HEAD
-        otlp/ingest_logs:
-=======
-          verbosity: basic
         otlp_grpc/ingest_logs:
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
           endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
           headers:
             Authorization: ApiKey ${env:ELASTIC_API_KEY}
@@ -610,14 +577,7 @@ collectors:
               min_size: 1_000_000 # 1MB uncompressed
               max_size: 4_000_000 # 4MB uncompressed
           timeout: 15s
-<<<<<<< HEAD
       service:
-=======
-      extensions:
-        cgroup_runtime: {}
-      service:
-        extensions: [cgroup_runtime]
->>>>>>> 61540533f ([EDOT] Update EDOT collector component names to fix deprecation warnings (#14418))
         pipelines:
           metrics:
             receivers: [otlp]
