@@ -1158,7 +1158,7 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 		dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
 	}
 	if mg.Verbose() {
-		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, platforms)
+		log.Printf("--- Packaging dependenciesVersion[%s], %+v\n", dependenciesVersion, platforms)
 	}
 
 	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(cfg, pkgSpecs)
