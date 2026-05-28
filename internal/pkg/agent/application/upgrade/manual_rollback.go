@@ -189,11 +189,10 @@ func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcher
 		if selectedRollbackVersionedHome == "" {
 			return fmt.Errorf("version %q not listed among the available rollbacks: %w", version, ErrNoRollbacksAvailable)
 		}
-		// There is a small window between selecting the target here and InvokeWatcher in the caller.
-		// PeriodicallyCleanRollbacks only removes expired entries, so the non-expired entry chosen above is safe.
-		// CleanupAllRollbacks (called at the start of a new upgrade) and rollbackInstall (via Set(nil)) can
-		// remove any entry, but a concurrent upgrade or failed install during the watcher grace period is
-		// unlikely. Fully closing the race would require holding the watcher applock past InvokeWatcher.
+		// There is a small window between selecting the rollback target and starting the rollback.
+		// A concurrent upgrade or failed install could remove the selected entry in this window,
+		// but both are unlikely while the watcher grace period is active.
+		// Fully closing the race would require holding the watcher applock through the rollback start.
 		return nil
 	})
 

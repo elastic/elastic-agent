@@ -49,9 +49,7 @@ type UpdateMarker struct {
 
 	Details *details.Details `json:"details,omitempty" yaml:"details,omitempty"`
 
-	// RollbacksAvailable is kept for backward compatibility with agents 9.3–9.4 that read
-	// rollback targets from this marker field on Windows (where the marker is not removed
-	// after a successful upgrade). Agents 9.5+ read from on-disk .ttl files instead.
+	// Agents older than 9.5.0 read rollback targets from this field on Windows.
 	// TODO: remove once the minimum supported upgrade-from version is 9.5.0.
 	RollbacksAvailable map[string]ttl.TTLMarker `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
 }
