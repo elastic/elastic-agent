@@ -40,13 +40,16 @@ try {
     # Instrumentation:
     # - clobberfree=1: paints freed heap memory with 0xdead pattern so corrupted bytes
     #   in the GC dump are recognizable as "freed memory leaked into use" vs random junk.
-    # - gctrace=1: one line per GC cycle on stderr; helps correlate the crashing sweep.
-    # - schedtrace=10000: scheduler state every 10s; shows what was running on which M/P.
     # - GOTRACEBACK=crash: full goroutine traceback to stderr THEN raises SIGABRT, so WER
     #   captures the dump.
+    # gctrace=1 and schedtrace=10000 are intentionally omitted: gotestsum/test2json
+    # treats every non-JSON stderr line as a package error, so those flags cause
+    # thousands of spurious failures and schedtrace can produce lines that exceed
+    # bufio.Scanner's 64 KB limit.  clobberfree=1 is safe because it only affects
+    # heap contents (no stderr output).
     # Loop over fresh binary invocations (same reason as the diagnostic script: the crash
     # is most likely at binary startup; -count loops accumulate heap and OOM instead).
-    $env:GODEBUG = "clobberfree=1,gctrace=1,schedtrace=10000"
+    $env:GODEBUG = "clobberfree=1"
     $env:GOTRACEBACK = "crash"
 
     $maxRuns = 5
