@@ -60,6 +60,7 @@ steps:
       - "build/diagnostics/*"
       - "coverage-*.out"
       - "build/dumps/*.dmp"
+      - "build/bins/*.exe"
     agents:
       provider: "azure"
       image: "${IMAGE_WIN_11}"

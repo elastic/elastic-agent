@@ -94,7 +94,11 @@ try {
     # long").  This is a diagnostic run that exists to crash the binary so WER
     # can capture a dump; we don't need JUnit, and the raw `go test -v` output
     # is easier to correlate with the gctrace/schedtrace lines anyway.
-    $testArgs = @("test", "-count=1", "-v", "-timeout=20m")
+    # -work keeps go test's per-package temp directories (b001/, b002/, ...)
+    # after the run completes.  Each contains the compiled <pkg>.test.exe; we
+    # need those preserved so that whichever test binaries crashed can be
+    # uploaded alongside their dumps for symbol resolution in dlv/WinDbg.
+    $testArgs = @("test", "-count=1", "-v", "-work", "-timeout=20m")
     if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
         $testArgs += "-race"
     }
@@ -166,6 +170,26 @@ try {
         # text marker (the Go runtime may exit before its diagnostic prints
         # flush all the way through Tee-Object).
         $crashed = $true
+
+        # Copy the matching test binary for each dump so dlv/WinDbg can resolve
+        # symbols (function names, line numbers).  Binaries are 200+ MB each
+        # with -race + -coverpkg=./..., so we copy ONLY the ones that crashed
+        # rather than every test binary in the work tree.
+        $binsDir = Join-Path $env:BUILDKITE_BUILD_CHECKOUT_PATH "build\bins"
+        New-Item -ItemType Directory -Force -Path $binsDir | Out-Null
+        foreach ($dump in $dumps) {
+            if ($dump.Name -match '^(.+\.exe)_\d+_\d+\.dmp$') {
+                $binName = $Matches[1]
+                $found = Get-ChildItem -Path $env:GOTMPDIR -Recurse -Filter $binName -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($found) {
+                    $dest = Join-Path $binsDir $binName
+                    Copy-Item -Path $found.FullName -Destination $dest -Force
+                    Write-Host "  Saved binary for $binName ($([math]::Round($found.Length/1MB,1)) MB)"
+                } else {
+                    Write-Host "  WARNING: could not find $binName under $env:GOTMPDIR"
+                }
+            }
+        }
     } elseif (-not $crashed) {
         Write-Host "No crash dumps captured (test suite did not crash, or WER did not fire)."
     }
