@@ -30,46 +30,65 @@ Set-ItemProperty -Path $werKey -Name "DumpCount"  -Value 3 -Type DWord
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting" -Name "DontShowUI" -Value 1 -Type DWord
 Write-Host "WER LocalDumps configured: DumpFolder=$dumpDir DumpType=2 (full) DumpCount=3"
 
-$mageExit = 0
+$testExit = 0
 try {
-    Write-Host "--- Unit tests (instrumented; asyncpreemptoff NOT set so the bug fires)"
-    $env:TEST_COVERAGE = $true
-    if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
-        $env:RACE_DETECTOR = $true
+    Write-Host "--- Build unit test helper binaries"
+    # Some unit tests exec helper binaries (pkg/component/fake/component,
+    # internal/edot/testing, ...).  `go test ./...` will not build them on its
+    # own, so reuse the existing mage target for prep.
+    mage build:unitTestBinaries
+    if ($LASTEXITCODE -ne 0) {
+        $testExit = $LASTEXITCODE
+        Write-Host "build:unitTestBinaries failed with $testExit"
+        exit $testExit
     }
+
+    Write-Host "--- Unit tests (instrumented; asyncpreemptoff NOT set so the bug fires)"
     # Instrumentation:
     # - clobberfree=1: paints freed heap memory with 0xdead pattern so corrupted bytes
     #   in the GC dump are recognizable as "freed memory leaked into use" vs random junk.
+    # - gctrace=1: one line per GC cycle on stderr; correlates the crashing sweep.
+    # - schedtrace=10000: scheduler state every 10s; shows what was running on which M/P.
     # - GOTRACEBACK=crash: full goroutine traceback to stderr THEN raises SIGABRT, so WER
     #   captures the dump.
-    # gctrace=1 and schedtrace=10000 are intentionally omitted: gotestsum/test2json
-    # treats every non-JSON stderr line as a package error, so those flags cause
-    # thousands of spurious failures and schedtrace can produce lines that exceed
-    # bufio.Scanner's 64 KB limit.  clobberfree=1 is safe because it only affects
-    # heap contents (no stderr output).
-    # Loop over fresh binary invocations (same reason as the diagnostic script: the crash
-    # is most likely at binary startup; -count loops accumulate heap and OOM instead).
-    $env:GODEBUG = "clobberfree=1"
+    $env:GODEBUG = "clobberfree=1,gctrace=1,schedtrace=10000"
     $env:GOTRACEBACK = "crash"
+
+    # We deliberately bypass `mage unitTest` / gotestsum here.  gotestsum (v1.13)
+    # treats every non-JSON line on the test process's stderr as a "package
+    # error", which means gctrace=1 (one line per GC cycle, thousands per run)
+    # produces a giant tally of spurious failures and masks the real signal.
+    # It also uses a default 64 KB bufio scanner that trips on the large
+    # goroutine dumps GOTRACEBACK=crash emits when the bug fires ("token too
+    # long").  This is a diagnostic run that exists to crash the binary so WER
+    # can capture a dump; we don't need JUnit, and the raw `go test -v` output
+    # is easier to correlate with the gctrace/schedtrace lines anyway.
+    $testArgs = @("test", "-count=1", "-v", "-timeout=20m")
+    if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
+        $testArgs += "-race"
+    }
+    $testArgs += @(
+        "-covermode=atomic",
+        "-coverprofile=build/coverage.out",
+        "-coverpkg=./...",
+        "./..."
+    )
 
     $maxRuns = 5
     for ($run = 1; $run -le $maxRuns; $run++) {
         Write-Host "--- Unit test run $run of $maxRuns"
-        mage unitTest
-        $mageExit = $LASTEXITCODE
-        if ($mageExit -ne 0) {
-            Write-Host "Test binary exited with code $mageExit on run $run"
+        & go @testArgs
+        $testExit = $LASTEXITCODE
+        if ($testExit -ne 0) {
+            Write-Host "Test binary exited with code $testExit on run $run"
             break
         }
     }
 
     Write-Host "--- Prepare artifacts"
     $buildkiteJobId = $env:BUILDKITE_JOB_ID
-    if (Test-Path "build/TEST-go-unit.cov") {
-        Move-Item -Path "build/TEST-go-unit.cov" -Destination "coverage-$buildkiteJobId.out"
-    }
-    if (Test-Path "build/TEST-go-unit.xml") {
-        Move-Item -Path "build/TEST-go-unit.xml" -Destination "build/TEST-$buildkiteJobId.xml"
+    if (Test-Path "build/coverage.out") {
+        Move-Item -Path "build/coverage.out" -Destination "coverage-$buildkiteJobId.out"
     }
     $dumps = Get-ChildItem -Path $dumpDir -Filter *.dmp -ErrorAction SilentlyContinue
     if ($dumps) {
@@ -103,4 +122,4 @@ try {
     Write-Host "WER LocalDumps restored."
 }
 
-exit $mageExit
+exit $testExit
