@@ -163,6 +163,15 @@ try {
         }
     }
 
+    # Clear the diagnostic GODEBUG/GOTRACEBACK before any further `go`
+    # invocations.  gctrace/schedtrace make every subsequent `go` command
+    # (go list, go test -c) write trace lines to stderr, and with the
+    # script-level $ErrorActionPreference = "Stop" PowerShell turns the first
+    # such native-command stderr line into a terminating error - which is
+    # what aborted the artifact-rebuild step in build 40519 before it ran.
+    $env:GODEBUG = ""
+    $env:GOTRACEBACK = ""
+
     Write-Host "--- Prepare artifacts"
     $buildkiteJobId = $env:BUILDKITE_JOB_ID
     if (Test-Path "build/coverage.out") {
@@ -196,7 +205,15 @@ try {
         # Enumerate import paths once so we can map a dump's binary basename
         # to a package path.  `go list ./...` skips packages with no Go
         # files, which is fine - they wouldn't produce a *.test.exe anyway.
-        $allPackages = & go list ./... 2>$null
+        # Relax EAP around the native call so any stderr output (build
+        # warnings, module download chatter) is not treated as terminating.
+        $prevEAP = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $allPackages = & go list ./... 2>$null
+        } finally {
+            $ErrorActionPreference = $prevEAP
+        }
 
         foreach ($dump in $dumps) {
             if ($dump.Name -notmatch '^(.+)\.test\.exe_\d+_\d+\.dmp$') {
