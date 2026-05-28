@@ -668,7 +668,7 @@ type mockDaemon struct {
 }
 
 func (s *mockDaemon) Start(opt ...grpc.ServerOption) error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.port))
+	lis, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", s.port))
 	if err != nil {
 		return err
 	}
@@ -693,7 +693,7 @@ func (s *mockDaemon) Client() client.Client {
 	return client.New(client.WithAddress(fmt.Sprintf("http://localhost:%d", s.port)))
 }
 
-func (s *mockDaemon) StateWatch(_ *cproto.Empty, srv cproto.ElasticAgentControl_StateWatchServer) error {
+func (s *mockDaemon) StateWatch(_ *cproto.StateWatchRequest, srv cproto.ElasticAgentControl_StateWatchServer) error {
 	return s.watch(srv)
 }
 
