@@ -1343,8 +1343,6 @@ specs:
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
           <<: *agent_otel_collector_binary_spec_core
           <<: *metricbeat_lightweight_module_core
-<<<<<<< HEAD
-=======
 
     - os: windows
       types: [ zip ]
@@ -1361,5 +1359,4 @@ specs:
             source: ./build/windows-{{.Platform.Arch}}-archive-root-binary/elastic-agent-archive-root.exe
           <<: *agent_otel_collector_binary_spec_core
           <<: *metricbeat_lightweight_module_core
->>>>>>> 014ac3482 ([mage] Distinguish between core version and package version (#14247))
     ######## End FIPS Specs ########
