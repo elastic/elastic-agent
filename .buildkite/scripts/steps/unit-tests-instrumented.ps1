@@ -106,11 +106,21 @@ try {
     # exception capture - critical for Go binaries because Go's runtime handles
     # exceptions in its UnhandledExceptionFilter and the second-chance never
     # fires (so AeDebug alone is not enough).  -ma writes a full memory dump.
+    #
+    # -f "Breakpoint" restricts capture to EXCEPTION_BREAKPOINT exceptions
+    # only.  This is how Go's `runtime.crash()` signals a fatal panic on
+    # Windows (it executes `INT 3` after the throw path is done printing the
+    # goroutine traceback).  Without this filter, procdump catches every
+    # recoverable nil-pointer dereference (and there are several during a
+    # normal test run as Go's fmt machinery probes Stringer-implementing
+    # nil pointers), producing dumps of harmless first-chance exceptions
+    # and missing the actual `runtime.throw` we want.
+    #
     # The wrapper is passed to `go test` via -exec; go test then invokes it as
     # `<wrapper> <test-binary> <test-args>`, which procdump consumes as
-    # `procdump -ma -e 1 -accepteula -x <dumpDir> <test-binary> <test-args>`.
+    # `procdump -ma -e 1 -f Breakpoint -accepteula -x <dumpDir> <test-binary> <test-args>`.
     if ($procdumpInstalled) {
-        $execValue = "`"$procdumpExe`" -ma -e 1 -accepteula -x `"$dumpDir`""
+        $execValue = "`"$procdumpExe`" -ma -e 1 -f Breakpoint -accepteula -x `"$dumpDir`""
         $testArgs += "-exec=$execValue"
     }
     $testArgs += @(
