@@ -30,6 +30,38 @@ Set-ItemProperty -Path $werKey -Name "DumpCount"  -Value 3 -Type DWord
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting" -Name "DontShowUI" -Value 1 -Type DWord
 Write-Host "WER LocalDumps configured: DumpFolder=$dumpDir DumpType=2 (full) DumpCount=3"
 
+# --- Register procdump as AeDebug postmortem debugger ---
+# WER LocalDumps alone is not enough on Go programs: Go's runtime installs an
+# UnhandledExceptionFilter that prints its own panic trace and exits cleanly,
+# so the exception never becomes "unhandled" from WER's perspective.  Procdump
+# registered via AeDebug runs *before* the UEF and grabs a dump anyway.
+$procdumpInstalled = $false
+$toolsDir = Join-Path $env:BUILDKITE_BUILD_CHECKOUT_PATH "build\tools"
+$procdumpExe = Join-Path $toolsDir "procdump64.exe"
+try {
+    if (-not (Test-Path $procdumpExe)) {
+        New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+        $zip = Join-Path $env:TEMP "procdump.zip"
+        Write-Host "Downloading Sysinternals procdump..."
+        Invoke-WebRequest -Uri "https://download.sysinternals.com/files/Procdump.zip" -OutFile $zip -UseBasicParsing
+        Expand-Archive -Path $zip -DestinationPath $toolsDir -Force
+        Remove-Item $zip -ErrorAction SilentlyContinue
+    }
+    # -accepteula avoids the interactive prompt the first time procdump is run.
+    # -ma writes a full memory dump.  -i <dir> installs procdump as the AeDebug
+    # postmortem debugger; subsequent unhandled exceptions in any process on
+    # this agent will trigger procdump and the dump lands in $dumpDir.
+    & $procdumpExe -accepteula -ma -i $dumpDir
+    if ($LASTEXITCODE -eq 0) {
+        $procdumpInstalled = $true
+        Write-Host "procdump installed as AeDebug postmortem debugger (dumps -> $dumpDir)"
+    } else {
+        Write-Host "WARNING: procdump install failed with exit $LASTEXITCODE (continuing without binary dumps)"
+    }
+} catch {
+    Write-Host "WARNING: procdump setup failed: $_ (continuing without binary dumps)"
+}
+
 $crashed = $false
 try {
     Write-Host "--- Build unit test helper binaries"
@@ -149,6 +181,14 @@ try {
         Remove-Item -Path $werKey -Recurse -Force -ErrorAction SilentlyContinue
     }
     Write-Host "WER LocalDumps restored."
+
+    # Unregister procdump as AeDebug so we don't leave global state pointing
+    # at a build-scoped path the next job won't have.  `-u` is idempotent; if
+    # install failed, the unregister no-ops.
+    if ($procdumpInstalled -and (Test-Path $procdumpExe)) {
+        & $procdumpExe -u
+        Write-Host "procdump uninstalled."
+    }
 }
 
 if ($crashed) {
