@@ -94,11 +94,7 @@ try {
     # long").  This is a diagnostic run that exists to crash the binary so WER
     # can capture a dump; we don't need JUnit, and the raw `go test -v` output
     # is easier to correlate with the gctrace/schedtrace lines anyway.
-    # -work keeps go test's per-package temp directories (b001/, b002/, ...)
-    # after the run completes.  Each contains the compiled <pkg>.test.exe; we
-    # need those preserved so that whichever test binaries crashed can be
-    # uploaded alongside their dumps for symbol resolution in dlv/WinDbg.
-    $testArgs = @("test", "-count=1", "-v", "-work", "-timeout=20m")
+    $testArgs = @("test", "-count=1", "-v", "-timeout=20m")
     if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
         $testArgs += "-race"
     }
@@ -181,34 +177,64 @@ try {
         # flush all the way through Tee-Object).
         $crashed = $true
 
-        # Copy the matching test binary for each dump so dlv/WinDbg can resolve
-        # symbols (function names, line numbers).  Binaries are 200+ MB each
-        # with -race + -coverpkg=./..., so we copy ONLY the ones that crashed
-        # rather than every test binary in the work tree.
+        # Build a fresh symbol-rich test binary for each crashed package so
+        # dlv/WinDbg can resolve symbols (function names, line numbers).  We
+        # used to just copy the binary from go test -work's tree, but build
+        # 40516 showed that artifact is stripped (no runtime.pclntab, no
+        # DWARF) - presumably go test's internal flow rewrites the binary
+        # after running, or the binary we picked was an intermediate compile.
+        #
+        # Instead, invoke `go test -c -o` with the same race/coverage flags
+        # against the package that produced the dump.  The result is built
+        # from the same source on the same Go toolchain on the same agent,
+        # so function offsets line up with the dump - and we get full
+        # symbols.  Building takes ~30-60s per crashed package; we accept
+        # that as the cost of useful dumps.
         $binsDir = Join-Path $env:BUILDKITE_BUILD_CHECKOUT_PATH "build\bins"
         New-Item -ItemType Directory -Force -Path $binsDir | Out-Null
-        # go test -work creates a fresh `go-build<N>` directory per invocation
-        # under GOTMPDIR.  Restrict the search to those so we never pick up a
-        # stale binary from a different mage/build step.  For each matching
-        # name we then pick the LARGEST file - the race+coverage instrumented
-        # test binary is consistently the biggest by a wide margin, so this
-        # cleanly filters out earlier-stage compiles that may share the name.
-        $workDirs = Get-ChildItem -Path $env:GOTMPDIR -Filter "go-build*" -Directory -ErrorAction SilentlyContinue
+
+        # Enumerate import paths once so we can map a dump's binary basename
+        # to a package path.  `go list ./...` skips packages with no Go
+        # files, which is fine - they wouldn't produce a *.test.exe anyway.
+        $allPackages = & go list ./... 2>$null
+
         foreach ($dump in $dumps) {
-            if ($dump.Name -match '^(.+\.exe)_\d+_\d+\.dmp$') {
-                $binName = $Matches[1]
-                $candidates = @()
-                foreach ($wd in $workDirs) {
-                    $candidates += Get-ChildItem -Path $wd.FullName -Recurse -Filter $binName -File -ErrorAction SilentlyContinue
-                }
-                $found = $candidates | Sort-Object Length -Descending | Select-Object -First 1
-                if ($found) {
-                    $dest = Join-Path $binsDir $binName
-                    Copy-Item -Path $found.FullName -Destination $dest -Force
-                    Write-Host "  Saved binary for $binName ($([math]::Round($found.Length/1MB,1)) MB) from $($found.FullName)"
-                } else {
-                    Write-Host "  WARNING: could not find $binName under any go-build* dir in $env:GOTMPDIR"
-                }
+            if ($dump.Name -notmatch '^(.+)\.test\.exe_\d+_\d+\.dmp$') {
+                Write-Host "  WARNING: dump filename '$($dump.Name)' does not match the expected <pkg>.test.exe_*.dmp pattern; skipping"
+                continue
+            }
+            $pkgBase = $Matches[1]
+            $binName = "$pkgBase.test.exe"
+            $matchedPkgs = $allPackages | Where-Object { (Split-Path $_ -Leaf) -eq $pkgBase }
+            if (-not $matchedPkgs) {
+                Write-Host "  WARNING: no package in 'go list ./...' has basename '$pkgBase'; skipping $binName"
+                continue
+            }
+            $pkgPath = $matchedPkgs | Select-Object -First 1
+            if (@($matchedPkgs).Count -gt 1) {
+                Write-Host "  Multiple packages match basename '$pkgBase'; using $pkgPath (others: $(@($matchedPkgs)[1..(@($matchedPkgs).Count-1)] -join ', '))"
+            }
+
+            $dest = Join-Path $binsDir $binName
+            $compileArgs = @("test", "-c", "-covermode=atomic", "-coverpkg=./...", "-o", $dest)
+            if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
+                $compileArgs += "-race"
+            }
+            $compileArgs += $pkgPath
+
+            $prevEAP = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            try {
+                Write-Host "  Compiling $binName from $pkgPath ..."
+                & go @compileArgs 2>&1 | Out-Host
+            } finally {
+                $ErrorActionPreference = $prevEAP
+            }
+            if (Test-Path $dest) {
+                $size = (Get-Item $dest).Length
+                Write-Host "  Saved binary for $binName ($([math]::Round($size/1MB,1)) MB) compiled from $pkgPath"
+            } else {
+                Write-Host "  WARNING: failed to compile $binName from $pkgPath"
             }
         }
     } elseif (-not $crashed) {
