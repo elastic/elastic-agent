@@ -1148,15 +1148,6 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 	fmt.Println("--- Package Elastic-Agent")
 
 	platforms := cfg.GetPlatforms()
-	if dependenciesVersion == "" {
-		agentCoreVersion := cfg.AgentQualifiedCoreVersion()
-		if agentCoreVersion == "" {
-			dependenciesVersion = bversion.GetDefaultVersion()
-		} else {
-			dependenciesVersion = agentCoreVersion
-		}
-		dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
-	}
 	if mg.Verbose() {
 		log.Printf("--- Packaging dependenciesVersion[%s], %+v\n", dependenciesVersion, platforms)
 	}
