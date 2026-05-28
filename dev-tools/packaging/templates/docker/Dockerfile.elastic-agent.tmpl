@@ -265,7 +265,7 @@ RUN for iter in {1..10}; do \
         microdnf -y install fontconfig freetype cairo glib2 gtk3 pango xorg-x11-fonts-misc xorg-x11-fonts-Type1 \
         at-spi2-atk atk at-spi2-core alsa-lib cups-libs dbus-libs libdrm mesa-libEGL mesa-libgbm nspr nss libX11 \
         libX11-xcb libxcb libXcomposite libXdamage libXext libXfixes libXrandr libxkbcommon libxshmfence glib2 \
-        dbus-glib libicu mesa-libGL unzip iptables && \
+        libicu mesa-libGL unzip && \
         mkdir -p /usr/share/fonts/google-noto && \
         curl -L -o NotoSansCJKjp.zip https://github.com/notofonts/noto-cjk/releases/download/Sans2.004/06_NotoSansCJKjp.zip && \
         unzip NotoSansCJKjp.zip -d /usr/share/fonts/google-noto && \
