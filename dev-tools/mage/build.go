@@ -312,7 +312,7 @@ func Run(ctx context.Context, env map[string]string, stdout, stderr io.Writer, c
 // allows users to view metadata about the exe in the Details tab of the file
 // properties viewer.
 func MakeWindowsSysoFile(cfg *Settings) (string, error) {
-	version := cfg.BeatQualifiedVersion()
+	version := cfg.AgentQualifiedCoreVersion()
 
 	commit := cfg.Build.CommitHash()
 
