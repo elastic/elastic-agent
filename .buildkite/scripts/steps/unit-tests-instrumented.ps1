@@ -98,6 +98,17 @@ try {
     if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
         $testArgs += "-race"
     }
+    # Wrap each test binary launch with procdump.  -e 1 enables first-chance
+    # exception capture - critical for Go binaries because Go's runtime handles
+    # exceptions in its UnhandledExceptionFilter and the second-chance never
+    # fires (so AeDebug alone is not enough).  -ma writes a full memory dump.
+    # The wrapper is passed to `go test` via -exec; go test then invokes it as
+    # `<wrapper> <test-binary> <test-args>`, which procdump consumes as
+    # `procdump -ma -e 1 -accepteula -x <dumpDir> <test-binary> <test-args>`.
+    if ($procdumpInstalled) {
+        $execValue = "`"$procdumpExe`" -ma -e 1 -accepteula -x `"$dumpDir`""
+        $testArgs += "-exec=$execValue"
+    }
     $testArgs += @(
         "-covermode=atomic",
         "-coverprofile=build/coverage.out",
