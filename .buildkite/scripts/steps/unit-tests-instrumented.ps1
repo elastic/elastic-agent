@@ -87,7 +87,20 @@ try {
     $maxRuns = 5
     for ($run = 1; $run -le $maxRuns; $run++) {
         Write-Host "--- Unit test run $run of $maxRuns"
-        & go @testArgs 2>&1 | Tee-Object -FilePath $runLog -Append
+        # Windows PowerShell 5.1 wraps every stderr line from a native command
+        # routed through `2>&1` as a RemoteException ErrorRecord.  With the
+        # script-level `$ErrorActionPreference = "Stop"`, the very first such
+        # line (a SCHED trace from compilation under schedtrace=10000) aborts
+        # the script before Tee-Object ever runs.  Relax EAP just for the
+        # duration of the `go test` call so the stderr stream is treated as
+        # text, not errors.
+        $prevEAP = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            & go @testArgs 2>&1 | Tee-Object -FilePath $runLog -Append
+        } finally {
+            $ErrorActionPreference = $prevEAP
+        }
         Write-Host "go test exited with code $LASTEXITCODE on run $run"
 
         if (Select-String -Path $runLog -Pattern $crashRegex -Quiet) {
