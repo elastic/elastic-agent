@@ -8,8 +8,6 @@ import (
 	"math"
 	"sync"
 	"time"
-
-	"github.com/elastic/elastic-agent-libs/upgrade/details"
 )
 
 // Observer is a function that will be called with upgrade details
@@ -36,7 +34,7 @@ type Metadata struct {
 
 	// DownloadRate is the rate, in bytes per second, at which the download
 	// is progressing.
-	DownloadRate details.DownloadRate `json:"download_rate,omitempty" yaml:"download_rate,omitempty"`
+	DownloadRate float64 `json:"download_rate,omitempty" yaml:"download_rate,omitempty"`
 
 	// RetryErrorMsg is any error message that is a result of a retryable upgrade
 	// step, e.g. the download step, being retried.
@@ -127,7 +125,7 @@ func (d *Details) SetDownloadProgress(percent, rateBytesPerSecond float64) {
 	if math.IsInf(rateBytesPerSecond, 0) || math.IsNaN(rateBytesPerSecond) {
 		d.Metadata.DownloadRate = 0
 	} else {
-		d.Metadata.DownloadRate = details.DownloadRate(rateBytesPerSecond)
+		d.Metadata.DownloadRate = rateBytesPerSecond
 	}
 
 	d.notifyObservers()
