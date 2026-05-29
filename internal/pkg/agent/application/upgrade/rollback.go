@@ -152,9 +152,7 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	source := ttl.NewTTLMarkerRegistry(log, topDirPath)
 	_, err := cleanupAgentDirectories(log, topDirPath, time.Now(), source, CleanupExpiredRollbacks, callerProtected, cleanupOpts{
 		// strict: called post-rollback when we know the upgrade has ended; a nil-Details marker
-		// cannot confirm an active upgrade, so it must not protect directories.
-		// CleanAvailableRollbacks uses lenient mode (requireMarkerDetails=false) for
-		// periodic cleanup where legacy markers with nil Details should still protect directories.
+		// cannot confirm an active upgrade, so it must not protect directories
 		requireMarkerDetails: true,
 		keepLogs:             keepLogs,
 	})

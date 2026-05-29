@@ -294,17 +294,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	var markerWritten bool
 	// postSymlinkPhase is set immediately after changeSymlink succeeds.
-	// Once the symlink points at the new install any failure must preserve the upgrade marker
-	// (coordinator.handleUpgrade reads it to call MarkUpgradeFailed for Fleet ack) and restore
-	// active.commit if markUpgrade has already updated it.
+	// Once the symlink points at the new install any failure must preserve the upgrade marker so the failure can be reported to Fleet, and restore active.commit if markUpgrade has already updated it.
 	var postSymlinkPhase bool
 	// activeCommitModified is set just before markUpgrade rewrites active.commit.
 	// The defer uses it to skip the restore when the file was never touched.
 	var activeCommitModified bool
 	// Read active.commit from disk; ensures the defer restores the correct pre-upgrade hash
 	// even if the running binary's embedded hash is empty or stale.
-	activeCommitPath := filepath.Join(paths.Top(), agentCommitFile)
-	previousCommitBytes, readErr := os.ReadFile(activeCommitPath)
+	previousCommitBytes, readErr := os.ReadFile(filepath.Join(paths.Top(), agentCommitFile))
 	previousCommit := release.Commit() // fallback if the file cannot be read
 	if readErr == nil {
 		if s := strings.TrimSpace(string(previousCommitBytes)); s != "" {
@@ -350,7 +347,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 				if previousCommit == "" {
 					u.log.Warnw("skipping active.commit restore: pre-upgrade commit hash is unknown")
 				} else {
-					if restoreErr := os.WriteFile(activeCommitPath, []byte(previousCommit), 0600); restoreErr != nil {
+					if restoreErr := UpdateActiveCommit(u.log, paths.Top(), previousCommit, os.WriteFile); restoreErr != nil {
 						u.log.Warnw("failed to restore active commit during upgrade cleanup", "error.message", restoreErr)
 					}
 				}
@@ -482,16 +479,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), previous, current)
 
-	// Write the marker before unpacking so newVersionedHome is protected from cleanup.
-	// active.commit is not updated here — only the marker file is written.
-	// RollbacksAvailable is intentionally nil: .ttl files are written only after the symlink
-	// flips, so advertising rollbacks here would create phantom targets if a crash occurs between
-	// the marker write and the Set call. The post-symlink markUpgrade populates RollbacksAvailable.
-	// Any rollbacks from a previous upgrade attempt were already cleared by CleanAvailableRollbacks
-	// at the start of Upgrade(), so there is no in-flight list to preserve here.
-	//
-	// writeUpgradeMarker uses an atomic rename (SafeFileRotate), so on failure no partial marker
-	// is left on disk and markerWritten=false correctly reflects that nothing needs cleaning up.
+	// Write the marker before unpacking so newVersionedHome is protected from cleanup during the upgrade.
+	// RollbacksAvailable is nil here: TTL entries are written after the symlink flips, and previous rollbacks were already removed at the start of Upgrade().
 	if err = u.writeUpgradeMarker(u.log, paths.Data(), time.Now(), current, previous, action, det, nil); err != nil {
 		return nil, fmt.Errorf("writing upgrade marker: %w", err)
 	}
@@ -562,9 +551,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
-	// The symlink now points at the new install. Any failure from here must preserve the
-	// upgrade marker (for Fleet ack via MarkUpgradeFailed) and restore active.commit if
-	// markUpgrade changed it.
+	// The symlink now points at the new install. Any failure from here must preserve the upgrade marker so the failure can be reported to Fleet, and restore active.commit if markUpgrade changed it.
 	postSymlinkPhase = true
 
 	// when downgrading to a pre-9.4 agent that doesn't manage the registry entry,

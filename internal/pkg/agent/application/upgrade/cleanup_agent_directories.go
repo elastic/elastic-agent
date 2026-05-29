@@ -118,9 +118,12 @@ func (dc *dirClassifier) shouldRemove(relPath string) bool {
 // cleanupOpts configures optional behaviour of cleanupAgentDirectories.
 type cleanupOpts struct {
 	// requireMarkerDetails controls whether a marker with nil Details is trusted for directory protection.
-	// On disk, Details can be nil for two reasons: (1) marker written by an older agent before the Details field existed, (2) pre-unpack marker written before an upgrade begins.
-	// true (strict): used when the upgrade lifecycle is known to have ended. A nil-Details marker carries no information about an active upgrade and does not protect directories.
-	// false (lenient): used during periodic cleanup when the upgrade state is unknown. A nil-Details marker may indicate an upgrade in progress, so it still protects referenced directories.
+	// On disk, Details can be nil for two reasons:
+	//   (1) marker written by an older agent before the Details field existed
+	//   (2) pre-unpack marker written before an upgrade begins.
+	//
+	// true (strict): used when the upgrade lifecycle is known to have ended, so we can ignore nil Details
+	// false (lenient): used during periodic cleanup when the upgrade state is unknown.
 	requireMarkerDetails bool
 	// keepLogs skips the "logs" subdirectory when removing a versioned home.
 	keepLogs bool
