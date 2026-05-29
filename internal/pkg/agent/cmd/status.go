@@ -13,10 +13,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 
 	"gopkg.in/yaml.v2"
 
