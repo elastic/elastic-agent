@@ -8,7 +8,7 @@ ARG BASE_TAG=9.7
 
 FROM ${BASE_REGISTRY}/${BASE_IMAGE}:${BASE_TAG} as prep_files
 
-ARG ELASTIC_STACK={{ beat_version }}
+ARG ELASTIC_STACK={{ agent_package_version }}
 ARG ELASTIC_PRODUCT=elastic-agent
 ARG OS_AND_ARCH=linux-x86_64
 
