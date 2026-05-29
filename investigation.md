@@ -5,12 +5,16 @@ Working branch: `worktree-test+diagnose-windows-gc-panic`.
 Upstream cause: <https://github.com/golang/go/issues/77975> — *"runtime:
 Windows crash with Go 1.26.0, 1.26.1"*.
 
-> **Status:** Reproduced reliably in CI. Leading suspect is the **Green Tea
-> garbage collector** (new default in Go 1.26), per the upstream issue: a
-> stack-scanning / copystack marking bug that corrupts GC metadata. A
-> `GOEXPERIMENT=nogreenteagc` CI variant is the in-flight decisive test. Not
-> yet reproduced in a standalone minimal test. No fix yet — diagnostic work
-> toward confirming this is go#77975.
+> **Status:** Reproduced reliably in CI. The crash is GC-metadata corruption
+> on Windows / Go 1.26.3 under heavy filesystem-test load + `GOGC=1`. The
+> **Green Tea GC has now been exonerated** (build 40583): the
+> `GOEXPERIMENT=nogreenteagc` variant still crashes at a comparable rate, with
+> the same corruption (`marking free object`, `unexpected signal during runtime
+> execution`) and the flag confirmed active. So this is *not* specific to the
+> Green Tea implementation. Next decisive experiment: a **Go version bisect**
+> (does 1.25 reproduce?) to determine whether it's a 1.26 runtime regression at
+> all. Whether the agent's crash is the same root cause as go#77975 (which only
+> *suspected* Green Tea) is now itself open.
 
 > **Correction (important):** Earlier revisions of this document hypothesized a
 > stray *kernel IOCP write into freed memory* (overlapped-I/O buffer lifetime
@@ -272,23 +276,28 @@ background churn *down* (the bug may be suppressed by CPU over-subscription).
 ## Open questions / next steps
 
 1. **`nogreenteagc` variant result (in flight, decisive).** If the
-   `GOEXPERIMENT=...,nogreenteagc` variant stops crashing while the plain
-   diagnostic variant keeps crashing, the agent's crashes are confirmed to be
-   the Green Tea GC bug (go#77975). If it *still* crashes, Green Tea GC is
-   exonerated and the search reopens (next suspect: a more general 1.26
-   marking/scanning change).
-2. If confirmed, the practical mitigation for the agent's own CI (until an
-   upstream fix lands) is to build/test Windows with `GOEXPERIMENT=nogreenteagc`,
-   and to attach our reproduction + dumps to go#77975.
-3. Does `iocprepro` v2 crash on the Azure runners? (pending) If not, a minimal
-   repro likely needs to lean on parallel GC marking pressure (many goroutines
-   with deep, growing stacks under `GOGC=1`) rather than the filesystem pattern
-   per se.
-4. Optional: confirm the agent's crashes vanished on Go 1.25 / before Green Tea
-   became default, as a version bisection corroborating go#77975.
+   `GOEXPERIMENT=...,nogreenteagc` variant stops crashing — **RESULT: it does
+   NOT (build 40583).** nogreenteagc still crashes (3/10 and climbing) with the
+   same corruption and the flag confirmed active. Green Tea GC exonerated.
+2. **Go version bisect — now the decisive experiment.** Does the crash
+   reproduce on Go 1.25 (a different runtime, before Green Tea)? Outcomes:
+   - 1.25 clean, 1.26 crashes → a Go **1.26 runtime regression** that is *not*
+     Green Tea-specific (since nogreenteagc still crashes). Bisect 1.25→1.26
+     runtime changes for the upstream report.
+   - 1.25 also crashes → not a 1.26 regression; points to the environment (the
+     Azure D8s_v5 / Windows 11 build 26200 image) or a long-standing latent
+     bug these tests happen to expose. Either way it reframes the whole hunt.
+   Run on the provisioned VM and/or as a CI variant with Go 1.25 on `.go-version`.
+3. Does `iocprepro` v2 crash on the Azure runners? (pending) Upgrade-package
+   scope alone does **not** reproduce on the live VM (25-iter ON run, 0 crashes),
+   so a minimal repro likely needs full-suite-scale heap/goroutine pressure.
 
 ### Falsified hypotheses
 
+- **Green Tea GC** (`GOEXPERIMENT=nogreenteagc` does not suppress; build 40583,
+  ~3/10 failures with the flag active, same corruption signatures). The
+  upstream go#77975 only *suspected* Green Tea; our A/B refutes it for the
+  agent's crash.
 - **Async preemption** (`asyncpreemptoff=1` does not suppress).
 - **Stack shrinking** (`gcshrinkstackoff=1` does not suppress; build 40538,
   equal 7/10 failure rate vs the plain variant). Note: copystack on stack
