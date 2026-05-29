@@ -94,6 +94,7 @@ type copyActionStoreFunc func(log *logger.Logger, newHome string) error
 type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string) error
 type fileDirCopyFunc func(from, to string, opts ...filecopy.Options) error
 type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error
+type writeUpgradeMarkerFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error
 type changeSymlinkFunc func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
 type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource ttl.Source) error
 
@@ -138,6 +139,7 @@ type Upgrader struct {
 	extractAgentVersion  func(metadata packageMetadata, upgradeVersion string) agentVersion
 	copyActionStore      copyActionStoreFunc
 	copyRunDirectory     copyRunDirectoryFunc
+	writeUpgradeMarker   writeUpgradeMarkerFunc
 	markUpgrade          markUpgradeFunc
 	changeSymlink        changeSymlinkFunc
 	rollbackInstall      rollbackInstallFunc
@@ -167,6 +169,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *c
 		extractAgentVersion:      extractAgentVersion,
 		copyActionStore:          copyActionStoreProvider(os.ReadFile, os.WriteFile),
 		copyRunDirectory:         copyRunDirectoryProvider(os.MkdirAll, filecopy.Copy),
+		writeUpgradeMarker:       writeUpgradeMarkerProvider(),
 		markUpgrade:              markUpgradeProvider(UpdateActiveCommit, os.WriteFile),
 		changeSymlink:            changeSymlink,
 		rollbackInstall:          rollbackInstall,
@@ -290,7 +293,28 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	var markerWritten bool
-	previousCommit := release.Commit() // captured here so the defer can restore active.commit on failure
+	// postSymlinkPhase is set immediately after changeSymlink succeeds.
+	// Once the symlink points at the new install any failure must preserve the upgrade marker
+	// (coordinator.handleUpgrade reads it to call MarkUpgradeFailed for Fleet ack) and restore
+	// active.commit if markUpgrade has already updated it.
+	var postSymlinkPhase bool
+	// Read the current commit from disk so dev builds with an empty release.Commit() are handled.
+	activeCommitPath := filepath.Join(paths.Top(), agentCommitFile)
+	previousCommitBytes, readErr := os.ReadFile(activeCommitPath)
+	previousCommit := release.Commit() // fallback if the file cannot be read
+	if readErr == nil {
+		if s := strings.TrimSpace(string(previousCommitBytes)); s != "" {
+			previousCommit = s
+		} else {
+			u.log.Warnw("active.commit exists but is empty; using in-memory commit hash as fallback")
+		}
+	} else if goerrors.Is(readErr, os.ErrNotExist) {
+		u.log.Debugw("active.commit not found before upgrade; using in-memory commit hash as fallback",
+			"error.message", readErr)
+	} else {
+		u.log.Warnw("could not read active.commit before upgrade; using in-memory commit hash as fallback",
+			"error.message", readErr)
+	}
 	cleanupPaths := []string{}
 	defer func() {
 		if err != nil {
@@ -308,17 +332,23 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 					err = goerrors.Join(err, rmErr)
 				}
 			}
-			// Remove the pre-unpack marker so it doesn't block the next upgrade attempt.
-			// If markUpgrade itself failed, markerWritten is false and the partial marker is left;
-			// active.commit still points to the old version so consistency is preserved.
-			if markerWritten {
+			if markerWritten && !postSymlinkPhase {
+				// Remove the pre-unpack marker: the symlink was never flipped so the watcher
+				// has nothing useful to watch, and active.commit was not rewritten, so the
+				// marker cannot be used for Fleet ack. Leaving it would block the next upgrade.
 				if cleanMarkerErr := CleanMarker(u.log, paths.Data()); cleanMarkerErr != nil {
 					u.log.Warnw("failed to clean upgrade marker during upgrade cleanup", "error.message", cleanMarkerErr)
 				}
-				// Restore the previous active.commit so the running binary is still recognized after a failed upgrade.
-				activeCommitPath := filepath.Join(paths.Top(), agentCommitFile)
-				if restoreErr := os.WriteFile(activeCommitPath, []byte(previousCommit), 0600); restoreErr != nil {
-					u.log.Warnw("failed to restore active commit during upgrade cleanup", "error.message", restoreErr)
+			}
+			if postSymlinkPhase {
+				// Restore active.commit: the post-symlink markUpgrade may have updated it to the new hash
+				// but rollbackInstall only reverts the symlink, not active.commit.
+				if previousCommit == "" {
+					u.log.Warnw("skipping active.commit restore: pre-upgrade commit hash is unknown")
+				} else {
+					if restoreErr := os.WriteFile(activeCommitPath, []byte(previousCommit), 0600); restoreErr != nil {
+						u.log.Warnw("failed to restore active commit during upgrade cleanup", "error.message", restoreErr)
+					}
 				}
 			}
 		}
@@ -362,7 +392,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	_, err = CleanAvailableRollbacks(u.log, u.availableRollbacksSource, paths.Top(), currentVersionedHome, time.Now(), CleanupAllRollbacks)
 	if err != nil {
-		u.log.Warnw("Unable to clean all available rollbacks", "error.message", err)
+		if !goerrors.Is(err, errCleanupDegraded) {
+			u.log.Warnw("Unable to clean all available rollbacks", "error.message", err)
+		} else {
+			if !isDegradedOnly(err) {
+				u.log.Warnw("Startup rollback cleanup had filesystem errors in degraded state", "error.message", err)
+			}
+			u.log.Infow("Startup rollback cleanup ran in degraded state; some directories may not have been removed")
+		}
 	}
 
 	det.SetState(details.StateDownloading)
@@ -406,12 +443,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("cannot upgrade the agent: %w", err)
 	}
 
-	// Derive the target directory from metadata before unpacking so the marker written below protects it
-	// from cleanup before the directory exists.
+	// Derive the target directory from metadata before unpacking so the writeUpgradeMarker call that follows
+	// can protect it from cleanup before the directory exists.
 	if len(metadata.hash) < HashLen {
 		return nil, fmt.Errorf("archive metadata hash %q is shorter than the expected minimum of %d characters", metadata.hash, HashLen)
 	}
-	newVersionedHome := versionedHomeFromMetadata(metadata)
+	newVersionedHome := predictVersionedHomeFromMetadata(metadata)
+	if newVersionedHome == "" {
+		return nil, fmt.Errorf("predicted versioned home is empty for package %q (manifest present: %v); cannot determine upgrade target", archivePath, metadata.manifest != nil)
+	}
 	newHome := filepath.Join(paths.Top(), newVersionedHome)
 
 	rollbackWindow := disableRollbackWindow
@@ -434,8 +474,17 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), previous, current)
 
-	// Write the marker before unpacking so newVersionedHome is protected from cleanup before it exists on disk.
-	if err = u.markUpgrade(u.log, paths.Data(), time.Now(), current, previous, action, det, availableRollbacks); err != nil {
+	// Write the marker before unpacking so newVersionedHome is protected from cleanup.
+	// active.commit is not updated here — only the marker file is written.
+	// RollbacksAvailable is intentionally nil: .ttl files are written only after the symlink
+	// flips, so advertising rollbacks here would create phantom targets if a crash occurs between
+	// the marker write and the Set call. The post-symlink markUpgrade populates RollbacksAvailable.
+	// Any rollbacks from a previous upgrade attempt were already cleared by CleanAvailableRollbacks
+	// at the start of Upgrade(), so there is no in-flight list to preserve here.
+	//
+	// writeUpgradeMarker uses an atomic rename (SafeFileRotate), so on failure no partial marker
+	// is left on disk and markerWritten=false correctly reflects that nothing needs cleaning up.
+	if err = u.writeUpgradeMarker(u.log, paths.Data(), time.Now(), current, previous, action, det, nil); err != nil {
 		return nil, fmt.Errorf("writing upgrade marker: %w", err)
 	}
 	markerWritten = true
@@ -461,7 +510,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	// The pre-unpack marker was written for newVersionedHome; a mismatch would leave it protecting the wrong directory.
 	if filepath.Clean(unpackRes.VersionedHome) != filepath.Clean(newVersionedHome) {
-		return nil, fmt.Errorf("unpack placed files at %q but metadata predicted %q", unpackRes.VersionedHome, newVersionedHome)
+		// Add the actual unpacked path to cleanupPaths so the defer removes it.
+		cleanupPaths = append(cleanupPaths, filepath.Join(paths.Top(), unpackRes.VersionedHome))
+		mismatchErr := fmt.Errorf("unpack placed files at %q but metadata predicted %q", unpackRes.VersionedHome, newVersionedHome)
+		u.log.Errorw("Rolling back: unpack destination mismatch", "error.message", mismatchErr)
+		return nil, goerrors.Join(err, mismatchErr)
 	}
 
 	if err != nil {
@@ -501,6 +554,10 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
+	// The symlink now points at the new install. Any failure from here must preserve the
+	// upgrade marker (for Fleet ack via MarkUpgradeFailed) and restore active.commit if
+	// markUpgrade changed it.
+	postSymlinkPhase = true
 
 	// when downgrading to a pre-9.4 agent that doesn't manage the registry entry,
 	// remove it now so no stale entry is left behind
@@ -510,7 +567,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		}
 	}
 
-	// Write TTL files only after the symlink has flipped, so the new install becomes a rollback target only once it is the live one.
+	// Write TTL files after the symlink has flipped: the old install is registered as a
+	// rollback target only once the new install is confirmed live.
 	if err = u.availableRollbacksSource.Set(availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: setting ttl markers failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
@@ -519,7 +577,9 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(paths.Top(), previous, current)
 
-	// Refresh the marker timestamp so the grace period starts now, not from before unpack.
+	// Write the marker with the post-symlink timestamp so the watcher's grace period starts at the moment the symlink flipped.
+	// markUpgrade also calls updateActiveCommit; if it fails mid-way (after writing the file but before returning),
+	// the defer restores active.commit to the pre-upgrade value.
 	if err = u.markUpgrade(u.log, paths.Data(), time.Now(), current, previous, action, det, availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: refreshing upgrade marker failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)

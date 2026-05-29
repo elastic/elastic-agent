@@ -1300,7 +1300,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
-		"should return error and cleanup downloaded artifact if markUpgrade fails": {
+		"should return error and cleanup downloaded artifact if writeUpgradeMarker fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
@@ -1319,12 +1319,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 						manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: versionedHome}},
 						hash:     "abc123",
 					},
-					returnUnpackResult: UnpackResult{
-						Hash:          "abc123",
-						VersionedHome: versionedHome,
-					},
 				}
-				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
+				upgrader.writeUpgradeMarker = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
 					return testError
 				}
 			},
@@ -1573,6 +1569,214 @@ func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
 		assert.NotEmpty(t, markers[currentVersionedHome].Hash, "rewritten marker must have a non-empty Hash")
 		assert.True(t, markers[currentVersionedHome].ValidUntil.After(time.Now()), "rewritten marker should have a future ValidUntil")
 	}
+}
+
+// TestUpgrade_RestoresActiveCommitAfterPostSymlinkFailure verifies that when the
+// upgrade fails after the symlink has been flipped and markUpgrade has updated
+// active.commit to the new hash, the defer in Upgrade() restores active.commit
+// to the pre-upgrade value so the running binary is still correctly identified.
+func TestUpgrade_RestoresActiveCommitAfterPostSymlinkFailure(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+
+	baseDir := t.TempDir()
+	origTop := paths.Top()
+	t.Cleanup(func() { paths.SetTop(origTop) })
+	paths.SetTop(baseDir)
+	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
+
+	// Write initial active.commit pointing to the current binary.
+	activeCommitPath := filepath.Join(baseDir, agentCommitFile)
+	require.NoError(t, os.WriteFile(activeCommitPath, []byte(release.Commit()), 0o600))
+
+	currentVersionedHome := createFakeAgentInstall(t, baseDir, release.VersionWithSnapshot(), release.Commit(), true)
+	createLink(t, baseDir, currentVersionedHome)
+	newVersionedHome := createFakeAgentInstall(t, baseDir, "99.0.0", "newhsh000000", true)
+
+	mockAgentInfo := info.NewMockAgent(t)
+	mockAgentInfo.EXPECT().Version().Return(release.Version())
+
+	mockRollbackSource := ttl.NewMockSource(t)
+	mockRollbackSource.EXPECT().GetAll().Return(nil, nil, nil)
+	mockRollbackSource.EXPECT().Set(mock.Anything).Return(nil)
+
+	mockWatcherHelper := NewMockWatcherHelper(t)
+	mockWatcherHelper.EXPECT().SelectWatcherExecutable(baseDir, mock.Anything, mock.Anything).Return("watcher")
+	invokeErr := errors.New("watcher invoke failed")
+	mockWatcherHelper.EXPECT().InvokeWatcher(mock.Anything, mock.Anything).Return(nil, invokeErr)
+
+	upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockRollbackSource)
+	require.NoError(t, err)
+
+	archivePath := filepath.Join(baseDir, "mockArchive")
+	require.NoError(t, os.WriteFile(archivePath, []byte("test"), 0o600))
+
+	upgrader.artifactDownloader = &mockArtifactDownloader{returnArchivePath: archivePath}
+	upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+		return agentVersion{version: upgradeVersion, snapshot: false, hash: metadata.hash}
+	}
+	upgrader.unpacker = &mockUnpacker{
+		returnPackageMetadata: packageMetadata{
+			manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: newVersionedHome}},
+			hash:     "newhsh",
+		},
+		returnUnpackResult: UnpackResult{Hash: "newhsh", VersionedHome: newVersionedHome},
+	}
+	upgrader.copyActionStore = func(_ *logger.Logger, _ string) error { return nil }
+	upgrader.copyRunDirectory = func(_ *logger.Logger, _, _ string) error { return nil }
+	upgrader.changeSymlink = func(_ *logger.Logger, _, _, _ string) error { return nil }
+	upgrader.rollbackInstall = func(_ context.Context, _ *logger.Logger, _, _, _ string, _ ttl.Source) error { return nil }
+	// Wrap the real markUpgrade to capture the intermediate active.commit value so the
+	// assertion below can confirm the restore is meaningful (not a no-op).
+	var activeCommitDuringUpgrade string
+	realMarkUpgrade := upgrader.markUpgrade
+	upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, prev agentInstall, action *fleetapi.ActionUpgrade, det *details.Details, rollbacks map[string]ttl.TTLMarker) error {
+		err := realMarkUpgrade(log, dataDirPath, updatedOn, agent, prev, action, det, rollbacks)
+		if err == nil {
+			got, _ := os.ReadFile(activeCommitPath)
+			activeCommitDuringUpgrade = string(got)
+		}
+		return err
+	}
+
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil,
+		details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
+	require.Error(t, err, "InvokeWatcher failure must cause Upgrade to return error")
+
+	// Confirm markUpgrade actually changed active.commit (makes the restore assertion non-trivial).
+	require.NotEqual(t, release.Commit(), activeCommitDuringUpgrade,
+		"markUpgrade must have changed active.commit to the new hash before InvokeWatcher failed")
+
+	// active.commit must be restored to the pre-upgrade value after the post-symlink failure.
+	gotCommit, readErr := os.ReadFile(activeCommitPath)
+	require.NoError(t, readErr)
+	assert.Equal(t, release.Commit(), string(gotCommit),
+		"active.commit must be restored to pre-upgrade value after post-symlink failure")
+
+	// The upgrade marker must survive a post-symlink failure so coordinator.handleUpgrade
+	// can call MarkUpgradeFailed and Fleet can ack the failed upgrade.
+	assert.FileExists(t, markerFilePath(paths.Data()),
+		"upgrade marker must survive post-symlink failure for Fleet ack via MarkUpgradeFailed")
+}
+
+// TestUpgrade_CleansMarkerOnPreSymlinkFailure verifies that when the upgrade
+// fails before the symlink flips (e.g. changeSymlink returns an error), the
+// pre-unpack marker is removed by the defer so it cannot block the next upgrade.
+func TestUpgrade_CleansMarkerOnPreSymlinkFailure(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+
+	baseDir := t.TempDir()
+	origTop := paths.Top()
+	t.Cleanup(func() { paths.SetTop(origTop) })
+	paths.SetTop(baseDir)
+	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
+
+	// Write initial active.commit so the S3 disk-read path is exercised.
+	activeCommitPath := filepath.Join(baseDir, agentCommitFile)
+	require.NoError(t, os.WriteFile(activeCommitPath, []byte(release.Commit()), 0o600))
+
+	currentVersionedHome := createFakeAgentInstall(t, baseDir, release.VersionWithSnapshot(), release.Commit(), true)
+	createLink(t, baseDir, currentVersionedHome)
+	newVersionedHome := createFakeAgentInstall(t, baseDir, "99.0.0", "newhsh000000", true)
+
+	mockAgentInfo := info.NewMockAgent(t)
+	mockAgentInfo.EXPECT().Version().Return(release.Version())
+
+	mockRollbackSource := ttl.NewMockSource(t)
+	mockRollbackSource.EXPECT().GetAll().Return(nil, nil, nil)
+
+	mockWatcherHelper := NewMockWatcherHelper(t)
+
+	upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockRollbackSource)
+	require.NoError(t, err)
+
+	archivePath := filepath.Join(baseDir, "mockArchive")
+	require.NoError(t, os.WriteFile(archivePath, []byte("test"), 0o600))
+
+	upgrader.artifactDownloader = &mockArtifactDownloader{returnArchivePath: archivePath}
+	upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+		return agentVersion{version: upgradeVersion, snapshot: false, hash: metadata.hash}
+	}
+	upgrader.unpacker = &mockUnpacker{
+		returnPackageMetadata: packageMetadata{
+			manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: newVersionedHome}},
+			hash:     "newhsh",
+		},
+		returnUnpackResult: UnpackResult{Hash: "newhsh", VersionedHome: newVersionedHome},
+	}
+	upgrader.copyActionStore = func(_ *logger.Logger, _ string) error { return nil }
+	upgrader.copyRunDirectory = func(_ *logger.Logger, _, _ string) error { return nil }
+	upgrader.changeSymlink = func(_ *logger.Logger, _, _, _ string) error {
+		return errors.New("changeSymlink failed")
+	}
+	upgrader.rollbackInstall = func(_ context.Context, _ *logger.Logger, _, _, _ string, _ ttl.Source) error { return nil }
+
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil,
+		details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
+	require.Error(t, err, "changeSymlink failure must cause Upgrade to return error")
+
+	assert.NoFileExists(t, markerFilePath(paths.Data()),
+		"upgrade marker must be removed after a pre-symlink failure so it cannot block the next upgrade")
+}
+
+// TestUpgrade_MismatchedUnpackDestination verifies that when the unpack step
+// places files at a different path than the one predicted from package metadata,
+// Upgrade returns a clear error and cleans up both directories.
+func TestUpgrade_MismatchedUnpackDestination(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+
+	baseDir := t.TempDir()
+	origTop := paths.Top()
+	t.Cleanup(func() { paths.SetTop(origTop) })
+	paths.SetTop(baseDir)
+	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
+
+	require.NoError(t, os.WriteFile(filepath.Join(baseDir, agentCommitFile), []byte(release.Commit()), 0o600))
+
+	currentVersionedHome := createFakeAgentInstall(t, baseDir, release.VersionWithSnapshot(), release.Commit(), true)
+	createLink(t, baseDir, currentVersionedHome)
+
+	predictedVersionedHome := filepath.Join("data", "elastic-agent-predicted-aabbcc")
+	actualVersionedHome := filepath.Join("data", "elastic-agent-actual-ddeeff")
+	require.NoError(t, os.MkdirAll(filepath.Join(baseDir, predictedVersionedHome), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(baseDir, actualVersionedHome), 0o755))
+
+	mockAgentInfo := info.NewMockAgent(t)
+	mockAgentInfo.EXPECT().Version().Return(release.Version())
+
+	mockRollbackSource := ttl.NewMockSource(t)
+	mockRollbackSource.EXPECT().GetAll().Return(nil, nil, nil)
+
+	mockWatcherHelper := NewMockWatcherHelper(t)
+
+	upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockRollbackSource)
+	require.NoError(t, err)
+
+	archivePath := filepath.Join(baseDir, "mockArchive")
+	require.NoError(t, os.WriteFile(archivePath, []byte("test"), 0o600))
+
+	upgrader.artifactDownloader = &mockArtifactDownloader{returnArchivePath: archivePath}
+	upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+		return agentVersion{version: upgradeVersion, snapshot: false, hash: metadata.hash}
+	}
+	upgrader.unpacker = &mockUnpacker{
+		returnPackageMetadata: packageMetadata{
+			manifest: &v1.PackageManifest{Package: v1.PackageDesc{VersionedHome: predictedVersionedHome}},
+			hash:     "aabbcc",
+		},
+		// unpack reports a different destination than what metadata predicted
+		returnUnpackResult: UnpackResult{Hash: "aabbcc", VersionedHome: actualVersionedHome},
+	}
+
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil,
+		details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
+	require.Error(t, err, "mismatch between predicted and actual unpack destination must return an error")
+	assert.Contains(t, err.Error(), "unpack placed files at", "error must identify the destination mismatch")
+
+	// Both the predicted and actual directories must be removed by the defer cleanup.
+	assert.NoDirExists(t, filepath.Join(baseDir, predictedVersionedHome),
+		"predicted versioned home must be cleaned up after mismatch")
+	assert.NoDirExists(t, filepath.Join(baseDir, actualVersionedHome),
+		"actual versioned home must be cleaned up after mismatch")
 }
 
 func TestCopyActionStore(t *testing.T) {
