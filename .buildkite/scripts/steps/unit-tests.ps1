@@ -19,7 +19,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "--- Disabling mitigations"
 # Disable CET (UserShadowStack) and ASLR globally
-Set-ProcessMitigation -System -Disable UserShadowStack, HighEntropyASLR, BottomUpASLR, ForceRelocateImages
+Set-ProcessMitigation -System -Disable HighEntropy, BottomUp, UserShadowStack, ForceRelocateImages
 
 # Disable Hypervisor-Enforced Code Integrity
 Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" -Name "Enabled" -Value 0
