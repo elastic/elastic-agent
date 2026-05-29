@@ -72,6 +72,11 @@ receivers:
           scrape_interval: 5s
           static_configs:
             - targets: ['0.0.0.0:8888']
+  azuremonitor:
+    subscription_ids:
+      - 00000000-0000-0000-0000-000000000000
+    cloud: AzureCloud
+    credentials: default_credentials
 
 connectors:
   spanmetrics:
@@ -160,6 +165,7 @@ service:
         - httpcheck
         - spanmetrics
         - prometheus
+        - azuremonitor
 
     metrics/aggregated:
       receivers:
