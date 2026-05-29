@@ -10,8 +10,8 @@ import (
 
 	"github.com/docker/go-units"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
 type progressObserver interface {
