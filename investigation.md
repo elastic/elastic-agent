@@ -39,6 +39,47 @@ Windows crash with Go 1.26.0, 1.26.1"*.
 > I/O. The IOCP sections below are kept for history but should be read in that
 > light.
 
+## Sharpest evidence: crash inside GC stack scan → copystack → unwinder (build 40590, Go 1.25.10)
+
+The cleanest crash stack we have. The GC background mark worker, while scanning
+a parked goroutine's stack, faulted in the stack unwinder:
+
+```
+[signal 0xc0000005 code=0x0 addr=0xe0 pc=0x1400767a5]   (nil-ish ptr +0xe0)
+runtime.sigpanic()                              signal_windows.go:387
+runtime.(*unwinder).next(...)                   traceback.go:458   ← faults here
+runtime.copystack(0xc000107180, ...)            stack.go:975
+runtime.shrinkstack(0xc000107180)               stack.go:1289
+runtime.scanstack(0xc000107180, ...)            mgcmark.go:898
+runtime.markroot.func1()                        mgcmark.go:248
+runtime.gcDrain(...) / gcBgMarkWorker.func2()   mgc.go:1541
+```
+
+The goroutine being scanned is `goroutine 94 ... [chan receive (scan)]` — an
+ordinary parked goroutine. The unwinder follows a frame/func pointer and
+dereferences `+0xe0` off a bad value → access violation. Both crashes in that
+job were this same path.
+
+Why this matters:
+
+- It is **exactly the symptom go#77975 describes** ("corrupted return address on
+  the stack … consistent with a bug during stack scanning or copystack") — but
+  reproduced here on **Go 1.25.10 with Green Tea disabled** and
+  `asyncpreemptoff=1`. So the stack-scan/copystack corruption is real but is
+  **not** Green-Tea-specific and **not** async-preemption-driven.
+- It reconciles the earlier `gcshrinkstackoff=1` non-result: `shrinkstack` is
+  where this instance *manifests*, not the cause. Disable it and `scanstack`
+  (every GC) and growth-driven `copystack` still walk the same corrupted stack
+  via other paths, so the crash persists (often with a different signature).
+
+**Unifying hypothesis (working):** a stray write corrupts a goroutine's *stack
+contents* (a saved frame/return pointer). The GC then either (a) faults
+unwinding that stack (this crash), or (b) marks a bogus pointer read from it →
+the `marked free object` / `found pointer to free object` / `checkmark` throws.
+The free-object crashes print a heap dump and die mid-print, so they don't
+yield a comparable stack to confirm (b) directly, but the single root
+"corrupted goroutine stack" accounts for the whole signature spread.
+
 ## Symptom
 
 On the Windows 11 CI runners the unit test suite intermittently dies with a

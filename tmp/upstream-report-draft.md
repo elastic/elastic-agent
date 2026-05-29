@@ -65,24 +65,46 @@ go test -race -covermode=atomic -coverpkg=./... ./...
 So: Windows-only, version-independent (1.25.7–1.26.3), not Green Tea, not async
 preemption, not stack shrinking.
 
-## Key evidence (symbolicated, matching binary)
+## Key evidence
 
-A captured minidump + a source-rebuilt symbol-rich test binary gave a clean
-throwing-goroutine stack:
+### (1) Crash inside GC stack scan → copystack → unwinder (Go 1.25.10)
+
+The clearest stack. The GC mark worker faulted while scanning a parked
+goroutine's stack:
 
 ```
-runtime.throw("s.allocCount != s.nelems && freeIndex == s.nelems")  panic.go
-runtime.(*mcache).nextFree(...)            malloc.go:1004   ← throw
-runtime.mallocgcSmallNoscan / mallocgc / growslice
-strings.(*Builder).WriteString ; filepath.Join
-<application>.checkFilesAfterRollback ...  (an os.Readlink + filepath.Join)
+[signal 0xc0000005 code=0x0 addr=0xe0 pc=0x1400767a5]
+runtime.sigpanic()                    signal_windows.go:387
+runtime.(*unwinder).next(...)         traceback.go:458   ← AV at +0xe0
+runtime.copystack(...)                stack.go:975
+runtime.shrinkstack(...)              stack.go:1289
+runtime.scanstack(...)                mgcmark.go:898
+runtime.markroot.func1() / gcDrain / gcBgMarkWorker.func2()
 ```
 
-The victim goroutine is doing an ordinary string allocation during a filesystem
-assertion. The allocator pulls an `mspan` whose `freeIndex == nelems` (looks
-full) yet `allocCount != nelems` (says not full) — internally inconsistent span
-bookkeeping. The corruption is of **runtime allocator/GC metadata**, found
-during routine allocation, not application use-after-free.
+The goroutine being scanned is an ordinary `[chan receive]` goroutine; the
+unwinder follows a frame/func pointer and dereferences a bad value. This is the
+**same symptom as #77975** ("corrupted return address … stack scanning /
+copystack"), but here on **1.25.10 with `GOEXPERIMENT=nogreenteagc` and
+`asyncpreemptoff=1`** — so it is not Green-Tea-specific and not async-preemption.
+`gcshrinkstackoff=1` does not help, because `scanstack` and growth-driven
+`copystack` still walk the corrupted stack.
+
+### (2) Allocator metadata inconsistency (Go 1.26.3, symbolicated via matching binary)
+
+```
+runtime.throw("s.allocCount != s.nelems && freeIndex == s.nelems")
+runtime.(*mcache).nextFree(...)   malloc.go:1004   ← throw, during a routine
+runtime.mallocgc / growslice / strings.Builder.WriteString / filepath.Join
+```
+
+An ordinary string allocation pulls an `mspan` with internally inconsistent
+bookkeeping.
+
+**Working unification:** a stray write corrupts a goroutine's *stack contents*;
+the GC then either faults unwinding that stack (1) or marks a bogus pointer from
+it, surfacing later as `marked/found free object` / `checkmark` / span
+bookkeeping throws (2 and the others).
 
 ## Artifacts available
 
