@@ -94,20 +94,57 @@ This is the strongest evidence to date:
 ## What we have ruled out / established
 
 - **Not async preemption.** `GODEBUG=asyncpreemptoff=1` does *not* suppress the
-  crash. This points away from async preemption interrupting a syscall
-  submission and toward a **synchronous** stack operation racing with the I/O —
-  most likely `shrinkstack` during the GC mark phase freeing a goroutine stack
-  whose memory then flows back to the heap while an in-flight IOCP completion
-  still targets it.
+  crash.
+- **Not stack shrinking (build 40538).** A dedicated `gcshrinkstackoff=1`
+  pipeline variant was run side by side with the plain diagnostic variant
+  (10 parallel jobs each). Both failed at the **same rate (7/10)**, and the
+  shrinkstackoff jobs still crashed with the same GC-metadata corruption
+  (`checkmark found unmarked object`, `unexpected signal during runtime
+  execution`). The `GODEBUG` line in the logs confirms the flag took effect.
+  **This falsifies the shrinkstack/copystack-vs-IOCP hypothesis** — disabling
+  stack shrinking changes nothing. (An earlier crash that happened to fault
+  *inside* `copystack` was just where one instance was detected, not the
+  cause.)
 - **`GOGC=1` makes it far more consistent.** Forcing a GC after effectively
-  every allocation maximises `shrinkstack`/`scanstack` frequency and the rate
-  at which freed memory is recycled, which is consistent with the
-  shrinkstack-vs-IOCP-completion race hypothesis.
+  every allocation maximises the rate at which freed heap memory is swept and
+  recycled — which is what raises the odds that a stray write lands in memory
+  that has since become live metadata or a live object and is therefore
+  *detected*. This points at recycled **heap** memory, not stacks.
 - **Environment-sensitive.** Reproduces reliably on the Azure `Standard_D8s_v5`
   Windows 11 runners but **not** on most local Windows machines. The trigger
   depends on IOCP completion timing relative to GC, which differs on the CI
   VMs (hypervisor I/O latency, Defender real-time scanning, cold FS cache, 8
   hyperthreads on contended host hardware are all candidates).
+
+### Full crash-signature spread (build 40538, 19 failed jobs)
+
+| Signature | Count | Structure |
+|-----------|-------|-----------|
+| `checkmark found unmarked object` | 10 | GC mark bitmap |
+| `unexpected signal during runtime execution` | 8 | raw fault in runtime code |
+| `marked free object` / `found pointer to free object` | 4 / 4 | GC mark bitmap |
+| `sweep increased allocation count` | 1 | `mspan` bookkeeping |
+
+All are GC/allocator-metadata corruption, on both the plain and the
+shrinkstackoff variants.
+
+## Refocused hypothesis (after the shrinkstack negative result)
+
+The corruption targets **recycled heap memory and runtime metadata**, not
+goroutine stacks. The most consistent explanation is an **overlapped-I/O
+buffer lifetime bug**: a buffer (or `OVERLAPPED` struct) handed to a Windows
+async filesystem syscall is freed/recycled by Go before the kernel completes
+the operation, so the kernel's completion write lands in memory that now backs
+an unrelated span, object, or GC bitmap. This is consistent with:
+
+- the variety of victims (16/64/112/208 B objects, mark bitmaps, mspan
+  bookkeeping, RWMutex words) — whatever happens to be recycled at that address;
+- `GOGC=1` amplifying it (faster recycling = more detected hits);
+- async-preemption and stack-shrinking being irrelevant (the race is with the
+  *kernel*, not with goroutine stack movement);
+- the trigger being filesystem syscalls (`Readlink`, `ReadFile`, `WriteFile`,
+  `Readdirnames`) that on modern Go/Windows can go through the runtime poller
+  with overlapped I/O.
 
 ## Working hypothesis
 
@@ -199,15 +236,28 @@ background churn *down* (the bug may be suppressed by CPU over-subscription).
 
 ## Open questions / next steps
 
-1. Does `iocprepro` v2 crash on the Azure runners? (pending)
-2. With a byte-matching rebuilt binary, symbolicate the *fatal* crash thread
-   (the `runtime.throw` caller, e.g. `gcBgMarkWorker`) to pin the exact
-   operation whose buffer was corrupted.
-3. Confirm whether `GODEBUG=gcshrinkstackoff=1` suppresses the crash — if so,
-   that is strong, specific evidence for the shrinkstack-vs-IOCP race to attach
-   to the upstream issue.
+1. **Test whether disabling async/pollable file I/O suppresses it.** The
+   refocused hypothesis is an overlapped-I/O buffer lifetime bug. If a GODEBUG
+   that routes Windows file handles off the runtime poller (back to synchronous
+   blocking I/O) makes the crash disappear, that pins it to the async file-I/O
+   path — the decisive evidence for the upstream report. This replaces the
+   (now falsified) shrinkstackoff experiment.
+2. **Inspect a matched-binary dump for pending IOCP state.** Scan the dump for
+   `OVERLAPPED` structures / pending completion buffers whose target address
+   falls inside the corrupted span. A confirmed pending completion pointing at
+   freed memory is the smoking gun.
+3. Does `iocprepro` v2 crash on the Azure runners? (pending) If not, the next
+   suspect is the specific syscall: narrow the repro to a tight loop of just
+   `os.Readlink`/`os.ReadFile` on a symlink (the `checkFilesAfterRollback`
+   path), which is the operation most consistently live at crash time.
 4. Optional: a full Process Monitor (procmon) trace during a run to see what
    else (Defender, indexer) touches the test files mid-syscall.
+
+### Falsified hypotheses
+
+- **Async preemption** (`asyncpreemptoff=1` does not suppress).
+- **Stack shrinking** (`gcshrinkstackoff=1` does not suppress; build 40538,
+  equal 7/10 failure rate vs the plain variant).
 
 ## Key files on this branch
 
