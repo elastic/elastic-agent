@@ -124,8 +124,6 @@ common:
       - complete
       - complete-wolfi
       - service
-      - slim
-      - slim-wolfi
       - wolfi
     default_variants: &k8s_test_default_variants
       - complete
