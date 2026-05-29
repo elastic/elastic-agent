@@ -50,6 +50,22 @@ func TestBeatNameToDefaultDatastreamType(t *testing.T) {
 			beatName:      "cloudbeat",
 			expectedError: fmt.Errorf("input type not supported by Otel: "),
 		},
+		{
+			beatName:     "auditbeat",
+			expectedType: "logs",
+		},
+		{
+			beatName:     "heartbeat",
+			expectedType: "logs",
+		},
+		{
+			beatName:     "osquerybeat",
+			expectedType: "logs",
+		},
+		{
+			beatName:     "packetbeat",
+			expectedType: "logs",
+		},
 	}
 
 	for _, tt := range tests {
@@ -129,6 +145,66 @@ func TestGetSignalForComponent(t *testing.T) {
 			},
 			expectedSignal: pipeline.SignalLogs,
 		},
+		{
+			name: "auditbeat",
+			component: component.Component{
+				InputType: "audit/auditd",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"auditbeat"},
+						},
+					},
+				},
+			},
+			expectedSignal: pipeline.SignalLogs,
+		},
+		{
+			name: "heartbeat",
+			component: component.Component{
+				InputType: "synthetics/http",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"heartbeat"},
+						},
+					},
+				},
+			},
+			expectedSignal: pipeline.SignalLogs,
+		},
+		{
+			name: "osquerybeat",
+			component: component.Component{
+				InputType: "osquery",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"osquerybeat"},
+						},
+					},
+				},
+			},
+			expectedSignal: pipeline.SignalLogs,
+		},
+		{
+			name: "packetbeat",
+			component: component.Component{
+				InputType: "packet",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"packetbeat"},
+						},
+					},
+				},
+			},
+			expectedSignal: pipeline.SignalLogs,
+		},
 	}
 
 	for _, tt := range tests {
@@ -148,6 +224,68 @@ func TestGetSignalForComponent(t *testing.T) {
 
 func TestGetOtelConfig(t *testing.T) {
 	agentInfo := &info.AgentInfo{}
+	auditbeatInputConfig := map[string]any{
+		"id":         "test",
+		"use_output": "default",
+		"type":       "audit/auditd",
+		"streams": []any{
+			map[string]any{
+				"id": "test-1",
+				"data_stream": map[string]any{
+					"dataset": "generic-1",
+				},
+				"audit_rules": "-a exit,always -F arch=b64 -S open",
+			},
+		},
+	}
+
+	heartbeatInputConfig := map[string]any{
+		"id":         "test",
+		"use_output": "default",
+		"type":       "synthetics/http",
+		"streams": []any{
+			map[string]any{
+				"id": "test-1",
+				"data_stream": map[string]any{
+					"dataset": "generic-1",
+				},
+				"urls":     []any{"https://example.com"},
+				"schedule": "@every 5s",
+			},
+		},
+	}
+
+	osquerybeatInputConfig := map[string]any{
+		"id":         "test",
+		"use_output": "default",
+		"type":       "osquery",
+		"streams": []any{
+			map[string]any{
+				"id": "test-1",
+				"data_stream": map[string]any{
+					"dataset": "generic-1",
+				},
+				"query":    "SELECT * FROM processes",
+				"interval": "3600",
+			},
+		},
+	}
+
+	packetbeatInputConfig := map[string]any{
+		"id":         "test",
+		"use_output": "default",
+		"type":       "packet",
+		"streams": []any{
+			map[string]any{
+				"id": "test-1",
+				"data_stream": map[string]any{
+					"dataset": "generic-1",
+				},
+				"ports": []any{443, 8443},
+			},
+		},
+	}
+
 	fileStreamConfig := map[string]any{
 		"id":         "test",
 		"use_output": "default",
@@ -354,37 +492,11 @@ func TestGetOtelConfig(t *testing.T) {
 		{"add_kubernetes_metadata": nil},
 	}
 
-	// expects input id
-	expectedFilestreamConfig := func(id string) (config map[string]any) {
-		config = map[string]any{
-			"filebeat": map[string]any{
-				"inputs": []map[string]any{
-					{
-						"id":   "test-1",
-						"type": "filestream",
-						"data_stream": map[string]any{
-							"dataset": "generic-1",
-						},
-						"paths": []any{
-							"/var/log/*.log",
-						},
-						"index":      "logs-generic-1-default",
-						"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
-					},
-					{
-						"id":   "test-2",
-						"type": "filestream",
-						"data_stream": map[string]any{
-							"dataset": "generic-2",
-						},
-						"paths": []any{
-							"/var/log/*.log",
-						},
-						"index":      "logs-generic-2-default",
-						"processors": defaultInputProcessors("test-2", "generic-2", "logs"),
-					},
-				},
-			},
+	// expected receiver config shared shape for ES-output beats with a single stream.
+	// queue uses uint64 because the "balanced" ES preset produces typed uint64 values.
+	beatReceiverBaseConfig := func(id, binaryName, inputType string) map[string]any {
+		dataset := fmt.Sprintf("elastic_agent.%s", binaryName)
+		return map[string]any{
 			"path": map[string]any{
 				"home": paths.Components(),
 				"data": filepath.Join(paths.Run(), id),
@@ -401,9 +513,9 @@ func TestGetOtelConfig(t *testing.T) {
 			"logging": map[string]any{
 				"with_fields": map[string]any{
 					"component": map[string]any{
-						"binary":  "filebeat",
-						"dataset": "elastic_agent.filebeat",
-						"type":    "filestream",
+						"binary":  binaryName,
+						"dataset": dataset,
+						"type":    inputType,
 						"id":      id,
 					},
 					"log": map[string]any{
@@ -415,6 +527,121 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": false,
 			},
 			"management.otel.enabled": true,
+		}
+	}
+
+	// expects component id
+	expectedAuditbeatReceiverConfig := func(id string) map[string]any {
+		cfg := beatReceiverBaseConfig(id, "auditbeat", "audit/auditd")
+		cfg["auditbeat"] = map[string]any{
+			"modules": []map[string]any{
+				{
+					"id": "test-1",
+					"data_stream": map[string]any{
+						"dataset": "generic-1",
+					},
+					"audit_rules": "-a exit,always -F arch=b64 -S open",
+					"index":       "logs-generic-1-default",
+					"processors":  defaultInputProcessors("test-1", "generic-1", "logs"),
+					"type":        "audit/auditd",
+				},
+			},
+		}
+		return cfg
+	}
+
+	// expects component id
+	expectedHeartbeatReceiverConfig := func(id string) map[string]any {
+		cfg := beatReceiverBaseConfig(id, "heartbeat", "synthetics/http")
+		cfg["heartbeat"] = map[string]any{
+			"monitors": []map[string]any{
+				{
+					"id": "test-1",
+					"data_stream": map[string]any{
+						"dataset": "generic-1",
+					},
+					"urls":       []any{"https://example.com"},
+					"schedule":   "@every 5s",
+					"index":      "logs-generic-1-default",
+					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
+					"type":       "synthetics/http",
+				},
+			},
+		}
+		return cfg
+	}
+
+	// expects component id
+	expectedOsquerybeatReceiverConfig := func(id string) map[string]any {
+		cfg := beatReceiverBaseConfig(id, "osquerybeat", "osquery")
+		cfg["osquerybeat"] = map[string]any{
+			"inputs": []map[string]any{
+				{
+					"id": "test-1",
+					"data_stream": map[string]any{
+						"dataset": "generic-1",
+					},
+					"query":      "SELECT * FROM processes",
+					"interval":   "3600",
+					"index":      "logs-generic-1-default",
+					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
+					"type":       "osquery",
+				},
+			},
+		}
+		return cfg
+	}
+
+	// expects component id
+	expectedPacketbeatReceiverConfig := func(id string) map[string]any {
+		cfg := beatReceiverBaseConfig(id, "packetbeat", "packet")
+		cfg["packetbeat"] = map[string]any{
+			"protocols": []map[string]any{
+				{
+					"id": "test-1",
+					"data_stream": map[string]any{
+						"dataset": "generic-1",
+					},
+					"ports":      []any{float64(443), float64(8443)},
+					"index":      "logs-generic-1-default",
+					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
+					"type":       "packet",
+				},
+			},
+		}
+		return cfg
+	}
+
+	// expects input id
+	expectedFilestreamConfig := func(id string) map[string]any {
+		config := beatReceiverBaseConfig(id, "filebeat", "filestream")
+		config["filebeat"] = map[string]any{
+			"inputs": []map[string]any{
+				{
+					"id":   "test-1",
+					"type": "filestream",
+					"data_stream": map[string]any{
+						"dataset": "generic-1",
+					},
+					"paths": []any{
+						"/var/log/*.log",
+					},
+					"index":      "logs-generic-1-default",
+					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
+				},
+				{
+					"id":   "test-2",
+					"type": "filestream",
+					"data_stream": map[string]any{
+						"dataset": "generic-2",
+					},
+					"paths": []any{
+						"/var/log/*.log",
+					},
+					"index":      "logs-generic-2-default",
+					"processors": defaultInputProcessors("test-2", "generic-2", "logs"),
+				},
+			},
 		}
 		return config
 	}
@@ -1798,6 +2025,242 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			}),
 		},
+		{
+			name: "auditbeat",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "auditbeat-default",
+						InputType:  "audit/auditd",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"auditbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "auditbeat-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(auditbeatInputConfig),
+							},
+							{
+								ID:     "auditbeat-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"abreceiver/_agent-component/auditbeat-default": expectedAuditbeatReceiverConfig("auditbeat-default"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/auditbeat-default": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"abreceiver/_agent-component/auditbeat-default"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "heartbeat",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "heartbeat-default",
+						InputType:  "synthetics/http",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"heartbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "heartbeat-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(heartbeatInputConfig),
+							},
+							{
+								ID:     "heartbeat-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"hbreceiver/_agent-component/heartbeat-default": expectedHeartbeatReceiverConfig("heartbeat-default"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/heartbeat-default": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"hbreceiver/_agent-component/heartbeat-default"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "osquerybeat",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "osquerybeat-default",
+						InputType:  "osquery",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"osquerybeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "osquerybeat-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(osquerybeatInputConfig),
+							},
+							{
+								ID:     "osquerybeat-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"osqreceiver/_agent-component/osquerybeat-default": expectedOsquerybeatReceiverConfig("osquerybeat-default"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/osquerybeat-default": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"osqreceiver/_agent-component/osquerybeat-default"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "packetbeat",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "packetbeat-default",
+						InputType:  "packet",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"packetbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "packetbeat-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(packetbeatInputConfig),
+							},
+							{
+								ID:     "packetbeat-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					"pbreceiver/_agent-component/packetbeat-default": expectedPacketbeatReceiverConfig("packetbeat-default"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/packetbeat-default": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"pbreceiver/_agent-component/packetbeat-default"},
+						},
+					},
+				},
+			}),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1912,6 +2375,143 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		},
 	}
 
+	auditbeatComponent := &component.Component{
+		ID:        "auditbeat-test-id",
+		InputType: "audit/auditd",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "audit/auditd",
+				Command: &component.CommandSpec{
+					Args: []string{"auditbeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "auditbeat-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "audit/auditd",
+					"streams": []any{
+						map[string]any{
+							"id": "test-1",
+							"data_stream": map[string]any{
+								"dataset": "generic-1",
+							},
+							"audit_rules": "-a exit,always -F arch=b64 -S open",
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	heartbeatComponent := &component.Component{
+		ID:        "heartbeat-test-id",
+		InputType: "synthetics/http",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "synthetics/http",
+				Command: &component.CommandSpec{
+					Args: []string{"heartbeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "heartbeat-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "synthetics/http",
+					"streams": []any{
+						map[string]any{
+							"id": "test-1",
+							"data_stream": map[string]any{
+								"dataset": "generic-1",
+							},
+							"urls":     []any{"https://example.com"},
+							"schedule": "@every 5s",
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	osquerybeatComponent := &component.Component{
+		ID:        "osquerybeat-test-id",
+		InputType: "osquery",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "osquery",
+				Command: &component.CommandSpec{
+					Args: []string{"osquerybeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "osquerybeat-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "osquery",
+					"streams": []any{
+						map[string]any{
+							"id": "test-1",
+							"data_stream": map[string]any{
+								"dataset": "generic-1",
+							},
+							"query": "SELECT * FROM processes",
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	packetbeatComponent := &component.Component{
+		ID:        "packetbeat-test-id",
+		InputType: "packet",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "packet",
+				Command: &component.CommandSpec{
+					Args: []string{"packetbeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "packetbeat-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "packet",
+					"streams": []any{
+						map[string]any{
+							"id": "test-1",
+							"data_stream": map[string]any{
+								"dataset": "generic-1",
+							},
+							"ports": []any{443},
+						},
+					},
+				}),
+			},
+		},
+	}
+
 	tests := []struct {
 		name                 string
 		component            *component.Component
@@ -1936,6 +2536,34 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			},
 			expectedReceiverType: "metricbeatreceiver",
 			expectedBeatName:     "metricbeat",
+		},
+		{
+			name:                 "auditbeat component",
+			component:            auditbeatComponent,
+			outputQueueConfig:    nil,
+			expectedReceiverType: "abreceiver",
+			expectedBeatName:     "auditbeat",
+		},
+		{
+			name:                 "heartbeat component",
+			component:            heartbeatComponent,
+			outputQueueConfig:    nil,
+			expectedReceiverType: "hbreceiver",
+			expectedBeatName:     "heartbeat",
+		},
+		{
+			name:                 "osquerybeat component",
+			component:            osquerybeatComponent,
+			outputQueueConfig:    nil,
+			expectedReceiverType: "osqreceiver",
+			expectedBeatName:     "osquerybeat",
+		},
+		{
+			name:                 "packetbeat component",
+			component:            packetbeatComponent,
+			outputQueueConfig:    nil,
+			expectedReceiverType: "pbreceiver",
+			expectedBeatName:     "packetbeat",
 		},
 		{
 			name: "component with no input units",

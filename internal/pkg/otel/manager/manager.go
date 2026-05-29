@@ -23,7 +23,6 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap"
 
-	"github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -614,28 +613,39 @@ func exporterIDToOutputNameLookup(components []component.Component) (map[string]
 	return lookup, nil
 }
 
+// internalTelemetryDiagnosticsFileName is the filename for the diagnostics file.
+// It is written to filepath.Join(paths.Home(), "logs") so that it sits alongside the
+// other elastic-agent log files and is automatically included in diagnostics bundles.
+// The file contains uncompressed OTLP JSON records (one per line). Plain NDJSON is
+// used here deliberately: the diagnostics collector packages files into a zip archive
+// using deflate, and repetitive JSON compresses to roughly 4% of its original size —
+// far better than the ~94% stored size of a pre-zstd file. Keeping the file
+// uncompressed also makes individual records immediately readable with standard tools.
+const internalTelemetryDiagnosticsFileName = "elastic-agent-metrics.ndjson"
+
+// defaultDiagnosticsFileSizeMB is the max size in megabytes for the internal telemetry
+// diagnostics file.
+const defaultDiagnosticsFileSizeMB = 10
+
 func injectMonitoringReceiver(
 	config *confmap.Conf,
 	monitoring *monitoringCfg.MonitoringConfig,
 	agentInfo info.Agent,
 	components []component.Component,
 ) error {
-	// Find the monitoring exporter that this pipeline will be writing to
+	// Check whether OTel-based monitoring is configured — it produces an ES exporter
+	// named "monitoring" that the internal telemetry pipeline can share.
 	exporterType := otelcomponent.MustNewType("elasticsearch")
 	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
 	monitoringExporterFound := false
 	if config.IsSet("exporters") {
-		// Search the defined exporters for one with the expected id for monitoring
 		for exporter := range config.Get("exporters").(map[string]any) {
 			if exporter == exporterID {
 				monitoringExporterFound = true
 			}
 		}
 	}
-	if !monitoringExporterFound {
-		// We can't monitor OTel metrics without OTel-based monitoring
-		return nil
-	}
+
 	outputNameLookup, err := exporterIDToOutputNameLookup(components)
 	if err != nil {
 		return fmt.Errorf("couldn't map exporter IDs to output names: %w", err)
@@ -646,9 +656,25 @@ func injectMonitoringReceiver(
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
 	processorID := translate.GetProcessorID().String()
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
+
+	// Build a file exporter for writing internal telemetry to disk as a diagnostics
+	// artifact. The file is written to the default logs directory.
+	// Records are written as plain OTLP JSON (one record per line). No compression.
+	// This data format compresses very well, so impact on diagnostics is minimal.
+	diagName := translate.OtelNamePrefix + receiverName
+	fileExporterID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("file"), diagName).String()
+	diagFilePath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
+
+	// The pipeline always writes to the file exporter (for diagnostics). When
+	// OTel-based monitoring is also configured, the ES monitoring exporter is
+	// included too so that the data flows to Elasticsearch as well.
+	pipelineExporters := []string{fileExporterID}
+	if monitoringExporterFound {
+		pipelineExporters = append(pipelineExporters, exporterID)
+	}
 	pipelineCfg := map[string]any{
 		"receivers": []string{receiverID},
-		"exporters": []string{exporterID},
+		"exporters": pipelineExporters,
 	}
 	collectorCfg := map[string]any{
 		"receivers": map[string]any{
@@ -657,6 +683,16 @@ func injectMonitoringReceiver(
 				"input_event_template": monitoringInputEventTemplate(monitoring, agentInfo),
 				"interval":             monitoring.MetricsPeriod,
 				"exporter_names":       outputNameLookup,
+			},
+		},
+		"exporters": map[string]any{
+			fileExporterID: map[string]any{
+				"path":   diagFilePath,
+				"format": "json",
+				"rotation": map[string]any{
+					"max_megabytes": defaultDiagnosticsFileSizeMB,
+					"max_backups":   1,
+				},
 			},
 		},
 		"service": map[string]any{
@@ -782,7 +818,7 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case extensionKey == "extension:"+m.healthCheckExtComponentID:
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
-				case strings.HasPrefix(extensionKey, "extension:"+kafkapartitionerextension.Type.String()):
+				case strings.HasPrefix(extensionKey, "extension:kafkapartitioner"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}
