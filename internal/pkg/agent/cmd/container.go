@@ -53,6 +53,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
+	"github.com/elastic/go-ucfg"
 )
 
 const (
@@ -845,25 +846,38 @@ func runLegacyAPMServer(streams *cli.IOStreams) (*process.Info, error) {
 	return process.Start(spec.BinaryPath, options...)
 }
 
-func containerCfgOverrides(cfg *configuration.Configuration) {
-	logsPath := envWithDefault("", "LOGS_PATH")
-	if logsPath == "" {
-		// when no LOGS_PATH defined the container should log to stderr
-		cfg.Settings.LoggingConfig.ToStderr = true
-		cfg.Settings.LoggingConfig.ToFiles = false
+func containerCfgOverrides(cfg *config.Config) error {
+	uCfg := map[string]any{}
+
+	if logsPath := envWithDefault("", "LOGS_PATH"); logsPath == "" {
+		uCfg["agent.logging.to_stderr"] = true
+		uCfg["agent.logging.to_files"] = false
 	}
 
+<<<<<<< HEAD
+=======
+	if envBool("HTTPPROF") {
+		uCfg["agent.monitoring.pprof.enabled"] = true
+	}
+
+>>>>>>> 50c891c71 (Deduplicate config loading and override TLS cert paths in container mode (#14408))
 	eventsToStderrEnv := envWithDefault("false", "EVENTS_TO_STDERR")
 	eventsToStderr, err := strconv.ParseBool(eventsToStderrEnv)
 	if err != nil {
-		logp.Warn("cannot parse EVENS_TO_STDERR='%s' as boolean, logging events to file'", eventsToStderrEnv)
+		logp.Warn("cannot parse EVENTS_TO_STDERR='%s' as boolean, logging events to file", eventsToStderrEnv)
 	}
 	if eventsToStderr {
-		cfg.Settings.EventLoggingConfig.ToFiles = false
-		cfg.Settings.EventLoggingConfig.ToStderr = true
+		uCfg["agent.logging.event_data.to_files"] = false
+		uCfg["agent.logging.event_data.to_stderr"] = true
 	}
 
-	configuration.OverrideDefaultContainerGRPCPort(cfg.Settings.GRPC)
+	uCfg["agent.grpc.port"] = configuration.GetContainerGRPCPort()
+
+	// Always read certs from env.
+	uCfg["fleet.ssl.certificate"] = envWithDefault("", "ELASTIC_AGENT_CERT")
+	uCfg["fleet.ssl.key"] = envWithDefault("", "ELASTIC_AGENT_CERT_KEY")
+
+	return cfg.Merge(uCfg)
 }
 
 func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool) error {
@@ -1133,6 +1147,15 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	cfg, err := config.NewConfigFrom(reader)
 	if err != nil {
 		return false, fmt.Errorf("failed to read from disk store: %w", err)
+	}
+
+	err = cfg.Agent.SetString("fleet.ssl.certificate", -1, envWithDefault("", "ELASTIC_AGENT_CERT"), ucfg.PathSep("."))
+	if err != nil {
+		return false, fmt.Errorf("failed to override cert: %w", err)
+	}
+	err = cfg.Agent.SetString("fleet.ssl.key", -1, envWithDefault("", "ELASTIC_AGENT_CERT_KEY"), ucfg.PathSep("."))
+	if err != nil {
+		return false, fmt.Errorf("failed to override cert key: %w", err)
 	}
 
 	storedConfig, err := configuration.NewFromConfig(cfg)
