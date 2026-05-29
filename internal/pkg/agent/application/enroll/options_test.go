@@ -18,6 +18,9 @@ import (
 )
 
 func TestRemoteConfig(t *testing.T) {
+	disabled := false
+	disabledReload := tlscommon.CertificateReload{Enabled: &disabled}
+
 	cases := []struct {
 		name                   string
 		failOnInsecureMismatch bool
@@ -50,7 +53,7 @@ func TestRemoteConfig(t *testing.T) {
 				Path:     "",
 				Host:     "localhost",
 				Transport: httpcommon.HTTPTransportSettings{
-					TLS:     &tlscommon.Config{},
+					TLS:     &tlscommon.Config{CertificateReload: disabledReload},
 					Timeout: remote.DefaultClientConfig().Transport.Timeout,
 				},
 			},
@@ -67,7 +70,8 @@ func TestRemoteConfig(t *testing.T) {
 				Host:     "localhost",
 				Transport: httpcommon.HTTPTransportSettings{
 					TLS: &tlscommon.Config{
-						CAs: []string{"ca"},
+						CAs:               []string{"ca"},
+						CertificateReload: disabledReload,
 					},
 					Timeout: remote.DefaultClientConfig().Transport.Timeout,
 				},
@@ -85,7 +89,8 @@ func TestRemoteConfig(t *testing.T) {
 				Host:     "localhost",
 				Transport: httpcommon.HTTPTransportSettings{
 					TLS: &tlscommon.Config{
-						CASha256: []string{"ca_sha"},
+						CASha256:          []string{"ca_sha"},
+						CertificateReload: disabledReload,
 					},
 					Timeout: remote.DefaultClientConfig().Transport.Timeout,
 				},
@@ -103,8 +108,9 @@ func TestRemoteConfig(t *testing.T) {
 				Host:     "localhost",
 				Transport: httpcommon.HTTPTransportSettings{
 					TLS: &tlscommon.Config{
-						CAs:      []string{"ca"},
-						CASha256: []string{"ca_sha"},
+						CAs:               []string{"ca"},
+						CASha256:          []string{"ca_sha"},
+						CertificateReload: disabledReload,
 					},
 					Timeout: remote.DefaultClientConfig().Transport.Timeout,
 				},
@@ -125,6 +131,7 @@ func TestRemoteConfig(t *testing.T) {
 						Certificate: tlscommon.CertificateConfig{
 							Certificate: "cert",
 						},
+						CertificateReload: disabledReload,
 					},
 					Timeout: remote.DefaultClientConfig().Transport.Timeout,
 				},
@@ -145,6 +152,7 @@ func TestRemoteConfig(t *testing.T) {
 						Certificate: tlscommon.CertificateConfig{
 							Key: "cert_key",
 						},
+						CertificateReload: disabledReload,
 					},
 					Timeout: remote.DefaultClientConfig().Transport.Timeout,
 				},
@@ -166,6 +174,7 @@ func TestRemoteConfig(t *testing.T) {
 							Certificate: "cert",
 							Key:         "cert_key",
 						},
+						CertificateReload: disabledReload,
 					},
 					Timeout: remote.DefaultClientConfig().Transport.Timeout,
 				},
@@ -184,7 +193,7 @@ func TestRemoteConfig(t *testing.T) {
 				Path:     "",
 				Host:     "localhost",
 				Transport: httpcommon.HTTPTransportSettings{
-					TLS:     &tlscommon.Config{},
+					TLS:     &tlscommon.Config{CertificateReload: disabledReload},
 					Timeout: remote.DefaultClientConfig().Transport.Timeout,
 					Proxy: httpcommon.HTTPClientProxySettings{
 						URL:     &httpcommon.ProxyURI{Scheme: "", Path: "proxy.url"},
@@ -209,7 +218,8 @@ func TestRemoteConfig(t *testing.T) {
 				Host:     "localhost:8221",
 				Transport: httpcommon.HTTPTransportSettings{
 					TLS: &tlscommon.Config{
-						VerificationMode: tlscommon.VerifyCertificate,
+						VerificationMode:  tlscommon.VerifyCertificate,
+						CertificateReload: disabledReload,
 					},
 					Timeout: remote.DefaultClientConfig().Transport.Timeout,
 					Proxy: httpcommon.HTTPClientProxySettings{
@@ -233,7 +243,8 @@ func TestRemoteConfig(t *testing.T) {
 				Host:     "localhost",
 				Transport: httpcommon.HTTPTransportSettings{
 					TLS: &tlscommon.Config{
-						VerificationMode: tlscommon.VerifyCertificate,
+						VerificationMode:  tlscommon.VerifyCertificate,
+						CertificateReload: disabledReload,
 					},
 					Timeout: remote.DefaultClientConfig().Transport.Timeout,
 					Proxy: httpcommon.HTTPClientProxySettings{
