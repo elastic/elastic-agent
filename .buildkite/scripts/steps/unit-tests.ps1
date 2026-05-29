@@ -29,17 +29,28 @@ Write-Host "--- Unit tests"
 $env:GOGC = "1"
 $env:GOTRACEBACK = "crash"
 $baseGodebug = "clobberfree=1,gccheckmark=1,invalidptr=1,gctrace=1,asyncpreemptoff=1"
-# Optional extra GODEBUG knobs injected by the pipeline (e.g. the
-# shrinkstackoff variant sets EXTRA_GODEBUG=gcshrinkstackoff=1 to test whether
-# disabling stack shrinking suppresses the crash - if it does, that pins the
-# corruption to the shrinkstack/copystack-vs-IOCP race for the upstream report).
+# Optional extra GODEBUG knobs injected by the pipeline.
 if ($env:EXTRA_GODEBUG) {
   $env:GODEBUG = "$baseGodebug,$env:EXTRA_GODEBUG"
 } else {
   $env:GODEBUG = $baseGodebug
 }
 Write-Host "GODEBUG=$env:GODEBUG"
-$env:GOEXPERIMENT="cgocheck2"
+
+# GOEXPERIMENT is built into the runtime/std `go test` rebuilds, so it is the
+# right lever for the Green Tea GC experiment (default-on in Go 1.26). The
+# upstream crash golang/go#77975 ("Windows crash with Go 1.26.0/1.26.1")
+# implicates Green Tea GC's stack scanning / copystack marking. The
+# nogreenteagc pipeline variant sets EXTRA_GOEXPERIMENT=nogreenteagc: if that
+# variant stops crashing while the plain diagnostic variant keeps crashing,
+# the agent's crashes are confirmed to be that Green Tea GC bug.
+$baseGoexperiment = "cgocheck2"
+if ($env:EXTRA_GOEXPERIMENT) {
+  $env:GOEXPERIMENT = "$baseGoexperiment,$env:EXTRA_GOEXPERIMENT"
+} else {
+  $env:GOEXPERIMENT = $baseGoexperiment
+}
+Write-Host "GOEXPERIMENT=$env:GOEXPERIMENT"
 
 # Bypass `mage unitTest` / gotestsum.  gotestsum (v1.13) treats every non-JSON
 # line on the test process's stderr as a "package error", so gctrace=1 produces

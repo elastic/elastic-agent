@@ -50,19 +50,26 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (shrinkstackoff run %n)"
-    key: "unit-tests-win11-shrinkstackoff"
-    # Same diagnostic config as unit-tests-win11, plus gcshrinkstackoff=1, which
-    # disables moving goroutines onto smaller stacks (runtime/stack.go:1280
-    # guards the shrinkstack->copystack path).  The d9 crash in build 40529
-    # faulted inside copystack (stack.go:1305) during a GC stack scan, so if
-    # this variant stops reproducing the crash while the plain diagnostic
-    # variant keeps crashing, that isolates the bug to the shrinkstack/
-    # copystack-vs-IOCP race - the specific evidence to attach to golang/go#77975.
+  - label: "Unit tests - Windows 11 (nogreenteagc run %n)"
+    key: "unit-tests-win11-nogreenteagc"
+    # Same diagnostic config as unit-tests-win11, but with the Green Tea GC
+    # experiment disabled (GOEXPERIMENT=...,nogreenteagc). Green Tea GC is the
+    # new default-on collector in Go 1.26, and golang/go#77975 ("Windows crash
+    # with Go 1.26.0/1.26.1") implicates a Green Tea GC stack-scanning /
+    # copystack marking bug. This is the decisive A/B: it differs from the
+    # plain diagnostic variant by exactly one flag. If this variant stops
+    # reproducing the crash while unit-tests-win11 keeps crashing, the agent's
+    # crashes are confirmed to be that Green Tea GC bug - the evidence to
+    # attach to the upstream issue.
+    #
+    # (The earlier gcshrinkstackoff=1 variant was retired: build 40538 showed
+    # it failed at the same 7/10 rate as the plain variant, ruling out stack
+    # *shrinking* as the mechanism. copystack on stack *growth* is not disabled
+    # by that flag and remains in scope under the Green Tea hypothesis.)
     command: .buildkite/scripts/steps/unit-tests.ps1
     parallelism: 10
     env:
-      EXTRA_GODEBUG: "gcshrinkstackoff=1"
+      EXTRA_GOEXPERIMENT: "nogreenteagc"
     artifact_paths:
       - "build/TEST-*.html"
       - "build/TEST-*.xml"
@@ -115,7 +122,7 @@ steps:
     depends_on:
       - step: "unit-tests-win11"
         allow_failure: true
-      - step: "unit-tests-win11-shrinkstackoff"
+      - step: "unit-tests-win11-nogreenteagc"
         allow_failure: true
       - step: "unit-tests-win11-instrumented"
         allow_failure: true

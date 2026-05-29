@@ -2,12 +2,29 @@
 
 Tracking a Windows-only fatal crash in the Elastic Agent unit test suite.
 Working branch: `worktree-test+diagnose-windows-gc-panic`.
-Suspected upstream cause: <https://github.com/golang/go/issues/77975>.
+Upstream cause: <https://github.com/golang/go/issues/77975> — *"runtime:
+Windows crash with Go 1.26.0, 1.26.1"*.
 
-> **Status:** Reproduced reliably in CI; root cause narrowed to memory
-> corruption consistent with a stray kernel (IOCP) write into freed/recycled
-> Go heap memory. Not yet reproduced in a standalone minimal test. No fix yet —
-> this is diagnostic work toward a clean upstream report.
+> **Status:** Reproduced reliably in CI. Leading suspect is the **Green Tea
+> garbage collector** (new default in Go 1.26), per the upstream issue: a
+> stack-scanning / copystack marking bug that corrupts GC metadata. A
+> `GOEXPERIMENT=nogreenteagc` CI variant is the in-flight decisive test. Not
+> yet reproduced in a standalone minimal test. No fix yet — diagnostic work
+> toward confirming this is go#77975.
+
+> **Correction (important):** Earlier revisions of this document hypothesized a
+> stray *kernel IOCP write into freed memory* (overlapped-I/O buffer lifetime
+> bug). That framing is now believed wrong on two counts: (1) the upstream
+> issue go#77975 is about the **Green Tea GC**, not IOCP, and its crash is a
+> corrupted return address consistent with **stack scanning / copystack**; and
+> (2) regular `os.Open`/`ReadFile`/`WriteFile` on Windows do **not** use
+> overlapped I/O unless the caller passes `O_FILE_FLAG_OVERLAPPED` (verified in
+> the Go 1.26.3 source, `os/file_windows.go:162`) — so the agent's file ops are
+> synchronous and there is no completion-after-return window to exploit. The
+> filesystem-heavy tests matter only because they generate the allocation churn
+> and goroutine stack growth that exercise the GC marker, not because of async
+> I/O. The IOCP sections below are kept for history but should be read in that
+> light.
 
 ## Symptom
 
@@ -128,46 +145,64 @@ This is the strongest evidence to date:
 All are GC/allocator-metadata corruption, on both the plain and the
 shrinkstackoff variants.
 
-## Refocused hypothesis (after the shrinkstack negative result)
+## Working hypothesis: Green Tea GC marking bug (golang/go#77975)
 
-The corruption targets **recycled heap memory and runtime metadata**, not
-goroutine stacks. The most consistent explanation is an **overlapped-I/O
-buffer lifetime bug**: a buffer (or `OVERLAPPED` struct) handed to a Windows
-async filesystem syscall is freed/recycled by Go before the kernel completes
-the operation, so the kernel's completion write lands in memory that now backs
-an unrelated span, object, or GC bitmap. This is consistent with:
+The upstream issue go#77975 ("Windows crash with Go 1.26.0, 1.26.1") points at
+the **Green Tea garbage collector**, which became the default-on collector in
+Go 1.26 (confirmed in this toolchain: `go list -f '{{context.ToolTags}}'
+runtime` includes `goexperiment.greenteagc`). The upstream crash is a corrupted
+return address consistent with a bug in **stack scanning / copystack** during
+GC marking.
 
-- the variety of victims (16/64/112/208 B objects, mark bitmaps, mspan
-  bookkeeping, RWMutex words) — whatever happens to be recycled at that address;
-- `GOGC=1` amplifying it (faster recycling = more detected hits);
-- async-preemption and stack-shrinking being irrelevant (the race is with the
-  *kernel*, not with goroutine stack movement);
-- the trigger being filesystem syscalls (`Readlink`, `ReadFile`, `WriteFile`,
-  `Readdirnames`) that on modern Go/Windows can go through the runtime poller
-  with overlapped I/O.
+Every signature we have observed is consistent with a GC *marking* bug rather
+than an external write:
 
-## Working hypothesis
+- `checkmark found unmarked object` — checkmark mode (`gccheckmark=1`) found a
+  live object the main mark phase failed to mark. This is a direct marker
+  correctness failure.
+- `marked free object` / `found pointer to free object` — mark bitmap vs. span
+  state inconsistency.
+- `s.allocCount != s.nelems`, `sweep increased allocation count` — span
+  bookkeeping inconsistencies downstream of bad marking.
+- `unexpected signal during runtime execution` / corrupted return address — a
+  scan/copystack mishap landing a bad pointer where execution later resumes.
 
-A kernel-side IOCP completion writes into a buffer (or a goroutine stack
-location) **after** the Go runtime has freed/recycled that memory during a GC
-cycle. The write lands in a now-unrelated heap object or runtime metadata,
-which the GC then detects on its next sweep (the "marked free object" /
-"found pointer to free object" throws) or which corrupts a live structure
-directly (the RWMutex state word, the zeroed `*ActionUpgrade` pointer). This
-matches the shape of golang/go#77975.
+Why the filesystem-heavy upgrade tests trigger it: they generate a tight burst
+of allocation churn and goroutine stack growth (deep `filepath`/`os` call
+chains) concurrently with `GOGC=1`'s near-continuous GC — exactly the workload
+that exercises the marker and stack scanner hardest. The filesystem aspect is
+incidental load, not the mechanism.
+
+This explains every prior observation, including the ones that killed the
+earlier hypotheses: async preemption and stack *shrinking* being irrelevant
+(the bug is in marking / growth-driven copystack / scanning, not in shrink or
+in any kernel race), `GOGC=1` amplifying (more marking cycles), heap-metadata
+victims (the marker corrupts its own bitmap), and poor local reproducibility
+(a timing-sensitive parallel-marking race).
+
+**Decisive test (in flight):** the `nogreenteagc` pipeline variant runs the
+identical diagnostic config with `GOEXPERIMENT=...,nogreenteagc`. If it stops
+crashing while the plain diagnostic variant keeps crashing, the agent's crashes
+are confirmed to be the Green Tea GC bug.
 
 ## Diagnostic infrastructure built on this branch
 
-The CI pipeline was reduced to two Windows 11 variants (see
+The CI pipeline was reduced to a few Windows 11 variants (see
 `.buildkite/pipeline.yml`):
 
 - **diagnostic run** (`unit-tests.ps1`): `GOGC=1`,
   `GODEBUG=clobberfree=1,gccheckmark=1,invalidptr=1,gctrace=1,asyncpreemptoff=1`,
   `GOEXPERIMENT=cgocheck2`, `GOTRACEBACK=crash`. Maximises GC pressure and
   sanity checks to make the crash consistent.
+- **nogreenteagc run** (`unit-tests.ps1` with `EXTRA_GOEXPERIMENT=nogreenteagc`):
+  identical to the diagnostic run but with Green Tea GC disabled — the decisive
+  A/B test for go#77975. (Replaced the retired `gcshrinkstackoff=1` variant.)
 - **instrumented run** (`unit-tests-instrumented.ps1`):
   `GODEBUG=clobberfree=1,gctrace=1,schedtrace=10000`, plus WER + procdump to
   capture a full memory dump.
+
+The script supports `EXTRA_GODEBUG` and `EXTRA_GOEXPERIMENT` env vars so the
+pipeline can spin up single-variable A/B variants without script changes.
 
 Key lessons baked into those scripts (each was a real dead end first):
 
@@ -236,28 +271,34 @@ background churn *down* (the bug may be suppressed by CPU over-subscription).
 
 ## Open questions / next steps
 
-1. **Test whether disabling async/pollable file I/O suppresses it.** The
-   refocused hypothesis is an overlapped-I/O buffer lifetime bug. If a GODEBUG
-   that routes Windows file handles off the runtime poller (back to synchronous
-   blocking I/O) makes the crash disappear, that pins it to the async file-I/O
-   path — the decisive evidence for the upstream report. This replaces the
-   (now falsified) shrinkstackoff experiment.
-2. **Inspect a matched-binary dump for pending IOCP state.** Scan the dump for
-   `OVERLAPPED` structures / pending completion buffers whose target address
-   falls inside the corrupted span. A confirmed pending completion pointing at
-   freed memory is the smoking gun.
-3. Does `iocprepro` v2 crash on the Azure runners? (pending) If not, the next
-   suspect is the specific syscall: narrow the repro to a tight loop of just
-   `os.Readlink`/`os.ReadFile` on a symlink (the `checkFilesAfterRollback`
-   path), which is the operation most consistently live at crash time.
-4. Optional: a full Process Monitor (procmon) trace during a run to see what
-   else (Defender, indexer) touches the test files mid-syscall.
+1. **`nogreenteagc` variant result (in flight, decisive).** If the
+   `GOEXPERIMENT=...,nogreenteagc` variant stops crashing while the plain
+   diagnostic variant keeps crashing, the agent's crashes are confirmed to be
+   the Green Tea GC bug (go#77975). If it *still* crashes, Green Tea GC is
+   exonerated and the search reopens (next suspect: a more general 1.26
+   marking/scanning change).
+2. If confirmed, the practical mitigation for the agent's own CI (until an
+   upstream fix lands) is to build/test Windows with `GOEXPERIMENT=nogreenteagc`,
+   and to attach our reproduction + dumps to go#77975.
+3. Does `iocprepro` v2 crash on the Azure runners? (pending) If not, a minimal
+   repro likely needs to lean on parallel GC marking pressure (many goroutines
+   with deep, growing stacks under `GOGC=1`) rather than the filesystem pattern
+   per se.
+4. Optional: confirm the agent's crashes vanished on Go 1.25 / before Green Tea
+   became default, as a version bisection corroborating go#77975.
 
 ### Falsified hypotheses
 
 - **Async preemption** (`asyncpreemptoff=1` does not suppress).
 - **Stack shrinking** (`gcshrinkstackoff=1` does not suppress; build 40538,
-  equal 7/10 failure rate vs the plain variant).
+  equal 7/10 failure rate vs the plain variant). Note: copystack on stack
+  *growth* is not disabled by that flag, so growth-driven copystack remains in
+  scope under the Green Tea hypothesis.
+- **Stray kernel IOCP write into freed memory** (the earlier "overlapped-I/O
+  buffer lifetime" theory). The agent's Windows file I/O is synchronous
+  (`os.Open`/`ReadFile`/`WriteFile` don't set `O_FILE_FLAG_OVERLAPPED`), so
+  there is no async completion-after-return window; and go#77975 implicates the
+  GC, not I/O.
 
 ## Key files on this branch
 
