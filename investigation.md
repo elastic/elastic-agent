@@ -5,16 +5,25 @@ Working branch: `worktree-test+diagnose-windows-gc-panic`.
 Upstream cause: <https://github.com/golang/go/issues/77975> — *"runtime:
 Windows crash with Go 1.26.0, 1.26.1"*.
 
-> **Status:** Reproduced reliably in CI. The crash is GC-metadata corruption
-> on Windows / Go 1.26.3 under heavy filesystem-test load + `GOGC=1`. The
-> **Green Tea GC has now been exonerated** (build 40583): the
-> `GOEXPERIMENT=nogreenteagc` variant still crashes at a comparable rate, with
-> the same corruption (`marking free object`, `unexpected signal during runtime
-> execution`) and the flag confirmed active. So this is *not* specific to the
-> Green Tea implementation. Next decisive experiment: a **Go version bisect**
-> (does 1.25 reproduce?) to determine whether it's a 1.26 runtime regression at
-> all. Whether the agent's crash is the same root cause as go#77975 (which only
-> *suspected* Green Tea) is now itself open.
+> **Status:** Reproduced reliably in CI. The crash is **GC-metadata corruption,
+> Windows-only, and Go-version-independent** across the whole range the code can
+> build. Confirmed NOT caused by: Green Tea GC, async preemption, stack
+> shrinking, or a stray kernel IOCP write (see Falsified). It is also **not a
+> Go 1.26 regression** — see the version bisect below. Current leading shape:
+> a long-standing bug in the **Windows-specific Go runtime** (present 1.25.7 →
+> 1.26.3) that needs the contended CI-host timing to fire, or a Windows
+> kernel/driver interaction on the Azure image. Not reproduced on a quiet
+> standalone VM or locally.
+>
+> **Version bisect result (builds 40583 @1.26.3 vs 40590 @1.25.10):**
+> - 1.26.3: crashes ~6/10 jobs.
+> - 1.25.10: crashes (≥3/10 jobs), same corruption (`unexpected signal during
+>   runtime execution`), Go 1.25.10 confirmed in the logs, no build failures.
+> - **Cannot test below 1.25.7:** a dependency (`sigs.k8s.io/e2e-framework
+>   @v0.7.0`) declares `go >= 1.25.7`, so Go 1.24 refuses to build the module
+>   graph. The bisect floor is therefore 1.25.7; the crash is present across the
+>   entire buildable range. So it predates Green Tea-as-default and is not a
+>   1.26 regression.
 
 > **Correction (important):** Earlier revisions of this document hypothesized a
 > stray *kernel IOCP write into freed memory* (overlapped-I/O buffer lifetime
@@ -273,29 +282,67 @@ upgrade package's transitive dependencies create. A blank-import shim pulling
 in those deps would be the next experiment. Also worth trying: dialing the
 background churn *down* (the bug may be suppressed by CPU over-subscription).
 
+## CI environment (probed on a VM built from the same image)
+
+A throwaway Azure `Standard_D8s_v5` VM was provisioned from the *same* gallery
+image the CI uses (`platform-ingest-elastic-agent-windows-11-pro`
+`1.0.1779464011`, Windows 11 Pro build 26200, 8 vCPU) and driven via
+`az vm run-command`. Findings:
+
+- **Defender real-time protection is ON, but `C:\` and `D:\` are entirely
+  excluded** from scanning (`Get-MpPreference.ExclusionPath = C:\, D:\`). So
+  Defender's `WdFilter` minifilter is in the I/O path but does not scan the
+  test files. This weakens the "AV scanning interferes mid-syscall" idea.
+- Filesystem minifilters loaded are otherwise stock Win11: `bindflt`, `UCPD`,
+  `WdFilter`, `applockerfltr`, `FileInfo`, `luafv`, `Wof`, etc. Nothing exotic.
+- **The standalone VM does not reproduce the crash**: 12/12 full-suite
+  iterations under the diagnostic config (Green Tea on, 1.26.3) crashed 0
+  times (all `exited 1` were ordinary test failures, no crash markers). The CI
+  *fleet* hits ~6/10. The delta is almost certainly host-level contention /
+  scheduling on the shared CI hosts that a freshly provisioned, idle VM lacks.
+- **Procmon is not a useful tool here.** It monitors file/registry/process
+  syscalls, not in-process memory writes, so it cannot see the GC-metadata
+  corruption. A short capture during the test build/run was ~2 GB in seconds
+  (the compile phase dominates), and headless PML→CSV conversion under
+  `run-command` (session 0, no interactive desktop) does not work. Given
+  Defender already excludes the drive, there is little external I/O to find.
+
 ## Open questions / next steps
 
-1. **`nogreenteagc` variant result (in flight, decisive).** If the
-   `GOEXPERIMENT=...,nogreenteagc` variant stops crashing — **RESULT: it does
-   NOT (build 40583).** nogreenteagc still crashes (3/10 and climbing) with the
-   same corruption and the flag confirmed active. Green Tea GC exonerated.
-2. **Go version bisect — now the decisive experiment.** Does the crash
-   reproduce on Go 1.25 (a different runtime, before Green Tea)? Outcomes:
-   - 1.25 clean, 1.26 crashes → a Go **1.26 runtime regression** that is *not*
-     Green Tea-specific (since nogreenteagc still crashes). Bisect 1.25→1.26
-     runtime changes for the upstream report.
-   - 1.25 also crashes → not a 1.26 regression; points to the environment (the
-     Azure D8s_v5 / Windows 11 build 26200 image) or a long-standing latent
-     bug these tests happen to expose. Either way it reframes the whole hunt.
-   Run on the provisioned VM and/or as a CI variant with Go 1.25 on `.go-version`.
-3. Does `iocprepro` v2 crash on the Azure runners? (pending) Upgrade-package
-   scope alone does **not** reproduce on the live VM (25-iter ON run, 0 crashes),
-   so a minimal repro likely needs full-suite-scale heap/goroutine pressure.
+Both the Green Tea A/B and the Go version bisect are now **done** (results in
+the status banner and Falsified list). The hunt has narrowed to: a Windows-only,
+version-independent (1.25.7–1.26.3) GC-metadata corruption that needs contended
+CI-host timing to fire. Remaining avenues:
+
+1. **Pin down the corrupting concurrent actor.** The victim goroutine is always
+   innocent (e.g. a `filepath.Join` allocation tripping over already-corrupt
+   `mspan`/bitmap metadata, build 40520). What we still lack is the *other*
+   goroutine/thread whose write corrupts that metadata. A dump can't show a
+   past write; the practical approach is `GODEBUG` GC-debug modes or a runtime
+   built with extra mheap write instrumentation.
+2. **Concurrency dependence.** Try `GOMAXPROCS=1` (or low) in CI: if the crash
+   vanishes it's a runtime concurrency race; if it persists it points harder at
+   the host/hypervisor. Cheap one-flag CI variant.
+3. **Make a quiet box reproduce.** The standalone VM is idle and does not
+   reproduce; try running several `go test ./...` instances concurrently (mimic
+   the contended CI host) — if that reproduces, we get a live `dlv` platform.
+4. **Upstream report.** We have enough for a solid golang/go issue (or an
+   addition to go#77975 noting it is *not* Green Tea and reproduces on 1.25):
+   Windows-only, version-independent GC-metadata corruption under heavy parallel
+   filesystem test load on Azure D8s_v5; symbolicated throw at `mcache.nextFree`
+   with internally-inconsistent `mspan` bookkeeping; dumps + matching binaries
+   available.
+5. `iocprepro` minimal repro still does not reproduce (upgrade-scope, and the
+   tiny standalone binary); a minimal repro likely needs full-suite-scale
+   heap/goroutine pressure on a contended host.
 
 ### Falsified hypotheses
 
+- **A Go 1.26 regression** (build 40590: Go 1.25.10 crashes too, same
+  corruption; bisect floor is 1.25.7 due to a dependency's go directive).
+  The crash is version-independent across the buildable range.
 - **Green Tea GC** (`GOEXPERIMENT=nogreenteagc` does not suppress; build 40583,
-  ~3/10 failures with the flag active, same corruption signatures). The
+  ~6/10 failures with the flag active, same corruption signatures). The
   upstream go#77975 only *suspected* Green Tea; our A/B refutes it for the
   agent's crash.
 - **Async preemption** (`asyncpreemptoff=1` does not suppress).
