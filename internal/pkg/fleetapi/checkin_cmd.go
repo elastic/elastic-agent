@@ -13,10 +13,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
 const checkingPath = "/api/fleet/agents/%s/checkin"
