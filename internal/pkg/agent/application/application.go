@@ -46,9 +46,6 @@ import (
 	"github.com/elastic/elastic-agent/version"
 )
 
-// CfgOverrider allows for application driven overrides of configuration read from disk.
-type CfgOverrider func(cfg *configuration.Configuration)
-
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
 	ctx context.Context,
@@ -61,8 +58,14 @@ func New(
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
+<<<<<<< HEAD
 	override CfgOverrider,
 	initialUpgradeDetails *details.Details,
+=======
+	cfg *configuration.Configuration,
+	initialUpdateMarker *upgrade.UpdateMarker,
+	availableRollbacksSource ttl.Source,
+>>>>>>> 50c891c71 (Deduplicate config loading and override TLS cert paths in container mode (#14408))
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -92,34 +95,11 @@ func New(
 
 	pathConfigFile := paths.ConfigFile()
 
-	var rawConfig *config.Config
 	if testingMode {
-		// testing mode doesn't read any configuration from the disk
-		rawConfig, err = config.NewConfigFrom("")
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-		}
-
+		cfg = configuration.DefaultConfiguration()
+		cfg.UCfg = config.MustNewConfigFrom(cfg)
 		// monitoring is always disabled in testing mode
 		disableMonitoring = true
-	} else {
-		log.Infof("Loading baseline config from %v", pathConfigFile)
-		rawConfig, err = config.LoadFile(pathConfigFile)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-		}
-	}
-	if err := info.InjectAgentConfig(rawConfig); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	if override != nil {
-		override(cfg)
 	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
@@ -161,7 +141,7 @@ func New(
 		configMgr = newTestingModeConfigManager(log)
 	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
-		flags, err := features.Parse(rawConfig)
+		flags, err := features.Parse(cfg.GetUCfg())
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 		}
@@ -177,7 +157,7 @@ func New(
 			configMgr = newEncryptedOnce(log, paths.AgentConfigFile())
 		} else {
 			loader := config.NewLoader(log, paths.ExternalInputs())
-			rawCfgMap, err := rawConfig.ToMapStr()
+			rawCfgMap, err := cfg.GetUCfg().ToMapStr()
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
 			}
@@ -193,16 +173,14 @@ func New(
 		}
 	} else {
 		isManaged = true
-		var store storage.Store
-		store, cfg, err = mergeFleetConfig(ctx, rawConfig)
-		if err != nil {
-			return nil, nil, nil, err
+		if err := cfg.Fleet.Valid(); err != nil {
+			return nil, nil, nil, fmt.Errorf("fleet configuration is invalid: %w", err)
 		}
 		if configuration.IsFleetServerBootstrap(cfg.Fleet) {
 			log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
 
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
-			configMgr = coordinator.NewConfigPatchManager(newFleetServerBootstrapManager(log), PatchAPMConfig(log, rawConfig))
+			configMgr = coordinator.NewConfigPatchManager(newFleetServerBootstrapManager(log), PatchAPMConfig(log, cfg.GetUCfg()))
 		} else {
 			log.Info("Parsed configuration and determined agent is managed by Fleet")
 
@@ -247,16 +225,24 @@ func New(
 				initialUpgradeDetails = dispatcher.GetScheduledUpgradeDetails(log, actionQueue.Actions(), time.Now())
 			}
 
+			store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to create encrypted disk store: %w", err)
+			}
 			// TODO: stop using global state
 			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
+<<<<<<< HEAD
 			configMgr = coordinator.NewConfigPatchManager(managed, PatchAPMConfig(log, rawConfig))
+=======
+			configMgr = coordinator.NewConfigPatchManager(managed, injectOutputOverrides(log, cfg.GetUCfg()), PatchAPMConfig(log, cfg.GetUCfg()))
+>>>>>>> 50c891c71 (Deduplicate config loading and override TLS cert paths in container mode (#14408))
 		}
 	}
 
-	varsManager, err := composable.New(log, rawConfig, composableManaged)
+	varsManager, err := composable.New(log, cfg.GetUCfg(), composableManaged)
 	if err != nil {
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
@@ -285,19 +271,20 @@ func New(
 		log.Debugf("agent limits have changed: %+v -> %+v", old, new)
 	}, "application.go")
 	// applying the initial limits for the agent process
-	if err := limits.Apply(rawConfig); err != nil {
+	if err := limits.Apply(cfg.GetUCfg()); err != nil {
 		return nil, nil, nil, fmt.Errorf("could not parse and apply limits config: %w", err)
 	}
 
 	// It is important that feature flags from configuration are applied as late as possible.  This will ensure that
 	// any feature flag change callbacks are registered before they get called by `features.Apply`.
-	if err := features.Apply(rawConfig); err != nil {
+	if err := features.Apply(cfg.GetUCfg()); err != nil {
 		return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 	}
 
 	return coord, configMgr, varsManager, nil
 }
 
+<<<<<<< HEAD
 func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
 	path := paths.AgentConfigFile()
 	store, err := storage.NewEncryptedDiskStore(ctx, path)
@@ -349,6 +336,129 @@ func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.St
 	}
 
 	return store, cfg, nil
+=======
+// normalizeAgentInstalls will attempt to normalize the agent installs and related TTL markers:
+// - if we just rolled back: the update marker is checked and in case of rollback we clean up the TTL marker of the rolled back version
+// - check all the entries:
+//   - verify that the home directory for that install still exists (remove TTL markers for what does not exist anymore)
+//   - check if the agent install: if it is no longer valid collect the versioned home and the TTL marker for deletion
+//
+// This function will NOT error out, it will log any errors it encounters as warnings but any error must be treated as non-fatal
+func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource ttl.Source) {
+	// Check if we rolled back and update the TTL markers
+	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil && initialUpdateMarker.Details.State == details.StateRollback {
+		// Reset the TTL for the current version if we are coming off a rollback
+		rollbacks, _, err := rollbackSource.GetAll()
+		if err != nil {
+			log.Warnf("Error getting available rollbacks from rollbackSource during startup check: %s", err)
+			return
+		}
+
+		// remove the current versioned home TTL marker
+		delete(rollbacks, initialUpdateMarker.PrevVersionedHome)
+		err = rollbackSource.Set(rollbacks)
+		if err != nil {
+			log.Warnf("Error setting available rollbacks during normalization: %s", err)
+			return
+		}
+	}
+
+	absHomePath := paths.Home()
+	relHomePath, err := filepath.Rel(topDir, absHomePath)
+	if err != nil {
+		log.Warnf("Error calculating home path %q relative to top path %q: %s", absHomePath, topDir, err)
+		return
+	}
+	_, err = upgrade.CleanAvailableRollbacks(log, rollbackSource, topDir, relHomePath, now, upgrade.PreserveActiveUpgradeVersions(initialUpdateMarker, upgrade.CleanupExpiredRollbacks))
+	if err != nil {
+		log.Warnf("Error cleaning available rollbacks: %s", err)
+	}
+}
+
+// injectOutputOverrides takes local configuration for specific outputs and applies them to the configuration.
+//
+// The name of the output must match or no options will be overwritten.
+func injectOutputOverrides(log *logger.Logger, rawConfig *config.Config) func(change coordinator.ConfigChange) coordinator.ConfigChange {
+	// merging uses no resolving as the AST variable substitution occurs on the outputs
+	// append the values to arrays (don't allow complete overriding of arrays)
+	mergeOpts := config.NoResolveOptions
+	mergeOpts = append(mergeOpts, ucfg.AppendValues)
+
+	// parse the outputs defined local in the configuration
+	// in the case the configuration as no outputs defined (most cases) then noop can be used
+	var parsed struct {
+		Outputs map[string]*ucfg.Config `config:"outputs"`
+	}
+	err := rawConfig.UnpackTo(&parsed)
+	if err != nil {
+		log.Errorf("error decoding raw config, output injection disabled: %v", err)
+		return noop
+	}
+	if len(parsed.Outputs) == 0 {
+		return noop
+	}
+
+	return func(change coordinator.ConfigChange) coordinator.ConfigChange {
+		cfg := change.Config()
+		outputs, err := cfg.Agent.Child("outputs", -1)
+		if err != nil {
+			if !isMissingError(err) {
+				// expecting only ErrMissing
+				log.Errorf("error getting outputs from config: %v", err)
+			}
+			return change
+		}
+		for outputName, outputOverrides := range parsed.Outputs {
+			cfgOutput, err := outputs.Child(outputName, -1)
+			if err != nil {
+				// no output with that name; do nothing
+				continue
+			}
+			// the order of merging is important
+			//
+			// this merges the ConfigChange on-top of the rawConfig to ensure that the
+			// ConfigChange options always override local options
+			//
+			// meaning that local options are only applied in the case that the ConfigChange
+			// doesn't provide a different value for those fields
+			err = func() error {
+				clone, err := ucfg.NewFrom(outputOverrides, mergeOpts...)
+				if err != nil {
+					return fmt.Errorf("failed to clone output overrides: %w", err)
+				}
+				err = clone.Merge(cfgOutput, mergeOpts...)
+				if err != nil {
+					return fmt.Errorf("failed to merge output over overrides: %w", err)
+				}
+				err = outputs.SetChild(outputName, -1, clone, mergeOpts...)
+				if err != nil {
+					return fmt.Errorf("failed to re-set output with overrides: %w", err)
+				}
+				return nil
+			}()
+			if err != nil {
+				log.Errorf("failed to perform output injection for output %s: %v", outputName, err)
+				continue
+			}
+			log.Infof("successfully injected output overrides for output %s", outputName)
+		}
+		return change
+	}
+}
+
+// isMissingError returns true if the error is because the field is missing
+//
+// Sadly go-ucfg doesn't support Unwrap interface so using `errors.Is(err, ucfg.ErrMissing)` doesn't work
+// this specific function is required to ensure its an `ErrMissing` error.
+func isMissingError(err error) bool {
+	//nolint:errorlint // limitation of go-ucfg (read docstring)
+	switch v := err.(type) {
+	case ucfg.Error:
+		//nolint:errorlint // limitation of go-ucfg (read docstring)
+		return v.Reason() == ucfg.ErrMissing
+	}
+	return false
+>>>>>>> 50c891c71 (Deduplicate config loading and override TLS cert paths in container mode (#14408))
 }
 
 // hasEncryptedStandaloneConfigChanged parses the file at pathConfigFile and checks if it has the same contents as storage.DefaultAgentEncryptedStandaloneConfig
