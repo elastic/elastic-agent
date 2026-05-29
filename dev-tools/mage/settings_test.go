@@ -7,10 +7,10 @@ package mage
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -22,17 +22,21 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 )
 
-// TestMain disables USE_PACKAGE_VERSION for the whole package so LoadSettings
-// doesn't read .package-version (and consequently fetch the manifest from
-// Elastic's CDN) by default. Tests that exercise that behaviour explicitly
-// re-enable it via t.Setenv.
-func TestMain(m *testing.M) {
-	os.Setenv("USE_PACKAGE_VERSION", "false")
-	os.Exit(m.Run())
+// loadTestSettings loads settings via LoadSettingsWithOptions using a hermetic
+// environment map (not os.Environ) so tests don't need to mutate process state
+// via t.Setenv. USE_PACKAGE_VERSION defaults to "false" so .package-version is
+// not consulted (and no manifest fetched); callers can override that, or any
+// other variable, via env. Use LoadSettings() with t.Setenv only to verify
+// that the default loader actually reads from os.Environ.
+func loadTestSettings(t *testing.T, env map[string]string) (*Settings, error) {
+	t.Helper()
+	full := map[string]string{"USE_PACKAGE_VERSION": "false"}
+	maps.Copy(full, env)
+	return LoadSettingsWithOptions(LoadOptions{Environment: full})
 }
 
 func TestGetVersion(t *testing.T) {
-	cfg, err := LoadSettings()
+	cfg, err := loadTestSettings(t, nil)
 	require.NoError(t, err)
 	bp := cfg.AgentQualifiedCoreVersion()
 	assert.NotEmpty(t, bp)
@@ -40,7 +44,7 @@ func TestGetVersion(t *testing.T) {
 
 func TestAgentPackageVersion(t *testing.T) {
 	t.Run("agent package version without env var", func(t *testing.T) {
-		cfg, err := LoadSettings()
+		cfg, err := loadTestSettings(t, nil)
 		require.NoError(t, err)
 		expectedPkgVersion := cfg.AgentQualifiedCoreVersion()
 		actualPkgVersion := cfg.AgentPackageVersion()
@@ -48,7 +52,7 @@ func TestAgentPackageVersion(t *testing.T) {
 	})
 
 	t.Run("agent package version env var set", func(t *testing.T) {
-		cfg, err := LoadSettings()
+		cfg, err := loadTestSettings(t, nil)
 		require.NoError(t, err)
 		expectedPkgVersion := "1.2.3-specialrelease+abcdef"
 		cfg.Packaging.AgentPackageVersion = expectedPkgVersion
@@ -57,7 +61,7 @@ func TestAgentPackageVersion(t *testing.T) {
 	})
 
 	t.Run("agent package version function must be mapped", func(t *testing.T) {
-		cfg, err := LoadSettings()
+		cfg, err := loadTestSettings(t, nil)
 		require.NoError(t, err)
 		cfg.Packaging.AgentPackageVersion = "1.2.3-specialrelease+abcdef"
 		funcMap := FuncMap(cfg)
@@ -578,14 +582,14 @@ func TestBuildSettingsCommitHash(t *testing.T) {
 	})
 
 	t.Run("returns hash populated by LoadSettings", func(t *testing.T) {
-		s, err := LoadSettings()
+		s, err := loadTestSettings(t, nil)
 		require.NoError(t, err)
 
 		assert.NotEmpty(t, s.Build.CommitHash())
 	})
 
 	t.Run("ignores agent core commit hash", func(t *testing.T) {
-		s, err := LoadSettings()
+		s, err := loadTestSettings(t, nil)
 		require.NoError(t, err)
 		s.Build.AgentCoreCommitHash = "abc123def456"
 
@@ -596,7 +600,7 @@ func TestBuildSettingsCommitHash(t *testing.T) {
 
 func TestBuildSettingsCommitHashShort(t *testing.T) {
 	t.Run("returns first 6 characters of git hash", func(t *testing.T) {
-		s, err := LoadSettings()
+		s, err := loadTestSettings(t, nil)
 		require.NoError(t, err)
 
 		fullHash := s.Build.CommitHash()
@@ -614,7 +618,7 @@ func TestSettingsAgentCoreCommitHash(t *testing.T) {
 	})
 
 	t.Run("returns repo git hash when AgentCoreCommitHash not set", func(t *testing.T) {
-		s, err := LoadSettings()
+		s, err := loadTestSettings(t, nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, s.Build.CommitHash(), s.AgentCoreCommitHash())
@@ -639,11 +643,9 @@ func TestSettingsAgentCoreCommitHashShort(t *testing.T) {
 
 func TestDefaultSettings(t *testing.T) {
 	t.Run("sets all defaults correctly without reading env vars", func(t *testing.T) {
-		// Set env vars that should NOT affect DefaultSettings()
-		t.Setenv("BEAT_NAME", "should-be-ignored")
-		t.Setenv("SNAPSHOT", "true")
-		t.Setenv("DEV", "true")
-
+		// DefaultSettings does not consult the environment at all (see
+		// setDefaults), so no env mutation is needed here. The assertions
+		// below verify the defaults directly.
 		settings := DefaultSettings()
 
 		assert.NotNil(t, settings)
@@ -684,7 +686,7 @@ func TestDefaultSettings(t *testing.T) {
 func TestLoadSettings(t *testing.T) {
 	t.Run("applies defaults before env vars", func(t *testing.T) {
 		// No env vars set - should get defaults
-		settings, err := LoadSettings()
+		settings, err := loadTestSettings(t, nil)
 
 		require.NoError(t, err)
 		assert.NotNil(t, settings)
@@ -714,22 +716,19 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads build settings from env vars", func(t *testing.T) {
-		// Disable the USE_PACKAGE_VERSION default so .package-version does
-		// not override BEAT_VERSION etc. during this test.
-		t.Setenv("USE_PACKAGE_VERSION", "false")
-		t.Setenv("SNAPSHOT", "true")
-		t.Setenv("DEV", "true")
-		t.Setenv("EXTERNAL", "true")
-		t.Setenv("FIPS", "true")
-		t.Setenv("VERSION_QUALIFIER", "rc1")
-		t.Setenv("CI", "true")
-		t.Setenv("MAX_PARALLEL", "8")
-		t.Setenv("BEAT_VERSION", "1.2.3")
-		t.Setenv("GOLANG_CROSSBUILD", "1")
-		t.Setenv("BEAT_GO_VERSION", "1.21.0")
-		t.Setenv("BEAT_DOC_BRANCH", "main")
-
-		settings, err := LoadSettings()
+		settings, err := loadTestSettings(t, map[string]string{
+			"SNAPSHOT":          "true",
+			"DEV":               "true",
+			"EXTERNAL":          "true",
+			"FIPS":              "true",
+			"VERSION_QUALIFIER": "rc1",
+			"CI":                "true",
+			"MAX_PARALLEL":      "8",
+			"BEAT_VERSION":      "1.2.3",
+			"GOLANG_CROSSBUILD": "1",
+			"BEAT_GO_VERSION":   "1.21.0",
+			"BEAT_DOC_BRANCH":   "main",
+		})
 
 		require.NoError(t, err)
 		assert.True(t, settings.Build.Snapshot)
@@ -749,16 +748,16 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads beat settings from env vars", func(t *testing.T) {
-		t.Setenv("BEAT_NAME", "custom-beat")
-		t.Setenv("BEAT_SERVICE_NAME", "custom-service")
-		t.Setenv("BEAT_INDEX_PREFIX", "custom-index")
-		t.Setenv("BEAT_DESCRIPTION", "Custom description")
-		t.Setenv("BEAT_VENDOR", "Custom Vendor")
-		t.Setenv("BEAT_LICENSE", "MIT")
-		t.Setenv("BEAT_URL", "https://custom.url")
-		t.Setenv("BEAT_USER", "customuser")
-
-		settings, err := LoadSettings()
+		settings, err := loadTestSettings(t, map[string]string{
+			"BEAT_NAME":         "custom-beat",
+			"BEAT_SERVICE_NAME": "custom-service",
+			"BEAT_INDEX_PREFIX": "custom-index",
+			"BEAT_DESCRIPTION":  "Custom description",
+			"BEAT_VENDOR":       "Custom Vendor",
+			"BEAT_LICENSE":      "MIT",
+			"BEAT_URL":          "https://custom.url",
+			"BEAT_USER":         "customuser",
+		})
 
 		require.NoError(t, err)
 		assert.Equal(t, "custom-beat", settings.Beat.Name)
@@ -772,11 +771,11 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads test settings from env vars", func(t *testing.T) {
-		t.Setenv("RACE_DETECTOR", "true")
-		t.Setenv("TEST_COVERAGE", "true")
-		t.Setenv("TEST_TAGS", "integration,e2e")
-
-		settings, err := LoadSettings()
+		settings, err := loadTestSettings(t, map[string]string{
+			"RACE_DETECTOR": "true",
+			"TEST_COVERAGE": "true",
+			"TEST_TAGS":     "integration,e2e",
+		})
 
 		require.NoError(t, err)
 		assert.True(t, settings.Test.RaceDetector)
@@ -785,15 +784,15 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads cross-build settings from env vars", func(t *testing.T) {
-		t.Setenv("PLATFORMS", "linux/amd64,darwin/arm64")
-		t.Setenv("PACKAGES", "targz,zip")
-		t.Setenv("DOCKER_VARIANTS", "basic,cloud")
-		t.Setenv("CROSSBUILD_MOUNT_MODCACHE", "false")
-		t.Setenv("CROSSBUILD_MOUNT_GOCACHE", "false")
-		t.Setenv("DEV_OS", "darwin")
-		t.Setenv("DEV_ARCH", "arm64")
-
-		settings, err := LoadSettings()
+		settings, err := loadTestSettings(t, map[string]string{
+			"PLATFORMS":                 "linux/amd64,darwin/arm64",
+			"PACKAGES":                  "targz,zip",
+			"DOCKER_VARIANTS":           "basic,cloud",
+			"CROSSBUILD_MOUNT_MODCACHE": "false",
+			"CROSSBUILD_MOUNT_GOCACHE":  "false",
+			"DEV_OS":                    "darwin",
+			"DEV_ARCH":                  "arm64",
+		})
 
 		require.NoError(t, err)
 		assert.Equal(t, "linux/amd64,darwin/arm64", settings.CrossBuild.Platforms)
@@ -806,15 +805,13 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads packaging settings from env vars", func(t *testing.T) {
-		// Disable USE_PACKAGE_VERSION so .package-version doesn't override our
-		// env values. MANIFEST_URL reading is tested separately via
-		// loadPackagingSettingsFromEnv to avoid LoadSettings's manifest fetch.
-		t.Setenv("USE_PACKAGE_VERSION", "false")
-		t.Setenv("AGENT_PACKAGE_VERSION", "2.0.0")
-		t.Setenv("AGENT_DROP_PATH", "/drop/path")
-		t.Setenv("KEEP_ARCHIVE", "true")
-
-		settings, err := LoadSettings()
+		// MANIFEST_URL reading is tested separately via loadPackagingSettingsFromEnv
+		// below to avoid LoadSettings's manifest fetch.
+		settings, err := loadTestSettings(t, map[string]string{
+			"AGENT_PACKAGE_VERSION": "2.0.0",
+			"AGENT_DROP_PATH":       "/drop/path",
+			"KEEP_ARCHIVE":          "true",
+		})
 
 		require.NoError(t, err)
 		assert.Equal(t, "2.0.0", settings.Packaging.AgentPackageVersion)
@@ -823,19 +820,19 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loadPackagingSettingsFromEnv reads MANIFEST_URL", func(t *testing.T) {
-		t.Setenv("USE_PACKAGE_VERSION", "false")
-		t.Setenv("MANIFEST_URL", "https://manifest.url")
-
 		s := DefaultSettings()
-		require.NoError(t, s.loadPackagingSettingsFromEnv())
+		require.NoError(t, s.loadPackagingSettingsFromEnv(map[string]string{
+			"USE_PACKAGE_VERSION": "false",
+			"MANIFEST_URL":        "https://manifest.url",
+		}))
 
 		assert.Equal(t, "https://manifest.url", s.Packaging.ManifestURL)
 	})
 
 	t.Run("applies .package-version overrides when USE_PACKAGE_VERSION is set", func(t *testing.T) {
-		t.Setenv("USE_PACKAGE_VERSION", "true")
-
-		settings, err := LoadSettings()
+		settings, err := loadTestSettings(t, map[string]string{
+			"USE_PACKAGE_VERSION": "true",
+		})
 		require.NoError(t, err)
 
 		// Read the real .package-version file from the repo root.
@@ -852,22 +849,22 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads integration test settings from env vars", func(t *testing.T) {
-		t.Setenv("AGENT_VERSION", "8.0.0")
-		t.Setenv("AGENT_STACK_VERSION", "8.0.0")
-		t.Setenv("AGENT_BUILD_DIR", "/build/dir")
-		t.Setenv("STACK_PROVISIONER", "serverless")
-		t.Setenv("INSTANCE_PROVISIONER", "kind")
-		t.Setenv("TEST_PLATFORMS", "linux/amd64")
-		t.Setenv("TEST_GROUPS", "default")
-		t.Setenv("TEST_BINARY_NAME", "test-binary")
-		t.Setenv("TEST_INTEG_TIMESTAMP", "true")
-		t.Setenv("TEST_RUN_UNTIL_FAILURE", "true")
-		t.Setenv("TEST_INTEG_CLEAN_ON_EXIT", "false")
-		t.Setenv("BUILD_AGENT", "true")
-		t.Setenv("GOTEST_FLAGS", "-v -count=1")
-		t.Setenv("TEST_ENVIRONMENT", "false")
-
-		settings, err := LoadSettings()
+		settings, err := loadTestSettings(t, map[string]string{
+			"AGENT_VERSION":            "8.0.0",
+			"AGENT_STACK_VERSION":      "8.0.0",
+			"AGENT_BUILD_DIR":          "/build/dir",
+			"STACK_PROVISIONER":        "serverless",
+			"INSTANCE_PROVISIONER":     "kind",
+			"TEST_PLATFORMS":           "linux/amd64",
+			"TEST_GROUPS":              "default",
+			"TEST_BINARY_NAME":         "test-binary",
+			"TEST_INTEG_TIMESTAMP":     "true",
+			"TEST_RUN_UNTIL_FAILURE":   "true",
+			"TEST_INTEG_CLEAN_ON_EXIT": "false",
+			"BUILD_AGENT":              "true",
+			"GOTEST_FLAGS":             "-v -count=1",
+			"TEST_ENVIRONMENT":         "false",
+		})
 
 		require.NoError(t, err)
 		assert.Equal(t, "8.0.0", settings.IntegrationTest.AgentVersion)
@@ -887,14 +884,14 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads docker settings from env vars", func(t *testing.T) {
-		t.Setenv("DOCKER_IMPORT_SOURCE", "docker.elastic.co")
-		t.Setenv("CUSTOM_IMAGE_TAG", "custom-tag")
-		t.Setenv("CI_ELASTIC_AGENT_DOCKER_IMAGE", "ci-image")
-		t.Setenv("DOCKER_NOCACHE", "1")
-		t.Setenv("DOCKER_PULL", "1")
-		t.Setenv("WINDOWS_NPCAP", "true")
-
-		settings, err := LoadSettings()
+		settings, err := loadTestSettings(t, map[string]string{
+			"DOCKER_IMPORT_SOURCE":          "docker.elastic.co",
+			"CUSTOM_IMAGE_TAG":              "custom-tag",
+			"CI_ELASTIC_AGENT_DOCKER_IMAGE": "ci-image",
+			"DOCKER_NOCACHE":                "1",
+			"DOCKER_PULL":                   "1",
+			"WINDOWS_NPCAP":                 "true",
+		})
 
 		require.NoError(t, err)
 		assert.Equal(t, "docker.elastic.co", settings.Docker.ImportSource)
@@ -906,10 +903,10 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads kubernetes settings from env vars", func(t *testing.T) {
-		t.Setenv("K8S_VERSION", "1.28")
-		t.Setenv("KIND_SKIP_DELETE", "true")
-
-		settings, err := LoadSettings()
+		settings, err := loadTestSettings(t, map[string]string{
+			"K8S_VERSION":      "1.28",
+			"KIND_SKIP_DELETE": "true",
+		})
 
 		require.NoError(t, err)
 		assert.Equal(t, "1.28", settings.Kubernetes.K8sVersion)
@@ -917,10 +914,10 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads dev machine settings from env vars", func(t *testing.T) {
-		t.Setenv("MACHINE_IMAGE", "custom-image")
-		t.Setenv("ZONE", "us-west1-b")
-
-		settings, err := LoadSettings()
+		settings, err := loadTestSettings(t, map[string]string{
+			"MACHINE_IMAGE": "custom-image",
+			"ZONE":          "us-west1-b",
+		})
 
 		require.NoError(t, err)
 		assert.Equal(t, "custom-image", settings.DevMachine.MachineImage)
@@ -928,26 +925,45 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads fmt settings from env vars", func(t *testing.T) {
-		t.Setenv("CHECK_HEADERS_DISABLED", "1")
-
-		settings, err := LoadSettings()
+		settings, err := loadTestSettings(t, map[string]string{
+			"CHECK_HEADERS_DISABLED": "1",
+		})
 
 		require.NoError(t, err)
 		assert.True(t, settings.Fmt.CheckHeadersDisabled)
 	})
 
 	t.Run("returns error for invalid bool env vars", func(t *testing.T) {
-		t.Setenv("SNAPSHOT", "invalid")
-
-		_, err := LoadSettings()
+		_, err := loadTestSettings(t, map[string]string{
+			"SNAPSHOT": "invalid",
+		})
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "SNAPSHOT")
 	})
 }
 
-func TestMustLoadSettings(t *testing.T) {
-	t.Run("returns settings without panic", func(t *testing.T) {
+// TestLoadSettingsReadsOSEnvironment verifies that LoadSettings() (no options)
+// — and MustLoadSettings, which wraps it — snapshot os.Environ() into
+// LoadOptions.Environment, so the process env continues to drive the loader
+// for normal mage runs. This is the only place we touch os.Environ via
+// t.Setenv; every other test uses loadTestSettings to inject an explicit
+// environment map and keeps process state untouched.
+func TestLoadSettingsReadsOSEnvironment(t *testing.T) {
+	t.Setenv("USE_PACKAGE_VERSION", "false")
+	t.Setenv("BEAT_NAME", "via-os-env")
+	t.Setenv("SNAPSHOT", "true")
+
+	t.Run("LoadSettings reads variables from os.Environ", func(t *testing.T) {
+		settings, err := LoadSettings()
+		require.NoError(t, err)
+
+		assert.Equal(t, "via-os-env", settings.Beat.Name)
+		assert.True(t, settings.Build.Snapshot)
+		assert.True(t, settings.Build.SnapshotSet)
+	})
+
+	t.Run("MustLoadSettings returns settings without panic", func(t *testing.T) {
 		assert.NotPanics(t, func() {
 			settings := MustLoadSettings()
 			assert.NotNil(t, settings)
@@ -959,7 +975,10 @@ func TestLoadSettingsWithOptionsSkipVCS(t *testing.T) {
 	t.Run("initCommitHash fails outside a git repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		// Prevent git from walking up past tmpDir and finding the checkout's .git.
-		// The ceiling must be a strict ancestor of cwd; listing tmpDir itself is ignored.
+		// The ceiling must be a strict ancestor of cwd; listing tmpDir itself is
+		// ignored. This t.Setenv targets the git subprocess (not LoadSettings,
+		// which uses LoadOptions.Environment); it's the only way to influence
+		// git itself.
 		t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(tmpDir))
 		t.Chdir(tmpDir)
 
@@ -969,7 +988,10 @@ func TestLoadSettingsWithOptionsSkipVCS(t *testing.T) {
 	})
 
 	t.Run("SkipVCS=true succeeds and leaves commit hash empty", func(t *testing.T) {
-		cfg, err := LoadSettingsWithOptions(LoadOptions{SkipVCS: true})
+		cfg, err := LoadSettingsWithOptions(LoadOptions{
+			SkipVCS:     true,
+			Environment: map[string]string{"USE_PACKAGE_VERSION": "false"},
+		})
 		require.NoError(t, err)
 		assert.Empty(t, cfg.Build.CommitHash())
 	})
@@ -977,7 +999,7 @@ func TestLoadSettingsWithOptionsSkipVCS(t *testing.T) {
 
 func TestEnvMap(t *testing.T) {
 	t.Run("includes settings values", func(t *testing.T) {
-		cfg, err := LoadSettings()
+		cfg, err := loadTestSettings(t, nil)
 		require.NoError(t, err)
 		cfg.Build.GOOS = "linux"
 		cfg.Build.GOARCH = "amd64"
@@ -991,7 +1013,7 @@ func TestEnvMap(t *testing.T) {
 	})
 
 	t.Run("merges additional args", func(t *testing.T) {
-		cfg, err := LoadSettings()
+		cfg, err := loadTestSettings(t, nil)
 		require.NoError(t, err)
 
 		envMap := EnvMap(cfg, map[string]interface{}{
