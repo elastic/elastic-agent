@@ -1043,7 +1043,7 @@ func TestWithManifestInfo(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, result.Build.Snapshot)
 		assert.Equal(t, "9.3.5", result.Build.AgentCoreVersion)
-		assert.Equal(t, "9.3.5-SNAPSHOT", result.Packaging.AgentPackageVersion)
+		assert.Equal(t, "9.3.5", result.Packaging.AgentPackageVersion) // prerelease stripped; snapshot state is in Build.Snapshot
 		assert.Equal(t, "9.3.5-SNAPSHOT", result.Build.DependenciesVersion)
 		assert.Equal(t, commitHash, result.Build.AgentCoreCommitHash)
 	})

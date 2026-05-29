@@ -897,8 +897,9 @@ func (s *Settings) WithManifestInfo(ctx context.Context) (*Settings, error) {
 	clone.Packaging.Manifest = &resp
 	clone.Build.Snapshot = parsedVersion.IsSnapshot()
 	clone.Build.AgentCoreVersion = parsedVersion.CoreVersion()
-	// This has to be the full version to account for Independent Agent Releases
-	clone.Packaging.AgentPackageVersion = parsedVersion.String()
+	// VersionWithBuildMetadata preserves the build ID for Independent Agent Releases while
+	// omitting the prerelease — snapshot state is captured in Build.Snapshot.
+	clone.Packaging.AgentPackageVersion = parsedVersion.VersionWithBuildMetadata()
 	clone.Build.AgentCoreCommitHash = agentCoreProject.CommitHash
 	clone.Build.DependenciesVersion = parsedVersion.VersionWithPrerelease()
 	return clone, nil
