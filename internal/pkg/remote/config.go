@@ -71,6 +71,13 @@ func (c *Config) GetHosts() []string {
 // Validate returns an error if the configuration is invalid; nil, otherwise.
 func (c *Config) Validate() error {
 	if c.Transport.TLS != nil {
+		// Certificate hot-reload was introduced after this branch was cut. Disable it
+		// by default so it does not land silently in a patch release. Operators who
+		// want it can set ssl.certificate_reload.enabled: true in their config.
+		if c.Transport.TLS.CertificateReload.Enabled == nil {
+			enabled := false
+			c.Transport.TLS.CertificateReload.Enabled = &enabled
+		}
 		return c.Transport.TLS.Validate()
 	}
 
