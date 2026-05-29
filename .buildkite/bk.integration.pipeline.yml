@@ -121,6 +121,7 @@ common:
       - &k8s_max_test_version v1.34.0
     variants: &k8s_test_variants
       - basic
+      - cloud
       - complete
       - complete-wolfi
       - service
