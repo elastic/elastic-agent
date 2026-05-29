@@ -27,9 +27,13 @@ common:
 env:
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
   IMAGE_WIN_11_VERSION: "1.0.1779464011"
+  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
+  IMAGE_WIN_10_VERSION: "1.0.1779464011"
+  IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
+  IMAGE_WIN_11_ARM64_VERSION: "1.0.1779464011"
 
 steps:
-  - label: "Unit tests - Windows 11 (diagnostic run %n)"
+  - label: "Unit tests - Windows 11 amd64 (diagnostic run %n)"
     key: "unit-tests-win11"
     command: .buildkite/scripts/steps/unit-tests.ps1
     parallelism: 10
@@ -50,35 +54,23 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (nogreenteagc run %n)"
-    key: "unit-tests-win11-nogreenteagc"
-    # Same diagnostic config as unit-tests-win11, but with the Green Tea GC
-    # experiment disabled (GOEXPERIMENT=...,nogreenteagc). Green Tea GC is the
-    # new default-on collector in Go 1.26, and golang/go#77975 ("Windows crash
-    # with Go 1.26.0/1.26.1") implicates a Green Tea GC stack-scanning /
-    # copystack marking bug. This is the decisive A/B: it differs from the
-    # plain diagnostic variant by exactly one flag. If this variant stops
-    # reproducing the crash while unit-tests-win11 keeps crashing, the agent's
-    # crashes are confirmed to be that Green Tea GC bug - the evidence to
-    # attach to the upstream issue.
-    #
-    # (The earlier gcshrinkstackoff=1 variant was retired: build 40538 showed
-    # it failed at the same 7/10 rate as the plain variant, ruling out stack
-    # *shrinking* as the mechanism. copystack on stack *growth* is not disabled
-    # by that flag and remains in scope under the Green Tea hypothesis.)
+  # OS/arch matrix to test the "Windows-11 + amd64 specific" hypothesis.
+  # All three use the SAME diagnostic script and Azure provider, so the only
+  # variables are Windows version (11 vs 10) and CPU arch (amd64 vs arm64).
+  #   - win10-amd64 clean + win11-amd64 crashes -> Windows 11-specific.
+  #   - win11-arm64 clean + win11-amd64 crashes -> amd64-specific.
+  #   - both clean -> specifically Windows 11 + amd64 (the hypothesis).
+  - label: "Unit tests - Windows 10 amd64 (diagnostic run %n)"
+    key: "unit-tests-win10-amd64"
     command: .buildkite/scripts/steps/unit-tests.ps1
     parallelism: 10
-    env:
-      EXTRA_GOEXPERIMENT: "nogreenteagc"
     artifact_paths:
-      - "build/TEST-*.html"
       - "build/TEST-*.xml"
-      - "build/diagnostics/*"
       - "coverage-*.out"
     agents:
       provider: "azure"
-      image: "${IMAGE_WIN_11}"
-      imageVersion: "${IMAGE_WIN_11_VERSION}"
+      image: "${IMAGE_WIN_10}"
+      imageVersion: "${IMAGE_WIN_10_VERSION}"
       vmSize: "Standard_D8s_v5"
       diskSizeGb: "256"
     retry:
@@ -87,22 +79,18 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (instrumented run %n)"
-    key: "unit-tests-win11-instrumented"
-    command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
-    parallelism: 5
+  - label: "Unit tests - Windows 11 arm64 (diagnostic run %n)"
+    key: "unit-tests-win11-arm64"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
     artifact_paths:
-      - "build/TEST-*.html"
       - "build/TEST-*.xml"
-      - "build/diagnostics/*"
       - "coverage-*.out"
-      - "build/dumps/*.dmp"
-      - "build/bins/*.exe"
     agents:
       provider: "azure"
-      image: "${IMAGE_WIN_11}"
-      imageVersion: "${IMAGE_WIN_11_VERSION}"
-      vmSize: "Standard_D8s_v5"
+      image: "${IMAGE_WIN_11_ARM64}"
+      imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+      vmSize: "Standard_D8ps_v6"
       diskSizeGb: "256"
     retry:
       manual:
@@ -122,9 +110,9 @@ steps:
     depends_on:
       - step: "unit-tests-win11"
         allow_failure: true
-      - step: "unit-tests-win11-nogreenteagc"
+      - step: "unit-tests-win10-amd64"
         allow_failure: true
-      - step: "unit-tests-win11-instrumented"
+      - step: "unit-tests-win11-arm64"
         allow_failure: true
 
   - wait: ~
