@@ -163,6 +163,7 @@ steps:
     depends_on:
       - packaging-containers-amd64
       - packaging-containers-arm64
+      - packaging-amd64
     env:
       TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
       FORCE_ESS_CREATE: "true"
