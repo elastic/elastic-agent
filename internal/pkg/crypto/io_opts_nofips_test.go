@@ -22,14 +22,6 @@ func Test_Option_Validate(t *testing.T) {
 		name   string
 		option *Option
 	}{{
-		name: "IVLength is 0",
-		option: &Option{
-			IVLength:        0,
-			SaltLength:      1,
-			IterationsCount: 1,
-			KeyLength:       1,
-		},
-	}, {
 		name: "SaltLength is 0",
 		option: &Option{
 			IVLength:        1,

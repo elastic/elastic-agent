@@ -24,6 +24,7 @@ var fakeComponentPltfs = []string{
 	"linux/amd64",
 	"linux/arm64",
 	"windows/amd64",
+	"windows/arm64",
 }
 
 var fakeComponent = atesting.UsableComponent{
@@ -64,6 +65,29 @@ var fakeComponent = atesting.UsableComponent{
 				Outputs:      []string{fakeOutputName},
 				Command:      &component.CommandSpec{},
 				IsolateUnits: true,
+			},
+		},
+	},
+}
+
+// fakeSIGTERMComponent is like fakeComponent but the component binary ignores
+// SIGTERM and clears its parent-death signal. This is used to test that the
+// agent actively kills (SIGKILL) and reaps components during shutdown rather
+// than relying on Pdeathsig to clean up after the agent exits.
+var fakeSIGTERMComponent = atesting.UsableComponent{
+	Name:       "fake-sigterm-ignore",
+	BinaryPath: mustAbs(filepath.Join("..", "..", "..", "pkg", "component", "fake", "component", osExt("component"))),
+	Spec: &component.Spec{
+		Version: 2,
+		Inputs: []component.InputSpec{
+			{
+				Name:        "fake",
+				Description: "A fake input that ignores SIGTERM",
+				Platforms:   fakeComponentPltfs,
+				Outputs:     []string{fakeOutputName},
+				Command: &component.CommandSpec{
+					Args: []string{"--sigterm-ignore", "--clear-pdeathsig"},
+				},
 			},
 		},
 	},

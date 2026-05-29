@@ -14,6 +14,7 @@ import (
 	mock "github.com/stretchr/testify/mock"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
 // NewMockAgent creates a new instance of MockAgent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -88,23 +89,23 @@ func (_c *MockAgent_AgentID_Call) RunAndReturn(run func() string) *MockAgent_Age
 }
 
 // ECSMetadata provides a mock function for the type MockAgent
-func (_mock *MockAgent) ECSMetadata(v *logger.Logger) (*ECSMeta, error) {
+func (_mock *MockAgent) ECSMetadata(v *logger.Logger) (*ecsmeta.ECSMeta, error) {
 	ret := _mock.Called(v)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ECSMetadata")
 	}
 
-	var r0 *ECSMeta
+	var r0 *ecsmeta.ECSMeta
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) (*ECSMeta, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) (*ecsmeta.ECSMeta, error)); ok {
 		return returnFunc(v)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) *ECSMeta); ok {
+	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) *ecsmeta.ECSMeta); ok {
 		r0 = returnFunc(v)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*ECSMeta)
+			r0 = ret.Get(0).(*ecsmeta.ECSMeta)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(*logger.Logger) error); ok {
@@ -139,12 +140,144 @@ func (_c *MockAgent_ECSMetadata_Call) Run(run func(v *logger.Logger)) *MockAgent
 	return _c
 }
 
-func (_c *MockAgent_ECSMetadata_Call) Return(eCSMeta *ECSMeta, err error) *MockAgent_ECSMetadata_Call {
+func (_c *MockAgent_ECSMetadata_Call) Return(eCSMeta *ecsmeta.ECSMeta, err error) *MockAgent_ECSMetadata_Call {
 	_c.Call.Return(eCSMeta, err)
 	return _c
 }
 
-func (_c *MockAgent_ECSMetadata_Call) RunAndReturn(run func(v *logger.Logger) (*ECSMeta, error)) *MockAgent_ECSMetadata_Call {
+func (_c *MockAgent_ECSMetadata_Call) RunAndReturn(run func(v *logger.Logger) (*ecsmeta.ECSMeta, error)) *MockAgent_ECSMetadata_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetLogLevelOverride provides a mock function for the type MockAgent
+func (_mock *MockAgent) GetLogLevelOverride() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLogLevelOverride")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockAgent_GetLogLevelOverride_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLogLevelOverride'
+type MockAgent_GetLogLevelOverride_Call struct {
+	*mock.Call
+}
+
+// GetLogLevelOverride is a helper method to define mock.On call
+func (_e *MockAgent_Expecter) GetLogLevelOverride() *MockAgent_GetLogLevelOverride_Call {
+	return &MockAgent_GetLogLevelOverride_Call{Call: _e.mock.On("GetLogLevelOverride")}
+}
+
+func (_c *MockAgent_GetLogLevelOverride_Call) Run(run func()) *MockAgent_GetLogLevelOverride_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockAgent_GetLogLevelOverride_Call) Return(s string) *MockAgent_GetLogLevelOverride_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockAgent_GetLogLevelOverride_Call) RunAndReturn(run func() string) *MockAgent_GetLogLevelOverride_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetLogLevelPolicy provides a mock function for the type MockAgent
+func (_mock *MockAgent) GetLogLevelPolicy() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLogLevelPolicy")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockAgent_GetLogLevelPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLogLevelPolicy'
+type MockAgent_GetLogLevelPolicy_Call struct {
+	*mock.Call
+}
+
+// GetLogLevelPolicy is a helper method to define mock.On call
+func (_e *MockAgent_Expecter) GetLogLevelPolicy() *MockAgent_GetLogLevelPolicy_Call {
+	return &MockAgent_GetLogLevelPolicy_Call{Call: _e.mock.On("GetLogLevelPolicy")}
+}
+
+func (_c *MockAgent_GetLogLevelPolicy_Call) Run(run func()) *MockAgent_GetLogLevelPolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockAgent_GetLogLevelPolicy_Call) Return(s string) *MockAgent_GetLogLevelPolicy_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockAgent_GetLogLevelPolicy_Call) RunAndReturn(run func() string) *MockAgent_GetLogLevelPolicy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetLogLevelRuntime provides a mock function for the type MockAgent
+func (_mock *MockAgent) GetLogLevelRuntime() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLogLevelRuntime")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockAgent_GetLogLevelRuntime_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLogLevelRuntime'
+type MockAgent_GetLogLevelRuntime_Call struct {
+	*mock.Call
+}
+
+// GetLogLevelRuntime is a helper method to define mock.On call
+func (_e *MockAgent_Expecter) GetLogLevelRuntime() *MockAgent_GetLogLevelRuntime_Call {
+	return &MockAgent_GetLogLevelRuntime_Call{Call: _e.mock.On("GetLogLevelRuntime")}
+}
+
+func (_c *MockAgent_GetLogLevelRuntime_Call) Run(run func()) *MockAgent_GetLogLevelRuntime_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockAgent_GetLogLevelRuntime_Call) Return(s string) *MockAgent_GetLogLevelRuntime_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockAgent_GetLogLevelRuntime_Call) RunAndReturn(run func() string) *MockAgent_GetLogLevelRuntime_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -239,94 +372,6 @@ func (_c *MockAgent_IsStandalone_Call) RunAndReturn(run func() bool) *MockAgent_
 	return _c
 }
 
-// LogLevel provides a mock function for the type MockAgent
-func (_mock *MockAgent) LogLevel() string {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for LogLevel")
-	}
-
-	var r0 string
-	if returnFunc, ok := ret.Get(0).(func() string); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	return r0
-}
-
-// MockAgent_LogLevel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogLevel'
-type MockAgent_LogLevel_Call struct {
-	*mock.Call
-}
-
-// LogLevel is a helper method to define mock.On call
-func (_e *MockAgent_Expecter) LogLevel() *MockAgent_LogLevel_Call {
-	return &MockAgent_LogLevel_Call{Call: _e.mock.On("LogLevel")}
-}
-
-func (_c *MockAgent_LogLevel_Call) Run(run func()) *MockAgent_LogLevel_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockAgent_LogLevel_Call) Return(s string) *MockAgent_LogLevel_Call {
-	_c.Call.Return(s)
-	return _c
-}
-
-func (_c *MockAgent_LogLevel_Call) RunAndReturn(run func() string) *MockAgent_LogLevel_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// RawLogLevel provides a mock function for the type MockAgent
-func (_mock *MockAgent) RawLogLevel() string {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for RawLogLevel")
-	}
-
-	var r0 string
-	if returnFunc, ok := ret.Get(0).(func() string); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	return r0
-}
-
-// MockAgent_RawLogLevel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RawLogLevel'
-type MockAgent_RawLogLevel_Call struct {
-	*mock.Call
-}
-
-// RawLogLevel is a helper method to define mock.On call
-func (_e *MockAgent_Expecter) RawLogLevel() *MockAgent_RawLogLevel_Call {
-	return &MockAgent_RawLogLevel_Call{Call: _e.mock.On("RawLogLevel")}
-}
-
-func (_c *MockAgent_RawLogLevel_Call) Run(run func()) *MockAgent_RawLogLevel_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockAgent_RawLogLevel_Call) Return(s string) *MockAgent_RawLogLevel_Call {
-	_c.Call.Return(s)
-	return _c
-}
-
-func (_c *MockAgent_RawLogLevel_Call) RunAndReturn(run func() string) *MockAgent_RawLogLevel_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // ReloadID provides a mock function for the type MockAgent
 func (_mock *MockAgent) ReloadID(ctx context.Context) error {
 	ret := _mock.Called(ctx)
@@ -378,12 +423,12 @@ func (_c *MockAgent_ReloadID_Call) RunAndReturn(run func(ctx context.Context) er
 	return _c
 }
 
-// SetLogLevel provides a mock function for the type MockAgent
-func (_mock *MockAgent) SetLogLevel(ctx context.Context, level string) error {
+// SetLogLevelOverride provides a mock function for the type MockAgent
+func (_mock *MockAgent) SetLogLevelOverride(ctx context.Context, level string) error {
 	ret := _mock.Called(ctx, level)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetLogLevel")
+		panic("no return value specified for SetLogLevelOverride")
 	}
 
 	var r0 error
@@ -395,19 +440,19 @@ func (_mock *MockAgent) SetLogLevel(ctx context.Context, level string) error {
 	return r0
 }
 
-// MockAgent_SetLogLevel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetLogLevel'
-type MockAgent_SetLogLevel_Call struct {
+// MockAgent_SetLogLevelOverride_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetLogLevelOverride'
+type MockAgent_SetLogLevelOverride_Call struct {
 	*mock.Call
 }
 
-// SetLogLevel is a helper method to define mock.On call
+// SetLogLevelOverride is a helper method to define mock.On call
 //   - ctx context.Context
 //   - level string
-func (_e *MockAgent_Expecter) SetLogLevel(ctx interface{}, level interface{}) *MockAgent_SetLogLevel_Call {
-	return &MockAgent_SetLogLevel_Call{Call: _e.mock.On("SetLogLevel", ctx, level)}
+func (_e *MockAgent_Expecter) SetLogLevelOverride(ctx interface{}, level interface{}) *MockAgent_SetLogLevelOverride_Call {
+	return &MockAgent_SetLogLevelOverride_Call{Call: _e.mock.On("SetLogLevelOverride", ctx, level)}
 }
 
-func (_c *MockAgent_SetLogLevel_Call) Run(run func(ctx context.Context, level string)) *MockAgent_SetLogLevel_Call {
+func (_c *MockAgent_SetLogLevelOverride_Call) Run(run func(ctx context.Context, level string)) *MockAgent_SetLogLevelOverride_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -425,13 +470,53 @@ func (_c *MockAgent_SetLogLevel_Call) Run(run func(ctx context.Context, level st
 	return _c
 }
 
-func (_c *MockAgent_SetLogLevel_Call) Return(err error) *MockAgent_SetLogLevel_Call {
+func (_c *MockAgent_SetLogLevelOverride_Call) Return(err error) *MockAgent_SetLogLevelOverride_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockAgent_SetLogLevel_Call) RunAndReturn(run func(ctx context.Context, level string) error) *MockAgent_SetLogLevel_Call {
+func (_c *MockAgent_SetLogLevelOverride_Call) RunAndReturn(run func(ctx context.Context, level string) error) *MockAgent_SetLogLevelOverride_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// SetLogLevelPolicy provides a mock function for the type MockAgent
+func (_mock *MockAgent) SetLogLevelPolicy(level string) {
+	_mock.Called(level)
+	return
+}
+
+// MockAgent_SetLogLevelPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetLogLevelPolicy'
+type MockAgent_SetLogLevelPolicy_Call struct {
+	*mock.Call
+}
+
+// SetLogLevelPolicy is a helper method to define mock.On call
+//   - level string
+func (_e *MockAgent_Expecter) SetLogLevelPolicy(level interface{}) *MockAgent_SetLogLevelPolicy_Call {
+	return &MockAgent_SetLogLevelPolicy_Call{Call: _e.mock.On("SetLogLevelPolicy", level)}
+}
+
+func (_c *MockAgent_SetLogLevelPolicy_Call) Run(run func(level string)) *MockAgent_SetLogLevelPolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAgent_SetLogLevelPolicy_Call) Return() *MockAgent_SetLogLevelPolicy_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockAgent_SetLogLevelPolicy_Call) RunAndReturn(run func(level string)) *MockAgent_SetLogLevelPolicy_Call {
+	_c.Run(run)
 	return _c
 }
 

@@ -8,7 +8,7 @@ ARG BASE_TAG=10.1
 
 FROM ${BASE_REGISTRY}/${BASE_IMAGE}:${BASE_TAG} as prep_files
 
-ARG ELASTIC_STACK={{ beat_version }}
+ARG ELASTIC_STACK={{ agent_package_version }}
 ARG ELASTIC_PRODUCT=elastic-agent
 ARG OS_AND_ARCH=linux-x86_64
 
@@ -83,6 +83,7 @@ RUN find /usr/share//elastic-agent/data -type d -exec chmod 0777 {} \; && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/apm-server || true) && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/cloud-defend || true) && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/endpoint-security || true) && \
+    (chmod 0644 /usr/share/elastic-agent/data/elastic-agent-*/components/endpoint-security-resources.zip || true) && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/fleet-server || true) && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/pf-elastic-collector || true) && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/pf-elastic-symbolizer || true) && \

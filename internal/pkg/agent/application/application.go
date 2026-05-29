@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"time"
 
 	"go.elastic.co/apm/v2"
@@ -48,12 +49,6 @@ import (
 	"github.com/elastic/elastic-agent/version"
 )
 
-type rollbacksSource interface {
-	Set(map[string]ttl.TTLMarker) error
-	Get() (map[string]ttl.TTLMarker, error)
-	Remove(string) error
-}
-
 // CfgOverrider allows for application driven overrides of configuration read from disk.
 type CfgOverrider func(cfg *configuration.Configuration)
 
@@ -71,7 +66,7 @@ func New(
 	disableMonitoring bool,
 	override CfgOverrider,
 	initialUpdateMarker *upgrade.UpdateMarker,
-	availableRollbacksSource rollbacksSource,
+	availableRollbacksSource ttl.Source,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -181,20 +176,35 @@ func New(
 		configMgr = newTestingModeConfigManager(log)
 	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
-
-		loader := config.NewLoader(log, paths.ExternalInputs())
-		rawCfgMap, err := rawConfig.ToMapStr()
+		flags, err := features.Parse(rawConfig)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
+			return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 		}
-		discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
-			kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
-		if !cfg.Settings.Reload.Enabled {
-			log.Debug("Reloading of configuration is off")
-			configMgr = newOnce(log, discover, loader)
+		if flags.EncryptedConfig() {
+			if hasEncryptedStandaloneConfigChanged(log, pathConfigFile) {
+				log.Debug("Detected config file change, re-encrypting...")
+				if err := storage.EncryptConfigOnPath(paths.Config()); err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to encrypt config file: %w", err)
+				}
+			}
+
+			log.Debug("Loading encrypted config")
+			configMgr = newEncryptedOnce(log, paths.AgentConfigFile())
 		} else {
-			log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
-			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
+			loader := config.NewLoader(log, paths.ExternalInputs())
+			rawCfgMap, err := rawConfig.ToMapStr()
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
+			}
+			discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
+				kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
+			if !cfg.Settings.Reload.Enabled {
+				log.Debug("Reloading of configuration is off")
+				configMgr = newOnce(log, discover, loader)
+			} else {
+				log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
+				configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
+			}
 		}
 	} else {
 		isManaged = true
@@ -238,8 +248,7 @@ func New(
 			}
 
 			retrier := retrier.New(fleetAcker, log)
-			batchedAcker := lazy.NewAcker(fleetAcker, log, lazy.WithRetrier(retrier))
-			actionAcker = stateStore.NewStateStoreActionAcker(batchedAcker, stateStorage)
+			actionAcker = lazy.NewAcker(fleetAcker, log, lazy.WithRetrier(retrier))
 
 			actionQueue, err := queue.NewActionQueue(stateStorage.Queue(), stateStorage)
 			if err != nil {
@@ -272,8 +281,8 @@ func New(
 		baseLogger,
 		agentInfo,
 		cfg.Settings.Collector,
-		monitor.ComponentMonitoringConfig,
 		otelmanager.CollectorStopTimeout,
+		nil,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
@@ -310,11 +319,11 @@ func New(
 //   - check if the agent install: if it is no longer valid collect the versioned home and the TTL marker for deletion
 //
 // This function will NOT error out, it will log any errors it encounters as warnings but any error must be treated as non-fatal
-func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource rollbacksSource) {
+func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource ttl.Source) {
 	// Check if we rolled back and update the TTL markers
 	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil && initialUpdateMarker.Details.State == details.StateRollback {
 		// Reset the TTL for the current version if we are coming off a rollback
-		rollbacks, err := rollbackSource.Get()
+		rollbacks, _, err := rollbackSource.GetAll()
 		if err != nil {
 			log.Warnf("Error getting available rollbacks from rollbackSource during startup check: %s", err)
 			return
@@ -477,4 +486,38 @@ func isMissingError(err error) bool {
 		return v.Reason() == ucfg.ErrMissing
 	}
 	return false
+}
+
+// hasEncryptedStandaloneConfigChanged parses the file at pathConfigFile and checks if it has the same contents as storage.DefaultAgentEncryptedStandaloneConfig
+func hasEncryptedStandaloneConfigChanged(log *logger.Logger, pathConfigFile string) bool {
+	embeddedConfig, err := config.NewConfigFrom(storage.DefaultAgentEncryptedStandaloneConfig)
+	if err != nil {
+		log.Errorw("Unable to load embedded defaults as config.", "err", err)
+		return false
+	}
+
+	opts := make([]interface{}, 0, len(config.NoResolveOptions))
+	for _, opt := range config.NoResolveOptions {
+		opts = append(opts, opt)
+	}
+	embeddedMap, err := embeddedConfig.ToMapStr(opts...)
+	if err != nil {
+		log.Errorw("Unable to unpack ebedded defaults as map.", "err", err)
+		return false
+	}
+
+	// reread config file, rawConfig contains injected attributes, not just  the encryption feature flag.
+	fileConfig, err := config.LoadFile(pathConfigFile)
+	if err != nil {
+		log.Errorw("Unable to load file config.", "err", err)
+		return false
+
+	}
+	fileMap, err := fileConfig.ToMapStr(opts...)
+	if err != nil {
+		log.Errorw("Unable to unpack file config as map", "err", err)
+		return false
+	}
+
+	return !reflect.DeepEqual(embeddedMap, fileMap)
 }

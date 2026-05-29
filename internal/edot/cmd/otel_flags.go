@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"go.opentelemetry.io/collector/featuregate"
 
@@ -50,8 +49,8 @@ func SetupOtelFlags(flags *pflag.FlagSet) {
 	flags.AddGoFlagSet(goFlags)
 }
 
-func GetConfigFiles(cmd *cobra.Command, useDefault bool) ([]string, error) {
-	configFiles, err := cmd.Flags().GetStringArray(otelConfigFlagName)
+func GetConfigFiles(flags *pflag.FlagSet, useDefault bool) ([]string, error) {
+	configFiles, err := flags.GetStringArray(otelConfigFlagName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve config flags: %w", err)
 	}
@@ -63,7 +62,7 @@ func GetConfigFiles(cmd *cobra.Command, useDefault bool) ([]string, error) {
 		configFiles = append(configFiles, paths.OtelConfigFile())
 	}
 
-	setVals, err := cmd.Flags().GetStringArray(otelSetFlagName)
+	setVals, err := flags.GetStringArray(otelSetFlagName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve set flags: %w", err)
 	}

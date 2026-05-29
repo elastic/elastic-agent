@@ -82,9 +82,9 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 	return nil, nil
 }
 
-func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper, source availableRollbacksSource, topDir string, now time.Time, rollbackVersion string, markUpgrade markUpgradeFunc, action *fleetapi.ActionUpgrade) (string, string, error) {
+func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, now time.Time, rollbackVersion string, markUpgrade markUpgradeFunc, action *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the available installs
-	availableRollbacks, err := source.Get()
+	availableRollbacks, _, err := source.GetAll()
 	if err != nil {
 		return "", "", fmt.Errorf("retrieving available rollbacks: %w", err)
 	}
@@ -312,10 +312,14 @@ func PreserveActiveUpgradeVersions(marker *UpdateMarker, innerFilter RollbackCle
 // returns true.
 // This function will return the leftover available rollbacks that will survive the cleanup, can be used to schedule another launch
 // of the cleanup in the future
-func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
-	rollbacks, err := source.Get()
+func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
+	rollbacks, malformed, err := source.GetAll()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get available rollbacks: %w", err)
+	}
+	for versionedHome, parseErr := range malformed {
+		log.Infow("TTL marker is unparseable; directory will not be protected from cleanup",
+			"versionedHome", versionedHome, "error.message", parseErr.Error())
 	}
 
 	if len(rollbacks) == 0 {
@@ -347,7 +351,7 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 
 		if filter(log, now, versionedHome, ttlMarker) {
 			log.Debugf("cleaning up rollback in %q", versionedHome)
-			if cleanupErr := install.RemoveBut(versionedHomeAbsPath, true); cleanupErr != nil {
+			if cleanupErr := install.RemoveBut(log, versionedHomeAbsPath, true); cleanupErr != nil {
 				aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing directory %q: %w", versionedHomeAbsPath, cleanupErr))
 			} else {
 				if removeErr := source.Remove(versionedHome); removeErr != nil {
@@ -363,7 +367,7 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 	return leftoverRollbacks, aggregateErr
 }
 
-func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir, currentVersionedHome string, source availableRollbacksSource, minInterval time.Duration) {
+func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir, currentVersionedHome string, source ttl.Source, minInterval time.Duration) {
 	log.Info("starting periodically cleaning rollbacks")
 	timer := time.NewTimer(minInterval)
 	for {
@@ -383,7 +387,7 @@ func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir,
 	}
 }
 
-func performScheduledCleanup(log *logger.Logger, topDir, currentVersionedHome string, source availableRollbacksSource, now time.Time, minInterval time.Duration) time.Time {
+func performScheduledCleanup(log *logger.Logger, topDir, currentVersionedHome string, source ttl.Source, now time.Time, minInterval time.Duration) time.Time {
 	rollbacksAfterCleanup, err := CleanAvailableRollbacks(log, source, topDir, currentVersionedHome, now, CleanupExpiredRollbacks)
 	if err != nil {
 		log.Errorf("error cleaning up rollbacks: %s, rescheduling cleanup in %s", err.Error(), minInterval)

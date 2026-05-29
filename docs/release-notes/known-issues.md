@@ -23,6 +23,70 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} Elastic Agent reports policy is outdated when agent.features.disable_policy_change_acks is enabled.
+**Applies to: {{agent}} 9.4.0, 9.3.4, 9.3.3, 9.3.2, 9.3.1, 9.3.0, 9.2.7, 9.2.6, 9.2.5, 9.2.4, 9.2.3, 9.2.2, 9.2.1, 9.2.0**
+
+On April 22, 2026 a known issue was discovered that prevents {{fleet}}-managed {{agents}} from correctly reporting their policy information when policy change acknowledgements are disabled.
+
+Users see an outdated policy warning on the {{fleet}} UI when policy change acknowledgments are disabled and a policy update is sent.
+
+**Workaround:**
+
+Affected users can uncheck the **Disable policy change acknowledgments** option within the agent policy settings in the Fleet UI.
+
+For more information check [Issue #264983](https://github.com/elastic/kibana/issues/264983).
+:::
+
+:::{dropdown} Events from Beats based integrations in Elastic Agent 9.3.4 incorrectly convert timestamps to an empty {} JSON object.
+**Applies to: {{agent}} 9.3.4**
+
+A performance optimization in Elastic Agent 9.3.4 causes timestamp fields sent from Beats based inputs and integrations to be incorrectly serialized to an empty `{}` JSON object. This does not affect the primary `@timestamp` field, only other timestamps fields in the event body.
+
+The most notable field affected is `event.created` which when missing prevents some features like SentinelOne response actions from functioning as described in [Issue #266355](https://github.com/elastic/kibana/issues/266355). Documents affected will have timestamps like `event.created` set to empty JSON objects as shown in the example below:
+
+```json
+  "event": {
+    "dataset": "sentinel_one.agent",
+    "created": {}
+  }
+```
+
+The performance optimization has been removed and a fix will be available in the next 9.3.5 release. This issue does not affect version 9.4.0.
+:::
+
+:::{dropdown} Elastic Agent 9.3.x fails to start on MacOS when OSQuery Manager integration is used
+**Applies to: {{agent}} 9.3.0, 9.3.1**
+
+On March 5, 2026, a known issue was discovered that prevents {{agent}} 9.3.0 and above from starting when:
+- {{agent}} is installed on MacOS.
+- The OSQuery Manager integration is installed.
+- The host or agent service is restarted.
+
+Users will see error failing with an error containing `lchown /Library/Elastic/Agent/data/elastic-agent-9.3.1-2ec825/components/osquery.app: operation not permitted` in `/Library/Elastic/Agent/co.elastic.elastic-agent.err.log` or other agent logs files:
+
+```json
+{"log.level":"error","@timestamp":"2026-02-25T07:19:14.101Z","log.origin":{"function":"github.com/elastic/elastic-agent/internal/pkg/agent/cmd.logReturn","file.name":"cmd/run.go","file.line":152}, "message":"failed to perform permission changes on path /Library/Elastic/Agent: cannot update ownership of \"/Library/Elastic/Agent\": lchown /Library/Elastic/Agent/data/elastic-agent-9.2.5-df1a8d/components/osquery.app: operation not permitted","log.source":"elastic-agent","ecs.version":"1.6.0"}
+```
+
+Upgrades from a previous version will succeed and Elastic Agent will operate normally until the host reboots or the Elastic Agent service is restarted for another reason.
+
+It will not be possible to collect agent diagnostics. If Elastic Defend is installed, Elastic Agent will show as orphaned.
+
+For more information, check [Issue #13059](https://github.com/elastic/elastic-agent/issues/13059).
+:::
+
+:::{dropdown} Elastic Agent becomes unhealthy when using the warning log level
+**Applies to: {{agent}} 9.3.0**
+
+On January 30th 2026, a known issue was discovered that causes Elastic Agent to become unhealthy with the message
+`Fatal: failed to unpack the log level 'WARN': invalid level 'warn'` when using the warning log level. Self-monitoring data
+and metrics data will fail to be collected.
+
+**Workaround**
+
+Affected users can use any other log level. A fix will be included in 9.3.1. See [Issue #12513](https://github.com/elastic/elastic-agent/issues/12513).
+:::
+
 :::{dropdown} Elastic Agent becomes unhealthy when an Elasticsearch output used for monitoring specifies any list parameter as a string
 **Applies to: {{agent}} 9.2.1, 9.2.2**
 
@@ -106,9 +170,10 @@ This issue is triggered if the upgrade fails during one of the early checks insi
 Restart the {{agent}} to clear the coordinator’s `overrideState` and allow new upgrade attempts to proceed.
 
 **Resolution**
+
 This issue was fixed in [#9992](https://github.com/elastic/elastic-agent/pull/9992), which ensures that the coordinator clears its override state whenever an early failure occurs.
 
-The fix is included in versions 9.1.4 and 8.19.4, and planned for versions 9.0.8 and 8.18.8.
+The fix is included in versions 9.1.4, 9.0.8, 8.19.4, and 8.18.8.
 :::
 
 :::{dropdown} [Windows] {{agent}} does not process Windows security events
@@ -119,9 +184,9 @@ On August 1, 2025, a known issue was discovered where {{agent}} does not process
 
 For more information, check [Issue #45693](https://github.com/elastic/beats/issues/45693).
 
-**Workaround**
+**Resolution**
 
-No workaround is available at the moment, but a fix is expected to be available in {{agent}} 8.19.1 and 9.1.1.
+This issue was fixed in [#45730](https://github.com/elastic/beats/pull/45730). The fix is included in {{agent}} 9.1.1 and 8.19.1.
 :::
 
 :::{dropdown} {{agents}} remain in an "Upgrade scheduled" state

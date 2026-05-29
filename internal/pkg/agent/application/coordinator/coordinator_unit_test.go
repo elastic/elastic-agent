@@ -58,10 +58,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 	pkgcomponent "github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -591,7 +590,7 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 	// and produces a valid AST, but can't be converted into a valid
 	// component model (which we trigger with invalid conditional
 	// expressions). In this case the resulting error should be stored
-	// in Coordinator.componentGenErr, and reported by Coordinator.State.
+	// in Coordinator.componentModelErr, and reported by Coordinator.State.
 
 	// Set a one-second timeout -- nothing here should block, but if it
 	// does let's report a failure instead of timing out the test runner.
@@ -631,7 +630,7 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 	}
 
 	// This configuration produces a valid AST but its EQL condition is
-	// invalid, so its failure should be reported in componentGenErr.
+	// invalid, so its failure should be reported in componentModelErr.
 	cfg := config.MustNewConfigFrom(`
 inputs:
   - type: filestream
@@ -641,8 +640,8 @@ inputs:
 	configChan <- cfgChange
 	coord.runLoopIteration(ctx)
 
-	require.Error(t, coord.componentGenErr)
-	require.Contains(t, coord.componentGenErr.Error(), "rendering inputs failed:")
+	require.Error(t, coord.componentModelErr)
+	require.Contains(t, coord.componentModelErr.Error(), "rendering inputs failed:")
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "Failed component generation should cause failed state")
@@ -660,7 +659,7 @@ inputs:
 	varsChan <- emptyVars(t)
 	coord.runLoopIteration(ctx)
 
-	assert.Error(t, coord.componentGenErr, "Vars update shouldn't affect componentGenErr")
+	assert.Error(t, coord.componentModelErr, "Vars update shouldn't affect componentModelErr")
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "Variable update should not overwrite component generation error")
@@ -677,6 +676,7 @@ inputs:
 	coord.runLoopIteration(ctx)
 
 	assert.NoError(t, coord.configErr, "Valid policy change should clear configErr")
+	assert.NoError(t, coord.componentModelErr, "Valid component model rebuild should clear componentModelErr")
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Healthy, state.State, "Valid policy change should produce healthy state")
@@ -1021,6 +1021,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 				"darwin/amd64",
 				"darwin/arm64",
 				"windows/amd64",
+				"windows/arm64",
 				"container/amd64",
 				"container/arm64",
 			},
@@ -1535,6 +1536,72 @@ func TestCoordinatorReportsOTelManagerUpdateFailure(t *testing.T) {
 	assert.Contains(t, state.Message, errorStr, "Failed policy update should be reported in Coordinator state message")
 }
 
+type ackErrConfigChange struct {
+	cfg *config.Config
+	err error
+}
+
+func (l *ackErrConfigChange) Config() *config.Config { return l.cfg }
+func (l *ackErrConfigChange) Ack() error             { return l.err }
+func (l *ackErrConfigChange) Fail(err error)         {}
+
+func TestCoordinatorReportsConfigChangeAckFailure(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	stateChan := make(chan State, 1)
+	configChan := make(chan ConfigChange, 1)
+
+	coord := &Coordinator{
+		logger:    logger,
+		agentInfo: &info.AgentInfo{},
+		state: State{
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
+		},
+
+		stateBroadcaster: &broadcaster.Broadcaster[State]{InputChan: stateChan},
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+		},
+		runtimeMgr:         &fakeRuntimeManager{},
+		otelMgr:            &fakeOTelManager{},
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+		isManaged:          true,
+	}
+
+	const errorStr = "ack failed for testing reasons"
+	configChan <- &ackErrConfigChange{
+		cfg: config.MustNewConfigFrom(nil),
+		err: errors.New(errorStr),
+	}
+	coord.runLoopIteration(ctx)
+	require.Error(t, coord.actionsErr, "Ack failure should be saved in actionsErr")
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Failed, state.State, "Ack failure should cause failed Coordinator")
+		assert.Contains(t, state.Message, errorStr, "Ack failure should be reported in Coordinator state message")
+	default:
+		assert.Fail(t, "Policy change should cause state update")
+	}
+
+	// A subsequent successful policy change ack should clear actionsErr.
+	configChan <- &configChange{cfg: config.MustNewConfigFrom(nil)}
+	coord.runLoopIteration(ctx)
+
+	assert.NoError(t, coord.actionsErr, "Successful Ack should clear actionsErr")
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Healthy, state.State, "Successful Ack should restore healthy state")
+		assert.Equal(t, state.Message, "Running", "Successful Ack should restore previous state message")
+	default:
+		assert.Fail(t, "Policy change should cause state update")
+	}
+}
+
 func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 	// Make sure:
 	// - An input unit that depends on an undefined variable is not created
@@ -1994,7 +2061,6 @@ func TestCoordinator_FleetServer_SkipsMigration(t *testing.T) {
 }
 
 func TestCoordinator_InitiatesMigration(t *testing.T) {
-	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
 	cfgPath := paths.Config()
 	defer paths.SetConfig(cfgPath)
 
@@ -2155,7 +2221,6 @@ func TestCoordinator_InitiatesMigration(t *testing.T) {
 }
 
 func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
-	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
 	cfgPath := paths.Config()
 	defer paths.SetConfig(cfgPath)
 
@@ -2521,7 +2586,7 @@ func (m *mockUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	return nil, m.upgradeErr
 }
 
@@ -2609,45 +2674,14 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 	logger := logp.NewLogger("testing")
 
-	t.Run("process runtime is not changed", func(t *testing.T) {
-		runtimeCfg := &pkgcomponent.RuntimeConfig{
-			DynamicInputs: "process",
-		}
-		comp := pkgcomponent.Component{
-			ID:             "test-component",
-			RuntimeManager: pkgcomponent.ProcessRuntimeManager,
-			Dynamic:        false,
-		}
-		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
-		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager, "ProcessRuntimeManager should not be changed")
-
-		// Even if dynamic, ProcessRuntimeManager should stay
-		comp.Dynamic = true
-		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
-		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager, "ProcessRuntimeManager should not be changed even when dynamic")
-	})
-
-	t.Run("dynamic otel component switches to process runtime when configured", func(t *testing.T) {
-		runtimeCfg := &pkgcomponent.RuntimeConfig{
-			DynamicInputs: "process",
-		}
-		comp := pkgcomponent.Component{
+	// otelSupportedComponent returns a minimal component that passes
+	// VerifyComponentIsOtelSupported so the dynamic-inputs logic can be
+	// exercised independently.
+	otelSupportedComponent := func(dynamic bool) pkgcomponent.Component {
+		return pkgcomponent.Component{
 			ID:             "test-component",
 			RuntimeManager: pkgcomponent.OtelRuntimeManager,
-			Dynamic:        true,
-		}
-		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
-		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager, "Dynamic OTel component should switch to ProcessRuntimeManager when DynamicInputs is 'process'")
-	})
-
-	t.Run("dynamic otel component stays otel when DynamicInputs is empty", func(t *testing.T) {
-		runtimeCfg := &pkgcomponent.RuntimeConfig{
-			DynamicInputs: "",
-		}
-		comp := pkgcomponent.Component{
-			ID:             "test-component",
-			RuntimeManager: pkgcomponent.OtelRuntimeManager,
-			Dynamic:        true,
+			Dynamic:        dynamic,
 			OutputType:     "elasticsearch",
 			Units: []pkgcomponent.Unit{
 				{
@@ -2659,65 +2693,38 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 				},
 			},
 		}
+	}
+
+	t.Run("no change when DynamicInputs is empty", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{DynamicInputs: ""}
+		comp := otelSupportedComponent(true)
 		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
-		// When DynamicInputs is empty, dynamic components should NOT be switched
-		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager, "Dynamic OTel component should stay as OTel when DynamicInputs is empty")
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager)
 	})
 
-	t.Run("dynamic otel component stays otel when DynamicInputs is otel", func(t *testing.T) {
+	t.Run("no change when component is not dynamic", func(t *testing.T) {
 		runtimeCfg := &pkgcomponent.RuntimeConfig{
-			DynamicInputs: "otel",
+			DynamicInputs: string(pkgcomponent.ProcessRuntimeManager),
 		}
-		comp := pkgcomponent.Component{
-			ID:             "test-component",
-			RuntimeManager: pkgcomponent.OtelRuntimeManager,
-			Dynamic:        true,
-			OutputType:     "elasticsearch",
-			Units: []pkgcomponent.Unit{
-				{
-					ID:   "test-unit",
-					Type: client.UnitTypeOutput,
-					Config: &proto.UnitExpectedConfig{
-						Type: "elasticsearch",
-					},
-				},
-			},
-		}
+		comp := otelSupportedComponent(false)
 		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
-		// When DynamicInputs matches the current runtime, no switch should happen
-		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager, "Dynamic OTel component should stay as OTel when DynamicInputs is 'otel'")
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager)
 	})
 
-	t.Run("non-dynamic otel component stays as otel runtime", func(t *testing.T) {
+	t.Run("dynamic component switches to the configured runtime", func(t *testing.T) {
 		runtimeCfg := &pkgcomponent.RuntimeConfig{
-			DynamicInputs: "process",
+			DynamicInputs: string(pkgcomponent.ProcessRuntimeManager),
 		}
-		// This test verifies the component stays as OTel when:
-		// - RuntimeManager is OtelRuntimeManager
-		// - Dynamic is false
-		// - No unsupported config issues (we're not setting any complex output config)
-		comp := pkgcomponent.Component{
-			ID:             "test-component",
-			RuntimeManager: pkgcomponent.OtelRuntimeManager,
-			Dynamic:        false,
-			OutputType:     "elasticsearch",
-			Units: []pkgcomponent.Unit{
-				{
-					ID:   "test-unit",
-					Type: client.UnitTypeOutput,
-					Config: &proto.UnitExpectedConfig{
-						Type: "elasticsearch",
-					},
-				},
-			},
-		}
+		comp := otelSupportedComponent(true)
 		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
-		// Note: the component may still be switched to ProcessRuntimeManager by
-		// VerifyComponentIsOtelSupported if there are other unsupported features
-		// For this test, we're just verifying the Dynamic flag check
-		// Since there's no error from VerifyComponentIsOtelSupported in this minimal case,
-		// the runtime should stay as OTel unless the translate package rejects it
-		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager, "Non-dynamic OTel component should stay as OTel even when DynamicInputs is 'process'")
+		assert.Equal(t, pkgcomponent.RuntimeManager(runtimeCfg.DynamicInputs), comp.RuntimeManager)
+	})
+
+	t.Run("default configuration switches dynamic otel components to process runtime", func(t *testing.T) {
+		runtimeCfg := pkgcomponent.DefaultRuntimeConfig()
+		comp := otelSupportedComponent(true)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager)
 	})
 }
 

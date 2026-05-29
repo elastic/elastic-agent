@@ -25,21 +25,21 @@ var DefaultCleanPaths = []string{
 	"_meta/kibana/7/index-pattern/{{.BeatName}}.json",
 }
 
-// Clean clean generated build artifacts and caches.
-func Clean(pathLists ...[]string) error {
+// Clean cleans generated build artifacts and caches.
+func Clean(cfg *Settings, pathLists ...[]string) error {
 	if len(pathLists) == 0 {
 		pathLists = [][]string{DefaultCleanPaths}
 	}
 	for _, paths := range pathLists {
 		for _, f := range paths {
-			f = MustExpand(f)
+			f = MustExpand(cfg, f)
 			if err := sh.Rm(f); err != nil {
 				return err
 			}
 		}
 	}
-	if CrossBuildMountBuildCache {
-		return sh.Run("docker", "volume", "rm", "-f", CrossBuildBuildCacheVolumeName)
+	if cfg.CrossBuild.MountBuildCache {
+		return sh.Run("docker", "volume", "rm", "-f", cfg.CrossBuild.BuildCacheVolumeName)
 	}
 	return nil
 }

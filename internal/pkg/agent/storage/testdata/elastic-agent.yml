@@ -1,0 +1,7 @@
+agent:
+  logging:
+    level: debug
+  features:
+    encrypted_config: true
+fleet:
+  enabled: false

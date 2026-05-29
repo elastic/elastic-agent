@@ -22,14 +22,14 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
-	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/scheduler"
 )
 
 // Max number of times an invalid API Key is checked
@@ -80,10 +80,6 @@ type stateStore interface {
 	Action() fleetapi.Action
 }
 
-type rollbacksSource interface {
-	Get() (map[string]ttl.TTLMarker, error)
-}
-
 type FleetGateway struct {
 	log                *logger.Logger
 	client             client.Sender
@@ -97,7 +93,8 @@ type FleetGateway struct {
 	stateFetcher       StateFetcher
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
-	rollbackSource     rollbacksSource
+	rollbackSource     ttl.ReadOnlySource
+	compression        string
 }
 
 // New creates a new fleet gateway
@@ -109,12 +106,12 @@ func New(
 	stateStore stateStore,
 	stateFetcher StateFetcher,
 	cfg *configuration.FleetCheckin,
-	source rollbacksSource,
+	source ttl.ReadOnlySource,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
 	st.Backoff = getBackoffSettings(cfg)
-	return newFleetGatewayWithScheduler(
+	gw, err := newFleetGatewayWithScheduler(
 		log,
 		st,
 		agentInfo,
@@ -125,6 +122,11 @@ func New(
 		stateFetcher,
 		source,
 	)
+	if err != nil {
+		return nil, err
+	}
+	gw.compression = cfg.GetCompression()
+	return gw, nil
 }
 
 func newFleetGatewayWithScheduler(
@@ -136,7 +138,7 @@ func newFleetGatewayWithScheduler(
 	acker acker.Acker,
 	stateStore stateStore,
 	stateFetcher StateFetcher,
-	source rollbacksSource,
+	source ttl.ReadOnlySource,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
 		log:            log,
@@ -399,15 +401,19 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	// Fix loglevel with the current log level used by coordinator
 	ecsMeta.Elastic.Agent.LogLevel = state.LogLevel.String()
 
-	action := f.stateStore.Action()
-	agentPolicyID := getPolicyID(action)
-	policyRevisionIDX := getPolicyRevisionIDX(action)
+	var (
+		agentPolicyID     string
+		policyRevisionIDX int64
+	)
+	if pc, ok := f.stateStore.Action().(*fleetapi.ActionPolicyChange); ok && pc != nil {
+		agentPolicyID = pc.PolicyID()
+		policyRevisionIDX = pc.PolicyRevisionIDX()
+	}
 
 	// get available rollbacks
-	rollbacks, err := f.rollbackSource.Get()
+	rollbacks, _, err := f.rollbackSource.GetAll()
 	if err != nil {
 		f.log.Warnf("error getting available rollbacks: %s", err.Error())
-		// this should already be nil but let's make sure that we don't include rollbacks in checkin body when encountering errors
 		rollbacks = nil
 	}
 
@@ -427,7 +433,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// checkin
-	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
+	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client, f.compression)
 	req := &fleetapi.CheckinRequest{
 		AckToken:          ackToken,
 		Metadata:          ecsMeta,
@@ -525,46 +531,6 @@ func RequestBackoff(done <-chan struct{}) backoff.Backoff {
 		defaultFleetBackoffSettings.Init,
 		defaultFleetBackoffSettings.Max,
 	)
-}
-
-// getPolicyID will check that the passed action is a POLICY_CHANGE action and return the policy_id attribute of the policy as a string.
-func getPolicyID(action fleetapi.Action) string {
-	policyChange, ok := action.(*fleetapi.ActionPolicyChange)
-	if !ok {
-		return ""
-	}
-	v, ok := policyChange.Data.Policy["policy_id"]
-	if !ok {
-		return ""
-	}
-	vv, ok := v.(string)
-	if !ok {
-		return ""
-	}
-	return vv
-}
-
-// getPolicyRevisionIDX will check that the passed action is a POLICY_CHANGE action and return the policy_revision_idx attribute of the policy as an int64.
-// The function will attempt to convert the attribute to int64 if int or float64 is used in order to prevent issues from serialization.
-func getPolicyRevisionIDX(action fleetapi.Action) int64 {
-	policyChange, ok := action.(*fleetapi.ActionPolicyChange)
-	if !ok {
-		return 0
-	}
-	v, ok := policyChange.Data.Policy["policy_revision_idx"]
-	if !ok {
-		return 0
-	}
-	switch vv := v.(type) {
-	case int64:
-		return vv
-	case int:
-		return int64(vv)
-	case float64:
-		return int64(vv)
-	default:
-		return 0
-	}
 }
 
 var errComponentStateChanged = errors.New("error component state changed")

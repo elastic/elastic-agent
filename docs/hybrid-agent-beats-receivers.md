@@ -4,8 +4,7 @@ This page provides a brief overview of the Beat receivers and Hybrid Agent proje
 These are part of Elastic's larger effort to base data collection on OpenTelemetry technologies. For more context, see
 https://www.elastic.co/observability-labs/blog/elastic-agent-pivot-opentelemetry. This document does not aim to be a
 comprehensive explanation of beat receivers or hybrid agent as concepts, it is only a brief overview along with
-testing instructions. Beat receivers and hybrid agent capabilities are available starting with the 9.1.0 and 8.19.0
-releases at a technical preview level and are not enabled or used by default.
+testing instructions.
 
 ## Beat Receivers
 
@@ -19,9 +18,12 @@ is currently gated by a feature flag.
 
 ### Beat Receivers for Agent Monitoring
 
-The first part of the Elastic Agent configuration that will run as Beat receivers
-by default will be the self-monitoring functionality. To use Beat receivers for self-monitoring set the
-`_runtime_experimental: "otel"` feature flag in the `agent.monitoring` section of the configuration:
+The first part of the Elastic Agent configuration that was converted to run as Beat receivers
+by default was  the self-monitoring functionality. To use Beat receivers for self-monitoring set the
+`_runtime_experimental: "otel"` feature flag in the `agent.monitoring` section of the configuration as shown below.
+This setting is available as a toggle in the Fleet UI as part of the agent policy advanced settings and via the
+`AGENT_MONITORING_RUNTIME_EXPERIMENTAL` environment variable in the Elastic Agent container images.
+The "otel" runtime is the default for self-monitoring as of 9.2.1.
 
 ```yaml
 agent.monitoring:
@@ -31,21 +33,10 @@ agent.monitoring:
   _runtime_experimental: otel
 ```
 
-This setting will be available as a toggle in the Fleet UI as part of the agent policy advanced settings once
-https://github.com/elastic/kibana/issues/233186 is implemented. Before that change is implemented, the agent policy
-overrides API can be used to add `_runtime_experimental: "otel"` to the `agent.monitoring` section of the policy.
-See https://support.elastic.dev/knowledge/view/06b69893 for details on the policy overrides API.
-
-For the Elastic Agent container images, the `AGENT_MONITORING_RUNTIME_EXPERIMENTAL` environment variable can be set to either `process` or `otel` to override the default runtime used for agent monitoring.
-
-Executing the `elastic-agent diagnostics` command in this mode will now produce an `otel-final.yml` file showing the generated
-collector configuration used to run the Beat receivers.
-
 ### Beat Receivers for Data Collection
 
-The capability to use Beat receivers is being enabled on per Beat and per input type basis. At the time of writing (August 2025),
-Filebeat and Metricbeat can run as receivers and both the `filestream` and `system/metrics` inputs work outside of
-monitoring use cases.
+The capability to use Beat receivers is being enabled on per Beat and per input type basis. As of 9.4.0 all Metricbeat inputs run as
+beats receivers by default, and all other beat inputs are capable of being run as beats receivers.
 
 With the changes in https://github.com/elastic/elastic-agent/pull/11186 a new `agent.internal.runtime` section allows controlling
 the default runtime where `otel` indicates the input should run as a receiver. The default can be controlled on a per Beat and per
@@ -87,6 +78,24 @@ outputs:
     api_key: placeholder
 ```
 
+With changes in https://github.com/elastic/elastic-agent/pull/12852, user can also control the runtime of the inputs based on output type.
+This can be done by setting `agent.internal.runtime.output.[output_type]` to `otel` or `process`. For example, below config would override all inputs used with elasticsearch output to use otel runtime
+
+```yaml
+agent:
+  internal:
+    runtime:
+      default: process
+      filebeat:
+        filestream: otel
+      metricbeat:
+        system/metrics: otel
+      output: # Override the runtime used based on the output type.
+        elasticsearch: otel # Force all inputs using the Elasticearch output to use the otel runtime
+        logstash: process # Force all inputs using the Logstash output to use the process runtime
+        kafka: process # Force all inputs using the kafka output to use the process runtime
+```
+
 ### Configuration Translation Overrides
 
 When an input is executed as a Beat receiver, it is injected into an OpenTelemetry collector pipeline that was
@@ -112,6 +121,25 @@ outputs:
           timeout: "60s" # Override the connection timeout from the translated value.
       exporter:
         include_source_on_error: false # Override the generated value of include_source_on_error.
+```
+
+Overrides can also be used to adjust batching behavior in the Elasticsearch exporter. By default, batching uses an items sizer that limits only the number of events per batch. In rare cases, very large events may cause batches to become unbalanced, allowing the total request size to exceed Elasticsearch limits and resulting in 413 (Request Entity Too Large) errors.
+
+To avoid this, the batching strategy can be configured to use a bytes sizer so that batches are constrained by their total size:
+
+```yaml
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+    api_key: "example-key"
+    otel:
+      exporter:
+        sending_queue:
+          batch:
+            min_size: 1e+6 # 1MB
+            max_size: 5e+6 # 5MB
+            sizer: bytes
 ```
 
 ## Hybrid Agent
@@ -250,21 +278,21 @@ service:
 
 ### Beats receivers delivery guarantees in OTel mode
 
-When Beat receivers are used in OTel mode, event delivery guarantees depend on the configuration of the OpenTelemetry Collector `sending_queue` and retry settings.  
-Unlike standalone Beats, the EDOT pipeline allows users to customize queue behavior through the Collector configuration.  
+When Beat receivers are used in OTel mode, event delivery guarantees depend on the configuration of the OpenTelemetry Collector `sending_queue` and retry settings.
+Unlike standalone Beats, the EDOT pipeline allows users to customize queue behavior through the Collector configuration.
 This flexibility is useful, but it also means that not every option combination is compatible with reliable delivery.
 
-Elastic Agent in OTel mode provides an **at least once** delivery guarantee for Beat receivers **only when using the supported `sending_queue` settings described below**.  
+Elastic Agent in OTel mode provides an **at least once** delivery guarantee for Beat receivers **only when using the supported `sending_queue` settings described below**.
 These settings mirror Beats pipeline behavior closely enough to preserve durability expectations.
 
-If users provide arbitrary `sending_queue` or Beat queue overrides, delivery semantics become **undefined** and **at least once delivery cannot be guaranteed**.  
+If users provide arbitrary `sending_queue` or Beat queue overrides, delivery semantics become **undefined** and **at least once delivery cannot be guaranteed**.
 These combinations are not tested and may result in event loss during backpressure or shutdown.
 
 To achieve the intended delivery guarantee, the exporter that receives events from Beat receivers must define a `sending_queue` with the following characteristics:
 
-- `enabled: true`: The queue must be active.  
-- `wait_for_result: true`: The pipeline must wait for the exporter response before removing events.  
-- `block_on_overflow: true`: Prevents event drops when the queue is full.  
+- `enabled: true`: The queue must be active.
+- `wait_for_result: true`: The pipeline must wait for the exporter response before removing events.
+- `block_on_overflow: true`: Prevents event drops when the queue is full.
 - The `batch` configuration must include explicit `max_size`, `min_size`, and `flush_timeout` values to ensure events are grouped and flushed in predictable, controlled batches.
 
 Additionally, the retry settings must be enabled on the exporter, using a backoff policy that retries until the operation succeeds. By default, `max_retries` is set to 3, which is how most Beats behave. Standalone Filebeat, however, retries indefinitely. Beats receivers don't support unlimited retries yet, and this is being tracked at https://github.com/elastic/beats/issues/47892.

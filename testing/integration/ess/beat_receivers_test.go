@@ -21,21 +21,20 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
-	"github.com/elastic/go-elasticsearch/v8"
-
 	"github.com/gofrs/uuid/v5"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 
 	"github.com/stretchr/testify/assert"
@@ -142,6 +141,47 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		},
 	}
 
+	// otelTests mirrors the classic tests but replaces the per-component beat stats test cases
+	// (elastic_agent.filebeat, elastic_agent.metricbeat) with their OTel equivalents.
+	// In OTel mode there is no beat/metrics-monitoring component doing unix-socket scraping,
+	// so per-component beat stats are not written to those datasets. Instead the
+	// elasticmonitoringreceiver collects OTel internal telemetry and emits:
+	//   - per-exporter stats into elastic_agent.elastic_agent (component.id varies per exporter;
+	//     the test below checks "elasticsearch-monitoring", the default monitoring exporter)
+	//   - per-receiver pipeline metrics into elastic_agent.elastic_agent (component.id: <receiver component>)
+	otelTests := []test{
+		// logs: identical to classic
+		tests[0],
+		// beat stats in OTel mode: exporter-level stats collected via OTel internal telemetry.
+		// In OTel mode the elasticmonitoringreceiver aggregates OTel exporter metrics and writes
+		// them to elastic_agent.elastic_agent with component.id set to the exporter name.
+		{
+			dsType:    "metrics",
+			dsDataset: "elastic_agent.elastic_agent",
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "stats"}},
+				{"match_phrase": map[string]any{"component.id": "elasticsearch-monitoring"}},
+				{"exists": map[string]any{"field": "beat.stats.libbeat.output.events.acked"}},
+			},
+			onlyCompareKeys: true,
+		},
+		// agent process metrics: identical to classic
+		tests[3],
+		// filebeat input metrics: in OTel mode the elasticmonitoringreceiver emits per-input
+		// metrics with metricset.name "stats" (from its event template), not "json" which is
+		// what the classic http/metrics-monitoring metricbeat uses when scraping /inputs/.
+		{
+			dsType:          "metrics",
+			dsDataset:       "elastic_agent.filebeat_input",
+			onlyCompareKeys: true,
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "stats"}},
+				{"match_phrase": map[string]any{"component.id": "filestream-monitoring"}},
+				{"exists": map[string]any{"field": "filebeat_input.bytes_processed_total"}},
+			},
+		},
+	}
+
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Privileged:     true,
@@ -188,9 +228,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	require.NoError(t, err, "error reading policy response")
 	defer resp.Body.Close()
 
-	apiKeyResponse, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
+	apiKeyResponse := createESApiKey(t, info.ESClient)
 	apiKey, err := getDecodedApiKey(apiKeyResponse)
 	require.NoError(t, err, "error decoding api key")
 
@@ -322,11 +360,11 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		var statusErr error
 		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 3)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 2)
 	}, 1*time.Minute, 1*time.Second)
 
 	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
-	for _, tc := range tests {
+	for _, tc := range otelTests {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 			defer findCancel()
@@ -365,22 +403,15 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	combinedOutput, err = beatReceiverFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 
-	// 7. Compare both documents are equivalent
-	for _, tc := range tests[:3] {
+	// 7. Compare both documents are equivalent.
+	// Only test cases that produce the same dataset/shape in both modes are compared here.
+	// Beat stats (elastic_agent.filebeat, elastic_agent.metricbeat) are not comparable: in classic
+	// mode they come from unix-socket scraping per component, while in OTel mode the
+	// elasticmonitoringreceiver writes aggregated exporter stats into elastic_agent.elastic_agent.
+	for _, tc := range tests[:1] {
 		agent := agentDocs[tc.dsType+"-"+tc.dsDataset+"-"+processNamespace].Hits.Hits[0].Source
 		otel := otelDocs[tc.dsType+"-"+tc.dsDataset+"-"+receiverNamespace].Hits.Hits[0].Source
-		ignoredFields := []string{
-			// Expected to change between agentDocs and OtelDocs
-			"@timestamp",
-			"agent.ephemeral_id",
-			// agent.id is different because it's the id of the underlying beat
-			"agent.id",
-			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
-			"agent.version",
-			"data_stream.namespace",
-			"elastic_agent.id",
-			"event.ingested",
-		}
+		ignoredFields := append(RuntimeComparisonIgnoredFields, "data_stream.namespace")
 		switch tc.onlyCompareKeys {
 		case true:
 			AssertMapstrKeysEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), "expected document keys to be equal for "+tc.dsType+"-"+tc.dsDataset)
@@ -402,6 +433,50 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	zeroDifferingFields(&agentStatus)
 	zeroDifferingFields(&otelStatus)
 	assert.Equal(t, agentStatus, otelStatus, "expected agent status to be equal to otel status")
+
+	// Make sure we haven't transferred any logs that are supposed to be dropped
+	findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer findCancel()
+	rawQuery := map[string]any{
+		"query": map[string]any{
+			"bool": map[string]any{
+				"filter": []map[string]any{
+					{
+						"terms": map[string]any{
+							"data_stream.namespace": []string{processNamespace, receiverNamespace},
+						},
+					},
+				},
+				"must": []map[string]any{
+					{
+						"bool": map[string]any{
+							"should": []map[string]any{
+								{
+									"match_phrase": map[string]any{
+										"message": "Non-zero metrics in the last",
+									},
+								},
+								{
+									"match_phrase": map[string]any{
+										"message": "Collector internal telemetry metrics updated",
+									},
+								},
+								{
+									"match_phrase": map[string]any{
+										"message": "No non-zero metrics in the last",
+									},
+								},
+							},
+							"minimum_should_match": 1,
+						},
+					},
+				},
+			},
+		},
+	}
+	docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, "logs-*", info.ESClient)
+	require.NoError(t, err)
+	require.Equal(t, 0, docs.Hits.Total.Value)
 }
 
 // TestAgentMetricsInput is a test that compares documents ingested by
@@ -462,9 +537,7 @@ outputs:
 
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 
 	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
 	require.NoError(t, err, "error decoding api key")
@@ -578,34 +651,7 @@ outputs:
 		otelDocs := esDocs["otel"]
 
 		// Fields that are present in both agent and otel documents, but are expected to change
-		ignoredFields := []string{
-			"@timestamp",
-			"agent.id",
-			"agent.ephemeral_id",
-			"elastic_agent.id",
-			"data_stream.namespace",
-			"event.ingested",
-			"event.duration",
-
-			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
-			"agent.version",
-		}
-
-		stripNondeterminism := func(m mapstr.M, mset string) {
-			// These metrics will change from run to run
-			prefixes := []string{
-				fmt.Sprintf("system.%s", mset),
-				fmt.Sprintf("host.%s", mset),
-			}
-
-			for k := range m {
-				for _, prefix := range prefixes {
-					if strings.HasPrefix(k, prefix) {
-						m[k] = nil
-					}
-				}
-			}
-		}
+		ignoredFields := append(RuntimeComparisonIgnoredFields, "data_stream.namespace", "event.duration")
 
 		testCases := []struct {
 			metricset     string
@@ -669,14 +715,31 @@ outputs:
 					}
 				})
 
-				stripNondeterminism(agentDoc, tt.metricset)
-				stripNondeterminism(otelDoc, tt.metricset)
+				StripNondeterminism(agentDoc, tt.metricset)
+				StripNondeterminism(otelDoc, tt.metricset)
 
 				AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for metricset "+tt.metricset)
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+tt.metricset)
 			})
 		}
 	})
+}
+
+// stripNondeterminism strips fields that are expected to change for system/metrics documents
+func StripNondeterminism(m mapstr.M, mset string) {
+	// These metrics will change from run to run
+	prefixes := []string{
+		fmt.Sprintf("system.%s", mset),
+		fmt.Sprintf("host.%s", mset),
+	}
+
+	for k := range m {
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(k, prefix) {
+				m[k] = nil
+			}
+		}
+	}
 }
 
 // TestBeatsReceiverLogs is a test that compares logs emitted by beats processes to those emitted by beats receivers.
@@ -831,10 +894,10 @@ func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
 		Stack: nil,
 	})
 
-	config := `agent.logging.to_stderr: true
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
+	config := fmt.Sprintf(`agent.logging.to_stderr: true
 agent.logging.to_files: false
-agent.internal.runtime.metricbeat:
-  system/metrics: otel
 inputs:
   - type: system/metrics
     id: unique-system-metrics-input
@@ -844,25 +907,20 @@ inputs:
   - type: system/metrics
     id: unique-system-metrics-input-2
     use_output: supported
-    _runtime_experimental: otel
     streams:
       - metricsets:
         - cpu
 outputs:
   default:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [%s]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
-    status_reporting:
-      enabled: false
   supported:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [%s]
     api_key: placeholder
-    status_reporting:
-      enabled: false
-`
+`, esURL.Host, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
@@ -906,7 +964,7 @@ outputs:
 	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
 	require.NoError(t, err)
 
-	// verify we've logged a warning about using the process runtime
+	// verify we've logged a message about using the process runtime
 	var unsupportedLogRecords []map[string]any
 	var monitoringOutputUnsupportedLogRecord map[string]any
 	for _, line := range strings.Split(string(logsBytes), "\n") {
@@ -959,7 +1017,9 @@ func TestBeatsReceiverDynamicInputProcessRuntimeFallback(t *testing.T) {
 		Stack: nil,
 	})
 
-	config := `agent.logging.to_stderr: true
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
+	config := fmt.Sprintf(`agent.logging.to_stderr: true
 agent.logging.to_files: false
 agent.monitoring.enabled: false
 agent.internal.runtime.dynamic_inputs: process
@@ -972,16 +1032,14 @@ inputs:
 outputs:
   default:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [%s]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 providers:
   local_dynamic:
     items:
     - vars:
         id: system-metrics-1
-`
+`, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
@@ -1062,13 +1120,15 @@ func TestBeatsReceiverSubcomponentStatus(t *testing.T) {
 		Stack: nil,
 	})
 
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
 	// This configuration contains two system/metrics inputs, each with two identical metricsets:
 	// * one for cpu, always healthy
 	// * one for processes, can't read data for some processes if not running as root
 	// The second metricset will emit a message about not being able to read process data. For the first input, this
 	// results in a Healthy status, but the second input is configured to become degraded in that case. The test
 	// verifies both of these conditions.
-	config := `agent:
+	config := fmt.Sprintf(`agent:
   logging:
     to_stderr: true
     to_files: false
@@ -1113,11 +1173,9 @@ outputs:
   default:
     api_key: placeholder
     hosts:
-    - 127.0.0.1:9200
+    - %s
     type: elasticsearch
-    status_reporting:
-      enabled: false
-`
+`, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
@@ -1365,7 +1423,7 @@ func getBeatStartLogRecords(logs string) []map[string]any {
 			continue
 		}
 
-		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Beat name:") {
+		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Starting metrics logging") {
 			logRecords = append(logRecords, mapstr.M(logRecord).Flatten())
 		}
 	}
@@ -1394,7 +1452,6 @@ func genIgnoredFields(goos string) []string {
 
 // TestSensitiveLogsESExporter tests sensitive logs from ex-exporter are not sent to fleet
 func TestSensitiveLogsESExporter(t *testing.T) {
-
 	// The ES exporter logs the original document on indexing failure only if
 	// the "telemetry::log_failed_docs_input" setting is enabled and the log level is set to debug.
 	info := define.Require(t, define.Requirements{
@@ -1435,9 +1492,7 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 
@@ -1570,7 +1625,7 @@ agent.logging.stderr: true
 	findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer findCancel()
 
-	docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, "logs-elastic_agent*", map[string]interface{}{
+	docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, "logs-elastic_agent*", map[string]any{
 		"log.type": "event",
 	})
 
@@ -1618,9 +1673,7 @@ func TestSensitiveIncludeSourceOnError(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 
@@ -1723,7 +1776,6 @@ agent.logging.stderr: true
 	// assert that error.reason is not part of monitoring logs
 	inputField := monitoringDoc.Hits.Hits[0].Source["error.reason"]
 	assert.Nil(t, inputField)
-
 }
 
 // setStrictMapping takes es client and index name
@@ -1731,12 +1783,12 @@ agent.logging.stderr: true
 // Useful to reproduce mapping conflicts required for testing
 func setStrictMapping(client *elasticsearch.Client, index string) error {
 	// Define the body
-	body := map[string]interface{}{
+	body := map[string]any{
 		"index_patterns": []string{index + "*"},
-		"template": map[string]interface{}{
-			"mappings": map[string]interface{}{
+		"template": map[string]any{
+			"mappings": map[string]any{
 				"dynamic": "strict",
-				"properties": map[string]interface{}{
+				"properties": map[string]any{
 					"@timestamp": map[string]string{"type": "date"},
 					"message":    map[string]string{"type": "integer"}, // we set message type to integer to cause mapping conflict
 				},
@@ -1944,7 +1996,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	healthCheck(ctx,
 		"Everything is ready. Begin running and processing data.",
 		component.OtelRuntimeManager,
-		3,
+		2,
 		otelTimestamp)
 
 	// restart 3 times, checks path definition is stable
@@ -1959,7 +2011,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		healthCheck(ctx,
 			"Everything is ready. Begin running and processing data.",
 			component.OtelRuntimeManager,
-			3,
+			2,
 			restartTimestamp)
 	}
 

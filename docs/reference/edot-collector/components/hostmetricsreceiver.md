@@ -2,11 +2,9 @@
 navigation_title: Host metrics receiver
 description: The host metrics receiver is an OpenTelemetry Collector component that collects system-level metrics from the host machine.
 applies_to:
-  stack:
+  stack: ga
   serverless:
-    observability:
-  product:
-    edot_collector:
+    observability: ga
 products:
   - id: elastic-agent
   - id: observability

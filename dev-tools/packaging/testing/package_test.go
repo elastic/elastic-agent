@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -54,16 +53,19 @@ const (
 )
 
 var (
-	excludedPathsPattern    = regexp.MustCompile(`node_modules`)
-	configFilePattern       = regexp.MustCompile(`.*beat\.spec.yml$|.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$$`)
-	otelcolScriptPattern    = regexp.MustCompile(`/otelcol$`)
-	manifestFilePattern     = regexp.MustCompile(`manifest.yml`)
-	modulesDirPattern       = regexp.MustCompile(`module/.+`)
-	modulesDDirPattern      = regexp.MustCompile(`modules.d/$`)
-	modulesDFilePattern     = regexp.MustCompile(`modules.d/.+`)
-	monitorsDFilePattern    = regexp.MustCompile(`monitors.d/.+`)
-	systemdUnitFilePattern  = regexp.MustCompile(`/lib/systemd/system/.*\.service`)
-	hintsInputsDFilePattern = regexp.MustCompile(`usr/share/elastic-agent/hints.inputs.d/.*\.yml`)
+	excludedPathsPattern        = regexp.MustCompile(`node_modules`)
+	configFilePattern           = regexp.MustCompile(`.*beat\.spec.yml$|.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$$`)
+	otelcolScriptPattern        = regexp.MustCompile(`/otelcol$`)
+	manifestFilePattern         = regexp.MustCompile(`manifest.yml`)
+	modulesDirPattern           = regexp.MustCompile(`module/.+`)
+	modulesDDirPattern          = regexp.MustCompile(`modules.d/$`)
+	modulesDFilePattern         = regexp.MustCompile(`modules.d/.+`)
+	monitorsDFilePattern        = regexp.MustCompile(`monitors.d/.+`)
+	systemdUnitFilePattern      = regexp.MustCompile(`/lib/systemd/system/.*\.service`)
+	hintsInputsDFilePattern     = regexp.MustCompile(`usr/share/elastic-agent/hints.inputs.d/.*\.yml`)
+	otelSamplesFilePattern      = regexp.MustCompile(`otel_samples/.+[^/]$`)
+	otelCollectorSpecPattern    = regexp.MustCompile(`elastic-otel-collector\.spec\.yml$`)
+	endpointResourcesZipPattern = regexp.MustCompile(`endpoint-security-resources\.zip$`)
 
 	licenseFiles = []string{"LICENSE.txt", "NOTICE.txt"}
 )
@@ -168,7 +170,7 @@ func TestDocker(t *testing.T) {
 		}
 
 		// sort the built variants by size
-		variantOrderBySize := slices.Collect(maps.Keys(builtVariantSizes))
+		variantOrderBySize := slices.Clone(builtVariantsExpectedOrder)
 		sort.SliceStable(variantOrderBySize, func(i, j int) bool {
 			return builtVariantSizes[variantOrderBySize[i]] < builtVariantSizes[variantOrderBySize[j]]
 		})
@@ -198,6 +200,9 @@ func checkRPM(t *testing.T, file string) {
 	checkMonitorsDPresent(t, "/etc", p)
 	checkLicensesPresent(t, "/usr/share", p)
 	checkSystemdUnitPermissions(t, p)
+	checkFilePermissions(t, p, otelSamplesFilePattern, expectedManifestMode)
+	checkFilePermissions(t, p, otelCollectorSpecPattern, expectedManifestMode)
+	checkFilePermissions(t, p, endpointResourcesZipPattern, expectedManifestMode)
 	ensureNoBuildIDLinks(t, p)
 }
 
@@ -220,6 +225,9 @@ func checkDeb(t *testing.T, file string, buf *bytes.Buffer) {
 	checkModulesOwner(t, p, true)
 	checkModulesPermissions(t, p)
 	checkSystemdUnitPermissions(t, p)
+	checkFilePermissions(t, p, otelSamplesFilePattern, expectedManifestMode)
+	checkFilePermissions(t, p, otelCollectorSpecPattern, expectedManifestMode)
+	checkFilePermissions(t, p, endpointResourcesZipPattern, expectedManifestMode)
 }
 
 func checkTar(t *testing.T, file string, fipsCheck bool) {
@@ -236,6 +244,9 @@ func checkTar(t *testing.T, file string, fipsCheck bool) {
 	checkModulesDPresent(t, "", p)
 	checkModulesPermissions(t, p)
 	checkModulesOwner(t, p, true)
+	checkFilePermissions(t, p, otelSamplesFilePattern, expectedManifestMode)
+	checkFilePermissions(t, p, otelCollectorSpecPattern, expectedManifestMode)
+	checkFilePermissions(t, p, endpointResourcesZipPattern, expectedManifestMode)
 	checkLicensesPresent(t, "", p)
 
 	// extract archive in a temporary directory
@@ -267,6 +278,9 @@ func checkZip(t *testing.T, file string) {
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
 	checkModulesPermissions(t, p)
+	checkFilePermissions(t, p, otelSamplesFilePattern, expectedManifestMode)
+	checkFilePermissions(t, p, otelCollectorSpecPattern, expectedManifestMode)
+	checkFilePermissions(t, p, endpointResourcesZipPattern, expectedManifestMode)
 	checkLicensesPresent(t, "", p)
 
 	// extract archive in a temporary directory
@@ -437,12 +451,15 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 	checkDockerEntryPoint(t, p, info)
 	checkDockerLabels(t, p, info, file)
 	checkDockerUser(t, p, info, *rootUserContainer)
-	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
+	checkRequiredFilePermissions(t, p, configFilePattern, os.FileMode(0644))
 	if !fipsPackage {
 		// FIPS docker image do not contain an otelcol script, run this check only on non FIPS-capable images
-		checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
+		checkRequiredFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
 	}
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
+	checkFilePermissions(t, p, otelSamplesFilePattern, expectedManifestMode)
+	checkFilePermissions(t, p, otelCollectorSpecPattern, expectedManifestMode)
+	checkFilePermissions(t, p, endpointResourcesZipPattern, expectedManifestMode)
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
 	checkHintsInputsD(t, "hints.inputs.d", hintsInputsDFilePattern, p)
@@ -490,9 +507,12 @@ func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
 	checkDockerEntryPoint(t, p, info)
 	checkDockerLabels(t, p, info, file)
 	checkDockerUser(t, p, info, *rootUserContainer)
-	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
-	checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
+	checkRequiredFilePermissions(t, p, configFilePattern, os.FileMode(0644))
+	checkRequiredFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
+	checkFilePermissions(t, p, otelSamplesFilePattern, expectedManifestMode)
+	checkFilePermissions(t, p, otelCollectorSpecPattern, expectedManifestMode)
+	checkFilePermissions(t, p, endpointResourcesZipPattern, expectedManifestMode)
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
 	checkLicensesPresent(t, "licenses/", p)
@@ -517,22 +537,30 @@ func checkCompleteDocker(t *testing.T, file string) {
 
 // Verify that the main configuration file is installed with a 0600 file mode.
 func checkConfigPermissions(t *testing.T, p *packageFile) {
-	checkFilePermissions(t, p, configFilePattern, expectedConfigMode)
+	checkRequiredFilePermissions(t, p, configFilePattern, expectedConfigMode)
 }
 
-func checkFilePermissions(t *testing.T, p *packageFile, configPattern *regexp.Regexp, expectedMode os.FileMode) {
-	t.Run("file permissions", func(t *testing.T) {
-		for _, entry := range p.Contents {
-			if configPattern.MatchString(entry.File) {
-				mode := entry.Mode.Perm()
-				if expectedMode != mode {
-					t.Errorf("file %v has wrong permissions: expected=%v actual=%v",
-						entry.File, expectedMode, mode)
-				}
-				return
+func checkFilePermissions(t *testing.T, p *packageFile, pattern *regexp.Regexp, expectedMode os.FileMode) int {
+	t.Helper()
+	matched := 0
+	for _, entry := range p.Contents {
+		if pattern.MatchString(entry.File) {
+			matched++
+			mode := entry.Mode.Perm()
+			if expectedMode != mode {
+				t.Errorf("file %v has wrong permissions: expected=%v actual=%v",
+					entry.File, expectedMode, mode)
 			}
 		}
-		t.Errorf("no config file found matching %v", configPattern)
+	}
+	return matched
+}
+
+func checkRequiredFilePermissions(t *testing.T, p *packageFile, pattern *regexp.Regexp, expectedMode os.FileMode) {
+	t.Run("file permissions", func(t *testing.T) {
+		if matched := checkFilePermissions(t, p, pattern, expectedMode); matched == 0 {
+			t.Errorf("no file found matching %v", pattern)
+		}
 	})
 }
 
@@ -568,15 +596,7 @@ func checkManifestPermissions(t *testing.T, p *packageFile) {
 
 func checkManifestPermissionsWithMode(t *testing.T, p *packageFile, expectedMode os.FileMode) {
 	t.Run("manifest file permissions", func(t *testing.T) {
-		for _, entry := range p.Contents {
-			if manifestFilePattern.MatchString(entry.File) {
-				mode := entry.Mode.Perm()
-				if expectedMode != mode {
-					t.Errorf("file %v has wrong permissions: expected=%v actual=%v",
-						entry.File, expectedMode, mode)
-				}
-			}
-		}
+		checkFilePermissions(t, p, manifestFilePattern, expectedMode)
 	})
 }
 
@@ -623,22 +643,11 @@ func checkModulesOwner(t *testing.T, p *packageFile, expectRoot bool) {
 	})
 }
 
-// Verify that the systemd unit file has a mode of 0644. It should not be
-// executable.
 func checkSystemdUnitPermissions(t *testing.T, p *packageFile) {
-	const expectedMode = os.FileMode(0644)
 	t.Run("systemd unit file permissions", func(t *testing.T) {
-		for _, entry := range p.Contents {
-			if systemdUnitFilePattern.MatchString(entry.File) {
-				mode := entry.Mode.Perm()
-				if expectedMode != mode {
-					t.Errorf("file %v has wrong permissions: expected=%v actual=%v",
-						entry.File, expectedMode, mode)
-				}
-				return
-			}
+		if matched := checkFilePermissions(t, p, systemdUnitFilePattern, os.FileMode(0644)); matched == 0 {
+			t.Errorf("no systemd unit file found matching %v", systemdUnitFilePattern)
 		}
-		t.Errorf("no systemd unit file found matching %v", configFilePattern)
 	})
 }
 

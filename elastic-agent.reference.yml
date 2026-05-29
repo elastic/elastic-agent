@@ -91,6 +91,9 @@ inputs:
 
 # fleet:
 #   access_api_key: ""
+#   checkin:
+#     # compression sets the compression algorithm for checkin requests one of ["gzip", "none"] (default: "gzip").
+#     compression: gzip
 #   kibana:
 #     # kibana minimal configuration
 #     hosts: ["localhost:5601"]
@@ -250,6 +253,10 @@ inputs:
 #agent.features:
 #  fqdn:
 #    enabled: false
+#  # allow stand-alone agents to use encrypted config.
+#  # ignored by Fleet managed agents, which always use encrypted config.
+#  encrypted_config:
+#    enabled: false
 
 # Logging
 
@@ -285,7 +292,8 @@ agent.logging.to_stderr: true
 #agent.logging.metrics.period: 30s
 
 # Logging to rotating files. Set logging.to_files to false to disable logging to
-# files.
+# files. Note that agent.logging.to_stderr must be set to false for file logging
+# to take effect.
 #agent.logging.to_files: true
 #agent.logging.files:
   # Configure the path where the logs are written. The default is the logs directory

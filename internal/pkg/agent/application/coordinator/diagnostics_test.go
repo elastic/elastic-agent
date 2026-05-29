@@ -13,12 +13,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/structpb"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -30,6 +30,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -152,10 +153,11 @@ func TestDiagnosticAgentInfo(t *testing.T) {
 			"header1": "value1",
 			"header2": "value2",
 		},
-		logLevel: "trace",
-		meta: &info.ECSMeta{
-			Elastic: &info.ElasticECSMeta{
-				Agent: &info.AgentECSMeta{
+		LogLevelPolicy:   "info",
+		LogLevelOverride: "trace",
+		meta: &ecsmeta.ECSMeta{
+			Elastic: &ecsmeta.ElasticECSMeta{
+				Agent: &ecsmeta.AgentECSMeta{
 					BuildOriginal: "8.14.0-SNAPSHOT",
 					ID:            "agent-id",
 					LogLevel:      "trace",
@@ -165,11 +167,11 @@ func TestDiagnosticAgentInfo(t *testing.T) {
 					Upgradeable:   true,
 				},
 			},
-			Host: &info.HostECSMeta{
+			Host: &ecsmeta.HostECSMeta{
 				Arch:     "arm64",
 				Hostname: "Test-Macbook-Pro.local",
 			},
-			OS: &info.SystemECSMeta{
+			OS: &ecsmeta.SystemECSMeta{
 				Name:     "macos",
 				Platform: "darwin",
 			},
@@ -181,7 +183,8 @@ headers:
   header1: value1
   header2: value2
 log_level: trace
-log_level_raw: trace
+log_level_policy: info
+log_level_override: trace
 metadata:
   elastic:
     agent:
@@ -469,6 +472,95 @@ components:
 	assert.YAMLEq(t, expected, string(result), "components-actual diagnostic returned unexpected value")
 }
 
+// TestDiagnosticStripComponentUnitsConfig verifies that the components-expected
+// and components-actual diagnostics do not leak secrets from Unit.Config.
+func TestDiagnosticStripComponentUnitsConfig(t *testing.T) {
+	secrets := []string{
+		"my-secret-elasticsearch-api-key-12345",
+		"otx-secret-token-67890",
+	}
+
+	outputSource, err := structpb.NewStruct(map[string]any{
+		"api_key": secrets[0],
+		"hosts":   []any{"https://my-cluster.es.cloud:443"},
+		"type":    "elasticsearch",
+	})
+	require.NoError(t, err)
+
+	inputSource, err := structpb.NewStruct(map[string]any{
+		"state": map[string]any{
+			"api_key": secrets[1],
+		},
+	})
+	require.NoError(t, err)
+
+	componentsModel := []component.Component{
+		{
+			ID:         "test-component",
+			InputType:  "cel",
+			OutputType: "elasticsearch",
+			OutputName: "default",
+			Units: []component.Unit{
+				{
+					ID:       "cel-input",
+					Type:     client.UnitTypeInput,
+					LogLevel: 2,
+					Config: &proto.UnitExpectedConfig{
+						Source: inputSource,
+					},
+				},
+				{
+					ID:       "cel-output",
+					Type:     client.UnitTypeOutput,
+					LogLevel: 2,
+					Config: &proto.UnitExpectedConfig{
+						Source: outputSource,
+					},
+				},
+			},
+		},
+	}
+
+	t.Run("components-expected does not leak secrets from unit config", func(t *testing.T) {
+		coord := &Coordinator{componentModel: componentsModel}
+		hook, ok := diagnosticHooksMap(coord)["components-expected"]
+		require.True(t, ok, "diagnostic hooks should have an entry for components-expected")
+
+		result := string(hook.Hook(context.Background()))
+
+		for _, secret := range secrets {
+			assert.NotContains(t, result, secret,
+				"components-expected diagnostic should not contain secret %q", secret)
+		}
+		assert.Contains(t, result, "test-component")
+		assert.Contains(t, result, "cel-input")
+		assert.Contains(t, result, "cel-output")
+	})
+
+	t.Run("components-actual does not leak secrets from unit config", func(t *testing.T) {
+		state := State{
+			Components: []runtime.ComponentComponentState{
+				{Component: componentsModel[0]},
+			},
+		}
+		coord := &Coordinator{
+			stateBroadcaster: broadcaster.New(state, 0, 0),
+		}
+		hook, ok := diagnosticHooksMap(coord)["components-actual"]
+		require.True(t, ok, "diagnostic hooks should have an entry for components-actual")
+
+		result := string(hook.Hook(context.Background()))
+
+		for _, secret := range secrets {
+			assert.NotContains(t, result, secret,
+				"components-actual diagnostic should not contain secret %q", secret)
+		}
+		assert.Contains(t, result, "test-component")
+		assert.Contains(t, result, "cel-input")
+		assert.Contains(t, result, "cel-output")
+	})
+}
+
 // TestDiagnosticState creates a coordinator with a test state and verify that
 // the state diagnostic reports it.
 func TestDiagnosticState(t *testing.T) {
@@ -654,14 +746,15 @@ func mapFromRawYAML(t *testing.T, str string) map[string]interface{} {
 }
 
 type fakeAgentInfo struct {
-	agentID      string
-	headers      map[string]string
-	logLevel     string
-	snapshot     bool
-	version      string
-	unprivileged bool
-	isStandalone bool
-	meta         *info.ECSMeta
+	agentID          string
+	headers          map[string]string
+	LogLevelPolicy   string
+	LogLevelOverride string
+	snapshot         bool
+	version          string
+	unprivileged     bool
+	isStandalone     bool
+	meta             *ecsmeta.ECSMeta
 }
 
 func (a fakeAgentInfo) AgentID() string {
@@ -672,12 +765,19 @@ func (a fakeAgentInfo) Headers() map[string]string {
 	return a.headers
 }
 
-func (a fakeAgentInfo) LogLevel() string {
-	return a.logLevel
+func (a fakeAgentInfo) GetLogLevelRuntime() string {
+	if a.LogLevelOverride != "" {
+		return a.LogLevelOverride
+	}
+	return a.LogLevelPolicy
 }
 
-func (a fakeAgentInfo) RawLogLevel() string {
-	return a.logLevel
+func (a fakeAgentInfo) GetLogLevelPolicy() string {
+	return a.LogLevelPolicy
+}
+
+func (a fakeAgentInfo) GetLogLevelOverride() string {
+	return a.LogLevelOverride
 }
 
 func (a fakeAgentInfo) Snapshot() bool {
@@ -696,12 +796,15 @@ func (a fakeAgentInfo) IsStandalone() bool {
 	return a.isStandalone
 }
 
-func (a fakeAgentInfo) ECSMetadata(l *logger.Logger) (*info.ECSMeta, error) {
+func (a fakeAgentInfo) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
 	return a.meta, nil
 }
 
-func (a fakeAgentInfo) ReloadID(ctx context.Context) error                  { panic("implement me") }
-func (a fakeAgentInfo) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }
+func (a fakeAgentInfo) ReloadID(ctx context.Context) error { panic("implement me") }
+func (a fakeAgentInfo) SetLogLevelOverride(ctx context.Context, level string) error {
+	panic("implement me")
+}
+func (a fakeAgentInfo) SetLogLevelPolicy(level string) { panic("implement me") }
 
 func TestCoordinatorPerformDiagnostics(t *testing.T) {
 	tests := []struct {

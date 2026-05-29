@@ -195,7 +195,30 @@ func TestRemoteConfig(t *testing.T) {
 			},
 			false,
 		},
-
+		{
+			"Fleet server TLS mode is set to certificate mode",
+			false,
+			EnrollOptions{
+				URL: "https://localhost:8221",
+				FleetServer: EnrollCmdFleetServerOption{
+					ConnStr: "http://localhost:9200",
+				},
+			},
+			remote.Config{
+				Protocol: "https",
+				Host:     "localhost:8221",
+				Transport: httpcommon.HTTPTransportSettings{
+					TLS: &tlscommon.Config{
+						VerificationMode: tlscommon.VerifyCertificate,
+					},
+					Timeout: remote.DefaultClientConfig().Transport.Timeout,
+					Proxy: httpcommon.HTTPClientProxySettings{
+						Disable: true,
+					},
+				},
+			},
+			false,
+		},
 		{
 			"Proxy settings - disabled when fleet server specified",
 			false,
@@ -209,7 +232,9 @@ func TestRemoteConfig(t *testing.T) {
 				Path:     "",
 				Host:     "localhost",
 				Transport: httpcommon.HTTPTransportSettings{
-					TLS:     &tlscommon.Config{},
+					TLS: &tlscommon.Config{
+						VerificationMode: tlscommon.VerifyCertificate,
+					},
 					Timeout: remote.DefaultClientConfig().Transport.Timeout,
 					Proxy: httpcommon.HTTPClientProxySettings{
 						URL:     &httpcommon.ProxyURI{Scheme: "", Path: "proxy.url"},
@@ -236,11 +261,10 @@ func TestRemoteConfig(t *testing.T) {
 	}
 }
 
-func TestMergeOptionsWithMigrateAction(t *testing.T) {
+func TestOptionsFromMigrateAction(t *testing.T) {
 	cases := []struct {
-		name    string
-		action  *fleetapi.ActionMigrate
-		options EnrollOptions
+		name   string
+		action *fleetapi.ActionMigrate
 
 		expectedOptions EnrollOptions
 		expectedError   bool
@@ -254,7 +278,6 @@ func TestMergeOptionsWithMigrateAction(t *testing.T) {
 				},
 			},
 			EnrollOptions{},
-			EnrollOptions{},
 			true,
 		},
 		{
@@ -266,7 +289,6 @@ func TestMergeOptionsWithMigrateAction(t *testing.T) {
 				},
 			},
 			EnrollOptions{},
-			EnrollOptions{},
 			true,
 		},
 		{
@@ -277,7 +299,6 @@ func TestMergeOptionsWithMigrateAction(t *testing.T) {
 					TargetURI:       "uri",
 				},
 			},
-			EnrollOptions{},
 			EnrollOptions{
 				EnrollAPIKey: "token",
 				URL:          "uri",
@@ -285,16 +306,13 @@ func TestMergeOptionsWithMigrateAction(t *testing.T) {
 			false,
 		},
 		{
-			"overwrite fields",
+			"settings from action are applied",
 			&fleetapi.ActionMigrate{
 				Data: fleetapi.ActionMigrateData{
 					EnrollmentToken: "token",
 					TargetURI:       "uri",
 					Settings:        json.RawMessage(`{"insecure": true, "replace_token": "replace-token", "tags":["a","b"]}`),
 				},
-			},
-			EnrollOptions{
-				ReplaceToken: "value",
 			},
 			EnrollOptions{
 				EnrollAPIKey: "token",
@@ -306,22 +324,33 @@ func TestMergeOptionsWithMigrateAction(t *testing.T) {
 			false,
 		},
 		{
-			"id is not persisted by default",
+			"source cluster config is not inherited",
 			&fleetapi.ActionMigrate{
 				Data: fleetapi.ActionMigrateData{
 					EnrollmentToken: "token",
 					TargetURI:       "uri",
-					Settings:        json.RawMessage(`{"insecure": true, "tags":["a","b"]}`),
 				},
 			},
+			// Source cluster had custom CA, proxy, etc — none of it should carry over.
 			EnrollOptions{
-				ID: "test-id",
+				EnrollAPIKey: "token",
+				URL:          "uri",
+			},
+			false,
+		},
+		{
+			"ca from action settings is used",
+			&fleetapi.ActionMigrate{
+				Data: fleetapi.ActionMigrateData{
+					EnrollmentToken: "token",
+					TargetURI:       "uri",
+					Settings:        json.RawMessage(`{"ca": ["/path/to/ca.crt"]}`),
+				},
 			},
 			EnrollOptions{
 				EnrollAPIKey: "token",
 				URL:          "uri",
-				Insecure:     true,
-				Tags:         []string{"a", "b"},
+				CAs:          []string{"/path/to/ca.crt"},
 			},
 			false,
 		},
@@ -331,49 +360,34 @@ func TestMergeOptionsWithMigrateAction(t *testing.T) {
 				Data: fleetapi.ActionMigrateData{
 					EnrollmentToken: "token",
 					TargetURI:       "uri",
-					Settings:        json.RawMessage(`{"insecure": true, "id": "new-id", "replace_token": "replace-token", "tags":["a","b"]}`),
+					Settings:        json.RawMessage(`{"id": "new-id", "replace_token": "replace-token"}`),
 				},
-			},
-			EnrollOptions{
-				ID: "test-id",
 			},
 			EnrollOptions{
 				EnrollAPIKey: "token",
 				ID:           "new-id",
-				Insecure:     true,
 				ReplaceToken: "replace-token",
-				Tags:         []string{"a", "b"},
 				URL:          "uri",
 			},
 			false,
 		},
 		{
-			"original id is used when replace token provided",
+			"invalid settings json",
 			&fleetapi.ActionMigrate{
 				Data: fleetapi.ActionMigrateData{
 					EnrollmentToken: "token",
 					TargetURI:       "uri",
-					Settings:        json.RawMessage(`{"insecure": true, "replace_token": "replace-token", "tags":["a","b"]}`),
+					Settings:        json.RawMessage(`{invalid}`),
 				},
 			},
-			EnrollOptions{
-				ID: "test-id",
-			},
-			EnrollOptions{
-				EnrollAPIKey: "token",
-				ID:           "test-id",
-				Insecure:     true,
-				ReplaceToken: "replace-token",
-				Tags:         []string{"a", "b"},
-				URL:          "uri",
-			},
-			false,
+			EnrollOptions{},
+			true,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			actOptions, actErr := MergeOptionsWithMigrateAction(tc.action, tc.options)
+			actOptions, actErr := OptionsFromMigrateAction(tc.action)
 			if tc.expectedError {
 				require.Error(t, actErr)
 				return

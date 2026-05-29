@@ -92,7 +92,7 @@
             "docker_image": "{{ .docker.kibana_image }}",
             {{ end }}
             "user_settings_json": {
-              "xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"],
+              "xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled", "enableAgentPrivilegeLevelChange"],
               "xpack.fleet.internal.registry.kibanaVersionCheckEnabled": false,
               "server.restrictInternalApis": false
             }

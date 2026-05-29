@@ -6,14 +6,16 @@ source .buildkite/scripts/steps/fleet.sh
 
 STACK_VERSION="$(jq -r '.stack_version' .package-version)"
 STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
-if [[ "${FIPS:-false}" == "true" ]]; then
-  # FRH testing environment does not have same stack build IDs as CFT environment so
-  # we just go with the STACK_VERSION.
-  STACK_BUILD_ID=""
-fi
+# if [[ "${FIPS:-false}" == "true" ]]; then
+#   # FRH testing environment does not have same stack build IDs as CFT environment so
+#   # we just go with the STACK_VERSION.
+#   STACK_BUILD_ID=""
+# fi
 ESS_REGION="${ESS_REGION:-gcp-us-west2}"
 
 ess_up "$STACK_VERSION" "$STACK_BUILD_ID" "$ESS_REGION"
+
+wait_for_stack
 
 preinstall_fleet_packages
 
@@ -32,4 +34,4 @@ buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}es.pwd" $ELA
 buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}kibana.host" $KIBANA_HOST
 buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}kibana.username" $KIBANA_USERNAME
 buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}kibana.pwd" $KIBANA_PASSWORD
-buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}integrations_server.host" $INTEGRATIONS_SERVER_HOST
+buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}integrations_server.host" $ELASTIC_APM_SERVER_URL

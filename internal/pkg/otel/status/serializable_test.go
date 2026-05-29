@@ -48,6 +48,26 @@ func TestCompareAggregateStatuses(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "unequal timestamps",
+			s1: &status.AggregateStatus{
+				Event: &healthCheckEvent{
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
+				},
+			},
+			s2: &status.AggregateStatus{
+				Event: &healthCheckEvent{
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp.Add(time.Second),
+					attributes: pcommon.NewMap(),
+					err:        nil,
+				},
+			},
+			expected: false,
+		},
+		{
 			name: "unequal statuses",
 			s1: &status.AggregateStatus{
 				Event: &healthCheckEvent{
@@ -925,8 +945,8 @@ func TestAggregateStatusHelper(t *testing.T) {
 		assert.Nil(t, result.Err())
 		assert.NotNil(t, result.ComponentStatusMap)
 		assert.Empty(t, result.ComponentStatusMap)
-		assert.NotNil(t, result.Attributes())
-		assert.Empty(t, result.Attributes().AsRaw())
+		assert.NotNil(t, result.Event)
+		assert.Empty(t, result.Event.Attributes().AsRaw())
 	})
 
 	t.Run("creates status with error", func(t *testing.T) {

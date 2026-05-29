@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -23,6 +24,8 @@ import (
 	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
@@ -52,6 +55,7 @@ type Fixture struct {
 	runLength       time.Duration
 	additionalArgs  []string
 	fipsArtifact    bool
+	cmdOutput       io.Writer
 
 	srcPackage string
 	workDir    string
@@ -67,10 +71,19 @@ type Fixture struct {
 	// Uninstall token value that is needed for the agent uninstall if it's tamper protected
 	uninstallToken string
 
+	// postUninstallHooks are functions called after a successful uninstall
+	// during fixture cleanup.
+	postUninstallHooks []func(t *testing.T)
+
 	// fileNamePrefix is a prefix to be used when saving files from this test.
 	// it's set by FileNamePrefix and once it's set, FileNamePrefix will return
 	// its value.
 	fileNamePrefix string
+
+	// procMutex protects access to proc and stopping
+	procMutex sync.Mutex
+	proc      *process.Info
+	stopping  bool
 }
 
 // FixtureOpt is an option for the fixture.
@@ -108,6 +121,16 @@ func WithPackageFormat(packageFormat string) FixtureOpt {
 func WithLogOutput() FixtureOpt {
 	return func(f *Fixture) {
 		f.logOutput = true
+	}
+}
+
+// WithCmdOutput configures a writer that receives a combined copy of stdout and
+// stderr from the spawned process started by Run/RunOtelWithClient/RunBeat.
+// Writes from the stdout and stderr goroutines are serialized internally so the
+// supplied writer does not need to be safe for concurrent use.
+func WithCmdOutput(w io.Writer) FixtureOpt {
+	return func(f *Fixture) {
+		f.cmdOutput = w
 	}
 }
 
@@ -335,6 +358,12 @@ func (f *Fixture) SetUninstallToken(uninstallToken string) {
 	f.uninstallToken = uninstallToken
 }
 
+// PostUninstallHook registers a function to be called after a successful
+// uninstall during fixture cleanup.
+func (f *Fixture) PostUninstallHook(hook func(t *testing.T)) {
+	f.postUninstallHooks = append(f.postUninstallHooks, hook)
+}
+
 // WorkDir returns the installed fixture's work dir AKA base dir AKA top dir. This
 // must be called after `Install` is called.
 func (f *Fixture) WorkDir() string {
@@ -353,6 +382,31 @@ func (f *Fixture) SrcPackage(ctx context.Context) (string, error) {
 // PackageFormat returns the package format for the  fixture
 func (f *Fixture) PackageFormat() string {
 	return f.packageFormat
+}
+
+// SetInstallBasePath records the install base path on the fixture. This is
+// needed when the agent is installed manually (e.g. via rpm -U) without going
+// through fixture.Install(), so that helpers such as FindRunDir can locate the
+// correct data directory.
+func (f *Fixture) SetInstallBasePath(path string) {
+	if f.installOpts == nil {
+		f.installOpts = &InstallOpts{}
+	}
+	f.installOpts.BasePath = path
+}
+
+// AgentDataDir returns the path to the agent's data directory, accounting for
+// any install prefix. For rpm/deb this is "{prefix}/var/lib/elastic-agent";
+// for other package formats it is the fixture's work directory.
+func (f *Fixture) AgentDataDir() string {
+	if pf := f.packageFormat; pf == "deb" || pf == "rpm" {
+		prefix := ""
+		if f.installOpts != nil {
+			prefix = f.installOpts.BasePath
+		}
+		return prefix + "/var/lib/elastic-agent"
+	}
+	return f.workDir
 }
 
 func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
@@ -414,7 +468,7 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 		f.binaryPath(),
 		process.WithContext(ctx),
 		process.WithArgs(args),
-		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+		process.WithCmdOptions(attachOutErr(stdOut, stdErr, f.cmdOutput)))
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
@@ -487,7 +541,7 @@ func RunProcess(t *testing.T,
 		processPath,
 		process.WithContext(ctx),
 		process.WithArgs(args),
-		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+		process.WithCmdOptions(attachOutErr(stdOut, stdErr, nil)))
 	if err != nil {
 		return fmt.Errorf("failed to spawn %q: %w", processPath, err)
 	}
@@ -552,13 +606,37 @@ func RunProcess(t *testing.T,
 // when `Run` is called.
 //
 // if shouldWatchState is set to false, communicating state does not happen.
-func (f *Fixture) RunOtelWithClient(ctx context.Context, states ...State) error {
-	return f.executeWithClient(ctx, "otel", false, false, false, states...)
+func (f *Fixture) RunOtelWithClient(ctx context.Context) error {
+	return f.executeWithClient(ctx, "otel", false, false, false)
+}
+
+// Stop gracefully stops the Elastic Agent process that has been started
+// by [RunOtelWithCliet] or [Run].
+// If the Elastic Agent has been installed, or the process
+// has not been started by [RunOtelWithClient] or [Run],
+// Stop fails the test by calling t.Fatal
+func (f *Fixture) Stop() {
+	f.procMutex.Lock()
+	defer f.procMutex.Unlock()
+
+	if f.installed {
+		f.t.Fatal("an installed Elastic Agent cannot be stopped")
+	}
+
+	if f.proc == nil {
+		f.t.Fatal("Elastic Agent has not been started")
+	}
+
+	f.stopping = true
+
+	if err := f.proc.Stop(); err != nil {
+		f.t.Errorf("Elastic Agent returned an error when stopping: %s", err)
+	}
 }
 
 func (f *Fixture) executeWithClient(ctx context.Context, command string, disableEncryptedStore bool, shouldWatchState bool, enableTestingMode bool, states ...State) error {
 	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
-		f.t.Fatal("Context passed to Fixture.Run() has no deadline set.")
+		f.t.Error("Context passed to Fixture.Run() has no deadline set.")
 	}
 
 	if f.binaryName != "elastic-agent" {
@@ -616,11 +694,13 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 
 	args = append(args, f.additionalArgs...)
 
-	proc, err := process.Start(
+	f.procMutex.Lock()
+	f.proc, err = process.Start(
 		f.binaryPath(),
 		process.WithContext(ctx),
 		process.WithArgs(args),
-		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+		process.WithCmdOptions(attachOutErr(stdOut, stdErr, f.cmdOutput)))
+	f.procMutex.Unlock()
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
@@ -637,23 +717,38 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		doneChan = time.After(f.runLength)
 	}
 
-	procWaitCh := proc.Wait()
+	procWaitCh := f.proc.Wait()
 	killProc := func() {
-		_ = proc.Kill()
+		_ = f.proc.Kill()
 		<-procWaitCh
 	}
 
-	stopping := false
+	f.procMutex.Lock()
+	f.stopping = false
+	f.procMutex.Unlock()
+
 	for {
 		select {
 		case <-ctx.Done():
 			killProc()
 			return ctx.Err()
 		case ps := <-procWaitCh:
-			if stopping {
+			if f.stopping {
+				if ps != nil {
+					// Log the exit code (decimal + hex) so callers can distinguish
+					// clean exits from Windows status codes (e.g. 0xC000013A =
+					// STATUS_CONTROL_C_EXIT) when the process was supposed to
+					// shut down gracefully but appears to have been terminated.
+					f.t.Logf("agent exited (after Stop): code=%d (0x%x)", ps.ExitCode(), uint32(ps.ExitCode())) //nolint:gosec // exit-code-to-uint32 is intentional for hex formatting
+				} else {
+					f.t.Logf("agent exited (after Stop): exit code unavailable")
+				}
 				return nil
 			}
-			return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
+			if ps != nil {
+				return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
+			}
+			return fmt.Errorf("elastic-agent exited unexpectedly: exit code unavailable")
 		case err := <-stdOut.Watch():
 			if !f.allowErrs {
 				// no errors allowed
@@ -667,7 +762,7 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
 			}
 		case err := <-stateErrCh:
-			if !stopping {
+			if !f.stopping {
 				// Give the log watchers a second to write out the agent logs.
 				// Client connnection failures can happen quickly enough to prevent logging.
 				time.Sleep(time.Second)
@@ -676,10 +771,10 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 				return fmt.Errorf("elastic-agent client received unexpected error: %w", err)
 			}
 		case <-doneChan:
-			if !stopping {
+			if !f.stopping {
 				// trigger the stop
-				stopping = true
-				_ = proc.Stop()
+				f.stopping = true
+				_ = f.proc.Stop()
 			}
 		case state := <-stateCh:
 			if smInstance != nil {
@@ -689,10 +784,10 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 					return fmt.Errorf("state management failed with unexpected error: %w", err)
 				}
 				if !cont {
-					if !stopping {
+					if !f.stopping {
 						// trigger the stop
-						stopping = true
-						_ = proc.Stop()
+						f.stopping = true
+						_ = f.proc.Stop()
 					}
 				} else if cfg != "" {
 					err := performConfigure(ctx, agentClient, cfg, 3*time.Second)
@@ -758,6 +853,7 @@ func (f *Fixture) PrepareAgentCommand(ctx context.Context, args []string, opts .
 			return nil, fmt.Errorf("error adding opts to Exec: %w", err)
 		}
 	}
+
 	return cmd, nil
 }
 
@@ -955,6 +1051,24 @@ func (f *Fixture) ExecDiagnostics(ctx context.Context, cmd ...string) (string, e
 	t.Logf("Found %q diagnostic archive.", files[0])
 
 	return files[0], err
+}
+
+// ExecWindowsRegistryUpdate runs 'elastic-agent windows registry update'.
+func (f *Fixture) ExecWindowsRegistryUpdate(ctx context.Context, opts ...process.CmdOption) error {
+	out, err := f.Exec(ctx, []string{"windows", "registry", "update"}, opts...)
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, out)
+	}
+	return nil
+}
+
+// ExecWindowsRegistryRemove runs 'elastic-agent windows registry remove'.
+func (f *Fixture) ExecWindowsRegistryRemove(ctx context.Context, opts ...process.CmdOption) error {
+	out, err := f.Exec(ctx, []string{"windows", "registry", "remove"}, opts...)
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, out)
+	}
+	return nil
 }
 
 // AgentID returns the ID of the installed Elastic Agent.
@@ -1385,7 +1499,10 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read contents of the data directory %s: %w", dataDir, err)
 	}
-	var versionDir string
+	var (
+		versionDir        string
+		versionDirModTime time.Time
+	)
 	for _, fi := range agentVersions {
 		filename := fi.Name()
 		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
@@ -1395,8 +1512,17 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 				// directories, we don't want first found
 				continue
 			}
-			versionDir = filename
-			break
+			info, err := fi.Info()
+			if err != nil {
+				continue
+			}
+			// After an upgrade within the same version, two directories with
+			// different build hashes will exist. Use the most recently modified
+			// one because that is the active install.
+			if versionDir == "" || info.ModTime().After(versionDirModTime) {
+				versionDir = filename
+				versionDirModTime = info.ModTime()
+			}
 		}
 	}
 	if versionDir == "" {
@@ -1421,11 +1547,7 @@ func FindComponentsDir(dir, version string) (string, error) {
 
 // FindRunDir identifies the directory that holds the run folder.
 func FindRunDir(fixture *Fixture) (string, error) {
-	agentWorkDir := fixture.WorkDir()
-	if pf := fixture.PackageFormat(); pf == "deb" || pf == "rpm" {
-		// these are hardcoded paths in packages.yml
-		agentWorkDir = "/var/lib/elastic-agent"
-	}
+	agentWorkDir := fixture.AgentDataDir()
 
 	version := fixture.Version()
 	versionDir, err := findAgentDataVersionDir(agentWorkDir, version)
@@ -1459,12 +1581,32 @@ func writeSpecFile(dest string, spec *component.Spec) error {
 }
 
 // attachOutErr attaches the logWatcher to std out and std error of the spawned process.
-func attachOutErr(stdOut *logWatcher, stdErr *logWatcher) process.CmdOption {
+// If extra is non-nil it receives a combined copy of stdout and stderr; writes from
+// the two streams are serialized so extra does not need to be safe for concurrent use.
+func attachOutErr(stdOut *logWatcher, stdErr *logWatcher, extra io.Writer) process.CmdOption {
 	return func(cmd *exec.Cmd) error {
 		cmd.Stdout = stdOut
 		cmd.Stderr = stdErr
+		if extra != nil {
+			synced := &syncWriter{w: extra}
+			cmd.Stdout = io.MultiWriter(stdOut, synced)
+			cmd.Stderr = io.MultiWriter(stdErr, synced)
+		}
 		return nil
 	}
+}
+
+// syncWriter serializes Write calls so the wrapped writer can be shared
+// between the stdout and stderr copy goroutines.
+type syncWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (s *syncWriter) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.w.Write(p)
 }
 
 func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time.Duration) (chan *client.AgentState, chan error) {
@@ -1539,7 +1681,7 @@ func createTempDir(t *testing.T) string {
 
 	cleanup := func() {
 		if !t.Failed() {
-			if err := install.RemovePath(tempDir); err != nil {
+			if err := install.RemovePath(logp.NewNopLogger(), tempDir); err != nil {
 				t.Errorf("could not remove temp dir '%s': %s", tempDir, err)
 			}
 		} else {

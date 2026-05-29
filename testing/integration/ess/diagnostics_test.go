@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/elastic-agent-libs/redact"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -294,7 +295,7 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		case map[string]any:
 			for rootKey, value := range root {
 				if rootKey == "custom_attr" {
-					if value != "<REDACTED>" {
+					if value != redact.REDACTED {
 						return fmt.Errorf("found non-redacted value in %q", rootKey)
 					}
 				}
@@ -306,6 +307,33 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 			}
 		default:
 			// ignore other types
+		}
+		return nil
+	}
+
+	checkConfigStripped := func(root map[string]any) error {
+		comps, ok := root["components"].([]any)
+		if !ok {
+			return nil
+		}
+		for _, comp := range comps {
+			compMap, ok := comp.(map[string]any)
+			if !ok {
+				continue
+			}
+			units, ok := compMap["units"].([]any)
+			if !ok {
+				continue
+			}
+			for _, unit := range units {
+				unitMap, ok := unit.(map[string]any)
+				if !ok {
+					continue
+				}
+				if _, hasConfig := unitMap["config"]; hasConfig {
+					return fmt.Errorf("found 'config' key in unit, expected it to be stripped")
+				}
+			}
 		}
 		return nil
 	}
@@ -323,8 +351,15 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		err = yaml.NewDecoder(f).Decode(&yObj)
 		require.NoError(t, err)
 
+		t.Logf("checking redaction for file %q", fileName)
 		err = checkRedacted(yObj)
 		require.NoError(t, err, "file %q has non-redacted values", path)
+
+		if strings.HasPrefix(fileName, "components-") {
+			t.Logf("checking unit config is stripped from file %q", fileName)
+			err = checkConfigStripped(yObj)
+			require.NoError(t, err, "file %q has unit config that should be stripped", path)
+		}
 	}
 }
 
@@ -333,6 +368,8 @@ func TestBeatDiagnostics(t *testing.T) {
 		Group: integration.Default,
 		Local: false,
 	})
+
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
 	configTemplate := `
 inputs:
@@ -346,11 +383,10 @@ inputs:
 outputs:
   default:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [{{ .ESHost }}]
     api_key: placeholder
-    status_reporting:
-      enabled: false
-agent.monitoring.enabled: false
+agent.monitoring.enabled: {{ .MonitoringEnabled }}
+{{ if .MonitoringEnabled }}agent.monitoring.metrics_period: 2s{{ end }}
 agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 `
 
@@ -380,11 +416,13 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 	testCases := []struct {
 		name                         string
 		runtime                      string
+		monitoringEnabled            bool
 		expectedCompDiagnosticsFiles []string
 	}{
 		{
-			name:    "filebeat process",
-			runtime: "process",
+			name:              "filebeat process",
+			runtime:           "process",
+			monitoringEnabled: false,
 			expectedCompDiagnosticsFiles: append(compDiagnosticsFiles,
 				"registry.tar.gz",
 				"input_metrics.json",
@@ -394,8 +432,9 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 			),
 		},
 		{
-			name:    "filebeat receiver",
-			runtime: "otel",
+			name:              "filebeat receiver",
+			runtime:           "otel",
+			monitoringEnabled: true,
 			expectedCompDiagnosticsFiles: []string{
 				"registry.tar.gz",
 				"beat_metrics.json",
@@ -425,10 +464,13 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 			var configBuffer bytes.Buffer
 			require.NoError(t,
 				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
-					"Runtime":   tc.runtime,
-					"InputFile": inputFile.Name(),
+					"Runtime":           tc.runtime,
+					"InputFile":         inputFile.Name(),
+					"ESHost":            esURL.Host,
+					"MonitoringEnabled": tc.monitoringEnabled,
 				}))
 			expDiagFiles := append([]string{}, diagnosticsFiles...)
+			var extraPatterns []filePattern
 			if tc.runtime == "otel" {
 				// EDOT adds these extra files.
 				// TestBeatDiagnostics is quite strict about what it expects to see in the archive.
@@ -441,11 +483,20 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 					"edot/threadcreate.profile.gz",
 					"edot/otel-merged-actual.yaml")
 			}
+			if tc.monitoringEnabled {
+				// When OTel-based elasticsearch monitoring is active, the manager
+				// injects a file exporter that writes zstd-compressed OTLP JSON
+				// telemetry alongside the agent's own log files.
+				extraPatterns = append(extraPatterns, filePattern{
+					pattern:  path.Join("logs", "*", "elastic-agent-metrics.ndjson"),
+					optional: false,
+				})
+			}
 			err = f.Run(ctx, integrationtest.State{
 				Configure:  configBuffer.String(),
 				AgentState: expectedAgentState,
 				Components: expectedComponentState,
-				After:      testDiagnosticsFactory(t, filebeatSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+				After:      testDiagnosticsFactory(t, filebeatSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}, extraPatterns...),
 			})
 			assert.NoError(t, err)
 		})
@@ -552,15 +603,32 @@ agent.internal.runtime.filebeat.filestream: otel
 	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
 }
 
-func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
+func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string, extraPatterns ...filePattern) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
+		// If any required extra patterns are present (e.g. the metrics file
+		// written by the OTel file exporter after the first collection cycle),
+		// wait long enough for at least one cycle to complete before gathering
+		// diagnostics. The metrics period configured in the test is 2 s, so
+		// 10 s gives a comfortable margin even if the OTel monitoring collector
+		// takes a few seconds to start after the agent reports HEALTHY.
+		for _, p := range extraPatterns {
+			if !p.optional {
+				select {
+				case <-time.After(10 * time.Second):
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				break
+			}
+		}
+
 		diagZip, err := fix.ExecDiagnostics(ctx, cmd...)
 
 		// get the version of the running agent
 		avi, err := getRunningAgentVersion(ctx, fix)
 		require.NoError(t, err)
 
-		verifyDiagnosticArchive(t, compSetup, diagZip, diagFiles, diagCompFiles, avi)
+		verifyDiagnosticArchive(t, compSetup, diagZip, diagFiles, diagCompFiles, avi, extraPatterns...)
 
 		// preserve the diagnostic archive if the test failed
 		if t.Failed() {
@@ -571,7 +639,7 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 	}
 }
 
-func verifyDiagnosticArchive(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagArchive string, diagFiles []string, diagCompFiles []string, avi *client.Version) {
+func verifyDiagnosticArchive(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagArchive string, diagFiles []string, diagCompFiles []string, avi *client.Version, extraPatterns ...filePattern) {
 	// check that the archive is not an empty file
 	stat, err := os.Stat(diagArchive)
 	require.NoErrorf(t, err, "stat file %q failed", diagArchive)
@@ -584,6 +652,7 @@ func verifyDiagnosticArchive(t *testing.T, compSetup map[string]integrationtest.
 
 	compAndUnitNames := extractComponentAndUnitNames(compSetup)
 	expectedDiagArchiveFilePatterns := compileExpectedDiagnosticFilePatterns(avi, diagFiles, diagCompFiles, compAndUnitNames)
+	expectedDiagArchiveFilePatterns = append(expectedDiagArchiveFilePatterns, extraPatterns...)
 
 	expectedExtractedFiles := map[string]struct{}{}
 	for _, filePattern := range expectedDiagArchiveFilePatterns {

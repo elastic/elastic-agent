@@ -119,11 +119,11 @@ resource "ec_deployment" "integration-testing" {
     }
   }
   kibana = {
-    size                      = "1g"
+    size                      = "4g" # our integration tests open a lot of connections
     zone_count                = 1
     config = {
       user_settings_json = jsonencode({
-        "xpack.fleet.enableExperimental"                          = ["agentTamperProtectionEnabled"]
+        "xpack.fleet.enableExperimental"                          = ["agentTamperProtectionEnabled", "enableAgentPrivilegeLevelChange"]
         "xpack.fleet.internal.registry.kibanaVersionCheckEnabled" = false
         "server.restrictInternalApis"                             = false
       })
@@ -139,6 +139,10 @@ resource "ec_deployment" "integration-testing" {
     config = {
       docker_image = local.integration_server_docker_image
     }
+  }
+
+  observability = {
+    deployment_id = "self"
   }
 
   tags = {

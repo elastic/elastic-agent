@@ -15,6 +15,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -37,10 +38,16 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default       string            `yaml:"default" config:"default" json:"default"`
-	Filebeat      BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Metricbeat    BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
-	DynamicInputs string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	Default              string            `yaml:"default" config:"default" json:"default"`
+	Auditbeat            BeatRuntimeConfig `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
+	Filebeat             BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Heartbeat            BeatRuntimeConfig `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
+	Metricbeat           BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	Osquerybeat          BeatRuntimeConfig `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
+	Packetbeat           BeatRuntimeConfig `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
+	DynamicInputs        string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	SharedReceiverQueues bool              `yaml:"shared_receiver_queues" config:"shared_receiver_queues"`
+	Output               map[string]string `yaml:"output" config:"output" json:"output"`
 }
 
 type BeatRuntimeConfig struct {
@@ -51,35 +58,33 @@ type BeatRuntimeConfig struct {
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
 		Default:       string(DefaultRuntimeManager),
-		DynamicInputs: "",
-		Metricbeat: BeatRuntimeConfig{
-			InputType: map[string]string{
-				"activemq/metrics":      string(OtelRuntimeManager),
-				"apache/metrics":        string(OtelRuntimeManager),
-				"beat/metrics":          string(OtelRuntimeManager),
-				"containerd/metrics":    string(OtelRuntimeManager),
-				"docker/metrics":        string(OtelRuntimeManager),
-				"elasticsearch/metrics": string(OtelRuntimeManager),
-				"etcd/metrics":          string(OtelRuntimeManager),
-				"http/metrics":          string(OtelRuntimeManager),
-				"jolokia/metrics":       string(OtelRuntimeManager),
-				"kafka/metrics":         string(OtelRuntimeManager),
-				"kibana/metrics":        string(OtelRuntimeManager),
-				"linux/metrics":         string(OtelRuntimeManager),
-				"logstash/metrics":      string(OtelRuntimeManager),
-				"memcached/metrics":     string(OtelRuntimeManager),
-				"mongodb/metrics":       string(OtelRuntimeManager),
-				"mysql/metrics":         string(OtelRuntimeManager),
-				"nats/metrics":          string(OtelRuntimeManager),
-				"nginx/metrics":         string(OtelRuntimeManager),
-				"rabbitmq/metrics":      string(OtelRuntimeManager),
-				"sql/metrics":           string(OtelRuntimeManager),
-				"stan/metrics":          string(OtelRuntimeManager),
-				"statsd/metrics":        string(OtelRuntimeManager),
-				"system/metrics":        string(OtelRuntimeManager),
-				"vsphere/metrics":       string(OtelRuntimeManager),
-			},
+		DynamicInputs: string(ProcessRuntimeManager),
+		Auditbeat: BeatRuntimeConfig{
+			// go-ucfg sets this while unpacking, having it in the default makes testing easier
+			InputType: make(map[string]string),
 		},
+		Filebeat: BeatRuntimeConfig{
+			Default: string(OtelRuntimeManager),
+			// go-ucfg sets this while unpacking, having it in the default makes testing easier
+			InputType: make(map[string]string),
+		},
+		Heartbeat: BeatRuntimeConfig{
+			// go-ucfg sets this while unpacking, having it in the default makes testing easier
+			InputType: make(map[string]string),
+		},
+		Metricbeat: BeatRuntimeConfig{
+			Default:   string(OtelRuntimeManager),
+			InputType: map[string]string{},
+		},
+		Osquerybeat: BeatRuntimeConfig{
+			// go-ucfg sets this while unpacking, having it in the default makes testing easier
+			InputType: make(map[string]string),
+		},
+		Packetbeat: BeatRuntimeConfig{
+			// go-ucfg sets this while unpacking, having it in the default makes testing easier
+			InputType: make(map[string]string),
+		},
+		Output: map[string]string{},
 	}
 }
 
@@ -99,7 +104,7 @@ func (r *RuntimeConfig) Validate() error {
 	if err := validateRuntime(r.Default, false); err != nil {
 		return err
 	}
-	for _, beatConfig := range []BeatRuntimeConfig{r.Filebeat, r.Metricbeat} {
+	for _, beatConfig := range []BeatRuntimeConfig{r.Auditbeat, r.Filebeat, r.Heartbeat, r.Metricbeat, r.Osquerybeat, r.Packetbeat} {
 		if err := validateRuntime(beatConfig.Default, true); err != nil {
 			return err
 		}
@@ -109,21 +114,46 @@ func (r *RuntimeConfig) Validate() error {
 			}
 		}
 	}
+
+	allowedOutput := []string{"elasticsearch", "logstash", "kafka"}
+	for name, runtime := range r.Output {
+		if !slices.Contains(allowedOutput, name) {
+			return fmt.Errorf("%s output is not supported", name)
+		}
+		if err := validateRuntime(runtime, false); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func (r *RuntimeConfig) BeatRuntimeConfig(beatName string) *BeatRuntimeConfig {
 	switch beatName {
+	case "auditbeat":
+		return &r.Auditbeat
 	case "filebeat":
 		return &r.Filebeat
+	case "heartbeat":
+		return &r.Heartbeat
 	case "metricbeat":
 		return &r.Metricbeat
+	case "osquerybeat":
+		return &r.Osquerybeat
+	case "packetbeat":
+		return &r.Packetbeat
 	default:
 		return nil
 	}
 }
 
-func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string, beatName string) RuntimeManager {
+func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string, beatName string, output outputI) RuntimeManager {
+	if r.Output != nil {
+		// Check if runtime is set for given output
+		if runtime, ok := r.Output[output.OutputType]; ok && output.Enabled {
+			return RuntimeManager(runtime)
+		}
+	}
+
 	beatRuntimeConfig := r.BeatRuntimeConfig(beatName)
 	if beatRuntimeConfig != nil {
 		// Check if there's a specific runtime manager for this input type
@@ -296,6 +326,10 @@ type Component struct {
 	Component *proto.Component `yaml:"component,omitempty"`
 
 	OutputStatusReporting *StatusReporting `yaml:"-"`
+
+	// LastConfiguredAt records when the component was last configured.
+	// It resets whenever a new configuration is applied.
+	LastConfiguredAt time.Time `yaml:"-"`
 }
 
 type StatusReporting struct {
@@ -367,6 +401,17 @@ func (c *Component) BeatName() string {
 		return c.InputSpec.BeatName()
 	}
 	return ""
+}
+
+// OutputUnit returns the first output unit among c.Units, if any.
+// Agent-built components normally have at most one output unit; if several are present, the first is returned.
+func (c *Component) OutputUnit() (Unit, bool) {
+	for _, u := range c.Units {
+		if u.Type == client.UnitTypeOutput {
+			return u, true
+		}
+	}
+	return Unit{}, false
 }
 
 // GetBeatInputIDForUnit returns the ID of the corresponding input or module in the beat configuration for the unit.
@@ -604,7 +649,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 			if input.enabled {
 				unitID := GetInputUnitId(componentID, input.id)
 				if input.runtimeManager == "" {
-					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName())
+					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
 				}
 				unitsForRuntimeManager[input.runtimeManager] = append(
 					unitsForRuntimeManager[input.runtimeManager],
@@ -635,6 +680,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
+					LastConfiguredAt:      time.Now(),
 				})
 			}
 		}
@@ -658,7 +704,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 			}
 
 			if input.runtimeManager == "" {
-				input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName())
+				input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
 			}
 
 			var units []Unit
@@ -681,6 +727,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
+					LastConfiguredAt:      time.Now(),
 				})
 			}
 		}

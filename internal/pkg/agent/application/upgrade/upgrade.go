@@ -70,6 +70,8 @@ var (
 	ErrAgentInstallNotFound = errors.New("agent install descriptor not found")
 	// Version_9_3_0_SNAPSHOT is the minimum version for manual rollback and rollback reason
 	Version_9_3_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 3, 0, "SNAPSHOT", "")
+	// Version_9_4_0_SNAPSHOT is the minimum version that manages the Windows Add/Remove Programs registry entry
+	Version_9_4_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 4, 0, "SNAPSHOT", "")
 )
 
 func init() {
@@ -93,7 +95,7 @@ type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string
 type fileDirCopyFunc func(from, to string, opts ...filecopy.Options) error
 type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error
 type changeSymlinkFunc func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
-type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource availableRollbacksSource) error
+type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource ttl.Source) error
 
 // Types used to abstract stdlib functions
 type mkdirAllFunc func(name string, perm fs.FileMode) error
@@ -117,12 +119,6 @@ type WatcherHelper interface {
 	TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error)
 }
 
-type availableRollbacksSource interface {
-	Set(map[string]ttl.TTLMarker) error
-	Get() (map[string]ttl.TTLMarker, error)
-	Remove(string) error
-}
-
 // Upgrader performs an upgrade
 type Upgrader struct {
 	log                      *logger.Logger
@@ -133,7 +129,7 @@ type Upgrader struct {
 	fleetServerURI           string
 	markerWatcher            MarkerWatcher
 	watcherHelper            WatcherHelper
-	availableRollbacksSource availableRollbacksSource
+	availableRollbacksSource ttl.Source
 
 	// The following are abstractions for testability
 	artifactDownloader   artifactDownloadHandler
@@ -155,7 +151,7 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper, ars availableRollbacksSource) (*Upgrader, error) {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper, ars ttl.Source) (*Upgrader, error) {
 	return &Upgrader{
 		log:                      log,
 		settings:                 settings,
@@ -281,7 +277,12 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...Option) (_ reexec.ShutdownCallbackFn, err error) {
+
+	var uOpts upgradeOptions
+	for _, opt := range opts {
+		opt(&uOpts)
+	}
 
 	if rollback {
 		return u.rollbackToPreviousVersion(ctx, paths.Top(), time.Now(), version, action)
@@ -447,10 +448,28 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), AgentName)
 
+	// All go/no-go checks have passed; the upgrade is committed to completing.
+	// Notify components (e.g. endpoint-security) that need to act before the
+	// symlink changes. Invoking this here — not earlier — prevents spurious
+	// unprotect signals when the upgrade is later aborted.
+	if uOpts.preSymlinkCallback != nil {
+		if err := uOpts.preSymlinkCallback(ctx, u.log, action); err != nil {
+			return nil, fmt.Errorf("pre-symlink callback failed: %w", err)
+		}
+	}
+
 	if err := u.changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(err, rollbackErr)
+	}
+
+	// when downgrading to a pre-9.4 agent that doesn't manage the registry entry,
+	// remove it now so no stale entry is left behind
+	if parsedVersion.Less(*Version_9_4_0_SNAPSHOT) {
+		if err := install.RemoveUninstallEntry(); err != nil {
+			u.log.Warnf("failed to remove uninstall registry entry: %v", err)
+		}
 	}
 
 	rollbackWindow := disableRollbackWindow
@@ -601,7 +620,7 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 	return current == newVersion
 }
 
-func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource availableRollbacksSource) error {
+func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource ttl.Source) error {
 	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), AgentName)
 	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, AgentName), oldAgentPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {

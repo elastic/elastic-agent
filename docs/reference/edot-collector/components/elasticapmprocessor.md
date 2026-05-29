@@ -2,11 +2,9 @@
 navigation_title: Elastic APM processor
 description: The Elastic APM processor is an OpenTelemetry Collector component that enriches OTel data for optimal use with Elastic APM.
 applies_to:
-  stack: ga 9.2+
+  stack: ga 9.2
   serverless:
-    observability:
-  product:
-    edot_collector: ga 9.2+
+    observability: ga
 products:
   - id: elastic-agent
   - id: observability

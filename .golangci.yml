@@ -57,12 +57,10 @@ linters:
         - github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption
         - github.com/apoydence/eachers
         - github.com/google/gopacket
-        - github.com/insomniacslk/dhcp
         - github.com/meraki/dashboard-api-go/v3
         - go.opentelemetry.io/otel/exporters/prometheus
         - github.com/elastic/elastic-agent/internal/edot
-        - github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck
-        - github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status
+        - github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter
       replace-local: true
     gomodguard:
       blocked:
@@ -108,6 +106,7 @@ linters:
       - third_party$
       - builtin$
       - examples$
+      - ^beats
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

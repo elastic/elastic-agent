@@ -40,6 +40,7 @@ type EnrollOptions struct {
 	UserProvidedMetadata map[string]interface{}     `yaml:"-" json:"-"`
 	FixPermissions       *utils.FileOwner           `yaml:"-" json:"-"`
 	DelayEnroll          bool                       `yaml:"-" json:"-"`
+	RetryOnInvalidToken  bool                       `yaml:"-" json:"-"`
 	FleetServer          EnrollCmdFleetServerOption `yaml:"-" json:"-"`
 	SkipCreateSecret     bool                       `yaml:"-" json:"-"`
 	SkipDaemonRestart    bool                       `yaml:"-" json:"-"`
@@ -91,6 +92,9 @@ func (e *EnrollOptions) RemoteConfig(failOnInsecureMismatch bool) (remote.Config
 	}
 	if e.Insecure {
 		tlsCfg.VerificationMode = tlscommon.VerifyNone
+	} else if e.FleetServer.ConnStr != "" && !e.FleetServer.Insecure {
+		// If we are communicating with a local fleet-server instance use cert verifcation
+		tlsCfg.VerificationMode = tlscommon.VerifyCertificate
 	}
 	if e.Certificate != "" || e.Key != "" {
 		tlsCfg.Certificate = tlscommon.CertificateConfig{
@@ -120,45 +124,21 @@ func (e *EnrollOptions) RemoteConfig(failOnInsecureMismatch bool) (remote.Config
 	return cfg, nil
 }
 
-func MergeOptionsWithMigrateAction(action *fleetapi.ActionMigrate, options EnrollOptions) (EnrollOptions, error) {
-	// there is place to make this much more performant but as this is far away from hot path
-	// i'm keeping it this way (michal)
+// OptionsFromMigrateAction builds EnrollOptions directly from a migrate action
+// without inheriting any configuration from the source cluster. Fields not
+// provided in the action default to zero values so the agent falls back to
+// system defaults (e.g., OS trust store for TLS).
+func OptionsFromMigrateAction(action *fleetapi.ActionMigrate) (EnrollOptions, error) {
 	if action.Data.EnrollmentToken == "" ||
 		action.Data.TargetURI == "" {
 		return EnrollOptions{}, fmt.Errorf("required fields missing")
 	}
 
-	configMap := make(map[string]interface{})
-
-	data, err := json.Marshal(options)
-	if err != nil {
-		return EnrollOptions{}, fmt.Errorf("failed to encode enroll options: %w", err)
-	}
-
-	if err := json.Unmarshal(data, &configMap); err != nil {
-		return EnrollOptions{}, fmt.Errorf("failed to decode enroll options: %w", err)
-	}
-
-	// overwriting what's needed
+	var options EnrollOptions
 	if len(action.Data.Settings) > 0 {
-		if err := json.Unmarshal(action.Data.Settings, &configMap); err != nil {
-			return EnrollOptions{}, fmt.Errorf("failed to decode migrate setting: %w", err)
+		if err := json.Unmarshal(action.Data.Settings, &options); err != nil {
+			return EnrollOptions{}, fmt.Errorf("failed to decode migrate settings: %w", err)
 		}
-	}
-
-	if _, ok := configMap["replace_token"]; !ok {
-		// do not preserve ID by default
-		delete(configMap, "id")
-		options.ID = ""
-	}
-
-	cmBytes, err := json.Marshal(configMap)
-	if err != nil {
-		return EnrollOptions{}, fmt.Errorf("failed to encode merged migrate setting: %w", err)
-	}
-
-	if err := json.Unmarshal(cmBytes, &options); err != nil {
-		return EnrollOptions{}, fmt.Errorf("failed to decode merged migrate setting: %w", err)
 	}
 
 	options.EnrollAPIKey = action.Data.EnrollmentToken

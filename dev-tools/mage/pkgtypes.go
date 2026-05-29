@@ -9,6 +9,8 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -78,6 +80,9 @@ var (
 	Docker             = PackageType(pkgcommon.Docker)
 )
 
+// AllPackageTypes contains all available package types.
+var AllPackageTypes = []PackageType{RPM, Deb, Zip, TarGz, Docker}
+
 // OSPackageArgs define a set of package types to build for an operating
 // system using the contained PackageSpec.
 type OSPackageArgs struct {
@@ -112,6 +117,7 @@ type PackageSpec struct {
 	ExtraTags               []string               `yaml:"extra_tags,omitempty"`  // Optional
 	Components              []packaging.BinarySpec `yaml:"components"`            // Optional: Components required for this package
 
+	cfg                    *Settings
 	evalContext            map[string]interface{}
 	packageDir             string
 	localPreInstallScript  string
@@ -299,7 +305,7 @@ func (typ PackageType) PackagingDir(home string, target BuildPlatform, spec Pack
 }
 
 // Build builds a package based on the provided spec.
-func (typ PackageType) Build(spec PackageSpec) error {
+func (typ PackageType) Build(ctx context.Context, spec PackageSpec) error {
 	switch typ {
 	case RPM:
 		return PackageRPM(spec)
@@ -310,7 +316,7 @@ func (typ PackageType) Build(spec PackageSpec) error {
 	case TarGz:
 		return PackageTarGz(spec)
 	case Docker:
-		return PackageDocker(spec)
+		return PackageDocker(ctx, spec)
 	default:
 		return fmt.Errorf("unknown package type: %v", typ)
 	}
@@ -351,8 +357,8 @@ func (s *PackageSpec) ExtraVar(key, value string) {
 
 // Expand expands a templated string using data from the spec.
 func (s PackageSpec) Expand(in string, args ...map[string]interface{}) (string, error) {
-	return expandTemplate("inline", in, FuncMap,
-		EnvMap(append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
+	return expandTemplate("inline", in, FuncMap(s.cfg),
+		EnvMap(s.cfg, append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
 }
 
 // MustExpand expands a templated string using data from the spec. It panics if
@@ -367,8 +373,8 @@ func (s PackageSpec) MustExpand(in string, args ...map[string]interface{}) strin
 
 // ExpandFile expands a template file using data from the spec.
 func (s PackageSpec) ExpandFile(src, dst string, args ...map[string]interface{}) error {
-	return expandFile(src, dst,
-		EnvMap(append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
+	return expandFile(s.cfg, src, dst,
+		EnvMap(s.cfg, append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
 }
 
 // MustExpandFile expands a template file using data from the spec. It panics if
@@ -387,7 +393,7 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 		if in == "" {
 			return ""
 		}
-		return MustExpand(in, args...)
+		return MustExpand(s.cfg, in, args...)
 	}
 
 	if s.evalContext == nil {
@@ -499,7 +505,7 @@ func (s PackageSpec) ImageName() string {
 		}
 
 		data := s.toMap()
-		for k, v := range varMap() {
+		for k, v := range varMap(s.cfg) {
 			data[k] = v
 		}
 
@@ -603,13 +609,12 @@ func PackageZip(spec PackageSpec) error {
 	w := zip.NewWriter(buf)
 	baseDir := spec.rootDir()
 
-	// Add files to zip.
-	for _, pkgFile := range spec.Files {
+	// Add files to zip (dirs before files so explicit entries take precedence).
+	for _, pkgFile := range dirsFirst(spec.Files) {
 		if pkgFile.Symlink {
 			// not supported on zip archives
 			continue
 		}
-
 		if err := addFileToZip(w, baseDir, pkgFile); err != nil {
 			p, _ := filepath.Abs(pkgFile.Source)
 			return fmt.Errorf("failed adding file=%+v to zip: %w", p, err)
@@ -667,27 +672,15 @@ func PackageTarGz(spec PackageSpec) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err := outFile.Close(); err != nil {
-			log.Printf("failed to close output file: %v", err)
-		}
-	}()
+	defer closeOrLog(outFile, "output file")
 
 	// Create a gzip writer to our output file
 	gzWriter := gzip.NewWriter(outFile)
-	defer func() {
-		if err := gzWriter.Close(); err != nil {
-			log.Printf("failed to close gzip writer: %v", err)
-		}
-	}()
+	defer closeOrLog(gzWriter, "gzip writer")
 
 	// Create a new tar archive.
 	w := tar.NewWriter(gzWriter)
-	defer func() {
-		if err := w.Close(); err != nil {
-			log.Printf("failed to close tar writer: %v", err)
-		}
-	}()
+	defer closeOrLog(w, "tar writer")
 
 	// // Replace the darwin-universal by darwin-x86_64 and darwin-arm64. Also
 	// // keep the other files.
@@ -710,12 +703,11 @@ func PackageTarGz(spec PackageSpec) error {
 	// 	spec.Files = newFiles
 	// }
 
-	// Add files to tar.
-	for _, pkgFile := range spec.Files {
+	// Add files to tar (dirs before files so explicit entries take precedence).
+	for _, pkgFile := range dirsFirst(spec.Files) {
 		if pkgFile.Symlink {
 			continue
 		}
-
 		if err := addFileToTar(w, baseDir, pkgFile); err != nil {
 			return fmt.Errorf("failed adding file=%+v to tar: %w", pkgFile, err)
 		}
@@ -758,6 +750,14 @@ func PackageTarGz(spec PackageSpec) error {
 		return fmt.Errorf("failed to create .sha512 file: %w", err)
 	}
 	return nil
+}
+
+func closeOrLog(closer io.Closer, what string) {
+	err := closer.Close()
+	if err == nil || errors.Is(err, os.ErrClosed) {
+		return
+	}
+	log.Printf("failed to close %s: %v", what, err)
 }
 
 // PackageDeb packages a deb file. This requires Docker to execute FPM.
@@ -887,10 +887,35 @@ func addUIDGidEnvArgs(args []string) ([]string, error) {
 			"Using UID=%d GID=%d", uid, gid)
 	}
 
-	return append(args,
-		"-e", "EXEC_UID="+strconv.Itoa(uid),
-		"-e", "EXEC_GID="+strconv.Itoa(gid),
-	), nil
+	// In rootless Docker, container UID 0 maps to the host user's UID, so files
+	// created as root inside the container are already owned by the correct user
+	// on the host.
+	if !isRootlessDocker() {
+		args = append(args,
+			"-e", "EXEC_UID="+strconv.Itoa(uid),
+			"-e", "EXEC_GID="+strconv.Itoa(gid),
+		)
+	}
+
+	return args, nil
+}
+
+// dirsFirst returns files with directory-source entries (paths ending in "/")
+// before regular-file entries, so explicit files always overwrite any
+// conflicting path laid down by a directory expansion.
+func dirsFirst(files map[string]PackageFile) []PackageFile {
+	out := make([]PackageFile, 0, len(files))
+	for _, f := range files {
+		if strings.HasSuffix(f.Source, "/") {
+			out = append(out, f)
+		}
+	}
+	for _, f := range files {
+		if !strings.HasSuffix(f.Source, "/") {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // addFileToZip adds a file (or directory) to a zip archive.
@@ -952,11 +977,11 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path comes from filepath.Walk on trusted build inputs, no user-controlled symlink attack surface
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer closeOrLog(file, "zip input file")
 
 		if _, err = io.Copy(w, file); err != nil {
 			return err
@@ -1035,11 +1060,11 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path comes from filepath.WalkDir on trusted build inputs, no user-controlled symlink attack surface
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer closeOrLog(file, "tar input file")
 
 		if _, err = io.Copy(ar, file); err != nil {
 			return err
@@ -1104,7 +1129,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 }
 
 // PackageDocker packages the Beat into a docker image.
-func PackageDocker(spec PackageSpec) error {
+func PackageDocker(ctx context.Context, spec PackageSpec) error {
 	if err := HaveDocker(); err != nil {
 		return fmt.Errorf("docker daemon required to build images: %w", err)
 	}
@@ -1113,7 +1138,7 @@ func PackageDocker(spec PackageSpec) error {
 	if err != nil {
 		return err
 	}
-	return b.Build()
+	return b.Build(ctx)
 }
 
 func mustConvertToUnit32(i int64) uint32 {

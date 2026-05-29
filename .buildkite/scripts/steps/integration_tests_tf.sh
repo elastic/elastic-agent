@@ -54,7 +54,7 @@ else
   export KIBANA_HOST=$(buildkite-agent meta-data get "${METADATA_PREFIX}kibana.host")
   export KIBANA_USERNAME=$(buildkite-agent meta-data get "${METADATA_PREFIX}kibana.username")
   export KIBANA_PASSWORD=$(buildkite-agent meta-data get "${METADATA_PREFIX}kibana.pwd")
-  export INTEGRATIONS_SERVER_HOST=$(buildkite-agent meta-data get "${METADATA_PREFIX}integrations_server.host")
+  export ELASTIC_APM_SERVER_URL=$(buildkite-agent meta-data get "${METADATA_PREFIX}integrations_server.host")
   echo "Elasticsearch Host: ${ELASTICSEARCH_HOST}"
 fi
 
@@ -67,7 +67,7 @@ if [[ "${GROUP_NAME}" == "kubernetes" ]]; then
 else
   # test binaries are needed only when running integration tests outside of k8s
   echo "~~~ Building test binaries"
-  mage build:testBinaries
+  mage build:integrationTestBinaries
 
   if [ "$TEST_SUDO" == "true" ]; then
     sudo -E .buildkite/scripts/buildkite-integration-tests.sh $@

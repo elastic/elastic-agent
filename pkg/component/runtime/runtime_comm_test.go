@@ -19,10 +19,10 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
 type agentInfoMock struct {
@@ -52,12 +52,18 @@ func (a agentInfoMock) IsStandalone() bool {
 	return a.isStandalone
 }
 
-func (a agentInfoMock) Headers() map[string]string                          { panic("implement me") }
-func (a agentInfoMock) LogLevel() string                                    { panic("implement me") }
-func (a agentInfoMock) RawLogLevel() string                                 { panic("implement me") }
-func (a agentInfoMock) ReloadID(ctx context.Context) error                  { panic("implement me") }
-func (a agentInfoMock) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }
-func (a agentInfoMock) ECSMetadata(l *logger.Logger) (*info.ECSMeta, error) { panic("implement me") }
+func (a agentInfoMock) Headers() map[string]string         { panic("implement me") }
+func (a agentInfoMock) GetLogLevelRuntime() string         { panic("implement me") }
+func (a agentInfoMock) GetLogLevelPolicy() string          { panic("implement me") }
+func (a agentInfoMock) GetLogLevelOverride() string        { panic("implement me") }
+func (a agentInfoMock) ReloadID(ctx context.Context) error { panic("implement me") }
+func (a agentInfoMock) SetLogLevelPolicy(level string)     { panic("implement me") }
+func (a agentInfoMock) SetLogLevelOverride(_ context.Context, _ string) error {
+	panic("implement me")
+}
+func (a agentInfoMock) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
+	panic("implement me")
+}
 
 func TestCheckinExpected(t *testing.T) {
 	ca, err := authority.NewCA()

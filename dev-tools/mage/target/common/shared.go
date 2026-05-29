@@ -4,9 +4,14 @@
 
 package common
 
-import devtools "github.com/elastic/elastic-agent/dev-tools/mage"
+import (
+	"context"
+
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
+)
 
 // DumpVariables writes the template variables and values to stdout.
-func DumpVariables() error {
-	return devtools.DumpVariables()
+func DumpVariables(ctx context.Context) error {
+	cfg := devtools.SettingsFromContext(ctx)
+	return devtools.DumpVariables(cfg)
 }

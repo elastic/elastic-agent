@@ -35,8 +35,47 @@ function ess_up() {
   export KIBANA_HOST=$(terraform output -raw kibana_endpoint)
   export KIBANA_USERNAME=$ELASTICSEARCH_USERNAME
   export KIBANA_PASSWORD=$ELASTICSEARCH_PASSWORD
-  export INTEGRATIONS_SERVER_HOST=$(terraform output -raw integrations_server_endpoint)
+  export ELASTIC_APM_SERVER_URL=$(terraform output -raw integrations_server_endpoint)
   popd
+}
+
+function wait_for_stack() {
+  local max_attempts=${1:-60}
+  local sleep_seconds=${2:-10}
+
+  echo "~~~ Waiting for ESS Stack to be reachable"
+
+  local attempt=0
+  while [ $attempt -lt $max_attempts ]; do
+    attempt=$((attempt + 1))
+    echo "Attempt $attempt/$max_attempts: checking stack connectivity..."
+
+    local es_ok=false
+    local kibana_ok=false
+
+    if curl -sf -u "${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}" \
+        --max-time 10 \
+        "${ELASTICSEARCH_HOST}" > /dev/null 2>&1; then
+      es_ok=true
+    fi
+
+    if curl -sf -u "${KIBANA_USERNAME}:${KIBANA_PASSWORD}" \
+        --max-time 10 \
+        "${KIBANA_HOST}/api/status" > /dev/null 2>&1; then
+      kibana_ok=true
+    fi
+
+    if $es_ok && $kibana_ok; then
+      echo "Stack is reachable (Elasticsearch: OK, Kibana: OK)"
+      return 0
+    fi
+
+    echo "Not ready yet (Elasticsearch: $es_ok, Kibana: $kibana_ok). Retrying in ${sleep_seconds}s..."
+    sleep "$sleep_seconds"
+  done
+
+  echo "Error: Stack did not become reachable after $((max_attempts * sleep_seconds))s" >&2
+  return 1
 }
 
 function ess_down() {

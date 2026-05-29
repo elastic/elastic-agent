@@ -2,11 +2,9 @@
 navigation_title: Migrate components
 description: How to migrate from deprecated EDOT Collector components to their replacements.
 applies_to:
-  stack:
+  stack: ga
   serverless:
-    observability:
-  product:
-    edot_collector: ga
+    observability: ga
 type: how-to
 products:
   - id: cloud-serverless
