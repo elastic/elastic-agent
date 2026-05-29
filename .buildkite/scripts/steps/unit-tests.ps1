@@ -17,6 +17,18 @@ if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE
 }
 
+Write-Host "--- Disabling mitigations"
+# Disable CET (UserShadowStack) and ASLR globally
+Set-ProcessMitigation -System -Disable UserShadowStack, HighEntropyASLR, BottomUpASLR, ForceRelocateImages
+
+# Disable Hypervisor-Enforced Code Integrity
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" -Name "Enabled" -Value 0
+
+# Set the GlobalFlag to force the legacy heap system-wide (requires reboot)
+# 0x00000008 is the 'FLG_HEAP_PAGE_ALLOCS' or 'Disable Segment Heap' indicator in modern builds
+$registryPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager"
+Set-ItemProperty -Path $registryPath -Name "GlobalFlags" -Value 0x00000008
+
 Write-Host "--- Unit tests"
 # Diagnostic: maximize GC pressure to make golang/go#77975 more consistent.
 # GOGC=1 triggers a GC cycle after every allocation, maximising shrinkstack and
