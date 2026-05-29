@@ -854,13 +854,6 @@ func containerCfgOverrides(cfg *config.Config) error {
 		uCfg["agent.logging.to_files"] = false
 	}
 
-<<<<<<< HEAD
-=======
-	if envBool("HTTPPROF") {
-		uCfg["agent.monitoring.pprof.enabled"] = true
-	}
-
->>>>>>> 50c891c71 (Deduplicate config loading and override TLS cert paths in container mode (#14408))
 	eventsToStderrEnv := envWithDefault("false", "EVENTS_TO_STDERR")
 	eventsToStderr, err := strconv.ParseBool(eventsToStderrEnv)
 	if err != nil {

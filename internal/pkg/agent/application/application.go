@@ -48,18 +48,12 @@ import (
 	"github.com/elastic/elastic-agent/version"
 )
 
-<<<<<<< HEAD
 type rollbacksSource interface {
 	Set(map[string]ttl.TTLMarker) error
 	Get() (map[string]ttl.TTLMarker, error)
 	Remove(string) error
 }
 
-// CfgOverrider allows for application driven overrides of configuration read from disk.
-type CfgOverrider func(cfg *configuration.Configuration)
-
-=======
->>>>>>> 50c891c71 (Deduplicate config loading and override TLS cert paths in container mode (#14408))
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
 	ctx context.Context,
@@ -161,23 +155,9 @@ func New(
 		configMgr = newTestingModeConfigManager(log)
 	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
-<<<<<<< HEAD
-=======
-		flags, err := features.Parse(cfg.GetUCfg())
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
-		}
-		if flags.EncryptedConfig() {
-			if hasEncryptedStandaloneConfigChanged(log, pathConfigFile) {
-				log.Debug("Detected config file change, re-encrypting...")
-				if err := storage.EncryptConfigOnPath(paths.Config()); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to encrypt config file: %w", err)
-				}
-			}
->>>>>>> 50c891c71 (Deduplicate config loading and override TLS cert paths in container mode (#14408))
 
 		loader := config.NewLoader(log, paths.ExternalInputs())
-		rawCfgMap, err := rawConfig.ToMapStr()
+		rawCfgMap, err := cfg.GetUCfg().ToMapStr()
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
 		}
@@ -187,25 +167,8 @@ func New(
 			log.Debug("Reloading of configuration is off")
 			configMgr = newOnce(log, discover, loader)
 		} else {
-<<<<<<< HEAD
 			log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
 			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
-=======
-			loader := config.NewLoader(log, paths.ExternalInputs())
-			rawCfgMap, err := cfg.GetUCfg().ToMapStr()
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
-			}
-			discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
-				kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
-			if !cfg.Settings.Reload.Enabled {
-				log.Debug("Reloading of configuration is off")
-				configMgr = newOnce(log, discover, loader)
-			} else {
-				log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
-				configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
-			}
->>>>>>> 50c891c71 (Deduplicate config loading and override TLS cert paths in container mode (#14408))
 		}
 	} else {
 		isManaged = true
