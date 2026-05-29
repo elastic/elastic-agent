@@ -261,12 +261,32 @@ USER root
 # We don't use npx playwright install-deps because that could pull a newer version
 # Install additional fonts as well
 RUN for iter in {1..10}; do \
+<<<<<<< HEAD
     apt-get update -y && \
     $NODE_PATH/node/lib/node_modules/@elastic/synthetics/node_modules/.bin/playwright install-deps chromium && \
     DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes \
     fonts-noto \
     fonts-noto-cjk && \
     exit_code=0 && break || exit_code=$? && echo "apt-get error: retry $iter in 10s" && sleep 10; \
+=======
+        microdnf -y update && \
+        microdnf -y install fontconfig freetype cairo glib2 gtk3 pango xorg-x11-fonts-misc xorg-x11-fonts-Type1 \
+        at-spi2-atk atk at-spi2-core alsa-lib cups-libs dbus-libs libdrm mesa-libEGL mesa-libgbm nspr nss libX11 \
+        libX11-xcb libxcb libXcomposite libXdamage libXext libXfixes libXrandr libxkbcommon libxshmfence glib2 \
+        libicu mesa-libGL unzip && \
+        mkdir -p /usr/share/fonts/google-noto && \
+        curl -L -o NotoSansCJKjp.zip https://github.com/notofonts/noto-cjk/releases/download/Sans2.004/06_NotoSansCJKjp.zip && \
+        unzip NotoSansCJKjp.zip -d /usr/share/fonts/google-noto && \
+        rm -f NotoSansCJKjp.zip && \
+        microdnf -y remove unzip && \
+        curl -LO https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf && \
+        mv NotoSans-Regular.ttf /usr/share/fonts/google-noto && \
+        curl -LO https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf && \
+        mv NotoColorEmoji.ttf /usr/share/fonts/google-noto && \
+        fc-cache -fv && \
+        microdnf clean all && \
+        exit_code=0 && break || exit_code=$? && echo "microdnf error: retry $iter in 10s" && sleep 10; \
+>>>>>>> c66773c6f (chore: remove unused Synthetics dependencies (#14630))
     done; \
     (exit $exit_code)
 {{- end }}
@@ -276,7 +296,7 @@ USER root
 # Install required dependencies from wolfi repository
 RUN for iter in {1..10}; do \
         apk fix && \
-        apk add --no-interactive --no-progress --no-cache nodejs-22=22.22.2-r0 npm=11.14.1-r0 glib dbus-glib libatk-1.0 \
+        apk add --no-interactive --no-progress --no-cache nodejs-22=22.22.2-r0 npm=11.14.1-r0 glib libatk-1.0 \
         libatk-bridge-2.0 cups-libs libxcomposite libxdamage libxfixes libxrandr libxkbcommon pango alsa-lib \
         font-opensans fontconfig gtk icu-data-full libnss mesa font-noto-cjk font-noto-emoji && \
         exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
