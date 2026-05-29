@@ -49,18 +49,12 @@ import (
 	"github.com/elastic/elastic-agent/version"
 )
 
-<<<<<<< HEAD
 type rollbacksSource interface {
 	Set(map[string]ttl.TTLMarker) error
 	Get() (map[string]ttl.TTLMarker, error)
 	Remove(string) error
 }
 
-// CfgOverrider allows for application driven overrides of configuration read from disk.
-type CfgOverrider func(cfg *configuration.Configuration)
-
-=======
->>>>>>> 50c891c71 (Deduplicate config loading and override TLS cert paths in container mode (#14408))
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
 	ctx context.Context,
