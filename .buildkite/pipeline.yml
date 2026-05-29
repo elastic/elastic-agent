@@ -50,65 +50,12 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (nogreenteagc run %n)"
-    key: "unit-tests-win11-nogreenteagc"
-    # Same diagnostic config as unit-tests-win11, but with the Green Tea GC
-    # experiment disabled (GOEXPERIMENT=...,nogreenteagc). Green Tea GC is the
-    # new default-on collector in Go 1.26, and golang/go#77975 ("Windows crash
-    # with Go 1.26.0/1.26.1") implicates a Green Tea GC stack-scanning /
-    # copystack marking bug. This is the decisive A/B: it differs from the
-    # plain diagnostic variant by exactly one flag. If this variant stops
-    # reproducing the crash while unit-tests-win11 keeps crashing, the agent's
-    # crashes are confirmed to be that Green Tea GC bug - the evidence to
-    # attach to the upstream issue.
-    #
-    # (The earlier gcshrinkstackoff=1 variant was retired: build 40538 showed
-    # it failed at the same 7/10 rate as the plain variant, ruling out stack
-    # *shrinking* as the mechanism. copystack on stack *growth* is not disabled
-    # by that flag and remains in scope under the Green Tea hypothesis.)
-    command: .buildkite/scripts/steps/unit-tests.ps1
-    parallelism: 10
-    env:
-      EXTRA_GOEXPERIMENT: "nogreenteagc"
-    artifact_paths:
-      - "build/TEST-*.html"
-      - "build/TEST-*.xml"
-      - "build/diagnostics/*"
-      - "coverage-*.out"
-    agents:
-      provider: "azure"
-      image: "${IMAGE_WIN_11}"
-      imageVersion: "${IMAGE_WIN_11_VERSION}"
-      vmSize: "Standard_D8s_v5"
-      diskSizeGb: "256"
-    retry:
-      manual:
-        allowed: true
-    plugins:
-      - *google_oidc_plugin
-
-  - label: "Unit tests - Windows 11 (instrumented run %n)"
-    key: "unit-tests-win11-instrumented"
-    command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
-    parallelism: 5
-    artifact_paths:
-      - "build/TEST-*.html"
-      - "build/TEST-*.xml"
-      - "build/diagnostics/*"
-      - "coverage-*.out"
-      - "build/dumps/*.dmp"
-      - "build/bins/*.exe"
-    agents:
-      provider: "azure"
-      image: "${IMAGE_WIN_11}"
-      imageVersion: "${IMAGE_WIN_11_VERSION}"
-      vmSize: "Standard_D8s_v5"
-      diskSizeGb: "256"
-    retry:
-      manual:
-        allowed: true
-    plugins:
-      - *google_oidc_plugin
+  # NOTE (branch gc-panic-go125-bisect): the nogreenteagc and instrumented
+  # variants are intentionally removed here. This branch tests only whether the
+  # crash reproduces on Go 1.25.10 (see .go-version and the go.mod directives).
+  # The instrumented variant uses a different script not patched for the beats
+  # submodule go-directive downgrade, and nogreenteagc is moot on 1.25 (Green
+  # Tea is not the default there). Just the plain diagnostic variant on 1.25.
 
   - label: ":junit: Junit annotate"
     agents:
@@ -121,10 +68,6 @@ steps:
       - *google_oidc_plugin
     depends_on:
       - step: "unit-tests-win11"
-        allow_failure: true
-      - step: "unit-tests-win11-nogreenteagc"
-        allow_failure: true
-      - step: "unit-tests-win11-instrumented"
         allow_failure: true
 
   - wait: ~

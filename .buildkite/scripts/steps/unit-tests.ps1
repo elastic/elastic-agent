@@ -7,6 +7,20 @@ git reset --quiet --hard
 
 $env:GOTMPDIR = "$env:BUILDKITE_BUILD_CHECKOUT_PATH"
 
+# --- Go version bisect (branch gc-panic-go125-bisect) ---
+# .go-version and the root + internal/edot go.mod directives are pinned to
+# 1.25.10 on this branch. The beats submodule is checked out at its pinned
+# commit (go.mod says go 1.26.3), so patch its go directive here, after the
+# git reset above, to match. GOTOOLCHAIN=local prevents Go from auto-fetching
+# 1.26.3 to satisfy any leftover directive (which would defeat the bisect).
+$env:GOTOOLCHAIN = "local"
+Write-Host "--- Pinning beats submodule go directive to 1.25.10 for the bisect"
+if (Test-Path "beats\go.mod") {
+  (Get-Content "beats\go.mod") -replace '^go 1\.26\.\d+$', 'go 1.25.10' | Set-Content "beats\go.mod"
+  Write-Host ("beats/go.mod: " + ((Select-String -Path "beats\go.mod" -Pattern '^go ').Line))
+}
+Write-Host ("go version in use: " + (go version))
+
 Write-Host "--- Build unit test helper binaries"
 # Some unit tests exec helper binaries (pkg/component/fake/component,
 # internal/edot/testing, ...).  `go test ./...` will not build them on its own,
