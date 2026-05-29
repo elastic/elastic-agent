@@ -897,7 +897,8 @@ func (s *Settings) WithManifestInfo(ctx context.Context) (*Settings, error) {
 	clone.Packaging.Manifest = &resp
 	clone.Build.Snapshot = parsedVersion.IsSnapshot()
 	clone.Build.AgentCoreVersion = parsedVersion.CoreVersion()
-	clone.Packaging.AgentPackageVersion = parsedVersion.CoreVersion()
+	// This has to be the full version to account for Independent Agent Releases
+	clone.Packaging.AgentPackageVersion = parsedVersion.String()
 	clone.Build.AgentCoreCommitHash = agentCoreProject.CommitHash
 	clone.Build.DependenciesVersion = parsedVersion.VersionWithPrerelease()
 	return clone, nil
