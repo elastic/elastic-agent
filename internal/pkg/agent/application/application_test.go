@@ -418,7 +418,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 				assert.Equal(t, oldAgentInstallPath, filepath.Join("data", "elastic-agent-1.2.3-oldver"),
 					"Unexpected old install versioned home. Post normalize assertions may not be working")
 
-				createSymlinkForFakeInstall(t, topDir, newAgentInstallPath)
+				createLink(t, topDir, newAgentInstallPath)
 
 				mockRollbackSource := ttl.NewMockSource(t)
 				mockRollbackSource.EXPECT().GetAll().Return(
@@ -502,9 +502,9 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 	return relVersionedHomePath
 }
 
-// createSymlinkForFakeInstall creates the top-level elastic-agent symlink pointing at the binary
-// inside the given versioned home (relative to topDir).
-func createSymlinkForFakeInstall(t *testing.T, topDir string, relVersionedHomePath string) {
+// createLink (copied from the upgrade package tests) creates the top-level elastic-agent symlink
+// pointing at the binary inside the given versioned home (relative to topDir).
+func createLink(t *testing.T, topDir string, relVersionedHomePath string) {
 	t.Helper()
 	linkName := upgrade.AgentName
 	linkTarget := paths.BinaryPath(relVersionedHomePath, upgrade.AgentName)

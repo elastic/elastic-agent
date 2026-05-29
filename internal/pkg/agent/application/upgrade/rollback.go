@@ -128,6 +128,8 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return nil
 	}
 
+	// keepLogs preserves forensic logs immediately after rollback; the next startup
+	// or periodic cleanup (keepLogs=false) sweeps log-only dirs, so they do not accumulate.
 	return Cleanup(log, topDirPath, settings.RemoveMarker, true /* keepLogs */, prevVersionedHome)
 }
 
@@ -138,7 +140,9 @@ func Cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 
 func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool, delay time.Duration, versionedHomesToKeep ...string) error {
 	log.Infow("Cleaning up upgrade", "remove_marker", removeMarker)
-	<-time.After(delay)
+	if delay > 0 {
+		<-time.After(delay)
+	}
 
 	callerProtected := make(map[string]bool, len(versionedHomesToKeep))
 	for _, d := range versionedHomesToKeep {

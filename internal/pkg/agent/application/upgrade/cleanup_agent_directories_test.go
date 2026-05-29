@@ -34,9 +34,10 @@ func TestIsDegradedOnly(t *testing.T) {
 		{name: "join of errCleanupDegraded alone", err: errors.Join(errCleanupDegraded), want: true},
 		{name: "join of fsErr and errCleanupDegraded", err: errors.Join(fsErr, errCleanupDegraded), want: false},
 		{name: "join of errCleanupDegraded and fsErr", err: errors.Join(errCleanupDegraded, fsErr), want: false},
-		// fmt.Errorf wrapping uses Unwrap() error (single), not Unwrap() []error (join).
-		// isDegradedOnly checks only the join-sibling level, so a plain wrap is still "degraded only".
-		{name: "wrapped errCleanupDegraded (not a sibling)", err: fmt.Errorf("ctx: %w", errCleanupDegraded), want: true},
+		// fmt.Errorf wraps errCleanupDegraded with no non-degraded siblings → true.
+		{name: "fmt.Errorf wrap of errCleanupDegraded has no non-degraded siblings", err: fmt.Errorf("ctx: %w", errCleanupDegraded), want: true},
+		// fmt.Errorf wraps a join that has a non-degraded sibling → false (recursion catches it).
+		{name: "fmt.Errorf wrap of mixed join is not degraded-only", err: fmt.Errorf("ctx: %w", errors.Join(fsErr, errCleanupDegraded)), want: false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

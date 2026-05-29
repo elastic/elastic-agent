@@ -23,10 +23,11 @@ import (
 // Callers detect it via errors.Is.
 var errCleanupDegraded = errors.New("cleanup completed with degraded verification")
 
-// isDegradedOnly returns true when err wraps errCleanupDegraded and carries no sibling errors.
-// It checks only the top-level join siblings: if err is an errors.Join result it walks the list
-// and rejects any sibling that is not errCleanupDegraded. A plain fmt.Errorf wrap (Unwrap() error,
-// not Unwrap() []error) is not a join sibling, so it passes and the function returns true.
+// isDegradedOnly returns true when err wraps errCleanupDegraded and carries no non-degraded
+// sibling errors at any level of the error chain.
+// For errors.Join results it inspects the join siblings directly; for single-Unwrap wrappers
+// (e.g. fmt.Errorf("%w", ...)) it recurses into the wrapped error so that a join nested inside
+// a plain wrap is still inspected.
 func isDegradedOnly(err error) bool {
 	if !errors.Is(err, errCleanupDegraded) {
 		return false
@@ -38,6 +39,12 @@ func isDegradedOnly(err error) bool {
 				return false
 			}
 		}
+		return true
+	}
+	// Single-Unwrap wrapper: recurse so a nested join is fully inspected.
+	type unwrapSingle interface{ Unwrap() error }
+	if u, ok := err.(unwrapSingle); ok {
+		return isDegradedOnly(u.Unwrap())
 	}
 	return true
 }
@@ -96,7 +103,8 @@ func (dc *dirClassifier) shouldRemove(relPath string) bool {
 	if dc.markerErr != nil {
 		return false
 	}
-	// In strict mode (requireMarkerDetails=true), a nil-Details marker cannot confirm an active upgrade, so it does not protect directories.
+	// In strict mode (requireMarkerDetails=true), a nil-Details marker cannot confirm an
+	// active upgrade, so it does not protect directories.
 	markerProtects := dc.marker != nil && !IsTerminalState(dc.marker) && (!dc.requireMarkerDetails || dc.marker.Details != nil)
 	if markerProtects {
 		if (dc.marker.VersionedHome != "" && relPath == filepath.Clean(dc.marker.VersionedHome)) ||
@@ -110,8 +118,9 @@ func (dc *dirClassifier) shouldRemove(relPath string) bool {
 // cleanupOpts configures optional behaviour of cleanupAgentDirectories.
 type cleanupOpts struct {
 	// requireMarkerDetails controls whether a marker with nil Details is trusted for directory protection.
-	// true (strict): nil-Details marker cannot confirm an active upgrade and does not protect directories.
-	// false (lenient): legacy markers with nil Details still protect referenced directories.
+	// On disk, Details can be nil for two reasons: (1) marker written by an older agent before the Details field existed, (2) pre-unpack marker written before an upgrade begins.
+	// true (strict): used when the upgrade lifecycle is known to have ended. A nil-Details marker carries no information about an active upgrade and does not protect directories.
+	// false (lenient): used during periodic cleanup when the upgrade state is unknown. A nil-Details marker may indicate an upgrade in progress, so it still protects referenced directories.
 	requireMarkerDetails bool
 	// keepLogs skips the "logs" subdirectory when removing a versioned home.
 	keepLogs bool
@@ -197,6 +206,7 @@ func cleanupAgentDirectories(
 		}
 		relPath = filepath.Clean(relPath)
 		existingDirSet[relPath] = true
+		// !opts.keepLogs short-circuits on the common path; preserve this operand order.
 		if dc.shouldRemove(relPath) && (!opts.keepLogs || !hasOnlyLogs(log, absPath)) {
 			toRemove = append(toRemove, relPath)
 		} else {
@@ -239,9 +249,15 @@ func cleanupAgentDirectories(
 
 	// Reconcile the on-disk TTL registry when the desired state differs from what was
 	// found: expired entries removed, stale entries filtered, or malformed .ttl files
-	// present that Set needs to sweep.  This also handles .ttl files that survived a
-	// partial RemoveBut failure.  Skip when the registry is already in the desired
+	// present that Set needs to sweep. This also handles .ttl files that survived a
+	// partial RemoveBut failure. Skip when the registry is already in the desired
 	// state to avoid unnecessary I/O.
+	//
+	// Concurrency note: a concurrent Upgrade() may write new TTL markers between the
+	// GetAll call above and this Set. TTLMarkerRegistry.Set sweeps entries not in the
+	// desired map, so a race could briefly remove a newly written marker. This is
+	// tolerated: the next cleanup cycle will see it, and the upgrade marker protects
+	// the new install's directory independently of the TTL registry.
 	if len(filteredRollbacks) != len(parsedRaw) || len(malformed) > 0 {
 		if setErr := source.Set(filteredRollbacks); setErr != nil {
 			aggregateErr = errors.Join(aggregateErr, fmt.Errorf("syncing TTL registry: %w", setErr))
@@ -269,11 +285,17 @@ func hasOnlyLogs(log *logger.Logger, dir string) bool {
 			"file.path", dir, "error.message", err.Error())
 		return false
 	}
-	var visible []os.DirEntry
+	visibleCount := 0
+	logsDir := false
 	for _, e := range entries {
-		if len(e.Name()) > 0 && e.Name()[0] != '.' {
-			visible = append(visible, e)
+		if len(e.Name()) == 0 || e.Name()[0] == '.' {
+			continue
 		}
+		visibleCount++
+		if visibleCount > 1 {
+			return false
+		}
+		logsDir = e.IsDir() && e.Name() == "logs"
 	}
-	return len(visible) == 1 && visible[0].IsDir() && visible[0].Name() == "logs"
+	return visibleCount == 1 && logsDir
 }

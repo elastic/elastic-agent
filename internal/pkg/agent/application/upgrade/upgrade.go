@@ -298,7 +298,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	// (coordinator.handleUpgrade reads it to call MarkUpgradeFailed for Fleet ack) and restore
 	// active.commit if markUpgrade has already updated it.
 	var postSymlinkPhase bool
-	// Read the current commit from disk so dev builds with an empty release.Commit() are handled.
+	// activeCommitModified is set just before markUpgrade rewrites active.commit.
+	// The defer uses it to skip the restore when the file was never touched.
+	var activeCommitModified bool
+	// Read active.commit from disk; ensures the defer restores the correct pre-upgrade hash
+	// even if the running binary's embedded hash is empty or stale.
 	activeCommitPath := filepath.Join(paths.Top(), agentCommitFile)
 	previousCommitBytes, readErr := os.ReadFile(activeCommitPath)
 	previousCommit := release.Commit() // fallback if the file cannot be read
@@ -340,8 +344,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 					u.log.Warnw("failed to clean upgrade marker during upgrade cleanup", "error.message", cleanMarkerErr)
 				}
 			}
-			if postSymlinkPhase {
-				// Restore active.commit: the post-symlink markUpgrade may have updated it to the new hash
+			if activeCommitModified {
+				// Restore active.commit: markUpgrade rewrote it to the new hash
 				// but rollbackInstall only reverts the symlink, not active.commit.
 				if previousCommit == "" {
 					u.log.Warnw("skipping active.commit restore: pre-upgrade commit hash is unknown")
@@ -401,6 +405,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 			u.log.Infow("Startup rollback cleanup ran in degraded state; some directories may not have been removed")
 		}
 	}
+	// Reset err: cleanup errors are logged above and must not propagate via the named return.
+	err = nil
 
 	det.SetState(details.StateDownloading)
 
@@ -449,6 +455,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("archive metadata hash %q is shorter than the expected minimum of %d characters", metadata.hash, HashLen)
 	}
 	newVersionedHome := predictVersionedHomeFromMetadata(metadata)
+	// getPackageMetadata already rejects a manifest with empty VersionedHome, so this
+	// path is unreachable in practice; kept as defence against future changes.
 	if newVersionedHome == "" {
 		return nil, fmt.Errorf("predicted versioned home is empty for package %q (manifest present: %v); cannot determine upgrade target", archivePath, metadata.manifest != nil)
 	}
@@ -463,7 +471,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	previous := agentInstall{
 		parsedVersion: previousParsedVersion,
 		version:       release.VersionWithSnapshot(),
-		hash:          release.Commit(),
+		hash:          previousCommit, // use disk-read value so dev builds (empty release.Commit()) produce a valid marker
 		versionedHome: currentVersionedHome,
 	}
 	current := agentInstall{
@@ -578,8 +586,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(paths.Top(), previous, current)
 
 	// Write the marker with the post-symlink timestamp so the watcher's grace period starts at the moment the symlink flipped.
-	// markUpgrade also calls updateActiveCommit; if it fails mid-way (after writing the file but before returning),
-	// the defer restores active.commit to the pre-upgrade value.
+	// markUpgrade also calls updateActiveCommit; track this so the defer restores active.commit on any subsequent failure.
+	activeCommitModified = true
 	if err = u.markUpgrade(u.log, paths.Data(), time.Now(), current, previous, action, det, availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: refreshing upgrade marker failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
