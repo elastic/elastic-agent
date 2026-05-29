@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -381,7 +382,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 			postNormalizeAssertions: nil,
 		},
 		{
-			name: "Entries not having a matching install directory will be removed from the list",
+			name: "Non-existent install directory with unexpired TTL does not cause errors",
 			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, ttl.Source) {
 				_ = createFakeAgentInstall(t, topDir, "4.5.6", "newversionhash", true)
 				oldAgentInstallPath := createFakeAgentInstall(t, topDir, "1.2.3", "oldversionhash", true)
@@ -400,6 +401,8 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 						ValidUntil: tomorrow,
 					},
 				}, nil, nil)
+				// nonExistingVersionedHome has no directory on disk; reconciliation removes its stale TTL entry.
+				mockRollbackSource.EXPECT().Set(mock.Anything).Return(nil)
 
 				return nil, mockRollbackSource
 			},
@@ -428,6 +431,8 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 					},
 					nil, nil,
 				)
+				// Expired entry is removed; reconciliation syncs the registry.
+				mockRollbackSource.EXPECT().Set(mock.Anything).Return(nil)
 
 				return nil, mockRollbackSource
 			},

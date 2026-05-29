@@ -312,11 +312,10 @@ func New(
 	return coord, configMgr, varsManager, nil
 }
 
-// normalizeAgentInstalls will attempt to normalize the agent installs and related TTL markers:
-// - if we just rolled back: the update marker is checked and in case of rollback we clean up the TTL marker of the rolled back version
-// - check all the entries:
-//   - verify that the home directory for that install still exists (remove TTL markers for what does not exist anymore)
-//   - check if the agent install: if it is no longer valid collect the versioned home and the TTL marker for deletion
+// normalizeAgentInstalls normalizes agent installs and TTL markers on startup.
+// It does two things:
+//   - if we just rolled back, removes the TTL marker for the version we rolled back from
+//   - calls CleanAvailableRollbacks to remove expired and orphan installs and sync the TTL registry
 //
 // This function will NOT error out, it will log any errors it encounters as warnings but any error must be treated as non-fatal
 func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource ttl.Source) {

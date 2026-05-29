@@ -553,6 +553,7 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourFromNow, // still valid
 					},
 				}, nil, nil)
+				rollbackSource.EXPECT().Set(mock.Anything).Return(nil)
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
 					installedAgents: []testAgentInstall{
@@ -603,6 +604,7 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourFromNow, // still valid
 					},
 				}, nil, nil)
+				rollbackSource.EXPECT().Set(mock.Anything).Return(nil)
 
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
@@ -655,6 +657,7 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourAgo, // expired 1 hour ago
 					},
 				}, nil, nil)
+				rollbackSource.EXPECT().Set(mock.Anything).Return(nil)
 
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
@@ -691,6 +694,7 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourAgo, // expired 1 hour ago
 					},
 				}, nil, nil)
+				rollbackSource.EXPECT().Set(mock.Anything).Return(nil)
 
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
@@ -904,6 +908,30 @@ func TestPerformScheduledCleanup(t *testing.T) {
 				assert.DirExists(t, filepath.Join(topDir, "data", "elastic-agent-7.8.9-actual"))
 				assert.DirExists(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-valid1"))
 			},
+		},
+		{
+			name: "Degraded cleanup (no symlink): retry at minInterval regardless of unexpired TTL",
+			setup: func(t *testing.T, log *logger.Logger, topDir string, source *ttl.MockSource) {
+				// Create a fake install without a symlink so liveVersionedHome() fails,
+				// causing cleanupAgentDirectories to return errCleanupDegraded.
+				// A degraded run retries at minInterval so the broken symlink is
+				// rechecked promptly rather than waiting until TTL expiry.
+				createFakeAgentInstall(t, topDir, v456Valid.version, v456Valid.hash, true)
+				source.EXPECT().GetAll().Return(
+					map[string]ttl.TTLMarker{
+						filepath.Join("data", "elastic-agent-4.5.6-valid1"): {
+							Version:    "4.5.6",
+							Hash:       "valid1",
+							ValidUntil: now.Add(1 * time.Hour),
+						},
+					},
+					nil, nil)
+			},
+			args: args{
+				currentVersionedHome: filepath.Join("data", "elastic-agent-4.5.6-valid1"),
+				minInterval:          cleanupInterval,
+			},
+			want: now.Add(cleanupInterval),
 		},
 	}
 

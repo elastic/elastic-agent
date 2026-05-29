@@ -308,11 +308,14 @@ func PreserveActiveUpgradeVersions(marker *UpdateMarker, innerFilter RollbackCle
 // CleanAvailableRollbacks removes agent installation directories that are safe to delete.
 // It protects the current install and any unexpired TTL-tracked rollback targets.
 // Orphan directories (no TTL, no active marker reference) are swept.
-// Legacy upgrade markers with nil Details still protect referenced directories.
+// Directories referenced by an active upgrade marker are preserved even if the marker
+// has no Details set (legacy markers before rollback tracking was introduced).
 // The remaining TTL entries are returned so the caller can schedule the next cleanup.
 func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
 	callerProtected := map[string]bool{filepath.Clean(currentHomeRelPath): true}
-	return cleanupAgentDirectories(log, topDir, now, source, filter, callerProtected, false, false)
+	return cleanupAgentDirectories(log, topDir, now, source, filter, callerProtected, cleanupOpts{
+		requireMarkerDetails: false, // lenient: legacy markers with nil Details still protect directories
+	})
 }
 
 func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir, currentVersionedHome string, source ttl.Source, minInterval time.Duration) {
@@ -338,7 +341,17 @@ func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir,
 func performScheduledCleanup(log *logger.Logger, topDir, currentVersionedHome string, source ttl.Source, now time.Time, minInterval time.Duration) time.Time {
 	rollbacksAfterCleanup, err := CleanAvailableRollbacks(log, source, topDir, currentVersionedHome, now, CleanupExpiredRollbacks)
 	if err != nil {
-		log.Errorf("error cleaning up rollbacks: %s, rescheduling cleanup in %s", err.Error(), minInterval)
+		if !errors.Is(err, errCleanupDegraded) {
+			log.Errorf("error cleaning up rollbacks: %s, rescheduling cleanup in %s", err.Error(), minInterval)
+			return now.Add(minInterval)
+		}
+		// Degraded state (symlink or marker unreadable). If real filesystem errors are also present
+		// (e.g. RemoveBut returned EBUSY), log them so operators notice.
+		if !isDegradedOnly(err) {
+			log.Warnf("cleanup filesystem errors in degraded run: %s", err.Error())
+		}
+		log.Warnf("cleanup completed in degraded state; %d unexpired rollback(s) preserved; rescheduling in %s",
+			len(rollbacksAfterCleanup), minInterval)
 		return now.Add(minInterval)
 	}
 
