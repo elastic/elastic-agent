@@ -77,7 +77,6 @@ This section provides a summary of components included in the Elastic Distributi
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.152.0/receiver/zipkinreceiver/README.md) | v0.152.0 |
 | [zookeeperreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zookeeperreceiver/v0.152.0/receiver/zookeeperreceiver/README.md) | v0.152.0 |
 
-
 ### Exporters
 
 | Component | Version |
