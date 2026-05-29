@@ -827,10 +827,10 @@ func TestUnpack(t *testing.T) {
 	}
 }
 
-// TestVersionedHomeFromMetadataMatchesUnpacker verifies that versionedHomeFromMetadata predicts the same path as the
-// unzip/untar functions compute from the same metadata. The upgrade flow writes the marker (using versionedHomeFromMetadata)
-// before unpacking, so a divergence would mean the marker protects the wrong directory.
-func TestVersionedHomeFromMetadataMatchesUnpacker(t *testing.T) {
+// TestPredictVersionedHomeFromMetadata verifies that predictVersionedHomeFromMetadata derives the correct path
+// from each metadata shape. The upgrade flow writes the marker (using predictVersionedHomeFromMetadata) before
+// unpacking, so a divergence would mean the marker protects the wrong directory.
+func TestPredictVersionedHomeFromMetadata(t *testing.T) {
 	tests := []struct {
 		name     string
 		metadata packageMetadata
@@ -846,6 +846,17 @@ func TestVersionedHomeFromMetadataMatchesUnpacker(t *testing.T) {
 				manifest: &v1.PackageManifest{
 					Package: v1.PackageDesc{
 						VersionedHome: "data/elastic-agent-abcdef",
+					},
+				},
+			},
+		},
+		{
+			name: "manifest with empty VersionedHome returns empty string",
+			metadata: packageMetadata{
+				hash: "abcdef1234567890",
+				manifest: &v1.PackageManifest{
+					Package: v1.PackageDesc{
+						VersionedHome: "", // empty — must return "" so Upgrade() can guard against it
 					},
 				},
 			},
@@ -878,8 +889,8 @@ func TestVersionedHomeFromMetadataMatchesUnpacker(t *testing.T) {
 				unpackerVersionedHome = createVersionedHomeFromHash(tt.metadata.hash)
 			}
 
-			assert.Equal(t, unpackerVersionedHome, versionedHomeFromMetadata(tt.metadata),
-				"versionedHomeFromMetadata must agree with the unpacker for metadata %+v", tt.metadata)
+			assert.Equal(t, unpackerVersionedHome, predictVersionedHomeFromMetadata(tt.metadata),
+				"predictVersionedHomeFromMetadata must agree with the unpacker for metadata %+v", tt.metadata)
 		})
 	}
 }

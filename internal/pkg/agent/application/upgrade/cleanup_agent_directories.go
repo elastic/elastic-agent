@@ -7,6 +7,7 @@ package upgrade
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -17,9 +18,29 @@ import (
 )
 
 // errCleanupDegraded signals that cleanupAgentDirectories completed but with
-// degraded verification (symlink and/or upgrade marker could not be read).
+// degraded verification: the live-install symlink or the upgrade marker could
+// not be read, so some conservative directory-preservation decisions were made.
 // Callers detect it via errors.Is.
-var errCleanupDegraded = errors.New("rollback cleanup completed with degraded verification")
+var errCleanupDegraded = errors.New("cleanup completed with degraded verification")
+
+// isDegradedOnly returns true when err wraps errCleanupDegraded and carries no sibling errors.
+// It checks only the top-level join siblings: if err is an errors.Join result it walks the list
+// and rejects any sibling that is not errCleanupDegraded. A plain fmt.Errorf wrap (Unwrap() error,
+// not Unwrap() []error) is not a join sibling, so it passes and the function returns true.
+func isDegradedOnly(err error) bool {
+	if !errors.Is(err, errCleanupDegraded) {
+		return false
+	}
+	type unwrapList interface{ Unwrap() []error }
+	if u, ok := err.(unwrapList); ok {
+		for _, e := range u.Unwrap() {
+			if !errors.Is(e, errCleanupDegraded) {
+				return false
+			}
+		}
+	}
+	return true
+}
 
 // dirClassifier holds the inputs needed to decide whether each agent directory
 // should be removed during cleanup. Built once per cleanup run and queried per directory.
@@ -59,7 +80,7 @@ func (dc *dirClassifier) shouldRemove(relPath string) bool {
 		}
 		// Defense in depth: expired TTL but still the live symlink target — keep.
 		if dc.symlinkErr == nil && relPath == dc.symlinkTarget {
-			dc.log.Warnw("TTL is expired but directory is the live install symlink target; preserving",
+			dc.log.Debugw("TTL is expired but directory is the live install symlink target; preserving",
 				"versionedHome", relPath)
 			return false
 		}
@@ -75,13 +96,25 @@ func (dc *dirClassifier) shouldRemove(relPath string) bool {
 	if dc.markerErr != nil {
 		return false
 	}
-	// In strict mode (requireMarkerDetails=true), a marker with nil Details cannot confirm an active upgrade, so it does not protect directories.
-	if dc.marker != nil && !IsTerminalState(dc.marker) && (!dc.requireMarkerDetails || dc.marker.Details != nil) {
-		if relPath == filepath.Clean(dc.marker.VersionedHome) || relPath == filepath.Clean(dc.marker.PrevVersionedHome) {
+	// In strict mode (requireMarkerDetails=true), a nil-Details marker cannot confirm an active upgrade, so it does not protect directories.
+	markerProtects := dc.marker != nil && !IsTerminalState(dc.marker) && (!dc.requireMarkerDetails || dc.marker.Details != nil)
+	if markerProtects {
+		if (dc.marker.VersionedHome != "" && relPath == filepath.Clean(dc.marker.VersionedHome)) ||
+			(dc.marker.PrevVersionedHome != "" && relPath == filepath.Clean(dc.marker.PrevVersionedHome)) {
 			return false
 		}
 	}
 	return true
+}
+
+// cleanupOpts configures optional behaviour of cleanupAgentDirectories.
+type cleanupOpts struct {
+	// requireMarkerDetails controls whether a marker with nil Details is trusted for directory protection.
+	// true (strict): nil-Details marker cannot confirm an active upgrade and does not protect directories.
+	// false (lenient): legacy markers with nil Details still protect referenced directories.
+	requireMarkerDetails bool
+	// keepLogs skips the "logs" subdirectory when removing a versioned home.
+	keepLogs bool
 }
 
 // cleanupAgentDirectories removes agent directories that are safe to delete and
@@ -95,8 +128,7 @@ func cleanupAgentDirectories(
 	source ttl.Source,
 	filter RollbackCleanupFilter,
 	callerProtected map[string]bool,
-	requireMarkerDetails bool,
-	keepLogs bool,
+	opts cleanupOpts,
 ) (map[string]ttl.TTLMarker, error) {
 	allAgentDirs, err := snapshotAgentDirs(topDir)
 	if err != nil {
@@ -108,13 +140,13 @@ func cleanupAgentDirectories(
 		return nil, fmt.Errorf("unable to get available rollbacks: %w", err)
 	}
 	for versionedHome, parseErr := range malformed {
-		log.Infow("TTL marker is unparseable; directory will not be protected from cleanup",
+		log.Infow("TTL marker is unparseable; treating directory as orphan candidate",
 			"versionedHome", versionedHome, "error.message", parseErr.Error())
 	}
 
 	// Reuse each filter result for both the removal map and the leftover set.
 	expiredTTL := make(map[string]bool, len(parsedRaw))
-	leftoverRollbacks := make(map[string]ttl.TTLMarker)
+	leftoverRollbacks := make(map[string]ttl.TTLMarker, len(parsedRaw))
 	for versionedHome, m := range parsedRaw {
 		removable := filter(log, now, versionedHome, m)
 		expiredTTL[versionedHome] = removable
@@ -146,12 +178,15 @@ func cleanupAgentDirectories(
 		callerProtected:      callerProtected,
 		marker:               marker,
 		markerErr:            markerErr,
-		requireMarkerDetails: requireMarkerDetails,
+		requireMarkerDetails: opts.requireMarkerDetails,
 		symlinkTarget:        symlinkTarget,
 		symlinkErr:           symlinkErr,
 		expiredTTL:           expiredTTL,
 	}
 
+	// existingDirSet is built here (rather than in a separate pass) to avoid
+	// computing filepath.Rel twice for every directory.
+	existingDirSet := make(map[string]bool, len(allAgentDirs))
 	var toRemove, keptDirs []string
 	for _, absPath := range allAgentDirs {
 		relPath, relErr := filepath.Rel(topDir, absPath)
@@ -161,44 +196,84 @@ func cleanupAgentDirectories(
 			continue
 		}
 		relPath = filepath.Clean(relPath)
-		if dc.shouldRemove(relPath) {
+		existingDirSet[relPath] = true
+		if dc.shouldRemove(relPath) && (!opts.keepLogs || !hasOnlyLogs(log, absPath)) {
 			toRemove = append(toRemove, relPath)
 		} else {
 			keptDirs = append(keptDirs, relPath)
 		}
 	}
 
-	log.Infof("Starting cleanup of versioned homes. Keeping: %v", keptDirs)
-
-	keepDirsMap := make(map[string]bool, len(keptDirs))
-	for _, d := range keptDirs {
-		keepDirsMap[d] = true
-	}
-	log.Debugw("preparing to cleanup agent directories", "keep_dirs", keepDirsMap, "to_remove", len(toRemove))
-
-	for _, d := range keptDirs {
-		log.Debugw("leaving agent directory intact", "path", d)
-	}
+	log.Infow("Starting cleanup of versioned homes", "toKeep", keptDirs, "toRemove", toRemove)
 
 	var aggregateErr error
 	for _, relPath := range toRemove {
 		hashedDir := filepath.Join(topDir, relPath)
 		log.Infow("Removing hashed data directory", "file.path", hashedDir)
 		var ignoredDirs []string
-		if keepLogs {
+		if opts.keepLogs {
 			ignoredDirs = []string{"logs"}
 		}
 		if cleanupErr := install.RemoveBut(log, hashedDir, true, ignoredDirs...); cleanupErr != nil {
-			aggregateErr = errors.Join(aggregateErr, cleanupErr)
+			if errors.Is(cleanupErr, os.ErrNotExist) {
+				log.Debugw("directory already gone before removal; skipping", "file.path", hashedDir)
+				continue
+			}
+			aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing %q: %w", hashedDir, cleanupErr))
+		}
+	}
+
+	// Filter leftoverRollbacks to entries whose directory still exists on disk.
+	// In practice this is always identical to leftoverRollbacks (unexpired TTL entries
+	// are never put in toRemove), but it defends against external deletions or edge
+	// cases where the dir disappears between snapshotAgentDirs and now.
+	filteredRollbacks := make(map[string]ttl.TTLMarker, len(leftoverRollbacks))
+	for versionedHome, m := range leftoverRollbacks {
+		if existingDirSet[filepath.Clean(versionedHome)] {
+			filteredRollbacks[versionedHome] = m
+		} else {
+			log.Debugw("removing stale TTL marker for non-existent directory",
+				"versionedHome", versionedHome)
+		}
+	}
+
+	// Reconcile the on-disk TTL registry when the desired state differs from what was
+	// found: expired entries removed, stale entries filtered, or malformed .ttl files
+	// present that Set needs to sweep.  This also handles .ttl files that survived a
+	// partial RemoveBut failure.  Skip when the registry is already in the desired
+	// state to avoid unnecessary I/O.
+	if len(filteredRollbacks) != len(parsedRaw) || len(malformed) > 0 {
+		if setErr := source.Set(filteredRollbacks); setErr != nil {
+			aggregateErr = errors.Join(aggregateErr, fmt.Errorf("syncing TTL registry: %w", setErr))
 		}
 	}
 
 	switch {
 	case degraded && aggregateErr != nil:
-		return leftoverRollbacks, errors.Join(aggregateErr, errCleanupDegraded)
+		return filteredRollbacks, errors.Join(aggregateErr, errCleanupDegraded)
 	case degraded:
-		return leftoverRollbacks, errCleanupDegraded
+		return filteredRollbacks, errCleanupDegraded
 	default:
-		return leftoverRollbacks, aggregateErr
+		return filteredRollbacks, aggregateErr
 	}
+}
+
+// hasOnlyLogs returns true when dir contains exactly one visible (non-hidden) entry
+// and that entry is a directory named "logs".
+// Hidden entries (names starting with ".") are ignored so that OS artefacts like
+// .DS_Store or a leftover .ttl file do not cause a false negative.
+func hasOnlyLogs(log *logger.Logger, dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		log.Debugw("could not read directory for log-only check; assuming not log-only",
+			"file.path", dir, "error.message", err.Error())
+		return false
+	}
+	var visible []os.DirEntry
+	for _, e := range entries {
+		if len(e.Name()) > 0 && e.Name()[0] != '.' {
+			visible = append(visible, e)
+		}
+	}
+	return len(visible) == 1 && visible[0].IsDir() && visible[0].Name() == "logs"
 }
