@@ -22,12 +22,12 @@ Write-Host "--- Disabling mitigations"
 Set-ProcessMitigation -System -Disable HighEntropy, BottomUp, UserShadowStack, ForceRelocateImages
 
 # Disable Hypervisor-Enforced Code Integrity
-Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" -Name "Enabled" -Value 0
+# Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" -Name "Enabled" -Value 0
 
 # Set the GlobalFlag to force the legacy heap system-wide (requires reboot)
 # 0x00000008 is the 'FLG_HEAP_PAGE_ALLOCS' or 'Disable Segment Heap' indicator in modern builds
-$registryPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager"
-Set-ItemProperty -Path $registryPath -Name "GlobalFlags" -Value 0x00000008
+# $registryPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager"
+# Set-ItemProperty -Path $registryPath -Name "GlobalFlags" -Value 0x00000008
 
 Write-Host "--- Unit tests"
 # Diagnostic: maximize GC pressure to make golang/go#77975 more consistent.
