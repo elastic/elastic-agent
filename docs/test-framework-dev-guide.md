@@ -151,6 +151,49 @@ share similar leavers as the packaging process.
        the case on macOS Docker Desktop). Requires Docker; does not require
        GCE credentials.
 
+ - `STACK_PROVISIONER`: Sets the provisioner used to create the Elastic Stack
+   (Elasticsearch, Kibana, Fleet Server) the tests talk to. Possible values are:
+     - `stateful`: Provisions a cloud ESS deployment (the default). Requires an
+       ESS API key (`mage integration:auth`).
+     - `serverless`: Provisions a cloud serverless project. Also requires an ESS
+       API key.
+     - `local`: Brings up a fully local stack with
+       [`elastic-package stack up`](https://github.com/elastic/elastic-package) —
+       no cloud account needed. Requires the `elastic-package` binary on `PATH`
+       (`go install github.com/elastic/elastic-package@latest`, or point
+       `ELASTIC_PACKAGE_BIN` at it). It uses a dedicated elastic-package profile
+       (`elastic-agent-integration`, override with `ELASTIC_PACKAGE_PROFILE`) so it
+       does not disturb a stack you may run yourself in the `default` profile.
+
+       The stack pulls Elastic images from `docker.elastic.co`, including the
+       package-registry image, which requires authentication. Run a one-time
+       `docker login docker.elastic.co` before first use. (elastic-package has no
+       supported way to skip the package-registry — Kibana depends on it — and its
+       image has no override, so authenticating is currently the simplest path.)
+
+   The `local` stack is designed to pair with the `docker` instance provisioner.
+   The local stack serves Elasticsearch/Kibana/Fleet over HTTPS with a self-signed
+   CA, so the runner:
+     - installs that CA into the test container's system trust store, so both the
+       test clients and the agent under test trust the stack with no `--insecure`
+       or per-test certificate configuration (both fall back to the system trust
+       store when no CA is configured); and
+     - attaches the test container to elastic-package's compose network, so the
+       container reaches the stack by service name (`https://elasticsearch:9200`,
+       `https://kibana:5601`, `https://fleet-server:8220`) — the names covered by
+       each service certificate's SANs, so TLS hostname verification passes; and
+     - relaxes a couple of Elasticsearch cluster settings on the single-node local
+       stack (disables disk-watermark-based allocation and raises the per-node shard
+       cap), since the suites create many data streams and would otherwise hit
+       `503 no_shard_available_action_exception`.
+
+   Example (no cloud account required):
+   ```
+   STACK_PROVISIONER=local INSTANCE_PROVISIONER=docker \
+     TEST_PLATFORMS="linux/amd64/ubuntu/24.04" AGENT_VERSION="9.5.0-SNAPSHOT" \
+     TEST_PACKAGES=tar.gz mage integration:single TestSystemMetricsWithLogstashOutput
+   ```
+
 When running local mode integration tests, `BUILD_AGENT=true` will build the agent for the current platform before running.
 
 An example for running a single test, including packaging the artifacts for it is:

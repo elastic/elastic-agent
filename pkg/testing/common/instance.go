@@ -70,3 +70,19 @@ type InstanceProvisioner interface {
 	// Clean cleans up all provisioned resources.
 	Clean(ctx context.Context, cfg Config, instances []Instance) error
 }
+
+// InstanceNetworkAttacher is an optional interface an InstanceProvisioner may
+// implement to attach a provisioned instance to an additional, externally-managed
+// network so it can reach a stack that lives on that network.
+//
+// It is used by the local stack provisioner together with the docker instance
+// provisioner: the local stack runs as a set of containers on its own compose
+// network, and the test container must join that network to resolve the stack's
+// services by name (so TLS hostnames match). The runner calls this when the stack
+// advertises a network and the instance provisioner implements this interface;
+// otherwise it is a no-op.
+type InstanceNetworkAttacher interface {
+	// AttachInstanceToNetwork attaches the given instance to the named network.
+	// It must be idempotent (attaching an already-attached instance is not an error).
+	AttachInstanceToNetwork(ctx context.Context, instance Instance, network string) error
+}

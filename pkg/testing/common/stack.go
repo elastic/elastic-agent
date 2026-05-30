@@ -41,6 +41,13 @@ type Stack struct {
 	// Password is the password.
 	Password string `yaml:"password"`
 
+	// CACert is the PEM-encoded CA certificate that signed the stack's
+	// Elasticsearch/Kibana/Fleet Server certificates. It is empty when the stack
+	// uses publicly-trusted certificates (e.g. cloud ESS); local stacks that serve
+	// TLS with a self-signed CA set it so the runner can install it into the test
+	// instance's trust store.
+	CACert string `yaml:"ca_cert"`
+
 	// Internal holds internal information used by the provisioner.
 	// Best to not touch the contents of this, and leave it be for
 	// the provisioner.

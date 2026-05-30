@@ -406,6 +406,31 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		env["KIBANA_PASSWORD"] = stack.Password
 		env["ELASTIC_APM_SERVER_URL"] = stack.IntegrationsServer
 		logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
+
+		// If the stack serves TLS with a private CA (local stacks do; cloud stacks
+		// use publicly-trusted certs and leave this empty), install it into the
+		// instance's system trust store. Both the test clients and the agent under
+		// test fall back to the system trust store when no CA is configured, so this
+		// makes them trust the stack with no per-test configuration.
+		if stack.CACert != "" {
+			if err := installStackCA(ctx, client, logger, stack.CACert); err != nil {
+				return common.OSRunnerResult{}, fmt.Errorf("failed to install stack CA on instance %s: %w", instance.Name, err)
+			}
+		}
+
+		// If the stack lives on its own network (local stacks) and the instance
+		// provisioner can attach to it, join the instance so it resolves the stack's
+		// services by name — which is what their TLS certificate SANs cover.
+		if network, ok := stack.Internal["network"].(string); ok && network != "" {
+			if na, ok := r.ip.(common.InstanceNetworkAttacher); ok {
+				logger.Logf("Attaching instance to stack network %s", network)
+				if err := na.AttachInstanceToNetwork(ctx, instance.Instance, network); err != nil {
+					return common.OSRunnerResult{}, fmt.Errorf("failed to attach instance %s to stack network %s: %w", instance.Name, network, err)
+				}
+			} else {
+				logger.Logf("Stack advertises network %s but instance provisioner %q cannot attach to it; tests may not reach the stack", network, r.ip.Name())
+			}
+		}
 	}
 
 	// set the go test flags
@@ -430,6 +455,23 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 	}
 
 	return result, nil
+}
+
+// installStackCA installs the PEM-encoded CA certificate into the instance's system
+// trust store over SSH and refreshes the trust store. Used for local stacks that
+// serve TLS with a self-signed CA.
+func installStackCA(ctx context.Context, client tssh.SSHClient, logger common.Logger, caPEM string) error {
+	logger.Logf("Installing stack CA certificate into instance trust store")
+	const dest = "/usr/local/share/ca-certificates/elastic-package-stack-ca.crt"
+	// `tee` (as root) writes the CA piped over stdin; the .crt extension under
+	// /usr/local/share/ca-certificates is what update-ca-certificates picks up.
+	if _, _, err := client.Exec(ctx, "sudo", []string{"tee", dest}, strings.NewReader(caPEM)); err != nil {
+		return fmt.Errorf("failed to write CA certificate to %s: %w", dest, err)
+	}
+	if _, _, err := client.Exec(ctx, "sudo", []string{"update-ca-certificates"}, nil); err != nil {
+		return fmt.Errorf("failed to refresh CA trust store: %w", err)
+	}
+	return nil
 }
 
 // validate ensures that required builds of Elastic Agent exist

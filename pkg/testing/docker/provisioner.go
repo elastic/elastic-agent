@@ -253,6 +253,21 @@ func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []co
 	return nil
 }
 
+// AttachInstanceToNetwork connects the instance's container to an additional docker
+// network so it can reach a stack running on that network (see
+// common.InstanceNetworkAttacher). It is idempotent: re-attaching an
+// already-connected container is treated as success.
+func (p *provisioner) AttachInstanceToNetwork(ctx context.Context, instance common.Instance, network string) error {
+	out, err := p.docker(ctx, nil, "network", "connect", network, instance.Name)
+	if err != nil {
+		if strings.Contains(out, "already exists in network") || strings.Contains(out, "already connected") {
+			return nil
+		}
+		return fmt.Errorf("failed to connect container %s to network %s: %w", instance.Name, network, err)
+	}
+	return nil
+}
+
 // launch creates (or recreates) the container for a batch and returns its instance.
 // modCache, when non-empty, is the host Go module download cache to share read-only.
 func (p *provisioner) launch(ctx context.Context, batch common.OSBatch, build imageBuild, publicKey []byte, modCache string) (common.Instance, error) {

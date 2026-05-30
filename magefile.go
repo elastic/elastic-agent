@@ -3260,9 +3260,14 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
 	}
 
-	provisionCfg, err := essProvisionerConfig(cfg, stackIdentifier)
-	if err != nil {
-		return nil, err
+	// The local stack provisioner runs elastic-package locally and needs no ESS
+	// credentials; only the cloud (stateful/serverless) provisioners require an API key.
+	var provisionCfg ess.ProvisionerConfig
+	if cfg.IntegrationTest.StackProvisioner != ess.ProvisionerLocal {
+		provisionCfg, err = essProvisionerConfig(cfg, stackIdentifier)
+		if err != nil {
+			return nil, err
+		}
 	}
 	stackProvisioner, _, err := newStackProvisioner(cfg, provisionCfg)
 	if err != nil {
@@ -3384,10 +3389,14 @@ func newStackProvisioner(cfg *devtools.Settings, provisionCfg ess.ProvisionerCon
 		defer cancel()
 		sp, err := ess.NewServerlessProvisioner(ctx, provisionCfg)
 		return sp, mode, err
+	case ess.ProvisionerLocal:
+		sp, err := ess.NewLocalProvisioner()
+		return sp, mode, err
 	default:
-		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
+		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q or %q, not %s",
 			ess.ProvisionerStateful,
 			ess.ProvisionerServerless,
+			ess.ProvisionerLocal,
 			mode)
 	}
 }
@@ -3408,9 +3417,14 @@ func ensureLocalStack(ctx context.Context, cfg *devtools.Settings) (map[string]s
 		return nil, err
 	}
 
-	provisionCfg, err := essProvisionerConfig(cfg, essIdentifier(localStackUser()))
-	if err != nil {
-		return nil, err
+	// The local stack provisioner runs elastic-package locally and needs no ESS
+	// credentials; only the cloud (stateful/serverless) provisioners require an API key.
+	var provisionCfg ess.ProvisionerConfig
+	if cfg.IntegrationTest.StackProvisioner != ess.ProvisionerLocal {
+		provisionCfg, err = essProvisionerConfig(cfg, essIdentifier(localStackUser()))
+		if err != nil {
+			return nil, err
+		}
 	}
 	sp, mode, err := newStackProvisioner(cfg, provisionCfg)
 	if err != nil {
