@@ -65,6 +65,10 @@ func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeK8SCluster
 }
 
+func (p *provisioner) Location() common.ProvisionerLocation {
+	return common.ProvisionerLocationLocal
+}
+
 func (p *provisioner) SetLogger(l common.Logger) {
 	p.logger = l
 }
