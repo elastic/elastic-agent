@@ -50,26 +50,25 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (nogreenteagc run %n)"
-    key: "unit-tests-win11-nogreenteagc"
-    # Same diagnostic config as unit-tests-win11, but with the Green Tea GC
-    # experiment disabled (GOEXPERIMENT=...,nogreenteagc). Green Tea GC is the
-    # new default-on collector in Go 1.26, and golang/go#77975 ("Windows crash
-    # with Go 1.26.0/1.26.1") implicates a Green Tea GC stack-scanning /
-    # copystack marking bug. This is the decisive A/B: it differs from the
-    # plain diagnostic variant by exactly one flag. If this variant stops
-    # reproducing the crash while unit-tests-win11 keeps crashing, the agent's
-    # crashes are confirmed to be that Green Tea GC bug - the evidence to
-    # attach to the upstream issue.
+  - label: "Unit tests - Windows 11 (norace run %n)"
+    key: "unit-tests-win11-norace"
+    # Same diagnostic config as unit-tests-win11, but with the race detector
+    # disabled on amd64 (NO_RACE=1). The race detector is only supported on
+    # windows/amd64 - never arm64 - so the arm64 runs that "don't crash" never
+    # had -race at all, confounding the architecture comparison. This variant
+    # de-confounds it on the same Win11 amd64 VM: if amd64 still crashes without
+    # -race, the bug is independent of the race detector and the arm64/Win10
+    # differences are a real environment signal; if it stops crashing, the
+    # repro depends on the race detector's instrumentation/scheduling timing.
     #
-    # (The earlier gcshrinkstackoff=1 variant was retired: build 40538 showed
-    # it failed at the same 7/10 rate as the plain variant, ruling out stack
-    # *shrinking* as the mechanism. copystack on stack *growth* is not disabled
-    # by that flag and remains in scope under the Green Tea hypothesis.)
+    # (Green Tea GC was ruled out: the crash reproduces with GOEXPERIMENT=
+    # nogreenteagc and on Go 1.25.10, so the nogreenteagc variant was retired.
+    # The earlier gcshrinkstackoff=1 variant was also retired: build 40538
+    # showed it failed at the same ~7/10 rate as the plain variant.)
     command: .buildkite/scripts/steps/unit-tests.ps1
     parallelism: 10
     env:
-      EXTRA_GOEXPERIMENT: "nogreenteagc"
+      NO_RACE: "1"
     artifact_paths:
       - "build/TEST-*.html"
       - "build/TEST-*.xml"
@@ -122,7 +121,7 @@ steps:
     depends_on:
       - step: "unit-tests-win11"
         allow_failure: true
-      - step: "unit-tests-win11-nogreenteagc"
+      - step: "unit-tests-win11-norace"
         allow_failure: true
       - step: "unit-tests-win11-instrumented"
         allow_failure: true

@@ -49,13 +49,12 @@ if ($env:EXTRA_GODEBUG) {
 }
 Write-Host "GODEBUG=$env:GODEBUG"
 
-# GOEXPERIMENT is built into the runtime/std `go test` rebuilds, so it is the
-# right lever for the Green Tea GC experiment (default-on in Go 1.26). The
-# upstream crash golang/go#77975 ("Windows crash with Go 1.26.0/1.26.1")
-# implicates Green Tea GC's stack scanning / copystack marking. The
-# nogreenteagc pipeline variant sets EXTRA_GOEXPERIMENT=nogreenteagc: if that
-# variant stops crashing while the plain diagnostic variant keeps crashing,
-# the agent's crashes are confirmed to be that Green Tea GC bug.
+# GOEXPERIMENT is baked into the runtime/std `go test` rebuilds. cgocheck2 adds
+# stricter cgo pointer-passing checks. EXTRA_GOEXPERIMENT lets a pipeline
+# variant inject further experiments without editing this script. (Green Tea GC
+# was ruled out as the cause - the crash reproduces with nogreenteagc and on Go
+# 1.25.10 - so no variant currently sets it, but the lever is kept for future
+# A/Bs.)
 $baseGoexperiment = "cgocheck2"
 if ($env:EXTRA_GOEXPERIMENT) {
   $env:GOEXPERIMENT = "$baseGoexperiment,$env:EXTRA_GOEXPERIMENT"
@@ -72,9 +71,16 @@ Write-Host "GOEXPERIMENT=$env:GOEXPERIMENT"
 # not useful here, and the raw `go test -v` output is easier to correlate with
 # the gctrace lines anyway.
 $testArgs = @("test", "-count=1", "-v", "-timeout=20m")
-if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
+# The race detector is only supported on windows/amd64 (never arm64), so arm64
+# is implicitly -race-off.  The NO_RACE pipeline variant disables it on amd64
+# too, to test whether the race detector's instrumentation/scheduling timing is
+# required to surface the crash - if amd64 still crashes without -race, the bug
+# is independent of the race detector.
+$useRace = ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") -and (-not $env:NO_RACE)
+if ($useRace) {
   $testArgs += "-race"
 }
+Write-Host "race detector enabled: $useRace"
 $testArgs += @(
   "-covermode=atomic",
   "-coverprofile=build/coverage.out",
