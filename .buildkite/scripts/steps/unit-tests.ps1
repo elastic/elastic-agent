@@ -17,55 +17,71 @@ if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE
 }
 
-Write-Host "--- Disabling mitigations (MITIGATION_SET bisect)"
-# Build 40686 finding: disabling the CET + ASLR process mitigations below took
-# the crash from 9/10 (build 40529, no disable) to 0/10, while the instrumented
-# cohort (no disable) still crashed 5/5 on the same build. MITIGATION_SET
-# bisects which of the two is responsible:
-#   all  - UserShadowStack + ASLR (reproduces the 40686 suppression; default)
-#   cet  - UserShadowStack only
-#   aslr - HighEntropy, BottomUp, ForceRelocateImages only
-#   none - disable nothing (positive control; expect crash)
-# NOTE: Set-ProcessMitigation -System nominally needs a reboot, but build 40686
-# empirically took effect for child processes launched later in the same
-# session - the posture dump below verifies that per run.
-$cetMit  = @("UserShadowStack")
-$aslrMit = @("HighEntropy", "BottomUp", "ForceRelocateImages")
-$mitSet  = if ($env:MITIGATION_SET) { $env:MITIGATION_SET } else { "all" }
-switch ($mitSet) {
-  "all"  { $toDisable = $cetMit + $aslrMit }
-  "cet"  { $toDisable = $cetMit }
-  "aslr" { $toDisable = $aslrMit }
-  "none" { $toDisable = @() }
-  default { Write-Host "WARNING: unknown MITIGATION_SET='$mitSet', using 'all'"; $toDisable = $cetMit + $aslrMit }
+# --- Mitigation handling -----------------------------------------------------
+# The earlier `Set-ProcessMitigation -System` approach was a no-op without a
+# reboot: the system default lives in Session Manager\kernel\MitigationOptions
+# and is read at boot, so build 40690's bisect + child-posture probe showed the
+# test processes kept their DEFAULT posture in every arm (BottomUp stayed ON;
+# UserShadowStack was OFF only because CET is off by default). The only
+# no-reboot lever is per-image IFEO (`Set-ProcessMitigation -Name <exe>`), which
+# is applied at process creation. DISABLE_MITIGATIONS_IFEO=1 applies it to every
+# test binary by image name (<import-path-leaf>.test.exe).
+$ifeoNames = @()
+if ($env:DISABLE_MITIGATIONS_IFEO -eq "1") {
+  Write-Host "--- Disabling mitigations per test-binary via IFEO (no reboot needed)"
+  $mits = @("HighEntropy", "BottomUp", "ForceRelocateImages", "UserShadowStack")
+  # IFEO matches on the image's base name regardless of the temp path go test
+  # runs it from. Enumerate both modules (root + internal/edot).
+  foreach ($mod in @("", "internal\edot")) {
+    $listArgs = @("list"); if ($mod) { $listArgs += @("-C", $mod) }; $listArgs += "./..."
+    $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    try { $pkgs = & go @listArgs 2>$null } finally { $ErrorActionPreference = $prevEAP }
+    foreach ($p in $pkgs) { $ifeoNames += (($p -split '/')[-1] + ".test.exe") }
+  }
+  $ifeoNames = $ifeoNames | Sort-Object -Unique
+  Write-Host "Applying IFEO mitigation-disable to $($ifeoNames.Count) test-binary names"
+  foreach ($exe in $ifeoNames) {
+    try { Set-ProcessMitigation -Name $exe -Disable $mits -ErrorAction Stop } catch { Write-Host "  IFEO set failed for ${exe}: $_" }
+  }
+  # Verify the override is configured AND effective without a reboot: build one
+  # test binary, launch it, and read its per-process posture.
+  try {
+    $cfg = Get-ProcessMitigation -Name "upgrade.test.exe"
+    Write-Host ("IFEO config(upgrade.test.exe): BottomUp={0} HighEntropy={1} ForceRelocate={2} UserShadowStack={3}" -f `
+      $cfg.ASLR.BottomUp, $cfg.ASLR.HighEntropy, $cfg.ASLR.ForceRelocateImages, $cfg.UserShadowStack.UserShadowStack)
+    $probeExe = Join-Path $env:BUILDKITE_BUILD_CHECKOUT_PATH "upgrade.test.exe"
+    $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    try { & go test -c -o $probeExe ./internal/pkg/agent/application/upgrade/ 2>$null } finally { $ErrorActionPreference = $prevEAP }
+    if (Test-Path $probeExe) {
+      $pp = Start-Process $probeExe -ArgumentList '-test.run=^NoSuchTest$','-test.timeout=20s' -PassThru -WindowStyle Hidden
+      Start-Sleep -Milliseconds 500
+      try {
+        $pm = Get-ProcessMitigation -Id $pp.Id
+        Write-Host ("EFFECTIVE posture(upgrade.test.exe pid=$($pp.Id)): ASLR.BottomUp={0} | UserShadowStack={1}" -f $pm.ASLR.BottomUp, $pm.UserShadowStack.UserShadowStack)
+      } catch { Write-Host "effective posture probe failed (process may have exited): $_" }
+      try { Wait-Process -Id $pp.Id -Timeout 25 -ErrorAction SilentlyContinue } catch {}
+    }
+  } catch { Write-Host "IFEO verification probe failed: $_" }
+} else {
+  # Control / norace: leave mitigations at default; just record the baseline so
+  # every run documents the posture it actually ran with.
+  try {
+    $probe = Start-Process powershell -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 2' -PassThru -WindowStyle Hidden
+    Start-Sleep -Milliseconds 300
+    $pm = Get-ProcessMitigation -Id $probe.Id
+    Write-Host ("baseline posture(child pid=$($probe.Id)): ASLR.BottomUp={0} | UserShadowStack={1}" -f `
+      $pm.ASLR.BottomUp, $pm.UserShadowStack.UserShadowStack)
+  } catch { Write-Host "baseline posture probe failed: $_" }
 }
-Write-Host "MITIGATION_SET=$mitSet -> disabling: $(if ($toDisable.Count) { $toDisable -join ', ' } else { '(nothing)' })"
-if ($toDisable.Count -gt 0) {
-  Set-ProcessMitigation -System -Disable $toDisable
-}
-
-# Verify the posture actually changed (system default + what a freshly-launched
-# child inherits without a reboot). Fully guarded so it can never fail the job.
-try {
-  $sys = Get-ProcessMitigation -System
-  Write-Host ("posture(system): ASLR BottomUp={0} HighEntropy={1} ForceRelocateImages={2} | UserShadowStack={3}" -f `
-    $sys.ASLR.BottomUp, $sys.ASLR.HighEntropy, $sys.ASLR.ForceRelocateImages, $sys.UserShadowStack.UserShadowStack)
-} catch { Write-Host "posture(system) dump failed: $_" }
-try {
-  $probe = Start-Process powershell -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 3' -PassThru -WindowStyle Hidden
-  Start-Sleep -Milliseconds 400
-  $pm = Get-ProcessMitigation -Id $probe.Id
-  Write-Host ("posture(child pid=$($probe.Id)): ASLR.BottomUp={0} | UserShadowStack={1}" -f `
-    $pm.ASLR.BottomUp, $pm.UserShadowStack.UserShadowStack)
-} catch { Write-Host "posture(child) probe failed: $_" }
 
 Write-Host "--- Unit tests"
-# Diagnostic: maximize GC pressure to make golang/go#77975 more consistent.
-# GOGC=1 triggers a GC cycle after every allocation, maximising shrinkstack and
-# scanstack frequency. This forces the kernel's async IOCP write (which targets
-# a goroutine-stack-allocated variable) to race against far more stack
-# relocations per second, making the memory-corruption crash far more likely
-# without suppressing the bug like asyncpreemptoff=1 does.
+# Diagnostic: maximize GC pressure to make the crash more consistent. GOGC=1
+# triggers a GC cycle after every allocation, maximising scanstack/shrinkstack/
+# copystack frequency - the crash manifests as GC mark-metadata corruption
+# detected during a stack scan, so more GC cycles = more chances to hit it.
+# (The original IOCP-async-write theory / golang/go#77975 is ruled out: the
+# tests' file I/O is synchronous on Windows, so there is no post-syscall kernel
+# write window. Mechanism is currently open.)
 # Loop over fresh binary invocations instead of -count: the crash is most
 # likely at binary startup when goroutine stacks are freshly allocated.
 $env:GOGC = "1"
@@ -151,6 +167,15 @@ for ($run = 1; $run -le $maxRuns; $run++) {
     Write-Host "*** Runtime crash marker detected on run $run - stopping further runs ***"
     $crashed = $true
     break
+  }
+}
+
+# Remove the IFEO overrides we added, so leftover registry state can't leak to a
+# later job if this agent is reused (no-op on ephemeral agents; cheap insurance).
+if ($ifeoNames.Count -gt 0) {
+  Write-Host "--- Removing $($ifeoNames.Count) IFEO mitigation overrides"
+  foreach ($exe in $ifeoNames) {
+    try { Set-ProcessMitigation -Name $exe -Remove -ErrorAction Stop } catch {}
   }
 }
 
