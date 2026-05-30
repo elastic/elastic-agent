@@ -17,17 +17,47 @@ if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE
 }
 
-Write-Host "--- Disabling mitigations"
-# Disable CET (UserShadowStack) and ASLR globally
-Set-ProcessMitigation -System -Disable HighEntropy, BottomUp, UserShadowStack, ForceRelocateImages
+Write-Host "--- Disabling mitigations (MITIGATION_SET bisect)"
+# Build 40686 finding: disabling the CET + ASLR process mitigations below took
+# the crash from 9/10 (build 40529, no disable) to 0/10, while the instrumented
+# cohort (no disable) still crashed 5/5 on the same build. MITIGATION_SET
+# bisects which of the two is responsible:
+#   all  - UserShadowStack + ASLR (reproduces the 40686 suppression; default)
+#   cet  - UserShadowStack only
+#   aslr - HighEntropy, BottomUp, ForceRelocateImages only
+#   none - disable nothing (positive control; expect crash)
+# NOTE: Set-ProcessMitigation -System nominally needs a reboot, but build 40686
+# empirically took effect for child processes launched later in the same
+# session - the posture dump below verifies that per run.
+$cetMit  = @("UserShadowStack")
+$aslrMit = @("HighEntropy", "BottomUp", "ForceRelocateImages")
+$mitSet  = if ($env:MITIGATION_SET) { $env:MITIGATION_SET } else { "all" }
+switch ($mitSet) {
+  "all"  { $toDisable = $cetMit + $aslrMit }
+  "cet"  { $toDisable = $cetMit }
+  "aslr" { $toDisable = $aslrMit }
+  "none" { $toDisable = @() }
+  default { Write-Host "WARNING: unknown MITIGATION_SET='$mitSet', using 'all'"; $toDisable = $cetMit + $aslrMit }
+}
+Write-Host "MITIGATION_SET=$mitSet -> disabling: $(if ($toDisable.Count) { $toDisable -join ', ' } else { '(nothing)' })"
+if ($toDisable.Count -gt 0) {
+  Set-ProcessMitigation -System -Disable $toDisable
+}
 
-# Disable Hypervisor-Enforced Code Integrity
-# Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" -Name "Enabled" -Value 0
-
-# Set the GlobalFlag to force the legacy heap system-wide (requires reboot)
-# 0x00000008 is the 'FLG_HEAP_PAGE_ALLOCS' or 'Disable Segment Heap' indicator in modern builds
-# $registryPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager"
-# Set-ItemProperty -Path $registryPath -Name "GlobalFlags" -Value 0x00000008
+# Verify the posture actually changed (system default + what a freshly-launched
+# child inherits without a reboot). Fully guarded so it can never fail the job.
+try {
+  $sys = Get-ProcessMitigation -System
+  Write-Host ("posture(system): ASLR BottomUp={0} HighEntropy={1} ForceRelocateImages={2} | UserShadowStack={3}" -f `
+    $sys.ASLR.BottomUp, $sys.ASLR.HighEntropy, $sys.ASLR.ForceRelocateImages, $sys.UserShadowStack.UserShadowStack)
+} catch { Write-Host "posture(system) dump failed: $_" }
+try {
+  $probe = Start-Process powershell -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 3' -PassThru -WindowStyle Hidden
+  Start-Sleep -Milliseconds 400
+  $pm = Get-ProcessMitigation -Id $probe.Id
+  Write-Host ("posture(child pid=$($probe.Id)): ASLR.BottomUp={0} | UserShadowStack={1}" -f `
+    $pm.ASLR.BottomUp, $pm.UserShadowStack.UserShadowStack)
+} catch { Write-Host "posture(child) probe failed: $_" }
 
 Write-Host "--- Unit tests"
 # Diagnostic: maximize GC pressure to make golang/go#77975 more consistent.

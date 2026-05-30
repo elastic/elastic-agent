@@ -31,8 +31,12 @@ env:
 steps:
   - label: "Unit tests - Windows 11 (diagnostic run %n)"
     key: "unit-tests-win11"
+    # Negative control for the mitigation bisect: disable BOTH CET and ASLR
+    # (MITIGATION_SET=all). Build 40686 had this at 0/10 crashed. Expect ~0.
     command: .buildkite/scripts/steps/unit-tests.ps1
     parallelism: 10
+    env:
+      MITIGATION_SET: "all"
     artifact_paths:
       - "build/TEST-*.html"
       - "build/TEST-*.xml"
@@ -50,25 +54,43 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (norace run %n)"
-    key: "unit-tests-win11-norace"
-    # Same diagnostic config as unit-tests-win11, but with the race detector
-    # disabled on amd64 (NO_RACE=1). The race detector is only supported on
-    # windows/amd64 - never arm64 - so the arm64 runs that "don't crash" never
-    # had -race at all, confounding the architecture comparison. This variant
-    # de-confounds it on the same Win11 amd64 VM: if amd64 still crashes without
-    # -race, the bug is independent of the race detector and the arm64/Win10
-    # differences are a real environment signal; if it stops crashing, the
-    # repro depends on the race detector's instrumentation/scheduling timing.
-    #
-    # (Green Tea GC was ruled out: the crash reproduces with GOEXPERIMENT=
-    # nogreenteagc and on Go 1.25.10, so the nogreenteagc variant was retired.
-    # The earlier gcshrinkstackoff=1 variant was also retired: build 40538
-    # showed it failed at the same ~7/10 rate as the plain variant.)
+  - label: "Unit tests - Windows 11 (disable CET run %n)"
+    key: "unit-tests-win11-cet"
+    # Mitigation bisect arm A: disable ONLY CET (UserShadowStack), leave ASLR on.
+    # Build 40686 showed disabling CET+ASLR together suppresses the crash; this
+    # isolates CET. If this arm stays clean while "disable ASLR" crashes, CET is
+    # the suppressor; if this arm crashes while "disable ASLR" stays clean, the
+    # ASLR knobs are. (Prior: the test binary isn't CET-compat, so ASLR is the
+    # favoured suspect - this confirms or refutes that.)
     command: .buildkite/scripts/steps/unit-tests.ps1
     parallelism: 10
     env:
-      NO_RACE: "1"
+      MITIGATION_SET: "cet"
+    artifact_paths:
+      - "build/TEST-*.html"
+      - "build/TEST-*.xml"
+      - "build/diagnostics/*"
+      - "coverage-*.out"
+    agents:
+      provider: "azure"
+      image: "${IMAGE_WIN_11}"
+      imageVersion: "${IMAGE_WIN_11_VERSION}"
+      vmSize: "Standard_D8s_v5"
+      diskSizeGb: "256"
+    retry:
+      manual:
+        allowed: true
+    plugins:
+      - *google_oidc_plugin
+
+  - label: "Unit tests - Windows 11 (disable ASLR run %n)"
+    key: "unit-tests-win11-aslr"
+    # Mitigation bisect arm B: disable ONLY ASLR (HighEntropy, BottomUp,
+    # ForceRelocateImages), leave CET on. Complements the "disable CET" arm.
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
+    env:
+      MITIGATION_SET: "aslr"
     artifact_paths:
       - "build/TEST-*.html"
       - "build/TEST-*.xml"
@@ -121,7 +143,9 @@ steps:
     depends_on:
       - step: "unit-tests-win11"
         allow_failure: true
-      - step: "unit-tests-win11-norace"
+      - step: "unit-tests-win11-cet"
+        allow_failure: true
+      - step: "unit-tests-win11-aslr"
         allow_failure: true
       - step: "unit-tests-win11-instrumented"
         allow_failure: true
