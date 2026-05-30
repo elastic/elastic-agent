@@ -2,47 +2,86 @@
 
 Tracking a Windows-only fatal crash in the Elastic Agent unit test suite.
 Working branch: `worktree-test+diagnose-windows-gc-panic`.
-Upstream cause: <https://github.com/golang/go/issues/77975> — *"runtime:
-Windows crash with Go 1.26.0, 1.26.1"*.
+Originally suspected upstream: <https://github.com/golang/go/issues/77975>
+(*"runtime: Windows crash with Go 1.26.0, 1.26.1"*) — but that issue blames the
+Green Tea GC, which we have **falsified** for this crash (see below).
 
-> **Status:** Reproduced reliably in CI. The crash is **GC-metadata corruption,
-> Windows-only, and Go-version-independent** across the whole range the code can
-> build. Confirmed NOT caused by: Green Tea GC, async preemption, stack
-> shrinking, or a stray kernel IOCP write (see Falsified). It is also **not a
-> Go 1.26 regression** — see the version bisect below. Current leading shape:
-> a long-standing bug in the **Windows-specific Go runtime** (present 1.25.7 →
-> 1.26.3) that needs the contended CI-host timing to fire, or a Windows
-> kernel/driver interaction on the Azure image. Not reproduced on a quiet
-> standalone VM or locally.
+> **Status:** Reproduced reliably in CI as **GC mark-metadata corruption**,
+> **`windows/amd64`-only**, and **Go-version-independent** across the buildable
+> range (1.25.7 → 1.26.3). The crash surfaces as several different fatal runtime
+> throws that all trace to one root: the GC's marking/stack-scan machinery
+> operating on corrupt state.
 >
-> **Version bisect result (builds 40583 @1.26.3 vs 40590 @1.25.10):**
-> - 1.26.3: crashes ~6/10 jobs.
-> - 1.25.10: crashes (≥3/10 jobs), same corruption (`unexpected signal during
->   runtime execution`), Go 1.25.10 confirmed in the logs, no build failures.
-> - **Cannot test below 1.25.7:** a dependency (`sigs.k8s.io/e2e-framework
->   @v0.7.0`) declares `go >= 1.25.7`, so Go 1.24 refuses to build the module
->   graph. The bisect floor is therefore 1.25.7; the crash is present across the
->   entire buildable range. So it predates Green Tea-as-default and is not a
->   1.26 regression.
+> **Leading hypothesis (build 40691): the crash is `-race`-GATED.** With the
+> race detector off, it does not reproduce; with it on, it reproduces readily.
+> The prime suspect is now the **race-detector (tsan) runtime on
+> `windows/amd64`** — either a tsan bug that corrupts memory, or tsan's
+> instrumentation perturbing timing/layout enough to expose a latent Go runtime
+> GC/stack-scan bug. Needs the contended Azure CI-host timing to fire; does not
+> reproduce on a quiet standalone VM or locally.
+>
+> **Falsified:** Green Tea GC, async preemption, stack shrinking, stray kernel
+> IOCP write, CET/ASLR process mitigations, and "a Go 1.26 regression" — all
+> ruled out with side-by-side CI A/Bs (details in *Falsified hypotheses*).
 
-> **Correction (important):** Earlier revisions of this document hypothesized a
-> stray *kernel IOCP write into freed memory* (overlapped-I/O buffer lifetime
-> bug). That framing is now believed wrong on two counts: (1) the upstream
-> issue go#77975 is about the **Green Tea GC**, not IOCP, and its crash is a
-> corrupted return address consistent with **stack scanning / copystack**; and
-> (2) regular `os.Open`/`ReadFile`/`WriteFile` on Windows do **not** use
-> overlapped I/O unless the caller passes `O_FILE_FLAG_OVERLAPPED` (verified in
-> the Go 1.26.3 source, `os/file_windows.go:162`) — so the agent's file ops are
-> synchronous and there is no completion-after-return window to exploit. The
-> filesystem-heavy tests matter only because they generate the allocation churn
-> and goroutine stack growth that exercise the GC marker, not because of async
-> I/O. The IOCP sections below are kept for history but should be read in that
-> light.
+## The decisive experiment: `-race` gates the crash (build 40691)
+
+Four cohorts, same commit, same Azure fleet, `parallelism: 10` (instrumented 5):
+
+| Cohort | `-race` | mitigations | crashed |
+|--------|---------|-------------|---------|
+| control | **on** | default | 2 / 10 |
+| no-race | **off** | default | **0 / 10** |
+| no-mitigations (IFEO) | on | **verified off** | 4 / 10 |
+| instrumented | on | default | 5 / 5 |
+
+- **no-race: 0/10 jobs (0/50 runs).** Every `-race` cohort crashed.
+- Statistics (this build's hit rate was low/variable, so calibrate): pooling the
+  procdump-free `-race` cohorts (control+no-mitigations = 6/20 ≈ 30%/job),
+  no-race 0/10 gives **p ≈ 0.03**; including instrumented (11/25 ≈ 44%/job),
+  **p ≈ 0.003**. Control alone (20%/job) → p ≈ 0.11, not significant on its own.
+- **Defensible claim:** the crash is `-race`-**gated or strongly catalyzed**.
+  Not yet proven strictly *required* (no-race could crash at a lower rate that
+  10 jobs wouldn't catch). **A confirmatory re-run** (more no-race jobs) would
+  settle it.
+
+Why this is the best lead we have:
+
+- It is consistent with the architecture data: **`windows/arm64` has no race
+  detector at all** (`internal/platform`: race is `windows/amd64`-only), so a
+  `-race`-gated crash can never fire there — which is exactly what's observed.
+- The remaining wrinkle: **Win10-amd64** *has* the race detector yet reportedly
+  doesn't crash. So `-race` is likely **necessary but not sufficient** — the
+  Win11 / Ice-Lake (Xeon 8370C) host timing also contributes.
+
+## Symptom
+
+On the Windows 11 CI runners the unit test suite intermittently dies with a
+*fatal* Go runtime throw (not a recoverable test failure), taking down the whole
+`go test` process. **The crash is not deterministic by message** — the same
+underlying condition surfaces as several different fatal errors. That breadth is
+the signature of corrupt GC/allocator metadata being *detected* at different
+points, not a type-specific logic bug.
+
+### Confirmed crash signatures (spread, build 40538, 19 failed jobs)
+
+| Signature | Count | Structure |
+|-----------|-------|-----------|
+| `checkmark found unmarked object` | 10 | GC mark bitmap (mark correctness) |
+| `unexpected signal during runtime execution` | 8 | raw fault in runtime code (stack scan/unwind) |
+| `marked free object` / `found pointer to free object` | 4 / 4 | GC mark bitmap vs span state |
+| `sweep increased allocation count` / `s.allocCount != s.nelems` | 1 | `mspan` bookkeeping |
+
+Also seen earlier: `sync: Unlock of unlocked RWMutex` (a zeroed/clobbered state
+word), and a recoverable AV reading a nil receiver in
+`(*fleetapi.ActionUpgrade).String()` during `fmt`'s panic-format path (a pointer
+field zeroed by the corruption). Across builds the corruption hits multiple size
+classes (16/64/112/208/224 B) and both GC metadata and live structures.
 
 ## Sharpest evidence: crash inside GC stack scan → copystack → unwinder (build 40590, Go 1.25.10)
 
-The cleanest crash stack we have. The GC background mark worker, while scanning
-a parked goroutine's stack, faulted in the stack unwinder:
+The cleanest stack we have. The GC background mark worker, scanning a parked
+goroutine's stack, faulted in the unwinder:
 
 ```
 [signal 0xc0000005 code=0x0 addr=0xe0 pc=0x1400767a5]   (nil-ish ptr +0xe0)
@@ -55,352 +94,221 @@ runtime.markroot.func1()                        mgcmark.go:248
 runtime.gcDrain(...) / gcBgMarkWorker.func2()   mgc.go:1541
 ```
 
-The goroutine being scanned is `goroutine 94 ... [chan receive (scan)]` — an
-ordinary parked goroutine. The unwinder follows a frame/func pointer and
-dereferences `+0xe0` off a bad value → access violation. Both crashes in that
-job were this same path.
+The goroutine being scanned is an ordinary parked `[chan receive (scan)]`. The
+unwinder follows a frame/func pointer and dereferences `+0xe0` off a bad value.
+Reproduced on **Go 1.25.10 with Green Tea disabled and `asyncpreemptoff=1`**, so
+the stack-scan/copystack corruption is real but is neither Green-Tea- nor
+async-preemption-specific. `shrinkstack` is where *this* instance manifests, not
+the cause (disabling it doesn't help — see Falsified).
 
-Why this matters:
-
-- It is **exactly the symptom go#77975 describes** ("corrupted return address on
-  the stack … consistent with a bug during stack scanning or copystack") — but
-  reproduced here on **Go 1.25.10 with Green Tea disabled** and
-  `asyncpreemptoff=1`. So the stack-scan/copystack corruption is real but is
-  **not** Green-Tea-specific and **not** async-preemption-driven.
-- It reconciles the earlier `gcshrinkstackoff=1` non-result: `shrinkstack` is
-  where this instance *manifests*, not the cause. Disable it and `scanstack`
-  (every GC) and growth-driven `copystack` still walk the same corrupted stack
-  via other paths, so the crash persists (often with a different signature).
-
-**Unifying hypothesis (working):** a stray write corrupts a goroutine's *stack
-contents* (a saved frame/return pointer). The GC then either (a) faults
-unwinding that stack (this crash), or (b) marks a bogus pointer read from it →
-the `marked free object` / `found pointer to free object` / `checkmark` throws.
-The free-object crashes print a heap dump and die mid-print, so they don't
-yield a comparable stack to confirm (b) directly, but the single root
-"corrupted goroutine stack" accounts for the whole signature spread.
-
-## Symptom
-
-On the Windows 11 CI runners the unit test suite intermittently dies with a
-fatal Go runtime error. The exact message varies (see below), but it is always
-a *fatal* runtime throw, not a recoverable test failure, so it takes down the
-whole `go test` process.
-
-The crash is **not deterministic by message** — the same underlying condition
-surfaces as several different fatal errors across runs. This is the single most
-important observation: it is not a logic bug in any one data structure.
-
-## Confirmed crash signatures
-
-| Build | Fatal message | Corrupted structure | Span size class |
-|-------|---------------|---------------------|-----------------|
-| 40495 | `runtime: marked free object` → `fatal error: found pointer to free object` | GC mark bitmap | 16 B |
-| 40511 | `found pointer to free object` (3 of 5 parallel jobs) | GC mark bitmap | 16 B, 64 B, 208 B |
-| 40516 | `found pointer to free object` | GC mark bitmap | 112 B |
-| 40519 | `fatal error: sync: Unlock of unlocked RWMutex` | `sync.RWMutex` internal state word | n/a |
-| 40520 | `fatal error: s.allocCount != s.nelems && freeIndex == s.nelems` | `mspan` allocator bookkeeping | thrown from `mcache.nextFree` |
-
-Earlier observed (pre-procdump) secondary effect: a recoverable
-`EXCEPTION_ACCESS_VIOLATION` reading a nil receiver in
-`(*fleetapi.ActionUpgrade).String()` while `fmt` formatted a panic message —
-i.e. a *pointer field that had been zeroed by the corruption*, surfacing during
-the test framework's panic-recovery path.
-
-Across all of these:
-
-- The corruption hits **different size classes** (16/64/112/208 B), **GC
-  metadata** (mark bitmap and `mspan` allocator bookkeeping), and **live
-  structures** (mutex state, pointer fields).
-- That breadth is the signature of a **stray single-word write landing in
-  whatever memory happens to be recycled at that address**, not a type-specific
-  bug.
-
-## Fully symbolicated crash (build 40520, `upgrade.test.exe`)
-
-Once the binary-rebuild step produced a symbol-rich binary (see fix #4 below),
-the throwing goroutine resolved cleanly:
-
-```
-goroutine 133 [running]:
-runtime.throw("s.allocCount != s.nelems && freeIndex == s.nelems")  panic.go:1229
-runtime.(*mcache).nextFree(...)            malloc.go:1004   ← throw site
-runtime.mallocgcSmallNoscan(...)           malloc.go:1397
-runtime.mallocgc(0x160, ...)               malloc.go:1143
-runtime.growslice(...)                     slice.go:265
-  strings.(*Builder).WriteString           builder.go:114
-  filepath.Join                            path.go:131
-upgrade.checkFilesAfterRollback(...)       rollback_test.go:707
-upgrade.TestRollback.func1(...)            rollback_test.go:314
-upgrade.TestRollback.func4(...)            rollback_test.go:389
-```
-
-This is the strongest evidence to date:
-
-- The victim goroutine is doing nothing unsafe — `rollback_test.go:707` is
-  `os.Readlink` followed by `filepath.Join(topDir, oldAgentHome)`, i.e. a
-  filesystem read and a string build.
-- The throw fires inside the **allocator** (`mcache.nextFree`): it pulled a
-  span whose `freeIndex == s.nelems` (looks full) yet `s.allocCount != s.nelems`
-  (bookkeeping says not full). The `mspan` metadata is internally inconsistent.
-- So the corruption is of **runtime allocator metadata**, detected during a
-  routine string allocation — not application use-after-free.
+**Working shape of the bug:** a stray write corrupts a goroutine's *stack
+contents* (a saved frame/return pointer) or the GC's mark metadata; the GC then
+either faults unwinding that stack (this crash) or marks a bogus pointer read
+from it (the `marked free object` / `checkmark` throws). One root —
+corrupt-state-during-GC-marking — accounts for the whole signature spread. With
+the `-race` gate now established, the corrupting actor is most likely in the
+**tsan runtime or tsan-perturbed GC/stack handling**.
 
 ## Where and when it fires
 
-- During filesystem-heavy tests in `internal/pkg/agent/application/upgrade`
-  (`rollback_test.go`) — observed in both **`TestCleanup`** and
-  **`TestRollback`**. It is *not* one specific test; it is the whole package's
-  filesystem-burst workload.
-- Always within a few **milliseconds of `=== RUN`** for the subtest —
-  during the `setupAgents` / `createUpdateMarker` / `cleanup()` /
-  `checkFilesAfterRollback` filesystem bursts, *not* during any long-running
-  activity.
-- Those bursts are tight sequences of Windows filesystem syscalls:
-  `os.MkdirAll`, `os.WriteFile`, `os.Symlink`, `os.Readlink`, `os.ReadFile`,
-  `os.Open` + `Readdirnames` + recursive `os.RemoveAll`, plus JSON marker
-  marshal/write/read.
-- On Windows every one of those goes through an **IO completion port (IOCP)**.
+- Filesystem-heavy tests in `internal/pkg/agent/application/upgrade`
+  (`rollback_test.go`) — both **`TestCleanup`** and **`TestRollback`**. Not one
+  test; the package's filesystem-burst workload.
+- Within a few **milliseconds of `=== RUN`** for a subtest, during the
+  `setupAgents` / `createUpdateMarker` / `cleanup()` / `checkFilesAfterRollback`
+  bursts (`os.MkdirAll`, `WriteFile`, `Symlink`, `Readlink`, `ReadFile`,
+  `Open`+`Readdirnames`+`RemoveAll`, JSON marker I/O).
+- **The filesystem aspect is incidental load, not the mechanism.** It generates
+  the allocation churn and goroutine stack growth that exercise the GC marker
+  and stack scanner hardest; that is why this package trips it. The file I/O
+  itself is **synchronous** (see Falsified: IOCP).
 
-## What we have ruled out / established
+## Falsified hypotheses
 
-- **Not async preemption.** `GODEBUG=asyncpreemptoff=1` does *not* suppress the
-  crash.
-- **Not stack shrinking (build 40538).** A dedicated `gcshrinkstackoff=1`
-  pipeline variant was run side by side with the plain diagnostic variant
-  (10 parallel jobs each). Both failed at the **same rate (7/10)**, and the
-  shrinkstackoff jobs still crashed with the same GC-metadata corruption
-  (`checkmark found unmarked object`, `unexpected signal during runtime
-  execution`). The `GODEBUG` line in the logs confirms the flag took effect.
-  **This falsifies the shrinkstack/copystack-vs-IOCP hypothesis** — disabling
-  stack shrinking changes nothing. (An earlier crash that happened to fault
-  *inside* `copystack` was just where one instance was detected, not the
-  cause.)
-- **`GOGC=1` makes it far more consistent.** Forcing a GC after effectively
-  every allocation maximises the rate at which freed heap memory is swept and
-  recycled — which is what raises the odds that a stray write lands in memory
-  that has since become live metadata or a live object and is therefore
-  *detected*. This points at recycled **heap** memory, not stacks.
-- **Environment-sensitive.** Reproduces reliably on the Azure `Standard_D8s_v5`
-  Windows 11 runners but **not** on most local Windows machines. The trigger
-  depends on IOCP completion timing relative to GC, which differs on the CI
-  VMs (hypervisor I/O latency, Defender real-time scanning, cold FS cache, 8
-  hyperthreads on contended host hardware are all candidates).
+- **Stray kernel IOCP write into freed memory** (the original framing). Regular
+  `os.Open`/`ReadFile`/`WriteFile` on Windows do **not** use overlapped I/O
+  unless the caller passes `FILE_FLAG_OVERLAPPED` (Go 1.26.3
+  `os/file_windows.go`). The tests' file ops are **synchronous** — the kernel
+  fills buffers before the syscall returns, so there is no
+  completion-after-return window to corrupt freed memory. go#77975 also
+  implicates the GC, not I/O.
+- **A Go 1.26 regression / Green Tea GC.** Version bisect: build 40583 @1.26.3
+  ~6/10 crashed; build 40590 @1.25.10 crashed too (≥3/10, same `unexpected
+  signal` corruption, Go version confirmed in logs). `GOEXPERIMENT=nogreenteagc`
+  did **not** suppress it. Bisect floor is 1.25.7 (dependency
+  `sigs.k8s.io/e2e-framework@v0.7.0` declares `go >= 1.25.7`, so 1.24 won't
+  build the graph). Version-independent across the buildable range ⇒ predates
+  Green-Tea-as-default; not a 1.26 regression.
+- **Async preemption** — `asyncpreemptoff=1` does not suppress.
+- **Stack shrinking** — `gcshrinkstackoff=1` (build 40538) failed at the same
+  7/10 rate as the plain variant, same signatures.
+- **CET / ASLR process mitigations** — *conclusively* ruled out (build 40691):
+  the no-mitigations cohort had CET (`UserShadowStack`) + ASLR (`HighEntropy`,
+  `BottomUp`, `ForceRelocateImages`) **verifiably disabled** via per-image IFEO
+  (`Get-ProcessMitigation` confirmed `OFF` on the test binaries) and still
+  crashed 4/10 — ~same as the control's 2/10. See the mitigation detour below.
 
-### Full crash-signature spread (build 40538, 19 failed jobs)
+## The mitigation detour (and the reboot lesson) — builds 40686 / 40690 / 40691
 
-| Signature | Count | Structure |
-|-----------|-------|-----------|
-| `checkmark found unmarked object` | 10 | GC mark bitmap |
-| `unexpected signal during runtime execution` | 8 | raw fault in runtime code |
-| `marked free object` / `found pointer to free object` | 4 / 4 | GC mark bitmap |
-| `sweep increased allocation count` | 1 | `mspan` bookkeeping |
+Worth recording because it cost two builds and produced a reusable lesson.
 
-All are GC/allocator-metadata corruption, on both the plain and the
-shrinkstackoff variants.
+- **Build 40686 looked like a breakthrough:** the cohorts running `unit-tests.ps1`
+  with a top-of-script `Set-ProcessMitigation -System -Disable HighEntropy,
+  BottomUp, UserShadowStack, ForceRelocateImages` crashed **0/20**, while the
+  instrumented cohort (no such line) crashed **5/5** on the same build.
+- **Build 40690 (bisect) refuted it:** splitting the disable into CET-only vs
+  ASLR-only, *all* arms crashed. A per-process posture probe revealed why: a
+  child launched after the `Set` still showed `BottomUp=ON` (and
+  `UserShadowStack=OFF` was just the default — CET is off by default on this
+  image). **The toggles were no-ops.**
+- **The reboot lesson (Microsoft docs):** process mitigation policies (DEP,
+  SEHOP, ASLR `BottomUp`/`ForceRelocateImages`, CET `UserShadowStack`) are
+  `PROCESS_CREATION_MITIGATION_POLICY_*` flags applied at *process creation*.
+  `Set-ProcessMitigation -System` writes the system default in
+  `…\Session Manager\kernel\MitigationOptions`, which is read **at boot** — so it
+  needs a **reboot**. The only no-reboot lever is **per-image IFEO**
+  (`Set-ProcessMitigation -Name <exe>`), applied at the next launch of that
+  image. (Sources: MS Learn *Customize exploit protection*, *Override Process
+  Mitigation Options*, *Kernel-mode Hardware-enforced Stack Protection*.)
+- **Build 40691 tested it properly:** per-image IFEO across all 162 test-binary
+  names, self-verified with `Get-ProcessMitigation`. Mitigations were genuinely
+  off and the crash persisted (4/10). Ruled out.
+- **Conclusion:** build 40686's 0/20 was an **anomalously quiet build** (this is
+  a timing-sensitive race with high build-to-build variance), not a mitigation
+  effect. Always confirm an all-clean cohort against a same-build positive
+  control before believing a suppressor.
 
-## Working hypothesis: Green Tea GC marking bug (golang/go#77975)
+## Diagnostic infrastructure on this branch
 
-The upstream issue go#77975 ("Windows crash with Go 1.26.0, 1.26.1") points at
-the **Green Tea garbage collector**, which became the default-on collector in
-Go 1.26 (confirmed in this toolchain: `go list -f '{{context.ToolTags}}'
-runtime` includes `goexperiment.greenteagc`). The upstream crash is a corrupted
-return address consistent with a bug in **stack scanning / copystack** during
-GC marking.
+CI pipeline reduced to a few Windows 11 variants (`.buildkite/pipeline.yml`),
+all on Azure `Standard_D8s_v5`:
 
-Every signature we have observed is consistent with a GC *marking* bug rather
-than an external write:
-
-- `checkmark found unmarked object` — checkmark mode (`gccheckmark=1`) found a
-  live object the main mark phase failed to mark. This is a direct marker
-  correctness failure.
-- `marked free object` / `found pointer to free object` — mark bitmap vs. span
-  state inconsistency.
-- `s.allocCount != s.nelems`, `sweep increased allocation count` — span
-  bookkeeping inconsistencies downstream of bad marking.
-- `unexpected signal during runtime execution` / corrupted return address — a
-  scan/copystack mishap landing a bad pointer where execution later resumes.
-
-Why the filesystem-heavy upgrade tests trigger it: they generate a tight burst
-of allocation churn and goroutine stack growth (deep `filepath`/`os` call
-chains) concurrently with `GOGC=1`'s near-continuous GC — exactly the workload
-that exercises the marker and stack scanner hardest. The filesystem aspect is
-incidental load, not the mechanism.
-
-This explains every prior observation, including the ones that killed the
-earlier hypotheses: async preemption and stack *shrinking* being irrelevant
-(the bug is in marking / growth-driven copystack / scanning, not in shrink or
-in any kernel race), `GOGC=1` amplifying (more marking cycles), heap-metadata
-victims (the marker corrupts its own bitmap), and poor local reproducibility
-(a timing-sensitive parallel-marking race).
-
-**Decisive test (in flight):** the `nogreenteagc` pipeline variant runs the
-identical diagnostic config with `GOEXPERIMENT=...,nogreenteagc`. If it stops
-crashing while the plain diagnostic variant keeps crashing, the agent's crashes
-are confirmed to be the Green Tea GC bug.
-
-## Diagnostic infrastructure built on this branch
-
-The CI pipeline was reduced to a few Windows 11 variants (see
-`.buildkite/pipeline.yml`):
-
-- **diagnostic run** (`unit-tests.ps1`): `GOGC=1`,
+- **control** (`unit-tests.ps1`): `GOGC=1`,
   `GODEBUG=clobberfree=1,gccheckmark=1,invalidptr=1,gctrace=1,asyncpreemptoff=1`,
-  `GOEXPERIMENT=cgocheck2`, `GOTRACEBACK=crash`. Maximises GC pressure and
-  sanity checks to make the crash consistent.
-- **nogreenteagc run** (`unit-tests.ps1` with `EXTRA_GOEXPERIMENT=nogreenteagc`):
-  identical to the diagnostic run but with Green Tea GC disabled — the decisive
-  A/B test for go#77975. (Replaced the retired `gcshrinkstackoff=1` variant.)
-- **instrumented run** (`unit-tests-instrumented.ps1`):
-  `GODEBUG=clobberfree=1,gctrace=1,schedtrace=10000`, plus WER + procdump to
-  capture a full memory dump.
+  `GOEXPERIMENT=cgocheck2`, `GOTRACEBACK=crash`, `-race`. Maximises GC pressure
+  + sanity checks so the crash is consistent. Known-crashing baseline.
+- **no-race** (`NO_RACE=1`): identical but `-race` off — the gating test.
+- **no-mitigations** (`DISABLE_MITIGATIONS_IFEO=1`): `-race` on, CET+ASLR
+  disabled per test-binary via IFEO, with a `Get-ProcessMitigation` posture
+  probe for self-verification.
+- **instrumented** (`unit-tests-instrumented.ps1`):
+  `clobberfree=1,gctrace=1,schedtrace=10000` + WER + procdump for full dumps.
+  Reliable positive control / dump source.
 
-The script supports `EXTRA_GODEBUG` and `EXTRA_GOEXPERIMENT` env vars so the
-pipeline can spin up single-variable A/B variants without script changes.
+The script honours `NO_RACE`, `DISABLE_MITIGATIONS_IFEO`, `EXTRA_GODEBUG`, and
+`EXTRA_GOEXPERIMENT` so single-variable A/Bs need no script edits. `GOGC=1`
+amplifies the crash (more mark cycles → more chances to hit/detect the
+corruption), which is why the diagnostic config crashes more readily than a
+plain run.
 
-Key lessons baked into those scripts (each was a real dead end first):
+Operational lessons (each a real dead end first):
 
-1. **gotestsum eats the diagnostics.** `gotestsum`/`test2json` treats every
-   non-JSON stderr line as a package error, so `gctrace=1` produced thousands
-   of spurious "errors", and `schedtrace` lines blew its 64 KB scanner. Fix:
-   bypass `mage unitTest`/gotestsum and run `go test` directly; only fail the
-   job on a real runtime crash marker, ignoring ordinary test failures.
-2. **PowerShell turns native-command stderr into terminating errors.** With
-   `$ErrorActionPreference = "Stop"`, the first `SCHED`/`gctrace` line written
-   by `go test`/`go list` via `2>&1` aborts the script. Fix: relax EAP around
-   each native `go` call, and clear `GODEBUG`/`GOTRACEBACK` before the
-   artifact-prep `go` invocations.
-3. **WER alone never fires for Go crashes.** Go installs an
-   `UnhandledExceptionFilter` that prints its traceback and `exit()`s, so the
-   exception is "handled" before WER's LocalDumps sees it. Registering procdump
-   via `AeDebug` (postmortem) *also* misses it because AeDebug is second-chance
-   only. Fix: run the test binary as a **child of procdump** via
-   `go test -exec`, with `-e 1` (first-chance) to catch the exception before
-   Go's UEF, and `-f Breakpoint` to filter to the fatal `runtime.crash()` INT 3
-   rather than the many recoverable nil-deref AVs `fmt` triggers.
-4. **The work-tree test binary is stripped.** `go test -work`'s leftover
-   `*.test.exe` has no `runtime.pclntab`/DWARF, so dlv can't symbolicate it.
-   Fix: on crash, rebuild a fresh symbol-rich binary from source with the same
+1. **gotestsum eats the diagnostics.** `test2json` treats non-JSON stderr as
+   package errors, so `gctrace=1` produced thousands of spurious "errors" and
+   `schedtrace` blew its 64 KB scanner. Fix: bypass `mage unitTest`/gotestsum,
+   run `go test` directly, fail only on a real runtime crash marker.
+2. **PowerShell turns native stderr into terminating errors** under
+   `$ErrorActionPreference = "Stop"` (the first `gctrace`/`SCHED` line aborts the
+   script). Fix: relax EAP around each native `go` call; clear `GODEBUG`/
+   `GOTRACEBACK` before artifact-prep `go` invocations.
+3. **WER alone never fires for Go crashes** — Go's `UnhandledExceptionFilter`
+   prints its traceback and `exit()`s before WER's LocalDumps sees it; AeDebug is
+   second-chance only and also misses it. Fix: run the test binary as a child of
+   procdump via `go test -exec`, `-e 1` (first-chance) to beat Go's UEF,
+   `-f Breakpoint` to filter to the fatal `runtime.crash()` INT 3.
+4. **The work-tree test binary is stripped** (no `pclntab`/DWARF). Fix: on crash,
+   rebuild a symbol-rich binary from source with the same
    `-race -covermode=atomic -coverpkg=./...` flags and upload that.
-5. **OIDC plugin was needed for uploads.** Restored `google_oidc_plugin` so
+5. **OIDC plugin needed for uploads** (`google_oidc_plugin`) so
    `buildkite-agent artifact upload` can write dumps to GCS.
 
-## Dump analysis workflow (Linux)
+## Dump analysis
 
-The dumps are Windows minidumps; they can be analysed on Linux:
+Dumps are Windows minidumps; analysable with `dlv core <matching-binary> <dump>
+--check-go-version=false` (threads, registers, symbolicated backtraces with a
+byte-matching binary) and a small custom minidump-stream parser for raw
+stack/heap inspection and pointer scans.
 
-- `dlv core <matching-binary> <dump> --check-go-version=false` — threads,
-  registers, and (with a byte-matching binary) symbolicated backtraces.
-- A small custom parser walks the minidump streams directly (Exception record,
-  ThreadList CONTEXT RIP/RSP, ModuleList, Memory64List) for raw stack/heap
-  inspection and pointer scans — useful for confirming, e.g., that **no pointer
-  to the corrupted slot exists anywhere in the dump** (which argued the mark
-  bitmap itself was corrupted, not a missed reference).
-- Binaries/dumps are fetched from Buildkite via `bk artifacts list` →
-  resolve the GCS redirect → `gcloud storage cp`.
+Confirmed from dumps (build 40529 instrumented `upgrade.test.exe`, analysed
+locally):
 
-Confirmed from a dump: the freed slot still held the `clobberfree=1`
-`0xdeadbeef` pattern while the GC had it marked, and the mark bitmap was
-internally inconsistent with the per-slot dump — i.e. the corruption is of
-runtime metadata, not application use-after-free.
+- The corruption victim is consistently a **16-byte size-class span low in the
+  first heap arena** (`0xc000058000`–`0xc00005a000`). Slot 0 there is a live
+  `string` header pointing at the **GODEBUG value string** — i.e. an early,
+  long-lived allocation. The binary has **ASLR off** (`DllCharacteristics=0x8100`,
+  no `DYNAMIC_BASE`), so the arena base is deterministic — which is why the
+  checkmark victim address (`0xc000058b6x`) and the `mspan` address (`0x99b170`,
+  16 B) recur identically across independent runs/builds.
+- The freed slots still held the `clobberfree=1` `0xdeadbeef` pattern while the
+  GC had the span marked, and the mark bitmap was internally inconsistent with
+  the per-slot dump — the corruption is of **runtime metadata, not application
+  use-after-free**. A prior parser pass found **no pointer to the corrupted slot
+  anywhere in the dump**, arguing the bitmap itself was corrupted rather than a
+  missed reference.
 
-## Minimal-reproduction attempt
+**Every dump we have is from a `-race` binary** (only the instrumented cohort
+captures dumps, and it uses `-race`). Now that the crash is `-race`-gated, these
+are the *right* dumps to re-read through a **tsan lens**: is the corrupted
+`0xc0000580xx` Go-heap region adjacent to / aliased with tsan shadow or meta
+memory? Do the throwing/scanning threads show `racecall` / `__tsan_*` frames
+(racecall runs on g0/systemstack — a GC stack-scan racing a racecall is a
+concrete candidate mechanism)? We cannot get a no-race dump to diff against (no
+crash without `-race`), so this is single-condition analysis.
 
-`internal/pkg/iocprepro` is a standalone (stdlib + testify only) test that
-mimics the `TestCleanup` filesystem burst, so it could be lifted into an
-upstream issue without dragging in elastic-agent infrastructure.
+## CI environment (probed on a VM from the same image)
 
-- **v1 (create-only burst):** passed cleanly in CI — insufficient.
-- **v2 (current):** adds the read+delete burst (`Readdirnames` +
-  `os.RemoveAll`) that the real `cleanup()` does, plus background heap-churn
-  goroutines (the real `upgrade.test.exe` has a large live heap so `GOGC=1`
-  collects constantly; a tiny binary does not) and background filesystem-churn
-  goroutines to keep the IOCP busy. Result pending CI.
+A throwaway Azure `Standard_D8s_v5` from the same gallery image
+(`platform-ingest-elastic-agent-windows-11-pro` `1.0.1779464011`, Win11 Pro
+26200, 8 vCPU, Xeon 8370C / Ice Lake):
 
-If v2 still does not reproduce, the next suspect is the **import surface
-itself**: the bug may need the specific heap layout/object population that the
-upgrade package's transitive dependencies create. A blank-import shim pulling
-in those deps would be the next experiment. Also worth trying: dialing the
-background churn *down* (the bug may be suppressed by CPU over-subscription).
+- Defender real-time protection is ON but `C:\` and `D:\` are **excluded**, so
+  `WdFilter` is in the I/O path but doesn't scan the test files.
+- Filesystem minifilters are otherwise stock Win11; nothing exotic.
+- **The standalone VM does not reproduce** (12/12 full-suite iterations, 0
+  crashes) while the CI *fleet* hits ~variable rates. The delta is host-level
+  contention/scheduling on shared CI hosts that an idle VM lacks.
+- Procmon is not useful here (it sees syscalls, not in-process memory writes;
+  the corruption is invisible to it, and the drive is Defender-excluded anyway).
 
-## CI environment (probed on a VM built from the same image)
+## Minimal reproduction
 
-A throwaway Azure `Standard_D8s_v5` VM was provisioned from the *same* gallery
-image the CI uses (`platform-ingest-elastic-agent-windows-11-pro`
-`1.0.1779464011`, Windows 11 Pro build 26200, 8 vCPU) and driven via
-`az vm run-command`. Findings:
-
-- **Defender real-time protection is ON, but `C:\` and `D:\` are entirely
-  excluded** from scanning (`Get-MpPreference.ExclusionPath = C:\, D:\`). So
-  Defender's `WdFilter` minifilter is in the I/O path but does not scan the
-  test files. This weakens the "AV scanning interferes mid-syscall" idea.
-- Filesystem minifilters loaded are otherwise stock Win11: `bindflt`, `UCPD`,
-  `WdFilter`, `applockerfltr`, `FileInfo`, `luafv`, `Wof`, etc. Nothing exotic.
-- **The standalone VM does not reproduce the crash**: 12/12 full-suite
-  iterations under the diagnostic config (Green Tea on, 1.26.3) crashed 0
-  times (all `exited 1` were ordinary test failures, no crash markers). The CI
-  *fleet* hits ~6/10. The delta is almost certainly host-level contention /
-  scheduling on the shared CI hosts that a freshly provisioned, idle VM lacks.
-- **Procmon is not a useful tool here.** It monitors file/registry/process
-  syscalls, not in-process memory writes, so it cannot see the GC-metadata
-  corruption. A short capture during the test build/run was ~2 GB in seconds
-  (the compile phase dominates), and headless PML→CSV conversion under
-  `run-command` (session 0, no interactive desktop) does not work. Given
-  Defender already excludes the drive, there is little external I/O to find.
+`internal/pkg/iocprepro` is a standalone (stdlib + testify) test mimicking the
+`TestCleanup` burst, intended to be liftable into an upstream issue. It does
+**not** reproduce — and it was built around the now-dead IOCP premise. Any future
+minimal repro must (a) use **`-race`** (the gate), and (b) likely include the
+full-suite-scale heap/goroutine/import surface, since `-race` + a tight FS burst
+alone (iocprepro, run under `-race` in the suite) was insufficient.
 
 ## Open questions / next steps
 
-Both the Green Tea A/B and the Go version bisect are now **done** (results in
-the status banner and Falsified list). The hunt has narrowed to: a Windows-only,
-version-independent (1.25.7–1.26.3) GC-metadata corruption that needs contended
-CI-host timing to fire. Remaining avenues:
-
-1. **Pin down the corrupting concurrent actor.** The victim goroutine is always
-   innocent (e.g. a `filepath.Join` allocation tripping over already-corrupt
-   `mspan`/bitmap metadata, build 40520). What we still lack is the *other*
-   goroutine/thread whose write corrupts that metadata. A dump can't show a
-   past write; the practical approach is `GODEBUG` GC-debug modes or a runtime
-   built with extra mheap write instrumentation.
-2. **Concurrency dependence.** Try `GOMAXPROCS=1` (or low) in CI: if the crash
-   vanishes it's a runtime concurrency race; if it persists it points harder at
-   the host/hypervisor. Cheap one-flag CI variant.
-3. **Make a quiet box reproduce.** The standalone VM is idle and does not
-   reproduce; try running several `go test ./...` instances concurrently (mimic
-   the contended CI host) — if that reproduces, we get a live `dlv` platform.
-4. **Upstream report.** We have enough for a solid golang/go issue (or an
+1. **Confirm the `-race` gate** — re-run with more no-race jobs (e.g.
+   `parallelism: 20`) or repeat build 40691. Moves the finding from p≈0.01 to
+   solid, and rules out "no-race crashes at a lower rate."
+2. **Pursue the race detector.** If confirmed: does it reproduce under `-race`
+   *without* the diagnostic `GODEBUG` (isolates tsan from GC-pressure)?
+   Re-analyse a `-race` dump for tsan shadow/meta adjacency and `racecall`
+   frames. Search upstream for `windows/amd64` race-detector + GC-corruption
+   reports.
+3. **Concurrency dependence** — `GOMAXPROCS=1` (or low) CI variant: if the crash
+   vanishes it's a runtime concurrency race; if it persists it points at the
+   host/hypervisor. Cheap one-flag test.
+4. **Make a quiet box reproduce** — run several `go test -race ./...` instances
+   concurrently on the standalone VM to mimic contended-host timing; success
+   gives a live `dlv` platform.
+5. **Upstream report** — we have enough for a strong golang/go issue (or an
    addition to go#77975 noting it is *not* Green Tea and reproduces on 1.25):
-   Windows-only, version-independent GC-metadata corruption under heavy parallel
-   filesystem test load on Azure D8s_v5; symbolicated throw at `mcache.nextFree`
-   with internally-inconsistent `mspan` bookkeeping; dumps + matching binaries
-   available.
-5. `iocprepro` minimal repro still does not reproduce (upgrade-scope, and the
-   tiny standalone binary); a minimal repro likely needs full-suite-scale
-   heap/goroutine pressure on a contended host.
-
-### Falsified hypotheses
-
-- **A Go 1.26 regression** (build 40590: Go 1.25.10 crashes too, same
-  corruption; bisect floor is 1.25.7 due to a dependency's go directive).
-  The crash is version-independent across the buildable range.
-- **Green Tea GC** (`GOEXPERIMENT=nogreenteagc` does not suppress; build 40583,
-  ~6/10 failures with the flag active, same corruption signatures). The
-  upstream go#77975 only *suspected* Green Tea; our A/B refutes it for the
-  agent's crash.
-- **Async preemption** (`asyncpreemptoff=1` does not suppress).
-- **Stack shrinking** (`gcshrinkstackoff=1` does not suppress; build 40538,
-  equal 7/10 failure rate vs the plain variant). Note: copystack on stack
-  *growth* is not disabled by that flag, so growth-driven copystack remains in
-  scope under the Green Tea hypothesis.
-- **Stray kernel IOCP write into freed memory** (the earlier "overlapped-I/O
-  buffer lifetime" theory). The agent's Windows file I/O is synchronous
-  (`os.Open`/`ReadFile`/`WriteFile` don't set `O_FILE_FLAG_OVERLAPPED`), so
-  there is no async completion-after-return window; and go#77975 implicates the
-  GC, not I/O.
+   `windows/amd64`-only, version-independent GC-metadata corruption under heavy
+   parallel filesystem test load, **gated on `-race`**, on Azure D8s_v5;
+   symbolicated GC-stack-scan fault and `mcache.nextFree`/`mspan` inconsistency;
+   dumps + matching binaries available.
 
 ## Key files on this branch
 
-- `.buildkite/pipeline.yml` — reduced 2-variant Windows 11 diagnostic pipeline.
-- `.buildkite/scripts/steps/unit-tests.ps1` — diagnostic run.
+- `.buildkite/pipeline.yml` — Windows 11 diagnostic pipeline (control / no-race
+  / no-mitigations-IFEO / instrumented).
+- `.buildkite/scripts/steps/unit-tests.ps1` — diagnostic/control run; honours
+  `NO_RACE`, `DISABLE_MITIGATIONS_IFEO`, `EXTRA_GODEBUG`, `EXTRA_GOEXPERIMENT`.
 - `.buildkite/scripts/steps/unit-tests-instrumented.ps1` — WER + procdump +
-  binary rebuild.
-- `internal/pkg/iocprepro/` — standalone minimal-reproduction attempt.
+  symbol-rich binary rebuild.
+- `internal/pkg/iocprepro/` — standalone minimal-reproduction attempt (does not
+  reproduce; built on the dead IOCP premise — needs a `-race`/tsan rework).
