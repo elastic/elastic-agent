@@ -22,6 +22,18 @@ type FleetServerConfig struct {
 	TLS          *tlscommon.ServerConfig  `config:"ssl" yaml:"ssl,omitempty"`
 }
 
+// Validate applies backport-branch defaults and validates the fleet server configuration.
+func (c *FleetServerConfig) Validate() error {
+	// Certificate hot-reload was introduced after this branch was cut. Disable it
+	// by default so it does not land silently in a patch release. Operators who
+	// want it can set ssl.certificate_reload.enabled: true in their config.
+	if c.TLS != nil && c.TLS.CertificateReload.Enabled == nil {
+		disabled := false
+		c.TLS.CertificateReload.Enabled = &disabled
+	}
+	return nil
+}
+
 // FleetServerPolicyConfig is the configuration for the policy Fleet Server should run on.
 type FleetServerPolicyConfig struct {
 	ID string `config:"id"`
@@ -51,6 +63,18 @@ type Elasticsearch struct {
 	ProxyURL         string            `config:"proxy_url" yaml:"proxy_url,omitempty"`
 	ProxyDisable     bool              `config:"proxy_disable" yaml:"proxy_disable"`
 	ProxyHeaders     map[string]string `config:"proxy_headers" yaml:"proxy_headers"`
+}
+
+// Validate applies backport-branch defaults and validates the Elasticsearch configuration.
+func (c *Elasticsearch) Validate() error {
+	// Certificate hot-reload was introduced after this branch was cut. Disable it
+	// by default so it does not land silently in a patch release. Operators who
+	// want it can set ssl.certificate_reload.enabled: true in their config.
+	if c.TLS != nil && c.TLS.CertificateReload.Enabled == nil {
+		disabled := false
+		c.TLS.CertificateReload.Enabled = &disabled
+	}
+	return nil
 }
 
 // ElasticsearchFromConnStr returns an Elasticsearch configuration from the connection string.
