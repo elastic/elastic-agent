@@ -74,15 +74,28 @@ try {
         exit $LASTEXITCODE
     }
 
-    Write-Host "--- Unit tests (instrumented; asyncpreemptoff NOT set so the bug fires)"
-    # Instrumentation:
-    # - clobberfree=1: paints freed heap memory with 0xdead pattern so corrupted bytes
-    #   in the GC dump are recognizable as "freed memory leaked into use" vs random junk.
-    # - gctrace=1: one line per GC cycle on stderr; correlates the crashing sweep.
-    # - schedtrace=10000: scheduler state every 10s; shows what was running on which M/P.
-    # - GOTRACEBACK=crash: full goroutine traceback to stderr THEN raises SIGABRT, so WER
-    #   captures the dump.
-    $env:GODEBUG = "clobberfree=1,gctrace=1,schedtrace=10000"
+    # Two GODEBUG modes:
+    #  - default (instrumented): a light config that lets the bug fire naturally;
+    #    in practice it tends to yield the sweep-phase "found pointer to free
+    #    object" crash, whose FailFast record carries only ExceptionCode 2.
+    #  - DIAG_CAPTURE=1: the diagnostic config (GOGC=1 + gccheckmark + invalidptr
+    #    + asyncpreemptoff). This maximises the *in-the-act* signatures we lack a
+    #    dump of: "checkmark found unmarked object" and "unexpected signal during
+    #    runtime execution" (a GC stack-scan access violation). Those are
+    #    AV-origin crashes, so dieFromException reconstructs the FailFast record
+    #    from gp.sig and the dump carries the real 0xC0000005 code + faulting PC +
+    #    fault address. Same proven capture path either way.
+    # clobberfree=1 paints freed heap with 0xdead so corrupted bytes stand out;
+    # gctrace=1 = one line per GC; GOTRACEBACK=crash = full traceback then crash.
+    if ($env:DIAG_CAPTURE -eq "1") {
+        Write-Host "--- Unit tests (DIAG_CAPTURE: diagnostic GODEBUG + dump capture)"
+        $env:GOGC = "1"
+        $env:GODEBUG = "clobberfree=1,gccheckmark=1,invalidptr=1,gctrace=1,asyncpreemptoff=1"
+        $env:GOEXPERIMENT = "cgocheck2"
+    } else {
+        Write-Host "--- Unit tests (instrumented; asyncpreemptoff NOT set so the bug fires)"
+        $env:GODEBUG = "clobberfree=1,gctrace=1,schedtrace=10000"
+    }
     $env:GOTRACEBACK = "crash"
 
     # We deliberately bypass `mage unitTest` / gotestsum here.  gotestsum (v1.13)
@@ -98,23 +111,20 @@ try {
     if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
         $testArgs += "-race"
     }
-    # Wrap each test binary launch with procdump.  -e 1 enables first-chance
-    # exception capture - critical for Go binaries because Go's runtime handles
-    # exceptions in its UnhandledExceptionFilter and the second-chance never
-    # fires (so AeDebug alone is not enough).  -ma writes a full memory dump.
+    # Wrap each test binary launch with procdump.  -ma = full memory dump.
+    # -e 1 = also monitor first-chance exceptions; -f Breakpoint filters *those*
+    # so we do NOT dump on the many benign first-chance AVs Go's fmt machinery
+    # raises probing nil Stringer pointers.
     #
-    # -f "Breakpoint" restricts capture to EXCEPTION_BREAKPOINT exceptions
-    # only.  This is how Go's `runtime.crash()` signals a fatal panic on
-    # Windows (it executes `INT 3` after the throw path is done printing the
-    # goroutine traceback).  Without this filter, procdump catches every
-    # recoverable nil-pointer dereference (and there are several during a
-    # normal test run as Go's fmt machinery probes Stringer-implementing
-    # nil pointers), producing dumps of harmless first-chance exceptions
-    # and missing the actual `runtime.throw` we want.
+    # The fatal crash is captured regardless of -f: Go's crash() ->
+    # dieFromException raises it via RaiseFailFastException (a noncontinuable,
+    # handler-bypassing exception - NOT an INT 3; it shows up in the dump with
+    # ExceptionAddress inside asmstdcall and, for a plain throw, the synthetic
+    # ExceptionCode 2). procdump captures that terminating exception as the
+    # process dies. So -f Breakpoint means "ignore benign first-chance noise,
+    # still grab the fatal FailFast".
     #
-    # The wrapper is passed to `go test` via -exec; go test then invokes it as
-    # `<wrapper> <test-binary> <test-args>`, which procdump consumes as
-    # `procdump -ma -e 1 -f Breakpoint -accepteula -x <dumpDir> <test-binary> <test-args>`.
+    # go test -exec invokes: procdump -ma -e 1 -f Breakpoint -accepteula -x <dumpDir> <test-binary> <test-args>.
     if ($procdumpInstalled) {
         $execValue = "`"$procdumpExe`" -ma -e 1 -f Breakpoint -accepteula -x `"$dumpDir`""
         $testArgs += "-exec=$execValue"
@@ -171,6 +181,10 @@ try {
     # what aborted the artifact-rebuild step in build 40519 before it ran.
     $env:GODEBUG = ""
     $env:GOTRACEBACK = ""
+    # GOGC=1 (DIAG_CAPTURE mode) would make the rebuild compiler GC after every
+    # allocation - cripplingly slow. Clear it. Leave GOEXPERIMENT set: the
+    # rebuilt binary must use the same experiments to byte-match the dump.
+    $env:GOGC = ""
 
     Write-Host "--- Prepare artifacts"
     $buildkiteJobId = $env:BUILDKITE_JOB_ID

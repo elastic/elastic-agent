@@ -81,40 +81,25 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (no-mitigations IFEO run %n)"
-    key: "unit-tests-win11-nomit"
-    # amd64, -race ON, but mitigations actually disabled per test-binary via IFEO
-    # (DISABLE_MITIGATIONS_IFEO=1). Unlike the earlier Set-ProcessMitigation
-    # -System approach (a no-op without a reboot), per-image IFEO applies at
-    # process creation - so this is the FIRST run where mitigations are genuinely
-    # off on the test processes. The job self-verifies via a per-process posture
-    # probe. If the control crashes but this stays clean, mitigations (CET/ASLR)
-    # really do matter; if this crashes too, they're conclusively not involved.
-    command: .buildkite/scripts/steps/unit-tests.ps1
-    parallelism: 10
-    env:
-      DISABLE_MITIGATIONS_IFEO: "1"
-    artifact_paths:
-      - "build/TEST-*.html"
-      - "build/TEST-*.xml"
-      - "build/diagnostics/*"
-      - "coverage-*.out"
-    agents:
-      provider: "azure"
-      image: "${IMAGE_WIN_11}"
-      imageVersion: "${IMAGE_WIN_11_VERSION}"
-      vmSize: "Standard_D8s_v5"
-      diskSizeGb: "256"
-    retry:
-      manual:
-        allowed: true
-    plugins:
-      - *google_oidc_plugin
-
-  - label: "Unit tests - Windows 11 (instrumented run %n)"
-    key: "unit-tests-win11-instrumented"
+  - label: "Unit tests - Windows 11 (diag-capture run %n)"
+    key: "unit-tests-win11-diagcapture"
+    # The dump-capturing variant, tuned to grab an AV-origin crash. Runs the
+    # instrumented capture machinery (procdump + WER + symbol-rich rebuild) but
+    # with the DIAGNOSTIC GODEBUG (DIAG_CAPTURE=1: GOGC=1 + gccheckmark +
+    # invalidptr + asyncpreemptoff). Every dump we have so far is the sweep
+    # "found pointer to free object" crash (FailFast ExceptionCode 2); the
+    # diagnostic config instead produces "checkmark found unmarked object" and
+    # "unexpected signal during runtime execution" (a GC stack-scan access
+    # violation), whose FailFast record is reconstructed from gp.sig and carries
+    # the real 0xC0000005 code + faulting PC + fault address. That is the
+    # in-the-act dump we want to read through a tsan lens. Also serves as the
+    # positive control (crashes readily). parallelism 5 to cap dump volume
+    # (~300 MB each); ~40% of crashes are the AV variant, so 5 jobs should yield
+    # one or more.
     command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
     parallelism: 5
+    env:
+      DIAG_CAPTURE: "1"
     artifact_paths:
       - "build/TEST-*.html"
       - "build/TEST-*.xml"
@@ -148,9 +133,7 @@ steps:
         allow_failure: true
       - step: "unit-tests-win11-norace"
         allow_failure: true
-      - step: "unit-tests-win11-nomit"
-        allow_failure: true
-      - step: "unit-tests-win11-instrumented"
+      - step: "unit-tests-win11-diagcapture"
         allow_failure: true
 
   - wait: ~
