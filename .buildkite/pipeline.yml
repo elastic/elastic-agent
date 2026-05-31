@@ -29,76 +29,18 @@ env:
   IMAGE_WIN_11_VERSION: "1.0.1779464011"
 
 steps:
-  - label: "Env probe - Windows 11 (run %n)"
-    key: "envprobe-win11"
-    # Characterise the CI execution context (std-handle types incl. ConPTY,
-    # job object, affinity/priority, scheduling jitter / vCPU-steal sample,
-    # process tree, loaded modules / injected DLLs, Defender, hypervisor) so we
-    # can diff it against a manually-provisioned VM (same image/HW) that does
-    # NOT reproduce, and find the confound. Deterministic - no crash needed.
-    # parallelism 3 to sample a few different CI hosts.
-    command: .buildkite/scripts/steps/envprobe.ps1
-    parallelism: 3
-    agents:
-      provider: "azure"
-      image: "${IMAGE_WIN_11}"
-      imageVersion: "${IMAGE_WIN_11_VERSION}"
-      vmSize: "Standard_D8s_v5"
-      diskSizeGb: "256"
-    retry:
-      manual:
-        allowed: true
-    plugins:
-      - *google_oidc_plugin
-
-  - label: "Unit tests - Windows 11 (narrow TestRollback-only run %n)"
-    key: "unit-tests-win11-rollback"
-    # Narrowing step 2: the TestRollback *family* already reproduced (build
-    # 40696, 4/10). Tighten to the single anchored test ^TestRollback$ (still
-    # table-driven with subtests). If it crashes, that one test is the minimal
-    # top-level unit; if not, the family needs >1 of its tests.
-    command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
-    parallelism: 10
-    env:
-      DIAG_CAPTURE: "1"
-      TEST_PKG: "./internal/pkg/agent/application/upgrade/"
-      TEST_RUN: "^TestRollback$"
-    artifact_paths:
-      - "build/TEST-*.html"
-      - "build/TEST-*.xml"
-      - "build/diagnostics/*"
-      - "coverage-*.out"
-      - "build/dumps/*.dmp"
-      - "build/bins/*.exe"
-    agents:
-      provider: "azure"
-      image: "${IMAGE_WIN_11}"
-      imageVersion: "${IMAGE_WIN_11_VERSION}"
-      vmSize: "Standard_D8s_v5"
-      diskSizeGb: "256"
-    retry:
-      manual:
-        allowed: true
-    plugins:
-      - *google_oidc_plugin
-
-  - label: "Unit tests - Windows 11 (diag-capture upgrade-scoped run %n)"
+  - label: "Unit tests - Windows 11 (diag-capture + steal sampler run %n)"
     key: "unit-tests-win11-diagcapture"
-    # Dump-capturing variant, SCOPED to the upgrade package (TEST_PKG) so every
-    # crash lands in a single rebuildable binary (upgrade.test.exe). The
-    # whole-suite diag-capture (build 40693) crashed 5/5 but 4 of those landed in
-    # the mage-target "test.test.exe", which can't be rebuilt - leaving those
-    # dumps (possibly the "unexpected signal" AVs we want) unsymbolicable. Only
-    # the one crash that happened to land in upgrade was usable. Scoping fixes
-    # that: whatever signature fires - checkmark, sweep, or the prized
-    # "unexpected signal" (GC stack-scan AV, FailFast carrying the real
-    # 0xC0000005 + fault PC + addr) - it comes with a byte-matching binary.
-    # DIAG_CAPTURE=1 = diagnostic GODEBUG (GOGC=1 + gccheckmark + invalidptr).
-    # parallelism 8 for more shots; ~40% of crashes are the AV variant.
-    # (If control crashes but this does not, upgrade-alone is insufficient load
-    # and we should broaden the scope.)
+    # Upgrade-scoped dump-capturing variant, now carrying a steal-under-load
+    # sampler (envprobe -steal) that logs host preemption throughout the run.
+    # Goal: correlate vCPU-steal with crash outcome across many runs/builds - the
+    # build-to-build crash-rate swing (40696 ~50% vs 40697 0%, identical config)
+    # points at per-build host contention as the confound, and the idle env
+    # probe can't see load-time steal. High parallelism to capture both crashing
+    # and clean jobs WITH steal data in one build. Still captures dumps + the
+    # rebuilt upgrade.test.exe.
     command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
-    parallelism: 8
+    parallelism: 15
     env:
       DIAG_CAPTURE: "1"
       TEST_PKG: "./internal/pkg/agent/application/upgrade/"
@@ -109,36 +51,7 @@ steps:
       - "coverage-*.out"
       - "build/dumps/*.dmp"
       - "build/bins/*.exe"
-    agents:
-      provider: "azure"
-      image: "${IMAGE_WIN_11}"
-      imageVersion: "${IMAGE_WIN_11_VERSION}"
-      vmSize: "Standard_D8s_v5"
-      diskSizeGb: "256"
-    retry:
-      manual:
-        allowed: true
-    plugins:
-      - *google_oidc_plugin
-
-  - label: "Unit tests - Windows 11 (narrow TestCleanup-only run %n)"
-    key: "unit-tests-win11-cleanup"
-    # Narrowing step 2 (companion): single anchored test ^TestCleanup$. The
-    # TestCleanup family reproduced (build 40696, 5/10); this checks whether the
-    # one base test alone suffices.
-    command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
-    parallelism: 10
-    env:
-      DIAG_CAPTURE: "1"
-      TEST_PKG: "./internal/pkg/agent/application/upgrade/"
-      TEST_RUN: "^TestCleanup$"
-    artifact_paths:
-      - "build/TEST-*.html"
-      - "build/TEST-*.xml"
-      - "build/diagnostics/*"
-      - "coverage-*.out"
-      - "build/dumps/*.dmp"
-      - "build/bins/*.exe"
+      - "build/steal.log"
     agents:
       provider: "azure"
       image: "${IMAGE_WIN_11}"
@@ -162,10 +75,6 @@ steps:
       - *google_oidc_plugin
     depends_on:
       - step: "unit-tests-win11-diagcapture"
-        allow_failure: true
-      - step: "unit-tests-win11-rollback"
-        allow_failure: true
-      - step: "unit-tests-win11-cleanup"
         allow_failure: true
 
   - wait: ~

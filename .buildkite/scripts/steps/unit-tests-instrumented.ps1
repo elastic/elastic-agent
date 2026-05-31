@@ -74,6 +74,26 @@ try {
         exit $LASTEXITCODE
     }
 
+    # Steal-under-load sampler: a sibling process that logs host preemption
+    # (vCPU steal) throughout the test run, so we can correlate contention with
+    # crash outcome across runs/builds. Built and launched HERE - before the
+    # diagnostic GODEBUG is set - so the sampler runs with a clean env (no
+    # gctrace spew) and a fast build (no GOGC=1). Only in DIAG_CAPTURE mode.
+    $sampler = $null
+    if ($env:DIAG_CAPTURE -eq "1") {
+        $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+        try {
+            & go build -o "build\steal.exe" ./.buildkite/scripts/steps/envprobe 2>&1 | Out-Host
+            if (Test-Path "build\steal.exe") {
+                $sampler = Start-Process -FilePath "build\steal.exe" -ArgumentList "-steal" `
+                    -RedirectStandardOutput "build\steal.log" -PassThru -WindowStyle Hidden
+                Write-Host "steal sampler started (pid=$($sampler.Id)) -> build\steal.log"
+            } else {
+                Write-Host "WARNING: steal.exe did not build; continuing without sampler"
+            }
+        } catch { Write-Host "steal sampler launch failed: $_" } finally { $ErrorActionPreference = $prevEAP }
+    }
+
     # Two GODEBUG modes:
     #  - default (instrumented): a light config that lets the bug fire naturally;
     #    in practice it tends to yield the sweep-phase "found pointer to free
@@ -185,6 +205,17 @@ try {
             $crashed = $true
             break
         }
+    }
+
+    # Stop the steal sampler and fold its log into the job output (so the
+    # monitor can read it) and artifacts. The STEAL lines are timestamped, so we
+    # can correlate host preemption with the crash time and across jobs.
+    if ($sampler -and -not $sampler.HasExited) {
+        Stop-Process -Id $sampler.Id -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-Path "build\steal.log") {
+        Write-Host "--- steal sampler log (host preemption during the run) ---"
+        Get-Content "build\steal.log" | Out-Host
     }
 
     # Clear the diagnostic GODEBUG/GOTRACEBACK before any further `go`

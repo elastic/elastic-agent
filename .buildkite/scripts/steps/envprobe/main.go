@@ -278,7 +278,25 @@ func jitter(d time.Duration, threads int) (maxGap time.Duration, over1ms, over10
 	return
 }
 
+// stealLoop runs continuously as a sibling of the test process, sampling host
+// preemption on 1 thread in short bursts and printing a timestamped line each
+// time. Because the test load is ~constant across runs, the variable component
+// of these gaps between crashing and clean jobs is host contention / vCPU steal
+// - which is what we want to correlate with crash outcome.
+func stealLoop() {
+	for {
+		mg, o1, o10 := jitter(250*time.Millisecond, 1)
+		fmt.Printf("STEAL %s maxgap=%v gaps>1ms=%d gaps>10ms=%d\n",
+			time.Now().Format("15:04:05.000"), mg, o1, o10)
+		time.Sleep(1750 * time.Millisecond)
+	}
+}
+
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "-steal" {
+		stealLoop()
+		return
+	}
 	fmt.Println("================ ENV PROBE ================")
 	fmt.Printf("GOOS/GOARCH=%s/%s  NumCPU=%d  GOMAXPROCS=%d  pid=%d\n",
 		runtime.GOOS, runtime.GOARCH, runtime.NumCPU(), runtime.GOMAXPROCS(0), os.Getpid())
