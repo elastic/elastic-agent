@@ -26,10 +26,102 @@ var (
 	pGetProcessAffinityMask   = k32.NewProc("GetProcessAffinityMask")
 	pGetPriorityClass         = k32.NewProc("GetPriorityClass")
 	pCreateToolhelp32Snapshot = k32.NewProc("CreateToolhelp32Snapshot")
-	pProcess32NextW           = k32.NewProc("Process32NextW")
-	pModule32NextW            = k32.NewProc("Module32NextW")
-	pCloseHandle              = k32.NewProc("CloseHandle")
+	pProcess32NextW            = k32.NewProc("Process32NextW")
+	pModule32NextW             = k32.NewProc("Module32NextW")
+	pCloseHandle               = k32.NewProc("CloseHandle")
+	pQueryInformationJobObject = k32.NewProc("QueryInformationJobObject")
 )
+
+// JOBOBJECT_BASIC_LIMIT_INFORMATION (explicit padding to match the C layout).
+type basicLimit struct {
+	PerProcessUserTimeLimit int64
+	PerJobUserTimeLimit     int64
+	LimitFlags              uint32
+	_                       uint32
+	MinimumWorkingSetSize   uintptr
+	MaximumWorkingSetSize   uintptr
+	ActiveProcessLimit      uint32
+	_                       uint32
+	Affinity                uintptr
+	PriorityClass           uint32
+	SchedulingClass         uint32
+}
+
+type ioCounters struct {
+	ReadOps, WriteOps, OtherOps, ReadBytes, WriteBytes, OtherBytes uint64
+}
+
+type extLimit struct {
+	Basic                 basicLimit
+	IoInfo                ioCounters
+	ProcessMemoryLimit    uintptr
+	JobMemoryLimit        uintptr
+	PeakProcessMemoryUsed uintptr
+	PeakJobMemoryUsed     uintptr
+}
+
+type cpuRateInfo struct {
+	ControlFlags uint32
+	Value        uint32
+}
+
+func decodeLimitFlags(f uint32) string {
+	names := []struct {
+		bit uint32
+		s   string
+	}{
+		{0x00000008, "ACTIVE_PROCESS"}, {0x00000010, "AFFINITY"}, {0x00000020, "PRIORITY_CLASS"},
+		{0x00000080, "SCHEDULING_CLASS"}, {0x00000100, "PROCESS_MEMORY"}, {0x00000200, "JOB_MEMORY"},
+		{0x00000800, "BREAKAWAY_OK"}, {0x00001000, "SILENT_BREAKAWAY_OK"}, {0x00002000, "KILL_ON_JOB_CLOSE"},
+		{0x00004000, "SUBSET_AFFINITY"},
+	}
+	var out []string
+	for _, n := range names {
+		if f&n.bit != 0 {
+			out = append(out, n.s)
+		}
+	}
+	if len(out) == 0 {
+		return "none"
+	}
+	return strings.Join(out, "|")
+}
+
+func decodeCpuRate(cr cpuRateInfo) string {
+	if cr.ControlFlags&0x1 == 0 {
+		return "NOT ENABLED (no CPU throttling)"
+	}
+	parts := []string{"ENABLE"}
+	if cr.ControlFlags&0x2 != 0 {
+		parts = append(parts, fmt.Sprintf("WEIGHT_BASED(weight=%d)", cr.Value))
+	}
+	if cr.ControlFlags&0x4 != 0 {
+		parts = append(parts, fmt.Sprintf("HARD_CAP(cap=%.2f%%)", float64(cr.Value)/100.0))
+	}
+	if cr.ControlFlags&0x10 != 0 {
+		parts = append(parts, fmt.Sprintf("MIN_MAX(min=%.2f%% max=%.2f%%)", float64(cr.Value&0xffff)/100.0, float64(cr.Value>>16)/100.0))
+	}
+	return strings.Join(parts, "|") + "  <-- THROTTLED"
+}
+
+func dumpJobLimits() {
+	var ext extLimit
+	r, _, e := pQueryInformationJobObject.Call(0, 9, uintptr(unsafe.Pointer(&ext)), unsafe.Sizeof(ext), 0)
+	if r == 0 {
+		fmt.Printf("  QueryInformationJobObject(ExtendedLimit) failed: %v\n", e)
+	} else {
+		fmt.Printf("  LimitFlags=0x%x [%s]  ActiveProcessLimit=%d  Affinity=0x%x  PriorityClass=0x%x\n",
+			ext.Basic.LimitFlags, decodeLimitFlags(ext.Basic.LimitFlags), ext.Basic.ActiveProcessLimit, ext.Basic.Affinity, ext.Basic.PriorityClass)
+		fmt.Printf("  ProcessMemoryLimit=0x%x  JobMemoryLimit=0x%x\n", ext.ProcessMemoryLimit, ext.JobMemoryLimit)
+	}
+	var cr cpuRateInfo
+	r2, _, e2 := pQueryInformationJobObject.Call(0, 15, uintptr(unsafe.Pointer(&cr)), unsafe.Sizeof(cr), 0)
+	if r2 == 0 {
+		fmt.Printf("  QueryInformationJobObject(CpuRateControl) failed: %v\n", e2)
+	} else {
+		fmt.Printf("  CPU rate control: ControlFlags=0x%x Value=%d => %s\n", cr.ControlFlags, cr.Value, decodeCpuRate(cr))
+	}
+}
 
 func fileType(h uintptr) string {
 	r, _, _ := pGetFileType.Call(h)
@@ -210,6 +302,9 @@ func main() {
 	var inJob int32
 	pIsProcessInJob.Call(cur, 0, uintptr(unsafe.Pointer(&inJob)))
 	fmt.Printf("  IsProcessInJob=%v\n", inJob != 0)
+	if inJob != 0 {
+		dumpJobLimits() // the decisive check: is buildkite-agent's job object throttling CPU?
+	}
 	var procMask, sysMask uintptr
 	pGetProcessAffinityMask.Call(cur, uintptr(unsafe.Pointer(&procMask)), uintptr(unsafe.Pointer(&sysMask)))
 	fmt.Printf("  process affinity=0x%x  system affinity=0x%x  (popcount proc=%d sys=%d)\n",
@@ -217,9 +312,14 @@ func main() {
 	pc, _, _ := pGetPriorityClass.Call(cur)
 	fmt.Printf("  priority class=0x%x\n", pc)
 
-	fmt.Println("\n-- scheduling jitter / vCPU-steal sample (2s, NumCPU threads) --")
-	mg, o1, o10 := jitter(2*time.Second, runtime.NumCPU())
-	fmt.Printf("  max gap=%v   gaps>1ms=%d   gaps>10ms=%d   (large/many => contended host)\n", mg, o1, o10)
+	fmt.Println("\n-- scheduling jitter / vCPU-steal sample --")
+	// 1 thread = clean host-preemption signal (guest not oversubscribed); any
+	// >10ms gap here is the hypervisor descheduling our vCPU. NumCPU threads adds
+	// self-oversubscription for comparison.
+	mg1, o1a, o10a := jitter(2*time.Second, 1)
+	fmt.Printf("  [1 thread]      max gap=%v   gaps>1ms=%d   gaps>10ms=%d   (clean host-steal signal)\n", mg1, o1a, o10a)
+	mgN, o1b, o10b := jitter(2*time.Second, runtime.NumCPU())
+	fmt.Printf("  [NumCPU thread] max gap=%v   gaps>1ms=%d   gaps>10ms=%d   (incl. self-oversubscription)\n", mgN, o1b, o10b)
 
 	fmt.Println("\n-- process tree (this <- parent <- ...) --")
 	procTree()

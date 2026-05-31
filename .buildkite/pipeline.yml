@@ -51,18 +51,18 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (narrow TestRollback run %n)"
+  - label: "Unit tests - Windows 11 (narrow TestRollback-only run %n)"
     key: "unit-tests-win11-rollback"
-    # Test-case narrowing: upgrade package scoped to -run=TestRollback (covers
-    # TestRollback + TestRollbackWithOpts). If this crashes, that family alone is
-    # sufficient to trigger the bug. Compared against the full-upgrade control
-    # and the TestCleanup narrowing below.
+    # Narrowing step 2: the TestRollback *family* already reproduced (build
+    # 40696, 4/10). Tighten to the single anchored test ^TestRollback$ (still
+    # table-driven with subtests). If it crashes, that one test is the minimal
+    # top-level unit; if not, the family needs >1 of its tests.
     command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
     parallelism: 10
     env:
       DIAG_CAPTURE: "1"
       TEST_PKG: "./internal/pkg/agent/application/upgrade/"
-      TEST_RUN: "TestRollback"
+      TEST_RUN: "^TestRollback$"
     artifact_paths:
       - "build/TEST-*.html"
       - "build/TEST-*.xml"
@@ -121,18 +121,17 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (narrow TestCleanup run %n)"
+  - label: "Unit tests - Windows 11 (narrow TestCleanup-only run %n)"
     key: "unit-tests-win11-cleanup"
-    # Test-case narrowing: upgrade package scoped to -run=TestCleanup. Companion
-    # to the TestRollback narrowing - together they tell us whether one family
-    # alone triggers the bug, or whether it needs the combined workload (only
-    # the full-upgrade control crashing would imply the latter).
+    # Narrowing step 2 (companion): single anchored test ^TestCleanup$. The
+    # TestCleanup family reproduced (build 40696, 5/10); this checks whether the
+    # one base test alone suffices.
     command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
     parallelism: 10
     env:
       DIAG_CAPTURE: "1"
       TEST_PKG: "./internal/pkg/agent/application/upgrade/"
-      TEST_RUN: "TestCleanup"
+      TEST_RUN: "^TestCleanup$"
     artifact_paths:
       - "build/TEST-*.html"
       - "build/TEST-*.xml"
