@@ -129,6 +129,12 @@ try {
         $execValue = "`"$procdumpExe`" -ma -e 1 -f Breakpoint -accepteula -x `"$dumpDir`""
         $testArgs += "-exec=$execValue"
     }
+    # TEST_RUN narrows to a subset of tests (passed as -run) to bisect which
+    # test cases are necessary to trigger the crash.
+    if ($env:TEST_RUN) {
+        $testArgs += "-run=$env:TEST_RUN"
+        Write-Host "test filter: -run=$env:TEST_RUN"
+    }
     # TEST_PKG scopes the run to one package (e.g. the upgrade package) so that
     # EVERY crash lands in a single, rebuildable test binary (<pkg>.test.exe) -
     # the whole-suite run scatters crashes into packages whose binaries can't be

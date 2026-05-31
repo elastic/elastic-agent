@@ -29,17 +29,16 @@ env:
   IMAGE_WIN_11_VERSION: "1.0.1779464011"
 
 steps:
-  - label: "Unit tests - Windows 11 (control run %n)"
-    key: "unit-tests-win11"
-    # Positive control: amd64, -race ON, mitigations at default. This is the
-    # known-crashing baseline the other two cohorts are compared against.
-    command: .buildkite/scripts/steps/unit-tests.ps1
-    parallelism: 10
-    artifact_paths:
-      - "build/TEST-*.html"
-      - "build/TEST-*.xml"
-      - "build/diagnostics/*"
-      - "coverage-*.out"
+  - label: "Env probe - Windows 11 (run %n)"
+    key: "envprobe-win11"
+    # Characterise the CI execution context (std-handle types incl. ConPTY,
+    # job object, affinity/priority, scheduling jitter / vCPU-steal sample,
+    # process tree, loaded modules / injected DLLs, Defender, hypervisor) so we
+    # can diff it against a manually-provisioned VM (same image/HW) that does
+    # NOT reproduce, and find the confound. Deterministic - no crash needed.
+    # parallelism 3 to sample a few different CI hosts.
+    command: .buildkite/scripts/steps/envprobe.ps1
+    parallelism: 3
     agents:
       provider: "azure"
       image: "${IMAGE_WIN_11}"
@@ -52,23 +51,25 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (no-race run %n)"
-    key: "unit-tests-win11-norace"
-    # amd64 with the race detector OFF (NO_RACE=1), everything else identical to
-    # the control. Tests whether the crash needs -race. If the control crashes
-    # but this stays clean, the repro is -race-gated - which also explains why
-    # arm64 never crashes (the race detector is windows/amd64-only) and shifts
-    # the prime suspect to the race-detector (tsan) runtime. If this also
-    # crashes, the bug is independent of -race.
-    command: .buildkite/scripts/steps/unit-tests.ps1
+  - label: "Unit tests - Windows 11 (narrow TestRollback run %n)"
+    key: "unit-tests-win11-rollback"
+    # Test-case narrowing: upgrade package scoped to -run=TestRollback (covers
+    # TestRollback + TestRollbackWithOpts). If this crashes, that family alone is
+    # sufficient to trigger the bug. Compared against the full-upgrade control
+    # and the TestCleanup narrowing below.
+    command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
     parallelism: 10
     env:
-      NO_RACE: "1"
+      DIAG_CAPTURE: "1"
+      TEST_PKG: "./internal/pkg/agent/application/upgrade/"
+      TEST_RUN: "TestRollback"
     artifact_paths:
       - "build/TEST-*.html"
       - "build/TEST-*.xml"
       - "build/diagnostics/*"
       - "coverage-*.out"
+      - "build/dumps/*.dmp"
+      - "build/bins/*.exe"
     agents:
       provider: "azure"
       image: "${IMAGE_WIN_11}"
@@ -120,6 +121,37 @@ steps:
     plugins:
       - *google_oidc_plugin
 
+  - label: "Unit tests - Windows 11 (narrow TestCleanup run %n)"
+    key: "unit-tests-win11-cleanup"
+    # Test-case narrowing: upgrade package scoped to -run=TestCleanup. Companion
+    # to the TestRollback narrowing - together they tell us whether one family
+    # alone triggers the bug, or whether it needs the combined workload (only
+    # the full-upgrade control crashing would imply the latter).
+    command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
+    parallelism: 10
+    env:
+      DIAG_CAPTURE: "1"
+      TEST_PKG: "./internal/pkg/agent/application/upgrade/"
+      TEST_RUN: "TestCleanup"
+    artifact_paths:
+      - "build/TEST-*.html"
+      - "build/TEST-*.xml"
+      - "build/diagnostics/*"
+      - "coverage-*.out"
+      - "build/dumps/*.dmp"
+      - "build/bins/*.exe"
+    agents:
+      provider: "azure"
+      image: "${IMAGE_WIN_11}"
+      imageVersion: "${IMAGE_WIN_11_VERSION}"
+      vmSize: "Standard_D8s_v5"
+      diskSizeGb: "256"
+    retry:
+      manual:
+        allowed: true
+    plugins:
+      - *google_oidc_plugin
+
   - label: ":junit: Junit annotate"
     agents:
       image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
@@ -130,11 +162,11 @@ steps:
           run-in-docker: false
       - *google_oidc_plugin
     depends_on:
-      - step: "unit-tests-win11"
-        allow_failure: true
-      - step: "unit-tests-win11-norace"
-        allow_failure: true
       - step: "unit-tests-win11-diagcapture"
+        allow_failure: true
+      - step: "unit-tests-win11-rollback"
+        allow_failure: true
+      - step: "unit-tests-win11-cleanup"
         allow_failure: true
 
   - wait: ~
