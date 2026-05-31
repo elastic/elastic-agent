@@ -129,11 +129,19 @@ try {
         $execValue = "`"$procdumpExe`" -ma -e 1 -f Breakpoint -accepteula -x `"$dumpDir`""
         $testArgs += "-exec=$execValue"
     }
+    # TEST_PKG scopes the run to one package (e.g. the upgrade package) so that
+    # EVERY crash lands in a single, rebuildable test binary (<pkg>.test.exe) -
+    # the whole-suite run scatters crashes into packages whose binaries can't be
+    # rebuilt (e.g. the mage-target "test.test.exe"), leaving those dumps
+    # unsymbolicable. Coverage flags are kept identical so the run binary and the
+    # crash-time rebuild byte-match.
+    $testTarget = if ($env:TEST_PKG) { $env:TEST_PKG } else { "./..." }
+    Write-Host "test target: $testTarget"
     $testArgs += @(
         "-covermode=atomic",
         "-coverprofile=build/coverage.out",
         "-coverpkg=./...",
-        "./..."
+        $testTarget
     )
 
     # Patterns that indicate the Go runtime tripped a sanity check or crashed

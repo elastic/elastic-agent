@@ -81,25 +81,26 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (diag-capture run %n)"
+  - label: "Unit tests - Windows 11 (diag-capture upgrade-scoped run %n)"
     key: "unit-tests-win11-diagcapture"
-    # The dump-capturing variant, tuned to grab an AV-origin crash. Runs the
-    # instrumented capture machinery (procdump + WER + symbol-rich rebuild) but
-    # with the DIAGNOSTIC GODEBUG (DIAG_CAPTURE=1: GOGC=1 + gccheckmark +
-    # invalidptr + asyncpreemptoff). Every dump we have so far is the sweep
-    # "found pointer to free object" crash (FailFast ExceptionCode 2); the
-    # diagnostic config instead produces "checkmark found unmarked object" and
-    # "unexpected signal during runtime execution" (a GC stack-scan access
-    # violation), whose FailFast record is reconstructed from gp.sig and carries
-    # the real 0xC0000005 code + faulting PC + fault address. That is the
-    # in-the-act dump we want to read through a tsan lens. Also serves as the
-    # positive control (crashes readily). parallelism 5 to cap dump volume
-    # (~300 MB each); ~40% of crashes are the AV variant, so 5 jobs should yield
-    # one or more.
+    # Dump-capturing variant, SCOPED to the upgrade package (TEST_PKG) so every
+    # crash lands in a single rebuildable binary (upgrade.test.exe). The
+    # whole-suite diag-capture (build 40693) crashed 5/5 but 4 of those landed in
+    # the mage-target "test.test.exe", which can't be rebuilt - leaving those
+    # dumps (possibly the "unexpected signal" AVs we want) unsymbolicable. Only
+    # the one crash that happened to land in upgrade was usable. Scoping fixes
+    # that: whatever signature fires - checkmark, sweep, or the prized
+    # "unexpected signal" (GC stack-scan AV, FailFast carrying the real
+    # 0xC0000005 + fault PC + addr) - it comes with a byte-matching binary.
+    # DIAG_CAPTURE=1 = diagnostic GODEBUG (GOGC=1 + gccheckmark + invalidptr).
+    # parallelism 8 for more shots; ~40% of crashes are the AV variant.
+    # (If control crashes but this does not, upgrade-alone is insufficient load
+    # and we should broaden the scope.)
     command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
-    parallelism: 5
+    parallelism: 8
     env:
       DIAG_CAPTURE: "1"
+      TEST_PKG: "./internal/pkg/agent/application/upgrade/"
     artifact_paths:
       - "build/TEST-*.html"
       - "build/TEST-*.xml"
