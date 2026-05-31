@@ -127,11 +127,18 @@ if ($useRace) {
   $testArgs += "-race"
 }
 Write-Host "race detector enabled: $useRace"
+# TEST_PKG narrows the package set (default the whole suite ./...). The full
+# suite runs ~GOMAXPROCS package binaries concurrently, which self-generates the
+# in-guest contention that makes the crash consistent; narrowing the set reduces
+# that concurrency. Used to bisect gently from ./... downward while watching the
+# crash-consistency gradient.
+$testTarget = if ($env:TEST_PKG) { $env:TEST_PKG } else { "./..." }
+Write-Host "test target: $testTarget"
 $testArgs += @(
   "-covermode=atomic",
   "-coverprofile=build/coverage.out",
   "-coverpkg=./...",
-  "./..."
+  $testTarget
 )
 
 # Patterns that indicate the Go runtime tripped a sanity check or crashed

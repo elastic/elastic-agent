@@ -29,29 +29,17 @@ env:
   IMAGE_WIN_11_VERSION: "1.0.1779464011"
 
 steps:
-  - label: "Unit tests - Windows 11 (diag-capture + steal sampler run %n)"
-    key: "unit-tests-win11-diagcapture"
-    # Upgrade-scoped dump-capturing variant, now carrying a steal-under-load
-    # sampler (envprobe -steal) that logs host preemption throughout the run.
-    # Goal: correlate vCPU-steal with crash outcome across many runs/builds - the
-    # build-to-build crash-rate swing (40696 ~50% vs 40697 0%, identical config)
-    # points at per-build host contention as the confound, and the idle env
-    # probe can't see load-time steal. High parallelism to capture both crashing
-    # and clean jobs WITH steal data in one build. Still captures dumps + the
-    # rebuilt upgrade.test.exe.
-    command: .buildkite/scripts/steps/unit-tests-instrumented.ps1
-    parallelism: 15
-    env:
-      DIAG_CAPTURE: "1"
-      TEST_PKG: "./internal/pkg/agent/application/upgrade/"
-    artifact_paths:
-      - "build/TEST-*.html"
-      - "build/TEST-*.xml"
-      - "build/diagnostics/*"
-      - "coverage-*.out"
-      - "build/dumps/*.dmp"
-      - "build/bins/*.exe"
-      - "build/steal.log"
+  # Gentle narrowing, variance-controlled: three package scopes run in the SAME
+  # build (same host conditions, so build-to-build variance cancels) to map the
+  # crash-consistency gradient. Hypothesis: `go test ./...` runs ~GOMAXPROCS
+  # package binaries concurrently => heavy in-guest contention => consistent
+  # crash; narrowing the set cuts that concurrency => marginal. All use the
+  # light diagnostic config (no procdump - we only need crash/no-crash here).
+  - label: "Unit tests - Windows 11 (scope=full ./... run %n)"
+    key: "unit-tests-win11-full"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 5
+    artifact_paths: ["coverage-*.out"]
     agents:
       provider: "azure"
       image: "${IMAGE_WIN_11}"
@@ -64,17 +52,42 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: ":junit: Junit annotate"
+  - label: "Unit tests - Windows 11 (scope=agent-subtree run %n)"
+    key: "unit-tests-win11-agentsubtree"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 5
+    env:
+      TEST_PKG: "./internal/pkg/agent/..."
+    artifact_paths: ["coverage-*.out"]
     agents:
-      image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
+      provider: "azure"
+      image: "${IMAGE_WIN_11}"
+      imageVersion: "${IMAGE_WIN_11_VERSION}"
+      vmSize: "Standard_D8s_v5"
+      diskSizeGb: "256"
+    retry:
+      manual:
+        allowed: true
     plugins:
-      - junit-annotate#v2.7.0:
-          artifacts: "**TEST-*.xml"
-          always-annotate: true
-          run-in-docker: false
       - *google_oidc_plugin
-    depends_on:
-      - step: "unit-tests-win11-diagcapture"
-        allow_failure: true
+
+  - label: "Unit tests - Windows 11 (scope=upgrade-only run %n)"
+    key: "unit-tests-win11-upgradeonly"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 5
+    env:
+      TEST_PKG: "./internal/pkg/agent/application/upgrade/"
+    artifact_paths: ["coverage-*.out"]
+    agents:
+      provider: "azure"
+      image: "${IMAGE_WIN_11}"
+      imageVersion: "${IMAGE_WIN_11_VERSION}"
+      vmSize: "Standard_D8s_v5"
+      diskSizeGb: "256"
+    retry:
+      manual:
+        allowed: true
+    plugins:
+      - *google_oidc_plugin
 
   - wait: ~
