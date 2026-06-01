@@ -26,6 +26,8 @@ extensions:
         default_value: Org-ID
   awslogs_encoding/elbaccess:
     format: elbaccess
+  azure_auth:
+    managed_identity:
   azure_encoding:
 
 processors:
@@ -196,6 +198,7 @@ service:
     - health_check
     - headers_setter
     - awslogs_encoding/elbaccess
+    - azure_auth
     - azure_encoding
   pipelines:
     logs:

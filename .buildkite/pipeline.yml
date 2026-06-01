@@ -271,8 +271,7 @@ steps:
           - *google_oidc_plugin
 
       - label: "Unit tests - Windows 11"
-        env:
-          GODEBUG: "asyncpreemptoff=1"  # see https://github.com/elastic/elastic-agent/issues/13796
+        skip: "See https://github.com/elastic/elastic-agent/issues/14248"
         key: "unit-tests-win11"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
@@ -295,8 +294,6 @@ steps:
           - *google_oidc_plugin
 
       - label: "Unit tests - Windows 11 arm64"
-        env:
-          GODEBUG: "asyncpreemptoff=1"  # see https://github.com/elastic/elastic-agent/issues/13796
         key: "unit-tests-win11-arm64"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
