@@ -22,13 +22,10 @@ extensions:
         key: X-Scope-OrgID
         from_context: tenant_id
         default_value: Org-ID
-<<<<<<< HEAD
-=======
   awslogs_encoding/elbaccess:
     format: elbaccess
   azure_auth:
     managed_identity:
->>>>>>> 700632aa5 (feat: add Azure auth extension to EDOT Collector (#14534))
   azure_encoding:
 
 processors:
@@ -118,11 +115,8 @@ service:
     - memory_limiter
     - health_check
     - headers_setter
-<<<<<<< HEAD
-=======
     - awslogs_encoding/elbaccess
     - azure_auth
->>>>>>> 700632aa5 (feat: add Azure auth extension to EDOT Collector (#14534))
     - azure_encoding
   pipelines:
     logs:
