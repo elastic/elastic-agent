@@ -469,6 +469,104 @@ func TestZipLogs(t *testing.T) {
 	}
 }
 
+func TestZipLogsComponentsLogs(t *testing.T) {
+	topPath := t.TempDir()
+	homePath := paths.HomeFrom(topPath)
+	// Create the versioned home so zipLogs iterates the current version.
+	require.NoError(t, os.MkdirAll(filepath.Join(homePath, "logs"), 0o700))
+
+	// Beat receivers write their trace logs under {pathsHome}/components/logs.
+	traceDir := filepath.Join(homePath, "components", "logs", "httpjson")
+	require.NoError(t, os.MkdirAll(traceDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(traceDir, "http-request-trace-test.ndjson"), []byte(".\n"), 0o600))
+
+	expected := []zippedItem{
+		{"logs/", true},
+		{"logs/elastic-agent-unknow/", true},
+		{"logs/elastic-agent-unknow/httpjson/", true},
+		{"logs/elastic-agent-unknow/httpjson/http-request-trace-test.ndjson", false},
+	}
+
+	buf := new(bytes.Buffer)
+	w := zip.NewWriter(buf)
+	require.NoError(t, zipLogs(w, time.Now(), topPath, true))
+	require.NoError(t, w.Close())
+
+	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	require.NoError(t, err)
+	var observed []zippedItem
+	for _, f := range r.File {
+		observed = append(observed, zippedItem{Name: f.Name, IsDir: f.FileInfo().IsDir()})
+	}
+
+	// The components walk and the versioned-home walk emit entries in a different order than a strict
+	// depth-first walk would, so compare without ordering.
+	assert.ElementsMatch(t, expected, observed)
+}
+
+func TestZipLogsComponentsLogsMultiVersionedHome(t *testing.T) {
+	topPath := t.TempDir()
+	dataPath := paths.DataFrom(topPath)
+
+	// Two versioned homes under data: currentDir matches paths.HomeFrom, oldDir is a stale version.
+	currentDir := filepath.Base(paths.HomeFrom(topPath))
+	oldDir := "elastic-agent-oldversion"
+	require.NoError(t, os.MkdirAll(filepath.Join(dataPath, currentDir, "logs"), 0o700))
+	require.NoError(t, os.MkdirAll(filepath.Join(dataPath, oldDir, "logs"), 0o700))
+
+	// Beat receivers write their trace logs under each version's own components/logs.
+	traceDir := filepath.Join(dataPath, currentDir, "components", "logs", "httpjson")
+	require.NoError(t, os.MkdirAll(traceDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(traceDir, "http-request-trace-test.ndjson"), []byte(".\n"), 0o600))
+
+	buf := new(bytes.Buffer)
+	w := zip.NewWriter(buf)
+	require.NoError(t, zipLogs(w, time.Now(), topPath, true))
+	require.NoError(t, w.Close())
+
+	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	require.NoError(t, err)
+
+	// Component trace logs land under logs/<version>/httpjson/ matching the 8.19 zip layout.
+	traceName := "logs/" + currentDir + "/httpjson/http-request-trace-test.ndjson"
+	var count int
+	for _, f := range r.File {
+		if f.Name == traceName {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count, "trace file should appear exactly once, attributed to the current version")
+}
+
+func TestZipLogsUnversionedHome(t *testing.T) {
+	originalVersionHome := paths.IsVersionHome()
+	t.Cleanup(func() { paths.SetVersionHome(originalVersionHome) })
+	// Container layout: the home path is unversioned and logs live directly under the top path.
+	paths.SetVersionHome(false)
+
+	topPath := t.TempDir()
+	logsDir := filepath.Join(topPath, "logs")
+	require.NoError(t, os.MkdirAll(logsDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(logsDir, "log.ndjson"), []byte(".\n"), 0o600))
+
+	buf := new(bytes.Buffer)
+	w := zip.NewWriter(buf)
+	require.NoError(t, zipLogs(w, time.Now(), topPath, true))
+	require.NoError(t, w.Close())
+
+	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	require.NoError(t, err)
+
+	wantName := "logs/" + filepath.Base(topPath) + "/log.ndjson"
+	var found bool
+	for _, f := range r.File {
+		if f.Name == wantName {
+			found = true
+		}
+	}
+	assert.Truef(t, found, "expected %q in zip", wantName)
+}
+
 func zipLogsAndAssertFiles(t *testing.T, topPath string, excludeEvents bool, expected []zippedItem) {
 	t.Helper()
 

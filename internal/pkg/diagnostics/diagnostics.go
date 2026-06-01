@@ -383,10 +383,24 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) e
 	homePath := paths.HomeFrom(topPath)
 	dataPath := paths.DataFrom(topPath)
 	currentDir := filepath.Base(homePath)
+
+	_, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "logs/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := collectServiceComponentsLogs(zw); err != nil {
+		return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
+	}
+
 	if !paths.IsVersionHome() {
 		// running in a container with custom top path set
 		// logs are directly under top path
-		return zipLogsWithPath(homePath, currentDir, true, excludeEvents, zw, ts)
+		return zipLogsWithPath(homePath, currentDir, excludeEvents, zw, ts)
 	}
 
 	dataDir, err := os.Open(dataPath)
@@ -405,9 +419,8 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) e
 		if !strings.HasPrefix(dir, dirPrefix) {
 			continue
 		}
-		collectServices := dir == currentDir
 		path := filepath.Join(dataPath, dir)
-		if err := zipLogsWithPath(path, dir, collectServices, excludeEvents, zw, ts); err != nil {
+		if err := zipLogsWithPath(path, dir, excludeEvents, zw, ts); err != nil {
 			return err
 		}
 	}
@@ -415,24 +428,10 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) e
 	return nil
 }
 
-// zipLogs walks paths.Logs() and copies the file structure into zw in "logs/"
-func zipLogsWithPath(pathsHome, commitName string, collectServices, excludeEvents bool, zw *zip.Writer, ts time.Time) error {
+// zipLogsWithPath walks {pathsHome}/logs and {pathsHome}/components/logs and copies them into zw
+// under "logs/<commitName>/" and "logs/<commitName>/components/" respectively.
+func zipLogsWithPath(pathsHome, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time) error {
 	_, err := zw.CreateHeader(&zip.FileHeader{
-		Name:     "logs/",
-		Method:   zip.Deflate,
-		Modified: ts,
-	})
-	if err != nil {
-		return err
-	}
-
-	if collectServices {
-		if err := collectServiceComponentsLogs(zw); err != nil {
-			return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
-		}
-	}
-
-	_, err = zw.CreateHeader(&zip.FileHeader{
 		Name:     "logs/" + commitName + "/",
 		Method:   zip.Deflate,
 		Modified: ts,
@@ -441,9 +440,23 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices, excludeEvent
 		return err
 	}
 
-	// using Data() + "/logs", for some reason default paths/Logs() is the home dir...
-	logPath := filepath.Join(pathsHome, "logs") + string(filepath.Separator)
-	return filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
+	if err := walkLogPath(filepath.Join(pathsHome, "logs"), commitName, excludeEvents, zw, ts); err != nil {
+		return err
+	}
+
+	// Beat receivers write trace logs under {pathsHome}/components/logs.
+	// Collect them under logs/<commitName>/ (same as agent logs) so the zip layout matches
+	// 8.19.x where trace files lived under {pathsHome}/logs directly.
+	return walkLogPath(filepath.Join(pathsHome, "components", "logs"), commitName, excludeEvents, zw, ts)
+}
+
+func walkLogPath(logRoot, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time) error {
+	logPath := logRoot + string(filepath.Separator)
+	return filepath.WalkDir(logPath, zipLogWalkFunc(logPath, commitName, excludeEvents, zw, ts))
+}
+
+func zipLogWalkFunc(logPath, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time) func(path string, d fs.DirEntry, fErr error) error {
+	return func(path string, d fs.DirEntry, fErr error) error {
 		if errors.Is(fErr, fs.ErrNotExist) {
 			return nil
 		}
@@ -486,7 +499,7 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices, excludeEvent
 			return err
 		}
 		return nil
-	})
+	}
 }
 
 func collectServiceComponentsLogs(zw *zip.Writer) error {
