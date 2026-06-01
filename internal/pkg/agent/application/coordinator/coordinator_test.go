@@ -541,13 +541,17 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 }
 
 func TestPreUpgradeCallback(t *testing.T) {
+	// Verify that WithPreUpgradeCallback is forwarded to upgradeMgr.Upgrade as an
+	// upgrade.WithPreSymlinkCallback option. The callback is invoked by the
+	// upgrader (not by the coordinator directly); if it returns an error the
+	// whole upgrade fails and the error is propagated back to the caller.
 	coordCh := make(chan error)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	upgradeManager := &fakeUpgradeManager{
 		upgradeable: true,
-		upgradeErr:  upgrade.ErrUpgradeSameVersion,
+		// No upgradeErr — the error comes from the pre-symlink callback itself.
 	}
 
 	acker := acker.NewMockAcker(t)
@@ -577,9 +581,8 @@ func TestPreUpgradeCallback(t *testing.T) {
 			return preUpgradeCallbackErr
 		}))
 
-	assert.ErrorIs(t, preUpgradeCallbackErr, upgradeErr)
+	assert.ErrorIs(t, upgradeErr, preUpgradeCallbackErr)
 	assert.Nil(t, coord.overrideState)
-	assert.Equal(t, preUpgradeCallbackErr, upgradeErr, "expected pre upgrade callback error")
 	assert.Eventually(t, func() bool {
 		return coord.State().UpgradeDetails.State == details.StateFailed
 	}, 10*time.Second, 100*time.Millisecond, "upgrade details are not set to failed")
@@ -1204,8 +1207,11 @@ func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	f.upgradeCalled = true
+	if cbErr := upgrade.InvokePreSymlinkCallback(opts, ctx, nil, action); cbErr != nil {
+		return nil, cbErr
+	}
 	if f.upgradeErr != nil {
 		return nil, f.upgradeErr
 	}
