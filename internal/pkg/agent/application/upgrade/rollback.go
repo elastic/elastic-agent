@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	"google.golang.org/grpc"
@@ -302,26 +301,6 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 
 	close(signal)
 	return nil
-}
-
-// snapshotAgentDirs returns absolute paths of all elastic-agent-* dirs in the data directory.
-// Take the snapshot before reading markers or TTL entries: directories created by a concurrent
-// upgrade afterward won't appear and therefore can't be swept by this cleanup run.
-func snapshotAgentDirs(topDir string) ([]string, error) {
-	entries, err := os.ReadDir(paths.DataFrom(topDir))
-	if err != nil {
-		if goerrors.Is(err, os.ErrNotExist) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("reading data directory: %w", err)
-	}
-	var dirs []string
-	for _, entry := range entries {
-		if entry.IsDir() && strings.HasPrefix(entry.Name(), "elastic-agent-") {
-			dirs = append(dirs, filepath.Join(paths.DataFrom(topDir), entry.Name()))
-		}
-	}
-	return dirs, nil
 }
 
 // liveVersionedHome resolves the versioned home that the top-level agent

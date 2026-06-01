@@ -324,7 +324,7 @@ func TestCleanupAgentDirectories_ReconcilesTTLRegistry(t *testing.T) {
 }
 
 func TestCleanupAgentDirectories_SetCondition(t *testing.T) {
-	t.Run("malformed entry triggers reconciliation", func(t *testing.T) {
+	t.Run("malformed entry triggers Remove", func(t *testing.T) {
 		log, _ := loggertest.New(t.Name())
 		topDir := t.TempDir()
 
@@ -339,14 +339,14 @@ func TestCleanupAgentDirectories_SetCondition(t *testing.T) {
 			map[string]error{live: errors.New("parse error")},
 			nil,
 		)
-		// Set must be called because len(malformed) > 0, even though filteredRollbacks is empty.
-		source.EXPECT().Set(map[string]ttl.TTLMarker{}).Return(nil)
+		// Remove must be called for the malformed entry only.
+		source.EXPECT().Remove(live).Return(nil)
 
 		_, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{})
 		require.NoError(t, err)
 	})
 
-	t.Run("unchanged registry skips reconciliation", func(t *testing.T) {
+	t.Run("no malformed entries skips Remove", func(t *testing.T) {
 		log, _ := loggertest.New(t.Name())
 		topDir := t.TempDir()
 
@@ -362,8 +362,7 @@ func TestCleanupAgentDirectories_SetCondition(t *testing.T) {
 			map[string]error{},
 			nil,
 		)
-		// Set must NOT be called: filteredRollbacks matches parsedRaw and there are no malformed entries.
-		// The mock will fail the test if Set is called unexpectedly.
+		// No Remove or Set calls expected — mock will fail the test if either is called.
 
 		leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{})
 		require.NoError(t, err)

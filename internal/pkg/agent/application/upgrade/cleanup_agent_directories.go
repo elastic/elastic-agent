@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -49,13 +50,29 @@ func isDegradedOnly(err error) bool {
 	return true
 }
 
+// cleanupOpts configures optional behaviour of cleanupAgentDirectories.
+type cleanupOpts struct {
+	// requireMarkerDetails controls whether a marker with nil Details is trusted for directory protection.
+	// On disk, Details can be nil for two reasons:
+	//   (1) marker written by an older agent before the Details field existed
+	//   (2) pre-unpack marker written before an upgrade begins.
+	//
+	// true (strict): used when the upgrade lifecycle is known to have ended, so we can ignore nil Details
+	// false (lenient): used during periodic cleanup when the upgrade state is unknown.
+	requireMarkerDetails bool
+	// keepLogs skips the "logs" subdirectory when removing a versioned home.
+	keepLogs bool
+}
+
 // dirClassifier holds the inputs needed to decide whether each agent directory
 // should be removed during cleanup. Built once per cleanup run and queried per directory.
 type dirClassifier struct {
-	log                  *logger.Logger
-	callerProtected      map[string]bool
-	marker               *UpdateMarker
-	markerErr            error
+	log             *logger.Logger
+	callerProtected map[string]bool
+	marker          *UpdateMarker
+	markerErr       error
+	// requireMarkerDetails mirrors cleanupOpts.requireMarkerDetails: when true, a marker with nil Details
+	// is not trusted to protect directories (strict mode). When false, any non-terminal marker protects them.
 	requireMarkerDetails bool
 	symlinkTarget        string
 	symlinkErr           error
@@ -113,20 +130,6 @@ func (dc *dirClassifier) shouldRemove(relPath string) bool {
 		}
 	}
 	return true
-}
-
-// cleanupOpts configures optional behaviour of cleanupAgentDirectories.
-type cleanupOpts struct {
-	// requireMarkerDetails controls whether a marker with nil Details is trusted for directory protection.
-	// On disk, Details can be nil for two reasons:
-	//   (1) marker written by an older agent before the Details field existed
-	//   (2) pre-unpack marker written before an upgrade begins.
-	//
-	// true (strict): used when the upgrade lifecycle is known to have ended, so we can ignore nil Details
-	// false (lenient): used during periodic cleanup when the upgrade state is unknown.
-	requireMarkerDetails bool
-	// keepLogs skips the "logs" subdirectory when removing a versioned home.
-	keepLogs bool
 }
 
 // cleanupAgentDirectories removes agent directories that are safe to delete and
@@ -220,13 +223,14 @@ func cleanupAgentDirectories(
 	log.Infow("Starting cleanup of versioned homes", "toKeep", keptDirs, "toRemove", toRemove)
 
 	var aggregateErr error
+	var ignoredDirs []string
+	if opts.keepLogs {
+		ignoredDirs = []string{"logs"}
+	}
+
 	for _, relPath := range toRemove {
 		hashedDir := filepath.Join(topDir, relPath)
 		log.Infow("Removing hashed data directory", "file.path", hashedDir)
-		var ignoredDirs []string
-		if opts.keepLogs {
-			ignoredDirs = []string{"logs"}
-		}
 		if cleanupErr := install.RemoveBut(log, hashedDir, true, ignoredDirs...); cleanupErr != nil {
 			if errors.Is(cleanupErr, os.ErrNotExist) {
 				log.Debugw("directory already gone before removal; skipping", "file.path", hashedDir)
@@ -236,34 +240,24 @@ func cleanupAgentDirectories(
 		}
 	}
 
-	// Filter leftoverRollbacks to entries whose directory still exists on disk.
-	// In practice this is always identical to leftoverRollbacks (unexpired TTL entries
-	// are never put in toRemove), but it defends against external deletions or edge
-	// cases where the dir disappears between snapshotAgentDirs and now.
+	// Build the return value: unexpired rollbacks whose directory still exists.
+	// In practice always identical to leftoverRollbacks (unexpired entries are never removed),
+	// but defends against a directory disappearing between snapshotAgentDirs and now.
 	filteredRollbacks := make(map[string]ttl.TTLMarker, len(leftoverRollbacks))
 	for versionedHome, m := range leftoverRollbacks {
 		if existingDirSet[filepath.Clean(versionedHome)] {
 			filteredRollbacks[versionedHome] = m
-		} else {
-			log.Debugw("removing stale TTL marker for non-existent directory",
-				"versionedHome", versionedHome)
 		}
+		// else: directory is gone; the .ttl inside it is gone with it — nothing to remove.
 	}
 
-	// Reconcile the on-disk TTL registry when the desired state differs from what was
-	// found: expired entries removed, stale entries filtered, or malformed .ttl files
-	// present that Set needs to sweep. This also handles .ttl files that survived a
-	// partial RemoveBut failure. Skip when the registry is already in the desired
-	// state to avoid unnecessary I/O.
-	//
-	// Concurrency note: a concurrent Upgrade() may write new TTL markers between the
-	// GetAll call above and this Set. TTLMarkerRegistry.Set sweeps entries not in the
-	// desired map, so a race could briefly remove a newly written marker. This is
-	// tolerated: the next cleanup cycle will see it, and the upgrade marker protects
-	// the new install's directory independently of the TTL registry.
-	if len(filteredRollbacks) != len(parsedRaw) || len(malformed) > 0 {
-		if setErr := source.Set(filteredRollbacks); setErr != nil {
-			aggregateErr = errors.Join(aggregateErr, fmt.Errorf("syncing TTL registry: %w", setErr))
+	// Remove .ttl files for malformed entries only. Their directories still exist but the
+	// .ttl file cannot be parsed and will never become a valid rollback target.
+	// Expired and externally-deleted directories are removed as a whole by RemoveBut above,
+	// taking their .ttl with them, so no explicit cleanup is needed for those cases.
+	for versionedHome := range malformed {
+		if removeErr := source.Remove(versionedHome); removeErr != nil {
+			aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing malformed TTL marker for %q: %w", versionedHome, removeErr))
 		}
 	}
 
@@ -281,6 +275,26 @@ func cleanupAgentDirectories(
 // and that entry is a directory named "logs".
 // Hidden entries (names starting with ".") are ignored so that OS artefacts like
 // .DS_Store or a leftover .ttl file do not cause a false negative.
+// snapshotAgentDirs returns absolute paths of all elastic-agent-* dirs in the data directory.
+// Take the snapshot before reading markers or TTL entries: directories created by a concurrent
+// upgrade afterward won't appear and therefore can't be swept by this cleanup run.
+func snapshotAgentDirs(topDir string) ([]string, error) {
+	entries, err := os.ReadDir(paths.DataFrom(topDir))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("reading data directory: %w", err)
+	}
+	var dirs []string
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), "elastic-agent-") {
+			dirs = append(dirs, filepath.Join(paths.DataFrom(topDir), entry.Name()))
+		}
+	}
+	return dirs, nil
+}
+
 func hasOnlyLogs(log *logger.Logger, dir string) bool {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
