@@ -30,6 +30,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
@@ -84,6 +85,7 @@ func (runner *MetricsRunner) SetupSuite() {
 
 	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
+	require.NoError(runner.T(), fleettools.SetDefaultESOutputPreset(ctx, runner.info.KibanaClient, fleettools.OutputPresetLatency))
 
 	runner.policyName = policyResp.Name
 	runner.policyID = policyResp.ID

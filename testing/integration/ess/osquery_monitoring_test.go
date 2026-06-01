@@ -26,6 +26,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
@@ -81,6 +82,7 @@ func (runner *OsqueryManagerRunner) SetupSuite() {
 
 	policyResp, agentID, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
+	require.NoError(runner.T(), fleettools.SetDefaultESOutputPreset(ctx, runner.info.KibanaClient, fleettools.OutputPresetLatency))
 
 	runner.agentID = agentID
 	runner.policyID = policyResp.ID

@@ -22,6 +22,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
@@ -84,6 +85,7 @@ func (runner *EndpointMetricsMonRunner) SetupSuite() {
 	policy, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(),
 		installOpts, runner.fixture, runner.info.KibanaClient, createPolicyReq)
 	require.NoError(runner.T(), err, "failed to install agent with policy")
+	require.NoError(runner.T(), fleettools.SetDefaultESOutputPreset(ctx, runner.info.KibanaClient, fleettools.OutputPresetLatency))
 
 	runner.T().Log("Installing Elastic Defend")
 	pkgPolicyResp, err := installElasticDefendPackage(runner.T(), runner.info, policy.ID)
