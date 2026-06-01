@@ -455,9 +455,9 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 			var configBuffer bytes.Buffer
 			require.NoError(t,
 				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
-					"Runtime":           tc.runtime,
-					"InputFile":         inputFilePath,
-					"ESHost":            esURL.Host,
+					"Runtime":   tc.runtime,
+					"InputFile": inputFilePath,
+					"ESHost":    esURL.Host,
 				}))
 			expDiagFiles := append([]string{}, diagnosticsFiles...)
 			if tc.runtime == "otel" {
