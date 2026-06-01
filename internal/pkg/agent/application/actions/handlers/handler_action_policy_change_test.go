@@ -1192,9 +1192,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *tes
 			require.NoError(t, yaml.Unmarshal(capture.saved, &got))
 			agentSection, ok := got["agent"].(map[any]any)
 			require.True(t, ok, "saved yaml must contain agent section")
-			loggingSection, ok := agentSection["logging"].(map[any]any)
-			require.True(t, ok, "saved yaml must contain logging section")
-			assert.Equal(t, tt.policyLevel, loggingSection["level"], "agent.logging.level should be persisted to fleet.enc")
+			assert.Equal(t, tt.policyLevel, agentSection["logging.level"], "agent.logging.level should be persisted to fleet.enc")
 
 			override, present := agentSection["logging.level_override"]
 			if tt.overrideLevel != "" {
