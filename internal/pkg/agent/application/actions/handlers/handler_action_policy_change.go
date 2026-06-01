@@ -464,11 +464,13 @@ func fleetToReader(agentID string, headers map[string]string, logLevelOverride s
 	agentConfig := map[string]interface{}{
 		"id":                           agentID,
 		"headers":                      headers,
+		"logging.level":                cfg.Settings.LoggingConfig.Level,
+		"logging.to_files":             cfg.Settings.LoggingConfig.ToFiles,
+		"logging.to_stderr":            cfg.Settings.LoggingConfig.ToStderr,
 		"logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
 		"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
 		"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
 		"monitoring.pprof":             cfg.Settings.MonitoringConfig.Pprof,
-		"logging":                      cfg.Settings.LoggingConfig,
 	}
 	if logLevelOverride != "" {
 		agentConfig["logging.level_override"] = logLevelOverride
