@@ -336,13 +336,16 @@ func (h *PolicyChangeHandler) hasEventLoggingOutputChanged(new *configuration.Co
 }
 
 func (h *PolicyChangeHandler) hasLoggingConfigChanged(new *configuration.Configuration, loggingConfig *logger.Config) bool {
+	if loggingConfig == nil {
+		// if there is no logging config in the policy, we consider that there is no change to the logging config
+		return false
+	}
 	switch {
 	case h.config.Settings.LoggingConfig.ToFiles != new.Settings.LoggingConfig.ToFiles:
 		return true
 	case h.config.Settings.LoggingConfig.ToStderr != new.Settings.LoggingConfig.ToStderr:
 		return true
-	case loggingConfig != nil && loggingConfig.Files.Path != "" &&
-		h.config.Settings.LoggingConfig.Files.Path != loggingConfig.Files.Path:
+	case h.config.Settings.LoggingConfig.Files.Path != new.Settings.LoggingConfig.Files.Path:
 		return true
 	default:
 		return false
