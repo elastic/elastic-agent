@@ -188,9 +188,6 @@ extensions:
   - name: azure_auth
     stability:
       extension: Alpha
-  - name: cgroupruntime
-    stability:
-      extension: Alpha
   - name: file_storage
     stability:
       extension: Beta
