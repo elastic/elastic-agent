@@ -14,11 +14,18 @@ Green Tea GC, which we have **falsified** for this crash (see below).
 >
 > **Leading hypothesis (build 40691): the crash is `-race`-GATED.** With the
 > race detector off, it does not reproduce; with it on, it reproduces readily.
-> The prime suspect is now the **race-detector (tsan) runtime on
-> `windows/amd64`** — either a tsan bug that corrupts memory, or tsan's
-> instrumentation perturbing timing/layout enough to expose a latent Go runtime
-> GC/stack-scan bug. Needs the contended Azure CI-host timing to fire; does not
-> reproduce on a quiet standalone VM or locally.
+> The prime suspect is the **race-detector (tsan) runtime on `windows/amd64`**.
+> A dump re-read (below) **rules out tsan corrupting via shadow-memory
+> adjacency** — the corrupt arena is nowhere near the tsan shadow reservation —
+> so the favoured form is now **tsan as a *catalyst*** (its instrumentation /
+> extra memory traffic / `racecall` scheduling exposing a latent Go-runtime
+> GC/stack-scan race, or a Win11/Ice-Lake hardware-timing sensitivity) rather
+> than tsan directly writing the corrupt word. Needs the contended Azure CI-host
+> timing + Windows 11 (not 10) to fire; does not reproduce on a quiet VM/locally.
+> The crash is **test-logic-independent**: it hits even `test.test.exe`
+> (`dev-tools/mage/target/test`, a package with *zero* test functions — just a
+> coverage-instrumented startup), exactly as it hits `upgrade.test.exe`. So the
+> trigger is the `-race` + `-coverpkg=./...` runtime startup, not any test.
 >
 > **Falsified:** Green Tea GC, async preemption, stack shrinking, stray kernel
 > IOCP write, CET/ASLR process mitigations, and "a Go 1.26 regression" — all
@@ -180,26 +187,32 @@ Worth recording because it cost two builds and produced a reusable lesson.
 
 ## Diagnostic infrastructure on this branch
 
-CI pipeline reduced to a few Windows 11 variants (`.buildkite/pipeline.yml`),
-all on Azure `Standard_D8s_v5`:
+CI pipeline = variance-controlled cofactor A/B (`.buildkite/pipeline.yml`), all
+Azure `Standard_D8s_v5`, four cohorts in **one** build (shared host conditions),
+each differing from `control` by exactly one variable, `parallelism: 10`:
 
 - **control** (`unit-tests.ps1`): `GOGC=1`,
   `GODEBUG=clobberfree=1,gccheckmark=1,invalidptr=1,gctrace=1,asyncpreemptoff=1`,
-  `GOEXPERIMENT=cgocheck2`, `GOTRACEBACK=crash`, `-race`. Maximises GC pressure
-  + sanity checks so the crash is consistent. Known-crashing baseline.
-- **no-race** (`NO_RACE=1`): identical but `-race` off — the gating test.
-- **no-mitigations** (`DISABLE_MITIGATIONS_IFEO=1`): `-race` on, CET+ASLR
-  disabled per test-binary via IFEO, with a `Get-ProcessMitigation` posture
-  probe for self-verification.
-- **instrumented** (`unit-tests-instrumented.ps1`):
-  `clobberfree=1,gctrace=1,schedtrace=10000` + WER + procdump for full dumps.
-  Reliable positive control / dump source.
+  `GOEXPERIMENT=cgocheck2`, `GOTRACEBACK=crash`, `-race`, `-coverpkg=./...`.
+  Known-crashing positive control.
+- **no-race** (`NO_RACE=1`): control minus `-race` — confirms the `-race` gate /
+  negative control (the doc's #1 open item, now folded into every build).
+- **no-cover** (`NO_COVER=1`): control minus the coverage flags — is the
+  `-coverpkg=./...` instrumentation footprint (the ~243 KB checkmark root) a
+  cofactor?
+- **gogc-default** (`GOGC_DEFAULT=1`): control minus `GOGC=1` (default 100), but
+  the sanity-check GODEBUGs are kept so a crash is still *detected* — is the
+  GC-pressure amplification *required* or just a catalyst?
 
-The script honours `NO_RACE`, `DISABLE_MITIGATIONS_IFEO`, `EXTRA_GODEBUG`, and
-`EXTRA_GOEXPERIMENT` so single-variable A/Bs need no script edits. `GOGC=1`
-amplifies the crash (more mark cycles → more chances to hit/detect the
-corruption), which is why the diagnostic config crashes more readily than a
-plain run.
+(Earlier builds also used **no-mitigations** (`DISABLE_MITIGATIONS_IFEO=1`,
+CET+ASLR off per test-binary, self-verified) and the **instrumented**
+(`unit-tests-instrumented.ps1`, WER + procdump dumps) cohorts.)
+
+The script honours `NO_RACE`, `NO_COVER`, `GOGC_DEFAULT`,
+`DISABLE_MITIGATIONS_IFEO`, `TEST_PKG`, `EXTRA_GODEBUG`, and `EXTRA_GOEXPERIMENT`
+so single-variable A/Bs need no script edits. `GOGC=1` amplifies the crash (more
+mark cycles → more chances to hit/detect the corruption), which is why the
+diagnostic config crashes more readily than a plain run.
 
 Operational lessons (each a real dead end first):
 
@@ -247,13 +260,38 @@ locally):
   missed reference.
 
 **Every dump we have is from a `-race` binary** (only the instrumented cohort
-captures dumps, and it uses `-race`). Now that the crash is `-race`-gated, these
-are the *right* dumps to re-read through a **tsan lens**: is the corrupted
-`0xc0000580xx` Go-heap region adjacent to / aliased with tsan shadow or meta
-memory? Do the throwing/scanning threads show `racecall` / `__tsan_*` frames
-(racecall runs on g0/systemstack — a GC stack-scan racing a racecall is a
-concrete candidate mechanism)? We cannot get a no-race dump to diff against (no
-crash without `-race`), so this is single-condition analysis.
+captures dumps, and it uses `-race`).
+
+### tsan-lens re-read result (build 40691 `test.test.exe` dump, memory map)
+
+Parsed the minidump's `MemoryInfoList` (full VirtualQuery map) and thread
+contexts:
+
+- **The corrupt arena is NOT adjacent to tsan shadow.** The corruption locus
+  (`0xc00005ab80`, inside the first committed heap chunk
+  `0xc000000000–0xc000400000`) is bracketed entirely by *other Go heap regions*
+  (`MEM_PRIVATE` commit/reserve). The only large reservations in the whole
+  address space are 2× ~258 MB (`0x05a00000`, `0x25a00000`) and one **4 GB at
+  `0x7ff4fdfc0000`** (the race/tsan shadow) — all far from `0xc000000000`. So
+  the simplest tsan story — *a shadow write that aliases into the Go heap
+  because shadow abuts the arena* — **is not supported**; tsan would need a
+  grossly wrong address computation, not mere adjacency.
+- **No thread caught mid-`racecall`.** All 12 threads are parked in `ntdll`
+  (Go stops the world before `crash()`), so the dump cannot catch the
+  corrupting actor in the act; and the dump's exception record is just Go's own
+  `crash()`/`asmstdcall` path (`addr=0x140017909`), not the original fault
+  (that lives in the job's printed traceback).
+
+**Conclusion:** the dump argues against tsan *directly* corrupting memory via
+its shadow. Combined with the rock-solid `-race` gate, this favours
+**tsan-as-catalyst** (see status banner). The remaining discriminators are A/Bs
+(coverage-off, GOGC-default), not more dumps — captured in the cofactor build.
+
+Confirmed earlier dump facts still hold (build 40529 `upgrade.test.exe`): the
+corrupt 16 B span recurs at a deterministic low-arena address because the binary
+has **ASLR off**, and freed slots still carried the `clobberfree` `0xdeadbeef`
+pattern while the GC had them marked — runtime metadata corruption, not
+application use-after-free.
 
 ## CI environment (probed on a VM from the same image)
 
@@ -281,17 +319,23 @@ alone (iocprepro, run under `-race` in the suite) was insufficient.
 
 ## Open questions / next steps
 
-1. **Confirm the `-race` gate** — re-run with more no-race jobs (e.g.
-   `parallelism: 20`) or repeat build 40691. Moves the finding from p≈0.01 to
-   solid, and rules out "no-race crashes at a lower rate."
-2. **Pursue the race detector.** If confirmed: does it reproduce under `-race`
-   *without* the diagnostic `GODEBUG` (isolates tsan from GC-pressure)?
-   Re-analyse a `-race` dump for tsan shadow/meta adjacency and `racecall`
-   frames. Search upstream for `windows/amd64` race-detector + GC-corruption
-   reports.
+1. **The cofactor A/B build (current pipeline) settles three at once**, all
+   against a same-build positive control:
+   - **control vs no-race** → confirms the `-race` gate with fresh stats
+     (the prior p≈0.01–0.11 item).
+   - **control vs no-cover** → is the `-coverpkg=./...` instrumentation a
+     cofactor? (the corrupt checkmark root was the coverage globals.)
+   - **control vs gogc-default** → is `GOGC=1` GC-pressure required, or just a
+     catalyst? Reading: if gogc-default still crashes (even rarer), pressure is
+     an amplifier not a prerequisite; if no-cover stops crashing, coverage is a
+     real cofactor; no-race staying clean re-confirms the gate.
+2. **tsan shadow-adjacency is ruled out** (dump re-read above); the open tsan
+   question is now catalyst-vs-corruptor, which the A/Bs target rather than more
+   dumps. Still worth: search upstream for `windows/amd64` race-detector +
+   GC/stack-scan corruption reports.
 3. **Concurrency dependence** — `GOMAXPROCS=1` (or low) CI variant: if the crash
    vanishes it's a runtime concurrency race; if it persists it points at the
-   host/hypervisor. Cheap one-flag test.
+   host/hypervisor. Cheap one-flag test (next build after the cofactor A/B).
 4. **Make a quiet box reproduce** — run several `go test -race ./...` instances
    concurrently on the standalone VM to mimic contended-host timing; success
    gives a live `dlv` platform.

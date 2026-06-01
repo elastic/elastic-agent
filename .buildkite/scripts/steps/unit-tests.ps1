@@ -84,7 +84,17 @@ Write-Host "--- Unit tests"
 # write window. Mechanism is currently open.)
 # Loop over fresh binary invocations instead of -count: the crash is most
 # likely at binary startup when goroutine stacks are freshly allocated.
-$env:GOGC = "1"
+# GOGC=1 forces a GC after every allocation, which AMPLIFIES the crash (more
+# mark/scan cycles = more chances to hit + detect the corruption). GOGC_DEFAULT=1
+# leaves GOGC at its default (100) to test whether that amplification is
+# *required* or merely a catalyst: the sanity-check GODEBUGs (gccheckmark,
+# invalidptr) are kept either way, so a crash is still detected if it fires - we
+# just stop forcing constant GC. If the gogc-default cohort still crashes (even
+# at a lower rate), GC-pressure is an amplifier, not a prerequisite.
+if (-not $env:GOGC_DEFAULT) {
+  $env:GOGC = "1"
+}
+Write-Host "GOGC=$($env:GOGC)"
 $env:GOTRACEBACK = "crash"
 $baseGodebug = "clobberfree=1,gccheckmark=1,invalidptr=1,gctrace=1,asyncpreemptoff=1"
 # Optional extra GODEBUG knobs injected by the pipeline.
@@ -134,12 +144,23 @@ Write-Host "race detector enabled: $useRace"
 # crash-consistency gradient.
 $testTarget = if ($env:TEST_PKG) { $env:TEST_PKG } else { "./..." }
 Write-Host "test target: $testTarget"
-$testArgs += @(
-  "-covermode=atomic",
-  "-coverprofile=build/coverage.out",
-  "-coverpkg=./...",
-  $testTarget
-)
+# Coverage: -coverpkg=./... instruments every package, producing very large
+# coverage-counter globals (the ~243 KB data-segment root the checkmark crash
+# was scanning when it found the corrupt pointer). NO_COVER=1 drops all coverage
+# flags to test whether that instrumentation footprint is a cofactor: if the
+# no-cover cohort still crashes at the control's rate, coverage is irrelevant;
+# if it stops, the coverage globals (or the cover tool's instrumentation) matter.
+if ($env:NO_COVER) {
+  Write-Host "coverage: DISABLED (NO_COVER)"
+  $testArgs += $testTarget
+} else {
+  $testArgs += @(
+    "-covermode=atomic",
+    "-coverprofile=build/coverage.out",
+    "-coverpkg=./...",
+    $testTarget
+  )
+}
 
 # Patterns that indicate the Go runtime tripped a sanity check or crashed
 # mid-GC (the bug we're hunting).  Normal test failures - t.Fatal, assertion
