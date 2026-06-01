@@ -35,6 +35,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [azuremonitorreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/azuremonitorreceiver/v0.152.0/receiver/azuremonitorreceiver/README.md) | v0.152.0 |
 | [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.152.0/receiver/filelogreceiver/README.md) | v0.152.0 |
 | [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.152.0/receiver/hostmetricsreceiver/README.md) | v0.152.0 |
 | [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.152.0/receiver/httpcheckreceiver/README.md) | v0.152.0 |

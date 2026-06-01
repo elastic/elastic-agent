@@ -28,8 +28,8 @@ env:
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1779464011"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
-  IMAGE_WIN_10_VERSION: "1.0.1779464011"
-  IMAGE_WIN_11_VERSION: "1.0.1779464011"
+  IMAGE_WIN_10_VERSION: "1.0.1780016512"
+  IMAGE_WIN_11_VERSION: "1.0.1780016512"
 
 steps:
 
@@ -249,8 +249,7 @@ steps:
           - *google_oidc_plugin
 
       - label: "Unit tests - Windows 11"
-        env:
-          GODEBUG: "asyncpreemptoff=1"  # see https://github.com/elastic/elastic-agent/issues/13796
+        skip: "See https://github.com/elastic/elastic-agent/issues/14248"
         key: "unit-tests-win11"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
