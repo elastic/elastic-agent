@@ -249,9 +249,13 @@ steps:
           - *google_oidc_plugin
 
       - label: "Unit tests - Windows 11"
-        skip: "See https://github.com/elastic/elastic-agent/issues/14248"
         key: "unit-tests-win11"
         command: .buildkite/scripts/steps/unit-tests.ps1
+        # The race detector is disabled here because it triggers a Go runtime
+        # GC-metadata corruption crash specific to Windows 11 amd64.
+        # See https://github.com/elastic/elastic-agent/issues/14248
+        env:
+          DISABLE_RACE_DETECTOR: "true"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
