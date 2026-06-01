@@ -496,6 +496,7 @@ shared:
   - &docker_ubuntu_spec
     docker_variant: 'basic'
     extra_vars:
+<<<<<<< HEAD
       from: '--platform=linux/amd64 ubuntu:24.04'
   - &docker_ubuntu_arm_spec
     docker_variant: 'basic'
@@ -506,11 +507,13 @@ shared:
     docker_variant: 'ubi'
     extra_vars:
       from: '--platform=linux/amd64 redhat/ubi9-minimal'
+=======
+      from: '--platform=linux/amd64 redhat/ubi10-minimal'
+>>>>>>> 4a2a1eb62 (package: use ubi10 (#12573))
   - &docker_ubi_arm_spec
     docker_variant: 'ubi'
     extra_vars:
-      from: '--platform=linux/arm64 redhat/ubi9-minimal'
-
+      from: '--platform=linux/arm64 redhat/ubi10-minimal'
   - &docker_wolfi_spec
     docker_variant: 'wolfi'
     extra_vars:
