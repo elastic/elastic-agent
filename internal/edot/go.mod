@@ -18,6 +18,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.152.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/azureauthextension v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension v0.152.0
@@ -61,8 +62,22 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
+<<<<<<< HEAD
 	github.com/elastic/apm-data v1.21.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.47.0 // indirect
+=======
+	github.com/coreos/go-oidc/v3 v3.18.0 // indirect
+	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
+	github.com/elastic/ebpfevents v0.9.0 // indirect
+	github.com/elastic/entcollect v0.0.0-20260514013106-6d4034497b3d // indirect
+	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
+	github.com/elastic/go-licenser v0.4.2 // indirect
+	github.com/elastic/go-quark v0.3.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.50.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
+	github.com/elastic/tk-btf v0.2.0 // indirect
+	github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb // indirect
+>>>>>>> 700632aa5 (feat: add Azure auth extension to EDOT Collector (#14534))
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.5 // indirect
 	github.com/go-openapi/swag/conv v0.25.5 // indirect
