@@ -12,8 +12,16 @@ Green Tea GC, which we have **falsified** for this crash (see below).
 > throws that all trace to one root: the GC's marking/stack-scan machinery
 > operating on corrupt state.
 >
-> **Leading hypothesis (build 40691): the crash is `-race`-GATED.** With the
-> race detector off, it does not reproduce; with it on, it reproduces readily.
+> **Confirmed (build 40742 cofactor A/B): the crash is `-race`-GATED, and
+> neither coverage nor GC-pressure is a cofactor.** Four cohorts in one build,
+> each one variable off control: no-race **0/10**, control 5/10, no-cover 4/10,
+> gogc-default 6/10. So `-race` is the *only* necessary software ingredient
+> (besides Win11/amd64); `-coverpkg=./...` and `GOGC=1` are neither required nor
+> amplifying. See *The cofactor A/B*.
+>
+> **Leading hypothesis (build 40691, reconfirmed 40742): the crash is
+> `-race`-GATED.** With the race detector off, it does not reproduce; with it on,
+> it reproduces readily.
 > The prime suspect is the **race-detector (tsan) runtime on `windows/amd64`**.
 > A dump re-read (below) **rules out tsan corrupting via shadow-memory
 > adjacency** — the corrupt arena is nowhere near the tsan shadow reservation —
@@ -60,6 +68,40 @@ Why this is the best lead we have:
 - The remaining wrinkle: **Win10-amd64** *has* the race detector yet reportedly
   doesn't crash. So `-race` is likely **necessary but not sufficient** — the
   Win11 / Ice-Lake (Xeon 8370C) host timing also contributes.
+
+## The cofactor A/B: `-race` necessary, coverage & GOGC ruled out (build 40742)
+
+Four cohorts, same commit (`2257c2f63d`), same Azure fleet, one build (so
+build-to-build host variance cancels), `parallelism: 10`. Each cohort differs
+from `control` by exactly one variable.
+
+| Cohort | delta from control | crashed | crash signature seen |
+|--------|--------------------|---------|----------------------|
+| control | `-race`, `GOGC=1`, coverage | 5 / 10 | `checkmark found unmarked object` |
+| **no-race** | **−`-race`** | **0 / 10** | — (clean) |
+| no-cover | −`-coverpkg=./...` | 4 / 10 | `found pointer to free object` |
+| gogc-default | −`GOGC=1` | 6 / 10 | `checkmark found unmarked object` |
+
+All failing jobs were verified (job logs) to die with the same GC-metadata
+corruption family (`checkmark found unmarked object` / `marked free object` /
+`found pointer to free object`), not unrelated failures. Go 1.26.3.
+
+Conclusions:
+
+- **`-race` is necessary.** no-race 0/10 again (now 0/20 pooled across 40691+40742).
+- **Coverage instrumentation is NOT a cofactor.** no-cover still crashes 4/10 —
+  retiring the earlier "the corrupt checkmark root was the coverage globals" idea.
+- **`GOGC=1` is NOT required, nor meaningfully amplifying.** gogc-default crashed
+  at the *highest* rate (6/10). It's a convenience amplifier at most, not a cause.
+- Net: the only necessary software ingredient besides Win11/amd64 is the race
+  detector → strongest evidence yet for **tsan-as-catalyst** (consistent with the
+  dump re-read ruling out shadow-adjacency corruption).
+- **Validates the mitigation:** disabling `-race` on Win11/amd64 eliminates the
+  crash while keeping the suite running (branch `unskip-win11-unit-tests`).
+
+(Pipeline artifacts here are `coverage-*.out` only, and only from passing jobs —
+crashed jobs die before writing coverage — so there is no dump payload in this
+light build; the signal is the pass/fail tally + job-log signatures.)
 
 ## Symptom
 
@@ -319,20 +361,15 @@ alone (iocprepro, run under `-race` in the suite) was insufficient.
 
 ## Open questions / next steps
 
-1. **The cofactor A/B build (current pipeline) settles three at once**, all
-   against a same-build positive control:
-   - **control vs no-race** → confirms the `-race` gate with fresh stats
-     (the prior p≈0.01–0.11 item).
-   - **control vs no-cover** → is the `-coverpkg=./...` instrumentation a
-     cofactor? (the corrupt checkmark root was the coverage globals.)
-   - **control vs gogc-default** → is `GOGC=1` GC-pressure required, or just a
-     catalyst? Reading: if gogc-default still crashes (even rarer), pressure is
-     an amplifier not a prerequisite; if no-cover stops crashing, coverage is a
-     real cofactor; no-race staying clean re-confirms the gate.
+1. **DONE — the cofactor A/B (build 40742) settled all three** against a
+   same-build positive control (see *The cofactor A/B*): `-race` necessary
+   (no-race 0/10), coverage **not** a cofactor (no-cover 4/10), `GOGC=1` **not**
+   required (gogc-default 6/10). Mitigation shipped on `unskip-win11-unit-tests`
+   (re-enable the Win11 step, disable `-race` there).
 2. **tsan shadow-adjacency is ruled out** (dump re-read above); the open tsan
-   question is now catalyst-vs-corruptor, which the A/Bs target rather than more
-   dumps. Still worth: search upstream for `windows/amd64` race-detector +
-   GC/stack-scan corruption reports.
+   question is now catalyst-vs-corruptor. The A/Bs point at catalyst. Still
+   worth: search upstream for `windows/amd64` race-detector + GC/stack-scan
+   corruption reports.
 3. **Concurrency dependence** — `GOMAXPROCS=1` (or low) CI variant: if the crash
    vanishes it's a runtime concurrency race; if it persists it points at the
    host/hypervisor. Cheap one-flag test (next build after the cofactor A/B).
