@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,36 +23,92 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/limits"
 )
 
-func TestMergeFleetConfig(t *testing.T) {
-	testutils.InitStorage(t)
+func TestLoadConfig(t *testing.T) {
+	validFleetEnc := `fleet:
+  enabled: true
+  kibana:
+    host: demo
+  access_api_key: "123"
+agent:
+  grpc:
+    port: 6790`
 
-	cfg := map[string]interface{}{
-		"fleet": map[string]interface{}{
-			"enabled":        true,
-			"kibana":         map[string]interface{}{"host": "demo"},
-			"access_api_key": "123",
+	cases := []struct {
+		name     string
+		baseCfg  string
+		fleetEnc string
+		assert   func(t *testing.T, cfg *configuration.Configuration)
+	}{
+		{
+			name:     "fleet enabled, fleet.enc merged",
+			baseCfg:  "fleet:\n  enabled: true\n",
+			fleetEnc: validFleetEnc,
+			assert: func(t *testing.T, cfg *configuration.Configuration) {
+				assert.True(t, cfg.Fleet.Enabled)
+				assert.Equal(t, "123", cfg.Fleet.AccessAPIKey)
+				assert.Equal(t, uint16(6790), cfg.Settings.GRPC.Port)
+			},
 		},
-		"agent": map[string]interface{}{
-			"grpc": map[string]interface{}{
-				"port": uint16(6790),
+		{
+			name:     "standalone ignores fleet.enc",
+			baseCfg:  "fleet:\n  enabled: false\n",
+			fleetEnc: validFleetEnc,
+			assert: func(t *testing.T, cfg *configuration.Configuration) {
+				assert.False(t, cfg.Fleet.Enabled)
+				assert.Empty(t, cfg.Fleet.AccessAPIKey)
+			},
+		},
+		{
+			name: "overlapping agent.logging.level",
+			baseCfg: `fleet:
+  enabled: true
+agent:
+  logging:
+    level: info
+`,
+			fleetEnc: `fleet:
+  enabled: true
+  kibana:
+    host: demo
+  access_api_key: "123"
+agent:
+  logging:
+    level: debug`,
+			assert: func(t *testing.T, cfg *configuration.Configuration) {
+				assert.True(t, cfg.Fleet.Enabled)
+				assert.Equal(t, logp.DebugLevel, cfg.Settings.LoggingConfig.Level)
 			},
 		},
 	}
 
-	rawConfig := config.MustNewConfigFrom(cfg)
-	storage, conf, err := mergeFleetConfig(context.Background(), rawConfig)
-	require.NoError(t, err)
-	assert.NotNil(t, storage)
-	assert.NotNil(t, conf)
-	assert.Equal(t, conf.Fleet.Enabled, cfg["fleet"].(map[string]interface{})["enabled"])
-	assert.Equal(t, conf.Fleet.AccessAPIKey, cfg["fleet"].(map[string]interface{})["access_api_key"])
-	assert.Equal(t, conf.Settings.GRPC.Port, cfg["agent"].(map[string]interface{})["grpc"].(map[string]interface{})["port"].(uint16))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			origCfg := paths.Config()
+			t.Cleanup(func() { paths.SetConfig(origCfg) })
+			paths.SetConfig(t.TempDir())
+			testutils.InitStorage(t)
+			require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte(tc.baseCfg), 0o644))
+
+			if tc.fleetEnc != "" {
+				store, err := storage.NewEncryptedDiskStore(t.Context(), paths.AgentConfigFile())
+				require.NoError(t, err)
+				require.NoError(t, store.Save(strings.NewReader(tc.fleetEnc)))
+			}
+
+			cfg, err := configuration.LoadConfig(t.Context(), nil)
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+			tc.assert(t, cfg)
+		})
+	}
 }
 
 func TestLimitsLog(t *testing.T) {
@@ -72,7 +129,7 @@ func TestLimitsLog(t *testing.T) {
 		true,              // testingMode
 		time.Millisecond,  // fleetInitTimeout
 		true,              // disable monitoring
-		nil,               // no configuration overrides
+		configuration.DefaultConfiguration(),
 		nil,
 		rollbackSrc,
 	)
