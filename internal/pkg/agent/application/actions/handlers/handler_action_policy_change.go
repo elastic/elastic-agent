@@ -332,7 +332,6 @@ func (h *PolicyChangeHandler) applyEventLoggingOutputChange(new *configuration.C
 
 func (h *PolicyChangeHandler) applyLoggingConfigChanged(new *configuration.Configuration, loggingConfig *logger.Config) bool {
 	if loggingConfig == nil {
-		// if there is no logging config in the policy, we consider that there is no change to the logging config
 		return false
 	}
 	current := h.config.Settings.LoggingConfig
@@ -456,6 +455,7 @@ func fleetToReader(agentID string, headers map[string]string, logLevelOverride s
 		"logging.level":                cfg.Settings.LoggingConfig.Level,
 		"logging.to_files":             cfg.Settings.LoggingConfig.ToFiles,
 		"logging.to_stderr":            cfg.Settings.LoggingConfig.ToStderr,
+		"logging.files.path":           cfg.Settings.LoggingConfig.Files.Path,
 		"logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
 		"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
 		"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
