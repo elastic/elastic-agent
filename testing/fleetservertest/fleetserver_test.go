@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
 // TestRunFleetServer shows how to configure and run a fleet-server capable of
@@ -398,8 +398,8 @@ func ExampleNewServer_enroll() {
 		EnrollAPIKey: enrollAPIKey,
 		Type:         "PERMANENT",
 		Metadata: fleetapi.Metadata{
-			Local: &info.ECSMeta{
-				Elastic: &info.ElasticECSMeta{Agent: &info.AgentECSMeta{
+			Local: &ecsmeta.ECSMeta{
+				Elastic: &ecsmeta.ElasticECSMeta{Agent: &ecsmeta.AgentECSMeta{
 					ID: "wrongAgentID",
 				}},
 			},

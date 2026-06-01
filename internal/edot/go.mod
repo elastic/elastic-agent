@@ -11,9 +11,9 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260521233542-134e3deef263
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260522214348-71d0f09b5402
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.43.0
+	github.com/elastic/elastic-agent-libs v0.43.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.50.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.50.0
@@ -30,6 +30,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.152.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/azureauthextension v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension v0.152.0
@@ -101,6 +102,7 @@ require (
 	github.com/bluekeyes/go-gitdiff v0.7.1 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
+	github.com/coreos/go-oidc/v3 v3.18.0 // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
 	github.com/elastic/ebpfevents v0.9.0 // indirect
 	github.com/elastic/entcollect v0.0.0-20260514013106-6d4034497b3d // indirect

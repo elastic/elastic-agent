@@ -30,13 +30,13 @@ import (
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	"github.com/elastic/elastic-agent-libs/testing/proxytest"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/fleetservertest"
 	"github.com/elastic/elastic-agent/testing/integration"
@@ -962,6 +962,7 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	t.Cleanup(proxy.Close)
 
 	fleetProxyResp, err := kibClient.CreateFleetProxy(ctx, kibana.ProxiesRequest{
+		ID:   "fleet-upgrade-test-proxy-" + testUUID.String(),
 		Name: "fleet-upgrade-test-proxy-" + testUUID.String(),
 		URL:  proxy.LocalhostURL,
 	})

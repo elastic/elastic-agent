@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -30,8 +31,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -42,6 +43,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -1082,7 +1084,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		upgradeOpts               []Option
 		checkArchiveCleanup       bool
 		checkVersionedHomeCleanup bool
-		setupMocks                func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper)
+		setupMocks                func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper)
 	}
 
 	testCases := map[string]testCase{
@@ -1096,9 +1098,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 			checkArchiveCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 		"should return error if getPackageMetadata fails": {
@@ -1113,9 +1115,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 			checkArchiveCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 		"should return error and cleanup downloaded archive if unpack fails before extracting": {
@@ -1141,9 +1143,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 			checkArchiveCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 		"should return error and cleanup downloaded archive if unpack fails after extracting": {
@@ -1174,9 +1176,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if copyActionStore fails": {
@@ -1209,9 +1211,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if copyRunDirectory fails": {
@@ -1248,9 +1250,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if changeSymlink fails": {
@@ -1283,7 +1285,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				upgrader.copyRunDirectory = func(log *logger.Logger, oldRunPath, newRunPath string) error {
 					return nil
 				}
-				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, source availableRollbacksSource) error {
+				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, source ttl.Source) error {
 					return nil
 				}
 				upgrader.changeSymlink = func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
@@ -1292,9 +1294,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if markUpgrade fails": {
@@ -1330,7 +1332,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				upgrader.changeSymlink = func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
 					return nil
 				}
-				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, source availableRollbacksSource) error {
+				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, source ttl.Source) error {
 					return nil
 				}
 				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
@@ -1339,9 +1341,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 				mockRollbackSrc.EXPECT().Set(map[string]ttl.TTLMarker(nil)).Return(nil)
 			},
 		},
@@ -1353,9 +1355,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					returnError: testError,
 				}
 			},
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 		// Regression tests for https://github.com/elastic/elastic-agent/issues/14118:
@@ -1376,9 +1378,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 			checkArchiveCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 		"pre-symlink callback must not be called if unpack fails": {
@@ -1404,9 +1406,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 		"pre-symlink callback error aborts upgrade before changeSymlink and triggers cleanup": {
@@ -1436,9 +1438,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
-			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
-				mockRollbackSrc.EXPECT().Get().Return(nil, nil)
+				mockRollbackSrc.EXPECT().GetAll().Return(nil, nil, nil)
 			},
 		},
 	}
@@ -1449,7 +1451,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			paths.SetTop(baseDir)
 
 			mockAgentInfo := info.NewMockAgent(t)
-			mockRollbackSource := newMockAvailableRollbacksSource(t)
+			mockRollbackSource := ttl.NewMockSource(t)
 			mockWatcherHelper := NewMockWatcherHelper(t)
 
 			if tc.setupMocks != nil {
@@ -1492,6 +1494,86 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				require.FileExists(t, filepath.Join(baseDir, "versionedHome"))
 			}
 		})
+	}
+}
+
+// TestUpgradeSelfHealsCorruptLiveTTL drives Upgrader.Upgrade end-to-end against
+// a real ttl.TTLMarkerRegistry on a TempDir where the live install already
+// carries a corrupt .ttl payload. It catches regressions where a future
+// refactor at the Upgrade -> ttl.Source.Set call site
+// reintroduces the all-or-nothing behavior that a single malformed marker
+// could wedge.
+func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+
+	baseDir := t.TempDir()
+	origTop := paths.Top()
+	t.Cleanup(func() { paths.SetTop(origTop) })
+	paths.SetTop(baseDir)
+
+	// Use the package-local helper so the live install lands at the exact path
+	// paths.VersionedHome() will resolve to inside Upgrader.Upgrade — passing
+	// release.VersionWithSnapshot()/release.Commit() makes the on-disk and
+	// production-side paths match without relying on the legacy fallback.
+	currentVersionedHome := createFakeAgentInstall(t, baseDir, release.VersionWithSnapshot(), release.Commit(), true)
+
+	const corruptPayload = "not valid yaml: {"
+	require.NoError(t, os.WriteFile(filepath.Join(baseDir, currentVersionedHome, ".ttl"), []byte(corruptPayload), 0o600))
+
+	newVersionedHome := createFakeAgentInstall(t, baseDir, "99.0.0", "newhsh000000", true)
+
+	mockAgentInfo := info.NewMockAgent(t)
+	mockAgentInfo.EXPECT().Version().Return(release.Version())
+
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+	mockWatcherHelper := NewMockWatcherHelper(t)
+	watcherExecutable := paths.BinaryPath(filepath.Join(baseDir, newVersionedHome), agentExecutableName)
+	mockWatcherHelper.EXPECT().SelectWatcherExecutable(baseDir, mock.Anything, mock.Anything).Return(watcherExecutable)
+	mockWatcherHelper.EXPECT().InvokeWatcher(mock.Anything, watcherExecutable).
+		Return(&exec.Cmd{Path: watcherExecutable}, nil)
+	mockWatcherHelper.EXPECT().WaitForWatcher(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	realRegistry := ttl.NewTTLMarkerRegistry(log, paths.Top())
+
+	// A non-nil UpgradeConfig with a non-zero Rollback.Window is required so
+	// getAvailableRollbacks produces a non-nil map that includes the live
+	// install. With a nil/zero config the map would be empty and Set would take
+	// the sweep path instead of the rewrite path, silently turning this test
+	// vacuous as a regression tripwire for the self-heal contract.
+	upgrader, err := NewUpgrader(log, &artifact.Config{}, configuration.DefaultUpgradeConfig(), mockAgentInfo, mockWatcherHelper, realRegistry)
+	require.NoError(t, err)
+
+	archivePath := filepath.Join(baseDir, "mockArchive")
+	require.NoError(t, os.WriteFile(archivePath, []byte("test"), 0o600))
+
+	upgrader.artifactDownloader = &mockArtifactDownloader{returnArchivePath: archivePath}
+	upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+		return agentVersion{version: upgradeVersion, snapshot: false, hash: metadata.hash}
+	}
+	upgrader.unpacker = &mockUnpacker{
+		returnPackageMetadata: packageMetadata{manifest: &v1.PackageManifest{}, hash: "newhsh"},
+		returnUnpackResult:    UnpackResult{Hash: "newhsh", VersionedHome: newVersionedHome},
+	}
+	upgrader.copyActionStore = func(_ *logger.Logger, _ string) error { return nil }
+	upgrader.copyRunDirectory = func(_ *logger.Logger, _, _ string) error { return nil }
+	upgrader.changeSymlink = func(_ *logger.Logger, _, _, _ string) error { return nil }
+	upgrader.markUpgrade = func(_ *logger.Logger, _ string, _ time.Time, _, _ agentInstall, _ *fleetapi.ActionUpgrade, _ *details.Details, _ map[string]ttl.TTLMarker) error {
+		return nil
+	}
+
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil, details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
+	require.NoError(t, err, "upgrade must self-heal the corrupt live .ttl and complete")
+
+	markers, malformed, getAllErr := realRegistry.GetAll()
+	require.NoError(t, getAllErr)
+	assert.Empty(t, malformed, "corrupt live .ttl must have been overwritten with valid YAML")
+	if assert.Contains(t, markers, currentVersionedHome, "live install should now hold a valid TTL marker") {
+		assert.NotEmpty(t, markers[currentVersionedHome].Version, "rewritten marker must have a non-empty Version")
+		assert.NotEmpty(t, markers[currentVersionedHome].Hash, "rewritten marker must have a non-empty Hash")
+		assert.True(t, markers[currentVersionedHome].ValidUntil.After(time.Now()), "rewritten marker should have a future ValidUntil")
 	}
 }
 

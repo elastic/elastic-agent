@@ -9,16 +9,16 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: other
+kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: upgrade NPM to 11.14.1 on wolfi images
+summary: Fix container config override inconsistencies
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-# description:
+description: Fixes a bug where container-mode overrides were correctly applied to the running agent but were overwritten by fleet.enc before being passed to the coordinator. This could result in incorrect config diagnostics and unnecessary restarts on policy updates.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:

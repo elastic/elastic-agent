@@ -21,10 +21,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
