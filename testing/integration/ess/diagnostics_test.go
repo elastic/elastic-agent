@@ -455,15 +455,9 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 			var configBuffer bytes.Buffer
 			require.NoError(t,
 				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
-<<<<<<< HEAD
 					"Runtime":   tc.runtime,
-					"InputFile": inputFile.Name(),
+					"InputFile": inputFilePath,
 					"ESHost":    esURL.Host,
-=======
-					"Runtime":           tc.runtime,
-					"InputFile":         inputFilePath,
-					"ESHost":            esURL.Host,
-					"MonitoringEnabled": tc.monitoringEnabled,
 >>>>>>> d1e89db2e (Avoid Windows TempDir cleanup failure in beat-diagnostics tests (#14685))
 				}))
 			expDiagFiles := append([]string{}, diagnosticsFiles...)
