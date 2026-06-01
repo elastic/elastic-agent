@@ -112,6 +112,7 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 outputs:
   default:
     type: elasticsearch
+	preset: latency
     hosts: [%s]
 
 inputs:
