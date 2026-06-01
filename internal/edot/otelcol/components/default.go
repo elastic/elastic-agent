@@ -232,11 +232,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 		}
 
 		extensions := []extension.Factory{
-<<<<<<< HEAD
-=======
 			azureauthextension.NewFactory(),
-			cgroupruntimeextension.NewFactory(),
->>>>>>> 700632aa5 (feat: add Azure auth extension to EDOT Collector (#14534))
 			k8sleaderelector.NewFactory(),
 			healthcheckv2extension.NewFactory(),
 			memorylimiterextension.NewFactory(),

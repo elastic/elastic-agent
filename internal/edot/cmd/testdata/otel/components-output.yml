@@ -185,15 +185,9 @@ connectors:
       traces-to-metrics: Development
       traces-to-traces: Undefined
 extensions:
-<<<<<<< HEAD
-=======
   - name: azure_auth
     stability:
       extension: Alpha
-  - name: cgroupruntime
-    stability:
-      extension: Alpha
->>>>>>> 700632aa5 (feat: add Azure auth extension to EDOT Collector (#14534))
   - name: file_storage
     stability:
       extension: Beta
