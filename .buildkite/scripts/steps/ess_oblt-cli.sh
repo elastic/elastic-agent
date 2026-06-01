@@ -18,7 +18,7 @@ function ess_up() {
     --output-file="${PWD}/cluster-info.json"
     --wait 20
     --parameter "StackVersion=$STACK_VERSION"
-    --parameter "ExpireInHours=4"
+    --parameter "ExpireInHours=2"
   )
 
   if [ -n "${INTEGRATION_SERVER_DOCKER_IMAGE:-}" ]; then
