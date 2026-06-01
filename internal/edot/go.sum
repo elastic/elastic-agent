@@ -406,6 +406,8 @@ github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
 github.com/containerd/log v0.1.0/go.mod h1:VRRf09a7mHDIRezVKTRCrOq78v577GXq3bSa3EhrzVo=
 github.com/containerd/platforms v1.0.0-rc.4 h1:M42JrUT4zfZTqtkUwkr0GzmUWbfyO5VO0Q5b3op97T4=
 github.com/containerd/platforms v1.0.0-rc.4/go.mod h1:lKlMXyLybmBedS/JJm11uDofzI8L2v0J2ZbYvNsbq1A=
+github.com/coreos/go-oidc/v3 v3.18.0 h1:V9orjXynvu5wiC9SemFTWnG4F45v403aIcjWo0d41+A=
+github.com/coreos/go-oidc/v3 v3.18.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
 github.com/coreos/go-systemd/v22 v22.7.0 h1:LAEzFkke61DFROc7zNLX/WA2i5J8gYqe0rSj9KI28KA=
 github.com/coreos/go-systemd/v22 v22.7.0/go.mod h1:xNUYtjHu2EDXbsxz1i41wouACIwT7Ybq9o0BQhMwD0w=
 github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f h1:lBNOc5arjvs8E5mO2tbpBpLoyyu8B6e44T7hJy6potg=
@@ -1187,6 +1189,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancing
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.152.0/go.mod h1:us0L9Tk9yRSlRowrHd2jlbpz8insDuS/p2L3IzGXASg=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter v0.152.0 h1:UOESrq9H2lg+6XC6eYemHtsnWg7Tz7XuIBn1VOmlQgk=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter v0.152.0/go.mod h1:37kNiBEUimqTCUbWoPk9MqNm/UVmPMS76VUrEYtJQkU=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/azureauthextension v0.152.0 h1:Vh2djtd2MxGLpeMxdX9hs7jwIdco8nmhyykWrjzLi1s=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/azureauthextension v0.152.0/go.mod h1:kehAbo8zmkprFx2xPxTHLKeYZj3JkBc7c1hnJYUIKHk=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.152.0 h1:0o5va8dE/+oIO6kyiAdin/SetZGGc17G3Jxt5mzA0Ko=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.152.0/go.mod h1:xx9gzqr/pAT5G4mZ04PzkuIOgQG2thAHaznNkY1iFkc=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/cgroupruntimeextension v0.152.0 h1:kArA+yKr4lwFFN5dgeW3259yTLR8yVCUZjfOrQIKLMU=

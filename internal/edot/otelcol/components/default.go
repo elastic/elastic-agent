@@ -96,6 +96,7 @@ import (
 	"github.com/elastic/beats/v7/x-pack/otel/processor/beatprocessor"
 
 	// Extensions
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/azureauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/cgroupruntimeextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension"
@@ -257,6 +258,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 		}
 
 		extensions := []extension.Factory{
+			azureauthextension.NewFactory(),
 			cgroupruntimeextension.NewFactory(),
 			k8sleaderelector.NewFactory(),
 			healthcheckv2extension.NewFactory(),
