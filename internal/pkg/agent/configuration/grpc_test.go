@@ -32,13 +32,11 @@ func TestOverrideDefaultGRPCPort(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := GRPCConfig{}
 			if tc.env != "" {
 				os.Setenv(grpcPortContainerEnvVar, tc.env)
 				defer os.Unsetenv(grpcPortContainerEnvVar)
 			}
-			OverrideDefaultContainerGRPCPort(&cfg)
-			assert.Equal(t, tc.expected, cfg.Port)
+			assert.Equal(t, tc.expected, GetContainerGRPCPort())
 		})
 	}
 }
