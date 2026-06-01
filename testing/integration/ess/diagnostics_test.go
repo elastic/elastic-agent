@@ -458,7 +458,6 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 					"Runtime":   tc.runtime,
 					"InputFile": inputFilePath,
 					"ESHost":    esURL.Host,
->>>>>>> d1e89db2e (Avoid Windows TempDir cleanup failure in beat-diagnostics tests (#14685))
 				}))
 			expDiagFiles := append([]string{}, diagnosticsFiles...)
 			if tc.runtime == "otel" {
