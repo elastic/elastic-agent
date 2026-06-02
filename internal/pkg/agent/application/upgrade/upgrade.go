@@ -242,7 +242,13 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...Option) (_ reexec.ShutdownCallbackFn, err error) {
+
+	var uOpts upgradeOptions
+	for _, opt := range opts {
+		opt(&uOpts)
+	}
+
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	cleanupPaths := []string{}
 	defer func() {
@@ -387,6 +393,16 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
 	if err != nil {
 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+	}
+
+	// All go/no-go checks have passed; the upgrade is committed to completing.
+	// Notify components (e.g. endpoint-security) that need to act before the
+	// symlink changes. Invoking this here — not earlier — prevents spurious
+	// unprotect signals when the upgrade is later aborted.
+	if uOpts.preSymlinkCallback != nil {
+		if err := uOpts.preSymlinkCallback(ctx, u.log, action); err != nil {
+			return nil, fmt.Errorf("pre-symlink callback failed: %w", err)
+		}
 	}
 
 	if err := u.changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
