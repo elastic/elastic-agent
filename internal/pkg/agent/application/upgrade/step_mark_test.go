@@ -5,12 +5,9 @@
 package upgrade
 
 import (
-<<<<<<< HEAD
-	"errors"
-=======
 	goerrors "errors"
->>>>>>> ed5b861e1 (fix: preserve live install during upgrade cleanup and report aborted upgrades to Fleet (#13935))
 	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -177,10 +174,9 @@ func TestMarkUpgrade(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 func TestUpdateActiveCommit(t *testing.T) {
 	log, _ := loggertest.New("test")
-	testError := errors.New("test error")
+	testError := goerrors.New("test error")
 	testCases := map[string]struct {
 		expectedError error
 		writeFileFunc writeFileFunc
@@ -204,8 +200,8 @@ func TestUpdateActiveCommit(t *testing.T) {
 			require.ErrorIs(t, err, tc.expectedError)
 		})
 	}
+}
 
-=======
 func TestMarkUpgradeFailed(t *testing.T) {
 	cause := goerrors.New("upgrade boom")
 
@@ -229,7 +225,7 @@ func TestMarkUpgradeFailed(t *testing.T) {
 			UpdatedOn:     time.Now(),
 			Details:       det,
 		}
-		require.NoError(t, SaveMarker(dataDir, original, true), "seed marker")
+		require.NoError(t, saveMarkerToDir(dataDir, original, true), "seed marker")
 
 		err := MarkUpgradeFailed(dataDir, det, cause)
 		require.NoError(t, err)
@@ -254,5 +250,4 @@ func TestMarkUpgradeFailed(t *testing.T) {
 		require.Equal(t, details.StateFailed, det.State,
 			"det must still reflect failure even when persistence fails")
 	})
->>>>>>> ed5b861e1 (fix: preserve live install during upgrade cleanup and report aborted upgrades to Fleet (#13935))
 }

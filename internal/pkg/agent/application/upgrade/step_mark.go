@@ -205,7 +205,7 @@ func MarkUpgradeFailed(dataDirPath string, det *details.Details, cause error) er
 		return nil
 	}
 	marker.Details = det
-	if err := SaveMarker(dataDirPath, marker, true); err != nil {
+	if err := saveMarkerToDir(dataDirPath, marker, true); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "saving failed-state marker")
 	}
 	return nil
@@ -312,4 +312,26 @@ func SaveMarker(marker *UpdateMarker, shouldFsync bool) error {
 
 func markerFilePath(dataDirPath string) string {
 	return filepath.Join(dataDirPath, markerFilename)
+}
+
+// saveMarkerToDir is like SaveMarker but writes to an explicit dataDirPath
+// rather than the global paths.Data(). Used by MarkUpgradeFailed and tests.
+func saveMarkerToDir(dataDirPath string, marker *UpdateMarker, shouldFsync bool) error {
+	makerSerializer := &updateMarkerSerializer{
+		Version:           marker.Version,
+		Hash:              marker.Hash,
+		VersionedHome:     marker.VersionedHome,
+		UpdatedOn:         marker.UpdatedOn,
+		PrevVersion:       marker.PrevVersion,
+		PrevHash:          marker.PrevHash,
+		PrevVersionedHome: marker.PrevVersionedHome,
+		Acked:             marker.Acked,
+		Action:            convertToMarkerAction(marker.Action),
+		Details:           marker.Details,
+	}
+	markerBytes, err := yaml.Marshal(makerSerializer)
+	if err != nil {
+		return err
+	}
+	return writeMarkerFile(markerFilePath(dataDirPath), markerBytes, shouldFsync)
 }

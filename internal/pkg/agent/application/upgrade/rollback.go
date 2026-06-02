@@ -11,11 +11,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-<<<<<<< HEAD
-=======
 	"runtime"
 	"slices"
->>>>>>> ed5b861e1 (fix: preserve live install during upgrade cleanup and report aborted upgrades to Fleet (#13935))
 	"strings"
 	"time"
 
@@ -126,56 +123,45 @@ func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath(topDirPath))
 	_ = os.Remove(prevSymlink)
 
-<<<<<<< HEAD
 	dirPrefix := fmt.Sprintf("%s-", agentName)
-	var currentDir string
+
+	// Compute the caller's keep path and the live install path, both
+	// normalized to dataDir-relative basenames. Drop phantom entries (paths
+	// that no longer exist on disk) with an Info log so stale
+	// marker.VersionedHome values are visible in triage output.
+	var callerKeep string
 	if currentVersionedHome != "" {
-		currentDir, err = filepath.Rel("data", currentVersionedHome)
-		if err != nil {
-			return fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", currentVersionedHome, err)
+		var callerRelErr error
+		callerKeep, callerRelErr = filepath.Rel("data", currentVersionedHome)
+		if callerRelErr != nil {
+			return fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", currentVersionedHome, callerRelErr)
 		}
 	} else {
-		currentDir = fmt.Sprintf("%s-%s", agentName, currentHash)
-=======
-	dirPrefix := fmt.Sprintf("%s-", AgentName)
-
-	log.Infof("versioned homes to keep: %v", versionedHomesToKeep)
-
-	candidates := append(make([]string, 0, len(versionedHomesToKeep)+1), versionedHomesToKeep...)
-	candidates = append(candidates, liveHome)
-
-	// Normalize each candidate to a dataDir-relative basename, deduplicate,
-	// and drop entries that don't exist on disk so the "Keeping" log line
-	// below reflects what is actually being preserved rather than a phantom
-	// path. A stale entry is harmless to leave in (the cleanup loop only
-	// iterates real subdirs) but misleading on triage; each dropped entry is
-	// surfaced as an Info so the cause — usually a stale
-	// marker.VersionedHome — is visible in logs.
-	var cumulativeError error
-	relativeHomePaths := make([]string, 0, len(candidates))
-	for _, h := range candidates {
-		rel, err := filepath.Rel(dataDirPath, filepath.Join(topDirPath, h))
-		if err != nil {
-			// We can't normalize this entry, and the cleanup loop below
-			// matches dataDir-relative basenames, so an un-normalized path
-			// would never match anyway. Record the failure for the caller
-			// and skip the entry rather than carry a value forward that
-			// can't preserve the directory.
-			cumulativeError = goerrors.Join(cumulativeError, fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", h, err))
+		callerKeep = fmt.Sprintf("%s-%s", agentName, currentHash)
+	}
+	liveKeep, liveRelErr := filepath.Rel(dataDirPath, filepath.Join(topDirPath, liveHome))
+	if liveRelErr != nil {
+		return fmt.Errorf("extracting live versioned home relative to data directory: %w", liveRelErr)
+	}
+	seen := make(map[string]bool)
+	relativeHomePaths := make([]string, 0, 2)
+	for _, rel := range []string{callerKeep, liveKeep} {
+		if seen[rel] {
 			continue
 		}
+		seen[rel] = true
 		if _, statErr := os.Stat(filepath.Join(dataDirPath, rel)); statErr != nil {
 			log.Infow("dropping non-existent keep-list entry from cleanup",
 				"path", rel, "error.message", statErr.Error())
 			continue
 		}
 		relativeHomePaths = append(relativeHomePaths, rel)
->>>>>>> ed5b861e1 (fix: preserve live install during upgrade cleanup and report aborted upgrades to Fleet (#13935))
 	}
+	log.Infof("Starting cleanup of versioned homes. Keeping: %v", relativeHomePaths)
 
 	var errs []error
 	for _, dir := range subdirs {
-		if dir == currentDir {
+		if slices.Contains(relativeHomePaths, dir) {
 			continue
 		}
 
@@ -302,8 +288,8 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 // Returns the empty string and a non-nil error if the symlink can't be read
 // or doesn't resolve to a path under topDirPath.
 func liveVersionedHome(topDirPath string) (string, error) {
-	symlinkPath := filepath.Join(topDirPath, AgentName)
-	if runtime.GOOS == windowsOSName {
+	symlinkPath := filepath.Join(topDirPath, agentName)
+	if runtime.GOOS == windows {
 		symlinkPath += exe
 	}
 	target, err := os.Readlink(symlinkPath)

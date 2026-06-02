@@ -15,10 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-<<<<<<< HEAD
-=======
-	"go.uber.org/zap/zaptest/observer"
->>>>>>> ed5b861e1 (fix: preserve live install during upgrade cleanup and report aborted upgrades to Fleet (#13935))
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -239,7 +235,7 @@ func TestCleanup_PreservesLiveVersionedHome(t *testing.T) {
 	createLink(t, topDir, liveHome)
 
 	// Caller passes a keep list that omits the live install.
-	err := cleanup(testLogger, topDir, false, false, 0, otherHome)
+	err := cleanup(testLogger, topDir, otherHome, "", false, false, 0)
 	require.NoError(t, err)
 
 	// Both installs must remain: otherHome because it's in the keep list,
@@ -262,7 +258,7 @@ func TestCleanup_DropsPhantomKeepListEntry(t *testing.T) {
 	createLink(t, topDir, liveHome)
 	phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
 
-	err := cleanup(testLogger, topDir, false, false, 0, phantomHome)
+	err := cleanup(testLogger, topDir, phantomHome, "", false, false, 0)
 	require.NoError(t, err)
 
 	// Live install is still present (cleanup guard kicked in).
@@ -387,270 +383,6 @@ func TestRollback(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
-=======
-func TestRollbackWithOpts(t *testing.T) {
-	type hookFuncWithLogs func(t *testing.T, logs *observer.ObservedLogs, topDir string)
-
-	agentExecutableName := AgentName
-	if runtime.GOOS == "windows" {
-		agentExecutableName += ".exe"
-	}
-
-	type args struct {
-		prevVersionedHome string
-		prevHash          string
-		rollbackOptions   []RollbackOpt
-	}
-
-	tests := map[string]struct {
-		agentInstallsSetup setupAgentInstallations
-		setupMocks         func(*client.MockClient)
-		args               args
-		wantErr            assert.ErrorAssertionFunc
-		checkAfterRollback hookFuncWithLogs
-	}{
-		"SkipCleanup: leave the current installation intact": {
-			agentInstallsSetup: setupAgentInstallations{
-				installedAgents: []testAgentInstall{
-					{
-						version:          version123Snapshot,
-						useVersionInPath: true,
-					},
-					{
-						version:          version456Snapshot,
-						useVersionInPath: true,
-					},
-				},
-				upgradeFrom:  version123Snapshot,
-				upgradeTo:    version456Snapshot,
-				currentAgent: version456Snapshot,
-			},
-			setupMocks: func(mockClient *client.MockClient) {
-				mockClient.EXPECT().Connect(
-					mock.AnythingOfType("*context.timerCtx"),
-					mock.AnythingOfType("*grpc.funcDialOption"),
-					mock.AnythingOfType("*grpc.funcDialOption"),
-				).Return(nil)
-				mockClient.EXPECT().Disconnect().Return()
-				mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
-			},
-			args: args{
-				prevVersionedHome: "data/elastic-agent-1.2.3-SNAPSHOT-abcdef",
-				prevHash:          "abcdef",
-				rollbackOptions: []RollbackOpt{
-					func(rs *RollbackSettings) { rs.SetSkipCleanup(true) },
-				},
-			},
-			wantErr: assert.NoError,
-			checkAfterRollback: func(t *testing.T, _ *observer.ObservedLogs, topDir string) {
-				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName)
-				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
-				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
-				assert.NoError(t, err, "reading topPath elastic-agent link")
-				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
-				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
-			},
-		},
-		"SkipRestart: no cleanup, no restart": {
-			agentInstallsSetup: setupAgentInstallations{
-				installedAgents: []testAgentInstall{
-					{
-						version:          version123Snapshot,
-						useVersionInPath: true,
-					},
-					{
-						version:          version456Snapshot,
-						useVersionInPath: true,
-					},
-				},
-				upgradeFrom:  version123Snapshot,
-				upgradeTo:    version456Snapshot,
-				currentAgent: version456Snapshot,
-			},
-			setupMocks: func(mockClient *client.MockClient) {
-				// nothing to do here, no restart will be issued
-			},
-			args: args{
-				prevVersionedHome: "data/elastic-agent-1.2.3-SNAPSHOT-abcdef",
-				prevHash:          "abcdef",
-				rollbackOptions: []RollbackOpt{
-					func(rs *RollbackSettings) { rs.SetSkipRestart(true) },
-				},
-			},
-			wantErr: assert.NoError,
-			checkAfterRollback: func(t *testing.T, _ *observer.ObservedLogs, topDir string) {
-				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName)
-				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
-				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
-				assert.NoError(t, err, "reading topPath elastic-agent link")
-				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
-				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
-			},
-		},
-		"Prerestart hook not fatal error: rollback, cleanup and restart as normal": {
-			agentInstallsSetup: setupAgentInstallations{
-				installedAgents: []testAgentInstall{
-					{
-						version:          version123Snapshot,
-						useVersionInPath: true,
-					},
-					{
-						version:          version456Snapshot,
-						useVersionInPath: true,
-					},
-				},
-				upgradeFrom:  version123Snapshot,
-				upgradeTo:    version456Snapshot,
-				currentAgent: version456Snapshot,
-			},
-			setupMocks: func(mockClient *client.MockClient) {
-				mockClient.EXPECT().Connect(
-					mock.AnythingOfType("*context.timerCtx"),
-					mock.AnythingOfType("*grpc.funcDialOption"),
-					mock.AnythingOfType("*grpc.funcDialOption"),
-				).Return(nil)
-				mockClient.EXPECT().Disconnect().Return()
-				mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
-			},
-			args: args{
-				prevVersionedHome: "data/elastic-agent-1.2.3-SNAPSHOT-abcdef",
-				prevHash:          "abcdef",
-				rollbackOptions: []RollbackOpt{
-					func(rs *RollbackSettings) {
-						rs.SetPreRestartHook(func(ctx context.Context, log *logger.Logger, topDirPath string) error {
-							return errors.New("pre-restart hook error, not fatal")
-						})
-					},
-				},
-			},
-			wantErr: assert.NoError,
-			checkAfterRollback: func(t *testing.T, logs *observer.ObservedLogs, topDir string) {
-				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName)
-				assertAgentInstallCleaned(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
-				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
-				assert.NoError(t, err, "reading topPath elastic-agent link")
-				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
-				snippetLogs := logs.FilterMessageSnippet("pre-restart hook error, not fatal").All()
-				assert.Len(t, snippetLogs, 1)
-				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
-			},
-		},
-		"Prerestart hook fatal error: rollback then return the error (no restart, no cleanup)": {
-			agentInstallsSetup: setupAgentInstallations{
-				installedAgents: []testAgentInstall{
-					{
-						version:          version123Snapshot,
-						useVersionInPath: true,
-					},
-					{
-						version:          version456Snapshot,
-						useVersionInPath: true,
-					},
-				},
-				upgradeFrom:  version123Snapshot,
-				upgradeTo:    version456Snapshot,
-				currentAgent: version456Snapshot,
-			},
-			setupMocks: func(mockClient *client.MockClient) {
-				// no restart request should be made
-			},
-			args: args{
-				prevVersionedHome: "data/elastic-agent-1.2.3-SNAPSHOT-abcdef",
-				prevHash:          "abcdef",
-				rollbackOptions: []RollbackOpt{
-					func(rs *RollbackSettings) {
-						rs.SetPreRestartHook(func(ctx context.Context, log *logger.Logger, topDirPath string) error {
-							return fmt.Errorf("fatal pre-restart hook error: %w", FatalRollbackError)
-						})
-					},
-				},
-			},
-			wantErr: assert.Error,
-			checkAfterRollback: func(t *testing.T, logs *observer.ObservedLogs, topDir string) {
-				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName)
-				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
-				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
-				assert.NoError(t, err, "reading topPath elastic-agent link")
-				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
-				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
-			},
-		},
-		"RemoveMarker true: delete the upgrade marker": {
-			agentInstallsSetup: setupAgentInstallations{
-				installedAgents: []testAgentInstall{
-					{
-						version:          version123Snapshot,
-						useVersionInPath: true,
-					},
-					{
-						version:          version456Snapshot,
-						useVersionInPath: true,
-					},
-				},
-				upgradeFrom:  version123Snapshot,
-				upgradeTo:    version456Snapshot,
-				currentAgent: version456Snapshot,
-			},
-			setupMocks: func(mockClient *client.MockClient) {
-				mockClient.EXPECT().Connect(
-					mock.AnythingOfType("*context.timerCtx"),
-					mock.AnythingOfType("*grpc.funcDialOption"),
-					mock.AnythingOfType("*grpc.funcDialOption"),
-				).Return(nil)
-				mockClient.EXPECT().Disconnect().Return()
-				mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
-			},
-			args: args{
-				prevVersionedHome: "data/elastic-agent-1.2.3-SNAPSHOT-abcdef",
-				prevHash:          "abcdef",
-				rollbackOptions: []RollbackOpt{
-					func(rs *RollbackSettings) {
-						rs.SetRemoveMarker(true)
-					},
-				}},
-			wantErr: assert.NoError,
-			checkAfterRollback: func(t *testing.T, logs *observer.ObservedLogs, topDir string) {
-				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName)
-				assertAgentInstallCleaned(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
-				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
-				assert.NoError(t, err, "reading topPath elastic-agent link")
-				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
-				assert.NoFileExists(t, filepath.Join(topDir, "data", markerFilename))
-			},
-		},
-	}
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			testLogger, obsLogs := loggertest.New(t.Name())
-			testTop := t.TempDir()
-			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup, true)
-
-			// mock client
-			mockClient := client.NewMockClient(t)
-			tt.setupMocks(mockClient)
-
-			tt.wantErr(t, RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, tt.args.prevVersionedHome, tt.args.prevHash, tt.args.rollbackOptions...))
-			tt.checkAfterRollback(t, obsLogs, testTop)
-		})
-	}
-}
-
-func assertAgentInstallExists(t *testing.T, versionedHome string, agentExecutableName string) {
-	assert.DirExists(t, versionedHome)
-	assert.FileExists(t, paths.BinaryPath(versionedHome, agentExecutableName))
-	assert.DirExists(t, filepath.Join(versionedHome, "logs"))
-	assert.DirExists(t, filepath.Join(versionedHome, "run"))
-}
-
-func assertAgentInstallCleaned(t *testing.T, versionedHome string, agentExecutableName string) {
-	assert.DirExists(t, versionedHome)
-	assert.DirExists(t, filepath.Join(versionedHome, "logs"))
-	assert.NoDirExists(t, filepath.Join(versionedHome, "run"))
-	assert.NoFileExists(t, paths.BinaryPath(versionedHome, agentExecutableName))
-}
-
->>>>>>> ed5b861e1 (fix: preserve live install during upgrade cleanup and report aborted upgrades to Fleet (#13935))
 // checkFilesAfterCleanup is a convenience function to check the file structure within topDir.
 // *AgentHome paths must be the expected old and new agent paths relative to topDir (typically in the form of "data/elastic-agent-*")
 func checkFilesAfterCleanup(t *testing.T, topDir, newAgentHome string, oldAgentHomes ...string) {
@@ -836,235 +568,6 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		nil, nil)
 	require.NoError(t, err, "error writing fake update marker")
 }
-<<<<<<< HEAD
-=======
-
-// TestRollbackWithOpts_PreservesInTTLRollbacksAvailable encodes the
-// multi-rollback retention contract for RollbackWithOpts: in-TTL entries in
-// marker.RollbacksAvailable must survive a rollback regardless of which one is
-// chosen as the rollback target.
-//
-// Setup:
-//   - Three on-disk installs A, B, C.
-//   - Symlink points at C (the failing upgrade).
-//   - Update marker records C as new, A as previous, with both A and B listed
-//     in RollbacksAvailable with future TTLs.
-//
-// We roll back to A. B (also unexpired) must survive
-func TestRollbackWithOpts_PreservesInTTLRollbacksAvailable(t *testing.T) {
-	agentExecutableName := AgentName
-	if runtime.GOOS == "windows" {
-		agentExecutableName += ".exe"
-	}
-
-	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"}
-	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"}
-	versionC := testAgentVersion{version: "3.0.0", hash: "cccccc"}
-
-	testLogger, _ := loggertest.New(t.Name())
-	testTop := t.TempDir()
-
-	relA := createFakeAgentInstall(t, testTop, versionA.version, versionA.hash, true)
-	relB := createFakeAgentInstall(t, testTop, versionB.version, versionB.hash, true)
-	relC := createFakeAgentInstall(t, testTop, versionC.version, versionC.hash, true)
-
-	createLink(t, testTop, relC)
-
-	validUntil := time.Now().Add(24 * time.Hour)
-	availableRollbacks := map[string]ttl.TTLMarker{
-		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: validUntil},
-		relB: {Version: versionB.version, Hash: versionB.hash, ValidUntil: validUntil},
-	}
-
-	require.NoError(t,
-		ttl.NewTTLMarkerRegistry(testLogger, testTop).Set(availableRollbacks),
-		"writing TTL registry with two valid entries")
-
-	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
-	err := markUpgrade(
-		testLogger,
-		paths.DataFrom(testTop),
-		time.Now(),
-		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
-		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
-		nil, nil, availableRollbacks,
-	)
-	require.NoError(t, err, "writing update marker with two RollbacksAvailable entries")
-
-	mockClient := client.NewMockClient(t)
-	mockClient.EXPECT().Connect(
-		mock.AnythingOfType("*context.timerCtx"),
-		mock.AnythingOfType("*grpc.funcDialOption"),
-		mock.AnythingOfType("*grpc.funcDialOption"),
-	).Return(nil)
-	mockClient.EXPECT().Disconnect().Return()
-	mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
-
-	err = RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, relA, versionA.hash)
-	require.NoError(t, err, "RollbackWithOpts to A")
-
-	t.Run("rollback target A is preserved", func(t *testing.T) {
-		assertAgentInstallExists(t, filepath.Join(testTop, relA), agentExecutableName)
-	})
-
-	t.Run("failing upgrade C is cleaned up", func(t *testing.T) {
-		assertAgentInstallCleaned(t, filepath.Join(testTop, relC), agentExecutableName)
-	})
-
-	t.Run("other in-TTL rollback target B is preserved", func(t *testing.T) {
-		// B's directory must survive — its TTL has not expired and the live
-		// TTL registry still lists it as a valid rollback target.
-		assertAgentInstallExists(t, filepath.Join(testTop, relB), agentExecutableName)
-	})
-}
-
-// TestRollbackWithOpts_RemovesMalformedTTLRollbacksAvailable verifies that a
-// directory whose .ttl marker is corrupt is NOT preserved by post-rollback
-// cleanup. Under the registry contract a parseable TTL is the only proof an
-// install is a valid rollback target, so a malformed entry is treated like a
-// missing one. This preserves the self-healing property that a corrupt .ttl
-// outside the active install gets reaped at the next rollback, allowing
-// future upgrades to proceed against a clean registry.
-func TestRollbackWithOpts_RemovesMalformedTTLRollbacksAvailable(t *testing.T) {
-	agentExecutableName := AgentName
-	if runtime.GOOS == "windows" {
-		agentExecutableName += ".exe"
-	}
-
-	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"}
-	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"}
-	versionC := testAgentVersion{version: "3.0.0", hash: "cccccc"}
-
-	testLogger, _ := loggertest.New(t.Name())
-	testTop := t.TempDir()
-
-	relA := createFakeAgentInstall(t, testTop, versionA.version, versionA.hash, true)
-	relB := createFakeAgentInstall(t, testTop, versionB.version, versionB.hash, true)
-	relC := createFakeAgentInstall(t, testTop, versionC.version, versionC.hash, true)
-
-	createLink(t, testTop, relC)
-
-	// A has a valid in-TTL marker; B has a corrupt one (unparseable YAML).
-	// Both directories must survive the rollback to A.
-	now := time.Now()
-	availableRollbacks := map[string]ttl.TTLMarker{
-		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: now.Add(24 * time.Hour)},
-	}
-	require.NoError(t,
-		ttl.NewTTLMarkerRegistry(testLogger, testTop).Set(availableRollbacks),
-		"writing TTL registry with single valid entry")
-	require.NoError(t,
-		os.WriteFile(filepath.Join(testTop, relB, ".ttl"), []byte("this is not yaml"), 0644),
-		"writing corrupt .ttl for B")
-
-	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
-	err := markUpgrade(
-		testLogger,
-		paths.DataFrom(testTop),
-		now,
-		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
-		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
-		nil, nil, availableRollbacks,
-	)
-	require.NoError(t, err, "writing update marker")
-
-	mockClient := client.NewMockClient(t)
-	mockClient.EXPECT().Connect(
-		mock.AnythingOfType("*context.timerCtx"),
-		mock.AnythingOfType("*grpc.funcDialOption"),
-		mock.AnythingOfType("*grpc.funcDialOption"),
-	).Return(nil)
-	mockClient.EXPECT().Disconnect().Return()
-	mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
-
-	err = RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, relA, versionA.hash)
-	require.NoError(t, err, "RollbackWithOpts to A")
-
-	t.Run("rollback target A is preserved", func(t *testing.T) {
-		assertAgentInstallExists(t, filepath.Join(testTop, relA), agentExecutableName)
-	})
-
-	t.Run("failing upgrade C is cleaned up", func(t *testing.T) {
-		assertAgentInstallCleaned(t, filepath.Join(testTop, relC), agentExecutableName)
-	})
-
-	t.Run("install B with corrupt .ttl is cleaned up", func(t *testing.T) {
-		// B's .ttl is unparseable, so we cannot prove B is a valid rollback
-		// target. Treat it like a directory with no .ttl and let cleanup
-		// reap it — that's the self-healing path that lets the next upgrade
-		// proceed against a clean registry.
-		assertAgentInstallCleaned(t, filepath.Join(testTop, relB), agentExecutableName)
-	})
-}
-
-// TestRollbackWithOpts_RemovesExpiredRollbacksAvailable verifies that expired
-// entries in marker.RollbacksAvailable are not preserved by the rollback
-// cleanup: the keep list is filtered by ValidUntil so expired directories get
-// swept alongside the failing upgrade target.
-func TestRollbackWithOpts_RemovesExpiredRollbacksAvailable(t *testing.T) {
-	agentExecutableName := AgentName
-	if runtime.GOOS == "windows" {
-		agentExecutableName += ".exe"
-	}
-
-	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"}
-	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"}
-	versionC := testAgentVersion{version: "3.0.0", hash: "cccccc"}
-
-	testLogger, _ := loggertest.New(t.Name())
-	testTop := t.TempDir()
-
-	relA := createFakeAgentInstall(t, testTop, versionA.version, versionA.hash, true)
-	relB := createFakeAgentInstall(t, testTop, versionB.version, versionB.hash, true)
-	relC := createFakeAgentInstall(t, testTop, versionC.version, versionC.hash, true)
-
-	createLink(t, testTop, relC)
-
-	now := time.Now()
-	availableRollbacks := map[string]ttl.TTLMarker{
-		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: now.Add(24 * time.Hour)},
-		relB: {Version: versionB.version, Hash: versionB.hash, ValidUntil: now.Add(-1 * time.Hour)},
-	}
-
-	require.NoError(t,
-		ttl.NewTTLMarkerRegistry(testLogger, testTop).Set(availableRollbacks),
-		"writing TTL registry with mixed-TTL entries")
-
-	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
-	err := markUpgrade(
-		testLogger,
-		paths.DataFrom(testTop),
-		now,
-		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
-		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
-		nil, nil, availableRollbacks,
-	)
-	require.NoError(t, err, "writing update marker with mixed TTL RollbacksAvailable entries")
-
-	mockClient := client.NewMockClient(t)
-	mockClient.EXPECT().Connect(
-		mock.AnythingOfType("*context.timerCtx"),
-		mock.AnythingOfType("*grpc.funcDialOption"),
-		mock.AnythingOfType("*grpc.funcDialOption"),
-	).Return(nil)
-	mockClient.EXPECT().Disconnect().Return()
-	mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
-
-	err = RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, relA, versionA.hash)
-	require.NoError(t, err, "RollbackWithOpts to A")
-
-	t.Run("rollback target A is preserved", func(t *testing.T) {
-		assertAgentInstallExists(t, filepath.Join(testTop, relA), agentExecutableName)
-	})
-
-	t.Run("failing upgrade C is cleaned up", func(t *testing.T) {
-		assertAgentInstallCleaned(t, filepath.Join(testTop, relC), agentExecutableName)
-	})
-
-	t.Run("expired rollback target B is cleaned up", func(t *testing.T) {
-		assertAgentInstallCleaned(t, filepath.Join(testTop, relB), agentExecutableName)
-	})
-}
 
 // TestLiveVersionedHome exercises the helper against a real install layout for
 // the host OS. createFakeAgentInstall + createLink build the on-disk structure
@@ -1099,9 +602,9 @@ func TestLiveVersionedHome(t *testing.T) {
 		// than returning a "../<other>" relative path that would let cleanup
 		// reason about a directory it doesn't own.
 		outsideDir := t.TempDir()
-		binary := filepath.Join(outsideDir, AgentName)
+		binary := filepath.Join(outsideDir, agentName)
 		require.NoError(t, os.WriteFile(binary, nil, 0o755))
-		require.NoError(t, os.Symlink(binary, filepath.Join(topDir, AgentName)))
+		require.NoError(t, os.Symlink(binary, filepath.Join(topDir, agentName)))
 
 		_, err := liveVersionedHome(topDir)
 		require.Error(t, err)
@@ -1120,7 +623,7 @@ func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
 		topDir := t.TempDir()
 
 		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
-		err := cleanup(testLogger, topDir, false, false, 0, phantomHome)
+		err := cleanup(testLogger, topDir, phantomHome, "", false, false, 0)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot identify live versioned home")
 	})
@@ -1135,7 +638,7 @@ func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
 			"writing placeholder marker file")
 
 		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
-		err := cleanup(testLogger, topDir, true, false, 0, phantomHome)
+		err := cleanup(testLogger, topDir, phantomHome, "", true, false, 0)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot identify live versioned home")
 
@@ -1143,4 +646,3 @@ func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
 			"upgrade marker must survive an aborted cleanup (CleanMarker must not run before resolve)")
 	})
 }
->>>>>>> ed5b861e1 (fix: preserve live install during upgrade cleanup and report aborted upgrades to Fleet (#13935))
