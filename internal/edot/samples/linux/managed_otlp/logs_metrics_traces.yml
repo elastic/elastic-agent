@@ -1,6 +1,6 @@
 receivers:
   # Receiver for platform specific log files
-  filelog/platformlogs:
+  file_log/platformlogs:
     include: [/var/log/*.log]
     retry_on_failure:
       enabled: true
@@ -86,7 +86,7 @@ processors:
           enabled: true
 
 exporters:
-  otlp/ingest_logs:
+  otlp_grpc/ingest_logs:
     endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
     headers:
       Authorization: ApiKey ${env:ELASTIC_API_KEY}
@@ -99,7 +99,7 @@ exporters:
         flush_timeout: 1s
         min_size: 1_000_000 # 1MB uncompressed
         max_size: 4_000_000 # 4MB uncompressed
-  otlp/ingest_metrics_traces:
+  otlp_grpc/ingest_metrics_traces:
     endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
     headers:
       Authorization: ApiKey ${env:ELASTIC_API_KEY}
@@ -119,24 +119,24 @@ service:
     traces/fromsdk:
       receivers: [otlp/fromsdk]
       processors: []
-      exporters: [otlp/ingest_metrics_traces]
+      exporters: [otlp_grpc/ingest_metrics_traces]
 
     metrics/fromsdk:
       receivers: [otlp/fromsdk]
       processors: []
-      exporters: [otlp/ingest_metrics_traces]
+      exporters: [otlp_grpc/ingest_metrics_traces]
 
     logs/fromsdk:
       receivers: [otlp/fromsdk]
       processors: []
-      exporters: [otlp/ingest_logs]
+      exporters: [otlp_grpc/ingest_logs]
 
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
       processors: [resourcedetection]
-      exporters: [otlp/ingest_metrics_traces]
+      exporters: [otlp_grpc/ingest_metrics_traces]
 
     logs/platformlogs:
-      receivers: [filelog/platformlogs]
+      receivers: [file_log/platformlogs]
       processors: [resourcedetection]
-      exporters: [otlp/ingest_logs]
+      exporters: [otlp_grpc/ingest_logs]
