@@ -179,6 +179,38 @@ func UpdateActiveCommit(log *logger.Logger, topDirPath, hash string, writeFile w
 	return nil
 }
 
+// MarkUpgradeFailed records an upgrade failure both in the in-memory
+// upgrade-details (det.Fail(cause)) and, if a marker is on disk, by saving
+// the marker with state=Failed so the failure is surfaced to Fleet via the
+// next upgrade-details ack.
+//
+// Designed as the single entry point for marking an upgrade as failed across
+// every error path that can run after the upgrade flow has begun, regardless
+// of whether the marker file was ever written. det is always mutated; the
+// marker step is best-effort and a no-op when no marker exists (e.g.
+// markUpgrade failed before writing it, or the failure happened before the
+// marker was created), so callers can invoke it uniformly without first
+// checking marker presence.
+//
+// The on-disk part is what prevents the next agent run from starting a
+// watcher against an upgrade that has already been undone
+// (https://github.com/elastic/elastic-agent/issues/13505).
+func MarkUpgradeFailed(dataDirPath string, det *details.Details, cause error) error {
+	det.Fail(cause)
+	marker, err := LoadMarker(dataDirPath)
+	if err != nil {
+		return errors.New(err, errors.TypeFilesystem, "loading marker after upgrade failure")
+	}
+	if marker == nil {
+		return nil
+	}
+	marker.Details = det
+	if err := saveMarkerToDir(dataDirPath, marker, true); err != nil {
+		return errors.New(err, errors.TypeFilesystem, "saving failed-state marker")
+	}
+	return nil
+}
+
 // CleanMarker removes a marker from disk.
 func CleanMarker(log *logger.Logger, dataDirPath string) error {
 	markerFile := markerFilePath(dataDirPath)
@@ -280,4 +312,26 @@ func SaveMarker(marker *UpdateMarker, shouldFsync bool) error {
 
 func markerFilePath(dataDirPath string) string {
 	return filepath.Join(dataDirPath, markerFilename)
+}
+
+// saveMarkerToDir is like SaveMarker but writes to an explicit dataDirPath
+// rather than the global paths.Data(). Used by MarkUpgradeFailed and tests.
+func saveMarkerToDir(dataDirPath string, marker *UpdateMarker, shouldFsync bool) error {
+	makerSerializer := &updateMarkerSerializer{
+		Version:           marker.Version,
+		Hash:              marker.Hash,
+		VersionedHome:     marker.VersionedHome,
+		UpdatedOn:         marker.UpdatedOn,
+		PrevVersion:       marker.PrevVersion,
+		PrevHash:          marker.PrevHash,
+		PrevVersionedHome: marker.PrevVersionedHome,
+		Acked:             marker.Acked,
+		Action:            convertToMarkerAction(marker.Action),
+		Details:           marker.Details,
+	}
+	markerBytes, err := yaml.Marshal(makerSerializer)
+	if err != nil {
+		return err
+	}
+	return writeMarkerFile(markerFilePath(dataDirPath), markerBytes, shouldFsync)
 }

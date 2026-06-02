@@ -221,6 +221,61 @@ func TestCleanup(t *testing.T) {
 	}
 }
 
+// TestCleanup_PreservesLiveVersionedHome ensures cleanup() always keeps the
+// directory backing the live agent symlink, even when the caller's keep list
+// does not reference it. Closes the data-loss path described in
+// https://github.com/elastic/elastic-agent/issues/13505.
+func TestCleanup_PreservesLiveVersionedHome(t *testing.T) {
+	testLogger, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	// Two installs; the symlink points at the older one (the live install).
+	liveHome := createFakeAgentInstall(t, topDir, version123Snapshot.version, version123Snapshot.hash, true)
+	otherHome := createFakeAgentInstall(t, topDir, version456Snapshot.version, version456Snapshot.hash, true)
+	createLink(t, topDir, liveHome)
+
+	// Caller passes a keep list that omits the live install.
+	err := cleanup(testLogger, topDir, otherHome, "", false, false, 0)
+	require.NoError(t, err)
+
+	// Both installs must remain: otherHome because it's in the keep list,
+	// liveHome because the symlink-based guard added it.
+	assert.DirExists(t, filepath.Join(topDir, liveHome),
+		"live versioned home must be preserved by the cleanup guard")
+	assert.DirExists(t, filepath.Join(topDir, otherHome))
+}
+
+// TestCleanup_DropsPhantomKeepListEntry ensures cleanup() drops keep-list
+// entries that don't exist on disk so the "Keeping" log line truthfully
+// reflects what is being preserved. The dropped entry must be reported via
+// an Info log so triage can see why a stale marker.VersionedHome is gone.
+func TestCleanup_DropsPhantomKeepListEntry(t *testing.T) {
+	testLogger, obs := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	// One real install + symlink, plus a phantom path the caller insists on.
+	liveHome := createFakeAgentInstall(t, topDir, version123Snapshot.version, version123Snapshot.hash, true)
+	createLink(t, topDir, liveHome)
+	phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
+
+	err := cleanup(testLogger, topDir, phantomHome, "", false, false, 0)
+	require.NoError(t, err)
+
+	// Live install is still present (cleanup guard kicked in).
+	assert.DirExists(t, filepath.Join(topDir, liveHome))
+
+	// Phantom entry was reported as dropped.
+	dropLogs := obs.FilterMessageSnippet("dropping non-existent keep-list entry").All()
+	assert.Len(t, dropLogs, 1, "expected exactly one drop log entry")
+
+	// "Keeping" log line must NOT mention the phantom entry.
+	keepLogs := obs.FilterMessageSnippet("Starting cleanup of versioned homes. Keeping:").All()
+	if assert.Len(t, keepLogs, 1) {
+		assert.NotContains(t, keepLogs[0].Message, "deadbeef",
+			"keep-list log must not contain phantom entry")
+	}
+}
+
 func TestRollback(t *testing.T) {
 	tests := map[string]struct {
 		agentInstallsSetup setupAgentInstallations
@@ -512,4 +567,82 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		oldAgentInstall,
 		nil, nil)
 	require.NoError(t, err, "error writing fake update marker")
+}
+
+// TestLiveVersionedHome exercises the helper against a real install layout for
+// the host OS. createFakeAgentInstall + createLink build the on-disk structure
+// using paths.BinaryPath, so on darwin CI this is a real darwin test (the
+// .app/Contents/MacOS bundle is created and resolved); on linux/windows CI it
+// covers the flat layout. If paths.BinaryPath ever changes its layout on a
+// platform without a corresponding update to liveVersionedHome, this test will
+// fail on that platform's CI.
+func TestLiveVersionedHome(t *testing.T) {
+	t.Run("symlink points at versioned-home binary", func(t *testing.T) {
+		topDir := t.TempDir()
+		versionedHome := createFakeAgentInstall(t, topDir, "1.2.3", "abcdef", true)
+		createLink(t, topDir, versionedHome)
+
+		got, err := liveVersionedHome(topDir)
+		require.NoError(t, err)
+		expected, err := filepath.Rel(topDir, filepath.Join(topDir, versionedHome))
+		require.NoError(t, err)
+		require.Equal(t, expected, got)
+	})
+
+	t.Run("missing symlink returns error", func(t *testing.T) {
+		topDir := t.TempDir()
+		_, err := liveVersionedHome(topDir)
+		require.Error(t, err)
+	})
+
+	t.Run("symlink resolving outside topDir returns error", func(t *testing.T) {
+		topDir := t.TempDir()
+		// Place the binary in a separate temp dir so the symlink resolves
+		// outside topDir. liveVersionedHome must reject the result rather
+		// than returning a "../<other>" relative path that would let cleanup
+		// reason about a directory it doesn't own.
+		outsideDir := t.TempDir()
+		binary := filepath.Join(outsideDir, agentName)
+		require.NoError(t, os.WriteFile(binary, nil, 0o755))
+		require.NoError(t, os.Symlink(binary, filepath.Join(topDir, agentName)))
+
+		_, err := liveVersionedHome(topDir)
+		require.Error(t, err)
+	})
+}
+
+// TestCleanup_AbortsWhenLiveHomeUnresolvable encodes the
+// refusal-to-proceed contract: when the symlink cannot be resolved, cleanup
+// must return an error and leave the on-disk state untouched rather than risk
+// deleting the live install based on a stale keep list. The resolve runs
+// before any destructive op so neither the versioned home nor the upgrade
+// marker may be mutated when the abort fires.
+func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
+	t.Run("removeMarker=false: error returned and versioned home untouched", func(t *testing.T) {
+		testLogger, _ := loggertest.New(t.Name())
+		topDir := t.TempDir()
+
+		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
+		err := cleanup(testLogger, topDir, phantomHome, "", false, false, 0)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot identify live versioned home")
+	})
+
+	t.Run("removeMarker=true: marker survives because resolve precedes CleanMarker", func(t *testing.T) {
+		testLogger, _ := loggertest.New(t.Name())
+		topDir := t.TempDir()
+
+		require.NoError(t, os.MkdirAll(paths.DataFrom(topDir), 0o750))
+		markerPath := filepath.Join(paths.DataFrom(topDir), markerFilename)
+		require.NoError(t, os.WriteFile(markerPath, []byte("placeholder upgrade marker"), 0o600),
+			"writing placeholder marker file")
+
+		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
+		err := cleanup(testLogger, topDir, phantomHome, "", true, false, 0)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot identify live versioned home")
+
+		assert.FileExists(t, markerPath,
+			"upgrade marker must survive an aborted cleanup (CleanMarker must not run before resolve)")
+	})
 }
