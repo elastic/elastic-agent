@@ -33,8 +33,7 @@ func LogstashToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[
 	// by default so it does not land silently in a patch release. Operators who
 	// want it can set ssl.certificate_reload.enabled: true in their config.
 	if logstashConfig.Config.TLS != nil && logstashConfig.Config.TLS.CertificateReload.Enabled == nil {
-		enabled := false
-		logstashConfig.Config.TLS.CertificateReload.Enabled = &enabled
+		logstashConfig.Config.TLS.CertificateReload.Enabled = new(false)
 	}
 
 	// convert logstash config into a map
