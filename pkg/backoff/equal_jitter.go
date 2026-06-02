@@ -31,7 +31,7 @@ type EqualJitterBackoff struct {
 	randFn randFn
 }
 
-// NewEqualJitterBackoff returns a new EqualJitter object.
+// NewEqualJitterBackoff returns a new EqualJitterBackoff.
 func NewEqualJitterBackoff(done <-chan struct{}, init, max time.Duration) Backoff {
 	bo := &EqualJitterBackoff{
 		done:   done,
@@ -60,7 +60,6 @@ func (b *EqualJitterBackoff) NextWait() time.Duration {
 func (b *EqualJitterBackoff) Wait() bool {
 	backoff := b.NextWait()
 
-	// increase duration for next wait.
 	b.nextRand = b.randFn(b.duration)
 	b.duration *= 2
 	if b.duration > b.max {
