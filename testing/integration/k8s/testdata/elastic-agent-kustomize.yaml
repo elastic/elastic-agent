@@ -4,7 +4,6 @@ data:
     outputs:
       default:
         type: elasticsearch
-        preset: latency
         hosts:
           - >-
             ${ES_HOST}
