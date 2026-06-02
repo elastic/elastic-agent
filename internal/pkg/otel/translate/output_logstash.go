@@ -29,6 +29,14 @@ func LogstashToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[
 		return nil, nil, fmt.Errorf("failed unpacking config. %w", err)
 	}
 
+	// Certificate hot-reload was introduced after this branch was cut. Disable it
+	// by default so it does not land silently in a patch release. Operators who
+	// want it can set ssl.certificate_reload.enabled: true in their config.
+	if logstashConfig.Config.TLS != nil && logstashConfig.Config.TLS.CertificateReload.Enabled == nil {
+		enabled := false
+		logstashConfig.Config.TLS.CertificateReload.Enabled = &enabled
+	}
+
 	// convert logstash config into a map
 	var finalMap map[string]any
 	lsConfig := config.MustNewConfigFrom(logstashConfig)
