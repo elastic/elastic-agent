@@ -19,11 +19,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
-	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-=======
->>>>>>> 8bac679d4 (Add pkg/backoff sub-package for shared backoff strategies (#13918))
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/backoff"

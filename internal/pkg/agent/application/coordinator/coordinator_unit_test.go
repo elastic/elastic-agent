@@ -60,11 +60,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
-=======
 	"github.com/elastic/elastic-agent/pkg/backoff"
->>>>>>> 8bac679d4 (Add pkg/backoff sub-package for shared backoff strategies (#13918))
 	pkgcomponent "github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
