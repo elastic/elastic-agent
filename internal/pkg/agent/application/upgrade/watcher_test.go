@@ -23,10 +23,10 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -668,7 +668,7 @@ type mockDaemon struct {
 }
 
 func (s *mockDaemon) Start(opt ...grpc.ServerOption) error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.port))
+	lis, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", s.port))
 	if err != nil {
 		return err
 	}
@@ -693,7 +693,7 @@ func (s *mockDaemon) Client() client.Client {
 	return client.New(client.WithAddress(fmt.Sprintf("http://localhost:%d", s.port)))
 }
 
-func (s *mockDaemon) StateWatch(_ *cproto.Empty, srv cproto.ElasticAgentControl_StateWatchServer) error {
+func (s *mockDaemon) StateWatch(_ *cproto.StateWatchRequest, srv cproto.ElasticAgentControl_StateWatchServer) error {
 	return s.watch(srv)
 }
 

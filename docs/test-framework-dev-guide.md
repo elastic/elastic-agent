@@ -144,6 +144,8 @@ share similar leavers as the packaging process.
        in Docker. This needs to be set if running Kubernetes integration
        tests.
 
+When running local mode integration tests, `BUILD_AGENT=true` will build the agent for the current platform before running.
+
 An example for running a single test, including packaging the artifacts for it is:
 ```
 EXTERNAL=true DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" SNAPSHOT=true mage package # create elastic-agent SNAPSHOT package using external sources for components
@@ -298,6 +300,8 @@ Tests with external dependencies might need more environment variables to be set
 when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
 `ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, `KIBANA_PASSWORD`, and
 `ELASTIC_APM_SERVER_URL`.
+
+`TEST_INTEG_CLEAN_ON_EXIT=true|false` will determine whether mage artifacts and .integration-cache are cleaned on exit automatically.
 
 ### Debugging tests
 

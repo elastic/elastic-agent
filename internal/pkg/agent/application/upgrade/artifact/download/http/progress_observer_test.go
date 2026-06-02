@@ -12,8 +12,8 @@ import (
 
 	"github.com/docker/go-units"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
 func TestDetailsProgressObserver(t *testing.T) {

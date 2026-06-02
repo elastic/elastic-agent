@@ -55,18 +55,18 @@ func DefaultGRPCConfig() *GRPCConfig {
 
 // OverrideDefaultContainerGRPCPort is the configuration override used by the container command
 // to switch to a more convenient default port.
-func OverrideDefaultContainerGRPCPort(cfg *GRPCConfig) {
-	cfg.Port = DefaultGPRCPortInContainer
-
+func GetContainerGRPCPort() uint16 {
 	// Allow manually specifying the port via an undocumented environment variable in case
 	// the change from the original DefaultGRPCPort causes unexpected problems.
 	grpcPortEnv, ok := os.LookupEnv(grpcPortContainerEnvVar)
 	if ok {
 		port, err := strconv.Atoi(grpcPortEnv)
 		if err == nil {
-			cfg.Port = uint16(port) //nolint:gosec // integer size truncation is fine here.
+			return uint16(port) //nolint:gosec // integer size truncation is fine here.
 		}
 	}
+
+	return DefaultGPRCPortInContainer
 }
 
 // String returns the composed listen address for the GRPC.
