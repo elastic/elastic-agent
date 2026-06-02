@@ -37,6 +37,7 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | [apachereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/apachereceiver/v0.152.0/receiver/apachereceiver/README.md) | v0.152.0 |
 | [awss3receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awss3receiver/v0.152.0/receiver/awss3receiver/README.md) | v0.152.0 |
+| [azuremonitorreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/azuremonitorreceiver/v0.152.0/receiver/azuremonitorreceiver/README.md) | v0.152.0 |
 | [couchdbreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/couchdbreceiver/v0.152.0/receiver/couchdbreceiver/README.md) | v0.152.0 |
 | [dockerstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/dockerstatsreceiver/v0.152.0/receiver/dockerstatsreceiver/README.md) | v0.152.0 |
 | [elasticapmintakereceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/elasticapmintakereceiver/v0.50.0/receiver/elasticapmintakereceiver/README.md) | v0.50.0 |
@@ -117,6 +118,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.50.0/extension/apikeyauthextension/README.md) | v0.50.0 |
 | [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.50.0/extension/apmconfigextension/README.md) | v0.50.0 |
 | [awslogsencodingextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/encoding/awslogsencodingextension/v0.152.0/extension/encoding/awslogsencodingextension/README.md) | v0.152.0 |
+| [azureauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/azureauthextension/v0.152.0/extension/azureauthextension/README.md) | v0.152.0 |
 | [azureencodingextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/encoding/azureencodingextension/v0.152.0/extension/encoding/azureencodingextension/README.md) | v0.152.0 |
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.152.0/extension/bearertokenauthextension/README.md) | v0.152.0 |
 | [cgroupruntimeextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/cgroupruntimeextension/v0.152.0/extension/cgroupruntimeextension/README.md) | v0.152.0 |

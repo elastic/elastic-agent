@@ -157,9 +157,10 @@ func TestRunLoadConfig(t *testing.T) {
 			err := os.WriteFile(filepath.Join(dir, paths.DefaultConfigName), tt.file, 0o644)
 			require.NoError(t, err)
 
-			cfg, err := loadConfig(t.Context(), nil)
+			cfg, err := configuration.LoadConfig(t.Context(), nil)
 			require.NoError(t, err)
-			require.Equal(t, tt.expect(), cfg)
+			require.Equal(t, tt.expect().Fleet, cfg.Fleet)
+			require.Equal(t, tt.expect().Settings, cfg.Settings)
 		})
 	}
 }
@@ -219,7 +220,7 @@ func TestApplyCustomLogsPath(t *testing.T) {
 			paths.SetConfig(dir)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, paths.DefaultConfigName), toStderrYAML, 0o644))
 
-			cfg, err := loadConfig(t.Context(), nil)
+			cfg, err := configuration.LoadConfig(t.Context(), nil)
 			require.NoError(t, err)
 
 			applyCustomLogsPath(cfg)

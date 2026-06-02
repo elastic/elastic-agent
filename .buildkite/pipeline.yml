@@ -22,16 +22,16 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1779464011"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1779464011"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1779464011"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1779464011"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1780275718"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1780275718"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1780275718"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1780275718"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
   IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
-  IMAGE_WIN_10_VERSION: "1.0.1779464011"
-  IMAGE_WIN_11_VERSION: "1.0.1779464011"
-  IMAGE_WIN_11_ARM64_VERSION: "1.0.1779464011"
+  IMAGE_WIN_10_VERSION: "1.0.1780275718"
+  IMAGE_WIN_11_VERSION: "1.0.1780275718"
+  IMAGE_WIN_11_ARM64_VERSION: "1.0.1780275718"
 
 steps:
 
@@ -251,10 +251,13 @@ steps:
           - *google_oidc_plugin
 
       - label: "Unit tests - Windows 11"
-        env:
-          GODEBUG: "asyncpreemptoff=1"  # see https://github.com/elastic/elastic-agent/issues/13796
         key: "unit-tests-win11"
         command: .buildkite/scripts/steps/unit-tests.ps1
+        # The race detector is disabled here because it triggers a Go runtime
+        # GC-metadata corruption crash specific to Windows 11 amd64.
+        # See https://github.com/elastic/elastic-agent/issues/14248
+        env:
+          DISABLE_RACE_DETECTOR: "true"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -275,8 +278,6 @@ steps:
           - *google_oidc_plugin
 
       - label: "Unit tests - Windows 11 arm64"
-        env:
-          GODEBUG: "asyncpreemptoff=1"  # see https://github.com/elastic/elastic-agent/issues/13796
         key: "unit-tests-win11-arm64"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:

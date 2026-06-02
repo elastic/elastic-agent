@@ -435,6 +435,26 @@ func TestExtractSnapshotFromVersionString(t *testing.T) {
 	}
 }
 
+func TestVersionWithBuildMetadata(t *testing.T) {
+	testcases := []struct {
+		input    string
+		expected string
+	}{
+		{input: "9.3.5", expected: "9.3.5"},
+		{input: "9.3.5-SNAPSHOT", expected: "9.3.5"},
+		{input: "9.3.5+build202605290902", expected: "9.3.5+build202605290902"},
+		{input: "9.3.5-SNAPSHOT+build202605290902", expected: "9.3.5+build202605290902"},
+		{input: "9.3.5-rc1+build202605290902", expected: "9.3.5+build202605290902"},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.input, func(t *testing.T) {
+			psv, err := ParseVersion(tc.input)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, psv.VersionWithBuildMetadata())
+		})
+	}
+}
+
 func TestComparisons(t *testing.T) {
 	testcases := []struct {
 		name         string

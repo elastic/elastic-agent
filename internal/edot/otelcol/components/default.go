@@ -23,6 +23,7 @@ import (
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
 	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
+	azuremonitorreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver"
 	couchdbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver"
 	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
@@ -95,6 +96,7 @@ import (
 	"github.com/elastic/beats/v7/x-pack/otel/processor/beatprocessor"
 
 	// Extensions
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/azureauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/cgroupruntimeextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension"
@@ -167,6 +169,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			mbreceiver.NewFactoryWithSettings(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
+			azuremonitorreceiver.NewFactory(),
 			couchdbreceiver.NewFactory(),
 			haproxyreceiver.NewFactory(),
 			iisreceiver.NewFactory(),
@@ -255,6 +258,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 		}
 
 		extensions := []extension.Factory{
+			azureauthextension.NewFactory(),
 			cgroupruntimeextension.NewFactory(),
 			k8sleaderelector.NewFactory(),
 			healthcheckv2extension.NewFactory(),
