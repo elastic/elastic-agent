@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -456,9 +455,6 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 						ValidUntil: tomorrow,
 					},
 				}, nil, nil)
-				// nonExistingVersionedHome has no directory on disk; reconciliation removes its stale TTL entry.
-				mockRollbackSource.EXPECT().Set(mock.Anything).Return(nil)
-
 				return nil, mockRollbackSource
 			},
 			postNormalizeAssertions: nil,
@@ -486,9 +482,6 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 					},
 					nil, nil,
 				)
-				// Expired entry is removed; reconciliation syncs the registry.
-				mockRollbackSource.EXPECT().Set(mock.Anything).Return(nil)
-
 				return nil, mockRollbackSource
 			},
 			postNormalizeAssertions: func(t *testing.T, topDir string, _ *upgrade.UpdateMarker) {

@@ -553,7 +553,6 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourFromNow, // still valid
 					},
 				}, nil, nil)
-				rollbackSource.EXPECT().Set(mock.Anything).Return(nil)
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
 					installedAgents: []testAgentInstall{
@@ -604,8 +603,6 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourFromNow, // still valid
 					},
 				}, nil, nil)
-				rollbackSource.EXPECT().Set(mock.Anything).Return(nil)
-
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
 					installedAgents: []testAgentInstall{
@@ -657,8 +654,6 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourAgo, // expired 1 hour ago
 					},
 				}, nil, nil)
-				rollbackSource.EXPECT().Set(mock.Anything).Return(nil)
-
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
 					installedAgents: []testAgentInstall{
@@ -694,8 +689,6 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourAgo, // expired 1 hour ago
 					},
 				}, nil, nil)
-				rollbackSource.EXPECT().Set(mock.Anything).Return(nil)
-
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
 					installedAgents: []testAgentInstall{
