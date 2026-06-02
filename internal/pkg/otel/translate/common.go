@@ -154,8 +154,7 @@ func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any
 	// by default so it does not land silently in a patch release. Operators who
 	// want it can set ssl.certificate_reload.enabled: true in their config.
 	if tlsConfig.CertificateReload.Enabled == nil {
-		enabled := false
-		tlsConfig.CertificateReload.Enabled = &enabled
+		tlsConfig.CertificateReload.Enabled = new(false)
 	}
 
 	// validate the beats config before proceeding
