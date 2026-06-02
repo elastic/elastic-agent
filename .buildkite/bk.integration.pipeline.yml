@@ -341,6 +341,7 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 2)"
+    if: build.pull_request.id != null
     if_changed:
       include:
         - .buildkite/**
@@ -646,6 +647,7 @@ steps:
             variant: *linux_deb_variants
 
   - group: "Stateful: Linux (tier 2)"
+    if: build.pull_request.id != null
     if_changed:
       include:
         - .buildkite/**
@@ -946,6 +948,7 @@ steps:
 
   - group: ":kubernetes: Kubernetes (tier 2)"
     key: integration-tests-kubernetes-tier-2
+    if: build.pull_request.id != null
     if_changed:
       include:
         - .buildkite/**
