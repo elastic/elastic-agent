@@ -35,12 +35,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
@@ -337,7 +337,7 @@ func TestFleetGateway(t *testing.T) {
 				data, err := io.ReadAll(body)
 				require.NoError(t, err)
 
-				var checkinRequest fleetapi.CheckinRequest
+				var checkinRequest pkgfleetapi.CheckinRequest
 				err = json.Unmarshal(data, &checkinRequest)
 				require.NoError(t, err)
 
@@ -399,7 +399,7 @@ func TestFleetGateway(t *testing.T) {
 				data, err := io.ReadAll(body)
 				require.NoError(t, err)
 
-				var checkinRequest fleetapi.CheckinRequest
+				var checkinRequest pkgfleetapi.CheckinRequest
 				err = json.Unmarshal(data, &checkinRequest)
 				require.NoError(t, err)
 
@@ -725,7 +725,7 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		defer cancel()
 
 		unauth := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
-			return nil, client.ErrInvalidAPIKey
+			return nil, pkgfleetapi.ErrInvalidAPIKey
 		}
 
 		clientWaitFn := c.Answer(unauth)
@@ -1115,7 +1115,7 @@ func TestAvailableRollbacks(t *testing.T) {
 		name                  string
 		setup                 func(t *testing.T, rbSource *ttl.MockReadOnlySource, client *testingClient)
 		wantErr               assert.ErrorAssertionFunc
-		assertCheckinResponse func(t *testing.T, resp *fleetapi.CheckinResponse)
+		assertCheckinResponse func(t *testing.T, resp *pkgfleetapi.CheckinResponse)
 	}{
 		{
 			name: "no available rollbacks - normal checkin",
@@ -1157,11 +1157,11 @@ func TestAvailableRollbacks(t *testing.T) {
 					assert.NoError(t, err, "error decoding checkin body")
 					if assert.Contains(t, unmarshaled, "upgrade") {
 						// verify that we got the correct data
-						var actualUpgrade fleetapi.CheckinUpgrade
+						var actualUpgrade pkgfleetapi.CheckinUpgrade
 						err = json.Unmarshal(unmarshaled["upgrade"], &actualUpgrade)
 						require.NoError(t, err, "error decoding upgrade info from checkin body")
 
-						expected := []fleetapi.CheckinRollback{{
+						expected := []pkgfleetapi.CheckinRollback{{
 							Version:    "1.2.3",
 							ValidUntil: validUntil,
 						}}
