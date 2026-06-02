@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path"
 	"path/filepath"
@@ -371,7 +373,14 @@ func TestBeatDiagnostics(t *testing.T) {
 
 	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
-	configTemplate := `
+	// Mock HTTP server polled by the httpjson trace logs test case.
+	httpjsonServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"message":"hello"}`)
+	}))
+	t.Cleanup(httpjsonServer.Close)
+
+	fileStreamConfigTemplate := `
 inputs:
   - id: filestream-filebeat
     type: filestream
@@ -391,15 +400,33 @@ agent.monitoring.enabled: {{ .MonitoringEnabled }}
 agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 `
 
-	var filebeatSetup = map[string]integrationtest.ComponentState{
-		"filestream-default": {
-			State: integrationtest.NewClientState(client.Healthy),
-		},
-	}
+	// httpjsonTracerConfigTemplate runs httpjson as a normal filebeat subprocess (process
+	// mode). In that mode filebeat sets the global paths.Paths.Logs, so the httpjson tracer
+	// path validation works and writes trace files to {versionedHome}/components/logs/httpjson/
+	// — the directory the diagnostic bundle fix now collects.
+	httpjsonTracerConfigTemplate := `
+inputs:
+  - type: httpjson
+    id: httpjson-trace-test
+    use_output: default
+    streams:
+      - id: httpjson-trace-stream
+        data_stream:
+          dataset: httpjson.generic
+          type: logs
+        request.url: {{ .MockServerURL }}
+        request.tracer.filename: http-request-trace-*.ndjson
+        interval: 1s
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{ .ESHost }}]
+    api_key: placeholder
+agent.monitoring.enabled: false
+agent.internal.runtime.filebeat.httpjson: process
+`
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
-	defer cancel()
-	expectedComponentState := map[string]integrationtest.ComponentState{
+	fileStreamAgentCompState := map[string]integrationtest.ComponentState{
 		"filestream-default": {
 			State: integrationtest.NewClientState(client.Healthy),
 			Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
@@ -412,6 +439,23 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 			},
 		},
 	}
+
+	httpjsonAgentCompState := map[string]integrationtest.ComponentState{
+		"httpjson-default": {
+			State: integrationtest.NewClientState(client.Healthy),
+			Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "httpjson-default"}: {
+					State: integrationtest.NewClientState(client.Healthy),
+				},
+				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "httpjson-default-httpjson-trace-test"}: {
+					State: integrationtest.NewClientState(client.Healthy),
+				},
+			},
+		},
+	}
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
 	expectedAgentState := integrationtest.NewClientState(client.Healthy)
 
 	testCases := []struct {
@@ -419,6 +463,10 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 		runtime                      string
 		monitoringEnabled            bool
 		expectedCompDiagnosticsFiles []string
+		agentCompState               map[string]integrationtest.ComponentState
+		diagCompSetup                map[string]integrationtest.ComponentState
+		configTemplate               string
+		extraPatterns                []filePattern
 	}{
 		{
 			name:              "filebeat process",
@@ -431,6 +479,11 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 				"beat-rendered-config.yml",
 				"global_processors.txt",
 			),
+			agentCompState: fileStreamAgentCompState,
+			diagCompSetup: map[string]integrationtest.ComponentState{
+				"filestream-default": {State: integrationtest.NewClientState(client.Healthy)},
+			},
+			configTemplate: fileStreamConfigTemplate,
 		},
 		{
 			name:              "filebeat receiver",
@@ -441,32 +494,65 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 				"beat_metrics.json",
 				"input_metrics.json",
 			},
+			agentCompState: fileStreamAgentCompState,
+			diagCompSetup: map[string]integrationtest.ComponentState{
+				"filestream-default": {State: integrationtest.NewClientState(client.Healthy)},
+			},
+			configTemplate: fileStreamConfigTemplate,
+		},
+		{
+			// Verifies that beat receiver trace logs written to {versionedHome}/components/logs/
+			// are included in the diagnostic bundle under logs/<commit>/httpjson/.
+			// Uses httpjson in process mode: the filebeat subprocess sets the global
+			// paths.Paths.Logs so the tracer path validation succeeds, and trace files land in
+			// {versionedHome}/components/logs/httpjson/ — the path the fix now collects.
+			name:    "httpjson trace logs in bundle",
+			runtime: "process",
+			expectedCompDiagnosticsFiles: append(compDiagnosticsFiles,
+				"registry.tar.gz",
+				"input_metrics.json",
+				"beat_metrics.json",
+				"beat-rendered-config.yml",
+				"global_processors.txt",
+			),
+			agentCompState: httpjsonAgentCompState,
+			diagCompSetup: map[string]integrationtest.ComponentState{
+				"httpjson-default": {State: integrationtest.NewClientState(client.Healthy)},
+			},
+			configTemplate: httpjsonTracerConfigTemplate,
+			extraPatterns: []filePattern{
+				{
+					pattern:  path.Join("logs", "*", "httpjson", "http-request-trace-*.ndjson"),
+					optional: false,
+				},
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create the fixture
 			f, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
 			require.NoError(t, err)
 			err = f.Prepare(ctx)
 			require.NoError(t, err)
 
-			// Create the data file to ingest.
+			// Create the data file to ingest (used by filestream cases).
 			inputFilePath := filepath.Join(t.TempDir(), "input.txt")
 			err = os.WriteFile(inputFilePath, []byte("hello world\n"), 0o600)
 			require.NoError(t, err, "failed to create input file for ingestion")
 
 			var configBuffer bytes.Buffer
 			require.NoError(t,
-				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
+				template.Must(template.New("config").Parse(tc.configTemplate)).Execute(&configBuffer, map[string]any{
 					"Runtime":           tc.runtime,
 					"InputFile":         inputFilePath,
 					"ESHost":            esURL.Host,
 					"MonitoringEnabled": tc.monitoringEnabled,
+					"MockServerURL":     httpjsonServer.URL,
 				}))
+
 			expDiagFiles := append([]string{}, diagnosticsFiles...)
-			var extraPatterns []filePattern
+			extraPatterns := append([]filePattern{}, tc.extraPatterns...)
 			if tc.runtime == "otel" {
 				// EDOT adds these extra files.
 				// TestBeatDiagnostics is quite strict about what it expects to see in the archive.
@@ -491,8 +577,8 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 			err = f.Run(ctx, integrationtest.State{
 				Configure:  configBuffer.String(),
 				AgentState: expectedAgentState,
-				Components: expectedComponentState,
-				After:      testDiagnosticsFactory(t, filebeatSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}, extraPatterns...),
+				Components: tc.agentCompState,
+				After:      testDiagnosticsFactory(t, tc.diagCompSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}, extraPatterns...),
 			})
 			assert.NoError(t, err)
 		})
