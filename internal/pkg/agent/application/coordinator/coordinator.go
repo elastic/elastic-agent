@@ -13,20 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
-<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"go.opentelemetry.io/collector/component/componentstatus"
-=======
-	"go.opentelemetry.io/collector/component/componentstatus"
-
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
-
-	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/pkg/backoff"
->>>>>>> 8bac679d4 (Add pkg/backoff sub-package for shared backoff strategies (#13918))
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 
