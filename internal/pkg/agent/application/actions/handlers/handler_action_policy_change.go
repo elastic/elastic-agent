@@ -123,33 +123,28 @@ func (h *PolicyChangeHandler) Watch() <-chan coordinator.ConfigChange {
 	return h.ch
 }
 
-func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, cfg *config.Config) (*remote.Config, error) {
+func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, cfg *configuration.Configuration) (*remote.Config, error) {
 	// do not update fleet-server host from policy; no setters provided with local Fleet Server
 	if len(h.setters) == 0 {
 		return nil, nil
 	}
 
-	parsedConfig, err := configuration.NewPartialFromConfigNoDefaults(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("parsing fleet config: %w", err)
-	}
-
-	if parsedConfig.Fleet == nil {
+	if cfg.Fleet == nil {
 		// there is no client config (weird)
 		return nil, nil
 	}
 
-	if clientEqual(h.config.Fleet.Client, parsedConfig.Fleet.Client) {
+	if clientEqual(h.config.Fleet.Client, cfg.Fleet.Client) {
 		// already the same hosts
 		return nil, nil
 	}
 
 	// make a copy the current client config and apply the changes on this copy
 	newFleetClientConfig := h.config.Fleet.Client
-	updateFleetConfig(h.log, parsedConfig.Fleet.Client, &newFleetClientConfig)
+	updateFleetConfig(h.log, cfg.Fleet.Client, &newFleetClientConfig)
 
 	// Test new config
-	err = testFleetConfig(ctx, h.log, newFleetClientConfig, h.config.Fleet.AccessAPIKey)
+	err := testFleetConfig(ctx, h.log, newFleetClientConfig, h.config.Fleet.AccessAPIKey)
 	if err != nil {
 		return nil, fmt.Errorf("validating fleet client config: %w", err)
 	}
@@ -242,13 +237,18 @@ func emptyCertificateConfig() tlscommon.CertificateConfig {
 }
 
 func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) error {
+	partialCfg, err := configuration.NewPartialFromConfigNoDefaults(c)
+	if err != nil {
+		return fmt.Errorf("parsing fleet config: %w", err)
+	}
+
 	// Step 1: Validate policy configuration.
 	var validationErr error
-	validatedFleetConfig, err := h.validateFleetServerHosts(ctx, c)
+	validatedFleetConfig, err := h.validateFleetServerHosts(ctx, partialCfg)
 	if err != nil {
 		validationErr = goerrors.Join(validationErr, fmt.Errorf("failed to validate Fleet client config: %w", err))
 	}
-	loggingConfig, err := validateLoggingConfig(c)
+	loggingConfig, err := validateLoggingConfig(partialCfg)
 	if err != nil {
 		validationErr = goerrors.Join(validationErr, fmt.Errorf("failed to validate logging config: %w", err))
 	}
@@ -267,14 +267,9 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		policyLogLevel = loggingConfig.Level.String()
 	}
 
-	hasEventLoggingOutputChanged := h.hasEventLoggingOutputChanged(cfg)
-
 	// Step 3: Update in-memory caches.
 	if validatedFleetConfig != nil {
 		h.config.Fleet.Client = *validatedFleetConfig
-	}
-	if hasEventLoggingOutputChanged {
-		h.config.Settings.EventLoggingConfig = cfg.Settings.EventLoggingConfig
 	}
 	if loggingConfig != nil {
 		h.config.Settings.LoggingConfig.Level = loggingConfig.Level
@@ -307,7 +302,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 
 	// If the event logging output has changed, re-exec the agent so it picks up
 	// the newly-persisted logging config on startup.
-	if hasEventLoggingOutputChanged {
+	if h.applyEventLoggingOutputChange(partialCfg) {
 		h.runtimeLogLevelSetter.ReExec(nil)
 	}
 
@@ -318,38 +313,36 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	return nil
 }
 
-// hasEventLoggingOutputChanged returns true if the output of the event logger has changed
-func (h *PolicyChangeHandler) hasEventLoggingOutputChanged(new *configuration.Configuration) bool {
-	switch {
-	case h.config.Settings.EventLoggingConfig.ToFiles != new.Settings.EventLoggingConfig.ToFiles:
-		return true
-	case h.config.Settings.EventLoggingConfig.ToStderr != new.Settings.EventLoggingConfig.ToStderr:
-		return true
-	default:
+func (h *PolicyChangeHandler) applyEventLoggingOutputChange(new *configuration.Configuration) bool {
+	if new == nil || new.Settings == nil || new.Settings.EventLoggingConfig == nil {
 		return false
 	}
-}
 
-func validateLoggingConfig(cfg *config.Config) (*logger.Config, error) {
+	current := h.config.Settings.EventLoggingConfig
+	incoming := new.Settings.EventLoggingConfig
 
-	parsedConfig, err := configuration.NewPartialFromConfigNoDefaults(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("parsing fleet config: %w", err)
+	if current.ToFiles == incoming.ToFiles && current.ToStderr == incoming.ToStderr {
+		return false
 	}
 
-	if parsedConfig == nil || parsedConfig.Settings == nil || parsedConfig.Settings.LoggingConfig == nil {
+	current.ToFiles = incoming.ToFiles
+	current.ToStderr = incoming.ToStderr
+	return true
+}
+
+func validateLoggingConfig(cfg *configuration.Configuration) (*logger.Config, error) {
+	if cfg == nil || cfg.Settings == nil || cfg.Settings.LoggingConfig == nil {
 		// no logging config, nothing to do
 		return nil, nil
 	}
 
-	loggingConfig := parsedConfig.Settings.LoggingConfig
+	loggingConfig := cfg.Settings.LoggingConfig
 	logLevel := loggingConfig.Level
 	if logLevel < logp.DebugLevel || logLevel > logp.CriticalLevel {
 		return nil, fmt.Errorf("unrecognized log level %d", logLevel)
 	}
 
 	return loggingConfig, nil
-
 }
 
 func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Config) error {

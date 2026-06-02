@@ -120,6 +120,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.50.0/extension/apikeyauthextension/README.md) | v0.50.0 |
 | [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.50.0/extension/apmconfigextension/README.md) | v0.50.0 |
 | [awslogsencodingextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/encoding/awslogsencodingextension/v0.152.0/extension/encoding/awslogsencodingextension/README.md) | v0.152.0 |
+| [azureauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/azureauthextension/v0.152.0/extension/azureauthextension/README.md) | v0.152.0 |
 | [azureencodingextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/encoding/azureencodingextension/v0.152.0/extension/encoding/azureencodingextension/README.md) | v0.152.0 |
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.152.0/extension/bearertokenauthextension/README.md) | v0.152.0 |
 | [cgroupruntimeextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/cgroupruntimeextension/v0.152.0/extension/cgroupruntimeextension/README.md) | v0.152.0 |
