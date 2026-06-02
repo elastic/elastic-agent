@@ -826,7 +826,11 @@ func (a agentInfo) AgentID() string {
 }
 
 // mustUnmarshalActions unmarshals raw JSON into fleetapi.Actions, panicking on error.
+// Returns an empty slice when raw is nil or empty (no actions in response).
 func mustUnmarshalActions(raw json.RawMessage) fleetapi.Actions {
+	if len(raw) == 0 {
+		return fleetapi.Actions{}
+	}
 	var actions fleetapi.Actions
 	if err := json.Unmarshal(raw, &actions); err != nil {
 		panic(fmt.Sprintf("failed to unmarshal actions: %v", err))
