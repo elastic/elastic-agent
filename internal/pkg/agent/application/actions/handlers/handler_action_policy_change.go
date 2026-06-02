@@ -278,6 +278,8 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	h.config.Settings.MonitoringConfig.Pprof = cfg.Settings.MonitoringConfig.Pprof
 	h.agentInfo.SetLogLevelPolicy(policyLogLevel)
 
+	hasEventLoggingChanged := h.applyEventLoggingOutputChange(partialCfg)
+
 	// Step 4: Persist the updated configuration to disk.
 	if err := saveConfig(h.agentInfo, h.config, h.store, h.log); err != nil {
 		return fmt.Errorf("failed to persist policy config: %w", err)
@@ -302,7 +304,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 
 	// If the event logging output has changed, re-exec the agent so it picks up
 	// the newly-persisted logging config on startup.
-	if h.applyEventLoggingOutputChange(partialCfg) {
+	if hasEventLoggingChanged {
 		h.runtimeLogLevelSetter.ReExec(nil)
 	}
 
