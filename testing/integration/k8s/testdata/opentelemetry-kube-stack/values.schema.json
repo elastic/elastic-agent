@@ -566,10 +566,7 @@
           "type": "string"
         },
         "value": {
-          "type": [
-            "string",
-            "number"
-          ]
+          "type": "string"
         },
         "valueFrom": {
           "$ref": "#/$defs/EnvVarSource"

@@ -210,12 +210,8 @@ func integTestDockerComposeEnvVars(cfg *Settings) map[string]string {
 // Go and Python testing libraries through the DOCKER_COMPOSE_PROJECT_NAME
 // environment variable.
 func (d *DockerIntegrationTester) dockerComposeProjectName(cfg *Settings) string {
-	commit, err := cfg.Build.CommitHash()
-	if err != nil {
-		panic(fmt.Errorf("failed to construct docker compose project name: %w", err))
-	}
-
-	version := strings.NewReplacer(".", "_").Replace(cfg.BeatQualifiedVersion())
+	commit := cfg.Build.CommitHash()
+	version := strings.NewReplacer(".", "_").Replace(cfg.AgentQualifiedCoreVersion())
 
 	projectName := "{{.BeatName}}_{{.Version}}_{{.ShortCommit}}-{{.StackEnvironment}}"
 	projectName = MustExpand(cfg, projectName, map[string]interface{}{

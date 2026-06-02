@@ -54,9 +54,6 @@ type rollbacksSource interface {
 	Remove(string) error
 }
 
-// CfgOverrider allows for application driven overrides of configuration read from disk.
-type CfgOverrider func(cfg *configuration.Configuration)
-
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
 	ctx context.Context,
@@ -69,7 +66,7 @@ func New(
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
-	override CfgOverrider,
+	cfg *configuration.Configuration,
 	initialUpdateMarker *upgrade.UpdateMarker,
 	availableRollbacksSource rollbacksSource,
 	modifiers ...component.PlatformModifier,
@@ -101,34 +98,11 @@ func New(
 
 	pathConfigFile := paths.ConfigFile()
 
-	var rawConfig *config.Config
 	if testingMode {
-		// testing mode doesn't read any configuration from the disk
-		rawConfig, err = config.NewConfigFrom("")
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-		}
-
+		cfg = configuration.DefaultConfiguration()
+		cfg.UCfg = config.MustNewConfigFrom(cfg)
 		// monitoring is always disabled in testing mode
 		disableMonitoring = true
-	} else {
-		log.Infof("Loading baseline config from %v", pathConfigFile)
-		rawConfig, err = config.LoadFile(pathConfigFile)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-		}
-	}
-	if err := info.InjectAgentConfig(rawConfig); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	if override != nil {
-		override(cfg)
 	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
@@ -183,7 +157,7 @@ func New(
 		log.Info("Parsed configuration and determined agent is managed locally")
 
 		loader := config.NewLoader(log, paths.ExternalInputs())
-		rawCfgMap, err := rawConfig.ToMapStr()
+		rawCfgMap, err := cfg.GetUCfg().ToMapStr()
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
 		}
@@ -198,16 +172,14 @@ func New(
 		}
 	} else {
 		isManaged = true
-		var store storage.Store
-		store, cfg, err = mergeFleetConfig(ctx, rawConfig)
-		if err != nil {
-			return nil, nil, nil, err
+		if err := cfg.Fleet.Valid(); err != nil {
+			return nil, nil, nil, fmt.Errorf("fleet configuration is invalid: %w", err)
 		}
 		if configuration.IsFleetServerBootstrap(cfg.Fleet) {
 			log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
 
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
-			configMgr = coordinator.NewConfigPatchManager(newFleetServerBootstrapManager(log), PatchAPMConfig(log, rawConfig))
+			configMgr = coordinator.NewConfigPatchManager(newFleetServerBootstrapManager(log), PatchAPMConfig(log, cfg.GetUCfg()))
 		} else {
 			log.Info("Parsed configuration and determined agent is managed by Fleet")
 
@@ -238,8 +210,7 @@ func New(
 			}
 
 			retrier := retrier.New(fleetAcker, log)
-			batchedAcker := lazy.NewAcker(fleetAcker, log, lazy.WithRetrier(retrier))
-			actionAcker = stateStore.NewStateStoreActionAcker(batchedAcker, stateStorage)
+			actionAcker = lazy.NewAcker(fleetAcker, log, lazy.WithRetrier(retrier))
 
 			actionQueue, err := queue.NewActionQueue(stateStorage.Queue(), stateStorage)
 			if err != nil {
@@ -252,16 +223,20 @@ func New(
 				initialUpgradeDetails = dispatcher.GetScheduledUpgradeDetails(log, actionQueue.Actions(), time.Now())
 			}
 
+			store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to create encrypted disk store: %w", err)
+			}
 			// TODO: stop using global state
 			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, availableRollbacksSource, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			configMgr = coordinator.NewConfigPatchManager(managed, injectOutputOverrides(log, rawConfig), PatchAPMConfig(log, rawConfig))
+			configMgr = coordinator.NewConfigPatchManager(managed, injectOutputOverrides(log, cfg.GetUCfg()), PatchAPMConfig(log, cfg.GetUCfg()))
 		}
 	}
 
-	varsManager, err := composable.New(log, rawConfig, composableManaged)
+	varsManager, err := composable.New(log, cfg.GetUCfg(), composableManaged)
 	if err != nil {
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
@@ -290,13 +265,13 @@ func New(
 		log.Debugf("agent limits have changed: %+v -> %+v", old, new)
 	}, "application.go")
 	// applying the initial limits for the agent process
-	if err := limits.Apply(rawConfig); err != nil {
+	if err := limits.Apply(cfg.GetUCfg()); err != nil {
 		return nil, nil, nil, fmt.Errorf("could not parse and apply limits config: %w", err)
 	}
 
 	// It is important that feature flags from configuration are applied as late as possible.  This will ensure that
 	// any feature flag change callbacks are registered before they get called by `features.Apply`.
-	if err := features.Apply(rawConfig); err != nil {
+	if err := features.Apply(cfg.GetUCfg()); err != nil {
 		return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 	}
 
@@ -339,59 +314,6 @@ func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, in
 	if err != nil {
 		log.Warnf("Error cleaning available rollbacks: %s", err)
 	}
-}
-
-func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
-	path := paths.AgentConfigFile()
-	store, err := storage.NewEncryptedDiskStore(ctx, path)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
-	}
-
-	reader, err := store.Load()
-	if err != nil {
-		return store, nil, errors.New(err, "could not initialize config store",
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, path))
-	}
-	config, err := config.NewConfigFrom(reader)
-	if err != nil {
-		return store, nil, errors.New(err,
-			fmt.Sprintf("fail to read configuration %s for the elastic-agent", path),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	// merge local configuration and configuration persisted from fleet.
-	err = rawConfig.Merge(config)
-	if err != nil {
-		return store, nil, errors.New(err,
-			fmt.Sprintf("fail to merge configuration with %s for the elastic-agent", path),
-			errors.TypeConfig,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return store, nil, errors.New(err,
-			fmt.Sprintf("fail to unpack configuration from %s", path),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	// Fix up fleet.agent.id otherwise the fleet.agent.id is empty string
-	if cfg.Settings != nil && cfg.Fleet != nil && cfg.Fleet.Info != nil && cfg.Fleet.Info.ID == "" {
-		cfg.Fleet.Info.ID = cfg.Settings.ID
-	}
-
-	if err := cfg.Fleet.Valid(); err != nil {
-		return store, nil, errors.New(err,
-			"fleet configuration is invalid",
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	return store, cfg, nil
 }
 
 // injectOutputOverrides takes local configuration for specific outputs and applies them to the configuration.

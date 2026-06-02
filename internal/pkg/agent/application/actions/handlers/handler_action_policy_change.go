@@ -34,15 +34,15 @@ import (
 
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
 type PolicyChangeHandler struct {
-	log                  *logger.Logger
-	agentInfo            info.Agent
-	config               *configuration.Configuration
-	store                storage.Store
-	ch                   chan coordinator.ConfigChange
-	setters              []actions.ClientSetter
-	policyLogLevelSetter logLevelSetter
-	coordinator          *coordinator.Coordinator
-	disableAckFn         func() bool
+	log                   *logger.Logger
+	agentInfo             info.Agent
+	config                *configuration.Configuration
+	store                 storage.Store
+	stateStore            stateStore
+	ch                    chan coordinator.ConfigChange
+	setters               []actions.ClientSetter
+	runtimeLogLevelSetter logLevelSetter
+	disableAckFn          func() bool
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 	// // Last known valid signature validation key
@@ -55,21 +55,21 @@ func NewPolicyChangeHandler(
 	agentInfo info.Agent,
 	config *configuration.Configuration,
 	store storage.Store,
+	stateStore stateStore,
 	ch chan coordinator.ConfigChange,
-	policyLogLevelSetter logLevelSetter,
-	coordinator *coordinator.Coordinator,
+	runtimeLogLevelSetter logLevelSetter,
 	setters ...actions.ClientSetter,
 ) *PolicyChangeHandler {
 	return &PolicyChangeHandler{
-		log:                  log,
-		agentInfo:            agentInfo,
-		config:               config,
-		store:                store,
-		ch:                   ch,
-		setters:              setters,
-		coordinator:          coordinator,
-		policyLogLevelSetter: policyLogLevelSetter,
-		disableAckFn:         features.DisablePolicyChangeAcks,
+		log:                   log,
+		agentInfo:             agentInfo,
+		config:                config,
+		store:                 store,
+		stateStore:            stateStore,
+		ch:                    ch,
+		setters:               setters,
+		runtimeLogLevelSetter: runtimeLogLevelSetter,
+		disableAckFn:          features.DisablePolicyChangeAcks,
 	}
 }
 
@@ -114,7 +114,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 		return err
 	}
 
-	h.ch <- newPolicyChange(ctx, c, a, acker, false, h.disableAckFn())
+	h.ch <- newPolicyChange(ctx, h.log, c, a, acker, false, h.stateStore, h.disableAckFn())
 	return nil
 }
 
@@ -123,33 +123,28 @@ func (h *PolicyChangeHandler) Watch() <-chan coordinator.ConfigChange {
 	return h.ch
 }
 
-func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, cfg *config.Config) (*remote.Config, error) {
+func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, cfg *configuration.Configuration) (*remote.Config, error) {
 	// do not update fleet-server host from policy; no setters provided with local Fleet Server
 	if len(h.setters) == 0 {
 		return nil, nil
 	}
 
-	parsedConfig, err := configuration.NewPartialFromConfigNoDefaults(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("parsing fleet config: %w", err)
-	}
-
-	if parsedConfig.Fleet == nil {
+	if cfg.Fleet == nil {
 		// there is no client config (weird)
 		return nil, nil
 	}
 
-	if clientEqual(h.config.Fleet.Client, parsedConfig.Fleet.Client) {
+	if clientEqual(h.config.Fleet.Client, cfg.Fleet.Client) {
 		// already the same hosts
 		return nil, nil
 	}
 
 	// make a copy the current client config and apply the changes on this copy
 	newFleetClientConfig := h.config.Fleet.Client
-	updateFleetConfig(h.log, parsedConfig.Fleet.Client, &newFleetClientConfig)
+	updateFleetConfig(h.log, cfg.Fleet.Client, &newFleetClientConfig)
 
 	// Test new config
-	err = testFleetConfig(ctx, h.log, newFleetClientConfig, h.config.Fleet.AccessAPIKey)
+	err := testFleetConfig(ctx, h.log, newFleetClientConfig, h.config.Fleet.AccessAPIKey)
 	if err != nil {
 		return nil, fmt.Errorf("validating fleet client config: %w", err)
 	}
@@ -241,118 +236,113 @@ func emptyCertificateConfig() tlscommon.CertificateConfig {
 	return tlscommon.CertificateConfig{}
 }
 
-func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) (err error) {
+func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) error {
+	partialCfg, err := configuration.NewPartialFromConfigNoDefaults(c)
+	if err != nil {
+		return fmt.Errorf("parsing fleet config: %w", err)
+	}
+
+	// Step 1: Validate policy configuration.
 	var validationErr error
-
-	// validate Fleet connectivity with the new configuration
-	var validatedConfig *remote.Config
-	validatedConfig, err = h.validateFleetServerHosts(ctx, c)
+	validatedFleetConfig, err := h.validateFleetServerHosts(ctx, partialCfg)
 	if err != nil {
-		validationErr = goerrors.Join(validationErr, fmt.Errorf("validating Fleet client config: %w", err))
+		validationErr = goerrors.Join(validationErr, fmt.Errorf("failed to validate Fleet client config: %w", err))
 	}
-
-	// validate agent settings
-
-	// agent logging
-
-	loggingConfig, err := validateLoggingConfig(c)
+	loggingConfig, err := validateLoggingConfig(partialCfg)
 	if err != nil {
-		validationErr = goerrors.Join(validationErr, fmt.Errorf("validating logging config: %w", err))
+		validationErr = goerrors.Join(validationErr, fmt.Errorf("failed to validate logging config: %w", err))
 	}
-
 	if validationErr != nil {
 		return validationErr
 	}
 
-	// apply logging configuration
-	err = h.applyLoggingConfig(ctx, loggingConfig)
-	if err != nil {
-		return fmt.Errorf("applying logging config: %w", err)
-	}
-
-	if validatedConfig != nil {
-		// there's a change in the fleet client settings
-		backupFleetClientCfg := h.config.Fleet.Client
-		// rollback in case of error
-		defer func() {
-			if err != nil {
-				h.config.Fleet.Client = backupFleetClientCfg
-			}
-		}()
-
-		// modify runtime handler config before saving
-		h.config.Fleet.Client = *validatedConfig
-	}
-
+	// Step 2: Parse the incoming policy configuration.
 	cfg, err := configuration.NewFromConfig(c)
 	if err != nil {
-		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
-	}
-	hasEventLoggingOutputChanged := h.hasEventLoggingOutputChanged(cfg)
-	if hasEventLoggingOutputChanged {
-		h.config.Settings.EventLoggingConfig = cfg.Settings.EventLoggingConfig
+		return fmt.Errorf("failed to parse policy configuration: %w", err)
 	}
 
+	policyLogLevel := logger.DefaultLogLevel.String()
+	if loggingConfig != nil {
+		policyLogLevel = loggingConfig.Level.String()
+	}
+
+	// Step 3: Update in-memory caches.
+	if validatedFleetConfig != nil {
+		h.config.Fleet.Client = *validatedFleetConfig
+	}
 	if loggingConfig != nil {
 		h.config.Settings.LoggingConfig.Level = loggingConfig.Level
 	}
+	h.config.Settings.MonitoringConfig.HTTP = cfg.Settings.MonitoringConfig.HTTP
+	h.config.Settings.MonitoringConfig.Pprof = cfg.Settings.MonitoringConfig.Pprof
+	h.agentInfo.SetLogLevelPolicy(policyLogLevel)
 
-	// persist configuration
-	err = saveConfig(h.agentInfo, h.config, h.store, h.log)
-	if err != nil {
-		return fmt.Errorf("saving config: %w", err)
+	// Step 4: Persist the updated configuration to disk.
+	if err := saveConfig(h.agentInfo, h.config, h.store, h.log); err != nil {
+		return fmt.Errorf("failed to persist policy config: %w", err)
 	}
 
-	// apply the new Fleet client configuration to the current clients
-	err = h.applyFleetClientConfig(validatedConfig)
-	if err != nil {
-		return fmt.Errorf("applying FleetClientConfig: %w", err)
+	// Step 5: Apply runtime changes.
+	var runtimeErr error
+	if err := h.applyFleetClientConfig(validatedFleetConfig); err != nil {
+		runtimeErr = goerrors.Join(runtimeErr, fmt.Errorf("failed to apply Fleet client config: %w", err))
 	}
 
-	// If the event logging output has changed, we need to
-	// re-exec the Elastic-Agent to apply the new logging
-	// output.
-	// The new logging configuration has already been persisted
-	// to the disk, the Elastic-Agent will pick it up once it starts.
-	if hasEventLoggingOutputChanged {
-		h.coordinator.ReExec(nil)
+	var logLevelRuntime logp.Level
+	logLevelRuntimeStr := h.agentInfo.GetLogLevelRuntime()
+	if err := logLevelRuntime.Unpack(logLevelRuntimeStr); err != nil {
+		runtimeErr = goerrors.Join(runtimeErr, fmt.Errorf("failed to unpack runtime log level %q: %w", logLevelRuntimeStr, err))
+	} else {
+		h.log.Infof("Policy change done, setting agent log level to %s", logLevelRuntime)
+		if err := h.runtimeLogLevelSetter.SetLogLevel(ctx, &logLevelRuntime); err != nil {
+			runtimeErr = goerrors.Join(runtimeErr, fmt.Errorf("failed to set runtime log level: %w", err))
+		}
+	}
+
+	// If the event logging output has changed, re-exec the agent so it picks up
+	// the newly-persisted logging config on startup.
+	if h.applyEventLoggingOutputChange(partialCfg) {
+		h.runtimeLogLevelSetter.ReExec(nil)
+	}
+
+	if runtimeErr != nil {
+		return runtimeErr
 	}
 
 	return nil
 }
 
-// hasEventLoggingOutputChanged returns true if the output of the event logger has changed
-func (h *PolicyChangeHandler) hasEventLoggingOutputChanged(new *configuration.Configuration) bool {
-	switch {
-	case h.config.Settings.EventLoggingConfig.ToFiles != new.Settings.EventLoggingConfig.ToFiles:
-		return true
-	case h.config.Settings.EventLoggingConfig.ToStderr != new.Settings.EventLoggingConfig.ToStderr:
-		return true
-	default:
+func (h *PolicyChangeHandler) applyEventLoggingOutputChange(new *configuration.Configuration) bool {
+	if new == nil || new.Settings == nil || new.Settings.EventLoggingConfig == nil {
 		return false
 	}
-}
 
-func validateLoggingConfig(cfg *config.Config) (*logger.Config, error) {
+	current := h.config.Settings.EventLoggingConfig
+	incoming := new.Settings.EventLoggingConfig
 
-	parsedConfig, err := configuration.NewPartialFromConfigNoDefaults(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("parsing fleet config: %w", err)
+	if current.ToFiles == incoming.ToFiles && current.ToStderr == incoming.ToStderr {
+		return false
 	}
 
-	if parsedConfig == nil || parsedConfig.Settings == nil || parsedConfig.Settings.LoggingConfig == nil {
+	current.ToFiles = incoming.ToFiles
+	current.ToStderr = incoming.ToStderr
+	return true
+}
+
+func validateLoggingConfig(cfg *configuration.Configuration) (*logger.Config, error) {
+	if cfg == nil || cfg.Settings == nil || cfg.Settings.LoggingConfig == nil {
 		// no logging config, nothing to do
 		return nil, nil
 	}
 
-	loggingConfig := parsedConfig.Settings.LoggingConfig
+	loggingConfig := cfg.Settings.LoggingConfig
 	logLevel := loggingConfig.Level
 	if logLevel < logp.DebugLevel || logLevel > logp.CriticalLevel {
 		return nil, fmt.Errorf("unrecognized log level %d", logLevel)
 	}
 
 	return loggingConfig, nil
-
 }
 
 func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Config) error {
@@ -374,30 +364,17 @@ func (h *PolicyChangeHandler) applyFleetClientConfig(validatedConfig *remote.Con
 	return nil
 }
 
-func (h *PolicyChangeHandler) applyLoggingConfig(ctx context.Context, loggingConfig *logger.Config) error {
-
-	var policyLogLevel *logger.Level
-	if loggingConfig != nil {
-		// we have logging config to set
-		policyLogLevel = &loggingConfig.Level
-	}
-
-	h.log.Infof("Setting fallback log level %v from policy", policyLogLevel)
-	return h.policyLogLevelSetter.SetLogLevel(ctx, policyLogLevel)
-}
-
 func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store, log *logger.Logger) error {
 	if validatedConfig == nil {
 		// nothing to do for fleet hosts
 		return nil
 	}
-	reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), validatedConfig)
+	reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), agentInfo.GetLogLevelOverride(), validatedConfig)
 	if err != nil {
 		return errors.New(
 			err, "fail to persist new Fleet Server API client hosts",
 			errors.TypeUnexpected, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
 	}
-
 	if err := saveConfigToStore(store, reader, log); err != nil {
 		return errors.New(
 			err, "fail to persist new Fleet Server API client hosts",
@@ -454,20 +431,23 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 	return true
 }
 
-func fleetToReader(agentID string, headers map[string]string, cfg *configuration.Configuration) (io.ReadSeeker, error) {
+func fleetToReader(agentID string, headers map[string]string, logLevelOverride string, cfg *configuration.Configuration) (io.ReadSeeker, error) {
+	agentConfig := map[string]interface{}{
+		"id":                           agentID,
+		"headers":                      headers,
+		"logging.level":                cfg.Settings.LoggingConfig.Level,
+		"logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
+		"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
+		"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
+		"monitoring.pprof":             cfg.Settings.MonitoringConfig.Pprof,
+	}
+	if logLevelOverride != "" {
+		agentConfig["logging.level_override"] = logLevelOverride
+	}
 	configToStore := map[string]interface{}{
 		"fleet": cfg.Fleet,
-		"agent": map[string]interface{}{ // Add event logging configuration here!
-			"id":                           agentID,
-			"headers":                      headers,
-			"logging.level":                cfg.Settings.LoggingConfig.Level,
-			"logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
-			"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
-			"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
-			"monitoring.pprof":             cfg.Settings.MonitoringConfig.Pprof,
-		},
+		"agent": agentConfig,
 	}
-
 	data, err := yaml.Marshal(configToStore)
 	if err != nil {
 		return nil, err
@@ -477,19 +457,23 @@ func fleetToReader(agentID string, headers map[string]string, cfg *configuration
 
 type policyChange struct {
 	ctx        context.Context
+	log        *logger.Logger
 	cfg        *config.Config
 	action     fleetapi.Action
 	acker      acker.Acker
 	ackWatcher chan struct{}
+	stateStore stateStore
 	disableAck bool
 }
 
 func newPolicyChange(
 	ctx context.Context,
+	log *logger.Logger,
 	config *config.Config,
 	action fleetapi.Action,
 	acker acker.Acker,
 	makeCh bool,
+	stateStore stateStore,
 	disableAck bool) *policyChange {
 	var ackWatcher chan struct{}
 	if makeCh {
@@ -498,10 +482,12 @@ func newPolicyChange(
 	}
 	return &policyChange{
 		ctx:        ctx,
+		log:        log,
 		cfg:        config,
 		action:     action,
 		acker:      acker,
 		ackWatcher: ackWatcher,
+		stateStore: stateStore,
 		disableAck: disableAck,
 	}
 }
@@ -510,21 +496,40 @@ func (l *policyChange) Config() *config.Config {
 	return l.cfg
 }
 
-// Ack sends an ack for the associated action if the results are expected.
-// An ack will be sent for UNENROLL actions, or by POLICY_CHANGE actions if it has not been explicitly disabled.
+// Ack is the post-apply hook called by the coordinator's ack chain.
+//
+// The work happens in three steps so that the error returned by Ack reflects
+// only Fleet-side ack failures, not local persistence failures (see
+// https://github.com/elastic/elastic-agent/issues/13677):
+//
+//  1. Persist the POLICY_CHANGE action to the state store and broadcast the
+//     policy id and revision to live consumers. Persistence failures are
+//     logged at warn level but do not propagate, so a transient disk hiccup
+//     does not masquerade as a Fleet ack failure.
+//  2. Send the network ack (unless explicitly disabled). A failure here
+//     propagates so the coordinator can retry.
+//  3. Commit the ack batch. Failures propagate.
 func (l *policyChange) Ack() error {
-	if l.disableAck || l.action == nil {
-		return nil
+	if pc, ok := l.action.(*fleetapi.ActionPolicyChange); ok && pc != nil && l.stateStore != nil {
+		l.stateStore.SetAction(pc)
+		if err := l.stateStore.Save(); err != nil && l.log != nil {
+			return fmt.Errorf("failed to perist policy change action to state store: %w", err)
+		}
 	}
-	err := l.acker.Ack(l.ctx, l.action)
-	if err != nil {
-		return err
+
+	if !l.disableAck && l.action != nil {
+		if err := l.acker.Ack(l.ctx, l.action); err != nil {
+			return err
+		}
+		if err := l.acker.Commit(l.ctx); err != nil {
+			return err
+		}
+		if l.ackWatcher != nil {
+			close(l.ackWatcher)
+		}
 	}
-	err = l.acker.Commit(l.ctx)
-	if err == nil && l.ackWatcher != nil {
-		close(l.ackWatcher)
-	}
-	return err
+
+	return nil
 }
 
 // WaitAck waits for policy change to be acked.

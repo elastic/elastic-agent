@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/elastic-agent-libs/redact"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -294,7 +295,7 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		case map[string]any:
 			for rootKey, value := range root {
 				if rootKey == "custom_attr" {
-					if value != "<REDACTED>" {
+					if value != redact.REDACTED {
 						return fmt.Errorf("found non-redacted value in %q", rootKey)
 					}
 				}
@@ -446,21 +447,16 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 			err = f.Prepare(ctx)
 			require.NoError(t, err)
 
-			// Create the data file to ingest
-			inputFile, err := os.CreateTemp(t.TempDir(), "input.txt")
-			require.NoError(t, err, "failed to create temp file to hold data to ingest")
-			t.Cleanup(func() {
-				cErr := inputFile.Close()
-				assert.NoError(t, cErr)
-			})
-			_, err = inputFile.WriteString("hello world\n")
-			require.NoError(t, err, "failed to write data to temp file")
+			// Create the data file to ingest.
+			inputFilePath := filepath.Join(t.TempDir(), "input.txt")
+			err = os.WriteFile(inputFilePath, []byte("hello world\n"), 0o600)
+			require.NoError(t, err, "failed to create input file for ingestion")
 
 			var configBuffer bytes.Buffer
 			require.NoError(t,
 				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
 					"Runtime":   tc.runtime,
-					"InputFile": inputFile.Name(),
+					"InputFile": inputFilePath,
 					"ESHost":    esURL.Host,
 				}))
 			expDiagFiles := append([]string{}, diagnosticsFiles...)
@@ -520,20 +516,15 @@ agent.internal.runtime.filebeat.filestream: otel
 	f, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
 	require.NoError(t, err)
 
-	// Create the data file to ingest
-	inputFile, err := os.CreateTemp(t.TempDir(), "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	t.Cleanup(func() {
-		cErr := inputFile.Close()
-		assert.NoError(t, cErr)
-	})
-	_, err = inputFile.WriteString("hello world\n")
-	require.NoError(t, err, "failed to write data to temp file")
+	// Create the data file to ingest.
+	inputFilePath := filepath.Join(t.TempDir(), "input.txt")
+	err = os.WriteFile(inputFilePath, []byte("hello world\n"), 0o600)
+	require.NoError(t, err, "failed to create input file for ingestion")
 
 	var configBuffer bytes.Buffer
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
-			"InputFile": inputFile.Name(),
+			"InputFile": inputFilePath,
 		}))
 	err = f.Prepare(ctx)
 	require.NoError(t, err)

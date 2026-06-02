@@ -13,12 +13,12 @@ kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: fix profiling agent daemonset for K8s versions v1.33+
+summary: Read TLS config from environment variables in container mode
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-# description:
+description: TLS certificate paths will now always be read from ELASTIC_AGENT_CERT and ELASTIC_AGENT_CERT_KEY in container mode rather than reading from potentially stale fleet.enc values.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:

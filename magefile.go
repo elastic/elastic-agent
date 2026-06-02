@@ -257,10 +257,7 @@ func (Build) GenerateConfig() error {
 func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch string) error {
 	fmt.Printf("--- Compiling root binary for %s windows archive\n", goarch)
 	cfg := devtools.SettingsFromContext(ctx)
-	hashShort, err := cfg.Build.CommitHashShort()
-	if err != nil {
-		return fmt.Errorf("error getting commit hash: %w", err)
-	}
+	hashShort := cfg.AgentCoreCommitHashShort()
 
 	outputName := "elastic-agent-archive-root"
 	if runtime.GOOS != "windows" {
@@ -611,6 +608,10 @@ func Package(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
+
 	if len(cfg.GetPlatforms()) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
 	}
@@ -632,7 +633,7 @@ func Package(ctx context.Context) error {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 	// only take the snapshot and version from the manifest, we don't want the commit hash or dependency version
-	cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithBeatVersion(cfgWithManifest.BeatVersion())
+	cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithAgentCoreVersion(cfgWithManifest.AgentCoreVersion())
 
 	if cfg.Packaging.ManifestURL != "" {
 		// don't download the elastic-agent-core components; built above
@@ -1084,11 +1085,10 @@ func Clean(ctx context.Context) error {
 }
 
 func dockerCommitHash(cfg *devtools.Settings) string {
-	commit, err := cfg.Build.CommitHash()
-	if err == nil && len(commit) > commitLen {
+	commit := cfg.Build.CommitHash()
+	if len(commit) > commitLen {
 		return commit[:commitLen]
 	}
-
 	return ""
 }
 
@@ -1165,14 +1165,12 @@ func packageAgent(ctx context.Context, cfg *mage.Settings, pkgSpecs []mage.OSPac
 	fmt.Println("--- Package elastic-agent")
 
 	if dependenciesVersion == "" {
-		// Get beat version - first check BEAT_VERSION env var, then fall back to default
-		beatVersion := cfg.BeatQualifiedVersion()
-		if beatVersion == "" {
+		agentCoreVersion := cfg.AgentQualifiedCoreVersion()
+		if agentCoreVersion == "" {
 			dependenciesVersion = bversion.GetDefaultVersion()
 		} else {
-			dependenciesVersion = beatVersion
+			dependenciesVersion = agentCoreVersion
 		}
-		// add the snapshot suffix if needed
 		dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
 	}
 	log.Printf("Packaging with dependenciesVersion: %s", dependenciesVersion)
@@ -1501,6 +1499,10 @@ func PackageUsingDRA(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	if len(cfg.GetPackageTypes()) == 0 {
+		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
@@ -2013,7 +2015,7 @@ func saveIronbank(cfg *devtools.Settings) error {
 }
 
 func getIronbankContextName(cfg *devtools.Settings) string {
-	ver := cfg.BeatQualifiedVersion()
+	ver := cfg.AgentPackageVersion()
 	defaultBinaryName := "{{.Name}}-ironbank-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}"
 	outputDir, _ := devtools.Expand(cfg, defaultBinaryName+"-docker-build-context", map[string]interface{}{
 		"Name":    "elastic-agent",
@@ -2058,7 +2060,7 @@ func prepareIronbankBuild(cfg *devtools.Settings) error {
 }
 
 func majorMinor(cfg *devtools.Settings) string {
-	if v := cfg.BeatQualifiedVersion(); v != "" {
+	if v := cfg.AgentPackageVersion(); v != "" {
 		parts := strings.SplitN(v, ".", 3)
 		return parts[0] + "." + parts[1]
 	}
@@ -2821,7 +2823,7 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
-	cfg := devtools.SettingsFromContext(ctx)
+	cfg := devtools.SettingsFromContextWithOptions(ctx, devtools.LoadOptions{SkipVCS: true})
 	mg.Deps(Build.TestFakeComponent)
 	version := cfg.IntegrationTest.AgentVersion
 	if version == "" {
@@ -3017,7 +3019,7 @@ func getTestRunnerVersions(cfg *devtools.Settings) (string, string, error) {
 	agentStackVersion := cfg.IntegrationTest.AgentStackVersion
 	agentVersion := cfg.IntegrationTest.AgentVersion
 	if agentVersion == "" {
-		agentVersion = cfg.BeatVersion()
+		agentVersion = cfg.AgentPackageVersion()
 		if agentStackVersion == "" {
 			// always use snapshot for stack version
 			agentStackVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
@@ -3762,6 +3764,24 @@ func (Otel) PrepareBeats() error {
 		}
 	}
 
+	// If the CI checkout used a pre-baked git mirror (BUILDKITE_GIT_MIRRORS_PATH /opt/git-mirrors),
+	// git sets up the submodule with an alternates reference so objects are stored in the mirror,
+	// not locally. The beats crossbuild mage target launches Docker mounting only the beats directory,
+	// so the mirror path is not accessible inside the container and git commands fail with exit 128.
+	// Repack all reachable objects into a local pack file and remove the alternates entry so the
+	// copied .git directory is fully self-sufficient when mounted into Docker.
+	alternatesPath := filepath.Join(beatsGitPath, "objects", "info", "alternates")
+	if _, err := os.Stat(alternatesPath); err == nil {
+		fmt.Println(">> Repacking beats git objects to remove git-mirror alternates dependency")
+		if err := sh.Run("git", "-C", "beats", "repack", "-a", "-d"); err != nil {
+			return fmt.Errorf("failed to repack beats git objects: %w", err)
+		}
+		if err := os.Remove(alternatesPath); err != nil {
+			return fmt.Errorf("failed to remove beats git alternates file: %w", err)
+		}
+		fmt.Println(">> Beats git objects are now self-sufficient (alternates removed)")
+	}
+
 	fmt.Println(">> Successfully converted beats/.git to a directory")
 	return nil
 }
@@ -4212,9 +4232,9 @@ func (h Helm) Package(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
-	agentCoreVersion := cfg.BeatVersion()
-	agentImageTag := agentCoreVersion
-	agentChartVersion := agentCoreVersion
+	agentPackageVersion := cfg.AgentPackageVersion()
+	agentImageTag := agentPackageVersion
+	agentChartVersion := agentPackageVersion
 	if !productionPackage {
 		// always use the SNAPSHOT version for image tag if not a production package
 		agentImageTag = agentImageTag + mage.SnapshotSuffix
@@ -4227,14 +4247,14 @@ func (h Helm) Package(ctx context.Context) error {
 	}{
 		// values file for elastic-agent Helm Chart
 		filepath.Join(helmChartPath, "values.yaml"): {
-			{"agent.version", agentCoreVersion},
+			{"agent.version", agentPackageVersion},
 			// always use the SNAPSHOT version for image tag
 			// for the chart that resides in the git repo
 			{"agent.image.tag", agentImageTag},
 		},
 		// Chart.yaml for elastic-agent Helm Chart
 		filepath.Join(helmChartPath, "Chart.yaml"): {
-			{"appVersion", agentCoreVersion},
+			{"appVersion", agentPackageVersion},
 			{"version", agentChartVersion},
 		},
 	} {

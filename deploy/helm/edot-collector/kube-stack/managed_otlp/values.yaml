@@ -17,7 +17,7 @@ crds:
 defaultCRConfig:
   image:
     repository: "docker.elastic.co/elastic-agent/elastic-agent"
-    tag: "9.3.5"
+    tag: "9.3.6"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
     # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
@@ -41,14 +41,14 @@ collectors:
     fullnameOverride: "opentelemetry-kube-stack-cluster-stats"
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: "true"
+        value: '"true"'
     config:
       exporters:
         # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
         debug:
           verbosity: basic # Options: basic, detailed. Choose verbosity level for debug logs.
           # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
-        otlp/gateway:
+        otlp_grpc/gateway:
           endpoint: "http://opentelemetry-kube-stack-gateway-collector:4317"
           tls:
             insecure: true
@@ -83,7 +83,7 @@ collectors:
               from_attribute: k8s.node.name
               action: upsert
         # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
-        k8sattributes:
+        k8s_attributes:
           passthrough: false # Annotates resources with the pod IP and does not try to extract any other metadata.
           pod_association:
             # Below association takes a look at the k8s.pod.ip and k8s.pod.uid resource attributes or connection's context, and tries to match it with the pod having the same attribute.
@@ -153,9 +153,9 @@ collectors:
           metrics:
             exporters:
               - debug
-              - otlp/gateway
+              - otlp_grpc/gateway
             processors:
-              - k8sattributes
+              - k8s_attributes
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
@@ -173,7 +173,7 @@ collectors:
               - resource/hostname
             exporters:
               - debug
-              - otlp/gateway
+              - otlp_grpc/gateway
   #  Daemon is a K8s daemonset EDOT collector focused on gathering telemetry at
   #  node level and exposing an OTLP endpoint for data ingestion.
   #  Auto-instrumentation SDKs will use this endpoint.
@@ -181,7 +181,7 @@ collectors:
     fullnameOverride: "opentelemetry-kube-stack-daemon"
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: "true"
+        value: '"true"'
     presets:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
@@ -200,7 +200,7 @@ collectors:
         # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
         debug:
           verbosity: basic
-        otlp/gateway:
+        otlp_grpc/gateway:
           endpoint: "http://opentelemetry-kube-stack-gateway-collector-headless:4317"
           tls:
             insecure: true
@@ -284,7 +284,7 @@ collectors:
               from_attribute: host.id
               action: insert
         # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
-        k8sattributes:
+        k8s_attributes:
           filter:
             # Only retrieve pods running on the same node as the collector
             node_from_env_var: OTEL_K8S_NODE_NAME
@@ -326,7 +326,7 @@ collectors:
             http:
               endpoint: 0.0.0.0:4318
         # [File Log Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver)
-        filelog:
+        file_log:
           retry_on_failure:
             enabled: true
           start_at: end
@@ -454,10 +454,10 @@ collectors:
           traces: null
           logs/node:
             receivers:
-              - filelog
+              - file_log
             processors:
               - batch
-              - k8sattributes
+              - k8s_attributes
               - resourcedetection/system
               - resourcedetection/eks
               - resourcedetection/gcp
@@ -465,14 +465,14 @@ collectors:
               - resource/hostname
               - resource/cloud
             exporters:
-              - otlp/gateway
+              - otlp_grpc/gateway
           metrics/node/otel:
             receivers:
               - kubeletstats
               - hostmetrics
             processors:
               - batch/metrics
-              - k8sattributes
+              - k8s_attributes
               - resourcedetection/system
               - resourcedetection/eks
               - resourcedetection/gcp
@@ -481,7 +481,7 @@ collectors:
               - resource/cloud
             exporters:
               # - debug
-              - otlp/gateway
+              - otlp_grpc/gateway
           metrics/otel-apm:
             receivers:
               - otlp
@@ -489,7 +489,7 @@ collectors:
               - batch/metrics
               - resource/hostname
             exporters:
-              - otlp/gateway
+              - otlp_grpc/gateway
           logs/apm:
             receivers:
               - otlp
@@ -497,7 +497,7 @@ collectors:
               - batch
               - resource/hostname
             exporters:
-              - otlp/gateway
+              - otlp_grpc/gateway
           traces/apm:
             receivers:
               - otlp
@@ -505,7 +505,7 @@ collectors:
               - batch
               - resource/hostname
             exporters:
-              - otlp/gateway
+              - otlp_grpc/gateway
   #  Gateway is a K8s deployment EDOT collector focused on processing and
   #  forwarding telemetry to an Elasticsearch endpoint.
   gateway:
@@ -527,7 +527,7 @@ collectors:
     enabled: true
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: "true"
+        value: '"true"'
       - name: ELASTIC_OTLP_ENDPOINT
         valueFrom:
           secretKeyRef:
@@ -549,7 +549,7 @@ collectors:
       processors: {}
       exporters:
         debug:
-        otlp/ingest_logs:
+        otlp_grpc/ingest_logs:
           endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
           headers:
             Authorization: ApiKey ${env:ELASTIC_API_KEY}
@@ -563,7 +563,7 @@ collectors:
               min_size: 1_000_000 # 1MB uncompressed
               max_size: 4_000_000 # 4MB uncompressed
           timeout: 15s
-        otlp/ingest_metrics_traces:
+        otlp_grpc/ingest_metrics_traces:
           endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
           headers:
             Authorization: ApiKey ${env:ELASTIC_API_KEY}
@@ -582,15 +582,15 @@ collectors:
           metrics:
             receivers: [otlp]
             processors: []
-            exporters: [debug, otlp/ingest_metrics_traces]
+            exporters: [debug, otlp_grpc/ingest_metrics_traces]
           logs:
             receivers: [otlp]
             processors: []
-            exporters: [debug, otlp/ingest_logs]
+            exporters: [debug, otlp_grpc/ingest_logs]
           traces:
             receivers: [otlp]
             processors: []
-            exporters: [debug, otlp/ingest_metrics_traces]
+            exporters: [debug, otlp_grpc/ingest_metrics_traces]
 # For more details on OpenTelemetry's zero-code instrumentation, see:
 # https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
 instrumentation:

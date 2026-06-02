@@ -83,13 +83,13 @@ func DefaultBuildArgs(cfg *Settings) BuildArgs {
 		CGO:  build.Default.CgoEnabled,
 		Env:  map[string]string{},
 		Vars: map[string]string{
-			elasticAgentModulePath + "/version.buildTime": "{{ date }}",
-			elasticAgentModulePath + "/version.commit":    "{{ commit }}",
+			elasticAgentModulePath + "/version.buildTime": cfg.BuildDateString(),
+			elasticAgentModulePath + "/version.commit":    cfg.Build.CommitHash(),
 		},
 		WinMetadata: true,
 	}
 	if cfg.Build.VersionQualified {
-		args.Vars[elasticAgentModulePath+"/version.qualifier"] = "{{ .Qualifier }}"
+		args.Vars[elasticAgentModulePath+"/version.qualifier"] = cfg.Build.VersionQualifier
 	}
 
 	if positionIndependentCodeSupported(cfg) {
@@ -299,12 +299,9 @@ func Run(ctx context.Context, env map[string]string, stdout, stderr io.Writer, c
 // allows users to view metadata about the exe in the Details tab of the file
 // properties viewer.
 func MakeWindowsSysoFile(cfg *Settings) (string, error) {
-	version := cfg.BeatQualifiedVersion()
+	version := cfg.AgentQualifiedCoreVersion()
 
-	commit, err := cfg.Build.CommitHash()
-	if err != nil {
-		return "", err
-	}
+	commit := cfg.Build.CommitHash()
 
 	major, minor, patch, err := ParseVersion(version)
 	if err != nil {
