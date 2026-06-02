@@ -448,7 +448,9 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 			require.NoError(t, err)
 
 			// Create the data file to ingest.
-			inputFilePath := filepath.Join(t.TempDir(), "input.txt")
+			// Use createTempDir instead of t.TempDir here to avoid cleanup problems on Windows.
+			tmpDir := createTempDir(t)
+			inputFilePath := filepath.Join(tmpDir, "input.txt")
 			err = os.WriteFile(inputFilePath, []byte("hello world\n"), 0o600)
 			require.NoError(t, err, "failed to create input file for ingestion")
 
