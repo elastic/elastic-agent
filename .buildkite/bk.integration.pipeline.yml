@@ -143,7 +143,7 @@ common:
     command: &k8s_test_command |
       buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
-    command: &k8s_test_command_with_sleep |
+    command_retry: &k8s_test_command_with_sleep |
       MIN=0
       MAX=9
       # echo let's avoid running multiple requests at the same time to avoid overwhelming the cluster and causing deployment issues
@@ -341,7 +341,9 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 2)"
-    if: build.pull_request.id != null
+    # NOTE: scheduler should run only tier 3 tests.
+    #       PRs or release branches should run tier 2 if there are relevant changes.
+    if: !(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")
     if_changed:
       include:
         - .buildkite/**
@@ -647,7 +649,9 @@ steps:
             variant: *linux_deb_variants
 
   - group: "Stateful: Linux (tier 2)"
-    if: build.pull_request.id != null
+    # NOTE: scheduler should run only tier 3 tests.
+    #       PRs or release branches should run tier 2 if there are relevant changes.
+    if: !(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")
     if_changed:
       include:
         - .buildkite/**
@@ -948,7 +952,9 @@ steps:
 
   - group: ":kubernetes: Kubernetes (tier 2)"
     key: integration-tests-kubernetes-tier-2
-    if: build.pull_request.id != null
+    # NOTE: scheduler should run only tier 3 tests.
+    #       PRs or release branches should run tier 2 if there are relevant changes.
+    if: !(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")
     if_changed:
       include:
         - .buildkite/**
