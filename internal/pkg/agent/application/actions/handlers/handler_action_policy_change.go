@@ -121,9 +121,11 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 	// in the dispatcher goroutine, keeps the state store consistent with fleet.enc
 	// before exit. Ack() will write the same action again, but duplicate IDs are
 	// safely deduplicated.
-	h.stateStore.SetAction(action)
-	if err := h.stateStore.Save(); err != nil {
-		h.log.Warnf("failed to persist policy action to state store: %v", err)
+	if h.stateStore != nil {
+		h.stateStore.SetAction(action)
+		if err := h.stateStore.Save(); err != nil {
+			h.log.Warnf("failed to persist policy action to state store: %v", err)
+		}
 	}
 
 	h.ch <- newPolicyChange(ctx, h.log, c, a, acker, false, h.stateStore, h.disableAckFn())
@@ -524,13 +526,6 @@ func (l *policyChange) Config() *config.Config {
 //     propagates so the coordinator can retry.
 //  3. Commit the ack batch. Failures propagate.
 func (l *policyChange) Ack() error {
-	if pc, ok := l.action.(*fleetapi.ActionPolicyChange); ok && pc != nil && l.stateStore != nil {
-		l.stateStore.SetAction(pc)
-		if err := l.stateStore.Save(); err != nil && l.log != nil {
-			return fmt.Errorf("failed to perist policy change action to state store: %w", err)
-		}
-	}
-
 	if !l.disableAck && l.action != nil {
 		if err := l.acker.Ack(l.ctx, l.action); err != nil {
 			return err
