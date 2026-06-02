@@ -166,41 +166,43 @@ func NewEnrollParams(ctx context.Context, client *kibana.Client) (*EnrollParams,
 type OutputPreset string
 
 const (
+	// DefaultFleetOutputID is the well-known ID of the default Fleet Elasticsearch
+	// output, as defined in the Kibana Fleet plugin source:
+	// x-pack/platform/plugins/shared/fleet/common/constants/output.ts
+	DefaultFleetOutputID = "fleet-default-output"
+
+	// OutputPresetLatency lowers the output flush timeout from the default 10s to 1s. Prefer it in all tests.
+	OutputPresetLatency    OutputPreset = "latency"
 	OutputPresetBalanced   OutputPreset = "balanced"
 	OutputPresetCustom     OutputPreset = "custom"
 	OutputPresetThroughput OutputPreset = "throughput"
 	OutputPresetScale      OutputPreset = "scale"
-	// OutputPresetLatency lowers the output flush timeout from the default 10s to 1s. Prefer it in all tests.
-	OutputPresetLatency OutputPreset = "latency"
 )
 
-// UpdateESOutputPreset updates the Fleet Elasticsearch output used by policy to
-// the given preset. Use OutputPresetLatency to lower the output flush interval
-// from 10s to 1s, which speeds up tests that poll Elasticsearch for ingested
-// data. When policy has no explicit data output ID set, DefaultFleetOutputID is
-// used.
-func UpdateESOutputPreset(ctx context.Context, client *kibana.Client, policy kibana.PolicyResponse, preset OutputPreset) error {
-	outputID := policy.DataOutputID
-	if outputID == "" {
-		// DefaultFleetOutputID is the well-known ID of the default Fleet Elasticsearch
-		// output, as defined in the Kibana Fleet plugin source code.
-		outputID = "fleet-default-output"
-	}
-
+// UpdateESOutputPreset updates the Fleet Elasticsearch output with the given ID
+// to use the given preset. Use DefaultFleetOutputID to target the default output
+// and OutputPresetLatency to lower the flush interval from 10s to 1s, which
+// speeds up tests that poll Elasticsearch for ingested data.
+//
+// Call this before enrolling the agent so that the preset is in effect from the
+// agent's first check-in, avoiding an extra policy revision bump mid-test.
+func UpdateESOutputPreset(ctx context.Context, client *kibana.Client, outputID string, preset OutputPreset) error {
 	updateBytes, err := json.Marshal(map[string]any{"preset": preset})
 	if err != nil {
 		return fmt.Errorf("marshaling Fleet output update: %w", err)
 	}
 
-	apiURL := "/api/fleet/outputs/" + outputID
-	putResp, err := client.SendWithContext(ctx, http.MethodPut, apiURL, nil, nil, bytes.NewReader(updateBytes))
+	url := "/api/fleet/outputs/" + outputID
+	resp, err := client.SendWithContext(ctx, http.MethodPut, url, nil, nil, bytes.NewReader(updateBytes))
 	if err != nil {
 		return fmt.Errorf("updating Fleet output %s: %w", outputID, err)
 	}
-	defer putResp.Body.Close()
-	if putResp.StatusCode != http.StatusOK {
-		putBody, _ := io.ReadAll(putResp.Body)
-		return fmt.Errorf("updating Fleet output %s returned status %d: %s", outputID, putResp.StatusCode, putBody)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("updating Fleet output %s returned status %d: %s", outputID, resp.StatusCode, body)
 	}
+
 	return nil
 }

@@ -89,9 +89,9 @@ func TestFQDN(t *testing.T) {
 		NonInteractive: true,
 		Force:          true,
 	}
+	require.NoError(t, fleettools.UpdateESOutputPreset(ctx, kibClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
 	policy, agentID, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
-	require.NoError(t, fleettools.UpdateESOutputPreset(ctx, kibClient, policy, fleettools.OutputPresetLatency))
 
 	t.Cleanup(func() {
 		// Use a separate context as the one in the test body will have been cancelled at this point.

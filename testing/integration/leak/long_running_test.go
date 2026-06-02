@@ -116,9 +116,9 @@ func (runner *ExtendedRunner) SetupSuite() {
 		},
 	}
 
+	require.NoError(runner.T(), fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
 	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
-	require.NoError(runner.T(), fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, policyResp, fleettools.OutputPresetLatency))
 
 	_, err = tools.InstallPackageFromDefaultFile(
 		ctx,
