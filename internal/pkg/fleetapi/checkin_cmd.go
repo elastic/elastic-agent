@@ -14,10 +14,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
 const checkingPath = "/api/fleet/agents/%s/checkin"
@@ -55,7 +55,7 @@ type CheckinUpgrade struct {
 type CheckinRequest struct {
 	Status            string             `json:"status"`
 	AckToken          string             `json:"ack_token,omitempty"`
-	Metadata          *info.ECSMeta      `json:"local_metadata,omitempty"`
+	Metadata          *ecsmeta.ECSMeta   `json:"local_metadata,omitempty"`
 	Message           string             `json:"message"`    // V2 Agent message
 	Components        []CheckinComponent `json:"components"` // V2 Agent components
 	UpgradeDetails    *details.Details   `json:"upgrade_details,omitempty"`

@@ -122,10 +122,10 @@ components:
     projectName: connectors
     packageName: connectors-{{.Version}}.zip
     # FIXME: connectors use only <major>.<minor>.<patch> in the root directory name so the definition should be something
-    # using the beat_version or similar
+    # using the agent_package_version or similar
     # We don't support that yet, so we are defining a rootDir that will error out if rendered. This is not a problem since
     # we don't extract/manipulate the archive during packaging, it has its own special handling in the 'service' docker image
-    rootDir: connectors-{{beat_version}}
+    rootDir: connectors-{{ agent_package_version }}
     binaryName: connectors
     fips: false
     platforms:
@@ -299,44 +299,44 @@ shared:
       /lib/systemd/system/{{.BeatServiceName}}.service:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl'
         mode: 0644
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
         mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/package.version:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/package.version:
         content: >
           {{ agent_package_version }}
         mode: 0644
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components:
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/elastic-otel-collector:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/elastic-otel-collector:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
         mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/elastic-otel-collector.spec.yml:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/elastic-otel-collector.spec.yml:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
         mode: 0644
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/endpoint-security-resources.zip:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/endpoint-security-resources.zip:
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/endpoint-security-resources.zip'
         mode: 0644
         skip_on_missing: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/module:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/module:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
         preserve_mode: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/certs/certs.pem:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/certs/certs.pem:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/certs/certs.pem'
         mode: 0640
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/lenses:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/lenses:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/lenses'
         preserve_mode: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/osqueryd:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/osqueryd:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osqueryd'
         mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/osquery-extension.ext:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/osquery-extension.ext:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
         mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/manifest.yaml:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/manifest.yaml:
         mode: 0644
         content: >
           {{ manifest .fips }}
@@ -646,12 +646,11 @@ shared:
   - &docker_ubi_spec
     docker_variant: 'basic'
     extra_vars:
-      from: '--platform=linux/amd64 redhat/ubi9-minimal'
+      from: '--platform=linux/amd64 redhat/ubi10-minimal'
   - &docker_ubi_arm_spec
     docker_variant: 'basic'
     extra_vars:
-      from: '--platform=linux/arm64 redhat/ubi9-minimal'
-
+      from: '--platform=linux/arm64 redhat/ubi10-minimal'
   - &docker_wolfi_spec
     docker_variant: 'wolfi'
     extra_vars:
@@ -774,8 +773,11 @@ shared:
     extra_tags:
       - 'git-{{ substring core_commit 0 12 }}'
     files:
-      'data/service/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip':
-        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip'
+      # Use the core version because the package version can contain build metadata for Independent Agent Releases
+      # IAR typically use non-IAR components, so we should use the version without build metadata here.
+      # TODO: Clarify what these versions should actually use and whether it matters at all.
+      'data/service/connectors-{{ agent_core_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip':
+        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/connectors-{{ agent_core_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip'
         mode: 0755
       'data/{{.BeatName}}-{{ core_commit_short }}/components/connectors':
         source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/connectors.sh'
@@ -1290,7 +1292,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
-        version: '{{ beat_version }}'
+        version: '{{ agent_core_version }}'
         # this is a way to place 'core' in the correct place for both the archive and the root dir, see defaultRootDir in dev-tools/mage/pkgtypes.go
         qualifier: core
         files:
@@ -1309,7 +1311,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
-        version: '{{ beat_version }}'
+        version: '{{ agent_core_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -1326,7 +1328,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
-        version: '{{ beat_version }}'
+        version: '{{ agent_core_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -1343,7 +1345,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
-        version: '{{ beat_version }}'
+        version: '{{ agent_core_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -1362,7 +1364,7 @@ specs:
         <<: *common_fips
         <<: *elastic_license_for_binaries
         name: '{{.BeatName}}'
-        version: '{{ beat_version }}'
+        version: '{{ agent_core_version }}'
         qualifier: 'core-fips'
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -1376,7 +1378,7 @@ specs:
         <<: *common_fips
         <<: *elastic_license_for_binaries
         name: '{{.BeatName}}'
-        version: '{{ beat_version }}'
+        version: '{{ agent_core_version }}'
         qualifier: core-fips
         files:
           '{{.BeatName}}{{.BinaryExt}}':
