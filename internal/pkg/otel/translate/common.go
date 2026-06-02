@@ -150,6 +150,13 @@ func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any
 		return nil, nil
 	}
 
+	// Certificate hot-reload was introduced after this branch was cut. Disable it
+	// by default so it does not land silently in a patch release. Operators who
+	// want it can set ssl.certificate_reload.enabled: true in their config.
+	if tlsConfig.CertificateReload.Enabled == nil {
+		tlsConfig.CertificateReload.Enabled = new(false)
+	}
+
 	// validate the beats config before proceeding
 	if err := tlsConfig.Validate(); err != nil {
 		return nil, err
