@@ -6,6 +6,7 @@ package fleet
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -25,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/scheduler"
 )
 
@@ -171,8 +173,11 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 				continue
 			}
 
-			actions := make([]fleetapi.Action, len(resp.Actions))
-			copy(actions, resp.Actions)
+			var actions fleetapi.Actions
+			if err := json.Unmarshal(resp.Actions, &actions); err != nil {
+				f.log.Errorf("failed to unmarshal checkin actions: %v", err)
+				continue
+			}
 			if len(actions) > 0 {
 				f.actionCh <- actions
 			}
@@ -185,7 +190,7 @@ func (f *FleetGateway) Errors() <-chan error {
 	return f.errCh
 }
 
-func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*fleetapi.CheckinResponse, error) {
+func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*pkgfleetapi.CheckinResponse, error) {
 	bo.Reset()
 
 	// Guard if the context is stopped by a out of bound call,
@@ -250,7 +255,7 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	return nil, ctx.Err()
 }
 
-func convertToCheckinComponents(logger *logp.Logger, components []runtime.ComponentComponentState, collector *status.AggregateStatus) []fleetapi.CheckinComponent {
+func convertToCheckinComponents(logger *logp.Logger, components []runtime.ComponentComponentState, collector *status.AggregateStatus) []pkgfleetapi.CheckinComponent {
 	if components == nil && (collector == nil || len(collector.ComponentStatusMap) == 0) {
 		return nil
 	}
@@ -287,13 +292,13 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 	if collector != nil {
 		size += len(collector.ComponentStatusMap)
 	}
-	checkinComponents := make([]fleetapi.CheckinComponent, 0, size)
+	checkinComponents := make([]pkgfleetapi.CheckinComponent, 0, size)
 
 	for _, item := range components {
 		component := item.Component
 		state := item.State
 
-		checkinComponent := fleetapi.CheckinComponent{
+		checkinComponent := pkgfleetapi.CheckinComponent{
 			ID:      component.ID,
 			Type:    component.Type(),
 			Status:  stateString(state.State),
@@ -301,10 +306,10 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 		}
 
 		if state.Units != nil {
-			units := make([]fleetapi.CheckinUnit, 0, len(state.Units))
+			units := make([]pkgfleetapi.CheckinUnit, 0, len(state.Units))
 
 			for unitKey, unitState := range state.Units {
-				units = append(units, fleetapi.CheckinUnit{
+				units = append(units, pkgfleetapi.CheckinUnit{
 					ID:      unitKey.UnitID,
 					Type:    unitTypeString(unitKey.UnitType),
 					Status:  stateString(unitState.State),
@@ -323,7 +328,7 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 		for id, item := range collector.ComponentStatusMap {
 			state, msg := translate.StateWithMessage(item)
 
-			checkinComponent := fleetapi.CheckinComponent{
+			checkinComponent := pkgfleetapi.CheckinComponent{
 				ID:      id,
 				Type:    "otel",
 				Status:  stateString(state),
@@ -331,10 +336,10 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 			}
 
 			if len(item.ComponentStatusMap) > 0 {
-				units := make([]fleetapi.CheckinUnit, 0, len(item.ComponentStatusMap))
+				units := make([]pkgfleetapi.CheckinUnit, 0, len(item.ComponentStatusMap))
 				for unitId, unitItem := range item.ComponentStatusMap {
 					unitState, unitMsg := translate.StateWithMessage(unitItem)
-					units = append(units, fleetapi.CheckinUnit{
+					units = append(units, pkgfleetapi.CheckinUnit{
 						ID:      unitId,
 						Status:  stateString(unitState),
 						Message: unitMsg,
@@ -351,7 +356,7 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 	return checkinComponents
 }
 
-func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
+func (f *FleetGateway) execute(ctx context.Context) (*pkgfleetapi.CheckinResponse, time.Duration, error) {
 	ecsMeta, err := info.Metadata(ctx, f.log)
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
@@ -375,8 +380,8 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	ecsMeta.Elastic.Agent.LogLevel = state.LogLevel.String()
 
 	// checkin
-	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
-	req := &fleetapi.CheckinRequest{
+	cmd := pkgfleetapi.NewCheckinCmd(f.agentInfo, f.client)
+	req := &pkgfleetapi.CheckinRequest{
 		AckToken:       ackToken,
 		Metadata:       ecsMeta,
 		Status:         agentStateToString(state.State),
@@ -391,7 +396,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		if f.shouldUseLongSched() {
 			f.log.Warnf("retrieved an invalid api key error '%d' times. will use long scheduler", f.unauthCounter)
 			f.scheduler.SetDuration(defaultGatewaySettings.ErrConsecutiveUnauthDuration)
-			return &fleetapi.CheckinResponse{}, took, nil
+			return &pkgfleetapi.CheckinResponse{}, took, nil
 		}
 
 		return nil, took, err
@@ -422,7 +427,7 @@ func (f *FleetGateway) shouldUseLongSched() bool {
 }
 
 func isUnauth(err error) bool {
-	return errors.Is(err, client.ErrInvalidAPIKey)
+	return errors.Is(err, pkgfleetapi.ErrInvalidAPIKey)
 }
 
 func (f *FleetGateway) SetClient(c client.Sender) {
