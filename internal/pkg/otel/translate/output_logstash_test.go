@@ -91,6 +91,7 @@ ssl.curve_types: "P-256"
 					"ca_sha256":                  []any{},
 					"supported_protocols":        []any{uint64(772)},
 					"certificate_authorities":    []any{"/not/a/real/path/ca.pem"},
+					"certificate_reload":         map[string]any{"enabled": false, "reload_interval": "0s"},
 					"renegotiation":              int64(0),
 					"cipher_suites":              []any{},
 					"disable_legacy_pem_support": false,

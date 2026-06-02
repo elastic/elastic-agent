@@ -806,6 +806,13 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 		return nil, err
 	}
 
+	// Certificate hot-reload was introduced after this branch was cut. Disable it
+	// by default so it does not land silently in a patch release. Operators who
+	// want it can set ssl.certificate_reload.enabled: true in their config.
+	if authSettings.Transport.TLS != nil && authSettings.Transport.TLS.CertificateReload.Enabled == nil {
+		authSettings.Transport.TLS.CertificateReload.Enabled = new(false)
+	}
+
 	newConfig, err := config.NewConfigFrom(authSettings)
 	if err != nil {
 		return nil, err
