@@ -153,6 +153,11 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		}
 	}
 
+	// Notify Fleet of the uninstall before removing the top path, at this point the service is stopped and won't run anymore.
+	// Doing this after RemovePath has been linked to some difficult to diagnose runtime panics on Windows, where the implementation
+	// of RemovePath is more complex. See https://github.com/elastic/elastic-agent/issues/14142 and https://github.com/elastic/elastic-agent/issues/8428.
+	notifyFleetIfNeeded(ctx, log, pt, cfg, agentID, notifyFleet, localFleet, skipFleetAudit, notifyFleetAuditUninstall)
+
 	// remove existing directory
 	pt.Describe("Removing install directory")
 	err = RemovePath(log, topPath)
@@ -165,7 +170,6 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	}
 	pt.Describe("Removed install directory")
 
-	notifyFleetIfNeeded(ctx, log, pt, cfg, agentID, notifyFleet, localFleet, skipFleetAudit, notifyFleetAuditUninstall)
 	return nil
 }
 

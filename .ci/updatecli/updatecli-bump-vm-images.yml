@@ -62,7 +62,6 @@ targets:
         - .buildkite/integration.pipeline.yml
         - .buildkite/pipeline.elastic-agent-binary-dra.yml
         - .buildkite/pipeline.elastic-agent-package.yml
-        - .buildkite/k8s-testing-pipeline.yml
       matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-([0-9]+)"'
       replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
 
