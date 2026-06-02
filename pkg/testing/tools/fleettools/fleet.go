@@ -174,11 +174,17 @@ const (
 	OutputPresetLatency OutputPreset = "latency"
 )
 
-// UpdateESOutputPreset updates the performance preset for the Elasticsearch output in the given policy.
+// UpdateESOutputPreset updates the Fleet Elasticsearch output used by policy to
+// the given preset. Use OutputPresetLatency to lower the output flush interval
+// from 10s to 1s, which speeds up tests that poll Elasticsearch for ingested
+// data. When policy has no explicit data output ID set, DefaultFleetOutputID is
+// used.
 func UpdateESOutputPreset(ctx context.Context, client *kibana.Client, policy kibana.PolicyResponse, preset OutputPreset) error {
 	outputID := policy.DataOutputID
 	if outputID == "" {
-		return errors.New("policy has no data output ID")
+		// DefaultFleetOutputID is the well-known ID of the default Fleet Elasticsearch
+		// output, as defined in the Kibana Fleet plugin source code.
+		outputID = "fleet-default-output"
 	}
 
 	updateBytes, err := json.Marshal(map[string]any{"preset": preset})
