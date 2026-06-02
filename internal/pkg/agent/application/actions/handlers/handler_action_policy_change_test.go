@@ -62,7 +62,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, &mockStateStore{}, ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, newStateStoreMock(), ch, defaultLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -87,7 +87,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, &mockStateStore{}, ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, newStateStoreMock(), ch, defaultLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -120,6 +120,8 @@ func TestPolicyAcked(t *testing.T) {
 			},
 		}
 		mockSaver := newStateStoreMock()
+		mockSaver.On("SetAction", mock.Anything).Return(nil).Once()
+		mockSaver.On("Save").Return(nil).Once()
 
 		// Test default FF value
 		cfg := configuration.DefaultConfiguration()
@@ -150,6 +152,8 @@ func TestPolicyAcked(t *testing.T) {
 			},
 		}
 		mockSaver := newStateStoreMock()
+		mockSaver.On("SetAction", mock.Anything).Return(nil).Once()
+		mockSaver.On("Save").Return(nil).Once()
 
 		cfg := configuration.DefaultConfiguration()
 		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
@@ -180,6 +184,8 @@ func TestPolicyAcked(t *testing.T) {
 			},
 		}
 		mockSaver := newStateStoreMock()
+		mockSaver.On("SetAction", mock.Anything).Return(nil).Once()
+		mockSaver.On("Save").Return(nil).Once()
 
 		cfg := configuration.DefaultConfiguration()
 		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
