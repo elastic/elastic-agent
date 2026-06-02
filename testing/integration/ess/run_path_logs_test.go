@@ -28,7 +28,7 @@ outputs:
   default:
     type: elasticsearch
     hosts: ["%s"]
-	preset: latency
+    preset: latency
     api_key: "fake-key"
 
 agent.monitoring:

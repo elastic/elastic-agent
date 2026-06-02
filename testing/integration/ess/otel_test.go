@@ -1223,7 +1223,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
-	preset: latency
+    preset: latency
     hosts: [{{.ESEndpoint}}]
     api_key: {{.BeatsESApiKey}}
     compression_level: 0
@@ -1449,7 +1449,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
-	preset: latency
+    preset: latency
     hosts: [{{.ESEndpoint}}]
     api_key: {{.BeatsESApiKey}}
     compression_level: 0
@@ -2217,7 +2217,7 @@ func TestLogReloading(t *testing.T) {
 outputs:
   default:
     type: elasticsearch
-	preset: latency
+    preset: latency
     hosts:
       - %s
     preset: balanced
