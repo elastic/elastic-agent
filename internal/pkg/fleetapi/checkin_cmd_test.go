@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 type agentinfo struct{}
@@ -48,9 +49,9 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := pkgfleetapi.NewCheckinCmd(agentInfo, client)
 
-			request := CheckinRequest{}
+			request := pkgfleetapi.CheckinRequest{}
 
 			_, took, err := cmd.Execute(ctx, &request)
 			require.Error(t, err)
@@ -99,18 +100,20 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := pkgfleetapi.NewCheckinCmd(agentInfo, client)
 
-			request := CheckinRequest{}
+			request := pkgfleetapi.CheckinRequest{}
 
 			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
-			require.Equal(t, 1, len(r.Actions))
+			var actions Actions
+			require.NoError(t, json.Unmarshal(r.Actions, &actions))
+			require.Equal(t, 1, len(actions))
 
 			// ActionPolicyChange
-			require.Equal(t, "id1", r.Actions[0].ID())
-			require.Equal(t, "POLICY_CHANGE", r.Actions[0].Type())
+			require.Equal(t, "id1", actions[0].ID())
+			require.Equal(t, "POLICY_CHANGE", actions[0].Type())
 		},
 	))
 
@@ -160,23 +163,25 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := pkgfleetapi.NewCheckinCmd(agentInfo, client)
 
-			request := CheckinRequest{}
+			request := pkgfleetapi.CheckinRequest{}
 
 			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
-			require.Equal(t, 2, len(r.Actions))
+			var actions Actions
+			require.NoError(t, json.Unmarshal(r.Actions, &actions))
+			require.Equal(t, 2, len(actions))
 
 			// ActionPolicyChange
-			require.Equal(t, "id1", r.Actions[0].ID())
-			require.Equal(t, "POLICY_CHANGE", r.Actions[0].Type())
+			require.Equal(t, "id1", actions[0].ID())
+			require.Equal(t, "POLICY_CHANGE", actions[0].Type())
 
 			// UnknownAction
-			require.Equal(t, "id2", r.Actions[1].ID())
-			require.Equal(t, "UNKNOWN", r.Actions[1].Type())
-			require.Equal(t, "WHAT_TO_DO_WITH_IT", r.Actions[1].(*ActionUnknown).OriginalType)
+			require.Equal(t, "id2", actions[1].ID())
+			require.Equal(t, "UNKNOWN", actions[1].Type())
+			require.Equal(t, "WHAT_TO_DO_WITH_IT", actions[1].(*ActionUnknown).OriginalType)
 		},
 	))
 
@@ -192,14 +197,16 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := pkgfleetapi.NewCheckinCmd(agentInfo, client)
 
-			request := CheckinRequest{}
+			request := pkgfleetapi.CheckinRequest{}
 
 			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
-			require.Equal(t, 0, len(r.Actions))
+			var actions Actions
+			require.NoError(t, json.Unmarshal(r.Actions, &actions))
+			require.Equal(t, 0, len(actions))
 		},
 	))
 
@@ -226,14 +233,16 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := pkgfleetapi.NewCheckinCmd(agentInfo, client)
 
-			request := CheckinRequest{Metadata: testMetadata()}
+			request := pkgfleetapi.CheckinRequest{Metadata: testMetadata()}
 
 			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
-			require.Equal(t, 0, len(r.Actions))
+			var actions Actions
+			require.NoError(t, json.Unmarshal(r.Actions, &actions))
+			require.Equal(t, 0, len(actions))
 		},
 	))
 
@@ -260,14 +269,16 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := pkgfleetapi.NewCheckinCmd(agentInfo, client)
 
-			request := CheckinRequest{}
+			request := pkgfleetapi.CheckinRequest{}
 
 			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
-			require.Equal(t, 0, len(r.Actions))
+			var actions Actions
+			require.NoError(t, json.Unmarshal(r.Actions, &actions))
+			require.Equal(t, 0, len(actions))
 		},
 	))
 
@@ -299,14 +310,16 @@ func TestCheckin(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			cmd := NewCheckinCmd(agentInfo, client)
+			cmd := pkgfleetapi.NewCheckinCmd(agentInfo, client)
 
-			request := CheckinRequest{}
+			request := pkgfleetapi.CheckinRequest{}
 
 			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
-			require.Equal(t, 0, len(r.Actions))
+			var actions Actions
+			require.NoError(t, json.Unmarshal(r.Actions, &actions))
+			require.Equal(t, 0, len(actions))
 		},
 		func(config *remote.Config) {
 			config.Headers = map[string]string{

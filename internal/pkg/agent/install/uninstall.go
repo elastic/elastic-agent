@@ -36,6 +36,7 @@ import (
 	comprt "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -180,12 +181,12 @@ func notifyFleetIfNeeded(ctx context.Context, log *logp.Logger, pt ProgressDescr
 	}
 }
 
-type NotifyFleetAuditUninstall func(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai fleetapi.AgentInfo) error
+type NotifyFleetAuditUninstall func(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) error
 
 // notifyFleetAuditUninstall will attempt to notify fleet-server of the agent's uninstall.
 //
 // There are retries for the attempt after a 10s wait, but it is a best-effort approach.
-func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai fleetapi.AgentInfo) error {
+func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	pt.Describe("Attempting to notify Fleet of uninstall")
