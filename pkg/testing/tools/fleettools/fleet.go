@@ -162,6 +162,7 @@ func NewEnrollParams(ctx context.Context, client *kibana.Client) (*EnrollParams,
 }
 
 // OutputPreset is a Fleet Elasticsearch output prefermance preset value.
+// See https://www.elastic.co/docs/reference/fleet/es-output-settings#es-output-settings-performance-tuning-settings
 type OutputPreset string
 
 const (
@@ -169,76 +170,31 @@ const (
 	OutputPresetCustom     OutputPreset = "custom"
 	OutputPresetThroughput OutputPreset = "throughput"
 	OutputPresetScale      OutputPreset = "scale"
-	OutputPresetLatency    OutputPreset = "latency"
+	// OutputPresetLatency lowers the output flush timeout from the default 10s to 1s. Prefer it in all tests.
+	OutputPresetLatency OutputPreset = "latency"
 )
 
-// SetDefaultESOutputPreset updates the default Fleet Elasticsearch output to use
-// the given preset. Use OutputPresetLatency to lower the output flush interval from
-// 10s to 1s, which speeds up tests that poll Elasticsearch for ingested data.
-func SetDefaultESOutputPreset(ctx context.Context, client *kibana.Client, preset OutputPreset) error {
-	type outputItem struct {
-		ID                  string   `json:"id"`
-		Name                string   `json:"name"`
-		Type                string   `json:"type"`
-		Hosts               []string `json:"hosts"`
-		IsDefault           bool     `json:"is_default"`
-		IsDefaultMonitoring bool     `json:"is_default_monitoring"`
-		Preset              string   `json:"preset"`
+// UpdateESOutputPreset updates the performance preset for the Elasticsearch output in the given policy.
+func UpdateESOutputPreset(ctx context.Context, client *kibana.Client, policy kibana.PolicyResponse, preset OutputPreset) error {
+	outputID := policy.DataOutputID
+	if outputID == "" {
+		return errors.New("policy has no data output ID")
 	}
 
-	listResp, err := client.SendWithContext(ctx, http.MethodGet, "/api/fleet/outputs", nil, nil, nil)
-	if err != nil {
-		return fmt.Errorf("listing Fleet outputs: %w", err)
-	}
-	defer listResp.Body.Close()
-	listBody, err := io.ReadAll(listResp.Body)
-	if err != nil {
-		return fmt.Errorf("reading Fleet outputs response: %w", err)
-	}
-	if listResp.StatusCode != http.StatusOK {
-		return fmt.Errorf("listing Fleet outputs returned status %d: %s", listResp.StatusCode, listBody)
-	}
-
-	var outputs struct {
-		Items []outputItem `json:"items"`
-	}
-	if err := json.Unmarshal(listBody, &outputs); err != nil {
-		return fmt.Errorf("parsing Fleet outputs response: %w", err)
-	}
-
-	var defaultOutput *outputItem
-	for i := range outputs.Items {
-		if outputs.Items[i].IsDefault && outputs.Items[i].Type == "elasticsearch" {
-			defaultOutput = &outputs.Items[i]
-			break
-		}
-	}
-	if defaultOutput == nil {
-		return errors.New("no default Elasticsearch Fleet output found")
-	}
-
-	updateBody := map[string]any{
-		"name":                  defaultOutput.Name,
-		"type":                  defaultOutput.Type,
-		"hosts":                 defaultOutput.Hosts,
-		"is_default":            defaultOutput.IsDefault,
-		"is_default_monitoring": defaultOutput.IsDefaultMonitoring,
-		"preset":                preset,
-	}
-	updateBytes, err := json.Marshal(updateBody)
+	updateBytes, err := json.Marshal(map[string]any{"preset": preset})
 	if err != nil {
 		return fmt.Errorf("marshaling Fleet output update: %w", err)
 	}
 
-	apiURL := "/api/fleet/outputs/" + defaultOutput.ID
+	apiURL := "/api/fleet/outputs/" + outputID
 	putResp, err := client.SendWithContext(ctx, http.MethodPut, apiURL, nil, nil, bytes.NewReader(updateBytes))
 	if err != nil {
-		return fmt.Errorf("updating Fleet output %s: %w", defaultOutput.ID, err)
+		return fmt.Errorf("updating Fleet output %s: %w", outputID, err)
 	}
 	defer putResp.Body.Close()
 	if putResp.StatusCode != http.StatusOK {
 		putBody, _ := io.ReadAll(putResp.Body)
-		return fmt.Errorf("updating Fleet output %s returned status %d: %s", defaultOutput.ID, putResp.StatusCode, putBody)
+		return fmt.Errorf("updating Fleet output %s returned status %d: %s", outputID, putResp.StatusCode, putBody)
 	}
 	return nil
 }

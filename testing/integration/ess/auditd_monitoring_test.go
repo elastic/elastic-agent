@@ -84,7 +84,7 @@ func (runner *AuditDRunner) SetupSuite() {
 
 	policyResp, agentID, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
-	require.NoError(runner.T(), fleettools.SetDefaultESOutputPreset(ctx, runner.info.KibanaClient, fleettools.OutputPresetLatency))
+	require.NoError(runner.T(), fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, policyResp, fleettools.OutputPresetLatency))
 
 	runner.agentID = agentID
 	runner.policyID = policyResp.ID

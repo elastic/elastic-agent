@@ -85,7 +85,7 @@ func (runner *EndpointMetricsMonRunner) SetupSuite() {
 	policy, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(),
 		installOpts, runner.fixture, runner.info.KibanaClient, createPolicyReq)
 	require.NoError(runner.T(), err, "failed to install agent with policy")
-	require.NoError(runner.T(), fleettools.SetDefaultESOutputPreset(ctx, runner.info.KibanaClient, fleettools.OutputPresetLatency))
+	require.NoError(runner.T(), fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, policy, fleettools.OutputPresetLatency))
 
 	runner.T().Log("Installing Elastic Defend")
 	pkgPolicyResp, err := installElasticDefendPackage(runner.T(), runner.info, policy.ID)

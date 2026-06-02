@@ -182,7 +182,7 @@ func enrollLocalFIPSAgentInFleetServer(t *testing.T, info *define.Info) (*atesti
 
 	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, basePolicy)
 	require.NoError(t, err)
-	require.NoError(t, fleettools.SetDefaultESOutputPreset(ctx, info.KibanaClient, fleettools.OutputPresetLatency))
+	require.NoError(t, fleettools.UpdateESOutputPreset(ctx, info.KibanaClient, policyResp, fleettools.OutputPresetLatency))
 
 	return fixture, policyResp.ID
 }
