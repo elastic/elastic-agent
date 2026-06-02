@@ -302,13 +302,8 @@ shared:
       /lib/systemd/system/{{.BeatServiceName}}.service:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl'
         mode: 0644
-<<<<<<< HEAD
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}:
-        source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-=======
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}:
-        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
->>>>>>> 230ee5575 (Fix docker service image for IAR (#14683))
+        source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
         mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/package.version:
         content: >
@@ -319,40 +314,11 @@ shared:
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
-<<<<<<< HEAD
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/components/endpoint-security-resources.zip:
-        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/endpoint-security-resources.zip'
-        mode: 0644
-        skip_on_missing: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ core_commit_short }}/manifest.yaml:
-=======
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/elastic-otel-collector:
-        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
-        mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/elastic-otel-collector.spec.yml:
-        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
-        mode: 0644
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/endpoint-security-resources.zip:
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/endpoint-security-resources.zip'
         mode: 0644
         skip_on_missing: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/module:
-        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
-        preserve_mode: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/certs/certs.pem:
-        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/certs/certs.pem'
-        mode: 0640
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/lenses:
-        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/lenses'
-        preserve_mode: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/osqueryd:
-        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osqueryd'
-        mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/osquery-extension.ext:
-        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
-        mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/manifest.yaml:
->>>>>>> 230ee5575 (Fix docker service image for IAR (#14683))
         mode: 0644
         content: >
           {{ manifest .fips }}
