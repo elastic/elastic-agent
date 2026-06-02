@@ -58,7 +58,7 @@ collectors:
         # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
         debug:
           verbosity: basic
-        otlp/gateway:
+        otlp_grpc/gateway:
           endpoint: "http://opentelemetry-kube-stack-gateway-collector-headless:4317"
           tls:
             insecure: true
@@ -134,7 +134,7 @@ collectors:
               from_attribute: host.id
               action: insert
         # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
-        k8sattributes:
+        k8s_attributes:
           filter:
             # Only retrieve pods running on the same node as the collector
             node_from_env_var: OTEL_K8S_NODE_NAME
@@ -170,6 +170,11 @@ collectors:
       receivers:
         otlp: null
         # [File Log Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver)
+        # Note: using the deprecated name "filelog" intentionally. The logsCollection preset
+        # in the kube-stack chart injects a base filelog: config (include paths, operators,
+        # etc.) that this block merges into via mustMergeOverwrite. If the canonical name
+        # "file_log" is used instead, the preset config lands under a different map key and
+        # the merge doesn't happen, leaving the receiver with no include: paths configured.
         filelog:
           exclude:
             # exlude opentelemetry-kube-stack pod logs
@@ -185,7 +190,7 @@ collectors:
               - filelog
             processors:
               - batch
-              - k8sattributes
+              - k8s_attributes
               - resourcedetection/system
               - resourcedetection/eks
               - resourcedetection/gcp
@@ -193,7 +198,7 @@ collectors:
               - resource/hostname
               - resource/cloud
             exporters:
-              - otlp/gateway
+              - otlp_grpc/gateway
   #  Gateway is a K8s deployment EDOT collector focused on processing and
   #  forwarding telemetry to an Elasticsearch endpoint.
   gateway:
@@ -237,7 +242,7 @@ collectors:
       processors: {}
       exporters:
         debug:
-        otlp/ingest:
+        otlp_grpc/ingest:
           endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
           headers:
             Authorization: ApiKey ${env:ELASTIC_API_KEY}
@@ -256,7 +261,7 @@ collectors:
           logs:
             receivers: [otlp]
             processors: []
-            exporters: [debug, otlp/ingest]
+            exporters: [debug, otlp_grpc/ingest]
 # For more details on OpenTelemetry's zero-code instrumentation, see:
 # https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
 instrumentation:
