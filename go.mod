@@ -265,6 +265,7 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v1.0.0-rc.4 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.18.2 // indirect
+	github.com/coreos/go-oidc/v3 v3.18.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.7.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
@@ -508,6 +509,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.152.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.152.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.152.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/azureauthextension v0.152.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.152.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding v0.152.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension v0.152.0 // indirect

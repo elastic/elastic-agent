@@ -18,6 +18,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.152.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/azureauthextension v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension v0.152.0
@@ -61,6 +62,7 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
+	github.com/coreos/go-oidc/v3 v3.18.0 // indirect
 	github.com/elastic/apm-data v1.21.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.47.0 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
