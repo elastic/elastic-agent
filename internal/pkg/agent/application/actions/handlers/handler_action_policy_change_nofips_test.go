@@ -219,7 +219,7 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 
 			cfg := config.MustNewConfigFrom(tc.newCfg)
 
-			err := h.handlePolicyChange(context.Background(), cfg)
+			err := h.handlePolicyChange(context.Background(), cfg, nil)
 			tc.assertErr(t, err)
 
 			assert.Equal(t, tc.setterCalledCount, setterCalledCount,
