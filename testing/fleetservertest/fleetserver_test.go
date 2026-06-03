@@ -16,9 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 // TestRunFleetServer shows how to configure and run a fleet-server capable of
@@ -163,15 +164,15 @@ func ExampleNewServer_checkin() {
 		WithAgentID(agentID))
 
 	defaultCheckinConfig := configuration.DefaultFleetCheckin()
-	cmd := fleetapi.NewCheckinCmd(
+	cmd := pkgfleetapi.NewCheckinCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 
-	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	got, _, err := cmd.Execute(context.Background(), &pkgfleetapi.CheckinRequest{})
 	if err != nil {
 		panic(fmt.Sprintf("ExampleNewServer_checkin failed executing checkin: %v", err))
 	}
 
-	fmt.Println(got.Actions)
+	fmt.Println(mustUnmarshalActions(got.Actions))
 	// Output:
 	// [id: anActionID, type: POLICY_CHANGE]
 }
@@ -192,15 +193,15 @@ func ExampleNewServer_checkin_compress() {
 		})},
 		WithAgentID(agentID))
 
-	cmd := fleetapi.NewCheckinCmd(
+	cmd := pkgfleetapi.NewCheckinCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, "gzip")
 
-	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	got, _, err := cmd.Execute(context.Background(), &pkgfleetapi.CheckinRequest{})
 	if err != nil {
 		panic(fmt.Sprintf("ExampleNewServer_checkin failed executing checkin: %v", err))
 	}
 
-	fmt.Println(got.Actions)
+	fmt.Println(mustUnmarshalActions(got.Actions))
 	// Output:
 	// [id: anActionID, type: POLICY_CHANGE]
 }
@@ -231,17 +232,18 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 		WithAgentID(agentID))
 
 	defaultCheckinConfig := configuration.DefaultFleetCheckin()
-	cmd := fleetapi.NewCheckinCmd(
+	cmd := pkgfleetapi.NewCheckinCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 
-	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	got, _, err := cmd.Execute(context.Background(), &pkgfleetapi.CheckinRequest{})
 	if err != nil {
 		panic(fmt.Sprintf("ExampleNewServer_checkin_fleetConnectionParams failed executing checkin: %v", err))
 	}
 
-	fmt.Println(got.Actions)
-	if len(got.Actions) > 0 {
-		policy := got.Actions[0].(*fleetapi.ActionPolicyChange).Data.Policy
+	checkinActions := mustUnmarshalActions(got.Actions)
+	fmt.Println(checkinActions)
+	if len(checkinActions) > 0 {
+		policy := checkinActions[0].(*fleetapi.ActionPolicyChange).Data.Policy
 		b := new(strings.Builder)
 		encoder := json.NewEncoder(b)
 		encoder.SetIndent("", "  ")
@@ -398,8 +400,8 @@ func ExampleNewServer_enroll() {
 		EnrollAPIKey: enrollAPIKey,
 		Type:         "PERMANENT",
 		Metadata: fleetapi.Metadata{
-			Local: &info.ECSMeta{
-				Elastic: &info.ElasticECSMeta{Agent: &info.AgentECSMeta{
+			Local: &ecsmeta.ECSMeta{
+				Elastic: &ecsmeta.ElasticECSMeta{Agent: &ecsmeta.AgentECSMeta{
 					ID: "wrongAgentID",
 				}},
 			},
@@ -492,27 +494,27 @@ func ExampleNewServer_checkin_fakeComponent() {
 
 	// 1st call, nextAction() will return a POLICY_CHANGE.
 	defaultCheckinConfig := configuration.DefaultFleetCheckin()
-	cmd := fleetapi.NewCheckinCmd(
+	cmd := pkgfleetapi.NewCheckinCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
-	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	resp, _, err := cmd.Execute(context.Background(), &pkgfleetapi.CheckinRequest{})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing 3rd checkin: %v", err))
 	}
-	fmt.Println(resp.Actions)
+	fmt.Println(mustUnmarshalActions(resp.Actions))
 
 	// 2nd subsequent call to nextAction() will return an error.
-	_, _, err = cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	_, _, err = cmd.Execute(context.Background(), &pkgfleetapi.CheckinRequest{})
 	if err == nil {
 		panic("expected an error, got none")
 	}
 	fmt.Println("Error:", err)
 
 	// any subsequent call to nextAction() will return no action.
-	resp, _, err = cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	resp, _, err = cmd.Execute(context.Background(), &pkgfleetapi.CheckinRequest{})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing 3rd checkin: %v", err))
 	}
-	fmt.Println(resp.Actions)
+	fmt.Println(mustUnmarshalActions(resp.Actions))
 
 	// Output:
 	// [id: anActionID, type: POLICY_CHANGE]
@@ -559,11 +561,11 @@ func ExampleNewServer_checkin_withDelay() {
 
 	// 1st - call actions have a delay.
 	defaultCheckinConfig := configuration.DefaultFleetCheckin()
-	cmd := fleetapi.NewCheckinCmd(
+	cmd := pkgfleetapi.NewCheckinCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 
 	start := time.Now()
-	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	resp, _, err := cmd.Execute(context.Background(), &pkgfleetapi.CheckinRequest{})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing 3rd checkin: %v", err))
 	}
@@ -571,11 +573,11 @@ func ExampleNewServer_checkin_withDelay() {
 	fmt.Printf("took more than %s: %t. response: %s\n",
 		delay,
 		elapsed > delay,
-		resp.Actions)
+		mustUnmarshalActions(resp.Actions))
 
 	// 2nd - subsequent call to nextAction() will return immediately.
 	start = time.Now()
-	resp, _, err = cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	resp, _, err = cmd.Execute(context.Background(), &pkgfleetapi.CheckinRequest{})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing 3rd checkin: %v", err))
 	}
@@ -583,7 +585,7 @@ func ExampleNewServer_checkin_withDelay() {
 	fmt.Printf("took more than %s: %t. response: %s\n",
 		delay,
 		elapsed > time.Second,
-		resp.Actions)
+		mustUnmarshalActions(resp.Actions))
 
 	// Output:
 	// took more than 250ms: true. response: [id: anActionID, type: POLICY_CHANGE]
@@ -742,7 +744,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	// =========================================================================
 	// 4th - instantiate the fleetapi commands
 	defaultCheckinConfig := configuration.DefaultFleetCheckin()
-	cmdCheckin := fleetapi.NewCheckinCmd(
+	cmdCheckin := pkgfleetapi.NewCheckinCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)}, defaultCheckinConfig.GetCompression())
 	cmdAck := fleetapi.NewAckCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathAgentAcks(agentID)})
@@ -771,11 +773,11 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 	// 1st checkin: it will return a POLICY_CHANGE.
 	// TODO: make the acker only ack if the checkin was called
-	respCheckin, _, err := cmdCheckin.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	respCheckin, _, err := cmdCheckin.Execute(context.Background(), &pkgfleetapi.CheckinRequest{})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing 3rd checkin: %v", err))
 	}
-	fmt.Println("[1st checkin]", respCheckin.Actions)
+	fmt.Println("[1st checkin]", mustUnmarshalActions(respCheckin.Actions))
 
 	// 2dn ack: acking the POLICY_CHANGE
 	respAck, err = cmdAck.Execute(context.Background(),
@@ -786,7 +788,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	fmt.Printf("[2nd ack] %#v\n", respAck)
 
 	// 2nd checkin: it will fail.
-	_, _, err = cmdCheckin.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	_, _, err = cmdCheckin.Execute(context.Background(), &pkgfleetapi.CheckinRequest{})
 	if err == nil {
 		panic("expected an error, got none")
 	}
@@ -821,6 +823,19 @@ type agentInfo string
 
 func (a agentInfo) AgentID() string {
 	return string(a)
+}
+
+// mustUnmarshalActions unmarshals raw JSON into fleetapi.Actions, panicking on error.
+// Returns an empty slice when raw is nil or empty (no actions in response).
+func mustUnmarshalActions(raw json.RawMessage) fleetapi.Actions {
+	if len(raw) == 0 {
+		return fleetapi.Actions{}
+	}
+	var actions fleetapi.Actions
+	if err := json.Unmarshal(raw, &actions); err != nil {
+		panic(fmt.Sprintf("failed to unmarshal actions: %v", err))
+	}
+	return actions
 }
 
 type sender struct {

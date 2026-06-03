@@ -20,7 +20,8 @@ The integration testing framework spins up resources in GCP.  To achieve this, i
 [GCloud CLI](https://cloud.google.com/sdk/gcloud) to be installed on the system where the tests are initiated from.
 
 #### Beats
-The Elastic Agent package that is used for integration tests packages Beats built from the Unified Release (as opposed to DRA).  There is no explicit action needed for this prerequisite but just keep in mind that if any Agent integration tests rely on certain Beats features or bugfixes, they may not be available in the integration tests yet because a unified release containing those features or bugfixes may not have happened yet.
+The Elastic Agent package that is used for integration tests packages Beats from the beats submodule in this repository. The submodule must be explicitly intialized with `git submodule update --init` on first checkout. The commit of beats packaged and tested in this repository is the commit of
+beats pinned in the submodule.
 
 #### Helm & Helm charts
 To run the Kubernetes integration tests you need to install
@@ -142,6 +143,8 @@ share similar leavers as the packaging process.
      - `kind`: Uses [Kind](https://kind.sigs.k8s.io/) to run Kubernetes
        in Docker. This needs to be set if running Kubernetes integration
        tests.
+
+When running local mode integration tests, `BUILD_AGENT=true` will build the agent for the current platform before running.
 
 An example for running a single test, including packaging the artifacts for it is:
 ```
@@ -297,6 +300,8 @@ Tests with external dependencies might need more environment variables to be set
 when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
 `ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, `KIBANA_PASSWORD`, and
 `ELASTIC_APM_SERVER_URL`.
+
+`TEST_INTEG_CLEAN_ON_EXIT=true|false` will determine whether mage artifacts and .integration-cache are cleaned on exit automatically.
 
 ### Debugging tests
 

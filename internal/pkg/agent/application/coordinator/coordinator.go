@@ -39,7 +39,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -55,8 +54,10 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -95,7 +96,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -835,7 +836,7 @@ type upgradeOpts struct {
 	skipVerifyOverride bool
 	skipDefaultPgp     bool
 	pgpBytes           []string
-	preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error
+	upgradeOpts        []upgrade.Option
 	rollback           bool
 }
 
@@ -861,7 +862,7 @@ func WithPgpBytes(pgpBytes []string) UpgradeOpt {
 
 func WithPreUpgradeCallback(preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
-		opts.preUpgradeCallback = preUpgradeCallback
+		opts.upgradeOpts = append(opts.upgradeOpts, upgrade.WithPreSymlinkCallback(preUpgradeCallback))
 	}
 }
 
@@ -945,16 +946,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		}
 	}
 
-	// run any pre upgrade callback
-	if uOpts.preUpgradeCallback != nil {
-		if err := uOpts.preUpgradeCallback(ctx, c.logger, action); err != nil {
-			c.ClearOverrideState()
-			det.Fail(err)
-			return err
-		}
-	}
-
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes...)
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes, uOpts.upgradeOpts...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
@@ -1261,7 +1253,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					LogLevelRuntime  string            `yaml:"log_level"`
 					LogLevelPolicy   string            `yaml:"log_level_policy"`
 					LogLevelOverride string            `yaml:"log_level_override"`
-					Metadata         *info.ECSMeta     `yaml:"metadata"`
+					Metadata         *ecsmeta.ECSMeta  `yaml:"metadata"`
 				}{
 					Headers:          c.agentInfo.Headers(),
 					LogLevelRuntime:  c.agentInfo.GetLogLevelRuntime(),

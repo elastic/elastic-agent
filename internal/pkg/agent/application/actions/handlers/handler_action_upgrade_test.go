@@ -24,7 +24,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -32,6 +31,7 @@ import (
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
 type mockUpgradeManager struct {
@@ -43,7 +43,7 @@ type mockUpgradeManager struct {
 		details *details.Details,
 		skipVerifyOverride bool,
 		skipDefaultPgp bool,
-		pgpBytes ...string) (reexec.ShutdownCallbackFn, error)
+		pgpBytes []string) (reexec.ShutdownCallbackFn, error)
 }
 
 func (u *mockUpgradeManager) Upgradeable() bool {
@@ -54,7 +54,7 @@ func (u *mockUpgradeManager) Reload(rawConfig *config.Config) error {
 	return nil
 }
 
-func (u *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+func (u *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (reexec.ShutdownCallbackFn, error) {
 
 	return u.UpgradeFn(
 		ctx,
@@ -64,7 +64,7 @@ func (u *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollba
 		details,
 		skipVerifyOverride,
 		skipDefaultPgp,
-		pgpBytes...)
+		pgpBytes)
 }
 
 func (u *mockUpgradeManager) Ack(_ context.Context, _ acker.Acker) error {
@@ -107,7 +107,7 @@ func TestUpgradeHandler(t *testing.T) {
 				details *details.Details,
 				skipVerifyOverride bool,
 				skipDefaultPgp bool,
-				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+				pgpBytes []string) (reexec.ShutdownCallbackFn, error) {
 
 				upgradeCalledChan <- struct{}{}
 				return nil, nil
@@ -161,7 +161,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 				details *details.Details,
 				skipVerifyOverride bool,
 				skipDefaultPgp bool,
-				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+				pgpBytes []string) (reexec.ShutdownCallbackFn, error) {
 
 				if upgradeCalled.CompareAndSwap(false, true) {
 					upgradeCalledChan <- struct{}{}
@@ -222,7 +222,7 @@ func TestDuplicateActionsHandled(t *testing.T) {
 				details *details.Details,
 				skipVerifyOverride bool,
 				skipDefaultPgp bool,
-				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+				pgpBytes []string) (reexec.ShutdownCallbackFn, error) {
 
 				defer func() {
 					upgradeCalledChan <- action.ActionID
@@ -313,7 +313,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 				details *details.Details,
 				skipVerifyOverride bool,
 				skipDefaultPgp bool,
-				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+				pgpBytes []string) (reexec.ShutdownCallbackFn, error) {
 
 				defer func() {
 					upgradeCalledChan <- version

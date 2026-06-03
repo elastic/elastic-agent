@@ -94,14 +94,26 @@ func (u *unpacker) getPackageMetadata(archivePath string) (packageMetadata, erro
 		ext = filepath.Ext(strings.TrimSuffix(archivePath, ext)) + ext
 	}
 
+	var m packageMetadata
+	var err error
 	switch ext {
 	case ".zip":
-		return getPackageMetadataFromZip(archivePath)
+		m, err = getPackageMetadataFromZip(archivePath)
 	case ".tar.gz":
-		return getPackageMetadataFromTar(archivePath)
+		m, err = getPackageMetadataFromTar(archivePath)
 	default:
 		return packageMetadata{}, fmt.Errorf("unknown package format %q", ext)
 	}
+	if err != nil {
+		return packageMetadata{}, err
+	}
+	// Reject early so callers never receive a manifest with no target directory.
+	// predictVersionedHomeFromMetadata would return "" for this case and the caller
+	// would catch it, but rejecting here keeps the failure before any state mutations.
+	if m.manifest != nil && m.manifest.Package.VersionedHome == "" {
+		return packageMetadata{}, fmt.Errorf("package manifest is present but VersionedHome is empty; cannot determine upgrade target directory")
+	}
+	return m, nil
 }
 
 // injecting copy, mkdirAll and openFile for testability
@@ -768,4 +780,13 @@ func getFilesContentFromTar(archivePath string, files ...string) (map[string]io.
 // formatted using OS-dependent path separators
 func createVersionedHomeFromHash(hash string) string {
 	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:HashLen]))
+}
+
+// predictVersionedHomeFromMetadata derives the versioned home path from package metadata without unpacking the archive.
+func predictVersionedHomeFromMetadata(metadata packageMetadata) string {
+	if metadata.manifest != nil {
+		pm := pathMapper{mappings: metadata.manifest.Package.PathMappings}
+		return filepath.FromSlash(pm.Map(metadata.manifest.Package.VersionedHome))
+	}
+	return createVersionedHomeFromHash(metadata.hash)
 }
