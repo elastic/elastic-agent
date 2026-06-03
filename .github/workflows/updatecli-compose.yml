@@ -28,6 +28,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: elastic/oblt-actions/updatecli/run@v1
+        continue-on-error: true
         with:
           command: --experimental compose diff
           version-file: .updatecli-version
