@@ -46,7 +46,7 @@ type unitWithComponent struct {
 }
 
 func stopComponents(ctx context.Context, ch chan coordinator.ConfigChange, a fleetapi.Action, acker acker.Acker, backupCallback func()) {
-	unenrollPolicy := newPolicyChange(ctx, nil, config.New(), a, acker, true, nil, false)
+	unenrollPolicy := newPolicyChange(ctx, nil, config.New(), a, acker, true, false)
 	ch <- unenrollPolicy
 
 	if backupCallback != nil {

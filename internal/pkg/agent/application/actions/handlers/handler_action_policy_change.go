@@ -109,19 +109,12 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 	}
 
 	h.log.Debugf("handlerPolicyChange: emit configuration for action %+v", a)
-	err = h.handlePolicyChange(ctx, c)
+	err = h.handlePolicyChange(ctx, c, action)
 	if err != nil {
 		return err
 	}
 
-	if h.stateStore != nil {
-		h.stateStore.SetAction(action)
-		if err := h.stateStore.Save(); err != nil {
-			h.log.Warnf("failed to persist policy action to state store: %v", err)
-		}
-	}
-
-	h.ch <- newPolicyChange(ctx, h.log, c, a, acker, false, h.stateStore, h.disableAckFn())
+	h.ch <- newPolicyChange(ctx, h.log, c, a, acker, false, h.disableAckFn())
 	return nil
 }
 
@@ -243,7 +236,7 @@ func emptyCertificateConfig() tlscommon.CertificateConfig {
 	return tlscommon.CertificateConfig{}
 }
 
-func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) error {
+func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config, action *fleetapi.ActionPolicyChange) error {
 	partialCfg, err := configuration.NewPartialFromConfigNoDefaults(c)
 	if err != nil {
 		return fmt.Errorf("parsing fleet config: %w", err)
@@ -308,15 +301,22 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 			runtimeErr = goerrors.Join(runtimeErr, fmt.Errorf("failed to set runtime log level: %w", err))
 		}
 	}
+	if runtimeErr != nil {
+		return runtimeErr
+	}
+
+	// Now, we can safely store the action as we can't have any more errors after this point.
+	if h.stateStore != nil && action != nil {
+		h.stateStore.SetAction(action)
+		if err := h.stateStore.Save(); err != nil {
+			h.log.Warnf("failed to persist policy action to state store: %v", err)
+		}
+	}
 
 	// If the event logging output has changed, re-exec the agent so it picks up
 	// the newly-persisted logging config on startup.
 	if hasEventLoggingChanged {
 		h.runtimeLogLevelSetter.ReExec(nil)
-	}
-
-	if runtimeErr != nil {
-		return runtimeErr
 	}
 
 	return nil
@@ -471,7 +471,6 @@ type policyChange struct {
 	action     fleetapi.Action
 	acker      acker.Acker
 	ackWatcher chan struct{}
-	stateStore stateStore
 	disableAck bool
 }
 
@@ -482,7 +481,6 @@ func newPolicyChange(
 	action fleetapi.Action,
 	acker acker.Acker,
 	makeCh bool,
-	stateStore stateStore,
 	disableAck bool) *policyChange {
 	var ackWatcher chan struct{}
 	if makeCh {
@@ -496,7 +494,6 @@ func newPolicyChange(
 		action:     action,
 		acker:      acker,
 		ackWatcher: ackWatcher,
-		stateStore: stateStore,
 		disableAck: disableAck,
 	}
 }

@@ -265,7 +265,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 						"fleet.proxy_url": "http://some.proxy",
 					})
 
-				err := h.handlePolicyChange(context.Background(), cfg)
+				err := h.handlePolicyChange(context.Background(), cfg, nil)
 				assert.ErrorContains(t, err, "fail to create API client with updated config")
 
 				// h.config must be unchanged since the error originated in validation, before any mutation.
@@ -323,7 +323,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 						"fleet.proxy_url": "http://some.proxy",
 					})
 
-				err := h.handlePolicyChange(context.Background(), cfg)
+				err := h.handlePolicyChange(context.Background(), cfg, nil)
 				assert.ErrorContains(t, err, "fail to communicate with Fleet Server API client hosts")
 
 				// h.config must be unchanged since the error originated in validation, before any mutation.
@@ -372,7 +372,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				map[string]interface{}{
 					"fleet.hosts": fleetServer.URL})
 
-			err := h.handlePolicyChange(context.Background(), cfg)
+			err := h.handlePolicyChange(context.Background(), cfg, nil)
 			require.NoError(t, err)
 
 			assert.Equal(t, 1, setterCalledCount)
@@ -421,7 +421,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					"fleet.proxy_url": mockProxy.URL,
 					"fleet.host":      fleetServer.URL})
 
-			err := h.handlePolicyChange(context.Background(), cfg)
+			err := h.handlePolicyChange(context.Background(), cfg, nil)
 			require.NoError(t, err)
 
 			assert.Equal(t, 1, setterCalledCount)
@@ -475,7 +475,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 						"fleet.proxy_url": "",
 						"fleet.host":      fleetServer.URL})
 
-				err = h.handlePolicyChange(context.Background(), cfg)
+				err = h.handlePolicyChange(context.Background(), cfg, nil)
 				require.NoError(t, err)
 
 				assert.Equal(t, 1, setterCalledCount)
@@ -532,7 +532,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 						"fleet.hosts":     []string{alwaysErroringServer.URL},
 					})
 
-				err = h.handlePolicyChange(context.Background(), cfg)
+				err = h.handlePolicyChange(context.Background(), cfg, nil)
 				if assert.Error(t, err, "action policy change handler should return an error if new fleet server sends back a bad status code") {
 					// check that we have the correct error contents
 					assert.ErrorContains(t, err, fmt.Sprintf("fleet server ping returned a bad status code: %d", httpStatusCode))
@@ -938,7 +938,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 
 				cfg := config.MustNewConfigFrom(tc.newCfg)
 
-				err := h.handlePolicyChange(context.Background(), cfg)
+				err := h.handlePolicyChange(context.Background(), cfg, nil)
 				tc.assertErr(t, err)
 
 				assert.Equal(t, tc.setterCalledCount, setterCalledCount,
@@ -1116,7 +1116,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 				runtimeLogLevelSetter: mockLogSetter,
 			}
 
-			tt.wantErr(t, h.handlePolicyChange(context.Background(), config.MustNewConfigFrom(tt.args.c)), fmt.Sprintf("handlePolicyChange(ctx, %v)", tt.args.c))
+			tt.wantErr(t, h.handlePolicyChange(context.Background(), config.MustNewConfigFrom(tt.args.c), nil), fmt.Sprintf("handlePolicyChange(ctx, %v)", tt.args.c))
 		})
 	}
 }
@@ -1178,7 +1178,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *tes
 			cfg := config.MustNewConfigFrom(map[string]interface{}{
 				"agent.logging.level": tt.policyLevel,
 			})
-			err := h.handlePolicyChange(context.Background(), cfg)
+			err := h.handlePolicyChange(context.Background(), cfg, nil)
 			require.NoError(t, err)
 
 			var policyLvl logp.Level
