@@ -383,6 +383,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [{{ .ESHost }}]
     api_key: placeholder
 agent.monitoring.enabled: false

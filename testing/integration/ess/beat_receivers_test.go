@@ -460,6 +460,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [{{.ESEndpoint}}]
     api_key: {{.BeatsESApiKey}}
 `
@@ -721,6 +722,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [http://localhost:9200]
     api_key: placeholder
 agent.monitoring.enabled: false
@@ -862,11 +864,13 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [%s]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
   supported:
     type: elasticsearch
+    preset: latency
     hosts: [%s]
     api_key: placeholder
 `, esURL.Host, esURL.Host)
@@ -985,6 +989,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [http://localhost:9200]
     api_key: placeholder
 agent.monitoring.enabled: false
@@ -1072,6 +1077,7 @@ inputs: []
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [http://localhost:9200]
     api_key: placeholder
 agent.monitoring.enabled: false
@@ -1225,6 +1231,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
     otel:
@@ -1407,6 +1414,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
 agent:
