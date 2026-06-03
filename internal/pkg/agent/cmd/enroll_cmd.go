@@ -47,6 +47,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client/wait"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -192,7 +193,11 @@ func newEnrollCmd(
 ) (*enrollCmd, error) {
 	if backoffFactory == nil {
 		backoffFactory = func(done <-chan struct{}) backoff.Backoff {
+<<<<<<< HEAD
 			return backoff.NewEqualJitterBackoff(done, enrollBackoffInit, enrollBackoffMax)
+=======
+			return backoff.NewEqualJitterBackoff(done, pkgfleetapi.EnrollBackoffInit, pkgfleetapi.EnrollBackoffMax)
+>>>>>>> 98a251b48 (Export enrollment and ack backoff constants from pkg/fleetapi (#14735))
 		}
 	}
 	return &enrollCmd{
