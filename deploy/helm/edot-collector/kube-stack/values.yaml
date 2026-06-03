@@ -54,7 +54,8 @@ collectors:
             insecure: true
       extensions:
         cgroup_runtime: {}
-        health_check: {}
+        health_check:
+          endpoint: "0.0.0.0:13133"
       processors:
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
         resourcedetection/env:
@@ -467,7 +468,8 @@ collectors:
             - container.id
       extensions:
         cgroup_runtime: {}
-        health_check: {}
+        health_check:
+          endpoint: "0.0.0.0:13133"
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
         extensions: [cgroup_runtime, health_check]
@@ -605,7 +607,8 @@ collectors:
             mode: otel
       extensions:
         cgroup_runtime: {}
-        health_check: {}
+        health_check:
+          endpoint: "0.0.0.0:13133"
       service:
         extensions: [cgroup_runtime, health_check]
         pipelines:
