@@ -917,14 +917,14 @@ outputs:
     type: elasticsearch
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
-    preset: "balanced"
+    preset: latency
     ssl.enabled: true
     ssl.verification_mode: full
   monitoring:
     type: elasticsearch
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
-    preset: "balanced"
+    preset: latency
 agent:
   monitoring:
     metrics: true
@@ -1062,7 +1062,7 @@ outputs:
     type: elasticsearch
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
-    preset: "balanced"
+    preset: latency
 agent.monitoring:
   metrics: false
   logs: false
@@ -1213,6 +1213,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [{{.ESEndpoint}}]
     api_key: {{.BeatsESApiKey}}
     compression_level: 0
@@ -1966,7 +1967,7 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-    preset: "balanced"
+    preset: latency
     status_reporting:
       enabled: {{.StatusReportingEnabled}}
 agent.internal.runtime.metricbeat:
@@ -2080,6 +2081,7 @@ func TestLogReloading(t *testing.T) {
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts:
       - %s
     preset: balanced

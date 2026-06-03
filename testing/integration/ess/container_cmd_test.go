@@ -746,6 +746,7 @@ func createSimpleAgentMonitoringConfig(t *testing.T, workDir string, esAddr stri
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts:
       - %s
 
