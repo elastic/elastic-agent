@@ -9,10 +9,11 @@ import (
 	"net/http"
 
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
-// ErrInvalidAPIKey is returned when authentication fail to fleet.
-var ErrInvalidAPIKey = errors.New("invalid api key to authenticate with fleet")
+// ErrInvalidAPIKey is re-exported from pkg/fleetapi for backwards compatibility.
+var ErrInvalidAPIKey = pkgfleetapi.ErrInvalidAPIKey
 
 // FleetUserAgentRoundTripper adds the Fleet user agent.
 type FleetUserAgentRoundTripper struct {
@@ -53,7 +54,7 @@ func (r *FleetAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		defer resp.Body.Close()
-		return nil, ErrInvalidAPIKey
+		return nil, pkgfleetapi.ErrInvalidAPIKey
 	}
 
 	return resp, err
