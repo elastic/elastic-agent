@@ -418,7 +418,8 @@ func TestGetOtelConfig(t *testing.T) {
 
 	expectedESConfig := func(outputName string) map[string]any {
 		return map[string]any{
-			"compression": "gzip",
+			"bulk_response_filter_path": "errors,items.*.error,items.*.status,items.*.failure_store",
+			"compression":               "gzip",
 			"compression_params": map[string]any{
 				"level": 1,
 			},
