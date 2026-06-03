@@ -120,9 +120,6 @@ func TestPolicyAcked(t *testing.T) {
 			},
 		}
 		mockSaver := newStateStoreMock()
-		mockSaver.On("SetAction", mock.Anything).Return(nil).Once()
-		mockSaver.On("Save").Return(nil).Once()
-
 		// Test default FF value
 		cfg := configuration.DefaultConfiguration()
 		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
@@ -152,8 +149,6 @@ func TestPolicyAcked(t *testing.T) {
 			},
 		}
 		mockSaver := newStateStoreMock()
-		mockSaver.On("SetAction", mock.Anything).Return(nil).Once()
-		mockSaver.On("Save").Return(nil).Once()
 
 		cfg := configuration.DefaultConfiguration()
 		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
@@ -184,8 +179,6 @@ func TestPolicyAcked(t *testing.T) {
 			},
 		}
 		mockSaver := newStateStoreMock()
-		mockSaver.On("SetAction", mock.Anything).Return(nil).Once()
-		mockSaver.On("Save").Return(nil).Once()
 
 		cfg := configuration.DefaultConfiguration()
 		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
