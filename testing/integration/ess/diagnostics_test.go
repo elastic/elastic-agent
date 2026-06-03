@@ -138,7 +138,7 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 		Configure:  simpleConfig2,
 		AgentState: integrationtest.NewClientState(client.Healthy),
 		Components: componentSetup,
-		After:      testDiagnosticsFactory(t, componentSetup, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
+		After:      testDiagnosticsFactory(t, componentSetup, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}, false),
 	})
 	require.NoError(t, err)
 }
@@ -164,7 +164,7 @@ func TestIsolatedUnitsDiagnosticsOptionalValues(t *testing.T) {
 		Configure:  complexIsolatedUnitsConfig,
 		AgentState: integrationtest.NewClientState(client.Healthy),
 		Components: isolatedUnitsComponentSetup,
-		After:      testDiagnosticsFactory(t, isolatedUnitsComponentSetup, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
+		After:      testDiagnosticsFactory(t, isolatedUnitsComponentSetup, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}, false),
 	})
 	require.NoError(t, err)
 }
@@ -187,7 +187,7 @@ func TestDiagnosticsCommand(t *testing.T) {
 		Configure:  simpleConfig2,
 		AgentState: integrationtest.NewClientState(client.Healthy),
 		Components: componentSetup,
-		After:      testDiagnosticsFactory(t, componentSetup, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+		After:      testDiagnosticsFactory(t, componentSetup, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}, false),
 	})
 	assert.NoError(t, err)
 }
@@ -210,7 +210,7 @@ func TestIsolatedUnitsDiagnosticsCommand(t *testing.T) {
 		Configure:  complexIsolatedUnitsConfig,
 		AgentState: integrationtest.NewClientState(client.Healthy),
 		Components: isolatedUnitsComponentSetup,
-		After:      testDiagnosticsFactory(t, isolatedUnitsComponentSetup, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+		After:      testDiagnosticsFactory(t, isolatedUnitsComponentSetup, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}, false),
 	})
 	assert.NoError(t, err)
 }
@@ -472,6 +472,9 @@ agent.internal.runtime.filebeat.httpjson: process
 		diagCompSetup                map[string]integrationtest.ComponentState
 		configTemplate               string
 		extraPatterns                []filePattern
+		// checkBeatReceiverTraceLogs tells testDiagnosticsFactory to assert that an
+		// httpjson trace log file is present in the bundle under logs/<commit>/.
+		checkBeatReceiverTraceLogs bool
 	}{
 		{
 			name:              "filebeat process",
@@ -524,13 +527,8 @@ agent.internal.runtime.filebeat.httpjson: process
 			diagCompSetup: map[string]integrationtest.ComponentState{
 				"httpjson-default": {State: integrationtest.NewClientState(client.Healthy)},
 			},
-			configTemplate: httpjsonTracerConfigTemplate,
-			extraPatterns: []filePattern{
-				{
-					pattern:  path.Join("logs", "*", "httpjson", "http-request-trace-*.ndjson"),
-					optional: false,
-				},
-			},
+			configTemplate:             httpjsonTracerConfigTemplate,
+			checkBeatReceiverTraceLogs: true,
 		},
 	}
 
@@ -583,7 +581,7 @@ agent.internal.runtime.filebeat.httpjson: process
 				Configure:  configBuffer.String(),
 				AgentState: expectedAgentState,
 				Components: tc.agentCompState,
-				After:      testDiagnosticsFactory(t, tc.diagCompSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}, extraPatterns...),
+				After:      testDiagnosticsFactory(t, tc.diagCompSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}, tc.checkBeatReceiverTraceLogs, extraPatterns...),
 			})
 			assert.NoError(t, err)
 		})
@@ -685,7 +683,7 @@ agent.internal.runtime.filebeat.filestream: otel
 	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
 }
 
-func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string, extraPatterns ...filePattern) func(ctx context.Context) error {
+func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string, checkBeatReceiverTraceLogs bool, extraPatterns ...filePattern) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
 		// If any required extra patterns are present (e.g. the metrics file
 		// written by the OTel file exporter after the first collection cycle),
@@ -693,14 +691,18 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 		// diagnostics. The metrics period configured in the test is 2 s, so
 		// 10 s gives a comfortable margin even if the OTel monitoring collector
 		// takes a few seconds to start after the agent reports HEALTHY.
+		needsWait := checkBeatReceiverTraceLogs
 		for _, p := range extraPatterns {
 			if !p.optional {
-				select {
-				case <-time.After(10 * time.Second):
-				case <-ctx.Done():
-					return ctx.Err()
-				}
+				needsWait = true
 				break
+			}
+		}
+		if needsWait {
+			select {
+			case <-time.After(10 * time.Second):
+			case <-ctx.Done():
+				return ctx.Err()
 			}
 		}
 
@@ -709,6 +711,15 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 		// get the version of the running agent
 		avi, err := getRunningAgentVersion(ctx, fix)
 		require.NoError(t, err)
+
+		if checkBeatReceiverTraceLogs {
+			// The diagnostic bundle places logs under logs/<commit>/. Use the real
+			// commit hash so the pattern matches the exact path in the bundle.
+			extraPatterns = append(extraPatterns, filePattern{
+				pattern:  path.Join("logs", "elastic-agent-"+avi.Commit[:6], "httpjson", "http-request-trace-*.ndjson"),
+				optional: false,
+			})
+		}
 
 		verifyDiagnosticArchive(t, compSetup, diagZip, diagFiles, diagCompFiles, avi, extraPatterns...)
 
