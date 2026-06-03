@@ -81,25 +81,26 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 	return nil, nil
 }
 
+// findRollbackTarget returns the versionedHome and TTLMarker for the first unexpired entry
+// matching version, or ("", zero, false) if none is found.
+func findRollbackTarget(rollbacks map[string]ttl.TTLMarker, now time.Time, version string) (string, ttl.TTLMarker, bool) {
+	for versionedHome, marker := range rollbacks {
+		if marker.Version == version && now.Before(marker.ValidUntil) {
+			return versionedHome, marker, true
+		}
+	}
+	return "", ttl.TTLMarker{}, false
+}
+
 func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, now time.Time, rollbackVersion string, markUpgrade markUpgradeFunc, action *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the available installs
 	availableRollbacks, _, err := source.GetAll()
 	if err != nil {
 		return "", "", fmt.Errorf("retrieving available rollbacks: %w", err)
 	}
-	// check for the version we want to rollback to
-	var targetInstall string
-	var targetTTLMarker ttl.TTLMarker
-	for versionedHome, ttlMarker := range availableRollbacks {
-		if ttlMarker.Version == rollbackVersion && now.Before(ttlMarker.ValidUntil) {
-			// found a valid target
-			targetInstall = versionedHome
-			targetTTLMarker = ttlMarker
-			break
-		}
-	}
 
-	if targetInstall == "" {
+	targetInstall, targetTTLMarker, found := findRollbackTarget(availableRollbacks, now, rollbackVersion)
+	if !found {
 		return "", "", fmt.Errorf("version %q not listed among the available rollbacks: %w", rollbackVersion, ErrNoRollbacksAvailable)
 	}
 
@@ -175,17 +176,9 @@ func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcher
 		if err != nil {
 			return fmt.Errorf("reading TTL markers: %w", err)
 		}
-		if len(rollbacks) == 0 {
-			return ErrNoRollbacksAvailable
-		}
-
-		for versionedHome, rollback := range rollbacks {
-			if rollback.Version == version && now.Before(rollback.ValidUntil) {
-				selectedRollbackVersionedHome = versionedHome
-				break
-			}
-		}
-		if selectedRollbackVersionedHome == "" {
+		var found bool
+		selectedRollbackVersionedHome, _, found = findRollbackTarget(rollbacks, now, version)
+		if !found {
 			return fmt.Errorf("version %q not listed among the available rollbacks: %w", version, ErrNoRollbacksAvailable)
 		}
 		// There is a small window between selecting the rollback target and starting the rollback.
