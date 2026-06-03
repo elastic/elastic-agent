@@ -290,11 +290,8 @@ when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAM
 `ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, `KIBANA_PASSWORD`, and
 `ELASTIC_APM_SERVER_URL`.
 
-<<<<<<< HEAD
-=======
 `TEST_INTEG_CLEAN_ON_EXIT=true|false` will determine whether mage artifacts and .integration-cache are cleaned on exit automatically. Defaults to `false` (no automatic cleanup) for local runs; CI sets this to `true` explicitly.
 
->>>>>>> bec6168ff (Fix: don't clean up after integration tests by default (#14747) (#14749))
 ### Debugging tests
 
 #### Connecting to VMs
