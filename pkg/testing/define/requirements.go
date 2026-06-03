@@ -89,6 +89,11 @@ type Stack struct {
 	// In the case that no version is provided the same version being used for
 	// the current test execution is used.
 	Version string `json:"version"`
+
+	// KibanaMemoryMB overrides the Kibana instance memory (MiB) for the stack
+	// provisioned for this test. When 0 the provisioner default (1024 MiB) is
+	// used. Tests that share a stack version get the maximum requested value.
+	KibanaMemoryMB int `json:"kibana_memory_mb,omitempty"`
 }
 
 // Requirements defines the testing requirements for the test to run.

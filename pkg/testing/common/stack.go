@@ -61,6 +61,10 @@ type StackRequest struct {
 
 	// Version is the version of the stack.
 	Version string `yaml:"version"`
+
+	// KibanaMemoryMB overrides the Kibana instance memory (MiB).
+	// When 0 the provisioner default is used.
+	KibanaMemoryMB int `yaml:"kibana_memory_mb,omitempty"`
 }
 
 // StackProvisioner performs the provisioning of stacks.

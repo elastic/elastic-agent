@@ -225,10 +225,11 @@ func (p *StatefulProvisioner) createDeployment(ctx context.Context, r common.Sta
 	}
 
 	createDeploymentRequest := CreateDeploymentRequest{
-		Name:    name,
-		Region:  p.cfg.Region,
-		Version: r.Version,
-		Tags:    tagArray,
+		Name:           name,
+		Region:         p.cfg.Region,
+		Version:        r.Version,
+		Tags:           tagArray,
+		KibanaMemoryMB: r.KibanaMemoryMB,
 	}
 
 	resp, err := p.client.CreateDeployment(ctx, createDeploymentRequest)

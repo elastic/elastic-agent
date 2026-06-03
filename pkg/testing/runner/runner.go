@@ -621,6 +621,7 @@ func (r *Runner) createRepoArchive(ctx context.Context, repoDir string, dir stri
 func (r *Runner) startStacks(ctx context.Context) error {
 	var versions []string
 	batchToVersion := make(map[string]string)
+	versionToKibanaMemory := make(map[string]int)
 	for _, lb := range r.batches {
 		if !lb.Skip && lb.Batch.Stack != nil {
 			if lb.Batch.Stack.Version == "" {
@@ -631,6 +632,9 @@ func (r *Runner) startStacks(ctx context.Context) error {
 				versions = append(versions, lb.Batch.Stack.Version)
 			}
 			batchToVersion[lb.ID] = lb.Batch.Stack.Version
+			if lb.Batch.Stack.KibanaMemoryMB > versionToKibanaMemory[lb.Batch.Stack.Version] {
+				versionToKibanaMemory[lb.Batch.Stack.Version] = lb.Batch.Stack.KibanaMemoryMB
+			}
 		}
 	}
 
@@ -638,8 +642,12 @@ func (r *Runner) startStacks(ctx context.Context) error {
 	for _, version := range versions {
 		id := strings.ReplaceAll(version, ".", "")
 		requests = append(requests, stackReq{
-			request: common.StackRequest{ID: id, Version: version},
-			stack:   r.findStack(id),
+			request: common.StackRequest{
+				ID:             id,
+				Version:        version,
+				KibanaMemoryMB: versionToKibanaMemory[version],
+			},
+			stack: r.findStack(id),
 		})
 	}
 

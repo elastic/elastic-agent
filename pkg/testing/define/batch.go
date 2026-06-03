@@ -206,6 +206,9 @@ func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch
 		if req.Stack != nil && batch.Stack == nil {
 			// assign the stack to this batch
 			batch.Stack = copyStack(req.Stack)
+		} else if req.Stack != nil && req.Stack.KibanaMemoryMB > batch.Stack.KibanaMemoryMB {
+			// take the highest KibanaMemoryMB requested by any test in this batch
+			batch.Stack.KibanaMemoryMB = req.Stack.KibanaMemoryMB
 		}
 		if req.Sudo {
 			batch.SudoTests = appendPackageTest(batch.SudoTests, tar.Package, tar.Test, req.Stack != nil)
