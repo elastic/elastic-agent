@@ -114,13 +114,6 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 		return err
 	}
 
-	// Persist the action before the async Ack() path. A re-exec triggered by
-	// handlePolicyChange can shut the agent down before Ack() updates the store,
-	// leaving the previous policy persisted. On restart, the stale action is
-	// replayed, causing another re-exec and an endless flip-flop. Writing here,
-	// in the dispatcher goroutine, keeps the state store consistent with fleet.enc
-	// before exit. Ack() will write the same action again, but duplicate IDs are
-	// safely deduplicated.
 	if h.stateStore != nil {
 		h.stateStore.SetAction(action)
 		if err := h.stateStore.Save(); err != nil {
