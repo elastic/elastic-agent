@@ -8,9 +8,12 @@ package ess
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httputil"
 	"os"
 	"path"
 	"path/filepath"
@@ -429,4 +432,28 @@ func getLogFilenames(
 	}
 
 	return logFiles, eventLogFiles
+}
+
+func sendPolicyUpdate(t *testing.T, info *define.Info, policyID, body string) {
+	t.Helper()
+
+	resp, err := info.KibanaClient.Send(
+		http.MethodPut,
+		fmt.Sprintf("/api/fleet/agent_policies/%s", policyID),
+		nil,
+		nil,
+		bytes.NewBufferString(body),
+	)
+	if err != nil {
+		t.Fatalf("could not execute request to Kibana/Fleet: %s", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		respDump, dumpErr := httputil.DumpResponse(resp, true)
+		if dumpErr != nil {
+			t.Fatalf("could not dump Kibana error response: %s", dumpErr)
+		}
+		t.Log("Kibana error response:")
+		t.Log(string(respDump))
+		t.Fatalf("received non-200 status when updating Fleet policy: %d", resp.StatusCode)
+	}
 }
