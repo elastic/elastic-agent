@@ -129,7 +129,7 @@ func TestEventLogFile(t *testing.T) {
 	})
 
 	// Now the Elastic-Agent is running, so validate the Event log file.
-	requireEventLogFileExistsWithData(t, agentFixture)
+	requireEventLogFileExistsWithData(t, agentFixture, "Publish event: ")
 	requireNoCopyProcessorError(t, agentFixture)
 
 	// The diagnostics command is already tested by another test,
@@ -254,7 +254,8 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 
 	// The default behaviour is to log events to the events log file
 	// so ensure this is happening
-	requireEventLogFileExistsWithData(t, agentFixture)
+	// As the mockEs returns indexing failures, we should see "Cannot index event" in the events log file
+	requireEventLogFileExistsWithData(t, agentFixture, "Cannot index event")
 
 	// Add a policy overwrite to change the events output to stderr
 	addOverwriteToPolicy(t, info, policyName, policyID)
@@ -302,7 +303,15 @@ func addOverwriteToPolicy(t *testing.T, info *define.Info, policyName, policyID 
           "to_stderr": true,
           "to_files": false
         }
-      }
+      },
+	  "internal": {
+		"runtime": {
+		  "default": "process",
+  		  "filebeat": {
+	  		"default": "process"
+		  }
+		}
+	  }
     }
   }
 }`, policyName)
@@ -367,11 +376,10 @@ func requireNoCopyProcessorError(t *testing.T, agentFixture *atesting.Fixture) {
 	}
 }
 
-func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixture) {
+func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixture, expectedStr string) {
 	logEntry := readEventLogFile(t, agentFixture)
 	// That's part of the generated event that is logged by the 'processor'
 	// logger at level debug
-	expectedStr := "Cannot index event"
 	if !strings.Contains(logEntry, expectedStr) {
 		t.Errorf(
 			"did not find the expected log entry ('%s') in the events log file",
