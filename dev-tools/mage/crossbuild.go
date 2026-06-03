@@ -7,7 +7,6 @@ package mage
 import (
 	"context"
 	"fmt"
-	"go/build"
 	"io/fs"
 	"log"
 	"os"
@@ -298,30 +297,30 @@ func (b GolangCrossBuilder) Build() error {
 		args = append(args,
 			"--env", fmt.Sprintf("EXEC_UID=%d", uid),
 			"--env", fmt.Sprintf("EXEC_GID=%d", gid),
+			"--env", fmt.Sprintf("CROSSBUILD_UID=%d", uid),
+			"--env", fmt.Sprintf("CROSSBUILD_GID=%d", gid),
 		)
 	}
 	if cfg.Build.VersionQualified {
 		args = append(args, "--env", "VERSION_QUALIFIER="+cfg.Build.VersionQualifier)
 	}
 
-	// We don't mount the mod cache when building with the upstream Go FIPS module. When setting
-	// a strict module version, the module archive has to be decompressed into the module cache directory.
-	// As such, it can't be readonly.
-	// TODO: Make crossbuild work as non-root and mount this as rw.
-	isWindowsFIPSBuild := cfg.Build.FIPSBuild && strings.HasPrefix(b.Platform, "windows")
-	if cfg.CrossBuild.MountModcache && !isWindowsFIPSBuild {
-		// Mount $GOPATH/pkg/mod into the container, read-only.
-		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
-		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
+	// Mount the mod cache directory into the container
+	hostModCacheDir, err := sh.Output("go", "env", "GOMODCACHE")
+	if err != nil {
+		return fmt.Errorf("error determining the Go mod cache location: %w", err)
 	}
+	modCacheLocation := "/tmp/.cache/gomod"
+	args = append(args, "-v", fmt.Sprintf("%s:%s", hostModCacheDir, modCacheLocation))
 
 	buildCacheLocation := "/tmp/.cache/go-build"
-	if cfg.CrossBuild.MountBuildCache {
-		// Mount the go build cache volume into the container.
-		args = append(args,
-			"-v", fmt.Sprintf("%s:%s", cfg.CrossBuild.BuildCacheVolumeName, buildCacheLocation),
-		)
+	hostCacheDir, err := sh.Output("go", "env", "GOCACHE")
+	if err != nil {
+		return fmt.Errorf("error determining the Go build cache location: %w", err)
 	}
+	args = append(args,
+		"-v", fmt.Sprintf("%s:%s", hostCacheDir, buildCacheLocation),
+	)
 
 	// Mount /opt/git-mirrors (if present) to resolve git alternates in CI
 	if _, err := os.Stat("/opt/git-mirrors"); err == nil {
@@ -330,8 +329,8 @@ func (b GolangCrossBuilder) Build() error {
 
 	args = append(args,
 		"--rm",
-		"--env", "GOFLAGS=-mod=readonly",
-		"--env", fmt.Sprintf("GOCACHE=%s", buildCacheLocation), // ensure this is writable by the user
+		"--env", fmt.Sprintf("GOCACHE=%s", buildCacheLocation),
+		"--env", fmt.Sprintf("GOMODCACHE=%s", modCacheLocation),
 		"--env", "MAGEFILE_VERBOSE="+verbose,
 		"--env", "MAGEFILE_TIMEOUT="+EnvOr("MAGEFILE_TIMEOUT", ""),
 		"--env", fmt.Sprintf("SNAPSHOT=%v", cfg.Build.Snapshot),
