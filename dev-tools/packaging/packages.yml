@@ -590,7 +590,7 @@ shared:
         source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh'
         mode: 0755
       'data/cloud_downloads/agentbeat-{{ agent_package_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
-        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-{{ agent_package_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
+        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-{{ agent_core_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
         mode: 0755
 
   - &agent_docker_cloud_fips_spec
@@ -605,7 +605,7 @@ shared:
         source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh'
         mode: 0755
       'data/cloud_downloads/agentbeat-fips-{{ agent_package_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
-        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-fips-{{ agent_package_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
+        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-fips-{{ agent_core_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
         mode: 0755
 
   # service build is based on previous cloud variant
