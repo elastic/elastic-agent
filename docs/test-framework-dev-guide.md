@@ -301,7 +301,7 @@ when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAM
 `ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, `KIBANA_PASSWORD`, and
 `ELASTIC_APM_SERVER_URL`.
 
-`TEST_INTEG_CLEAN_ON_EXIT=true|false` will determine whether mage artifacts and .integration-cache are cleaned on exit automatically.
+`TEST_INTEG_CLEAN_ON_EXIT=true|false` will determine whether mage artifacts and .integration-cache are cleaned on exit automatically. Defaults to `false` (no automatic cleanup) for local runs; CI sets this to `true` explicitly.
 
 ### Debugging tests
 

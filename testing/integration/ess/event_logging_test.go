@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/kibana"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
@@ -128,7 +129,7 @@ func TestEventLogFile(t *testing.T) {
 	})
 
 	// Now the Elastic-Agent is running, so validate the Event log file.
-	requireEventLogFileExistsWithData(t, agentFixture)
+	requireEventLogFileExistsWithData(t, agentFixture, "Publish event: ")
 	requireNoCopyProcessorError(t, agentFixture)
 
 	// The diagnostics command is already tested by another test,
@@ -166,7 +167,6 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		},
 		Group: "container",
 	})
-	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/5159")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -182,6 +182,29 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		info,
 		policyName,
 		outputID)
+
+	// Switch to process monitoring, as event logging is not yet supported for otel.
+	// https://github.com/elastic/elastic-agent/issues/8845
+	processMonUpdateReq := kibana.AgentPolicyUpdateRequest{
+		Name:      policyName,
+		Namespace: info.Namespace,
+		Overrides: map[string]any{
+			"agent": map[string]any{
+				"internal": map[string]any{
+					"runtime": map[string]any{
+						"default": "process",
+						"filebeat": map[string]any{
+							"default": "process",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err = info.KibanaClient.UpdatePolicy(ctx,
+		policyID, processMonUpdateReq)
+	require.NoError(t, err)
 
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	if err != nil {
@@ -231,7 +254,8 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 
 	// The default behaviour is to log events to the events log file
 	// so ensure this is happening
-	requireEventLogFileExistsWithData(t, agentFixture)
+	// As the mockEs returns indexing failures, we should see "Cannot index event" in the events log file
+	requireEventLogFileExistsWithData(t, agentFixture, "Cannot index event")
 
 	// Add a policy overwrite to change the events output to stderr
 	addOverwriteToPolicy(t, info, policyName, policyID)
@@ -267,7 +291,8 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 }
 
 func addOverwriteToPolicy(t *testing.T, info *define.Info, policyName, policyID string) {
-	addLoggingOverwriteBody := fmt.Sprintf(`
+	t.Helper()
+	body := fmt.Sprintf(`
 {
   "name": "%s",
   "namespace": "default",
@@ -278,36 +303,19 @@ func addOverwriteToPolicy(t *testing.T, info *define.Info, policyName, policyID 
           "to_stderr": true,
           "to_files": false
         }
-      }
+      },
+	  "internal": {
+		"runtime": {
+		  "default": "process",
+  		  "filebeat": {
+	  		"default": "process"
+		  }
+		}
+	  }
     }
   }
-}
-`, policyName)
-	resp, err := info.KibanaClient.Send(
-		http.MethodPut,
-		fmt.Sprintf("/api/fleet/agent_policies/%s", policyID),
-		nil,
-		nil,
-		bytes.NewBufferString(addLoggingOverwriteBody),
-	)
-	if err != nil {
-		t.Fatalf("could not execute request to Kibana/Fleet: %s", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		// On error dump the whole request response so we can easily spot
-		// what went wrong.
-		t.Errorf("received a non 200-OK when adding overwrite to policy. "+
-			"Status code: %d", resp.StatusCode)
-		respDump, err := httputil.DumpResponse(resp, true)
-		if err != nil {
-			t.Fatalf("could not dump error response from Kibana: %s", err)
-		}
-		// Make debugging as easy as possible
-		t.Log("================================================================================")
-		t.Log("Kibana error response:")
-		t.Log(string(respDump))
-		t.FailNow()
-	}
+}`, policyName)
+	sendPolicyUpdate(t, info, policyID, body)
 }
 
 func readEventLogFile(t *testing.T, agentFixture *atesting.Fixture) string {
@@ -327,7 +335,7 @@ func readEventLogFile(t *testing.T, agentFixture *atesting.Fixture) string {
 			t.Fatalf("could not scan for the events log file: %s", err)
 		}
 
-		if len(files) == 1 {
+		if len(files) >= 1 {
 			logFileName = files[0]
 			return true
 		}
@@ -368,11 +376,10 @@ func requireNoCopyProcessorError(t *testing.T, agentFixture *atesting.Fixture) {
 	}
 }
 
-func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixture) {
+func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixture, expectedStr string) {
 	logEntry := readEventLogFile(t, agentFixture)
 	// That's part of the generated event that is logged by the 'processor'
 	// logger at level debug
-	expectedStr := "TestEventLogFile"
 	if !strings.Contains(logEntry, expectedStr) {
 		t.Errorf(
 			"did not find the expected log entry ('%s') in the events log file",
@@ -433,4 +440,28 @@ func getLogFilenames(
 	}
 
 	return logFiles, eventLogFiles
+}
+
+func sendPolicyUpdate(t *testing.T, info *define.Info, policyID, body string) {
+	t.Helper()
+
+	resp, err := info.KibanaClient.Send(
+		http.MethodPut,
+		fmt.Sprintf("/api/fleet/agent_policies/%s", policyID),
+		nil,
+		nil,
+		bytes.NewBufferString(body),
+	)
+	if err != nil {
+		t.Fatalf("could not execute request to Kibana/Fleet: %s", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		respDump, dumpErr := httputil.DumpResponse(resp, true)
+		if dumpErr != nil {
+			t.Fatalf("could not dump Kibana error response: %s", dumpErr)
+		}
+		t.Log("Kibana error response:")
+		t.Log(string(respDump))
+		t.Fatalf("received non-200 status when updating Fleet policy: %d", resp.StatusCode)
+	}
 }
