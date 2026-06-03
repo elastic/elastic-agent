@@ -109,12 +109,12 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 	}
 
 	h.log.Debugf("handlerPolicyChange: emit configuration for action %+v", a)
-	err = h.handlePolicyChange(ctx, c)
+	err = h.handlePolicyChange(ctx, c, action)
 	if err != nil {
 		return err
 	}
 
-	h.ch <- newPolicyChange(ctx, h.log, c, a, acker, false, h.stateStore, h.disableAckFn())
+	h.ch <- newPolicyChange(ctx, h.log, c, a, acker, false, h.disableAckFn())
 	return nil
 }
 
@@ -236,7 +236,7 @@ func emptyCertificateConfig() tlscommon.CertificateConfig {
 	return tlscommon.CertificateConfig{}
 }
 
-func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) error {
+func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config, action *fleetapi.ActionPolicyChange) error {
 	partialCfg, err := configuration.NewPartialFromConfigNoDefaults(c)
 	if err != nil {
 		return fmt.Errorf("parsing fleet config: %w", err)
@@ -262,28 +262,15 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return fmt.Errorf("failed to parse policy configuration: %w", err)
 	}
 
+	// Step 3: Set the policy log level, the runtime step below reads it back.
 	policyLogLevel := logger.DefaultLogLevel.String()
 	if loggingConfig != nil {
 		policyLogLevel = loggingConfig.Level.String()
 	}
-
-	// Step 3: Update in-memory caches.
-	if validatedFleetConfig != nil {
-		h.config.Fleet.Client = *validatedFleetConfig
-	}
-	if loggingConfig != nil {
-		h.config.Settings.LoggingConfig.Level = loggingConfig.Level
-	}
-	h.config.Settings.MonitoringConfig.HTTP = cfg.Settings.MonitoringConfig.HTTP
-	h.config.Settings.MonitoringConfig.Pprof = cfg.Settings.MonitoringConfig.Pprof
 	h.agentInfo.SetLogLevelPolicy(policyLogLevel)
 
-	// Step 4: Persist the updated configuration to disk.
-	if err := saveConfig(h.agentInfo, h.config, h.store, h.log); err != nil {
-		return fmt.Errorf("failed to persist policy config: %w", err)
-	}
-
-	// Step 5: Apply runtime changes.
+	// Step 4: Apply runtime changes before persisting, so a failure leaves
+	// fleet.enc and the state store untouched.
 	var runtimeErr error
 	if err := h.applyFleetClientConfig(validatedFleetConfig); err != nil {
 		runtimeErr = goerrors.Join(runtimeErr, fmt.Errorf("failed to apply Fleet client config: %w", err))
@@ -299,15 +286,40 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 			runtimeErr = goerrors.Join(runtimeErr, fmt.Errorf("failed to set runtime log level: %w", err))
 		}
 	}
-
-	// If the event logging or file logging output has changed, re-exec the agent so it picks up
-	// the newly-persisted logging config on startup.
-	if h.applyEventLoggingOutputChange(partialCfg) || h.applyLoggingConfigChanged(cfg, loggingConfig) {
-		h.runtimeLogLevelSetter.ReExec(nil)
-	}
-
 	if runtimeErr != nil {
 		return runtimeErr
+	}
+
+	// Step 5: Commit. Nothing below can fail so we update the caches, persist the
+	// config and the action and then re-exec.
+	//
+	// The caches are updated here, not earlier, because they are the baseline we
+	// compare the next policy against. If we updated them before a failure, the
+	// resent policy would look unchanged and we would skip re-applying it.
+	hasEventLoggingChanged := h.applyEventLoggingOutputChange(partialCfg)
+  hasLoggingChanged := h.applyLoggingConfigChanged(cfg, loggingConfig)
+	if validatedFleetConfig != nil {
+		h.config.Fleet.Client = *validatedFleetConfig
+	}
+	if loggingConfig != nil {
+		h.config.Settings.LoggingConfig.Level = loggingConfig.Level
+	}
+	h.config.Settings.MonitoringConfig.HTTP = cfg.Settings.MonitoringConfig.HTTP
+	h.config.Settings.MonitoringConfig.Pprof = cfg.Settings.MonitoringConfig.Pprof
+
+	if err := saveConfig(h.agentInfo, h.config, h.store, h.log); err != nil {
+		return fmt.Errorf("failed to persist policy config: %w", err)
+	}
+	if h.stateStore != nil && action != nil {
+		h.stateStore.SetAction(action)
+		if err := h.stateStore.Save(); err != nil {
+			h.log.Warnf("failed to persist policy action to state store: %v", err)
+		}
+	}
+
+	// Re-exec so the new event logging output is applied on restart.
+	if hasEventLoggingChanged || hasLoggingChanged {
+		h.runtimeLogLevelSetter.ReExec(nil)
 	}
 
 	return nil
@@ -482,7 +494,6 @@ type policyChange struct {
 	action     fleetapi.Action
 	acker      acker.Acker
 	ackWatcher chan struct{}
-	stateStore stateStore
 	disableAck bool
 }
 
@@ -493,7 +504,6 @@ func newPolicyChange(
 	action fleetapi.Action,
 	acker acker.Acker,
 	makeCh bool,
-	stateStore stateStore,
 	disableAck bool) *policyChange {
 	var ackWatcher chan struct{}
 	if makeCh {
@@ -507,7 +517,6 @@ func newPolicyChange(
 		action:     action,
 		acker:      acker,
 		ackWatcher: ackWatcher,
-		stateStore: stateStore,
 		disableAck: disableAck,
 	}
 }
@@ -530,13 +539,6 @@ func (l *policyChange) Config() *config.Config {
 //     propagates so the coordinator can retry.
 //  3. Commit the ack batch. Failures propagate.
 func (l *policyChange) Ack() error {
-	if pc, ok := l.action.(*fleetapi.ActionPolicyChange); ok && pc != nil && l.stateStore != nil {
-		l.stateStore.SetAction(pc)
-		if err := l.stateStore.Save(); err != nil && l.log != nil {
-			return fmt.Errorf("failed to perist policy change action to state store: %w", err)
-		}
-	}
-
 	if !l.disableAck && l.action != nil {
 		if err := l.acker.Ack(l.ctx, l.action); err != nil {
 			return err
