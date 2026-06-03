@@ -423,6 +423,11 @@ outputs:
     hosts: [{{ .ESHost }}]
     api_key: placeholder
 agent.monitoring.enabled: false
+# Force process (subprocess) mode for httpjson. The default runtime for all filebeat inputs
+# is otel (see DefaultRuntimeConfig), but in otel mode the fbreceiver stores paths in
+# b.Info.Paths rather than the global paths.Paths, so the httpjson tracer path validation
+# reads an uninitialised paths.Paths.Logs and rejects the tracer filename. In process mode
+# filebeat runs as a subprocess and initialises the global paths normally.
 agent.internal.runtime.filebeat.httpjson: process
 `
 
