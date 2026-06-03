@@ -319,7 +319,7 @@ func ZipArchive(
 	}
 
 	// Gather Logs:
-	return zipLogs(zw, ts, topPath, excludeEvents)
+	return zipLogs(zw, ts, topPath, excludeEvents, errOut)
 }
 
 func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
@@ -379,7 +379,7 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 	return err
 }
 
-func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) error {
+func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool, errOut io.Writer) error {
 	homePath := paths.HomeFrom(topPath)
 	dataPath := paths.DataFrom(topPath)
 	currentDir := filepath.Base(homePath)
@@ -394,13 +394,14 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) e
 	}
 
 	if err := collectServiceComponentsLogs(zw); err != nil {
-		return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
+		fmt.Fprintf(errOut, "[WARNING] failed to collect endpoint-security logs: %s\n", err)
 	}
 
 	if !paths.IsVersionHome() {
 		// running in a container with custom top path set
 		// logs are directly under top path
-		return zipLogsWithPath(homePath, currentDir, excludeEvents, zw, ts)
+		zipLogsWithPath(homePath, currentDir, excludeEvents, zw, ts, errOut)
+		return nil
 	}
 
 	dataDir, err := os.Open(dataPath)
@@ -420,9 +421,7 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) e
 			continue
 		}
 		path := filepath.Join(dataPath, dir)
-		if err := zipLogsWithPath(path, dir, excludeEvents, zw, ts); err != nil {
-			return err
-		}
+		zipLogsWithPath(path, dir, excludeEvents, zw, ts, errOut)
 	}
 
 	return nil
@@ -430,38 +429,47 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) e
 
 // zipLogsWithPath walks {pathsHome}/logs and {pathsHome}/components/logs and copies them into zw
 // under "logs/<commitName>/" and "logs/<commitName>/components/" respectively.
-func zipLogsWithPath(pathsHome, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time) error {
-	_, err := zw.CreateHeader(&zip.FileHeader{
+func zipLogsWithPath(pathsHome, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer) {
+	if _, err := zw.CreateHeader(&zip.FileHeader{
 		Name:     "logs/" + commitName + "/",
 		Method:   zip.Deflate,
 		Modified: ts,
-	})
-	if err != nil {
-		return err
+	}); err != nil {
+		fmt.Fprintf(errOut, "[WARNING] failed to create logs dir entry for %s: %s\n", commitName, err)
 	}
 
-	if err := walkLogPath(filepath.Join(pathsHome, "logs"), commitName, excludeEvents, zw, ts); err != nil {
-		return err
+	if err := walkLogPath(filepath.Join(pathsHome, "logs"), commitName, excludeEvents, zw, ts, errOut); err != nil {
+		fmt.Fprintf(errOut, "[WARNING] failed to collect logs from %s: %s\n", pathsHome, err)
+	}
+
+	if _, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "logs/" + commitName + "/components/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	}); err != nil {
+		fmt.Fprintf(errOut, "[WARNING] failed to create components logs dir entry for %s: %s\n", commitName, err)
 	}
 
 	// Beat receivers write trace logs under {pathsHome}/components/logs.
-	// Collect them under logs/<commitName>/ (same as agent logs) so the zip layout matches
-	// 8.19.x where trace files lived under {pathsHome}/logs directly.
-	return walkLogPath(filepath.Join(pathsHome, "components", "logs"), commitName, excludeEvents, zw, ts)
+	// Mirror that structure under logs/<commitName>/components/ to reflect the source layout.
+	if err := walkLogPath(filepath.Join(pathsHome, "components", "logs"), filepath.Join(commitName, "components"), excludeEvents, zw, ts, errOut); err != nil {
+		fmt.Fprintf(errOut, "[WARNING] failed to collect component logs from %s: %s\n", pathsHome, err)
+	}
 }
 
-func walkLogPath(logRoot, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time) error {
+func walkLogPath(logRoot, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer) error {
 	logPath := logRoot + string(filepath.Separator)
-	return filepath.WalkDir(logPath, zipLogWalkFunc(logPath, commitName, excludeEvents, zw, ts))
+	return filepath.WalkDir(logPath, zipLogWalkFunc(logPath, commitName, excludeEvents, zw, ts, errOut))
 }
 
-func zipLogWalkFunc(logPath, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time) func(path string, d fs.DirEntry, fErr error) error {
+func zipLogWalkFunc(logPath, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer) func(path string, d fs.DirEntry, fErr error) error {
 	return func(path string, d fs.DirEntry, fErr error) error {
 		if errors.Is(fErr, fs.ErrNotExist) {
 			return nil
 		}
 		if fErr != nil {
-			return fmt.Errorf("unable to walk log dir: %w", fErr)
+			fmt.Fprintf(errOut, "[WARNING] unable to walk log dir %s: %s\n", path, fErr)
+			return nil
 		}
 
 		// name is the relative dir/file name replacing any filepath seperators with /
@@ -482,13 +490,12 @@ func zipLogWalkFunc(logPath, commitName string, excludeEvents bool, zw *zip.Writ
 		name = filepath.Join(commitName, name)
 
 		if d.IsDir() {
-			_, err := zw.CreateHeader(&zip.FileHeader{
+			if _, err := zw.CreateHeader(&zip.FileHeader{
 				Name:     "logs/" + filepath.ToSlash(name) + "/",
 				Method:   zip.Deflate,
 				Modified: ts,
-			})
-			if err != nil {
-				return fmt.Errorf("unable to create log directory in archive: %w", err)
+			}); err != nil {
+				fmt.Fprintf(errOut, "[WARNING] unable to create log directory in archive %s: %s\n", name, err)
 			}
 			return nil
 		}
@@ -496,7 +503,7 @@ func zipLogWalkFunc(logPath, commitName string, excludeEvents bool, zw *zip.Writ
 		// Add the file to the zip.
 		// Ignore files that don't exist to account for races with log rotation.
 		if err := saveLogs(name, path, zw); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return err
+			fmt.Fprintf(errOut, "[WARNING] unable to save log file %s: %s\n", path, err)
 		}
 		return nil
 	}

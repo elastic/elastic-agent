@@ -447,6 +447,7 @@ func TestZipLogs(t *testing.T) {
 				{"logs/elastic-agent-unknow/events/elastic-agent-events-log.ndjson", false},
 				{"logs/elastic-agent-unknow/sub-dir/", true},
 				{"logs/elastic-agent-unknow/sub-dir/log.ndjson", false},
+				{"logs/elastic-agent-unknow/components/", true},
 			},
 		},
 
@@ -458,6 +459,7 @@ func TestZipLogs(t *testing.T) {
 				{"logs/elastic-agent-unknow/", true},
 				{"logs/elastic-agent-unknow/sub-dir/", true},
 				{"logs/elastic-agent-unknow/sub-dir/log.ndjson", false},
+				{"logs/elastic-agent-unknow/components/", true},
 			},
 		},
 	}
@@ -483,13 +485,14 @@ func TestZipLogsComponentsLogs(t *testing.T) {
 	expected := []zippedItem{
 		{"logs/", true},
 		{"logs/elastic-agent-unknow/", true},
-		{"logs/elastic-agent-unknow/httpjson/", true},
-		{"logs/elastic-agent-unknow/httpjson/http-request-trace-test.ndjson", false},
+		{"logs/elastic-agent-unknow/components/", true},
+		{"logs/elastic-agent-unknow/components/httpjson/", true},
+		{"logs/elastic-agent-unknow/components/httpjson/http-request-trace-test.ndjson", false},
 	}
 
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now(), topPath, true))
+	require.NoError(t, zipLogs(w, time.Now(), topPath, true, io.Discard))
 	require.NoError(t, w.Close())
 
 	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
@@ -521,14 +524,14 @@ func TestZipLogsComponentsLogsMultiVersionedHome(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now(), topPath, true))
+	require.NoError(t, zipLogs(w, time.Now(), topPath, true, io.Discard))
 	require.NoError(t, w.Close())
 
 	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
 	require.NoError(t, err)
 
-	// Component trace logs land under logs/<version>/httpjson/ matching the 8.19 zip layout.
-	traceName := "logs/" + currentDir + "/httpjson/http-request-trace-test.ndjson"
+	// Component trace logs land under logs/<version>/components/httpjson/ mirroring the source layout.
+	traceName := "logs/" + currentDir + "/components/httpjson/http-request-trace-test.ndjson"
 	var count int
 	for _, f := range r.File {
 		if f.Name == traceName {
@@ -551,7 +554,7 @@ func TestZipLogsUnversionedHome(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now(), topPath, true))
+	require.NoError(t, zipLogs(w, time.Now(), topPath, true, io.Discard))
 	require.NoError(t, w.Close())
 
 	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
@@ -573,7 +576,7 @@ func zipLogsAndAssertFiles(t *testing.T, topPath string, excludeEvents bool, exp
 	// Zip the logs directory.
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now(), topPath, excludeEvents))
+	require.NoError(t, zipLogs(w, time.Now(), topPath, excludeEvents, io.Discard))
 	require.NoError(t, w.Close())
 
 	// Read back the contents.
