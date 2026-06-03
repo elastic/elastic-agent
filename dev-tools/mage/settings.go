@@ -739,7 +739,7 @@ func (s *Settings) setPackagingDefaults() {
 
 // setIntegrationTestDefaults sets default values for IntegrationTestSettings.
 func (s *Settings) setIntegrationTestDefaults() {
-	s.IntegrationTest.CleanOnExit = true
+	s.IntegrationTest.CleanOnExit = false
 	s.IntegrationTest.TestEnvironmentEnabled = true
 }
 
@@ -1627,7 +1627,9 @@ func (s *Settings) loadIntegrationTestSettingsFromEnv() error {
 	if os.Getenv("TEST_RUN_UNTIL_FAILURE") == "true" {
 		s.IntegrationTest.RunUntilFailure = true
 	}
-	if os.Getenv("TEST_INTEG_CLEAN_ON_EXIT") == "false" {
+	if v := os.Getenv("TEST_INTEG_CLEAN_ON_EXIT"); v == "true" {
+		s.IntegrationTest.CleanOnExit = true
+	} else if v == "false" {
 		s.IntegrationTest.CleanOnExit = false
 	}
 	if v := os.Getenv("TEST_LONG_RUNNING"); v != "" {
