@@ -297,7 +297,8 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	// compare the next policy against. If we updated them before a failure, the
 	// resent policy would look unchanged and we would skip re-applying it.
 	hasEventLoggingChanged := h.applyEventLoggingOutputChange(partialCfg)
-  hasLoggingChanged := h.applyLoggingConfigChanged(cfg, loggingConfig)
+	hasLoggingChanged := h.applyLoggingConfigChange(cfg, loggingConfig)
+
 	if validatedFleetConfig != nil {
 		h.config.Fleet.Client = *validatedFleetConfig
 	}
@@ -342,7 +343,7 @@ func (h *PolicyChangeHandler) applyEventLoggingOutputChange(new *configuration.C
 	return true
 }
 
-func (h *PolicyChangeHandler) applyLoggingConfigChanged(new *configuration.Configuration, loggingConfig *logger.Config) bool {
+func (h *PolicyChangeHandler) applyLoggingConfigChange(new *configuration.Configuration, loggingConfig *logger.Config) bool {
 	if loggingConfig == nil {
 		return false
 	}

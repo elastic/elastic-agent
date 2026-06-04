@@ -1264,7 +1264,10 @@ func TestFleetToReaderPersistsLoggingOutputFlags(t *testing.T) {
 		}))
 		require.NoError(t, err)
 
-		assert.False(t, h.applyLoggingConfigChanged(policyWithSameLogging, nil),
+		assert.False(t, h.applyLoggingConfigChange(policyWithSameLogging, &logger.Config{
+			ToStderr: true,
+			ToFiles:  false,
+		}),
 			"after re-exec + reload the same policy must not be detected as a logging change, which would cause an infinite re-exec loop")
 	})
 }
