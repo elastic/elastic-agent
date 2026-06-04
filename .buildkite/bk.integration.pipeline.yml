@@ -11,9 +11,18 @@ env:
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1780275718"
   IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1780275718"
   IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1780275718"
+  IMAGE_RHEL_9: "platform-ingest-elastic-agent-rhel-9-1780275718"
   IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1780275718"
   IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1780275718"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1780275718"
   IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1780275718"
+  IMAGE_ALMALINUX_9: "platform-ingest-elastic-agent-almalinux-9-1780275718"
+  IMAGE_ALMALINUX_10: "platform-ingest-elastic-agent-almalinux-10-1780275718"
+  IMAGE_ORACLE_8: "platform-ingest-elastic-agent-oracle-8-1780275718"
+  IMAGE_ORACLE_9: "platform-ingest-elastic-agent-oracle-9-1780275718"
+  IMAGE_ORACLE_10: "platform-ingest-elastic-agent-oracle-10-1780275718"
+  IMAGE_ROCKY_9: "platform-ingest-elastic-agent-rocky-9-1780275718"
+  IMAGE_ROCKY_10: "platform-ingest-elastic-agent-rocky-10-1780275718"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1780275718"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1780275718"
   IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1780275718"
@@ -788,6 +797,7 @@ steps:
               - "${IMAGE_UBUNTU_2204_X86_64}"
               - "${IMAGE_UBUNTU_2404_X86_64}"
               - "${IMAGE_DEBIAN_11}"
+              - "${IMAGE_DEBIAN_12}"
               - "${IMAGE_DEBIAN_13}"
             variant:
               - default
@@ -822,6 +832,7 @@ steps:
               - "${IMAGE_UBUNTU_2204_X86_64}"
               - "${IMAGE_UBUNTU_2404_X86_64}"
               - "${IMAGE_DEBIAN_11}"
+              - "${IMAGE_DEBIAN_12}"
               - "${IMAGE_DEBIAN_13}"
             variant: *linux_deb_variants
 
@@ -851,8 +862,16 @@ steps:
         matrix:
           setup:
             os:
+              - "${IMAGE_ALMALINUX_9}"
+              - "${IMAGE_ALMALINUX_10}"
+              - "${IMAGE_ORACLE_8}"
+              - "${IMAGE_ORACLE_9}"
+              - "${IMAGE_ORACLE_10}"
               - "${IMAGE_RHEL_8}"
+              - "${IMAGE_RHEL_9}"
               - "${IMAGE_RHEL_10}"
+              - "${IMAGE_ROCKY_9}"
+              - "${IMAGE_ROCKY_10}"
             sudo:
               - "true"
               - "false"
