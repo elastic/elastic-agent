@@ -7,6 +7,7 @@ package define
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -102,7 +103,7 @@ func DetermineBatches(dir string, testFlags string, buildTags ...string) ([]Batc
 	}
 
 	cmdArgs = append(cmdArgs, dir)
-	testCmd := exec.Command("go", cmdArgs...)
+	testCmd := exec.CommandContext(context.Background(), "go", cmdArgs...)
 	output, err := testCmd.Output()
 	if err != nil {
 		// format cmdArgs to make the error message more coherent
