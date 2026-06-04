@@ -703,12 +703,18 @@ func PackageTarGz(spec PackageSpec) error {
 	// 	spec.Files = newFiles
 	// }
 
+	// When building multiple package types simultaneously (e.g. PACKAGES=all),
+	// components that only support Docker may land in the shared drop path.
+	// Derive the exclusion list from the spec's component definitions so any
+	// future Docker-only component is also excluded without a code change.
+	excludedFromTar := componentFilesNotSupportingPackageType(spec.Components, pkgcommon.TarGz)
+
 	// Add files to tar (dirs before files so explicit entries take precedence).
 	for _, pkgFile := range dirsFirst(spec.Files) {
 		if pkgFile.Symlink {
 			continue
 		}
-		if err := addFileToTar(w, baseDir, pkgFile); err != nil {
+		if err := addFileToTar(w, baseDir, pkgFile, excludedFromTar); err != nil {
 			return fmt.Errorf("failed adding file=%+v to tar: %w", pkgFile, err)
 		}
 	}
@@ -990,10 +996,22 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 	})
 }
 
-// addFileToTar adds a file (or directory) to a tar archive.
-func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
-	excludedFiles := []string{}
+// componentFilesNotSupportingPackageType returns the binary names and spec
+// filenames of components whose packageTypes field does not include pkgType.
+// These files should be excluded when assembling an archive of that type.
+func componentFilesNotSupportingPackageType(components []packaging.BinarySpec, pkgType pkgcommon.PackageType) []string {
+	var excluded []string
+	for _, comp := range components {
+		if !comp.SupportsPackageType(pkgType) {
+			excluded = append(excluded, comp.BinaryName, comp.BinaryName+".spec.yml")
+		}
+	}
+	return excluded
+}
 
+// addFileToTar adds a file (or directory) to a tar archive.
+// excludedFiles is a list of base filenames (not paths) to skip during the walk.
+func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile, excludedFiles []string) error {
 	return filepath.WalkDir(pkgFile.Source, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
