@@ -32,14 +32,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
@@ -360,7 +359,7 @@ func TestFleetGateway(t *testing.T) {
 				data, err := io.ReadAll(body)
 				require.NoError(t, err)
 
-				var checkinRequest fleetapi.CheckinRequest
+				var checkinRequest pkgfleetapi.CheckinRequest
 				err = json.Unmarshal(data, &checkinRequest)
 				require.NoError(t, err)
 
@@ -617,7 +616,7 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		defer cancel()
 
 		unauth := func(_ http.Header, _ io.Reader) (*http.Response, error) {
-			return nil, client.ErrInvalidAPIKey
+			return nil, pkgfleetapi.ErrInvalidAPIKey
 		}
 
 		clientWaitFn := c.Answer(unauth)
@@ -682,7 +681,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 		name       string
 		components []runtime.ComponentComponentState
 		collector  *status.AggregateStatus
-		expected   []fleetapi.CheckinComponent
+		expected   []pkgfleetapi.CheckinComponent
 	}{
 		{
 			name:       "Nil inputs",
@@ -694,7 +693,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 			name:       "Empty inputs",
 			components: []runtime.ComponentComponentState{},
 			collector:  &status.AggregateStatus{},
-			expected:   []fleetapi.CheckinComponent{},
+			expected:   []pkgfleetapi.CheckinComponent{},
 		},
 		{
 			name: "Only agent components",
@@ -722,7 +721,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 				},
 			},
 			collector: nil,
-			expected: []fleetapi.CheckinComponent{
+			expected: []pkgfleetapi.CheckinComponent{
 				{
 					ID:      "comp-1",
 					Type:    "log",
@@ -734,7 +733,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					Type:    "log",
 					Status:  "DEGRADED",
 					Message: "Component is degraded",
-					Units: []fleetapi.CheckinUnit{
+					Units: []pkgfleetapi.CheckinUnit{
 						{
 							ID:      "unit-1",
 							Type:    "input",
@@ -775,13 +774,13 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					},
 				},
 			},
-			expected: []fleetapi.CheckinComponent{
+			expected: []pkgfleetapi.CheckinComponent{
 				{
 					ID:      "extensions",
 					Type:    "otel",
 					Status:  "HEALTHY",
 					Message: "Healthy",
-					Units: []fleetapi.CheckinUnit{
+					Units: []pkgfleetapi.CheckinUnit{
 						{
 							ID:      "extensions:healthcheck",
 							Type:    "",
@@ -795,7 +794,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					Type:    "otel",
 					Status:  "DEGRADED",
 					Message: "Recoverable: pipeline error",
-					Units: []fleetapi.CheckinUnit{
+					Units: []pkgfleetapi.CheckinUnit{
 						{
 							ID:      "exporter:elasticsearch",
 							Type:    "output",
@@ -836,7 +835,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					},
 				},
 			},
-			expected: []fleetapi.CheckinComponent{
+			expected: []pkgfleetapi.CheckinComponent{
 				{
 					ID:      "comp-1",
 					Type:    "log",
@@ -869,13 +868,13 @@ func TestConvertToCheckingComponents(t *testing.T) {
 				},
 			},
 			collector: nil,
-			expected: []fleetapi.CheckinComponent{
+			expected: []pkgfleetapi.CheckinComponent{
 				{
 					ID:      "comp-1",
 					Type:    "log",
 					Status:  "",
 					Message: "Unknown state",
-					Units: []fleetapi.CheckinUnit{
+					Units: []pkgfleetapi.CheckinUnit{
 						{
 							ID:      "unit-1",
 							Type:    "",
@@ -901,13 +900,13 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					},
 				},
 			},
-			expected: []fleetapi.CheckinComponent{
+			expected: []pkgfleetapi.CheckinComponent{
 				{
 					ID:      "invalid-id",
 					Type:    "otel",
 					Status:  "HEALTHY",
 					Message: "Healthy",
-					Units: []fleetapi.CheckinUnit{
+					Units: []pkgfleetapi.CheckinUnit{
 						{
 							ID:      "invalid-unit-id",
 							Type:    "",
@@ -924,11 +923,11 @@ func TestConvertToCheckingComponents(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := convertToCheckinComponents(logp.NewNopLogger(), tt.components, tt.collector)
 			// Testify diffs are nicer if we sort and compare directly vs using ElementsMathc
-			slices.SortFunc(result, func(a, b fleetapi.CheckinComponent) int {
+			slices.SortFunc(result, func(a, b pkgfleetapi.CheckinComponent) int {
 				return strings.Compare(a.ID, b.ID)
 			})
 			for _, c := range result {
-				slices.SortFunc(c.Units, func(a, b fleetapi.CheckinUnit) int {
+				slices.SortFunc(c.Units, func(a, b pkgfleetapi.CheckinUnit) int {
 					return strings.Compare(a.ID, b.ID)
 				})
 			}
