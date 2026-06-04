@@ -127,30 +127,40 @@ func FindMSIProductCodes() []string {
 	}
 	defer k.Close()
 
-	var guids []string
-	for {
-		names, err := k.ReadSubKeyNames(100)
-		for _, name := range names {
-			// The Elastic Agent MSI ProductCode varies per version but
-			// it always starts with "{E550A894-5C44-5BEF-9967-".
-			// See: https://github.com/elastic/elastic-stack-installers/blob/main/src/shared/Uuid5.cs
-			if !strings.HasPrefix(strings.ToUpper(name), "{E550A894-5C44-5BEF-9967-") {
-				continue
-			}
-			subKey, subErr := registry.OpenKey(registry.LOCAL_MACHINE, UninstallKeyPath+`\`+name, registry.QUERY_VALUE)
-			if subErr != nil {
-				continue
-			}
-			displayName, _, _ := subKey.GetStringValue("DisplayName")
-			winInstaller, _, _ := subKey.GetIntegerValue("WindowsInstaller")
-			subKey.Close()
+	return findMSIProductCodes(k)
+}
 
-			if strings.HasPrefix(displayName, "Elastic Agent") && winInstaller == 1 {
-				guids = append(guids, name)
-			}
+// findMSIProductCodes enumerates the subkeys of the given open Uninstall key
+// and returns the names of the Elastic Agent MSI entries.
+func findMSIProductCodes(k registry.Key) []string {
+	// Pass -1 to read all subkey names in a single call. Passing a positive
+	// count (e.g. 100) does not paginate: ReadSubKeyNames always enumerates
+	// from index 0 and returns a nil error whenever the key has at least that
+	// many subkeys, so looping on a non-nil error spins forever on hosts with
+	// many Add/Remove Programs entries.
+	names, err := k.ReadSubKeyNames(-1)
+	if err != nil {
+		return nil
+	}
+
+	var guids []string
+	for _, name := range names {
+		// The Elastic Agent MSI ProductCode varies per version but
+		// it always starts with "{E550A894-5C44-5BEF-9967-".
+		// See: https://github.com/elastic/elastic-stack-installers/blob/main/src/shared/Uuid5.cs
+		if !strings.HasPrefix(strings.ToUpper(name), "{E550A894-5C44-5BEF-9967-") {
+			continue
 		}
-		if err != nil {
-			break
+		subKey, subErr := registry.OpenKey(k, name, registry.QUERY_VALUE)
+		if subErr != nil {
+			continue
+		}
+		displayName, _, _ := subKey.GetStringValue("DisplayName")
+		winInstaller, _, _ := subKey.GetIntegerValue("WindowsInstaller")
+		subKey.Close()
+
+		if strings.HasPrefix(displayName, "Elastic Agent") && winInstaller == 1 {
+			guids = append(guids, name)
 		}
 	}
 	return guids
