@@ -7,11 +7,8 @@
 package ess
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"net/http"
-	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,7 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
-func TestLoggingFileConfigViaFleet(t *testing.T) {
+func TestLoggingFileLevelChangeViaFleet(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack: &define.Stack{},
 		Local: false,
@@ -68,10 +65,6 @@ func TestLoggingFileConfigViaFleet(t *testing.T) {
 		return waitForAgentAndFleetHealthy(ctx, t, f)
 	}, 2*time.Minute, 5*time.Second, "agent never became healthy before logging policy change")
 
-	logGlob := filepath.Join(
-		f.WorkDir(), "data", "elastic-agent-*", "logs", "*.ndjson",
-	)
-
 	t.Log("Applying policy override: agent.logging.to_files=false, agent.logging.to_stderr=true")
 	applyMainLoggingOutputPolicy(t, info, policyResp.AgentPolicy, true, false)
 
@@ -81,9 +74,10 @@ func TestLoggingFileConfigViaFleet(t *testing.T) {
 		"agent never became healthy after logging config policy change")
 	t.Log("Agent is healthy after the initial re-exec — starting loop observation")
 
-	logFilesAfter, globErr := filepath.Glob(logGlob)
-	require.NoError(t, globErr, "globbing log files after policy change")
-	t.Logf("Agent log files present on disk after to_files=false: %v", logFilesAfter)
+	inspectOutput, err := f.ExecInspect(ctx)
+	require.NoError(t, err, "failed to exec inspect after logging policy change")
+	require.True(t, inspectOutput.Agent.Logging.ToStderr)
+	require.False(t, inspectOutput.Agent.Logging.ToFiles)
 }
 
 func applyMainLoggingOutputPolicy(t *testing.T, info *define.Info, policy kibana.AgentPolicy, toStderr, toFiles bool) {
@@ -168,6 +162,12 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 		return len(matches) > 0
 	}, 2*time.Minute, 5*time.Second,
 		"no log files found in custom log directory %s after path change", customLogDir)
+
+	inspectOutput, err := f.ExecInspect(ctx)
+	require.NoError(t, err, "failed to exec inspect after logging policy change")
+	require.False(t, inspectOutput.Agent.Logging.ToStderr)
+	require.True(t, inspectOutput.Agent.Logging.ToFiles)
+	require.Equal(t, customLogDir, inspectOutput.Agent.Logging.Files.Path)
 }
 
 func applyLoggingFilePathPolicy(t *testing.T, info *define.Info, policy kibana.AgentPolicy, logPath string) {
@@ -191,28 +191,4 @@ func applyLoggingFilePathPolicy(t *testing.T, info *define.Info, policy kibana.A
 }`, policy.Name, policy.Namespace, logPath)
 
 	sendPolicyUpdate(t, info, policy.ID, body)
-}
-
-func sendPolicyUpdate(t *testing.T, info *define.Info, policyID, body string) {
-	t.Helper()
-
-	resp, err := info.KibanaClient.Send(
-		http.MethodPut,
-		fmt.Sprintf("/api/fleet/agent_policies/%s", policyID),
-		nil,
-		nil,
-		bytes.NewBufferString(body),
-	)
-	if err != nil {
-		t.Fatalf("could not execute request to Kibana/Fleet: %s", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		respDump, dumpErr := httputil.DumpResponse(resp, true)
-		if dumpErr != nil {
-			t.Fatalf("could not dump Kibana error response: %s", dumpErr)
-		}
-		t.Log("Kibana error response:")
-		t.Log(string(respDump))
-		t.Fatalf("received non-200 status when updating Fleet policy: %d", resp.StatusCode)
-	}
 }
