@@ -13,8 +13,13 @@ tags:
 
 # Build args passed to Dockerfile ARGs
 args:
+<<<<<<< HEAD
   BASE_IMAGE: "redhat/ubi/ubi9"
   BASE_TAG: "9.7"
+=======
+  BASE_IMAGE: "redhat/ubi/ubi10"
+  BASE_TAG: "10.2"
+>>>>>>> 6a2407661 (Bump UBI to 10.2 (#14778))
   ELASTIC_STACK: "{{ agent_package_version }}"
   ELASTIC_PRODUCT: "elastic-agent"
 
