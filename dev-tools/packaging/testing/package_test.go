@@ -66,6 +66,7 @@ var (
 	otelSamplesFilePattern      = regexp.MustCompile(`otel_samples/.+[^/]$`)
 	otelCollectorSpecPattern    = regexp.MustCompile(`elastic-otel-collector\.spec\.yml$`)
 	endpointResourcesZipPattern = regexp.MustCompile(`endpoint-security-resources\.zip$`)
+	cloudDefendPattern          = regexp.MustCompile(`/cloud-defend(\.spec\.yml)?$`)
 
 	licenseFiles = []string{"LICENSE.txt", "NOTICE.txt"}
 )
@@ -248,6 +249,7 @@ func checkTar(t *testing.T, file string, fipsCheck bool) {
 	checkFilePermissions(t, p, otelCollectorSpecPattern, expectedManifestMode)
 	checkFilePermissions(t, p, endpointResourcesZipPattern, expectedManifestMode)
 	checkLicensesPresent(t, "", p)
+	checkCloudDefendNotPresent(t, p)
 
 	// extract archive in a temporary directory
 	tempExtractionPath := t.TempDir()
@@ -638,6 +640,18 @@ func checkModulesOwner(t *testing.T, p *packageFile, expectRoot bool) {
 		for _, entry := range p.Contents {
 			if modulesDFilePattern.MatchString(entry.File) || modulesDDirPattern.MatchString(entry.File) {
 				checkOwner(t, entry, expectRoot)
+			}
+		}
+	})
+}
+
+// checkCloudDefendNotPresent verifies cloud-defend is absent from tar.gz packages.
+// Cloud Defend is only supported in Docker images.
+func checkCloudDefendNotPresent(t *testing.T, p *packageFile) {
+	t.Run("cloud-defend not present", func(t *testing.T) {
+		for name := range p.Contents {
+			if cloudDefendPattern.MatchString(name) {
+				t.Errorf("cloud-defend must not be included in tar.gz packages, found: %s", name)
 			}
 		}
 	})
