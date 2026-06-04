@@ -3,8 +3,13 @@
 # Extract Elastic Agent and make various file manipulations.
 ################################################################################
 ARG BASE_REGISTRY=registry1.dsop.io
+<<<<<<< HEAD
 ARG BASE_IMAGE=redhat/ubi/ubi9
 ARG BASE_TAG=9.7
+=======
+ARG BASE_IMAGE=redhat/ubi/ubi10
+ARG BASE_TAG=10.2
+>>>>>>> 6a2407661 (Bump UBI to 10.2 (#14778))
 
 FROM ${BASE_REGISTRY}/${BASE_IMAGE}:${BASE_TAG} as prep_files
 
