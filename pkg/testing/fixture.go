@@ -1760,7 +1760,12 @@ type AgentInspectOutput struct {
 		Headers  interface{} `yaml:"headers"`
 		ID       string      `yaml:"id"`
 		Logging  struct {
-			Level string `yaml:"level"`
+			Level    string `yaml:"level"`
+			ToFiles  bool   `yaml:"to_files"`
+			ToStderr bool   `yaml:"to_stderr"`
+			Files    struct {
+				Path string `yaml:"path"`
+			} `yaml:"files"`
 		} `yaml:"logging"`
 		Monitoring struct {
 			Enabled bool `yaml:"enabled"`
