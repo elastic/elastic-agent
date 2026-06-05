@@ -336,6 +336,42 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return runtimeErr
 	}
 
+<<<<<<< HEAD
+=======
+	// Step 5: Commit. Nothing below can fail so we update the caches, persist the
+	// config and the action and then re-exec.
+	//
+	// The caches are updated here, not earlier, because they are the baseline we
+	// compare the next policy against. If we updated them before a failure, the
+	// resent policy would look unchanged and we would skip re-applying it.
+	hasEventLoggingChanged := h.applyEventLoggingOutputChange(partialCfg)
+	hasLoggingChanged := h.applyLoggingConfigChange(cfg, loggingConfig)
+
+	if validatedFleetConfig != nil {
+		h.config.Fleet.Client = *validatedFleetConfig
+	}
+	if loggingConfig != nil {
+		h.config.Settings.LoggingConfig.Level = loggingConfig.Level
+	}
+	h.config.Settings.MonitoringConfig.HTTP = cfg.Settings.MonitoringConfig.HTTP
+	h.config.Settings.MonitoringConfig.Pprof = cfg.Settings.MonitoringConfig.Pprof
+
+	if err := saveConfig(h.agentInfo, h.config, h.store, h.log); err != nil {
+		return fmt.Errorf("failed to persist policy config: %w", err)
+	}
+	if h.stateStore != nil && action != nil {
+		h.stateStore.SetAction(action)
+		if err := h.stateStore.Save(); err != nil {
+			h.log.Warnf("failed to persist policy action to state store: %v", err)
+		}
+	}
+
+	// Re-exec so the new event logging output is applied on restart.
+	if hasEventLoggingChanged || hasLoggingChanged {
+		h.runtimeLogLevelSetter.ReExec(nil)
+	}
+
+>>>>>>> c9910d844 ([agent] Fix a few bugs related to logging for fleet-managed mode (#14504))
 	return nil
 }
 
@@ -351,6 +387,7 @@ func (h *PolicyChangeHandler) hasEventLoggingOutputChanged(new *configuration.Co
 	}
 }
 
+<<<<<<< HEAD
 func validateLoggingConfig(cfg *config.Config) (*logger.Config, error) {
 
 	parsedConfig, err := configuration.NewPartialFromConfigNoDefaults(cfg)
@@ -359,6 +396,27 @@ func validateLoggingConfig(cfg *config.Config) (*logger.Config, error) {
 	}
 
 	if parsedConfig == nil || parsedConfig.Settings == nil || parsedConfig.Settings.LoggingConfig == nil {
+=======
+func (h *PolicyChangeHandler) applyLoggingConfigChange(new *configuration.Configuration, loggingConfig *logger.Config) bool {
+	if loggingConfig == nil {
+		return false
+	}
+	current := h.config.Settings.LoggingConfig
+	incoming := new.Settings.LoggingConfig
+	if current.ToFiles == incoming.ToFiles && current.ToStderr == incoming.ToStderr && current.Files.Path == incoming.Files.Path {
+		// if there is no change in the logging output settings, we consider that there is no change to the logging config
+		return false
+	}
+
+	current.ToFiles = incoming.ToFiles
+	current.ToStderr = incoming.ToStderr
+	current.Files.Path = incoming.Files.Path
+	return true
+}
+
+func validateLoggingConfig(cfg *configuration.Configuration) (*logger.Config, error) {
+	if cfg == nil || cfg.Settings == nil || cfg.Settings.LoggingConfig == nil {
+>>>>>>> c9910d844 ([agent] Fix a few bugs related to logging for fleet-managed mode (#14504))
 		// no logging config, nothing to do
 		return nil, nil
 	}
@@ -464,6 +522,9 @@ func fleetToReader(agentID string, headers map[string]string, logLevelOverride s
 		"id":                           agentID,
 		"headers":                      headers,
 		"logging.level":                cfg.Settings.LoggingConfig.Level,
+		"logging.to_files":             cfg.Settings.LoggingConfig.ToFiles,
+		"logging.to_stderr":            cfg.Settings.LoggingConfig.ToStderr,
+		"logging.files.path":           cfg.Settings.LoggingConfig.Files.Path,
 		"logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
 		"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
 		"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
