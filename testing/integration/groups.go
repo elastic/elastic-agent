@@ -58,4 +58,7 @@ const (
 
 	// ECHDeployment group of tests. Used for tests that orchestrate ECH deployments.
 	ECHDeployment = "ech-deployment"
+
+	// Extended test suite that contains tests that do not need to run on each PR.
+	Extended = "extended"
 )

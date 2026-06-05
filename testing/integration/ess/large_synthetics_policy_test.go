@@ -49,7 +49,7 @@ const (
 // (8 000 HTTP + 1 000 TCP + 1 000 ICMP) on a single private location.
 func TestLargeSyntheticsPolicy(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.Extended,
 		Stack: &define.Stack{
 			KibanaMemoryMB: 4096,
 		},
