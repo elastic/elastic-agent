@@ -349,12 +349,33 @@ func TestSettingsGetPackageTypes(t *testing.T) {
 		assert.Equal(t, []PackageType{TarGz, Zip}, types)
 	})
 
-	t.Run("returns nil when both are empty", func(t *testing.T) {
+	t.Run("returns platform-derived default when both are empty", func(t *testing.T) {
 		s := DefaultSettings()
+		// Default platforms include both Unix and Windows entries, so the derived
+		// default should contain both tar.gz and zip.
+		s.CrossBuild.Platforms = "linux/amd64,windows/amd64"
 
 		types := s.GetPackageTypes()
 
-		assert.Nil(t, types)
+		assert.Equal(t, []PackageType{TarGz, Zip}, types)
+	})
+
+	t.Run("returns only tar.gz for unix-only platforms", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Platforms = "linux/amd64,darwin/arm64"
+
+		types := s.GetPackageTypes()
+
+		assert.Equal(t, []PackageType{TarGz}, types)
+	})
+
+	t.Run("returns only zip for windows-only platforms", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Platforms = "windows/amd64"
+
+		types := s.GetPackageTypes()
+
+		assert.Equal(t, []PackageType{Zip}, types)
 	})
 
 	t.Run("returns all package types when PACKAGES is all", func(t *testing.T) {
