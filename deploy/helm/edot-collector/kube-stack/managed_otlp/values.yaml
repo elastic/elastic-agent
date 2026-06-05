@@ -148,12 +148,11 @@ collectors:
             k8s.container.status.last_terminated_reason:
               enabled: true
       extensions:
-        cgroup_runtime: {}
         health_check:
           endpoint: "0.0.0.0:13133"
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-        extensions: [cgroup_runtime, health_check]
+        extensions: [health_check]
         pipelines:
           metrics:
             exporters:
@@ -451,12 +450,11 @@ collectors:
           extra_metadata_labels:
             - container.id
       extensions:
-        cgroup_runtime: {}
         health_check:
           endpoint: "0.0.0.0:13133"
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-        extensions: [cgroup_runtime, health_check]
+        extensions: [health_check]
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -588,11 +586,10 @@ collectors:
               max_size: 4_000_000 # 4MB uncompressed
           timeout: 15s
       extensions:
-        cgroup_runtime: {}
         health_check:
           endpoint: "0.0.0.0:13133"
       service:
-        extensions: [cgroup_runtime, health_check]
+        extensions: [health_check]
         pipelines:
           metrics:
             receivers: [otlp]

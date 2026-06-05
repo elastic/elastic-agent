@@ -53,7 +53,6 @@ collectors:
           tls:
             insecure: true
       extensions:
-        cgroup_runtime: {}
         health_check:
           endpoint: "0.0.0.0:13133"
       processors:
@@ -153,7 +152,7 @@ collectors:
               enabled: true
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-        extensions: [cgroup_runtime, health_check]
+        extensions: [health_check]
         pipelines:
           metrics:
             exporters:
@@ -452,12 +451,11 @@ collectors:
           extra_metadata_labels:
             - container.id
       extensions:
-        cgroup_runtime: {}
         health_check:
           endpoint: "0.0.0.0:13133"
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-        extensions: [cgroup_runtime, health_check]
+        extensions: [health_check]
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -586,11 +584,10 @@ collectors:
           mapping:
             mode: otel
       extensions:
-        cgroup_runtime: {}
         health_check:
           endpoint: "0.0.0.0:13133"
       service:
-        extensions: [cgroup_runtime, health_check]
+        extensions: [health_check]
         pipelines:
           metrics:
             receivers: [otlp]
