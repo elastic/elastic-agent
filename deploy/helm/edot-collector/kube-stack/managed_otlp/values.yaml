@@ -147,10 +147,6 @@ collectors:
               enabled: true
             k8s.container.status.last_terminated_reason:
               enabled: true
-<<<<<<< HEAD
-      # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
-      service:
-=======
       extensions:
         cgroup_runtime: {}
         health_check:
@@ -158,7 +154,6 @@ collectors:
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
         extensions: [cgroup_runtime, health_check]
->>>>>>> 7be1166b1 (Add health_check extension to kube-stack otel collector configs (#14576))
         pipelines:
           metrics:
             exporters:
@@ -455,10 +450,6 @@ collectors:
               enabled: true
           extra_metadata_labels:
             - container.id
-<<<<<<< HEAD
-      # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
-      service:
-=======
       extensions:
         cgroup_runtime: {}
         health_check:
@@ -466,7 +457,6 @@ collectors:
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
         extensions: [cgroup_runtime, health_check]
->>>>>>> 7be1166b1 (Add health_check extension to kube-stack otel collector configs (#14576))
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -597,16 +587,12 @@ collectors:
               min_size: 1_000_000 # 1MB uncompressed
               max_size: 4_000_000 # 4MB uncompressed
           timeout: 15s
-<<<<<<< HEAD
-      service:
-=======
       extensions:
         cgroup_runtime: {}
         health_check:
           endpoint: "0.0.0.0:13133"
       service:
         extensions: [cgroup_runtime, health_check]
->>>>>>> 7be1166b1 (Add health_check extension to kube-stack otel collector configs (#14576))
         pipelines:
           metrics:
             receivers: [otlp]

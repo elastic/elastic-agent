@@ -179,10 +179,6 @@ collectors:
           exclude:
             # exlude opentelemetry-kube-stack pod logs
             - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
-<<<<<<< HEAD
-      # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
-      service:
-=======
       extensions:
         cgroup_runtime: {}
         health_check:
@@ -190,7 +186,6 @@ collectors:
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
         extensions: [cgroup_runtime, health_check]
->>>>>>> 7be1166b1 (Add health_check extension to kube-stack otel collector configs (#14576))
         pipelines:
           logs: null
           metrics: null
@@ -266,16 +261,12 @@ collectors:
               min_size: 1_000_000 # 1MB uncompressed
               max_size: 4_000_000 # 4MB uncompressed
           timeout: 15s
-<<<<<<< HEAD
-      service:
-=======
       extensions:
         cgroup_runtime: {}
         health_check:
           endpoint: "0.0.0.0:13133"
       service:
         extensions: [cgroup_runtime, health_check]
->>>>>>> 7be1166b1 (Add health_check extension to kube-stack otel collector configs (#14576))
         pipelines:
           logs:
             receivers: [otlp]
