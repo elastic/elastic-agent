@@ -343,7 +343,7 @@ steps:
   - group: "Stateful: Windows (tier 2)"
     # NOTE: scheduler should run only tier 3 tests.
     #       PRs or release branches should run tier 2 if there are relevant changes.
-    if: !(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")
+    if: '!(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")'
     if_changed:
       include:
         - .buildkite/**
@@ -651,7 +651,7 @@ steps:
   - group: "Stateful: Linux (tier 2)"
     # NOTE: scheduler should run only tier 3 tests.
     #       PRs or release branches should run tier 2 if there are relevant changes.
-    if: !(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")
+    if: '!(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")'
     if_changed:
       include:
         - .buildkite/**
@@ -954,7 +954,7 @@ steps:
     key: integration-tests-kubernetes-tier-2
     # NOTE: scheduler should run only tier 3 tests.
     #       PRs or release branches should run tier 2 if there are relevant changes.
-    if: !(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")
+    if: '!(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")'
     if_changed:
       include:
         - .buildkite/**
