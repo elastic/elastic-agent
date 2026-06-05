@@ -179,8 +179,12 @@ collectors:
           exclude:
             # exlude opentelemetry-kube-stack pod logs
             - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
+      extensions:
+        health_check:
+          endpoint: "0.0.0.0:13133"
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+        extensions: [health_check]
         pipelines:
           logs: null
           metrics: null
@@ -256,7 +260,11 @@ collectors:
               min_size: 1_000_000 # 1MB uncompressed
               max_size: 4_000_000 # 4MB uncompressed
           timeout: 15s
+      extensions:
+        health_check:
+          endpoint: "0.0.0.0:13133"
       service:
+        extensions: [health_check]
         pipelines:
           logs:
             receivers: [otlp]

@@ -52,6 +52,9 @@ collectors:
           endpoint: "http://opentelemetry-kube-stack-gateway-collector:4317"
           tls:
             insecure: true
+      extensions:
+        health_check:
+          endpoint: "0.0.0.0:13133"
       processors:
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
         resourcedetection/eks:
@@ -149,6 +152,7 @@ collectors:
               enabled: true
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+        extensions: [health_check]
         pipelines:
           metrics:
             exporters:
@@ -446,8 +450,12 @@ collectors:
               enabled: true
           extra_metadata_labels:
             - container.id
+      extensions:
+        health_check:
+          endpoint: "0.0.0.0:13133"
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+        extensions: [health_check]
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -575,7 +583,11 @@ collectors:
           #   insecure_skip_verify: true
           mapping:
             mode: otel
+      extensions:
+        health_check:
+          endpoint: "0.0.0.0:13133"
       service:
+        extensions: [health_check]
         pipelines:
           metrics:
             receivers: [otlp]
