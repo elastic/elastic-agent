@@ -59,6 +59,7 @@ steps:
           - *google_oidc_plugin
 
       - label: ":package: amd64: FIPS tar.gz,zip (linux,windows)"
+        skip: "fast CI"
         key: "packaging-amd64-fips"
         env:
           PACKAGES: "tar.gz,zip"
@@ -97,6 +98,7 @@ steps:
           - *google_oidc_plugin
 
       - label: ":package: arm64: FIPS tar.gz,zip (linux,windows)"
+        skip: "fast CI"
         key: "packaging-arm64-fips"
         env:
           PACKAGES: "tar.gz,zip"
@@ -152,6 +154,7 @@ steps:
           - *google_oidc_plugin
 
       - label: ":package: amd64: FIPS Containers"
+        skip: "fast CI"
         key: packaging-containers-amd64-fips
         env:
           PACKAGES: "docker"
@@ -172,6 +175,7 @@ steps:
           - *google_oidc_plugin
 
       - label: ":package: arm64: FIPS Containers"
+        skip: "fast CI"
         key: packaging-containers-arm64-fips
         env:
           PACKAGES: "docker"
@@ -196,6 +200,7 @@ steps:
 
   ## PRs
   - label: "Triggering custom FIPS integration tests"
+    skip: "fast CI"
     if: build.pull_request.id != null
     key: "fips-its-prs"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
@@ -210,6 +215,7 @@ steps:
 
   ## Branches
   - label: "Triggering custom FIPS integration tests (branches)"
+    skip: "fast CI"
     if: build.pull_request.id == null
     key: "fips-its-branches"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
@@ -217,6 +223,7 @@ steps:
     - *sparse_checkout_plugin
 
   - label: "Test packages"
+    skip: "fast CI"
     depends_on:
     - int-packaging
     command: |

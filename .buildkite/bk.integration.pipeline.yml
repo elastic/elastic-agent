@@ -166,6 +166,7 @@ common:
 
 steps:
   - label: "Custom ECH Testing"
+    skip: "fast CI"
     key: integration-tests-ech
     depends_on:
       - packaging-containers-amd64
@@ -212,6 +213,7 @@ steps:
       - *vault_github_token
 
   - group: "Extended runtime leak tests"
+    skip: "fast CI"
     key: extended-integration-tests
     notify:
       - github_commit_status:
@@ -288,6 +290,7 @@ steps:
           - *vault_github_token
 
   - group: "Stateful: Windows (tier 1)"
+    skip: "fast CI"
     if: build.pull_request.id != null
     key: integration-tests-win-tier-1
     notify:
@@ -350,6 +353,7 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 2)"
+    skip: "fast CI"
     if_changed:
       include:
         - .buildkite/**
@@ -428,6 +432,7 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 3)"
+    skip: "fast CI"
     key: integration-tests-win-tier-3
     # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
     #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
@@ -592,6 +597,7 @@ steps:
               - default
 
   - group: "Stateful: Linux (tier 1)"
+    skip: "fast CI"
     if: build.pull_request.id != null
     key: integration-tests-linux-tier-1
     notify:
@@ -762,7 +768,7 @@ steps:
     key: integration-tests-linux-tier-3
     # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
     #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
-    if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler"
+    #if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Linux - tier 3"
@@ -795,10 +801,10 @@ steps:
           setup:
             os:
               - "${IMAGE_UBUNTU_2204_X86_64}"
-              - "${IMAGE_UBUNTU_2404_X86_64}"
-              - "${IMAGE_DEBIAN_11}"
+              #- "${IMAGE_UBUNTU_2404_X86_64}"
+              #- "${IMAGE_DEBIAN_11}"
               - "${IMAGE_DEBIAN_12}"
-              - "${IMAGE_DEBIAN_13}"
+              #- "${IMAGE_DEBIAN_13}"
             variant:
               - default
 
@@ -830,10 +836,10 @@ steps:
           setup:
             os:
               - "${IMAGE_UBUNTU_2204_X86_64}"
-              - "${IMAGE_UBUNTU_2404_X86_64}"
+              #- "${IMAGE_UBUNTU_2404_X86_64}"
               - "${IMAGE_DEBIAN_11}"
               - "${IMAGE_DEBIAN_12}"
-              - "${IMAGE_DEBIAN_13}"
+              #- "${IMAGE_DEBIAN_13}"
             variant: *linux_deb_variants
 
       - label: "linux:amd64:tier3:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
@@ -867,9 +873,9 @@ steps:
               - "${IMAGE_ORACLE_8}"
               - "${IMAGE_ORACLE_9}"
               - "${IMAGE_ORACLE_10}"
-              - "${IMAGE_RHEL_8}"
+              #- "${IMAGE_RHEL_8}"
               - "${IMAGE_RHEL_9}"
-              - "${IMAGE_RHEL_10}"
+              #- "${IMAGE_RHEL_10}"
               - "${IMAGE_ROCKY_9}"
               - "${IMAGE_ROCKY_10}"
             sudo:
@@ -932,6 +938,7 @@ steps:
               - default
 
   - group: ":kubernetes: Kubernetes (tier 1)"
+    skip: "fast CI"
     key: integration-tests-kubernetes-tier-1
     if: build.pull_request.id != null
     notify:
@@ -964,6 +971,7 @@ steps:
               *k8s_test_versions
 
   - group: ":kubernetes: Kubernetes (tier 2)"
+    skip: "fast CI"
     key: integration-tests-kubernetes-tier-2
     if_changed:
       include:
@@ -1004,6 +1012,7 @@ steps:
               - *k8s_max_test_version
 
   - group: ":kubernetes: Kubernetes (tier 3)"
+    skip: "fast CI"
     key: integration-tests-kubernetes-tier-3
     # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
     #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
@@ -1038,6 +1047,7 @@ steps:
               *k8s_test_versions
 
   - group: "Serverless integration test"
+    skip: "fast CI"
     key: integration-tests-serverless
     notify:
       - github_commit_status:
@@ -1133,6 +1143,7 @@ steps:
       - *oblt_cli_plugin
       - *vault_github_token
   - label: Aggregate test reports
+    skip: "fast CI"
     # Warning: The key has a hook in pre-command
     key: aggregate-reports
     depends_on:

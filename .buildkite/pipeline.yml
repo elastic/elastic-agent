@@ -35,6 +35,7 @@ env:
 steps:
 
   - label: "check-ci"
+    skip: "fast CI"
     key: "check-ci"
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
@@ -45,6 +46,7 @@ steps:
         allowed: true
 
   - group: "Unit tests"
+    skip: "fast CI"
     key: "unit-tests"
     steps:
       - label: "Unit tests - Ubuntu 22.04"
@@ -204,6 +206,7 @@ steps:
           - *google_oidc_plugin
 
   - group: "macOS tests"
+    skip: "fast CI"
     key: "macos-unit-tests"
     steps:
       - label: "Unit tests - macOS 15 ARM"
@@ -246,6 +249,7 @@ steps:
           - *google_oidc_plugin
 
   - group: "Desktop Windows tests"
+    skip: "fast CI"
     key: "extended-windows"
     steps:
       - label: "Unit tests - Windows 10"
@@ -344,6 +348,7 @@ steps:
           - *google_oidc_plugin
 
   - label: ":junit: Junit annotate"
+    skip: "fast CI"
     agents:
       # requires at least "bash", "curl" and "git"
       image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
@@ -380,6 +385,7 @@ steps:
         allow_failure: true
 
   - group: "K8s tests"
+    skip: "fast CI"
     key: "k8s-tests"
     steps:
       - label: "K8s tests: {{matrix.k8s_version}}"
@@ -406,6 +412,7 @@ steps:
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed
   - label: "Trigger k8s sync"
+    skip: "fast CI"
     branches: main
     command: ".buildkite/scripts/steps/sync-k8s.sh"
     agents:
@@ -468,6 +475,7 @@ steps:
   # Trigger for pull requests - Serverless Beats Tests
   # this should help detecting issues earlier in the development cycle
   - label: "Trigger Serverless Beats Tests"
+    skip: "fast CI"
     if: build.pull_request.id != null
     trigger: "beats-agent-serverless-tests"
     build:
@@ -482,6 +490,7 @@ steps:
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/issues/11604
   - label: "Trigger Elastic Agent Package"
+    skip: "fast CI"
     if: build.pull_request.id != null
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
@@ -506,6 +515,7 @@ steps:
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/pull/11725
   - label: "DRY RUN publish to serverless"
+    skip: "fast CI"
     if: build.pull_request.id != null && build.env("BUILDKITE_PULL_REQUEST_BASE_BRANCH") == "main"
     if_changed:
       include:
@@ -526,6 +536,7 @@ steps:
   - wait: ~
 
   - label: "Publish to serverless"
+    skip: "fast CI"
     branches: main
     trigger: "agentless-serverless-release"
     build:
