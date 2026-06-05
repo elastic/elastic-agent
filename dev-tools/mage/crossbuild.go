@@ -21,7 +21,6 @@ import (
 	"github.com/magefile/mage/sh"
 
 	"github.com/elastic/elastic-agent-libs/file"
-	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
@@ -136,12 +135,6 @@ func CrossBuild(ctx context.Context, cfg *Settings, options ...CrossBuildOption)
 	// Docker is required for this target.
 	if err := HaveDocker(); err != nil {
 		return err
-	}
-
-	if cfg.CrossBuild.MountModcache {
-		// Make sure the module dependencies are downloaded on the host,
-		// as they will be mounted into the container read-only.
-		mg.Deps(func() error { return gotool.Mod.Download() })
 	}
 
 	// Build the magefile for Linux, so we can run it inside the container.

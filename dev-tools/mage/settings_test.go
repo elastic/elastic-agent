@@ -644,10 +644,6 @@ func TestDefaultSettings(t *testing.T) {
 		// CrossBuild defaults
 		assert.Equal(t, "linux", settings.CrossBuild.DevOS)
 		assert.Equal(t, "amd64", settings.CrossBuild.DevArch)
-		assert.True(t, settings.CrossBuild.MountModcache)
-		assert.True(t, settings.CrossBuild.MountBuildCache)
-		assert.Equal(t, "elastic-agent-crossbuild-build-cache", settings.CrossBuild.BuildCacheVolumeName)
-
 		// IntegrationTest defaults
 		assert.True(t, settings.IntegrationTest.CleanOnExit)
 		assert.True(t, settings.IntegrationTest.TestEnvironmentEnabled)
@@ -678,9 +674,6 @@ func TestLoadSettings(t *testing.T) {
 		// CrossBuild defaults
 		assert.Equal(t, "linux", settings.CrossBuild.DevOS)
 		assert.Equal(t, "amd64", settings.CrossBuild.DevArch)
-		assert.True(t, settings.CrossBuild.MountModcache)
-		assert.True(t, settings.CrossBuild.MountBuildCache)
-
 		// IntegrationTest defaults
 		assert.True(t, settings.IntegrationTest.CleanOnExit)
 		assert.True(t, settings.IntegrationTest.TestEnvironmentEnabled)
@@ -758,8 +751,6 @@ func TestLoadSettings(t *testing.T) {
 		t.Setenv("PLATFORMS", "linux/amd64,darwin/arm64")
 		t.Setenv("PACKAGES", "targz,zip")
 		t.Setenv("DOCKER_VARIANTS", "basic,cloud")
-		t.Setenv("CROSSBUILD_MOUNT_MODCACHE", "false")
-		t.Setenv("CROSSBUILD_MOUNT_GOCACHE", "false")
 		t.Setenv("DEV_OS", "darwin")
 		t.Setenv("DEV_ARCH", "arm64")
 
@@ -769,8 +760,6 @@ func TestLoadSettings(t *testing.T) {
 		assert.Equal(t, "linux/amd64,darwin/arm64", settings.CrossBuild.Platforms)
 		assert.Equal(t, "targz,zip", settings.CrossBuild.Packages)
 		assert.Equal(t, "basic,cloud", settings.CrossBuild.DockerVariants)
-		assert.False(t, settings.CrossBuild.MountModcache)
-		assert.False(t, settings.CrossBuild.MountBuildCache)
 		assert.Equal(t, "darwin", settings.CrossBuild.DevOS)
 		assert.Equal(t, "arm64", settings.CrossBuild.DevArch)
 	})
