@@ -52,6 +52,13 @@ collectors:
           endpoint: "http://opentelemetry-kube-stack-gateway-collector:4317"
           tls:
             insecure: true
+<<<<<<< HEAD
+=======
+      extensions:
+        cgroup_runtime: {}
+        health_check:
+          endpoint: "0.0.0.0:13133"
+>>>>>>> 7be1166b1 (Add health_check extension to kube-stack otel collector configs (#14576))
       processors:
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
         resourcedetection/eks:
@@ -149,6 +156,10 @@ collectors:
               enabled: true
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+<<<<<<< HEAD
+=======
+        extensions: [cgroup_runtime, health_check]
+>>>>>>> 7be1166b1 (Add health_check extension to kube-stack otel collector configs (#14576))
         pipelines:
           metrics:
             exporters:
@@ -446,8 +457,18 @@ collectors:
               enabled: true
           extra_metadata_labels:
             - container.id
+<<<<<<< HEAD
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+=======
+      extensions:
+        cgroup_runtime: {}
+        health_check:
+          endpoint: "0.0.0.0:13133"
+      # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
+      service:
+        extensions: [cgroup_runtime, health_check]
+>>>>>>> 7be1166b1 (Add health_check extension to kube-stack otel collector configs (#14576))
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -575,7 +596,16 @@ collectors:
           #   insecure_skip_verify: true
           mapping:
             mode: otel
+<<<<<<< HEAD
       service:
+=======
+      extensions:
+        cgroup_runtime: {}
+        health_check:
+          endpoint: "0.0.0.0:13133"
+      service:
+        extensions: [cgroup_runtime, health_check]
+>>>>>>> 7be1166b1 (Add health_check extension to kube-stack otel collector configs (#14576))
         pipelines:
           metrics:
             receivers: [otlp]
