@@ -84,9 +84,18 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
+<<<<<<< HEAD
+=======
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true
+>>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ToOTelConfig(cfg, logger)
@@ -140,9 +149,18 @@ sending_queue:
   wait_for_result: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
+<<<<<<< HEAD
+=======
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true
+>>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ToOTelConfig(cfg, logger)
@@ -195,9 +213,18 @@ sending_queue:
   wait_for_result: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
+<<<<<<< HEAD
+=======
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true
+>>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ToOTelConfig(cfg, logger)
@@ -254,9 +281,18 @@ sending_queue:
   wait_for_result: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
+<<<<<<< HEAD
+=======
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true
+>>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ToOTelConfig(cfg, logger)
@@ -280,7 +316,7 @@ preset: %s
 
 		commonOTelCfg := `
 logs_dynamic_pipeline:
-  enabled: true    
+  enabled: true
 endpoints:
   - http://localhost:9200
 retry:
@@ -304,9 +340,18 @@ retry:
 logs_index: some-index
 password: changeme
 user: elastic
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
+<<<<<<< HEAD
+=======
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true
+>>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
 `
 
 		tests := []struct {
@@ -351,7 +396,7 @@ sending_queue:
 				presetName: "scale",
 				output: `
 logs_dynamic_pipeline:
-  enabled: true        
+  enabled: true
 endpoints:
   - http://localhost:9200
 retry:
@@ -387,9 +432,22 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+<<<<<<< HEAD
 compression: gzip
 compression_params:
   level: 1
+=======
+suppress_conflict_errors: true
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+compression: gzip
+compression_params:
+  level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true
+>>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `,
 			},
 			{
@@ -500,9 +558,18 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
+<<<<<<< HEAD
+=======
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true
+>>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ToOTelConfig(cfg, logger)
@@ -556,9 +623,18 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
+<<<<<<< HEAD
+=======
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true
+>>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ToOTelConfig(cfg, logger)
@@ -582,7 +658,7 @@ compression_level: %d`
 
 	otelConfig := `
 logs_dynamic_pipeline:
-  enabled: true 
+  enabled: true
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
@@ -619,13 +695,28 @@ sending_queue:
   num_consumers: 2
   queue_size: 3200
   wait_for_result: true
+<<<<<<< HEAD
+=======
+suppress_conflict_errors: true
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+>>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
 {{ if gt . 0 }}
 compression: gzip
 compression_params:
   level: {{ . }}
 {{ else }}
 compression: none
+<<<<<<< HEAD
 {{ end }}`
+=======
+{{ end }}
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true
+`
+>>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
 
 	for level := range 9 {
 		t.Run(fmt.Sprintf("compression-level-%d", level), func(t *testing.T) {
