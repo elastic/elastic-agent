@@ -88,14 +88,6 @@ bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_s
 compression: gzip
 compression_params:
   level: 1
-<<<<<<< HEAD
-=======
-include_source_on_error: true
-logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
-  enabled: true
->>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ToOTelConfig(cfg, logger)
@@ -153,14 +145,6 @@ bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_s
 compression: gzip
 compression_params:
   level: 1
-<<<<<<< HEAD
-=======
-include_source_on_error: true
-logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
-  enabled: true
->>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ToOTelConfig(cfg, logger)
@@ -174,10 +158,6 @@ logs_dynamic_pipeline:
 hosts: "localhost:9200"
 index: "some-index"
 api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
-<<<<<<< HEAD
-=======
-parameters:
-  somekey : somevalue
 `
 
 		OTelCfg := `
@@ -288,14 +268,6 @@ bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_s
 compression: gzip
 compression_params:
   level: 1
-<<<<<<< HEAD
-=======
-include_source_on_error: true
-logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
-  enabled: true
->>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ToOTelConfig(cfg, logger)
@@ -406,14 +378,6 @@ bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_s
 compression: gzip
 compression_params:
   level: 1
-<<<<<<< HEAD
-=======
-include_source_on_error: true
-logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
-  enabled: true
->>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
 `
 
 		tests := []struct {
@@ -494,22 +458,10 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
-<<<<<<< HEAD
-compression: gzip
-compression_params:
-  level: 1
-=======
-suppress_conflict_errors: true
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
-include_source_on_error: true
-logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
-  enabled: true
->>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `,
 			},
 			{
@@ -624,14 +576,6 @@ bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_s
 compression: gzip
 compression_params:
   level: 1
-<<<<<<< HEAD
-=======
-include_source_on_error: true
-logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
-  enabled: true
->>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ToOTelConfig(cfg, logger)
@@ -689,14 +633,6 @@ bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_s
 compression: gzip
 compression_params:
   level: 1
-<<<<<<< HEAD
-=======
-include_source_on_error: true
-logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
-  enabled: true
->>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ToOTelConfig(cfg, logger)
@@ -757,28 +693,14 @@ sending_queue:
   num_consumers: 2
   queue_size: 3200
   wait_for_result: true
-<<<<<<< HEAD
-=======
-suppress_conflict_errors: true
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
->>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
 {{ if gt . 0 }}
 compression: gzip
 compression_params:
   level: {{ . }}
 {{ else }}
 compression: none
-<<<<<<< HEAD
 {{ end }}`
-=======
-{{ end }}
-include_source_on_error: true
-logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
-  enabled: true
-`
->>>>>>> e19616f00 (adjust filter_path to be same as beats (#14452))
 
 	for level := range 9 {
 		t.Run(fmt.Sprintf("compression-level-%d", level), func(t *testing.T) {
