@@ -1219,6 +1219,59 @@ func (c *captureStore) Save(r io.Reader) error {
 	return nil
 }
 
+func TestFleetToReaderPersistsLoggingOutputFlags(t *testing.T) {
+	agentInfo := &info.AgentInfo{}
+
+	t.Run("to_stderr=true is round-tripped through save/load", func(t *testing.T) {
+		cfg := configuration.DefaultConfiguration()
+		cfg.Settings.LoggingConfig.ToStderr = true
+		cfg.Settings.LoggingConfig.ToFiles = false
+
+		reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), "", cfg)
+		require.NoError(t, err)
+
+		reloaded, err := config.NewConfigFrom(reader)
+		require.NoError(t, err)
+
+		reloadedFull, err := configuration.NewFromConfig(reloaded)
+		require.NoError(t, err)
+
+		assert.Equal(t, cfg.Settings.LoggingConfig.ToStderr, reloadedFull.Settings.LoggingConfig.ToStderr,
+			"LoggingConfig.ToStderr must survive the save/load cycle to prevent a re-exec loop")
+		assert.Equal(t, cfg.Settings.LoggingConfig.ToFiles, reloadedFull.Settings.LoggingConfig.ToFiles,
+			"LoggingConfig.ToFiles must survive the save/load cycle to prevent a re-exec loop")
+	})
+
+	t.Run("hasLoggingConfigChanged returns false after save/load with same policy", func(t *testing.T) {
+		cfg := configuration.DefaultConfiguration()
+		cfg.Settings.LoggingConfig.ToStderr = true
+		cfg.Settings.LoggingConfig.ToFiles = false
+
+		reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), "", cfg)
+		require.NoError(t, err)
+
+		reloaded, err := config.NewConfigFrom(reader)
+		require.NoError(t, err)
+
+		reloadedFull, err := configuration.NewFromConfig(reloaded)
+		require.NoError(t, err)
+
+		h := &PolicyChangeHandler{config: reloadedFull}
+
+		policyWithSameLogging, err := configuration.NewFromConfig(config.MustNewConfigFrom(map[string]interface{}{
+			"agent.logging.to_stderr": true,
+			"agent.logging.to_files":  false,
+		}))
+		require.NoError(t, err)
+
+		assert.False(t, h.applyLoggingConfigChange(policyWithSameLogging, &logger.Config{
+			ToStderr: true,
+			ToFiles:  false,
+		}),
+			"after re-exec + reload the same policy must not be detected as a logging change, which would cause an infinite re-exec loop")
+	})
+}
+
 func defaultLogLevelSet(t *testing.T) *mockLogLevelSetter {
 	defaultLogLevel := logger.DefaultLogLevel
 	logLevelSetter := newMockLogLevelSetter(t)
