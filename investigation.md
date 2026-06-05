@@ -103,6 +103,50 @@ Conclusions:
 crashed jobs die before writing coverage — so there is no dump payload in this
 light build; the signal is the pass/fail tally + job-log signatures.)
 
+## Branch-merged-on-main re-run (build 40854): still reproduces, rate variable
+
+Merged `origin/main` into the diagnostic branch (same OLD Win11 image
+`1.0.1779464011` pinned as control, only main's code drift changed) and re-ran
+the four cohorts. Result: **1/40** — only `gogc-default run 5` crashed
+(`fatal error: missing stackmap` → `unexpected signal during runtime execution`,
+in `gcBgMarkStartWorkers`, same family). control/no-race/no-cover all 0/10.
+
+- The one crash hit **~0.18s into the crashing package's own process** (`gc #2`),
+  ~3.9 min into the test phase / ~9.6 min into the job — same early-process,
+  fresh-stack, GC-worker fingerprint as always. Mechanism unchanged.
+- A drop from ~40–60% (build 40742 cohorts) to 1/40 on a single build is **not
+  distinguishable** from "main's code fixed it" vs "lucky quiet hosts": the rate
+  has large build-to-build variance because it is dominated by *which physical
+  hosts the jobs land on*, not by code or any lever we turn. One sample at 1/40
+  cannot separate those. → confirms the confound is **outside the knobs**.
+
+## Instrumented amplifier build (next): observe the host + raise sensitivity
+
+Since the crash lives in the *uncontrolled* variable (host contention / vCPU
+steal), the next build does two things at once:
+
+**Observability on EVERY run (crash and clean), for correlation** (`unit-tests.ps1`):
+- **A3** Azure host identity (vmId, placement/fault+update domain, agent) via IMDS
+  → `host-info-<job>.log`.
+- **A1** scheduling-stall probe: a 1ms-resolution background thread recording
+  multi-ms descheduling gaps (the direct fingerprint of losing a vCPU), per-1s
+  windows incl. per-core stall counts → `sched-probe-<job>.log`.
+- **A2** best-effort cross-core `rdtsc` spread (inter-vCPU clock-skew leg).
+- The 1ms timer bump is a *constant* perturbation across all cohorts, so it can't
+  bias the A/B; probe runs as an isolated background job (can't fail the run).
+
+**Two new amplifier cohorts** (single-variable off control):
+- **async-preempt** (`ASYNC_PREEMPT=1`, removes `asyncpreemptoff`): tests whether
+  arbitrary-PC SIGURG preemption — the closest *in-guest analog to vCPU steal* —
+  raises the rate. NB: mechanism-analogy amplifier test only; `asyncpreemptoff=1`
+  still does not *suppress* the crash, and `missing stackmap` arose *with*
+  preemption off, so the signature link is weak.
+- **gogc10** (`GOGC_OVERRIDE=10`): middle-ground GC-pressure amplifier.
+
+Hypothesis to confirm: crash runs show fatter scheduling-stall tails (and/or
+larger TSC spread) than clean runs on the same cohort → steal is the trigger.
+Upstream report drafted for golang/go (local `golang-issue-draft.md`).
+
 ## Symptom
 
 On the Windows 11 CI runners the unit test suite intermittently dies with a
