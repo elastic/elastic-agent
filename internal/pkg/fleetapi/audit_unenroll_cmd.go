@@ -14,6 +14,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 // ReqError is an error wrapper to wrap errors with a request.
@@ -60,10 +61,10 @@ func (e *AuditUnenrollRequest) Validate() error {
 
 type AuditUnenrollCmd struct {
 	client client.Sender
-	info   AgentInfo
+	info   pkgfleetapi.AgentInfo
 }
 
-func NewAuditUnenrollCmd(info AgentInfo, client client.Sender) *AuditUnenrollCmd {
+func NewAuditUnenrollCmd(info pkgfleetapi.AgentInfo, client client.Sender) *AuditUnenrollCmd {
 	return &AuditUnenrollCmd{
 		client: client,
 		info:   info,

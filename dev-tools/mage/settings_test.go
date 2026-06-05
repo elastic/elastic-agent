@@ -649,7 +649,7 @@ func TestDefaultSettings(t *testing.T) {
 		assert.Equal(t, "elastic-agent-crossbuild-build-cache", settings.CrossBuild.BuildCacheVolumeName)
 
 		// IntegrationTest defaults
-		assert.True(t, settings.IntegrationTest.CleanOnExit)
+		assert.False(t, settings.IntegrationTest.CleanOnExit)
 		assert.True(t, settings.IntegrationTest.TestEnvironmentEnabled)
 	})
 }
@@ -682,7 +682,7 @@ func TestLoadSettings(t *testing.T) {
 		assert.True(t, settings.CrossBuild.MountBuildCache)
 
 		// IntegrationTest defaults
-		assert.True(t, settings.IntegrationTest.CleanOnExit)
+		assert.False(t, settings.IntegrationTest.CleanOnExit)
 		assert.True(t, settings.IntegrationTest.TestEnvironmentEnabled)
 	})
 
@@ -842,6 +842,15 @@ func TestLoadSettings(t *testing.T) {
 		assert.True(t, settings.IntegrationTest.BuildAgent)
 		assert.Equal(t, "-v -count=1", settings.IntegrationTest.GoTestFlags)
 		assert.False(t, settings.IntegrationTest.TestEnvironmentEnabled)
+	})
+
+	t.Run("enables clean on exit via env var", func(t *testing.T) {
+		t.Setenv("TEST_INTEG_CLEAN_ON_EXIT", "true")
+
+		settings, err := LoadSettings()
+
+		require.NoError(t, err)
+		assert.True(t, settings.IntegrationTest.CleanOnExit)
 	})
 
 	t.Run("loads docker settings from env vars", func(t *testing.T) {
