@@ -74,7 +74,11 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.43.0
 	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v3 v3.0.4
+<<<<<<< HEAD
 	golang.org/x/crypto v0.52.0
+=======
+	golang.org/x/crypto v0.51.0
+>>>>>>> e8ffee8bf (bump x/net to v0.55.0 (#14804))
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
 	golang.org/x/mod v0.35.0
 	golang.org/x/net v0.55.0
