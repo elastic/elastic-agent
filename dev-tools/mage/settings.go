@@ -724,9 +724,6 @@ func (s *Settings) setTestDefaults() {
 
 // setCrossBuildDefaults sets default values for CrossBuildSettings.
 func (s *Settings) setCrossBuildDefaults() {
-	s.CrossBuild.MountModcache = true
-	s.CrossBuild.MountBuildCache = true
-	s.CrossBuild.BuildCacheVolumeName = "elastic-agent-crossbuild-build-cache"
 	s.CrossBuild.DevOS = "linux"
 	s.CrossBuild.DevArch = "amd64"
 }
@@ -1113,15 +1110,6 @@ type CrossBuildSettings struct {
 	// DockerVariants is the comma-separated list of Docker variants (from DOCKER_VARIANTS env var)
 	DockerVariants string
 
-	// MountModcache enables mounting $GOPATH/pkg/mod into crossbuild containers (from CROSSBUILD_MOUNT_MODCACHE env var)
-	MountModcache bool
-
-	// MountBuildCache enables mounting Go build cache into crossbuild containers (from CROSSBUILD_MOUNT_GOCACHE env var)
-	MountBuildCache bool
-
-	// BuildCacheVolumeName is the Docker volume name for the build cache
-	BuildCacheVolumeName string
-
 	// DevOS is the target OS for config generation (from DEV_OS env var, default "linux")
 	DevOS string
 
@@ -1506,12 +1494,6 @@ func (s *Settings) loadCrossBuildSettingsFromEnv() {
 	}
 	if v := os.Getenv("DOCKER_VARIANTS"); v != "" {
 		s.CrossBuild.DockerVariants = v
-	}
-	if v, ok := os.LookupEnv("CROSSBUILD_MOUNT_MODCACHE"); ok {
-		s.CrossBuild.MountModcache = v == "true"
-	}
-	if v, ok := os.LookupEnv("CROSSBUILD_MOUNT_GOCACHE"); ok {
-		s.CrossBuild.MountBuildCache = v == "true"
 	}
 	if v := os.Getenv("DEV_OS"); v != "" {
 		s.CrossBuild.DevOS = v

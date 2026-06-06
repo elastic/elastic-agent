@@ -173,9 +173,6 @@ func GolangCrossBuild(ctx context.Context, cfg *Settings, params BuildArgs) erro
 			"only be executed within the golang-crossbuild docker environment")
 	}
 
-	defer DockerChown(filepath.Join(params.OutputDir, params.Name+binaryExtension(cfg.Build.GOOS)))
-	defer DockerChown(filepath.Join(params.OutputDir))
-
 	mountPoint := cfg.ElasticBeatsDir
 	if err := sh.Run("git", "config", "--global", "--add", "safe.directory", mountPoint); err != nil {
 		return err
