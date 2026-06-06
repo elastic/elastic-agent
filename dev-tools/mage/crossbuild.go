@@ -385,7 +385,7 @@ func chownPaths(uid, gid int, path string) error {
 			return nil
 		}
 
-		if err := os.Chown(name, uid, gid); err != nil {
+		if err := os.Chown(name, uid, gid); err != nil { //nolint:gosec // G122: build-time chown in trusted Docker container, path comes from Walk callback over a controlled directory
 			return fmt.Errorf("failed to chown path=%v : %w", name, err)
 		}
 		numFixed++
