@@ -155,6 +155,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		"logs_dynamic_pipeline": map[string]any{
 			"enabled": true,
 		},
+		"bulk_response_filter_path": "errors,items.*.error,items.*.status,items.*.failure_store",
 	}
 	// Retries
 	retryCfg := map[string]any{
