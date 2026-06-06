@@ -451,7 +451,7 @@ func buildMergedConfig(
 			if mCfg.Enabled && mCfg.MonitorMetrics {
 				// Metrics monitoring is enabled, inject a receiver for the
 				// collector's internal telemetry.
-				if err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components); err != nil {
+				if err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components, logger); err != nil {
 					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
 				}
 			}
@@ -507,19 +507,10 @@ func injectDiagnosticsExtension(config *confmap.Conf) error {
 	}))
 }
 
-func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent) map[string]any {
+func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent, logger *logp.Logger) map[string]any {
 	namespace := "default"
 	if monitoring.Namespace != "" {
 		namespace = monitoring.Namespace
-	}
-	agentFields := map[string]any{
-		"id":      agentInfo.AgentID(),
-		"version": agentInfo.Version(),
-	}
-	// Add hostname as agent.name if available
-	agentName, err := os.Hostname()
-	if err == nil {
-		agentFields["name"] = agentName
 	}
 
 	result := map[string]any{
@@ -537,7 +528,10 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 			"snapshot": agentInfo.Snapshot(),
 			"version":  agentInfo.Version(),
 		},
-		"agent": agentFields,
+		"agent": map[string]any{
+			"id":      agentInfo.AgentID(),
+			"version": agentInfo.Version(),
+		},
 		"component": map[string]any{
 			"binary": "elastic-otel-collector",
 			"id":     "elastic-otel-collector",
@@ -545,6 +539,21 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 		"metricset": map[string]any{
 			"name": "stats",
 		},
+	}
+
+	var hostname string
+	ecsMetadata, err := agentInfo.ECSMetadata(logger)
+	if err == nil {
+		hostname = ecsMetadata.Host.Hostname
+	} else if name, err := os.Hostname(); err == nil {
+		hostname = name
+	}
+
+	if hostname != "" {
+		result["agent"].(map[string]any)["name"] = hostname
+		result["host"] = map[string]any{
+			"hostname": hostname,
+		}
 	}
 
 	return result
@@ -574,6 +583,7 @@ func injectMonitoringReceiver(
 	monitoring *monitoringCfg.MonitoringConfig,
 	agentInfo info.Agent,
 	components []component.Component,
+	logger *logp.Logger,
 ) error {
 	// Find the monitoring exporter that this pipeline will be writing to
 	exporterType := otelcomponent.MustNewType("elasticsearch")
@@ -609,7 +619,7 @@ func injectMonitoringReceiver(
 	collectorCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
-				"event_template": monitoringEventTemplate(monitoring, agentInfo),
+				"event_template": monitoringEventTemplate(monitoring, agentInfo, logger),
 				"interval":       monitoring.MetricsPeriod,
 				"exporter_names": outputNameLookup,
 			},
