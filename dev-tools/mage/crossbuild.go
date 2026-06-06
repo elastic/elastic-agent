@@ -7,7 +7,11 @@ package mage
 import (
 	"context"
 	"fmt"
+<<<<<<< HEAD
 	"go/build"
+=======
+	"io/fs"
+>>>>>>> 8e79eb6a8 ([mage] Run golang-crossbuild as non-root (#14803))
 	"log"
 	"os"
 	"path/filepath"
@@ -20,7 +24,11 @@ import (
 	"github.com/magefile/mage/sh"
 
 	"github.com/elastic/elastic-agent-libs/file"
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
+=======
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
+>>>>>>> 8e79eb6a8 ([mage] Run golang-crossbuild as non-root (#14803))
 )
 
 const defaultCrossBuildTarget = "golangCrossBuild"
@@ -134,12 +142,6 @@ func CrossBuild(ctx context.Context, cfg *Settings, options ...CrossBuildOption)
 	// Docker is required for this target.
 	if err := HaveDocker(); err != nil {
 		return err
-	}
-
-	if cfg.CrossBuild.MountModcache {
-		// Make sure the module dependencies are downloaded on the host,
-		// as they will be mounted into the container read-only.
-		mg.Deps(func() error { return gotool.Mod.Download() })
 	}
 
 	// Build the magefile for Linux, so we can run it inside the container.
@@ -279,24 +281,37 @@ func (b GolangCrossBuilder) Build() error {
 		args = append(args,
 			"--env", fmt.Sprintf("EXEC_UID=%d", uid),
 			"--env", fmt.Sprintf("EXEC_GID=%d", gid),
+			"--env", fmt.Sprintf("CROSSBUILD_UID=%d", uid),
+			"--env", fmt.Sprintf("CROSSBUILD_GID=%d", gid),
 		)
 	}
 	if cfg.Build.VersionQualified {
 		args = append(args, "--env", "VERSION_QUALIFIER="+cfg.Build.VersionQualifier)
 	}
+<<<<<<< HEAD
 	if cfg.CrossBuild.MountModcache {
 		// Mount $GOPATH/pkg/mod into the container, read-only.
 		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
 		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
+=======
+
+	// Mount the mod cache directory into the container
+	hostModCacheDir, err := sh.Output("go", "env", "GOMODCACHE")
+	if err != nil {
+		return fmt.Errorf("error determining the Go mod cache location: %w", err)
+>>>>>>> 8e79eb6a8 ([mage] Run golang-crossbuild as non-root (#14803))
 	}
+	modCacheLocation := "/tmp/.cache/gomod"
+	args = append(args, "-v", fmt.Sprintf("%s:%s", hostModCacheDir, modCacheLocation))
 
 	buildCacheLocation := "/tmp/.cache/go-build"
-	if cfg.CrossBuild.MountBuildCache {
-		// Mount the go build cache volume into the container.
-		args = append(args,
-			"-v", fmt.Sprintf("%s:%s", cfg.CrossBuild.BuildCacheVolumeName, buildCacheLocation),
-		)
+	hostCacheDir, err := sh.Output("go", "env", "GOCACHE")
+	if err != nil {
+		return fmt.Errorf("error determining the Go build cache location: %w", err)
 	}
+	args = append(args,
+		"-v", fmt.Sprintf("%s:%s", hostCacheDir, buildCacheLocation),
+	)
 
 	// Mount /opt/git-mirrors (if present) to resolve git alternates in CI
 	if _, err := os.Stat("/opt/git-mirrors"); err == nil {
@@ -313,8 +328,8 @@ func (b GolangCrossBuilder) Build() error {
 
 	args = append(args,
 		"--rm",
-		"--env", "GOFLAGS=-mod=readonly",
-		"--env", fmt.Sprintf("GOCACHE=%s", buildCacheLocation), // ensure this is writable by the user
+		"--env", fmt.Sprintf("GOCACHE=%s", buildCacheLocation),
+		"--env", fmt.Sprintf("GOMODCACHE=%s", modCacheLocation),
 		"--env", "MAGEFILE_VERBOSE="+verbose,
 		"--env", "MAGEFILE_TIMEOUT="+EnvOr("MAGEFILE_TIMEOUT", ""),
 		"--env", fmt.Sprintf("SNAPSHOT=%v", cfg.Build.Snapshot),
