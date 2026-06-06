@@ -3701,22 +3701,7 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 // CrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
 func (Otel) CrossBuild(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
-<<<<<<< HEAD
 	return devtools.CrossBuild(ctx, cfg, devtools.WithName("elastic-otel-collector"), devtools.WithTarget("otel:golangCrossBuild"))
-=======
-
-	opts := []devtools.CrossBuildOption{devtools.WithName("elastic-otel-collector"), devtools.WithTarget("otel:golangCrossBuild")}
-
-	// embedded packetbeat is only included in a non-FIPS build
-	if !cfg.Build.FIPSBuild {
-		// download the NPCAP installer
-		mg.SerialDeps(xpacketbeat.GetNpcapInstallerFn(filepath.Join("beats", "x-pack", "packetbeat")))
-		// use the npcap build image for windows
-		opts = append(opts, devtools.ImageSelector(npcapImageSelector(cfg.Docker.WindowsNpcap)))
-	}
-
-	return devtools.CrossBuild(ctx, cfg, opts...)
->>>>>>> 8e79eb6a8 ([mage] Run golang-crossbuild as non-root (#14803))
 }
 
 func (Otel) Readme() error {
