@@ -2539,7 +2539,7 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	monitoringConfig := &config.MonitoringConfig{}
 	agentInfo := &info.AgentInfo{}
 	components := []component.Component{}
-	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components)
+	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components, logp.NewNopLogger())
 	require.NoError(t, err, "injectMonitoringReceiver should succeed")
 	result := mapstr.M(cfg.ToStringMap()).Flatten()
 
