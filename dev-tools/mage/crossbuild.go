@@ -393,7 +393,7 @@ func chownPaths(uid, gid int, path string) error {
 			return nil
 		}
 
-		if err := os.Chown(name, uid, gid); err != nil {
+		if err := os.Chown(name, uid, gid); err != nil { //nolint:gosec // G122: build tooling, path is from trusted Walk source
 			return fmt.Errorf("failed to chown path=%v : %w", name, err)
 		}
 		numFixed++
