@@ -7,11 +7,6 @@ package mage
 import (
 	"context"
 	"fmt"
-<<<<<<< HEAD
-	"go/build"
-=======
-	"io/fs"
->>>>>>> 8e79eb6a8 ([mage] Run golang-crossbuild as non-root (#14803))
 	"log"
 	"os"
 	"path/filepath"
@@ -24,11 +19,6 @@ import (
 	"github.com/magefile/mage/sh"
 
 	"github.com/elastic/elastic-agent-libs/file"
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
-=======
-	"github.com/elastic/elastic-agent/dev-tools/packaging"
->>>>>>> 8e79eb6a8 ([mage] Run golang-crossbuild as non-root (#14803))
 )
 
 const defaultCrossBuildTarget = "golangCrossBuild"
@@ -290,18 +280,11 @@ func (b GolangCrossBuilder) Build() error {
 	if cfg.Build.VersionQualified {
 		args = append(args, "--env", "VERSION_QUALIFIER="+cfg.Build.VersionQualifier)
 	}
-<<<<<<< HEAD
-	if cfg.CrossBuild.MountModcache {
-		// Mount $GOPATH/pkg/mod into the container, read-only.
-		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
-		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
-=======
 
 	// Mount the mod cache directory into the container
 	hostModCacheDir, err := sh.Output("go", "env", "GOMODCACHE")
 	if err != nil {
 		return fmt.Errorf("error determining the Go mod cache location: %w", err)
->>>>>>> 8e79eb6a8 ([mage] Run golang-crossbuild as non-root (#14803))
 	}
 	modCacheLocation := "/tmp/.cache/gomod"
 	args = append(args, "-v", fmt.Sprintf("%s:%s", hostModCacheDir, modCacheLocation))
