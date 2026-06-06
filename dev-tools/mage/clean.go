@@ -38,8 +38,5 @@ func Clean(cfg *Settings, pathLists ...[]string) error {
 			}
 		}
 	}
-	if cfg.CrossBuild.MountBuildCache {
-		return sh.Run("docker", "volume", "rm", "-f", cfg.CrossBuild.BuildCacheVolumeName)
-	}
 	return nil
 }
