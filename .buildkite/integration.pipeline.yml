@@ -10,6 +10,8 @@ env:
   # Please do not change them manually.
   IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1780275718"
   IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1780275718"
+  BUILDKITE_PLUGIN_S3_CACHE_BUCKET: "elastic-agent-ci-go-cache"
+  BUILDKITE_PLUGIN_S3_CACHE_PREFIX: "elastic-agent-test"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -30,6 +32,25 @@ common:
         - .buildkite
         - .go-version
         - version/version.go
+  - aws_oidc: &aws_oidc
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-aws-buildkite-oidc.tf
+      elastic/oblt-aws-auth#v0.2.0:
+  - base_cache_settings: &base_cache_settings
+      manifest:
+      - go.mod
+      - go.sum
+      - internal/edot/go.mod
+      - internal/edot/go.sum
+      - .go-version
+      backend: s3
+      restore: pipeline
+      save:
+      - file
+      - branch
+      compression: tgz
+  - linux_cache_settings: &linux_cache_settings
+      <<: *base_cache_settings
+      path: /opt/buildkite-agent/.cache/go-build
 
 steps:
   - group: "Integration tests: packaging"
@@ -56,6 +77,10 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/amd64"
           - *google_oidc_plugin
 
       - label: ":package: amd64: FIPS tar.gz,zip (linux,windows)"
@@ -75,6 +100,10 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/amd64"
           - *google_oidc_plugin
 
       # Packaging linux and windows for arm64
@@ -94,6 +123,10 @@ steps:
           instanceType: "c6g.2xlarge"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
         plugins:
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/arm64"
           - *google_oidc_plugin
 
       - label: ":package: arm64: FIPS tar.gz,zip (linux,windows)"
@@ -113,6 +146,10 @@ steps:
           instanceType: "c6g.2xlarge"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
         plugins:
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/arm64"
           - *google_oidc_plugin
 
       - label: ":package: amd64: Containers"
@@ -131,6 +168,10 @@ steps:
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/amd64"
           - *google_oidc_plugin
           - *vault_docker_login
 
@@ -149,6 +190,10 @@ steps:
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
         plugins:
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/arm64"
           - *google_oidc_plugin
 
       - label: ":package: amd64: FIPS Containers"
@@ -168,6 +213,10 @@ steps:
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/amd64"
           - *vault_docker_login
           - *google_oidc_plugin
 
@@ -187,6 +236,10 @@ steps:
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
         plugins:
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/arm64"
           - *google_oidc_plugin
 
   - label: "Triggering Integration tests"
