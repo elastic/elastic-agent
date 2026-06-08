@@ -328,7 +328,7 @@ func TestHTTPClient(t *testing.T) {
 			})
 
 			require.NoError(t, err)
-			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, bytes.NewBuffer([]byte("hello")))
+			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, bytes.NewReader([]byte("hello")))
 			require.NoError(t, err)
 
 			body, err := io.ReadAll(resp.Body)
@@ -602,7 +602,7 @@ func TestSendRetriesAcrossHosts(t *testing.T) {
 		clients: []*requestClient{firstRequester, secondRequester},
 	}
 
-	resp, err := c.Send(ctx, http.MethodPost, "/checkin", nil, nil, bytes.NewBufferString(payload))
+	resp, err := c.Send(ctx, http.MethodPost, "/checkin", nil, nil, bytes.NewReader([]byte(payload)))
 	require.NoError(t, err, "Send should succeed when the second host is healthy")
 	defer resp.Body.Close()
 

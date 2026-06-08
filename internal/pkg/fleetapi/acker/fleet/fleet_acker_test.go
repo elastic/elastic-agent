@@ -40,7 +40,7 @@ func (s *testSender) Send(
 	path string,
 	params url.Values,
 	headers http.Header,
-	body io.Reader,
+	body io.ReadSeeker,
 ) (*http.Response, error) {
 	d := json.NewDecoder(body)
 	var req ackRequest

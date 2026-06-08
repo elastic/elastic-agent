@@ -1966,7 +1966,7 @@ func TestCopyRunDirectory(t *testing.T) {
 
 type mockSender struct{}
 
-func (m *mockSender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (*http.Response, error) {
+func (m *mockSender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.ReadSeeker) (*http.Response, error) {
 	return nil, nil
 }
 
