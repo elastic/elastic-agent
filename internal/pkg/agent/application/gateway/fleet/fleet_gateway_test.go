@@ -57,7 +57,7 @@ func (t *testingClient) Send(
 	_ string,
 	_ url.Values,
 	headers http.Header,
-	body io.Reader,
+	body io.ReadSeeker,
 ) (*http.Response, error) {
 	t.Lock()
 	defer t.Unlock()

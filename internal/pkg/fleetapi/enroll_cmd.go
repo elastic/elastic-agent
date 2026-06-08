@@ -208,7 +208,7 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 		return nil, errors.New(err, "fail to encode the enrollment request")
 	}
 
-	resp, err := e.client.Send(ctx, "POST", p, nil, headers, bytes.NewBuffer(b))
+	resp, err := e.client.Send(ctx, "POST", p, nil, headers, bytes.NewReader(b))
 	if err != nil {
 		if errors.Is(err, syscall.ECONNREFUSED) {
 			return nil, ErrConnRefused

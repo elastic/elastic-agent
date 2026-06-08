@@ -32,7 +32,7 @@ type Sender interface {
 		path string,
 		params url.Values,
 		headers http.Header,
-		body io.Reader,
+		body io.ReadSeeker,
 	) (*http.Response, error)
 }
 
@@ -136,6 +136,19 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 		return nil, 0, fmt.Errorf("fail to encode the checkin request: %w", err)
 	}
 
+<<<<<<< HEAD
+=======
+	requestHeaders := http.Header{}
+	var requestBody io.ReadSeeker = bytes.NewReader(b)
+	if e.compression == "gzip" {
+		requestBody, err = gzipEncodeCheckinRequestBody(b)
+		if err != nil {
+			return nil, 0, fmt.Errorf("fail to gzip encode checkin request: %w", err)
+		}
+		requestHeaders.Set(checkinContentEncodingHeader, checkinContentEncodingGzip)
+	}
+
+>>>>>>> 3b8ea9c24 (Fix bug where an empty body could be sent after failing over to another Fleet host (#14838))
 	cp := fmt.Sprintf(checkingPath, e.info.AgentID())
 	sendStart := time.Now()
 	resp, err := e.client.Send(ctx, "POST", cp, nil, nil, bytes.NewBuffer(b))
@@ -195,3 +208,20 @@ func extractError(resp io.Reader) error {
 
 	return fmt.Errorf("could not decode the response, raw response: %s", string(data))
 }
+<<<<<<< HEAD
+=======
+
+func gzipEncodeCheckinRequestBody(body []byte) (*bytes.Reader, error) {
+	var compressedBody bytes.Buffer
+	gzipWriter := gzip.NewWriter(&compressedBody)
+	if _, err := gzipWriter.Write(body); err != nil {
+		return nil, err
+	}
+
+	if err := gzipWriter.Close(); err != nil {
+		return nil, err
+	}
+
+	return bytes.NewReader(compressedBody.Bytes()), nil
+}
+>>>>>>> 3b8ea9c24 (Fix bug where an empty body could be sent after failing over to another Fleet host (#14838))
