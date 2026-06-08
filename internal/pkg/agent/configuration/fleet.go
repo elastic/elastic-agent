@@ -19,11 +19,7 @@ const (
 
 	defaultCompression = CheckinCompressionGzip
 
-	FleetCheckinModeStandard = "standard"
-
-	// FleetCheckinModeOnStateChange is the checkin mode that causes the agent to
-	// check in with Fleet immediately when its state changes, rather than waiting
-	// for the full polling interval. Useful for speeding up integration tests.
+	FleetCheckinModeStandard      = "standard"
 	FleetCheckinModeOnStateChange = "on_state_change"
 )
 
