@@ -19,6 +19,13 @@ import (
 	"go.opentelemetry.io/collector/service/telemetry/otelconftelemetry"
 
 	// Receivers:
+<<<<<<< HEAD
+=======
+	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
+	awscloudwatchreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver"
+	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
+	azureeventhubreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azureeventhubreceiver"
+>>>>>>> cfd76549e (Add awscloudwatchreceiver to EDOT (#14774))
 	azuremonitorreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
@@ -119,6 +126,31 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			jmxreceiver.NewFactory(),
 			nopreceiver.NewFactory(),
 			azuremonitorreceiver.NewFactory(),
+<<<<<<< HEAD
+=======
+			couchdbreceiver.NewFactory(),
+			haproxyreceiver.NewFactory(),
+			iisreceiver.NewFactory(),
+			memcachedreceiver.NewFactory(),
+			mongodbreceiver.NewFactory(),
+			mysqlreceiver.NewFactory(),
+			oracledbreceiver.NewFactory(),
+			postgresqlreceiver.NewFactory(),
+			rabbitmqreceiver.NewFactory(),
+			snmpreceiver.NewFactory(),
+			kafkametricsreceiver.NewFactory(),
+			sqlserverreceiver.NewFactory(),
+			statsdreceiver.NewFactory(),
+			vcenterreceiver.NewFactory(),
+			zookeeperreceiver.NewFactory(),
+			windowseventlogreceiver.NewFactory(),
+			azureeventhubreceiver.NewFactory(),
+			awscloudwatchreceiver.NewFactory(),
+			awss3receiver.NewFactory(),
+			windowsperfcountersreceiver.NewFactory(),
+			prometheusremotewritereceiver.NewFactory(),
+			akamaisiemreceiver.NewFactory(),
+>>>>>>> cfd76549e (Add awscloudwatchreceiver to EDOT (#14774))
 		}
 		// some receivers should only be available when
 		// not in fips mode due to restrictions on crypto usage
