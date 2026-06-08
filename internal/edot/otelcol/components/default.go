@@ -22,6 +22,7 @@ import (
 
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
+	awscloudwatchreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver"
 	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
 	azuremonitorreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver"
 	couchdbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver"
@@ -186,6 +187,11 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			vcenterreceiver.NewFactory(),
 			zookeeperreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
+<<<<<<< HEAD
+=======
+			azureeventhubreceiver.NewFactory(),
+			awscloudwatchreceiver.NewFactory(),
+>>>>>>> cfd76549e (Add awscloudwatchreceiver to EDOT (#14774))
 			awss3receiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
 			prometheusremotewritereceiver.NewFactory(),
