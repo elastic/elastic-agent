@@ -38,8 +38,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/compose"
-	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -2822,20 +2820,9 @@ services:
       - KAFKA_ADVERTISED_HOST=localhost
 `, kafkaPath)
 
-	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = stack.Down(
-			context.Background(),
-			compose.RemoveOrphans(true),
-			compose.RemoveVolumes(true),
-			compose.RemoveImagesLocal,
-		)
-	})
-
-	err = stack.
-		Up(t.Context(), compose.Wait(true))
+	stack := newDockerCompose(t, composeContent)
+	t.Cleanup(func() { _ = stack.down(context.Background()) })
+	err := stack.up(t.Context())
 	require.NoError(t, err)
 
 	kafkaDocs := make(map[string]mapstr.M, 0)
@@ -3030,19 +3017,9 @@ services:
       - KAFKA_ADVERTISED_HOST=localhost
 `, kafkaPath)
 
-	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = stack.Down(
-			context.Background(),
-			compose.RemoveOrphans(true),
-			compose.RemoveVolumes(true),
-			compose.RemoveImagesLocal,
-		)
-	})
-
-	err = stack.Up(t.Context(), compose.Wait(true))
+	stack := newDockerCompose(t, composeContent)
+	t.Cleanup(func() { _ = stack.down(context.Background()) })
+	err := stack.up(t.Context())
 	require.NoError(t, err)
 
 	// Each strategy gets its own topic.
@@ -3325,21 +3302,10 @@ services:
       - 5055:5055
 `, logstash_testdata, pipeline, logstash_testdata)
 
-	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = stack.Down(
-			context.Background(),
-			compose.RemoveOrphans(true),
-			compose.RemoveVolumes(true),
-			compose.RemoveImagesLocal,
-		)
-	})
-
-	err = stack.
-		WaitForService("logstash", wait.NewHTTPStrategy("/_node/stats").WithPort("9600/tcp").WithStartupTimeout(5*time.Minute)).
-		Up(t.Context(), compose.Wait(true))
+	stack := newDockerCompose(t, composeContent)
+	t.Cleanup(func() { _ = stack.down(context.Background()) })
+	// The logstash service has a healthcheck in the compose file; --wait handles readiness.
+	err := stack.up(t.Context())
 	require.NoError(t, err)
 
 	// baseURL := "http://localhost:8082"
@@ -3435,11 +3401,7 @@ agent.monitoring:
 				logCtx, logCancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer logCancel()
 
-				lsContainer, err := stack.ServiceContainer(logCtx, "logstash")
-				if err != nil {
-					t.Logf("could not read logs from logstash container: %s", err.Error())
-				}
-				rc, err := lsContainer.Logs(logCtx)
+				rc, err := stack.serviceLogs(logCtx, "logstash")
 				if err != nil {
 					t.Logf("could not read logs from logstash container: %s", err.Error())
 					return
