@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -57,23 +58,69 @@ func TestLargeSyntheticsPolicy(t *testing.T) {
 		Sudo:  true,
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(30*time.Minute))
-	defer cancel()
+	t.Run("all monitors succeed", func(t *testing.T) {
+		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(30*time.Minute))
+		defer cancel()
 
-	// 1. Start a local HTTP server. All three monitor types target it so it must
-	//    remain alive for the duration of the test.
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "Hello, World!")
-	}))
-	t.Cleanup(ts.Close)
+		// Start a local HTTP server that always returns 200.
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, "Hello, World!")
+		}))
+		t.Cleanup(ts.Close)
 
-	tsURL, err := url.Parse(ts.URL)
+		agentFixture := setupMonitorsAndAgent(t, ctx, info, ts.URL)
+
+		// ensure all components are healthy
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			status, err := agentFixture.ExecStatus(ctx)
+			require.NoError(c, err)
+			require.NotEmpty(c, status.Components, "expected at least one component")
+			for _, comp := range status.Components {
+				assert.Equalf(c, int(cproto.State_HEALTHY), comp.State, "component %s not healthy", comp.Name)
+			}
+			require.Equal(c, int(cproto.State_HEALTHY), status.State, "expected agent status to be healthy")
+			require.Equal(c, int(cproto.State_HEALTHY), status.FleetState, "expected fleet status to be healthy")
+			t.Logf("agent healthy with %d components", len(status.Components))
+		}, 10*time.Minute, 10*time.Second, "agent did not reach fully healthy state")
+	})
+
+	// Test where all monitors fail - payload information may be different then success case causing even larger checkin bodies.
+	t.Run("all monitors fail", func(t *testing.T) {
+		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(30*time.Minute))
+		defer cancel()
+
+		// Start a local listener that closes all incoming connections immediatly.
+		l, err := net.Listen("tcp", "localhost:0")
+		require.NoError(t, err)
+		cl := &closeListener{l}
+		t.Cleanup(func() {
+			cl.Close()
+		})
+
+		agentFixture := setupMonitorsAndAgent(t, ctx, info, "http://"+cl.Addr().String())
+
+		// Ensure agent is not healthy
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			status, err := agentFixture.ExecStatus(ctx)
+			require.NoError(c, err)
+			require.NotEmpty(c, status.Components, "expected at least one component")
+			require.Equal(c, int(cproto.State_DEGRADED), status.State, "expected agent status to be degraded")
+			require.Equal(c, int(cproto.State_HEALTHY), status.FleetState, "expected fleet status to be healthy")
+		}, 10*time.Minute, 10*time.Second, "expected agent to be unhealthy")
+	})
+}
+
+// setupMonitorsAndAgent creates a policy and uses it as a synthetics private location for 10k monitors directed to testURL.
+// then install an agent with that policy and ensures the agent is connected to fleet.
+func setupMonitorsAndAgent(t *testing.T, ctx context.Context, info *define.Info, testURL string) *atesting.Fixture {
+	t.Helper()
+	tsURL, err := url.Parse(testURL)
 	require.NoError(t, err)
 	tsHost := tsURL.Hostname()
 	tsPort := tsURL.Port()
 
-	// 2. Create a Fleet agent policy.
+	// Create a Fleet agent policy.
 	uid := uuid.Must(uuid.NewV4()).String()
 	policyResp, err := info.KibanaClient.CreatePolicy(ctx, kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-large-synthetics-%s", uid),
@@ -87,20 +134,20 @@ func TestLargeSyntheticsPolicy(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("created Fleet policy %s", policyResp.ID)
 
-	// 3. Create a Synthetics private location backed by the Fleet policy.
+	// Create a Synthetics private location backed by the created Fleet policy.
 	locationLabel := fmt.Sprintf("test-location-%s", uid)
 	privLocID, err := createSyntheticsPrivateLocation(ctx, info.KibanaClient, locationLabel, policyResp.ID)
 	require.NoError(t, err)
 	t.Logf("created private location %s (label: %s)", privLocID, locationLabel)
 
-	// 4. Push 10 000 monitors to the private location in batches.
+	// Push 10 000 monitors to the private location in batches.
 	projectName := fmt.Sprintf("large-policy-test-%s", uid)
 	monitors := buildSyntheticsMonitors(tsHost, tsPort, locationLabel)
 	t.Logf("pushing %d monitors in batches of %d", len(monitors), syntheticsBatchSize)
 	require.NoError(t, bulkPushSyntheticsMonitors(ctx, t, info.KibanaClient, projectName, monitors))
 	t.Logf("pushed %d monitors", len(monitors))
 
-	// 5. Install the agent enrolled into the policy.
+	// Install an agent enrolled into the policy.
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
@@ -112,29 +159,21 @@ func TestLargeSyntheticsPolicy(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("enrolled agent %s", agentID)
 
-	// 6. Wait for the agent to connect to Fleet and for every component to
-	//    reach the HEALTHY state.
+	// Wait for the agent to connect to Fleet.
 	check.ConnectedToFleet(ctx, t, agentFixture, 10*time.Minute)
-
-	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		status, err := agentFixture.ExecStatus(ctx)
-		require.NoError(c, err)
-		require.NotEmpty(c, status.Components, "expected at least one component")
-		for _, comp := range status.Components {
-			assert.Equalf(c, int(cproto.State_HEALTHY), comp.State, "component %s not healthy", comp.Name)
-		}
-		t.Logf("agent healthy with %d components", len(status.Components))
-	}, 10*time.Minute, 10*time.Second, "agent did not reach fully healthy state")
+	return agentFixture
 }
 
 // --- Kibana Synthetics API helpers ---
 
+// syntheticsPrivateLocationResp is the response when defining a fleet policy as a private_location
 type syntheticsPrivateLocationResp struct {
 	ID            string `json:"id"`
 	Label         string `json:"label"`
 	AgentPolicyID string `json:"agentPolicyId"`
 }
 
+// createSyntheticsPriveLocation creates a private_location associated with the passed policyID and label.
 func createSyntheticsPrivateLocation(ctx context.Context, client *kibana.Client, label, policyID string) (string, error) {
 	body, err := json.Marshal(map[string]string{
 		"label":         label,
@@ -192,6 +231,11 @@ type syntheticsBulkPutResponse struct {
 	} `json:"failedMonitors"`
 }
 
+// buildSyntheticsMonitors creates 10k monitors for the passed host:port for the private_location specified by locationLabel.
+//
+// 8k http monitors are created - each with a different path (generated by random uuids)
+// 1k tcp monitors are created
+// 1k icmp monitors are created
 func buildSyntheticsMonitors(host, port, locationLabel string) []syntheticsMonitorSchema {
 	total := numHTTPMonitors + numICMPMonitors + numTCPMonitors
 	monitors := make([]syntheticsMonitorSchema, 0, total)
@@ -236,9 +280,8 @@ func buildSyntheticsMonitors(host, port, locationLabel string) []syntheticsMonit
 	return monitors
 }
 
-// bulkPushSyntheticsMonitors uploads monitors to the Synthetics project API in
-// batches of syntheticsBatchSize with a short inter-batch pause to avoid
-// overwhelming the server.
+// bulkPushSyntheticsMonitors uploads monitors to the Synthetics project API in batches.
+// If a batch fails it is retried with exponential backoff to avoid overwhelming the Kibana instance.
 func bulkPushSyntheticsMonitors(ctx context.Context, t *testing.T, client *kibana.Client, projectName string, monitors []syntheticsMonitorSchema) error {
 	apiURL := fmt.Sprintf("/api/synthetics/project/%s/monitors/_bulk_update", projectName)
 	headers := http.Header{"Content-Type": []string{"application/json"}}
@@ -260,9 +303,9 @@ func bulkPushSyntheticsMonitors(ctx context.Context, t *testing.T, client *kiban
 	return nil
 }
 
-// sendBatchWithRetry sends a single batch to the Kibana Synthetics API. On
-// transient failures (network error, 429, 5xx) it retries with exponential
-// backoff (15s base, 2× multiplier, 5 min cap, 10 attempts).
+// sendBatchWithRetry sends a single batch to the Kibana Synthetics API.
+// On transient failures (network error, 429, 5xx) it retries with exponential backoff.
+// (15s base, 2× multiplier, 5 min cap, 10 attempts)
 func sendBatchWithRetry(ctx context.Context, t *testing.T, client *kibana.Client, apiURL string, headers http.Header, reqBody []byte, batchNum int) error {
 	const (
 		maxAttempts = 10
@@ -315,4 +358,18 @@ func sendBatchWithRetry(ctx context.Context, t *testing.T, client *kibana.Client
 		return nil
 	}
 	return fmt.Errorf("batch %d: max retries exceeded; last error: %w", batchNum, lastErr)
+}
+
+// closeListener is a net.Listener that closes any accepted connections.
+type closeListener struct {
+	net.Listener
+}
+
+// Accept will accept a connction from the underlying listener and close it.
+func (c *closeListener) Accept() (net.Conn, error) {
+	conn, err := c.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return nil, conn.Close()
 }
