@@ -105,8 +105,10 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceP("tag", "", []string{}, "User-set tags")
 	cmd.Flags().Bool("checkin-on-state-change", false, "Use on_state_change Fleet checkin mode so the agent checks in immediately on state changes (speeds up integration tests)")
 
-	cmd.Flags().MarkHidden("skip-daemon-reload")         //nolint:errcheck // an error is only returned if the flag does not exist.
-	cmd.Flags().MarkHidden("checkin-on-state-change")    //nolint:errcheck // an error is only returned if the flag does not exist.
+	// Hide the checkin-on-state-change flag, it's used to speed up tests and in agentless only.
+	// Faster checkins affects Fleet scalability by lowering the maximum agents that can be managed due to increased authentication load.
+	cmd.Flags().MarkHidden("checkin-on-state-change") //nolint:errcheck // an error is only returned if the flag does not exist.
+	cmd.Flags().MarkHidden("skip-daemon-reload")      //nolint:errcheck // an error is only returned if the flag does not exist.
 }
 
 func validateEnrollFlags(cmd *cobra.Command) error {
