@@ -249,7 +249,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	// state changes rather than waiting the full polling interval. Tests that
 	// need the standard poll-based mode should pass WithStandardCheckinMode()
 	// when creating their fixture.
-	if !f.useStandardCheckinMode {
+	if !f.useStandardCheckinMode && shouldEnroll {
 		installArgs = append(installArgs, "--checkin-on-state-change")
 	}
 
