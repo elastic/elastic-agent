@@ -244,6 +244,15 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	}
 
 	installArgs = append(installArgs, installOpts.ToCmdArgs()...)
+
+	// Speed up integration tests by having the agent check in with Fleet on
+	// state changes rather than waiting the full polling interval. Tests that
+	// need the standard poll-based mode should pass WithStandardCheckinMode()
+	// when creating their fixture.
+	if !f.useStandardCheckinMode {
+		installArgs = append(installArgs, "--checkin-on-state-change")
+	}
+
 	out, err := f.Exec(ctx, installArgs, opts...)
 	if err != nil {
 		f.DumpProcesses("-install")

@@ -19,8 +19,12 @@ const (
 
 	defaultCompression = CheckinCompressionGzip
 
-	fleetCheckinModeStandard       = "standard"
-	fleetCheckinModeOnStateChanged = "on_state_change"
+	fleetCheckinModeStandard = "standard"
+
+	// FleetCheckinModeOnStateChange is the checkin mode that causes the agent to
+	// check in with Fleet immediately when its state changes, rather than waiting
+	// for the full polling interval. Useful for speeding up integration tests.
+	FleetCheckinModeOnStateChange = "on_state_change"
 )
 
 // FleetAgentConfig is the internal configuration of the agent after the enrollment is done,
@@ -87,7 +91,7 @@ func DefaultFleetCheckin() *FleetCheckin {
 }
 
 func (f *FleetCheckin) IsModeOnStateChanged() bool {
-	return f != nil && f.Mode == fleetCheckinModeOnStateChanged
+	return f != nil && f.Mode == FleetCheckinModeOnStateChange
 }
 
 func (f *FleetCheckin) GetMode() string {
@@ -103,7 +107,7 @@ func (f *FleetCheckin) Validate() error {
 		return nil
 	}
 
-	if f.Mode != "" && f.Mode != fleetCheckinModeStandard && f.Mode != fleetCheckinModeOnStateChanged {
+	if f.Mode != "" && f.Mode != fleetCheckinModeStandard && f.Mode != FleetCheckinModeOnStateChange {
 		return errors.New("checkin.mode must be either 'standard' or 'on_state_change'")
 	}
 

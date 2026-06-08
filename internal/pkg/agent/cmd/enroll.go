@@ -103,8 +103,10 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().DurationP("fleet-server-timeout", "", 0, "When bootstrapping Fleet Server, timeout waiting for Fleet Server to be ready to start enrollment")
 	cmd.Flags().Bool("skip-daemon-reload", false, "Skip daemon reload after enrolling")
 	cmd.Flags().StringSliceP("tag", "", []string{}, "User-set tags")
+	cmd.Flags().Bool("checkin-on-state-change", false, "Use on_state_change Fleet checkin mode so the agent checks in immediately on state changes (speeds up integration tests)")
 
-	cmd.Flags().MarkHidden("skip-daemon-reload") //nolint:errcheck // an error is only returned if the flag does not exist.
+	cmd.Flags().MarkHidden("skip-daemon-reload")         //nolint:errcheck // an error is only returned if the flag does not exist.
+	cmd.Flags().MarkHidden("checkin-on-state-change")    //nolint:errcheck // an error is only returned if the flag does not exist.
 }
 
 func validateEnrollFlags(cmd *cobra.Command) error {
@@ -214,6 +216,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	fTimeout, _ := cmd.Flags().GetDuration("fleet-server-timeout")
 	skipDaemonReload, _ := cmd.Flags().GetBool("skip-daemon-reload")
 	fTags, _ := cmd.Flags().GetStringSlice("tag")
+	checkinOnStateChange, _ := cmd.Flags().GetBool("checkin-on-state-change")
 	args := []string{}
 	if url != "" {
 		args = append(args, "--url")
@@ -363,6 +366,9 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	for _, v := range fTags {
 		args = append(args, "--tag", v)
 	}
+	if checkinOnStateChange {
+		args = append(args, "--checkin-on-state-change")
+	}
 	return args
 }
 
@@ -491,6 +497,7 @@ func doEnroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	fTimeout, _ := cmd.Flags().GetDuration("fleet-server-timeout")
 	skipDaemonReload, _ := cmd.Flags().GetBool("skip-daemon-reload")
 	tags, _ := cmd.Flags().GetStringSlice("tag")
+	checkinOnStateChange, _ := cmd.Flags().GetBool("checkin-on-state-change")
 
 	caStr, _ := cmd.Flags().GetString("certificate-authorities")
 	CAs := cli.StringToSlice(caStr)
@@ -540,6 +547,7 @@ func doEnroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		DaemonTimeout:        daemonTimeout,
 		SkipDaemonRestart:    skipDaemonReload,
 		Tags:                 tags,
+		CheckinOnStateChange: checkinOnStateChange,
 		FleetServer: enroll.EnrollCmdFleetServerOption{
 			ConnStr:               fServer,
 			ElasticsearchCA:       fElasticSearchCA,
