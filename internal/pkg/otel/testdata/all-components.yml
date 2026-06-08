@@ -106,6 +106,13 @@ receivers:
       s3_prefix: 'test'
     encodings:
       - extension: awslogs_encoding/elbaccess
+  awscloudwatch:
+    region: us-east-1
+    logs:
+      poll_interval: 1m
+      groups:
+        autodiscover:
+          limit: 1
   prometheusremotewrite:
     endpoint: 0.0.0.0:9090
   statsd:
@@ -224,6 +231,7 @@ service:
         - elasticapmintake
         - elasticmonitoringreceiver
         - azure_event_hub
+        - awscloudwatch
         - verifier
 
     logs/forward_receive:
