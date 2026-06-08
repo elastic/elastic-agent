@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
+	agentversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 // ErrNotInstalled is returned in cases where Agent isn't installed
@@ -249,7 +250,9 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	// state changes rather than waiting the full polling interval. Tests that
 	// need the standard poll-based mode should pass WithStandardCheckinMode()
 	// when creating their fixture.
-	if !f.useStandardCheckinMode && shouldEnroll {
+	// Gate on the fixture version: the flag was introduced in 9.5.0-SNAPSHOT, so
+	// older binaries (e.g. the start agent in upgrade tests) would reject it.
+	if !f.useStandardCheckinMode && supportsCheckinOnStateChange(f.version) {
 		installArgs = append(installArgs, "--checkin-on-state-change")
 	}
 
@@ -908,4 +911,16 @@ func KeepInstalledFlag() bool {
 	// failure reports false (ignore error)
 	v, _ := strconv.ParseBool(os.Getenv("AGENT_KEEP_INSTALLED"))
 	return v
+}
+
+// supportsCheckinOnStateChange returns true when the given version string is new enough
+// to support the --checkin-on-state-change install/enroll flag.
+func supportsCheckinOnStateChange(versionStr string) bool {
+	parsed, err := agentversion.ParseVersion(versionStr)
+	if err != nil {
+		return false
+	}
+
+	// The --checkin-on-state-change flag is currently only available in 9.5.0-SNAPSHOT.
+	return !parsed.Less(*agentversion.NewParsedSemVer(9, 5, 0, "SNAPSHOT", ""))
 }
