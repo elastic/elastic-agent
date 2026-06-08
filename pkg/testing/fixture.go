@@ -57,6 +57,10 @@ type Fixture struct {
 	fipsArtifact    bool
 	cmdOutput       io.Writer
 
+	// useStandardCheckinMode disables the on_state_change Fleet checkin
+	// mode used in tests by default.
+	useStandardCheckinMode bool
+
 	srcPackage string
 	workDir    string
 	extractDir string
@@ -170,6 +174,15 @@ func WithAdditionalArgs(args []string) FixtureOpt {
 func WithFIPSArtifact() FixtureOpt {
 	return func(f *Fixture) {
 		f.fipsArtifact = true
+	}
+}
+
+// WithStandardCheckinMode opts the fixture out of the default on_state_change
+// Fleet checkin mode. Use this when a test specifically requires standard
+// checkin behavior where changes can take up to 5 minutes to be reported to Fleet.
+func WithStandardCheckinMode() FixtureOpt {
+	return func(f *Fixture) {
+		f.useStandardCheckinMode = true
 	}
 }
 

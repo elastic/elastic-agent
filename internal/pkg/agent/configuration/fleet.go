@@ -11,6 +11,21 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
 
+<<<<<<< HEAD
+=======
+const (
+	// CheckinCompressionNone disables checkin request compression.
+	CheckinCompressionNone = "none"
+	// CheckinCompressionGzip enables gzip compression of checkin requests.
+	CheckinCompressionGzip = "gzip"
+
+	defaultCompression = CheckinCompressionGzip
+
+	FleetCheckinModeStandard      = "standard"
+	FleetCheckinModeOnStateChange = "on_state_change"
+)
+
+>>>>>>> cb4ff5574 (Use the checkin on state change mode in integration tests (#14836))
 // FleetAgentConfig is the internal configuration of the agent after the enrollment is done,
 // this configuration is not exposed in anyway in the elastic-agent.yml and is only internal configuration.
 type FleetAgentConfig struct {
@@ -65,12 +80,12 @@ type FleetCheckin struct {
 }
 
 func (f *FleetCheckin) IsModeOnStateChanged() bool {
-	return f != nil && f.Mode == fleetCheckinModeOnStateChanged
+	return f != nil && f.Mode == FleetCheckinModeOnStateChange
 }
 
 func (f *FleetCheckin) GetMode() string {
 	if f == nil || f.Mode == "" {
-		return fleetCheckinModeStandard
+		return FleetCheckinModeStandard
 	}
 
 	return f.Mode
@@ -81,7 +96,7 @@ func (f *FleetCheckin) Validate() error {
 		return nil
 	}
 
-	if f.Mode != "" && f.Mode != fleetCheckinModeStandard && f.Mode != fleetCheckinModeOnStateChanged {
+	if f.Mode != "" && f.Mode != FleetCheckinModeStandard && f.Mode != FleetCheckinModeOnStateChange {
 		return errors.New("checkin.mode must be either 'standard' or 'on_state_change'")
 	}
 
