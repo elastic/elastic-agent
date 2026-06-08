@@ -48,9 +48,9 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingAgentInstalls(u.log, u.watcherHelper, u.availableRollbacksSource, topDir, now, version, u.markUpgrade, action)
 	} else {
 		// If upgrade marker is available, we need to gracefully stop any watcher process, read the available rollbacks from
-		// the upgrade marker and then proceed with rollback
+		// the TTL registry and then proceed with rollback
 		updateMarkerExistsBeforeRollback = true
-		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingUpgradeMarker(ctx, u.log, u.watcherHelper, topDir, now, version, action)
+		watcherExecutable, versionedHomeToRollbackTo, err = rollbackWithExistingMarker(ctx, u.log, u.watcherHelper, u.availableRollbacksSource, topDir, now, version, action)
 	}
 
 	if err != nil {
@@ -81,25 +81,26 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 	return nil, nil
 }
 
+// findRollbackTarget returns the versionedHome and TTLMarker for the first unexpired entry
+// matching version, or ("", zero, false) if none is found.
+func findRollbackTarget(rollbacks map[string]ttl.TTLMarker, now time.Time, version string) (string, ttl.TTLMarker, bool) {
+	for versionedHome, marker := range rollbacks {
+		if marker.Version == version && now.Before(marker.ValidUntil) {
+			return versionedHome, marker, true
+		}
+	}
+	return "", ttl.TTLMarker{}, false
+}
+
 func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, now time.Time, rollbackVersion string, markUpgrade markUpgradeFunc, action *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the available installs
 	availableRollbacks, _, err := source.GetAll()
 	if err != nil {
 		return "", "", fmt.Errorf("retrieving available rollbacks: %w", err)
 	}
-	// check for the version we want to rollback to
-	var targetInstall string
-	var targetTTLMarker ttl.TTLMarker
-	for versionedHome, ttlMarker := range availableRollbacks {
-		if ttlMarker.Version == rollbackVersion && now.Before(ttlMarker.ValidUntil) {
-			// found a valid target
-			targetInstall = versionedHome
-			targetTTLMarker = ttlMarker
-			break
-		}
-	}
 
-	if targetInstall == "" {
+	targetInstall, targetTTLMarker, found := findRollbackTarget(availableRollbacks, now, rollbackVersion)
+	if !found {
 		return "", "", fmt.Errorf("version %q not listed among the available rollbacks: %w", rollbackVersion, ErrNoRollbacksAvailable)
 	}
 
@@ -150,7 +151,7 @@ func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper,
 	return watcherExecutable, targetInstall, nil
 }
 
-func rollbackUsingUpgradeMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, topDir string, now time.Time, version string, _ *fleetapi.ActionUpgrade) (string, string, error) {
+func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, now time.Time, version string, _ *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the upgrade marker
 	updateMarker, err := LoadMarker(paths.DataFrom(topDir))
 	if err != nil {
@@ -171,29 +172,19 @@ func rollbackUsingUpgradeMarker(ctx context.Context, log *logger.Logger, watcher
 	var selectedRollbackVersionedHome string
 
 	err = withTakeOverWatcher(ctx, log, topDir, watcherHelper, func() error {
-		// read the upgrade marker
-		updateMarker, err = LoadMarker(paths.DataFrom(topDir))
+		rollbacks, _, err := source.GetAll()
 		if err != nil {
-			return fmt.Errorf("loading marker: %w", err)
+			return fmt.Errorf("reading TTL markers: %w", err)
 		}
-
-		if updateMarker == nil {
-			return ErrNilUpdateMarker
-		}
-
-		if len(updateMarker.RollbacksAvailable) == 0 {
-			return ErrNoRollbacksAvailable
-		}
-
-		for versionedHome, rollback := range updateMarker.RollbacksAvailable {
-			if rollback.Version == version && now.Before(rollback.ValidUntil) {
-				selectedRollbackVersionedHome = versionedHome
-				break
-			}
-		}
-		if selectedRollbackVersionedHome == "" {
+		var found bool
+		selectedRollbackVersionedHome, _, found = findRollbackTarget(rollbacks, now, version)
+		if !found {
 			return fmt.Errorf("version %q not listed among the available rollbacks: %w", version, ErrNoRollbacksAvailable)
 		}
+		// There is a small window between selecting the rollback target and starting the rollback.
+		// A concurrent upgrade or failed install could remove the selected entry in this window,
+		// but both are unlikely while the watcher grace period is active.
+		// Fully closing the race would require holding the watcher applock through the rollback start.
 		return nil
 	})
 
@@ -233,7 +224,7 @@ func extractAgentInstallsFromMarker(updateMarker *UpdateMarker) (previous agentI
 		parsedVersion: previousParsedVersion,
 		version:       updateMarker.PrevVersion,
 		hash:          updateMarker.PrevHash,
-		versionedHome: updateMarker.PrevVersionedHome,
+		versionedHome: filepath.FromSlash(updateMarker.PrevVersionedHome),
 	}
 
 	currentParsedVersion, err := version.ParseVersion(updateMarker.Version)
@@ -244,7 +235,7 @@ func extractAgentInstallsFromMarker(updateMarker *UpdateMarker) (previous agentI
 		parsedVersion: currentParsedVersion,
 		version:       updateMarker.Version,
 		hash:          updateMarker.Hash,
-		versionedHome: updateMarker.VersionedHome,
+		versionedHome: filepath.FromSlash(updateMarker.VersionedHome),
 	}
 
 	return previous, current, nil
