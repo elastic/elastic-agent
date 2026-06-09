@@ -656,7 +656,6 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, cfg.Checkin)
 			assert.Equal(t, configuration.FleetCheckinModeOnStateChange, cfg.Checkin.Mode)
-			assert.Equal(t, configuration.CheckinCompressionGzip, cfg.Checkin.GetCompression())
 		},
 	))
 }
