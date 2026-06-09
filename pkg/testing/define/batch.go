@@ -338,7 +338,7 @@ type GroupCustomization struct {
 // given path. Returns nil without error when the file does not exist.
 func readDeploymentCustomizations(file string) (*deploymentCustomizations, error) {
 	data, err := os.ReadFile(file)
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {

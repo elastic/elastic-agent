@@ -89,7 +89,6 @@ type Stack struct {
 	// In the case that no version is provided the same version being used for
 	// the current test execution is used.
 	Version string `json:"version"`
-
 }
 
 // Requirements defines the testing requirements for the test to run.
