@@ -770,7 +770,7 @@ func TestDaemonReloadWithBackoff(t *testing.T) {
 // from Send, so the enrollment retry loop engages.
 type failingSender struct{}
 
-func (failingSender) Send(context.Context, string, string, url.Values, http.Header, io.Reader) (*http.Response, error) {
+func (failingSender) Send(context.Context, string, string, url.Values, http.Header, io.ReadSeeker) (*http.Response, error) {
 	return nil, errors.New("boom")
 }
 
@@ -784,7 +784,7 @@ type invalidAPIKeySender struct {
 	calls atomic.Int32
 }
 
-func (s *invalidAPIKeySender) Send(context.Context, string, string, url.Values, http.Header, io.Reader) (*http.Response, error) {
+func (s *invalidAPIKeySender) Send(context.Context, string, string, url.Values, http.Header, io.ReadSeeker) (*http.Response, error) {
 	s.calls.Add(1)
 	return nil, fleetclient.ErrInvalidAPIKey
 }
