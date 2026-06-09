@@ -355,11 +355,7 @@ func runElasticAgent(
 
 	isBootstrap := configuration.IsFleetServerBootstrap(cfg.Fleet)
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode,
-<<<<<<< HEAD
-		fleetInitTimeout, isBootstrap, override, upgradeDetailsFromMarker, modifiers...)
-=======
-		fleetInitTimeout, isBootstrap, cfg, initialUpgradeMarker, availableRollbacksSource, modifiers...)
->>>>>>> 50c891c71 (Deduplicate config loading and override TLS cert paths in container mode (#14408))
+		fleetInitTimeout, isBootstrap, cfg, upgradeDetailsFromMarker, modifiers...)
 	if err != nil {
 		return err
 	}
