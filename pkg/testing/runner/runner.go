@@ -632,8 +632,8 @@ func (r *Runner) startStacks(ctx context.Context) error {
 				versions = append(versions, lb.Batch.Stack.Version)
 			}
 			batchToVersion[lb.ID] = lb.Batch.Stack.Version
-			if lb.Batch.Stack.KibanaMemoryMB > versionToKibanaMemory[lb.Batch.Stack.Version] {
-				versionToKibanaMemory[lb.Batch.Stack.Version] = lb.Batch.Stack.KibanaMemoryMB
+			if lb.Batch.Customization != nil && lb.Batch.Customization.KibanaMemoryMB > versionToKibanaMemory[lb.Batch.Stack.Version] {
+				versionToKibanaMemory[lb.Batch.Stack.Version] = lb.Batch.Customization.KibanaMemoryMB
 			}
 		}
 	}

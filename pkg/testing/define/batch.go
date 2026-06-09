@@ -11,10 +11,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 )
+
+const deploymentCustomizationsFile = "deployment_customizations.yml"
 
 // defaultOS is the set of OS that are used in the case that a requirement doesn't define any
 var defaultOS = []OS{
@@ -51,6 +56,10 @@ type Batch struct {
 
 	// Stack defines the stack required for this batch.
 	Stack *Stack `json:"stack,omitempty"`
+
+	// Customization holds deployment overrides for this batch derived from
+	// deployment_customizations.yml based on the batch group.
+	Customization *GroupCustomization `json:"customization,omitempty"`
 
 	// Tests define the set of packages and tests that do not require sudo
 	// privileges to be performed.
@@ -143,6 +152,14 @@ func DetermineBatches(dir string, testFlags string, buildTags ...string) ([]Batc
 			batches = appendTest(batches, tar, req)
 		}
 	}
+
+	cleanDir := strings.TrimPrefix(dir, "./")
+	customizations, err := readDeploymentCustomizations(filepath.Join(cleanDir, deploymentCustomizationsFile))
+	if err != nil {
+		return nil, fmt.Errorf("reading deployment customizations: %w", err)
+	}
+	applyGroupCustomizations(batches, customizations)
+
 	return batches, nil
 }
 
@@ -205,11 +222,7 @@ func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch
 			batch.OS.DockerVariant = o.DockerVariant
 		}
 		if req.Stack != nil && batch.Stack == nil {
-			// assign the stack to this batch
 			batch.Stack = copyStack(req.Stack)
-		} else if req.Stack != nil && req.Stack.KibanaMemoryMB > batch.Stack.KibanaMemoryMB {
-			// take the highest KibanaMemoryMB requested by any test in this batch
-			batch.Stack.KibanaMemoryMB = req.Stack.KibanaMemoryMB
 		}
 		if req.Sudo {
 			batch.SudoTests = appendPackageTest(batch.SudoTests, tar.Package, tar.Test, req.Stack != nil)
@@ -308,4 +321,50 @@ type testActionResult struct {
 	Package string `json:"Package"`
 	Test    string `json:"Test"`
 	Output  string `json:"Output"`
+}
+
+// deploymentCustomizations holds per-group deployment overrides loaded from a
+// deployment_customizations.yml file in the test directory.
+type deploymentCustomizations struct {
+	Groups map[string]GroupCustomization `yaml:"groups"`
+}
+
+// GroupCustomization holds deployment overrides for a test group.
+type GroupCustomization struct {
+	KibanaMemoryMB int `yaml:"kibana_memory_mb" json:"kibana_memory_mb,omitempty"`
+}
+
+// readDeploymentCustomizations loads the deployment customizations file at the
+// given path. Returns nil without error when the file does not exist.
+func readDeploymentCustomizations(file string) (*deploymentCustomizations, error) {
+	data, err := os.ReadFile(file)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var c deploymentCustomizations
+	if err := yaml.Unmarshal(data, &c); err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// applyGroupCustomizations sets KibanaMemoryMB on each batch that has a Stack,
+// using the group-level override from the customizations file.
+// Batches without a Stack are left unchanged.
+func applyGroupCustomizations(batches []Batch, c *deploymentCustomizations) {
+	if c == nil {
+		return
+	}
+	for i, b := range batches {
+		if b.Stack == nil {
+			continue
+		}
+		if gc, ok := c.Groups[b.Group]; ok {
+			gc := gc
+			batches[i].Customization = &gc
+		}
+	}
 }

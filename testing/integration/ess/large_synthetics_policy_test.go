@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -24,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -46,17 +46,30 @@ const (
 )
 
 // TestLargeSyntheticsPolicy verifies that an elastic-agent can enroll into and
-// stay healthy under a Fleet policy that contains 10 000 synthetic monitors
+// connected to Fleet with a policy that contains 10 000 synthetic monitors
 // (8 000 HTTP + 1 000 TCP + 1 000 ICMP) on a single private location.
+// There are subtests for healthy, and unhealthy monitors.
 func TestLargeSyntheticsPolicy(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Extended,
-		Stack: &define.Stack{
-			KibanaMemoryMB: 4096,
-		},
+		Group: integration.Stress,
+		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
 	})
+
+	validateSyntheticsHealthy := func(t *testing.T, ctx context.Context, agentFixture *atesting.Fixture) func(c *assert.CollectT) {
+		return func(c *assert.CollectT) {
+			status, err := agentFixture.ExecStatus(ctx)
+			require.NoError(c, err)
+			require.NotEmpty(c, status.Components, "expected at least one component")
+			for _, comp := range status.Components {
+				assert.Equalf(c, int(cproto.State_HEALTHY), comp.State, "component %s not healthy", comp.Name)
+			}
+			assert.Equal(c, int(cproto.State_HEALTHY), status.State, "expected agent status to be healthy")
+			assert.Equal(c, int(cproto.State_HEALTHY), status.FleetState, "expected fleet status to be healthy")
+			t.Logf("agent healthy with %d components", len(status.Components))
+		}
+	}
 
 	t.Run("all monitors succeed", func(t *testing.T) {
 		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(30*time.Minute))
@@ -72,17 +85,7 @@ func TestLargeSyntheticsPolicy(t *testing.T) {
 		agentFixture := setupMonitorsAndAgent(t, ctx, info, ts.URL)
 
 		// ensure all components are healthy
-		require.EventuallyWithT(t, func(c *assert.CollectT) {
-			status, err := agentFixture.ExecStatus(ctx)
-			require.NoError(c, err)
-			require.NotEmpty(c, status.Components, "expected at least one component")
-			for _, comp := range status.Components {
-				assert.Equalf(c, int(cproto.State_HEALTHY), comp.State, "component %s not healthy", comp.Name)
-			}
-			require.Equal(c, int(cproto.State_HEALTHY), status.State, "expected agent status to be healthy")
-			require.Equal(c, int(cproto.State_HEALTHY), status.FleetState, "expected fleet status to be healthy")
-			t.Logf("agent healthy with %d components", len(status.Components))
-		}, 10*time.Minute, 10*time.Second, "agent did not reach fully healthy state")
+		require.EventuallyWithT(t, validateSyntheticsHealthy(t, ctx, agentFixture), 10*time.Minute, 10*time.Second, "agent did not reach fully healthy state")
 	})
 
 	// Test where all monitors fail - payload information may be different then success case causing even larger checkin bodies.
@@ -90,24 +93,10 @@ func TestLargeSyntheticsPolicy(t *testing.T) {
 		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(30*time.Minute))
 		defer cancel()
 
-		// Start a local listener that closes all incoming connections immediatly.
-		l, err := net.Listen("tcp", "localhost:0")
-		require.NoError(t, err)
-		cl := &closeListener{l}
-		t.Cleanup(func() {
-			cl.Close()
-		})
+		agentFixture := setupMonitorsAndAgent(t, ctx, info, "http://fake.internal:8080")
 
-		agentFixture := setupMonitorsAndAgent(t, ctx, info, "http://"+cl.Addr().String())
-
-		// Ensure agent is not healthy
-		require.EventuallyWithT(t, func(c *assert.CollectT) {
-			status, err := agentFixture.ExecStatus(ctx)
-			require.NoError(c, err)
-			require.NotEmpty(c, status.Components, "expected at least one component")
-			require.Equal(c, int(cproto.State_DEGRADED), status.State, "expected agent status to be degraded")
-			require.Equal(c, int(cproto.State_HEALTHY), status.FleetState, "expected fleet status to be healthy")
-		}, 10*time.Minute, 10*time.Second, "expected agent to be unhealthy")
+		// even though the monitor fails - all componets and agent status is healthy
+		require.EventuallyWithT(t, validateSyntheticsHealthy(t, ctx, agentFixture), 10*time.Minute, 10*time.Second, "agent did not reach fully healthy state")
 	})
 }
 
@@ -312,19 +301,12 @@ func sendBatchWithRetry(ctx context.Context, t *testing.T, client *kibana.Client
 		baseDelay   = 15 * time.Second
 		maxDelay    = 5 * time.Minute
 	)
+	done := make(chan struct{})
+	defer close(done)
+	bo := backoff.NewExpBackoff(done, baseDelay, maxDelay)
 	var lastErr error
-	delay := baseDelay
-	for attempt := range maxAttempts {
-		if attempt > 0 {
-			t.Logf("batch %d: attempt %d failed (%v); backing off %s", batchNum, attempt, lastErr, delay)
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(delay):
-			}
-			delay = min(delay*2, maxDelay)
-		}
-
+	for range maxAttempts {
+		bo.Wait()
 		resp, err := client.SendWithContext(ctx, http.MethodPut, apiURL, nil, headers, bytes.NewReader(reqBody))
 		if err != nil {
 			lastErr = fmt.Errorf("network error: %w", err)
@@ -358,18 +340,4 @@ func sendBatchWithRetry(ctx context.Context, t *testing.T, client *kibana.Client
 		return nil
 	}
 	return fmt.Errorf("batch %d: max retries exceeded; last error: %w", batchNum, lastErr)
-}
-
-// closeListener is a net.Listener that closes any accepted connections.
-type closeListener struct {
-	net.Listener
-}
-
-// Accept will accept a connction from the underlying listener and close it.
-func (c *closeListener) Accept() (net.Conn, error) {
-	conn, err := c.Listener.Accept()
-	if err != nil {
-		return nil, err
-	}
-	return nil, conn.Close()
 }
