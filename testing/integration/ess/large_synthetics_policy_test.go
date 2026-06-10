@@ -296,48 +296,39 @@ func bulkPushSyntheticsMonitors(ctx context.Context, t *testing.T, client *kiban
 // On transient failures (network error, 429, 5xx) it retries with exponential backoff.
 // (15s base, 2× multiplier, 5 min cap, 10 attempts)
 func sendBatchWithRetry(ctx context.Context, t *testing.T, client *kibana.Client, apiURL string, headers http.Header, reqBody []byte, batchNum int) error {
-	const (
-		maxAttempts = 10
-		baseDelay   = 15 * time.Second
-		maxDelay    = 5 * time.Minute
-	)
 	done := make(chan struct{})
 	defer close(done)
-	bo := backoff.NewExpBackoff(done, baseDelay, maxDelay)
-	var lastErr error
-	for range maxAttempts {
-		bo.Wait()
-		resp, err := client.SendWithContext(ctx, http.MethodPut, apiURL, nil, headers, bytes.NewReader(reqBody))
-		if err != nil {
-			lastErr = fmt.Errorf("network error: %w", err)
-			continue
-		}
-
-		respBody, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			lastErr = fmt.Errorf("reading response: %w", err)
-			continue
-		}
-
-		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
-			lastErr = fmt.Errorf("status %d: %s", resp.StatusCode, respBody)
-			continue
-		}
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("batch %d returned %d: %s", batchNum, resp.StatusCode, respBody)
-		}
-
-		var putResp syntheticsBulkPutResponse
-		if err := json.Unmarshal(respBody, &putResp); err != nil {
-			return fmt.Errorf("decoding batch %d response: %w", batchNum, err)
-		}
-		if len(putResp.FailedMonitors) > 0 {
-			first := putResp.FailedMonitors[0]
-			return fmt.Errorf("batch %d: %d monitors failed; first: id=%s reason=%q details=%q",
-				batchNum, len(putResp.FailedMonitors), first.ID, first.Reason, first.Details)
-		}
-		return nil
+	bo := backoff.NewExpBackoff(done, 15*time.Second, 5*time.Minute)
+	client.Retry = kibana.RetryConfig{
+		MaxRetries:    10,
+		RetryOnStatus: []int{http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout},
+		RetryBackoff: func(_ int) time.Duration {
+			return bo.NextWait()
+		},
 	}
-	return fmt.Errorf("batch %d: max retries exceeded; last error: %w", batchNum, lastErr)
+	resp, err := client.SendWithContext(ctx, http.MethodPut, apiURL, nil, headers, bytes.NewReader(reqBody))
+	if err != nil {
+		return err
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("batch %d returned %d: %s", batchNum, resp.StatusCode, respBody)
+	}
+
+	var putResp syntheticsBulkPutResponse
+	if err := json.Unmarshal(respBody, &putResp); err != nil {
+		return fmt.Errorf("decoding batch %d response: %w", batchNum, err)
+	}
+	if len(putResp.FailedMonitors) > 0 {
+		first := putResp.FailedMonitors[0]
+		return fmt.Errorf("batch %d: %d monitors failed; first: id=%s reason=%q details=%q",
+			batchNum, len(putResp.FailedMonitors), first.ID, first.Reason, first.Details)
+	}
+	return nil
 }
