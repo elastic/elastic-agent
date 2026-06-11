@@ -1,0 +1,5 @@
+kind: enhancement
+
+summary: Enable AWS CloudWatch metrics ingestion via the awscloudwatchreceiver in the EDOT Collector.
+
+component: edot-collector
