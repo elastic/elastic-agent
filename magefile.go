@@ -579,15 +579,8 @@ func Package(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
-<<<<<<< HEAD
 	cfg := devtools.SettingsFromContext(ctx)
 
-	if len(cfg.GetPackageTypes()) == 0 {
-		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
-	}
-
-=======
->>>>>>> 28d14a834 ([mage] Set default package type per platform (#14799))
 	if len(cfg.GetPlatforms()) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
 	}
@@ -1561,15 +1554,10 @@ func PackageUsingDRA(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
-<<<<<<< HEAD
-	cfg := devtools.SettingsFromContext(ctx)
-
 	if len(cfg.GetPackageTypes()) == 0 {
 		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
 	}
 
-=======
->>>>>>> 28d14a834 ([mage] Set default package type per platform (#14799))
 	if len(cfg.GetPlatforms()) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
 	}
