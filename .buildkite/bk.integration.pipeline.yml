@@ -78,12 +78,21 @@ common:
   - linux_cache_settings: &linux_cache_settings
       <<: *base_cache_settings
       path: /opt/buildkite-agent/.cache/go-build
+  - linux_mod_cache_settings: &linux_mod_cache_settings
+      <<: *base_cache_settings
+      path: /opt/buildkite-agent/go/pkg/mod
   - windows_cache_settings: &windows_cache_settings
       <<: *base_cache_settings
       path: /c/Users/buildkite/AppData/Local/go-build
+  - windows_mod_cache_settings: &windows_mod_cache_settings
+      <<: *base_cache_settings
+      path: /c/Users/buildkite/go/pkg/mod
   - macos_cache_settings: &macos_cache_settings
       <<: *base_cache_settings
       path: /Users/admin/Library/Caches/go-build
+  - macos_mod_cache_settings: &macos_mod_cache_settings
+      <<: *base_cache_settings
+      path: /Users/admin/go/pkg/mod
   # Variants/Groups for the Windows ITs
   - windows_variants: &windows_variants
       - "default"
@@ -215,6 +224,9 @@ steps:
       - cache#v1.8.0:
           <<: *linux_cache_settings
           key-extra: "linux/amd64,integration"
+      - cache#v1.8.0:
+          <<: *linux_mod_cache_settings
+          key-extra: "linux/amd64,integration"
 
   - label: Start ESS stack for integration tests
     key: integration-ess
@@ -267,6 +279,9 @@ steps:
           - cache#v1.8.0:
               <<: *windows_cache_settings
               key-extra: "windows/amd64,integration"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
+              key-extra: "windows/amd64,integration"
 
       - label: "Windows:2025:amd64:sudo"
         depends_on:
@@ -294,6 +309,9 @@ steps:
           - cache#v1.8.0:
               <<: *windows_cache_settings
               key-extra: "windows/amd64,integration"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
+              key-extra: "windows/amd64,integration"
 
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-amd64
@@ -319,6 +337,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
+              key-extra: "linux/amd64,integration"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
               key-extra: "linux/amd64,integration"
 
   - group: "Stateful: Windows (tier 1)"
@@ -356,6 +377,9 @@ steps:
           - cache#v1.8.0:
               <<: *windows_cache_settings
               key-extra: "windows/amd64,integration"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
+              key-extra: "windows/amd64,integration"
         matrix:
           setup:
             variant: *windows_variants
@@ -385,6 +409,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
+              key-extra: "windows/amd64,integration"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
               key-extra: "windows/amd64,integration"
         matrix:
           setup:
@@ -438,6 +465,9 @@ steps:
           - cache#v1.8.0:
               <<: *windows_cache_settings
               key-extra: "windows/amd64,integration"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
+              key-extra: "windows/amd64,integration"
         matrix:
           setup:
             os:
@@ -472,6 +502,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
+              key-extra: "windows/amd64,integration"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
               key-extra: "windows/amd64,integration"
         matrix:
           setup:
@@ -520,6 +553,9 @@ steps:
           - cache#v1.8.0:
               <<: *windows_cache_settings
               key-extra: "windows/amd64,integration"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
+              key-extra: "windows/amd64,integration"
         matrix:
           setup:
             os:
@@ -556,6 +592,9 @@ steps:
           - cache#v1.8.0:
               <<: *windows_cache_settings
               key-extra: "windows/amd64,integration"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
+              key-extra: "windows/amd64,integration"
         matrix:
           setup:
             os:
@@ -590,6 +629,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
+              key-extra: "windows/amd64,integration"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
               key-extra: "windows/amd64,integration"
         matrix:
           setup:
@@ -627,6 +669,9 @@ steps:
           - cache#v1.8.0:
               <<: *windows_cache_settings
               key-extra: "windows/arm64,integration"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
+              key-extra: "windows/arm64,integration"
         matrix:
           setup:
             variant: *windows_variants
@@ -658,6 +703,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
+              key-extra: "windows/arm64,integration"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
               key-extra: "windows/arm64,integration"
         matrix:
           setup:
@@ -698,6 +746,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/amd64,integration"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/amd64,integration"
         matrix:
           setup:
             variant:
@@ -730,6 +781,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
+              key-extra: "linux/amd64,integration"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
               key-extra: "linux/amd64,integration"
         matrix:
           setup:
@@ -779,6 +833,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/amd64,integration"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/amd64,integration"
         matrix:
           setup:
             os:
@@ -814,6 +871,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/amd64,integration"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/amd64,integration"
         matrix:
           setup:
             os:
@@ -844,6 +904,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
+              key-extra: "linux/amd64,integration"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
               key-extra: "linux/amd64,integration"
         matrix:
           setup:
@@ -891,6 +954,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/amd64,integration"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/amd64,integration"
         matrix:
           setup:
             os:
@@ -929,6 +995,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/amd64,integration"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/amd64,integration"
         matrix:
           setup:
             os:
@@ -964,6 +1033,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
+              key-extra: "linux/amd64,integration"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
               key-extra: "linux/amd64,integration"
         matrix:
           setup:
@@ -1001,6 +1073,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/arm64,integration"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/arm64,integration"
         matrix:
           setup:
             variant: *linux_arm_variants
@@ -1031,6 +1106,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
+              key-extra: "linux/arm64,integration"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
               key-extra: "linux/arm64,integration"
         matrix:
           setup:

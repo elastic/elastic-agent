@@ -54,12 +54,21 @@ common:
 - linux_cache_settings: &linux_cache_settings
     <<: *base_cache_settings
     path: /opt/buildkite-agent/.cache/go-build
+- linux_mod_cache_settings: &linux_mod_cache_settings
+    <<: *base_cache_settings
+    path: /opt/buildkite-agent/go/pkg/mod
 - windows_cache_settings: &windows_cache_settings
     <<: *base_cache_settings
     path: /c/Users/buildkite/AppData/Local/go-build
+- windows_mod_cache_settings: &windows_mod_cache_settings
+    <<: *base_cache_settings
+    path: /c/Users/buildkite/go/pkg/mod
 - macos_cache_settings: &macos_cache_settings
     <<: *base_cache_settings
     path: /Users/admin/Library/Caches/go-build
+- macos_mod_cache_settings: &macos_mod_cache_settings
+    <<: *base_cache_settings
+    path: /Users/admin/go/pkg/mod
 
 steps:
 
@@ -98,6 +107,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/amd64"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/amd64"
           - *google_oidc_plugin
 
       - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
@@ -123,6 +135,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
+              key-extra: "linux/amd64"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
               key-extra: "linux/amd64"
           - *google_oidc_plugin
 
@@ -150,6 +165,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/amd64"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/amd64"
           - *google_oidc_plugin
 
       - label: "Unit tests - Ubuntu 22.04 ARM64"
@@ -174,6 +192,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
+              key-extra: "linux/arm64"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
               key-extra: "linux/arm64"
           - *google_oidc_plugin
 
@@ -200,6 +221,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
+              key-extra: "windows/amd64"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
               key-extra: "windows/amd64"
           - *google_oidc_plugin
 
@@ -229,6 +253,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
+              key-extra: "windows/amd64"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
               key-extra: "windows/amd64"
           - *google_oidc_plugin
 
@@ -279,6 +306,9 @@ steps:
           - cache#v1.8.0:
               <<: *macos_cache_settings
               key-extra: "macos/arm64"
+          - cache#v1.8.0:
+              <<: *macos_mod_cache_settings
+              key-extra: "macos/arm64"
           - *google_oidc_plugin
 
       # Runs only on main and release branches
@@ -303,6 +333,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *macos_cache_settings
+              key-extra: "macos/amd64"
+          - cache#v1.8.0:
+              <<: *macos_mod_cache_settings
               key-extra: "macos/amd64"
           - *google_oidc_plugin
 
@@ -332,6 +365,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
+              key-extra: "windows/amd64"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
               key-extra: "windows/amd64"
           - *google_oidc_plugin
 
@@ -364,6 +400,9 @@ steps:
           - cache#v1.8.0:
               <<: *windows_cache_settings
               key-extra: "windows/amd64"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
+              key-extra: "windows/amd64"
           - *google_oidc_plugin
 
       - label: "Unit tests - Windows 11 arm64"
@@ -389,6 +428,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
+              key-extra: "windows/arm64"
+          - cache#v1.8.0:
+              <<: *windows_mod_cache_settings
               key-extra: "windows/arm64"
           - *google_oidc_plugin
 

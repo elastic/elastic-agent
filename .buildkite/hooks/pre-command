@@ -61,3 +61,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
   .buildkite/scripts/install-awscli.sh
 fi
 
+# Ensure the Go module cache directory exists so the S3 cache plugin can
+# always save it, even on a fresh agent before any modules are downloaded.
+mkdir -p "$(go env GOMODCACHE)"
+

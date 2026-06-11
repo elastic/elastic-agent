@@ -51,6 +51,9 @@ common:
   - linux_cache_settings: &linux_cache_settings
       <<: *base_cache_settings
       path: /opt/buildkite-agent/.cache/go-build
+  - linux_mod_cache_settings: &linux_mod_cache_settings
+      <<: *base_cache_settings
+      path: /opt/buildkite-agent/go/pkg/mod
 
 steps:
   - group: "Integration tests: packaging"
@@ -81,6 +84,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/amd64"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/amd64"
           - *google_oidc_plugin
 
       - label: ":package: amd64: FIPS tar.gz,zip (linux,windows)"
@@ -103,6 +109,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
+              key-extra: "linux/amd64"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
               key-extra: "linux/amd64"
           - *google_oidc_plugin
 
@@ -127,6 +136,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/arm64"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/arm64"
           - *google_oidc_plugin
 
       - label: ":package: arm64: FIPS tar.gz,zip (linux,windows)"
@@ -150,6 +162,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/arm64"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/arm64"
           - *google_oidc_plugin
 
       - label: ":package: amd64: Containers"
@@ -172,6 +187,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/amd64"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/amd64"
           - *google_oidc_plugin
           - *vault_docker_login
 
@@ -193,6 +211,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
+              key-extra: "linux/arm64"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
               key-extra: "linux/arm64"
           - *google_oidc_plugin
 
@@ -217,6 +238,9 @@ steps:
           - cache#v1.8.0:
               <<: *linux_cache_settings
               key-extra: "linux/amd64"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
+              key-extra: "linux/amd64"
           - *vault_docker_login
           - *google_oidc_plugin
 
@@ -239,6 +263,9 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
+              key-extra: "linux/arm64"
+          - cache#v1.8.0:
+              <<: *linux_mod_cache_settings
               key-extra: "linux/arm64"
           - *google_oidc_plugin
 
