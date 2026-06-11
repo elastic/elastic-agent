@@ -1554,6 +1554,8 @@ func PackageUsingDRA(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
+	cfg := devtools.SettingsFromContext(ctx)
+	
 	if len(cfg.GetPackageTypes()) == 0 {
 		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
 	}
