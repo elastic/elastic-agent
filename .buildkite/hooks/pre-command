@@ -61,7 +61,10 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
   .buildkite/scripts/install-awscli.sh
 fi
 
-# Ensure the Go module cache directory exists so the S3 cache plugin can
-# always save it, even on a fresh agent before any modules are downloaded.
-mkdir -p "$(go env GOMODCACHE)"
+# Pin GOMODCACHE to a stable path that matches the S3 cache plugin config.
+# The asdf golang plugin sets GOPATH to a version-specific directory under
+# .asdf/installs/golang/<ver>/packages, so go env GOMODCACHE would return a
+# path inconsistent with the hardcoded plugin path in pipeline YAML.
+export GOMODCACHE="${HOME}/go/pkg/mod"
+mkdir -p "$GOMODCACHE"
 
