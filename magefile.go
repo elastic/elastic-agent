@@ -603,14 +603,12 @@ func (Format) License() error {
 // Use SNAPSHOT=true to build snapshots.
 // Use PLATFORMS to control the target platforms.
 // Use VERSION_QUALIFIER to control the version qualifier.
+// Use PACKAGES to override the package types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker).
+// If PACKAGES is not set, defaults to tar.gz for non-Windows platforms and zip for Windows.
 func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
-
-	if len(cfg.GetPackageTypes()) == 0 {
-		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
-	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
@@ -1499,10 +1497,6 @@ func PackageUsingDRA(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
-
-	if len(cfg.GetPackageTypes()) == 0 {
-		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
-	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
