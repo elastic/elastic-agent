@@ -113,6 +113,12 @@ receivers:
       groups:
         autodiscover:
           limit: 1
+    metrics:
+      collection_interval: 5m
+      period: 5m
+      queries:
+        - namespace: AWS/Lambda
+          metric_name: Invocations
   prometheusremotewrite:
     endpoint: 0.0.0.0:9090
   statsd:
@@ -284,6 +290,7 @@ service:
         - vcenter
         - zookeeper
         - azure_event_hub
+        - awscloudwatch
 
     metrics/aggregated:
       receivers:

@@ -37,7 +37,7 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | [akamaisiemreceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/akamaisiemreceiver/v0.1.0/receiver/akamaisiemreceiver/README.md) | v0.1.0 |
 | [apachereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/apachereceiver/v0.152.0/receiver/apachereceiver/README.md) | v0.152.0 |
-| [awscloudwatchreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awscloudwatchreceiver/v0.152.0/receiver/awscloudwatchreceiver/README.md) | v0.152.0 |
+| [awscloudwatchreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awscloudwatchreceiver/v0.153.0/receiver/awscloudwatchreceiver/README.md) | v0.153.0 |
 | [awss3receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awss3receiver/v0.152.0/receiver/awss3receiver/README.md) | v0.152.0 |
 | [azureeventhubreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/azureeventhubreceiver/v0.152.0/receiver/azureeventhubreceiver/README.md) | v0.152.0 |
 | [azuremonitorreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/azuremonitorreceiver/v0.152.0/receiver/azuremonitorreceiver/README.md) | v0.152.0 |
@@ -69,7 +69,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [prometheusremotewritereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusremotewritereceiver/v0.152.0/receiver/prometheusremotewritereceiver/README.md) | v0.152.0 |
 | [rabbitmqreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/rabbitmqreceiver/v0.152.0/receiver/rabbitmqreceiver/README.md) | v0.152.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.152.0/receiver/receivercreator/README.md) | v0.152.0 |
-| [receivertest](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/receivertest/v0.152.0/receiver/receivertest/README.md) | v0.152.0 |
+| [receivertest](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/receivertest/v0.153.0/receiver/receivertest/README.md) | v0.153.0 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.152.0/receiver/redisreceiver/README.md) | v0.152.0 |
 | [snmpreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/snmpreceiver/v0.152.0/receiver/snmpreceiver/README.md) | v0.152.0 |
 | [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlserverreceiver/v0.152.0/receiver/sqlserverreceiver/README.md) | v0.152.0 |
