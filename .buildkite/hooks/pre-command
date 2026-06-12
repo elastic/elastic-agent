@@ -61,10 +61,13 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
   .buildkite/scripts/install-awscli.sh
 fi
 
-# Pin GOMODCACHE to a stable path that matches the S3 cache plugin config.
+# Override GOPATH to the standard $HOME/go location.
 # The asdf golang plugin sets GOPATH to a version-specific directory under
-# .asdf/installs/golang/<ver>/packages, so go env GOMODCACHE would return a
-# path inconsistent with the hardcoded plugin path in pipeline YAML.
-export GOMODCACHE="${HOME}/go/pkg/mod"
+# .asdf/installs/golang/<ver>/packages. Both the elastic-agent and beats
+# crossbuilds resolve the module cache via GOPATH, so they must agree on it.
+# Using the standard $HOME/go ensures the S3 cache plugin path in the
+# pipeline YAML also matches (e.g. /opt/buildkite-agent/go/pkg/mod on Linux).
+export GOPATH="${HOME}/go"
+export GOMODCACHE="${GOPATH}/pkg/mod"
 mkdir -p "$GOMODCACHE"
 
