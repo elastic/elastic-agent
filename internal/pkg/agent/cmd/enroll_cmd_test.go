@@ -542,6 +542,122 @@ func TestEnroll(t *testing.T) {
 			assert.Equal(t, host, config.Client.Host)
 		},
 	))
+
+	t.Run("default fleet checkin mode is the standard mode", withServer(
+		func(t *testing.T) *http.ServeMux {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`
+{
+    "action": "created",
+    "item": {
+        "id": "a9328860-ec54-11e9-93c4-d72ab8a69391",
+        "active": true,
+        "policy_id": "69f3f5a0-ec52-11e9-93c4-d72ab8a69391",
+        "type": "PERMANENT",
+        "enrolled_at": "2019-10-11T18:26:37.158Z",
+        "user_provided_metadata": {},
+        "local_metadata": {
+            "platform": "linux",
+            "version": "8.0.0"
+        },
+        "actions": [],
+        "access_api_key": "my-access-api-key"
+    }
+}`))
+			})
+			return mux
+		}, func(t *testing.T, host string) {
+			url := "http://" + host
+			store := &mockStore{}
+			cmd, err := newEnrollCmd(
+				log,
+				&enroll.EnrollOptions{
+					URL:               url,
+					CAs:               []string{},
+					EnrollAPIKey:      "my-enrollment-api-key",
+					Insecure:          true,
+					SkipCreateSecret:  skipCreateSecret,
+					SkipDaemonRestart: true,
+				},
+				"",
+				store,
+				nil,
+			)
+			require.NoError(t, err)
+
+			streams, _, _, _ := cli.NewTestingIOStreams()
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
+			require.NoError(t, err, "enroll command should return no error")
+
+			assert.True(t, store.Called, "the store should have been called")
+			cfg, err := readConfig(store.Content)
+			require.NoError(t, err)
+			require.Equal(t, configuration.FleetCheckinModeStandard, cfg.Checkin.GetMode())
+		},
+	))
+
+	t.Run("checkin-on-state-change flag configures on_state_change checkin mode", withServer(
+		func(t *testing.T) *http.ServeMux {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`
+{
+    "action": "created",
+    "item": {
+        "id": "a9328860-ec54-11e9-93c4-d72ab8a69391",
+        "active": true,
+        "policy_id": "69f3f5a0-ec52-11e9-93c4-d72ab8a69391",
+        "type": "PERMANENT",
+        "enrolled_at": "2019-10-11T18:26:37.158Z",
+        "user_provided_metadata": {},
+        "local_metadata": {
+            "platform": "linux",
+            "version": "8.0.0"
+        },
+        "actions": [],
+        "access_api_key": "my-access-api-key"
+    }
+}`))
+			})
+			return mux
+		}, func(t *testing.T, host string) {
+			url := "http://" + host
+			store := &mockStore{}
+			cmd, err := newEnrollCmd(
+				log,
+				&enroll.EnrollOptions{
+					URL:                  url,
+					CAs:                  []string{},
+					EnrollAPIKey:         "my-enrollment-api-key",
+					Insecure:             true,
+					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
+					CheckinOnStateChange: true,
+				},
+				"",
+				store,
+				nil,
+			)
+			require.NoError(t, err)
+
+			streams, _, _, _ := cli.NewTestingIOStreams()
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
+			require.NoError(t, err, "enroll command should return no error")
+
+			assert.True(t, store.Called, "the store should have been called")
+			cfg, err := readConfig(store.Content)
+			require.NoError(t, err)
+			require.NotNil(t, cfg.Checkin)
+			assert.Equal(t, configuration.FleetCheckinModeOnStateChange, cfg.Checkin.Mode)
+		},
+	))
 }
 
 func TestValidateArgs(t *testing.T) {

@@ -11,6 +11,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
 
+const (
+	FleetCheckinModeStandard      = "standard"
+	FleetCheckinModeOnStateChange = "on_state_change"
+)
+
 // FleetAgentConfig is the internal configuration of the agent after the enrollment is done,
 // this configuration is not exposed in anyway in the elastic-agent.yml and is only internal configuration.
 type FleetAgentConfig struct {
@@ -54,7 +59,7 @@ func DefaultFleetAgentConfig() *FleetAgentConfig {
 		Enabled: false,
 		Client:  remote.DefaultClientConfig(),
 		Info:    &AgentInfo{},
-		Checkin: nil,
+		Checkin: DefaultFleetCheckin(),
 	}
 }
 
@@ -64,13 +69,18 @@ type FleetCheckin struct {
 	RequestBackoffMax  time.Duration `config:"request_backoff_max" yaml:"request_backoff_max,omitempty"`
 }
 
+// DefaultFleetCheckin returns a FleetCheckin with default values.
+func DefaultFleetCheckin() *FleetCheckin {
+	return &FleetCheckin{}
+}
+
 func (f *FleetCheckin) IsModeOnStateChanged() bool {
-	return f != nil && f.Mode == fleetCheckinModeOnStateChanged
+	return f != nil && f.Mode == FleetCheckinModeOnStateChange
 }
 
 func (f *FleetCheckin) GetMode() string {
 	if f == nil || f.Mode == "" {
-		return fleetCheckinModeStandard
+		return FleetCheckinModeStandard
 	}
 
 	return f.Mode
@@ -81,7 +91,7 @@ func (f *FleetCheckin) Validate() error {
 		return nil
 	}
 
-	if f.Mode != "" && f.Mode != fleetCheckinModeStandard && f.Mode != fleetCheckinModeOnStateChanged {
+	if f.Mode != "" && f.Mode != FleetCheckinModeStandard && f.Mode != FleetCheckinModeOnStateChange {
 		return errors.New("checkin.mode must be either 'standard' or 'on_state_change'")
 	}
 

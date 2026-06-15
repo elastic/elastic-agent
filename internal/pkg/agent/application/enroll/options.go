@@ -45,6 +45,7 @@ type EnrollOptions struct {
 	SkipCreateSecret     bool                       `yaml:"-" json:"-"`
 	SkipDaemonRestart    bool                       `yaml:"-" json:"-"`
 	Tags                 []string                   `yaml:"tags,omitempty" json:"tags,omitempty"`
+	CheckinOnStateChange bool                       `yaml:"-" json:"-"`
 }
 
 // EnrollCmdFleetServerOption define all the supported enrollment options for bootstrapping with Fleet Server.
