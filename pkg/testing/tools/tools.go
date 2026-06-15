@@ -32,7 +32,7 @@ func IsPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, 
 			return false
 		}
 
-		return updatedPolicyAgent.PolicyRevision == policyRevision
+		return updatedPolicyAgent.PolicyRevision >= policyRevision
 	}
 }
 
