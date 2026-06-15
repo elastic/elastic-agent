@@ -1272,6 +1272,12 @@ func httpCopyRules() []any {
 			"from": "http.filebeat_input",
 			"to":   "filebeat_input",
 		},
+
+		// System CPU core count
+		map[string]any{
+			"from": "http.agent.system.cpu.cores",
+			"to":   "system.cpu.cores",
+		},
 	}
 
 	return fromToMap
