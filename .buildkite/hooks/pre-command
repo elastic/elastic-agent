@@ -69,5 +69,9 @@ fi
 # pipeline YAML also matches (e.g. /opt/buildkite-agent/go/pkg/mod on Linux).
 export GOPATH="${HOME}/go"
 export GOMODCACHE="${GOPATH}/pkg/mod"
-mkdir -p "$GOMODCACHE"
+mkdir -p "$GOMODCACHE" "${GOPATH}/bin"
+# Add GOPATH/bin to PATH so that binaries installed via 'go install' (e.g.
+# gotestsum, go-licenser) are found directly, bypassing the asdf shims which
+# look for the .go-version-specified version in the asdf packages directory.
+export PATH="${GOPATH}/bin:${PATH}"
 
