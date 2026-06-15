@@ -81,8 +81,8 @@ type unpackHandler interface {
 type copyActionStoreFunc func(log *logger.Logger, newHome string) error
 type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string) error
 type fileDirCopyFunc func(from, to string, opts ...filecopy.Options) error
-type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error
-type writeUpgradeMarkerFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error
+type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error
+type writeUpgradeMarkerFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error
 type changeSymlinkFunc func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
 type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource ttl.Source) error
 
@@ -471,8 +471,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), previous, current)
 
 	// Write the marker before unpacking so newVersionedHome is protected from cleanup during the upgrade.
-	// RollbacksAvailable is nil here: TTL entries are written after the symlink flips, and previous rollbacks were already removed at the start of Upgrade().
-	if err = u.writeUpgradeMarker(u.log, paths.Data(), time.Now(), current, previous, action, det, nil); err != nil {
+	if err = u.writeUpgradeMarker(u.log, paths.Data(), time.Now(), current, previous, action, det); err != nil {
 		return nil, fmt.Errorf("writing upgrade marker: %w", err)
 	}
 	markerWritten = true
@@ -566,7 +565,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	// Write the marker with the post-symlink timestamp so the watcher's grace period starts at the moment the symlink flipped.
 	// markUpgrade also calls updateActiveCommit; track this so the defer restores active.commit on any subsequent failure.
 	activeCommitModified = true
-	if err = u.markUpgrade(u.log, paths.Data(), time.Now(), current, previous, action, det, availableRollbacks); err != nil {
+	if err = u.markUpgrade(u.log, paths.Data(), time.Now(), current, previous, action, det); err != nil {
 		u.log.Errorw("Rolling back: refreshing upgrade marker failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), newVersionedHome, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(err, rollbackErr)
