@@ -115,7 +115,7 @@ func (e *AckCmd) Execute(ctx context.Context, r *AckRequest) (_ *AckResponse, er
 	}
 
 	ap := fmt.Sprintf(ackPath, e.info.AgentID())
-	resp, err := e.client.Send(ctx, "POST", ap, nil, nil, bytes.NewBuffer(b))
+	resp, err := e.client.Send(ctx, "POST", ap, nil, nil, bytes.NewReader(b))
 	if err != nil {
 		return nil, errors.New(err,
 			"fail to ack to fleet",

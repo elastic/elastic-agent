@@ -1864,7 +1864,8 @@ func (s *Settings) GetPlatforms() BuildPlatformList {
 // If SelectedPackageTypes is set in the settings, returns that.
 // Otherwise parses from PACKAGES env var.
 // If PACKAGES is "all", returns all available package types.
-// If PACKAGES is empty, returns nil.
+// If PACKAGES is empty, returns a platform-derived default: tar.gz for non-Windows
+// platforms and zip for Windows platforms.
 func (s *Settings) GetPackageTypes() []PackageType {
 	// Check settings override first
 	if s.SelectedPackageTypes != nil {
@@ -1872,7 +1873,7 @@ func (s *Settings) GetPackageTypes() []PackageType {
 	}
 	// Fall back to env var
 	if s.CrossBuild.Packages == "" {
-		return nil
+		return s.defaultPackageTypesForPlatforms()
 	}
 	if strings.ToLower(s.CrossBuild.Packages) == "all" {
 		return AllPackageTypes
@@ -1883,6 +1884,28 @@ func (s *Settings) GetPackageTypes() []PackageType {
 		if err := p.UnmarshalText([]byte(pkgtype)); err == nil {
 			types = append(types, p)
 		}
+	}
+	return types
+}
+
+// defaultPackageTypesForPlatforms returns the default package types derived from the
+// configured platforms: tar.gz for non-Windows platforms, zip for Windows platforms.
+func (s *Settings) defaultPackageTypesForPlatforms() []PackageType {
+	platforms := s.GetPlatforms()
+	var hasUnix, hasWindows bool
+	for _, p := range platforms {
+		if p.GOOS() == "windows" {
+			hasWindows = true
+		} else {
+			hasUnix = true
+		}
+	}
+	var types []PackageType
+	if hasUnix {
+		types = append(types, TarGz)
+	}
+	if hasWindows {
+		types = append(types, Zip)
 	}
 	return types
 }
