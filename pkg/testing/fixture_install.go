@@ -922,5 +922,5 @@ func supportsCheckinOnStateChange(versionStr string) bool {
 	}
 
 	// The --checkin-on-state-change flag is currently only available in 9.5.0-SNAPSHOT.
-	return !parsed.Less(*agentversion.NewParsedSemVer(9, 5, 0, "SNAPSHOT", ""))
+	return !parsed.Less(*agentversion.NewParsedSemVer(9, 3, 6, "SNAPSHOT", ""))
 }
