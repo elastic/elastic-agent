@@ -59,7 +59,7 @@ func DefaultFleetAgentConfig() *FleetAgentConfig {
 		Enabled: false,
 		Client:  remote.DefaultClientConfig(),
 		Info:    &AgentInfo{},
-		Checkin: nil,
+		Checkin: DefaultFleetCheckin(),
 	}
 }
 
@@ -67,6 +67,11 @@ type FleetCheckin struct {
 	Mode               string        `config:"mode" yaml:"mode,omitempty"` // `standard` or `on_state_change` (empty string is accepted as standard)
 	RequestBackoffInit time.Duration `config:"request_backoff_init" yaml:"request_backoff_init,omitempty"`
 	RequestBackoffMax  time.Duration `config:"request_backoff_max" yaml:"request_backoff_max,omitempty"`
+}
+
+// DefaultFleetCheckin returns a FleetCheckin with default values.
+func DefaultFleetCheckin() *FleetCheckin {
+	return &FleetCheckin{}
 }
 
 func (f *FleetCheckin) IsModeOnStateChanged() bool {
