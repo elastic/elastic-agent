@@ -657,9 +657,9 @@ require (
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.6 // indirect
-	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0 // indirect
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.6 // indirect
-	go.elastic.co/apm/v2 v2.7.6 // indirect
+	go.elastic.co/apm/module/apmgrpc/v2 v2.7.12 // indirect
+	go.elastic.co/apm/module/apmhttp/v2 v2.7.12 // indirect
+	go.elastic.co/apm/v2 v2.7.12 // indirect
 	go.elastic.co/ecszap v1.0.3 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.etcd.io/bbolt v1.4.3 // indirect
