@@ -1,0 +1,51 @@
+---
+# Runs separately from the compose policy; submodules: false avoids go-git/go-git#872.
+name: 'deps: Bump ironbank Dockerfile version'
+pipelineid: ironbank/dockerfile
+
+sources:
+  ubi_version:
+    name: 'Get ubi version from ironbank'
+    kind: yaml
+    spec:
+      file: 'https://repo1.dso.mil/dsop/redhat/ubi/10.x/ubi10/-/raw/master/hardening_manifest.yaml?ref_type=heads'
+      key: "$.labels.'org.opencontainers.image.version'"
+    transformers:
+      - trimprefix: '"'
+      - trimsuffix: '"'
+
+scms:
+  default:
+    kind: github
+    spec:
+      user: 'github-actions[bot]'
+      owner: elastic
+      repository: elastic-agent
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      username: '{{ env "GITHUB_ACTOR" }}'
+      branch: main
+      commitusingapi: true
+      submodules: false
+
+targets:
+  dockerfile_ironbank:
+    scmid: default
+    name: 'deps(ironbank): Bump ubi version to {{ source "ubi_version" }}'
+    kind: dockerfile
+    sourceid: ubi_version
+    spec:
+      file: dev-tools/packaging/templates/ironbank/Dockerfile.tmpl
+      instruction:
+        keyword: "ARG"
+        matcher: "BASE_TAG"
+
+actions:
+  default:
+    title: 'deps: Bump ironbank Dockerfile version to {{ source "ubi_version" }}'
+    kind: github/pullrequest
+    spec:
+      automerge: false
+      labels:
+        - dependencies
+        - backport-active-all
+    scmid: default

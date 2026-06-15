@@ -2,6 +2,9 @@ config:
   - path: dev-tools/packaging/templates/ironbank
     dockerfile: Dockerfile.tmpl
     manifest: hardening_manifest.yaml.tmpl
+    # kind: dockerfile checks git cleanliness via go-git, which fails with the beats submodule
+    # (go-git/go-git#872). Handled separately in .ci/updatecli/ironbank-dockerfile.yaml.
+    skip_dockerfile: true
 
 pull_request:
   labels:

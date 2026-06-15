@@ -41,6 +41,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Ironbank Dockerfile update runs separately with submodules: false (go-git/go-git#872).
+      - uses: elastic/oblt-actions/updatecli/run@v1
+        with:
+          command: diff --config .ci/updatecli/ironbank-dockerfile.yaml
+          version-file: .updatecli-version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: elastic/oblt-actions/updatecli/run@v1
+        with:
+          command: apply --config .ci/updatecli/ironbank-dockerfile.yaml
+          version-file: .updatecli-version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - if: ${{ failure()  }}
         uses: elastic/oblt-actions/slack/send@v1
         env:
