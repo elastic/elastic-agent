@@ -611,14 +611,12 @@ func (Format) License() error {
 // Snapshot builds are the default; use SNAPSHOT=false to build a release package.
 // Use PLATFORMS to control the target platforms.
 // Use VERSION_QUALIFIER to control the version qualifier.
+// Use PACKAGES to override the package types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker).
+// If PACKAGES is not set, defaults to tar.gz for non-Windows platforms and zip for Windows.
 func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
-
-	if len(cfg.GetPackageTypes()) == 0 {
-		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
-	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
@@ -1495,10 +1493,6 @@ func PackageUsingDRA(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
-
-	if len(cfg.GetPackageTypes()) == 0 {
-		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
-	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
@@ -3599,17 +3593,6 @@ func (Otel) CrossBuild(ctx context.Context) error {
 	mg.Deps(EnsureCrossBuildOutputDir)
 
 	cfg := devtools.SettingsFromContext(ctx)
-
-	// Download modules from internal/edot before crossbuilding.
-	// The crossbuild process mounts the host's module cache read-only into the container,
-	// so all dependencies must be downloaded before the build starts.
-	// internal/edot has its own go.mod with different dependencies than the main module.
-	if cfg.CrossBuild.MountModcache {
-		fmt.Println(">> Downloading modules for internal/edot")
-		if err := sh.Run("go", "-C", "internal/edot", "mod", "download"); err != nil {
-			return fmt.Errorf("failed to download modules for internal/edot: %w", err)
-		}
-	}
 
 	opts := []devtools.CrossBuildOption{devtools.WithName("elastic-otel-collector"), devtools.WithTarget("otel:golangCrossBuild")}
 

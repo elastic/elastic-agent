@@ -72,23 +72,22 @@ type retrySender struct {
 
 // Send calls the underlying Sender's Send method.
 // If a non context-related error is returned or the 429 status code is returned the request is retried after a backoff period.
-func (r *retrySender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (resp *http.Response, err error) {
+func (r *retrySender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.ReadSeeker) (resp *http.Response, err error) {
 	r.wait.Reset()
 
-	var b bytes.Buffer
-	tr := io.TeeReader(body, &b)
 	for i := 0; i < r.max; i++ {
-		resp, err = r.c.Send(ctx, method, path, params, headers, tr)
+		if body != nil {
+			_, _ = body.Seek(0, io.SeekStart)
+		}
+		resp, err = r.c.Send(ctx, method, path, params, headers, body)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return resp, err
 			}
-			tr = bytes.NewReader(b.Bytes())
 			r.wait.Wait()
 			continue
 		}
 		if resp.StatusCode == http.StatusTooManyRequests {
-			tr = bytes.NewReader(b.Bytes())
 			r.wait.Wait()
 			continue
 		}
@@ -131,7 +130,7 @@ func (c *Client) New(ctx context.Context, r *NewUploadRequest) (*NewUploadRespon
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.c.Send(ctx, http.MethodPost, PathNewUpload, nil, nil, bytes.NewBuffer(b))
+	resp, err := c.c.Send(ctx, http.MethodPost, PathNewUpload, nil, nil, bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +149,7 @@ func (c *Client) New(ctx context.Context, r *NewUploadRequest) (*NewUploadRespon
 }
 
 // Chunk uploads a file chunk to fleet-server.
-func (c *Client) Chunk(ctx context.Context, uploadID string, chunkID int, sha256Hash []byte, r io.Reader) error {
+func (c *Client) Chunk(ctx context.Context, uploadID string, chunkID int, sha256Hash []byte, r io.ReadSeeker) error {
 	h := http.Header{"X-Chunk-Sha2": {fmt.Sprintf("%x", sha256Hash)}}
 	resp, err := c.c.Send(ctx, "PUT", fmt.Sprintf(PathChunk, uploadID, chunkID), nil, h, r)
 	if err != nil {
@@ -171,7 +170,7 @@ func (c *Client) Finish(ctx context.Context, id string, r *FinishRequest) error 
 		return err
 	}
 
-	resp, err := c.c.Send(ctx, "POST", fmt.Sprintf(PathFinishUpload, id), nil, nil, bytes.NewBuffer(b))
+	resp, err := c.c.Send(ctx, "POST", fmt.Sprintf(PathFinishUpload, id), nil, nil, bytes.NewReader(b))
 	if err != nil {
 		return err
 	}
@@ -209,7 +208,10 @@ func (c *Client) UploadDiagnostics(ctx context.Context, actionId string, timesta
 		var data bytes.Buffer
 		io.CopyN(&data, r, chunkSize) //nolint:errcheck // copy chunkSize bytes to a buffer so we can get the checksum
 		hash := sha256.Sum256(data.Bytes())
-		err := c.Chunk(ctx, uploadID, chunk, hash[:], &data) // hash[:] uses the array as a slice
+		// bytes.NewReader references the existing buffer without copying and
+		// implements io.ReadSeeker, so retrySender can rewind on retry rather
+		// than buffering a second copy of the chunk.
+		err := c.Chunk(ctx, uploadID, chunk, hash[:], bytes.NewReader(data.Bytes()))
 		if err != nil {
 			return uploadID, err
 		}

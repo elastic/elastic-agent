@@ -49,6 +49,8 @@ type UpdateMarker struct {
 
 	Details *details.Details `json:"details,omitempty" yaml:"details,omitempty"`
 
+	// Agents older than 9.5.0 read rollback targets from this field on Windows.
+	// TODO: remove once the minimum supported upgrade-from version is 9.5.0.
 	RollbacksAvailable map[string]ttl.TTLMarker `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
 }
 

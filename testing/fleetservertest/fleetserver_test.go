@@ -848,7 +848,7 @@ func (s sender) Send(
 	path string,
 	params url.Values,
 	headers http.Header,
-	body io.Reader) (*http.Response, error) {
+	body io.ReadSeeker) (*http.Response, error) {
 
 	r, err := http.NewRequest(method, s.url+path, body) //nolint:noctx // it's a test
 	if err != nil {
