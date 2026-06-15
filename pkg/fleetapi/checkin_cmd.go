@@ -35,7 +35,7 @@ type Sender interface {
 		path string,
 		params url.Values,
 		headers http.Header,
-		body io.Reader,
+		body io.ReadSeeker,
 	) (*http.Response, error)
 }
 
@@ -150,7 +150,7 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 	}
 
 	requestHeaders := http.Header{}
-	requestBody := bytes.NewBuffer(b)
+	var requestBody io.ReadSeeker = bytes.NewReader(b)
 	if e.compression == "gzip" {
 		requestBody, err = gzipEncodeCheckinRequestBody(b)
 		if err != nil {
@@ -220,9 +220,9 @@ func extractError(resp io.Reader) error {
 	return fmt.Errorf("could not decode the response, raw response: %s", string(data))
 }
 
-func gzipEncodeCheckinRequestBody(body []byte) (*bytes.Buffer, error) {
-	compressedBody := bytes.NewBuffer(nil)
-	gzipWriter := gzip.NewWriter(compressedBody)
+func gzipEncodeCheckinRequestBody(body []byte) (*bytes.Reader, error) {
+	var compressedBody bytes.Buffer
+	gzipWriter := gzip.NewWriter(&compressedBody)
 	if _, err := gzipWriter.Write(body); err != nil {
 		return nil, err
 	}
@@ -231,5 +231,5 @@ func gzipEncodeCheckinRequestBody(body []byte) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	return compressedBody, nil
+	return bytes.NewReader(compressedBody.Bytes()), nil
 }

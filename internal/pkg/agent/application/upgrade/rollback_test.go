@@ -831,8 +831,6 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		versionedHome: oldAgentVersionedHome,
 	}
 
-	// use a rollback window value that disables the creation of the available_rollbacks field in the upgrade marker
-	// to create a backward compatible marker
 	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
 	err := markUpgrade(log,
 		paths.DataFrom(topDir),
@@ -843,18 +841,18 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 	require.NoError(t, err, "error writing fake update marker")
 }
 
-// TestRollbackWithOpts_PreservesUnexpiredRollbacksAvailable verifies that an unexpired
-// entry in marker.RollbacksAvailable survives a rollback even when a different target
-// is chosen, so that it remains available for a subsequent rollback attempt.
+// TestRollbackWithOpts_PreservesInTTLRollbacks encodes the
+// multi-rollback retention contract for RollbackWithOpts: in-TTL entries in
+// the TTL registry must survive a rollback regardless of which one is
+// chosen as the rollback target.
 //
 // Setup:
 //   - Three on-disk installs A, B, C.
 //   - Symlink points at C (the failing upgrade).
-//   - Update marker records C as new, A as previous, with both A and B listed
-//     in RollbacksAvailable with future TTLs.
+//   - TTL registry lists both A and B with future TTLs.
 //
 // We roll back to A. B (also unexpired) must survive
-func TestRollbackWithOpts_PreservesUnexpiredRollbacksAvailable(t *testing.T) {
+func TestRollbackWithOpts_PreservesInTTLRollbacks(t *testing.T) {
 	agentExecutableName := AgentName
 	if runtime.GOOS == "windows" {
 		agentExecutableName += ".exe"
@@ -890,9 +888,9 @@ func TestRollbackWithOpts_PreservesUnexpiredRollbacksAvailable(t *testing.T) {
 		time.Now(),
 		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
 		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
-		nil, nil, availableRollbacks,
+		nil, nil, nil,
 	)
-	require.NoError(t, err, "writing update marker with two RollbacksAvailable entries")
+	require.NoError(t, err, "writing update marker")
 
 	mockClient := client.NewMockClient(t)
 	mockClient.EXPECT().Connect(
@@ -921,14 +919,14 @@ func TestRollbackWithOpts_PreservesUnexpiredRollbacksAvailable(t *testing.T) {
 	})
 }
 
-// TestRollbackWithOpts_RemovesMalformedTTLRollbacksAvailable verifies that a
+// TestRollbackWithOpts_RemovesMalformedTTLEntries verifies that a
 // directory whose .ttl marker is corrupt is NOT preserved by post-rollback
 // cleanup. Under the registry contract a parseable TTL is the only proof an
 // install is a valid rollback target, so a malformed entry is treated like a
 // missing one. This preserves the self-healing property that a corrupt .ttl
 // outside the active install gets reaped at the next rollback, allowing
 // future upgrades to proceed against a clean registry.
-func TestRollbackWithOpts_RemovesMalformedTTLRollbacksAvailable(t *testing.T) {
+func TestRollbackWithOpts_RemovesMalformedTTLEntries(t *testing.T) {
 	agentExecutableName := AgentName
 	if runtime.GOOS == "windows" {
 		agentExecutableName += ".exe"
@@ -967,7 +965,7 @@ func TestRollbackWithOpts_RemovesMalformedTTLRollbacksAvailable(t *testing.T) {
 		now,
 		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
 		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
-		nil, nil, availableRollbacks,
+		nil, nil, nil,
 	)
 	require.NoError(t, err, "writing update marker")
 
@@ -1000,11 +998,11 @@ func TestRollbackWithOpts_RemovesMalformedTTLRollbacksAvailable(t *testing.T) {
 	})
 }
 
-// TestRollbackWithOpts_RemovesExpiredRollbacksAvailable verifies that expired
-// entries in marker.RollbacksAvailable are not preserved by the rollback
+// TestRollbackWithOpts_RemovesExpiredTTLEntries verifies that expired
+// entries in the TTL registry are not preserved by the rollback
 // cleanup: the keep list is filtered by ValidUntil so expired directories get
 // swept alongside the failing upgrade target.
-func TestRollbackWithOpts_RemovesExpiredRollbacksAvailable(t *testing.T) {
+func TestRollbackWithOpts_RemovesExpiredTTLEntries(t *testing.T) {
 	agentExecutableName := AgentName
 	if runtime.GOOS == "windows" {
 		agentExecutableName += ".exe"
@@ -1040,9 +1038,9 @@ func TestRollbackWithOpts_RemovesExpiredRollbacksAvailable(t *testing.T) {
 		now,
 		agentInstall{version: versionC.version, hash: versionC.hash, versionedHome: relC},
 		agentInstall{version: versionA.version, hash: versionA.hash, versionedHome: relA},
-		nil, nil, availableRollbacks,
+		nil, nil, nil,
 	)
-	require.NoError(t, err, "writing update marker with mixed TTL RollbacksAvailable entries")
+	require.NoError(t, err, "writing update marker")
 
 	mockClient := client.NewMockClient(t)
 	mockClient.EXPECT().Connect(
