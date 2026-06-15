@@ -79,12 +79,13 @@ The packaging process has many leavers that need to be correctly set:
   not set, it defaults to **ALL** platforms. [Selecting specific
   platform](#selecting-specific-platform) contains a list of common
   values. For a full list look at [`elastic-agent/dev-tools/mage/platforms.go`](https://github.com/elastic/elastic-agent/blob/main/dev-tools/mage/platforms.go#L15).
- - `PACKAGES`: **Required.** Comma separated list of packages you want
-  to build. Use `PACKAGES=all` to build all package types.
-  The packages are defined in
+ - `PACKAGES`: Comma separated list of packages you want to build.
+  If not set, defaults to `tar.gz` for non-Windows platforms and `zip`
+  for Windows platforms (based on `PLATFORMS`). Use `PACKAGES=all` to
+  build all package types. The packages are defined in
   [`elastic-agent/dev-tools/mage/pkgtypes.go`](https://github.com/elastic/elastic-agent/blob/main/dev-tools/mage/pkgtypes.go#L72).
-  To run Linux tests you need to package `tar.gz` ,`deb` and `rpm`.
-The possible options are:
+  To run Linux tests you need to package `tar.gz`, `deb` and `rpm`.
+  The possible options are:
     - `tar.gz`
     - `zip` (Windows only)
     - `deb`
