@@ -135,7 +135,7 @@ func TestFQDN(t *testing.T) {
 	t.Log("Wait until policy has been applied by Agent")
 	require.Eventually(
 		t,
-		tools.IsPolicyRevision(ctx, t, kibClient, agent.ID, updatedPolicy.Revision),
+		tools.IsMinPolicyRevision(ctx, t, kibClient, agent.ID, updatedPolicy.Revision),
 		2*time.Minute,
 		1*time.Second,
 	)
@@ -165,7 +165,7 @@ func TestFQDN(t *testing.T) {
 	t.Log("Wait until policy has been applied by Agent")
 	require.Eventually(
 		t,
-		tools.IsPolicyRevision(ctx, t, kibClient, agent.ID, updatedPolicy.Revision),
+		tools.IsMinPolicyRevision(ctx, t, kibClient, agent.ID, updatedPolicy.Revision),
 		2*time.Minute,
 		1*time.Second,
 	)

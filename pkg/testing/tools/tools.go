@@ -20,10 +20,28 @@ import (
 )
 
 // IsPolicyRevision returns a niladic function that returns true if the
-// given agent's policy revision has reached the given policy revision; false
-// otherwise. The returned function is intended
+// given agent's policy revision matches the given policy revision exactly;
+// false otherwise. The returned function is intended
 // for use with assert.Eventually or require.Eventually.
 func IsPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, agentID string, policyRevision int) func() bool {
+	return func() bool {
+		getAgentReq := kibana.GetAgentRequest{ID: agentID}
+		updatedPolicyAgent, err := client.GetAgent(ctx, getAgentReq)
+		if err != nil {
+			t.Logf("failed to get agent document to check policy revision: %v", err)
+			return false
+		}
+
+		return updatedPolicyAgent.PolicyRevision == policyRevision
+	}
+}
+
+// IsMinPolicyRevision returns a niladic function that returns true if the
+// given agent's policy revision is at least the given policy revision; false
+// otherwise. Use this instead of IsPolicyRevision when intermediate revisions
+// may occur between computing the expected value and the agent applying it.
+// The returned function is intended for use with assert.Eventually or require.Eventually.
+func IsMinPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, agentID string, policyRevision int) func() bool {
 	return func() bool {
 		getAgentReq := kibana.GetAgentRequest{ID: agentID}
 		updatedPolicyAgent, err := client.GetAgent(ctx, getAgentReq)
