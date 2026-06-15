@@ -74,6 +74,61 @@ receivers:
           scrape_interval: 5s
           static_configs:
             - targets: ['0.0.0.0:8888']
+<<<<<<< HEAD
+=======
+  elasticapmintake:
+  akamai_siem:
+    endpoint: https://akab-placeholder.luna.akamaiapis.net
+    config_ids: "12345"
+    authentication:
+      client_token: placeholder-client-token
+      client_secret: placeholder-client-secret
+      access_token: placeholder-access-token
+  apache:
+  mysql:
+  postgresql:
+    username: test
+    password: test
+  docker_stats:
+  azure_event_hub:
+    connection: Endpoint=sb://namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=superSecret1234=;EntityPath=hubName
+  awss3:
+    starttime: "2024-01-01 01:00"
+    endtime: "2024-01-02"
+    s3downloader:
+      s3_bucket: 'test'
+      s3_prefix: 'test'
+    encodings:
+      - extension: awslogs_encoding/elbaccess
+  awscloudwatch:
+    region: us-east-1
+    logs:
+      poll_interval: 1m
+      groups:
+        autodiscover:
+          limit: 1
+  prometheusremotewrite:
+    endpoint: 0.0.0.0:9090
+  statsd:
+    endpoint: localhost:8125
+  elasticmonitoringreceiver:
+  verifier:
+    cloud_connector_id: "test-cc-001"
+    verification_id: "test-verify-001"
+    policies:
+      - policy_id: "policy-001"
+        integrations:
+          - policy_template: "cloudtrail"
+            package_name: "aws"
+  snmp:
+    metrics:
+      snmp.uptime:
+        unit: s
+        gauge:
+          value_type: int
+        scalar_oids:
+          - oid: ".1.3.6.1.2.1.1.8.0"
+>>>>>>> cfd76549e (Add awscloudwatchreceiver to EDOT (#14774))
   azuremonitor:
     subscription_ids:
       - 00000000-0000-0000-0000-000000000000
@@ -135,6 +190,14 @@ service:
         - filelog
         - otlp
         - nop
+<<<<<<< HEAD
+=======
+        - elasticapmintake
+        - elasticmonitoringreceiver
+        - azure_event_hub
+        - awscloudwatch
+        - verifier
+>>>>>>> cfd76549e (Add awscloudwatchreceiver to EDOT (#14774))
 
     logs/forward_receive:
       receivers:

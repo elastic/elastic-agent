@@ -27,6 +27,15 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.152.0
+<<<<<<< HEAD
+=======
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/logdedupprocessor v0.152.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.152.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver v0.152.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.152.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.152.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azureeventhubreceiver v0.152.0
+>>>>>>> cfd76549e (Add awscloudwatchreceiver to EDOT (#14774))
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.152.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.152.0

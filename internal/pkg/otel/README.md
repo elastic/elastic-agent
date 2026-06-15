@@ -35,6 +35,14 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD:internal/pkg/otel/README.md
+=======
+| [akamaisiemreceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/akamaisiemreceiver/v0.1.0/receiver/akamaisiemreceiver/README.md) | v0.1.0 |
+| [apachereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/apachereceiver/v0.152.0/receiver/apachereceiver/README.md) | v0.152.0 |
+| [awscloudwatchreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awscloudwatchreceiver/v0.152.0/receiver/awscloudwatchreceiver/README.md) | v0.152.0 |
+| [awss3receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awss3receiver/v0.152.0/receiver/awss3receiver/README.md) | v0.152.0 |
+| [azureeventhubreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/azureeventhubreceiver/v0.152.0/receiver/azureeventhubreceiver/README.md) | v0.152.0 |
+>>>>>>> cfd76549e (Add awscloudwatchreceiver to EDOT (#14774)):internal/edot/README.md
 | [azuremonitorreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/azuremonitorreceiver/v0.152.0/receiver/azuremonitorreceiver/README.md) | v0.152.0 |
 | [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.152.0/receiver/filelogreceiver/README.md) | v0.152.0 |
 | [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.152.0/receiver/hostmetricsreceiver/README.md) | v0.152.0 |
