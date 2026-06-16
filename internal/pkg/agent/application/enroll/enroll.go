@@ -187,7 +187,7 @@ func enroll(
 			errors.TypeNetwork)
 	}
 
-	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, options.EnrollAPIKey, options.ReplaceToken, remoteConfig)
+	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, options.EnrollAPIKey, options.ReplaceToken, remoteConfig, options.CheckinOnStateChange)
 	if err != nil {
 		return err
 	}
@@ -490,12 +490,15 @@ func storeAgentInfo(s saver, reader io.Reader) error {
 	return nil
 }
 
-func createFleetConfigFromEnroll(accessAPIKey string, enrollmentToken string, replaceToken string, cli remote.Config) (*configuration.FleetAgentConfig, error) {
+func createFleetConfigFromEnroll(accessAPIKey string, enrollmentToken string, replaceToken string, cli remote.Config, checkinOnStateChange bool) (*configuration.FleetAgentConfig, error) {
 	var err error
 	cfg := configuration.DefaultFleetAgentConfig()
 	cfg.Enabled = true
 	cfg.AccessAPIKey = accessAPIKey
 	cfg.Client = cli
+	if checkinOnStateChange {
+		cfg.Checkin.Mode = configuration.FleetCheckinModeOnStateChange
+	}
 	cfg.EnrollmentTokenHash, err = fleetHashToken(enrollmentToken)
 	if err != nil {
 		return nil, errors.New(err, "failed to generate enrollment hash", errors.TypeConfig)

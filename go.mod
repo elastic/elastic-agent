@@ -15,7 +15,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260612200516-84fd2f5eed79
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260615204556-9fc22e420eb2
 	github.com/elastic/cloud-on-k8s/v3 v3.4.0
 	github.com/elastic/elastic-agent-autodiscover v0.10.3-0.20260423154939-e990715f9426
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
@@ -54,11 +54,11 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639
-	go.elastic.co/apm/module/apmgorilla/v2 v2.6.0
-	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0
-	go.elastic.co/apm/v2 v2.7.6
+	go.elastic.co/apm/module/apmgorilla/v2 v2.7.12
+	go.elastic.co/apm/module/apmgrpc/v2 v2.7.12
+	go.elastic.co/apm/v2 v2.7.12
 	go.elastic.co/ecszap v1.0.3
-	go.elastic.co/go-licence-detector v0.7.0
+	go.elastic.co/go-licence-detector v0.10.0
 	go.opentelemetry.io/collector/component/componentstatus v0.153.0
 	go.opentelemetry.io/collector/component/componenttest v0.153.0
 	go.opentelemetry.io/collector/extension/extensiontest v0.153.0
@@ -177,7 +177,7 @@ require (
 	github.com/gohugoio/hashstructure v0.6.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
-	github.com/google/licenseclassifier v0.0.0-20221004142553-c1ed8fcf4bab // indirect
+	github.com/google/licenseclassifier v0.0.0-20250213175939-b5d1a3369749 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -259,7 +259,7 @@ require (
 	github.com/yuin/goldmark v1.7.13 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.6 // indirect
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.6 // indirect
+	go.elastic.co/apm/module/apmhttp/v2 v2.7.12 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/collector/config/configtelemetry v0.153.0 // indirect

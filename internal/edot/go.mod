@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260612200516-84fd2f5eed79
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260615204556-9fc22e420eb2
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.43.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -629,9 +629,9 @@ require (
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.6 // indirect
-	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0 // indirect
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.6 // indirect
-	go.elastic.co/apm/v2 v2.7.6 // indirect
+	go.elastic.co/apm/module/apmgrpc/v2 v2.7.12 // indirect
+	go.elastic.co/apm/module/apmhttp/v2 v2.7.12 // indirect
+	go.elastic.co/apm/v2 v2.7.12 // indirect
 	go.elastic.co/ecszap v1.0.3 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.etcd.io/bbolt v1.4.3 // indirect
