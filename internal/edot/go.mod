@@ -19,6 +19,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.58.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.58.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.58.0
+	github.com/elastic/opentelemetry-collector-components/extension/awscredentialsproviderextension v0.58.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.58.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.58.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.58.0
@@ -44,9 +45,6 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/logdedupprocessor v0.153.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.153.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver v0.153.0
-	// TEMPORARY: ahead of the other contrib pins (v0.152.0) to enable CloudWatch metrics
-	// support, which only landed upstream in v0.153.0. Realign with the next coordinated
-	// contrib version bump.
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.153.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.153.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azureeventhubreceiver v0.153.0
@@ -812,4 +810,5 @@ replace (
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
 	github.com/google/gopacket => github.com/elastic/gopacket v1.1.20-0.20241002174017-e8c5fda595e6
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260615132925-c7aa5d05d232
 )
