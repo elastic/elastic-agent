@@ -484,9 +484,7 @@ type managerChans struct {
 
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
 
-	// upgradeMarkerCleanCh is sent to by the Fleet gateway after a checkin
-	// carrying StateCompleted returns successfully, signalling the coordinator
-	// to delete the upgrade marker. Buffered size 1; gateway sends non-blocking.
+	// upgradeMarkerCleanCh receives a signal when a StateCompleted checkin has been confirmed, triggering upgrade marker cleanup.
 	upgradeMarkerCleanCh chan struct{}
 }
 
@@ -1001,10 +999,7 @@ func (c *Coordinator) logUpgradeDetails(details *details.Details) {
 	c.logger.Infow("updated upgrade details", "upgrade_details", details)
 }
 
-// UpgradeMarkerCleanCh returns the send side of the upgrade marker clean channel.
-// The Fleet gateway sends to this channel (non-blocking) after a checkin carrying
-// StateCompleted returns successfully, signalling the coordinator to delete the marker.
-// Called from external goroutines.
+// UpgradeMarkerCleanCh returns the send side of the channel used to signal that a StateCompleted checkin was confirmed and the upgrade marker can be deleted.
 func (c *Coordinator) UpgradeMarkerCleanCh() chan<- struct{} {
 	return c.managerChans.upgradeMarkerCleanCh
 }

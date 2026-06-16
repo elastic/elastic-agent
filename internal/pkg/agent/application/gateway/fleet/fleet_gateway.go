@@ -98,7 +98,7 @@ type FleetGateway struct {
 	actionCh           chan []fleetapi.Action
 	rollbackSource     ttl.ReadOnlySource
 	compression        string
-	// onUpgradeCompleted is called after a checkin with StateCompleted returns successfully, so the coordinator can clean up the upgrade marker. Nil when not set.
+	// onUpgradeCompleted is called when a checkin carrying StateCompleted returns successfully. Nil when not set.
 	onUpgradeCompleted func()
 }
 

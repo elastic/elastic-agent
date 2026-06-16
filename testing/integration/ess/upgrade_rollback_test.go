@@ -528,7 +528,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 					assert.Equal(t, cproto.State_HEALTHY, state.State)
 					assert.Equal(collect, expectedVersion, state.Info.Version)
 					assert.Equal(collect, expectedSnapshot, state.Info.Snapshot)
-					// coordinator removes the marker on all platforms after StateCompleted
+					// marker is removed after StateCompleted is confirmed, on all platforms
 					assert.NoFileExists(collect, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"))
 				}, 4*time.Minute, 10*time.Second)
 				t.Log("elastic agent is out of grace period.")

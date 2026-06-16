@@ -139,7 +139,7 @@ func Test_watchCmd(t *testing.T) {
 					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil)
 
-				// the coordinator owns marker removal; watcher always passes false here
+				// marker removal is not the watcher's responsibility
 				installModifier.EXPECT().
 					Cleanup(mock.Anything, topDir, false, false, filepath.Join("data", "elastic-agent-4.5.6-newver")).
 					Return(nil)
@@ -457,11 +457,10 @@ func Test_watchCmd_MarkerPointsToSelf(t *testing.T) {
 		paths.BinaryPath(filepath.Join(topDir, liveHome), binName),
 		"live agent binary must survive cleanup")
 
-	// The watcher no longer removes the marker on success; the coordinator does.
-	// The marker must still be present on disk after watchCmd returns.
+	// The watcher does not remove the marker on success; it is removed later after the completed state is confirmed.
 	loaded, loadErr := upgrade.LoadMarker(dataDir)
 	require.NoError(t, loadErr)
-	assert.NotNil(t, loaded, "marker should be preserved after successful watch — coordinator removes it later")
+	assert.NotNil(t, loaded, "marker should be preserved after successful watch")
 }
 
 // writeFakeInstallForWatcherTest builds the on-disk shape that step_unpack

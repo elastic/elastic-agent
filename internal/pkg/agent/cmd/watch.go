@@ -274,8 +274,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	// watch succeeded - upgrade was successful!
 	upgradeDetails.SetState(details.StateCompleted)
 
-	// cleanup older versions; the coordinator removes the upgrade marker after
-	// confirming the completed state with Fleet (or immediately for standalone).
+	// cleanup older versions; the upgrade marker is removed separately after the completed state is confirmed.
 	removeMarker := false
 	newVersionedHome := marker.VersionedHome
 	if newVersionedHome == "" {
