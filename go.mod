@@ -53,9 +53,9 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639
-	go.elastic.co/apm/module/apmgorilla/v2 v2.6.0
-	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0
-	go.elastic.co/apm/v2 v2.7.6
+	go.elastic.co/apm/module/apmgorilla/v2 v2.7.12
+	go.elastic.co/apm/module/apmgrpc/v2 v2.7.12
+	go.elastic.co/apm/v2 v2.7.12
 	go.elastic.co/ecszap v1.0.3
 	go.elastic.co/go-licence-detector v0.10.0
 	go.opentelemetry.io/collector/component/componentstatus v0.153.0
@@ -657,7 +657,7 @@ require (
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.6 // indirect
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.6 // indirect
+	go.elastic.co/apm/module/apmhttp/v2 v2.7.12 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.etcd.io/bbolt v1.4.3 // indirect
 	go.mongodb.org/mongo-driver v1.17.9 // indirect
