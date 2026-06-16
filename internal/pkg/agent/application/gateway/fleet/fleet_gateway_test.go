@@ -96,7 +96,7 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 		mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
 		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
-		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc, nil)
 
 		require.NoError(t, err)
 
@@ -229,7 +229,7 @@ func TestFleetGateway(t *testing.T) {
 		mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
 		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
-		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc, nil)
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -275,7 +275,7 @@ func TestFleetGateway(t *testing.T) {
 		gateway, err := newFleetGatewayWithScheduler(log, &fleetGatewaySettings{
 			Duration: d,
 			Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
-		}, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+		}, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc, nil)
 		require.NoError(t, err)
 
 		ch2 := client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
@@ -328,7 +328,7 @@ func TestFleetGateway(t *testing.T) {
 		mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
 		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
-		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(stateFetcher), mockRollbacksSrc)
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(stateFetcher), mockRollbacksSrc, nil)
 
 		require.NoError(t, err)
 
@@ -391,7 +391,7 @@ func TestFleetGateway(t *testing.T) {
 		mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
 		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
-		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc, nil)
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -446,7 +446,7 @@ func TestFleetGateway(t *testing.T) {
 		gateway, err := newFleetGatewayWithScheduler(log, &fleetGatewaySettings{
 			Duration: 5 * time.Second,
 			Backoff:  &backoffSettings{Init: 10 * time.Millisecond, Max: 30 * time.Second},
-		}, agentInfo, client, scheduler, noop.New(), stateStore, stateFetcher, mockRollbacksSrc)
+		}, agentInfo, client, scheduler, noop.New(), stateStore, stateFetcher, mockRollbacksSrc, nil)
 		require.NoError(t, err)
 
 		requestSent := make(chan struct{}, 10)
@@ -1214,7 +1214,7 @@ func TestAvailableRollbacks(t *testing.T) {
 
 			tc.setup(t, mockRollbacksSrc, testClient)
 
-			gateway, err := newFleetGatewayWithScheduler(log, defaultGatewaySettings, mockAgentInfo, testClient, stepperScheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+			gateway, err := newFleetGatewayWithScheduler(log, defaultGatewaySettings, mockAgentInfo, testClient, stepperScheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc, nil)
 			require.NoError(t, err, "error creating gateway")
 			checkinResponse, _, err := gateway.execute(t.Context())
 			tc.wantErr(t, err)
@@ -1222,5 +1222,160 @@ func TestAvailableRollbacks(t *testing.T) {
 				tc.assertCheckinResponse(t, checkinResponse)
 			}
 		})
+	}
+}
+
+func TestOnUpgradeCompletedCallback(t *testing.T) {
+	log, _ := logger.New("fleet_gateway_test", false)
+	stateStore := newStateStore(t, log)
+	mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
+	mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
+
+	called := make(chan struct{}, 1)
+	onUpgradeCompleted := func() {
+		select {
+		case called <- struct{}{}:
+		default:
+		}
+	}
+
+	det := details.NewDetails("8.99.0", details.StateCompleted, "test-action-id")
+	stateFetcherFn := func() coordinator.State {
+		return coordinator.State{UpgradeDetails: det}
+	}
+
+	client := newTestingClient()
+	client.Answer(func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"actions":[]}`)),
+		}, nil
+	})
+
+	gw, err := newFleetGatewayWithScheduler(
+		log,
+		defaultGatewaySettings,
+		&testAgentInfo{},
+		client,
+		scheduler.NewStepper(),
+		noop.New(),
+		stateStore,
+		NewCheckinStateFetcher(stateFetcherFn),
+		mockRollbacksSrc,
+		onUpgradeCompleted,
+	)
+	require.NoError(t, err)
+
+	_, _, err = gw.execute(t.Context())
+	require.NoError(t, err)
+
+	select {
+	case <-called:
+		// callback fired as expected
+	default:
+		t.Fatal("onUpgradeCompleted was not called after StateCompleted checkin")
+	}
+}
+
+func TestOnUpgradeCompletedCallbackNotCalledOnCheckinError(t *testing.T) {
+	log, _ := logger.New("fleet_gateway_test", false)
+	stateStore := newStateStore(t, log)
+	mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
+	mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
+
+	called := make(chan struct{}, 1)
+	onUpgradeCompleted := func() {
+		select {
+		case called <- struct{}{}:
+		default:
+		}
+	}
+
+	// StateCompleted in the state, but the checkin HTTP call fails.
+	det := details.NewDetails("8.99.0", details.StateCompleted, "test-action-id")
+	stateFetcherFn := func() coordinator.State {
+		return coordinator.State{UpgradeDetails: det}
+	}
+
+	client := newTestingClient()
+	client.Answer(func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
+		return nil, fmt.Errorf("network error")
+	})
+
+	gw, err := newFleetGatewayWithScheduler(
+		log,
+		defaultGatewaySettings,
+		&testAgentInfo{},
+		client,
+		scheduler.NewStepper(),
+		noop.New(),
+		stateStore,
+		NewCheckinStateFetcher(stateFetcherFn),
+		mockRollbacksSrc,
+		onUpgradeCompleted,
+	)
+	require.NoError(t, err)
+
+	_, _, err = gw.execute(t.Context())
+	require.Error(t, err)
+
+	select {
+	case <-called:
+		t.Fatal("onUpgradeCompleted must not be called when checkin fails")
+	default:
+		// correct — callback not fired
+	}
+}
+
+func TestOnUpgradeCompletedCallbackNotCalledWithoutStateCompleted(t *testing.T) {
+	log, _ := logger.New("fleet_gateway_test", false)
+	stateStore := newStateStore(t, log)
+	mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
+	mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
+
+	called := make(chan struct{}, 1)
+	onUpgradeCompleted := func() {
+		select {
+		case called <- struct{}{}:
+		default:
+		}
+	}
+
+	// StateWatching — not StateCompleted
+	det := details.NewDetails("8.99.0", details.StateWatching, "test-action-id")
+	stateFetcherFn := func() coordinator.State {
+		return coordinator.State{UpgradeDetails: det}
+	}
+
+	client := newTestingClient()
+	client.Answer(func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"actions":[]}`)),
+		}, nil
+	})
+
+	gw, err := newFleetGatewayWithScheduler(
+		log,
+		defaultGatewaySettings,
+		&testAgentInfo{},
+		client,
+		scheduler.NewStepper(),
+		noop.New(),
+		stateStore,
+		NewCheckinStateFetcher(stateFetcherFn),
+		mockRollbacksSrc,
+		onUpgradeCompleted,
+	)
+	require.NoError(t, err)
+
+	_, _, err = gw.execute(t.Context())
+	require.NoError(t, err)
+
+	select {
+	case <-called:
+		t.Fatal("onUpgradeCompleted must not be called when state is not StateCompleted")
+	default:
+		// correct — callback not fired
 	}
 }

@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/scheduler"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
 // Max number of times an invalid API Key is checked
@@ -97,6 +98,8 @@ type FleetGateway struct {
 	actionCh           chan []fleetapi.Action
 	rollbackSource     ttl.ReadOnlySource
 	compression        string
+	// onUpgradeCompleted is called after a checkin with StateCompleted returns successfully, so the coordinator can clean up the upgrade marker. Nil when not set.
+	onUpgradeCompleted func()
 }
 
 // New creates a new fleet gateway
@@ -109,6 +112,7 @@ func New(
 	stateFetcher StateFetcher,
 	cfg *configuration.FleetCheckin,
 	source ttl.ReadOnlySource,
+	onUpgradeCompleted func(),
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
@@ -123,6 +127,7 @@ func New(
 		stateStore,
 		stateFetcher,
 		source,
+		onUpgradeCompleted,
 	)
 	if err != nil {
 		return nil, err
@@ -141,19 +146,21 @@ func newFleetGatewayWithScheduler(
 	stateStore stateStore,
 	stateFetcher StateFetcher,
 	source ttl.ReadOnlySource,
+	onUpgradeCompleted func(),
 ) (*FleetGateway, error) {
 	return &FleetGateway{
-		log:            log,
-		client:         client,
-		settings:       settings,
-		agentInfo:      agentInfo,
-		scheduler:      scheduler,
-		acker:          acker,
-		stateFetcher:   stateFetcher,
-		stateStore:     stateStore,
-		errCh:          make(chan error),
-		actionCh:       make(chan []fleetapi.Action, 1),
-		rollbackSource: source,
+		log:                log,
+		client:             client,
+		settings:           settings,
+		agentInfo:          agentInfo,
+		scheduler:          scheduler,
+		acker:              acker,
+		stateFetcher:       stateFetcher,
+		stateStore:         stateStore,
+		errCh:              make(chan error),
+		actionCh:           make(chan []fleetapi.Action, 1),
+		rollbackSource:     source,
+		onUpgradeCompleted: onUpgradeCompleted,
 	}, nil
 }
 
@@ -483,6 +490,12 @@ func (f *FleetGateway) execute(ctx context.Context) (*pkgfleetapi.CheckinRespons
 		if serr != nil {
 			f.log.Errorf("failed to save the ack token, err: %v", serr)
 		}
+	}
+
+	if f.onUpgradeCompleted != nil &&
+		req.UpgradeDetails != nil &&
+		req.UpgradeDetails.State == details.StateCompleted {
+		f.onUpgradeCompleted()
 	}
 
 	return resp, took, nil
