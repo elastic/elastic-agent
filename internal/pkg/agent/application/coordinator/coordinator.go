@@ -483,6 +483,11 @@ type managerChans struct {
 	otelManagerError           <-chan error
 
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
+
+	// upgradeMarkerCleanCh is sent to by the Fleet gateway after a checkin
+	// carrying StateCompleted returns successfully, signalling the coordinator
+	// to delete the upgrade marker. Buffered size 1; gateway sends non-blocking.
+	upgradeMarkerCleanCh chan struct{}
 }
 
 // diffCheck is a container used by checkAndLogUpdate()
@@ -623,6 +628,7 @@ func New(
 	if upgradeMgr != nil && upgradeMgr.MarkerWatcher() != nil {
 		c.managerChans.upgradeMarkerUpdate = upgradeMgr.MarkerWatcher().Watch()
 	}
+	c.managerChans.upgradeMarkerCleanCh = make(chan struct{}, 1)
 	return c
 }
 
@@ -993,6 +999,14 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 func (c *Coordinator) logUpgradeDetails(details *details.Details) {
 	c.logger.Infow("updated upgrade details", "upgrade_details", details)
+}
+
+// UpgradeMarkerCleanCh returns the send side of the upgrade marker clean channel.
+// The Fleet gateway sends to this channel (non-blocking) after a checkin carrying
+// StateCompleted returns successfully, signalling the coordinator to delete the marker.
+// Called from external goroutines.
+func (c *Coordinator) UpgradeMarkerCleanCh() chan<- struct{} {
+	return c.managerChans.upgradeMarkerCleanCh
 }
 
 // AckUpgrade is the method used on startup to ack a previously successful upgrade action.
@@ -1705,6 +1719,14 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 				}
 				c.setUpgradeDetails(nil)
 			}
+		}
+
+	case <-c.managerChans.upgradeMarkerCleanCh:
+		if ctx.Err() == nil {
+			if err := upgrade.CleanMarker(c.logger, paths.Data()); err != nil {
+				c.logger.Warnw("failed to clean upgrade marker after Fleet confirmation", "error.message", err)
+			}
+			c.setUpgradeDetails(nil)
 		}
 	}
 

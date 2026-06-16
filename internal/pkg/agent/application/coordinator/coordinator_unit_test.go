@@ -2863,3 +2863,49 @@ func TestCoordinatorDoesNotCleanMarkerOnStateCompletedManaged(t *testing.T) {
 	require.NotNil(t, coord.state.UpgradeDetails)
 	assert.Equal(t, details.StateCompleted, coord.state.UpgradeDetails.State)
 }
+
+func TestCoordinatorCleansMarkerOnFleetConfirmation(t *testing.T) {
+	top := paths.Top()
+	paths.SetTop(t.TempDir())
+	t.Cleanup(func() { paths.SetTop(top) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	log, _ := loggertest.New("coordinator-marker-test")
+	stateChan := make(chan State, 1)
+	cleanCh := make(chan struct{}, 1)
+
+	coord := &Coordinator{
+		isManaged: true,
+		logger:    log,
+		state: State{
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
+		},
+		stateBroadcaster: &broadcaster.Broadcaster[State]{
+			InputChan: stateChan,
+		},
+		managerChans: managerChans{
+			upgradeMarkerCleanCh: cleanCh,
+		},
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+	}
+
+	// Write a marker file and pre-load StateCompleted into coordinator state
+	// as the gateway would have observed it from the checkin.
+	require.NoError(t, os.MkdirAll(paths.Data(), 0o750))
+	marker := upgrade.UpdateMarker{}
+	require.NoError(t, upgrade.SaveMarker(paths.Data(), &marker, false))
+	det := details.NewDetails("8.99.0", details.StateCompleted, "test-action-id")
+	coord.state.UpgradeDetails = det
+
+	// Simulate the Fleet gateway signalling successful StateCompleted checkin.
+	cleanCh <- struct{}{}
+	coord.runLoopIteration(ctx)
+
+	// Marker file must be gone.
+	assert.NoFileExists(t, filepath.Join(paths.Data(), ".update-marker"))
+	// Coordinator state must have UpgradeDetails cleared.
+	assert.Nil(t, coord.state.UpgradeDetails)
+}
