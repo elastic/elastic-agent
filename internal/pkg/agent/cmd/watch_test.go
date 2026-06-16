@@ -139,11 +139,9 @@ func Test_watchCmd(t *testing.T) {
 					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil)
 
-				// on windows the marker is not removed immediately to allow for cleanup on restart
-				expectedRemoveMarkerFlag := runtime.GOOS != "windows"
-
+				// the coordinator owns marker removal; watcher always passes false here
 				installModifier.EXPECT().
-					Cleanup(mock.Anything, topDir, expectedRemoveMarkerFlag, false, filepath.Join("data", "elastic-agent-4.5.6-newver")).
+					Cleanup(mock.Anything, topDir, false, false, filepath.Join("data", "elastic-agent-4.5.6-newver")).
 					Return(nil)
 			},
 			args: args{
@@ -459,16 +457,11 @@ func Test_watchCmd_MarkerPointsToSelf(t *testing.T) {
 		paths.BinaryPath(filepath.Join(topDir, liveHome), binName),
 		"live agent binary must survive cleanup")
 
-	// Sanity: watchCmd sets removeMarker = !isWindows() for the success
-	// branch, so the marker should be gone on non-Windows and preserved
-	// on Windows.
+	// The watcher no longer removes the marker on success; the coordinator does.
+	// The marker must still be present on disk after watchCmd returns.
 	loaded, loadErr := upgrade.LoadMarker(dataDir)
 	require.NoError(t, loadErr)
-	if runtime.GOOS == "windows" {
-		assert.NotNil(t, loaded, "marker should be preserved after successful watch on windows")
-	} else {
-		assert.Nil(t, loaded, "marker should be cleaned up after successful watch on non-windows")
-	}
+	assert.NotNil(t, loaded, "marker should be preserved after successful watch — coordinator removes it later")
 }
 
 // writeFakeInstallForWatcherTest builds the on-disk shape that step_unpack

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -275,13 +274,9 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	// watch succeeded - upgrade was successful!
 	upgradeDetails.SetState(details.StateCompleted)
 
-	// cleanup older versions,
-	// in windows it might leave self untouched, this will get cleaned up
-	// later at the start, because for windows we leave marker untouched.
-	//
-	// Why is this being skipped on Windows? The comment above is not clear.
-	// issue: https://github.com/elastic/elastic-agent/issues/3027
-	removeMarker := !isWindows()
+	// cleanup older versions; the coordinator removes the upgrade marker after
+	// confirming the completed state with Fleet (or immediately for standalone).
+	removeMarker := false
 	newVersionedHome := marker.VersionedHome
 	if newVersionedHome == "" {
 		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
@@ -347,10 +342,6 @@ func rollback(log *logp.Logger, topDir string, client client.Client, installModi
 	}
 
 	return nil
-}
-
-func isWindows() bool {
-	return runtime.GOOS == "windows"
 }
 
 // gracePeriod returns true if it is within grace period and time until grace period ends.
