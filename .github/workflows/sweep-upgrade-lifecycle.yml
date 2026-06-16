@@ -7,6 +7,7 @@ on:
 permissions:
   actions: read
   contents: read
+  copilot-requests: write
   issues: write
   pull-requests: read
 
@@ -122,5 +123,3 @@ jobs:
         - A priority ranking: which issues affect the most common upgrade paths vs edge cases
         - Platform-specific findings clearly labeled (Windows, macOS, Linux)
         - A summary of upgrade paths you audited and found safe
-    secrets:
-      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

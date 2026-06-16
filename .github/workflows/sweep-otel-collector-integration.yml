@@ -7,6 +7,7 @@ on:
 permissions:
   actions: read
   contents: read
+  copilot-requests: write
   issues: write
   pull-requests: read
 
@@ -119,5 +120,3 @@ jobs:
         - Confirmed issues with test code, the exact config or status scenario, and fix direction
         - A priority ranking: data-loss issues first, then status misreporting, then lifecycle
         - Translation fields you audited and found correctly mapped
-    secrets:
-      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
