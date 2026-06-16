@@ -2775,3 +2775,91 @@ func TestGetDynamicInputs(t *testing.T) {
 		assert.False(t, result["env-input"], "env-input should not be marked as dynamic")
 	})
 }
+
+func TestCoordinatorCleansMarkerOnStateCompletedStandalone(t *testing.T) {
+	top := paths.Top()
+	paths.SetTop(t.TempDir())
+	t.Cleanup(func() { paths.SetTop(top) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	log, _ := loggertest.New("coordinator-marker-test")
+	stateChan := make(chan State, 1)
+	markerChan := make(chan upgrade.UpdateMarker, 1)
+
+	coord := &Coordinator{
+		isManaged: false,
+		logger:    log,
+		state: State{
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
+		},
+		stateBroadcaster: &broadcaster.Broadcaster[State]{
+			InputChan: stateChan,
+		},
+		managerChans: managerChans{
+			upgradeMarkerUpdate: markerChan,
+		},
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+	}
+
+	// Write a marker file so we can verify it gets cleaned.
+	require.NoError(t, os.MkdirAll(paths.Data(), 0o750))
+	det := details.NewDetails("8.99.0", details.StateCompleted, "test-action-id")
+	marker := upgrade.UpdateMarker{Details: det}
+	require.NoError(t, upgrade.SaveMarker(paths.Data(), &marker, false))
+
+	// Send StateCompleted through the marker update channel.
+	markerChan <- marker
+	coord.runLoopIteration(ctx)
+
+	// Marker file must be gone.
+	assert.NoFileExists(t, filepath.Join(paths.Data(), ".update-marker"))
+	// Coordinator state must have UpgradeDetails cleared.
+	assert.Nil(t, coord.state.UpgradeDetails)
+}
+
+func TestCoordinatorDoesNotCleanMarkerOnStateCompletedManaged(t *testing.T) {
+	top := paths.Top()
+	paths.SetTop(t.TempDir())
+	t.Cleanup(func() { paths.SetTop(top) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	log, _ := loggertest.New("coordinator-marker-test")
+	stateChan := make(chan State, 1)
+	markerChan := make(chan upgrade.UpdateMarker, 1)
+
+	coord := &Coordinator{
+		isManaged: true,
+		logger:    log,
+		state: State{
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
+		},
+		stateBroadcaster: &broadcaster.Broadcaster[State]{
+			InputChan: stateChan,
+		},
+		managerChans: managerChans{
+			upgradeMarkerUpdate: markerChan,
+		},
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+	}
+
+	// Write a marker file — it must survive this iteration.
+	require.NoError(t, os.MkdirAll(paths.Data(), 0o750))
+	det := details.NewDetails("8.99.0", details.StateCompleted, "test-action-id")
+	marker := upgrade.UpdateMarker{Details: det}
+	require.NoError(t, upgrade.SaveMarker(paths.Data(), &marker, false))
+
+	markerChan <- marker
+	coord.runLoopIteration(ctx)
+
+	// Marker file must still be present — coordinator waits for Fleet confirmation.
+	assert.FileExists(t, filepath.Join(paths.Data(), ".update-marker"))
+	// Coordinator state must carry StateCompleted so future checkins include it.
+	require.NotNil(t, coord.state.UpgradeDetails)
+	assert.Equal(t, details.StateCompleted, coord.state.UpgradeDetails.State)
+}

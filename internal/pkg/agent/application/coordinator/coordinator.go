@@ -1697,6 +1697,14 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 	case upgradeMarker := <-c.managerChans.upgradeMarkerUpdate:
 		if ctx.Err() == nil {
 			c.setUpgradeDetails(upgradeMarker.Details)
+			if !c.isManaged &&
+				upgradeMarker.Details != nil &&
+				upgradeMarker.Details.State == details.StateCompleted {
+				if err := upgrade.CleanMarker(c.logger, paths.Data()); err != nil {
+					c.logger.Warnw("failed to clean upgrade marker", "error.message", err)
+				}
+				c.setUpgradeDetails(nil)
+			}
 		}
 	}
 
