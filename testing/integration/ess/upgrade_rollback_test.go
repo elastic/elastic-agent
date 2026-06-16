@@ -528,10 +528,8 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 					assert.Equal(t, cproto.State_HEALTHY, state.State)
 					assert.Equal(collect, expectedVersion, state.Info.Version)
 					assert.Equal(collect, expectedSnapshot, state.Info.Snapshot)
-					if runtime.GOOS != "windows" {
-						// on windows the update marker is not removed when cleaning up
-						assert.NoFileExists(collect, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"))
-					}
+					// coordinator removes the marker on all platforms after StateCompleted
+					assert.NoFileExists(collect, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"))
 				}, 4*time.Minute, 10*time.Second)
 				t.Log("elastic agent is out of grace period.")
 				t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)
