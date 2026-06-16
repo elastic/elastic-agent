@@ -250,8 +250,9 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	// state changes rather than waiting the full polling interval. Tests that
 	// need the standard poll-based mode should pass WithStandardCheckinMode()
 	// when creating their fixture.
-	// Gate on the fixture version: the flag was introduced in 9.5.0-SNAPSHOT, so
-	// older binaries (e.g. the start agent in upgrade tests) would reject it.
+	// Gate on the fixture version: the flag was introduced in 9.3.6-SNAPSHOT /
+	// 9.4.3-SNAPSHOT / 9.5.0-SNAPSHOT depending on the minor line, so older
+	// binaries (e.g. the start agent in upgrade tests) would reject it.
 	if !f.useStandardCheckinMode && supportsCheckinOnStateChange(f.version) {
 		installArgs = append(installArgs, "--checkin-on-state-change")
 	}
@@ -921,6 +922,11 @@ func supportsCheckinOnStateChange(versionStr string) bool {
 		return false
 	}
 
-	// The --checkin-on-state-change flag is currently only available in 9.5.0-SNAPSHOT.
+	// The flag was backported to 9.4.3-SNAPSHOT in the 9.4 line; 9.4.0–9.4.2 do not have it.
+	if parsed.Major() == 9 && parsed.Minor() == 4 {
+		return !parsed.Less(*agentversion.NewParsedSemVer(9, 4, 3, "SNAPSHOT", ""))
+	}
+
+	// The flag only exists in 9.3.6-SNAPSHOT and above otherwise.
 	return !parsed.Less(*agentversion.NewParsedSemVer(9, 3, 6, "SNAPSHOT", ""))
 }
