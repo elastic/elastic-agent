@@ -1843,7 +1843,11 @@ func (s *Settings) BuildDateString() string {
 }
 
 // GetPlatforms returns the parsed platform list from PLATFORMS env var.
-// If PLATFORMS is empty, returns the default platform list.
+// If PLATFORMS is empty, returns the host platform (runtime.GOOS/runtime.GOARCH)
+// when that platform is known, or BuildPlatforms.Defaults() as a fallback for
+// exotic hosts. This makes `mage package` produce host-only artifacts by
+// default; callers that want a broader matrix (CI cross-builds) set PLATFORMS
+// explicitly.
 // Platform filters from the settings' PlatformFilters are applied to the result.
 // Note: linux/386 and windows/386 are always filtered out as they are not supported.
 func (s *Settings) GetPlatforms() BuildPlatformList {
@@ -1851,7 +1855,12 @@ func (s *Settings) GetPlatforms() BuildPlatformList {
 	if s.CrossBuild.Platforms != "" {
 		platforms = NewPlatformList(s.CrossBuild.Platforms)
 	} else {
-		platforms = BuildPlatforms.Defaults()
+		hostName := runtime.GOOS + "/" + runtime.GOARCH
+		if bp, ok := BuildPlatforms.Get(hostName); ok {
+			platforms = BuildPlatformList{bp}
+		} else {
+			platforms = BuildPlatforms.Defaults()
+		}
 	}
 
 	// Filter out unsupported platforms
