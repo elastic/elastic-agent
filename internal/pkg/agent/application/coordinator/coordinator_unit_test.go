@@ -2857,7 +2857,7 @@ func TestCoordinatorDoesNotCleanMarkerOnStateCompletedManaged(t *testing.T) {
 	markerChan <- marker
 	coord.runLoopIteration(ctx)
 
-	// Marker file must still be present — coordinator waits for Fleet confirmation.
+	// Marker file must still be present.
 	assert.FileExists(t, filepath.Join(paths.Data(), ".update-marker"))
 	// Coordinator state must carry StateCompleted so future checkins include it.
 	require.NotNil(t, coord.state.UpgradeDetails)
@@ -2892,15 +2892,12 @@ func TestCoordinatorCleansMarkerOnFleetConfirmation(t *testing.T) {
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 
-	// Write a marker file and pre-load StateCompleted into coordinator state
-	// as the gateway would have observed it from the checkin.
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o750))
 	marker := upgrade.UpdateMarker{}
 	require.NoError(t, upgrade.SaveMarker(paths.Data(), &marker, false))
 	det := details.NewDetails("8.99.0", details.StateCompleted, "test-action-id")
 	coord.state.UpgradeDetails = det
 
-	// Simulate the Fleet gateway signalling successful StateCompleted checkin.
 	cleanCh <- struct{}{}
 	coord.runLoopIteration(ctx)
 

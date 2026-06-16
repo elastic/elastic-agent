@@ -274,7 +274,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	// watch succeeded - upgrade was successful!
 	upgradeDetails.SetState(details.StateCompleted)
 
-	// cleanup older versions; the upgrade marker is removed separately after the completed state is confirmed.
+	// cleanup older versions
 	removeMarker := false
 	newVersionedHome := marker.VersionedHome
 	if newVersionedHome == "" {

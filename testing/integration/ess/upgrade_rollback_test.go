@@ -408,9 +408,8 @@ func TestFleetManagedUpgradeRollback(t *testing.T) {
 		}
 	}, 5*time.Minute, 15*time.Second)
 
-	// Fleet confirmed the completed state, so the marker must be gone now on all platforms.
 	assert.NoFileExists(t, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"),
-		"upgrade marker must be removed after Fleet confirms StateCompleted")
+		"upgrade marker must be removed after upgrade completes")
 
 	// 3. Request rollback via Fleet API
 	t.Logf("Requesting rollback via Fleet API for agent %s", agentID)
@@ -532,7 +531,6 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 					assert.Equal(t, cproto.State_HEALTHY, state.State)
 					assert.Equal(collect, expectedVersion, state.Info.Version)
 					assert.Equal(collect, expectedSnapshot, state.Info.Snapshot)
-					// marker is removed after StateCompleted is confirmed, on all platforms
 					assert.NoFileExists(collect, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"))
 				}, 4*time.Minute, 10*time.Second)
 				t.Log("elastic agent is out of grace period.")
