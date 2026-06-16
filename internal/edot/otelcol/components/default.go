@@ -122,6 +122,7 @@ import (
 
 	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
 	"github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension"
+	"github.com/elastic/opentelemetry-collector-components/extension/awscredentialsproviderextension"
 
 	// Connectors
 	otlpjsonconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector"
@@ -286,6 +287,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			awslogsencodingextension.NewFactory(),
 			azureencodingextension.NewFactory(),
 			opampextension.NewFactory(),
+			awscredentialsproviderextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)

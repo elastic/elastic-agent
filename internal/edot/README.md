@@ -120,6 +120,7 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.58.0/extension/apikeyauthextension/README.md) | v0.58.0 |
 | [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.58.0/extension/apmconfigextension/README.md) | v0.58.0 |
+| [awscredentialsproviderextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/awscredentialsproviderextension/v0.59.0/extension/awscredentialsproviderextension/README.md) | v0.59.0 |
 | [awslogsencodingextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/encoding/awslogsencodingextension/v0.153.0/extension/encoding/awslogsencodingextension/README.md) | v0.153.0 |
 | [azureauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/azureauthextension/v0.153.0/extension/azureauthextension/README.md) | v0.153.0 |
 | [azureencodingextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/encoding/azureencodingextension/v0.153.0/extension/encoding/azureencodingextension/README.md) | v0.153.0 |
