@@ -408,6 +408,10 @@ func TestFleetManagedUpgradeRollback(t *testing.T) {
 		}
 	}, 5*time.Minute, 15*time.Second)
 
+	// Fleet confirmed the completed state, so the marker must be gone now on all platforms.
+	assert.NoFileExists(t, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"),
+		"upgrade marker must be removed after Fleet confirms StateCompleted")
+
 	// 3. Request rollback via Fleet API
 	t.Logf("Requesting rollback via Fleet API for agent %s", agentID)
 	err = fleettools.RollbackAgent(ctx, kibClient, agentID)
