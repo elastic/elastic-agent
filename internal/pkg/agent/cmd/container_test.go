@@ -35,6 +35,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -1247,6 +1248,7 @@ func TestKibanaFetchToken(t *testing.T) {
 
 // Regression test for #13810: ensure env vars override fleet.enc for certs
 func TestContainerEnvOverridesFleetTLSPaths(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "encrypted disk storage does not use NewGCMWithRandomNonce.")
 	_, childPair, err := certutil.NewRSARootAndChildCerts()
 	require.NoError(t, err)
 	certDir := t.TempDir()
