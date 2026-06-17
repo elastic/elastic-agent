@@ -139,6 +139,7 @@ service:
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
+	t.Cleanup(wg.Wait)
 	go func() {
 		defer wg.Done()
 		assert.NoError(t, fixture.RunOtelWithClient(ctx))
