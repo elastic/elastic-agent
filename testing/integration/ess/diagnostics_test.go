@@ -713,10 +713,10 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 		require.NoError(t, err)
 
 		if checkBeatReceiverTraceLogs {
-			// The diagnostic bundle places logs under logs/<commit>/. Use the real
+			// The diagnostic bundle places logs under logs/<commit>/components. Use the real
 			// commit hash so the pattern matches the exact path in the bundle.
 			extraPatterns = append(extraPatterns, filePattern{
-				pattern:  path.Join("logs", "elastic-agent-"+avi.Commit[:6], "httpjson", "http-request-trace-*.ndjson"),
+				pattern:  path.Join("logs", "elastic-agent-"+avi.Commit[:6], "components", "httpjson", "http-request-trace-*.ndjson"),
 				optional: false,
 			})
 		}
