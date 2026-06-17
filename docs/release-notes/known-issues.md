@@ -40,6 +40,27 @@ If the count is more than 100, upgrade directly to a version that is not affecte
 For more information, check [Issue #14764](https://github.com/elastic/elastic-agent/issues/14764).
 :::
 
+:::{dropdown} Missing `service_destination` metrics in specific 9.2/9.3 EDOT component combinations
+
+**Applies to: {{agent}} 9.2.6, 9.2.7, 9.3.1, 9.3.2**
+
+On June 17, 2026, a known issue was discovered where expected aggregated `service_destination` metric series may be missing (or incomplete) from `metrics/aggregated-otel-metrics` even when trace traffic is present and other telemetry paths appear healthy.
+
+This issue affects specific EDOT component-version combinations where traces are ingested and the `elasticapmprocessor` + `elasticapmconnector` flow executes, but destination-derived metric series are not emitted as expected.
+
+The issue was observed with this component signal:
+
+| elasticapmconnector | elasticapmprocessor | elastictraceprocessor | elasticapmintakereceiver | opentelemetry-lib | otelcol |
+|---:|---:|---:|---:|---:|---:|
+| v0.29.0 | v0.29.0 | v0.29.0 | v0.29.0 | v0.30.0 | v0.144.0 / v0.145.0 |
+
+**Resolution**
+
+This issue is fixed in {{agent}} 9.2.8 and 9.3.3, where the affected component combinations are no longer present.
+
+For more information, check [Issue #14964](https://github.com/elastic/elastic-agent/issues/14964).
+:::
+
 :::{dropdown} Elastic Agent reports policy is outdated when agent.features.disable_policy_change_acks is enabled.
 **Applies to: {{agent}} 9.4.0, 9.3.4, 9.3.3, 9.3.2, 9.3.1, 9.3.0, 9.2.7, 9.2.6, 9.2.5, 9.2.4, 9.2.3, 9.2.2, 9.2.1, 9.2.0**
 
