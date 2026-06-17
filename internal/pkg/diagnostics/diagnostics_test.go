@@ -541,6 +541,67 @@ func TestZipLogsComponentsLogsMultiVersionedHome(t *testing.T) {
 	assert.Equal(t, 1, count, "trace file should appear exactly once, attributed to the current version")
 }
 
+// TestZipLogsConflictingNames checks that every log file gets a unique zip entry and
+// its content is preserved, across all sources that could produce the same filename:
+// agent logs vs component logs, multiple components sharing the same filename, and
+// multiple versioned homes.
+func TestZipLogsConflictingNames(t *testing.T) {
+	topPath := t.TempDir()
+	dataPath := paths.DataFrom(topPath)
+	currentDir := filepath.Base(paths.HomeFrom(topPath))
+	oldDir := "elastic-agent-oldversion"
+
+	mkfile := func(path, content string) {
+		t.Helper()
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+	}
+
+	// Current versioned home: agent log and two components all share the same filename.
+	mkfile(filepath.Join(dataPath, currentDir, "logs", "httpjson", "trace.ndjson"), "current-agent\n")
+	mkfile(filepath.Join(dataPath, currentDir, "components", "logs", "httpjson", "trace.ndjson"), "current-httpjson\n")
+	mkfile(filepath.Join(dataPath, currentDir, "components", "logs", "filestream", "trace.ndjson"), "current-filestream\n")
+
+	// Old versioned home: same filenames repeated.
+	mkfile(filepath.Join(dataPath, oldDir, "logs", "httpjson", "trace.ndjson"), "old-agent\n")
+	mkfile(filepath.Join(dataPath, oldDir, "components", "logs", "httpjson", "trace.ndjson"), "old-httpjson\n")
+
+	buf := new(bytes.Buffer)
+	w := zip.NewWriter(buf)
+	require.NoError(t, zipLogs(w, time.Now(), topPath, true, io.Discard))
+	require.NoError(t, w.Close())
+
+	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	require.NoError(t, err)
+
+	want := map[string]string{
+		"logs/" + currentDir + "/httpjson/trace.ndjson":              "current-agent\n",
+		"logs/" + currentDir + "/components/httpjson/trace.ndjson":   "current-httpjson\n",
+		"logs/" + currentDir + "/components/filestream/trace.ndjson": "current-filestream\n",
+		"logs/" + oldDir + "/httpjson/trace.ndjson":                  "old-agent\n",
+		"logs/" + oldDir + "/components/httpjson/trace.ndjson":       "old-httpjson\n",
+	}
+
+	counts := make(map[string]int)
+	contents := make(map[string]string)
+	for _, f := range r.File {
+		counts[f.Name]++
+		if _, ok := want[f.Name]; ok {
+			rc, err := f.Open()
+			require.NoError(t, err)
+			data, err := io.ReadAll(rc)
+			rc.Close()
+			require.NoError(t, err)
+			contents[f.Name] = string(data)
+		}
+	}
+
+	for name, wantContent := range want {
+		assert.Equal(t, 1, counts[name], "entry %q should appear exactly once", name)
+		assert.Equal(t, wantContent, contents[name], "entry %q has wrong content", name)
+	}
+}
+
 func TestZipLogsUnversionedHome(t *testing.T) {
 	originalVersionHome := paths.IsVersionHome()
 	t.Cleanup(func() { paths.SetVersionHome(originalVersionHome) })
