@@ -1937,8 +1937,8 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 			assert.NoError(collect, statusErr)
 			assertBeatsHealthy(collect, &status, runtime, componentCount)
 		}, 1*time.Minute, 1*time.Second)
-		require.Eventuallyf(t,
-			func() bool {
+		require.EventuallyWithT(t,
+			func(collect *assert.CollectT) {
 				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 				defer findCancel()
 				mustClauses := []map[string]any{
@@ -1959,8 +1959,8 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 					},
 				}
 				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, "logs-*", info.ESClient)
-				require.NoError(t, err)
-				return docs.Hits.Total.Value > 0
+				require.NoError(collect, err)
+				assert.Greater(collect, docs.Hits.Total.Value, 0)
 			},
 			4*time.Minute, 5*time.Second,
 			"health check failed: timestamp: %s", timestamp)
@@ -1994,10 +1994,10 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 
 	// wait until policy is applied
 	policyCheck := func(expectedRevision int) {
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			inspectOutput, err := fut.ExecInspect(ctx)
-			require.NoError(t, err)
-			return expectedRevision == inspectOutput.Revision
+			require.NoError(collect, err)
+			assert.Equal(collect, expectedRevision, inspectOutput.Revision)
 		}, 3*time.Minute, 1*time.Second)
 	}
 	policyCheck(otelMonResp.Revision)

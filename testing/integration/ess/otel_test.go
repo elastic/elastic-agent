@@ -1348,19 +1348,19 @@ service:
 	actualHits := &struct {
 		Hits int
 	}{}
-	require.Eventually(t,
-		func() bool {
+	require.EventuallyWithT(t,
+		func(collect *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
 			docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbIndex+"*", map[string]interface{}{
 				"log.file.path": inputFilePath,
 			})
-			require.NoError(t, err)
+			require.NoError(collect, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
 
-			return actualHits.Hits == numEvents*2 // filebeat + fbreceiver
+			assert.Equal(collect, numEvents*2, actualHits.Hits) // filebeat + fbreceiver
 		},
 		1*time.Minute, 1*time.Second,
 		"Expected %d logs in elasticsearch, got: %v", numEvents, actualHits)
@@ -1531,19 +1531,19 @@ processors:
 	actualHits := &struct {
 		Hits int
 	}{}
-	require.Eventually(t,
-		func() bool {
+	require.EventuallyWithT(t,
+		func(collect *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
 			docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbIndex+"*", map[string]interface{}{
 				"log.file.path": inputFilePath,
 			})
-			require.NoError(t, err)
+			require.NoError(collect, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
 
-			return actualHits.Hits == numEvents
+			assert.Equal(collect, numEvents, actualHits.Hits)
 		},
 		1*time.Minute, 1*time.Second,
 		"Expected %d logs in elasticsearch, got: %v", numEvents, actualHits)
@@ -1916,18 +1916,18 @@ service:
 
 	// Make sure find the logs
 	actualHits := &struct{ Hits int }{}
-	require.Eventually(t,
-		func() bool {
+	require.EventuallyWithT(t,
+		func(collect *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
 
 			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]interface{}{
 				"metricset.name": "cpu",
 			})
-			require.NoError(t, err)
+			require.NoError(collect, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
-			return actualHits.Hits >= 1
+			assert.GreaterOrEqual(collect, actualHits.Hits, 1)
 		},
 		2*time.Minute, 1*time.Second,
 		"Expected at least %d logs, got %v", 1, actualHits)
