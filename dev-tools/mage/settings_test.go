@@ -469,6 +469,9 @@ func TestSettingsGetDockerVariants(t *testing.T) {
 func TestSettingsIsPackageTypeSelected(t *testing.T) {
 	t.Run("returns true when no types selected", func(t *testing.T) {
 		s := DefaultSettings()
+		// Simulate a cross-platform build so defaultPackageTypesForPlatforms
+		// produces both TarGz (Unix) and Zip (Windows).
+		s.CrossBuild.Platforms = "linux/amd64 windows/amd64"
 
 		assert.True(t, s.IsPackageTypeSelected(TarGz))
 		assert.True(t, s.IsPackageTypeSelected(Zip))
