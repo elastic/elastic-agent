@@ -40,17 +40,17 @@ If the count is more than 100, upgrade directly to a version that is not affecte
 For more information, check [Issue #14764](https://github.com/elastic/elastic-agent/issues/14764).
 :::
 
-:::{dropdown} Missing APM `service_destination` metrics and empty service map on APM UI
+:::{dropdown} Missing APM service_destination metrics and empty service map in the APM UI
 
 **Applies to: {{agent}} 9.2.6, 9.2.7, 9.3.1, 9.3.2**
 
-Aggregated `service_destination` metric used by APM UI may be missing from `metrics/aggregated-otel-metrics` EDOT otel collector pipeline even when trace traffic is present and other telemetry paths appear healthy. This causes APM UI service map to be empty.
+On June 17, 2026, a known issue was discovered where the aggregated `service_destination` metric that the APM UI uses can be missing from the `metrics/aggregated-otel-metrics` EDOT Collector pipeline, even when trace traffic is present and other telemetry paths appear healthy. As a result, the APM service map appears empty.
 
-This issue is caused by the specific EDOT component-version combination of `elasticapmprocessor` + `elasticapmconnector` both on v0.29.0, which is the bundled version in the affected Elastic Agent versions.
+The issue occurs when two EDOT components, `elasticapmprocessor` and `elasticapmconnector`, are both at v0.29.0, which is the version bundled with the affected {{agent}} releases.
 
 **Resolution**
 
-This issue is fixed in {{agent}} 9.2.8 and 9.3.3, where the affected component combinations are no longer present.
+This issue is fixed in {{agent}} 9.2.8 and 9.3.3, which include updated versions of these components.
 
 For more information, check [Issue #14964](https://github.com/elastic/elastic-agent/issues/14964).
 :::
