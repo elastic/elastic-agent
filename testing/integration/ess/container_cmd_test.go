@@ -889,6 +889,7 @@ func TestContainerCMDEnrollByPolicyName(t *testing.T) {
 		err, agentOutput,
 	)
 }
+
 // Regression test for #13810: ensure env vars override fleet.enc for certs
 func TestContainerCMDTLSCertOverride(t *testing.T) {
 	info := define.Require(t, define.Requirements{
