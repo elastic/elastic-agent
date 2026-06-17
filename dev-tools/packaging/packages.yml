@@ -40,7 +40,6 @@ packageTypes: &all-package-types
 settings:
   fips:
     compile:
-      cgo: false
       env:
         # See https://go.dev/doc/security/fips140#go-cryptographic-module-v100
         # CMVP Certificate #5247: https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/5247
