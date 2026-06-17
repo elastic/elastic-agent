@@ -106,7 +106,7 @@ func (runner *MetricsRunner) addMonitoringToOtelRuntimeOverwrite() {
 	addMonitoringOverwriteBody := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "monitoring": {
@@ -115,7 +115,7 @@ func (runner *MetricsRunner) addMonitoringToOtelRuntimeOverwrite() {
     }
   }
 }
-`, runner.policyName)
+`, runner.policyName, runner.info.Namespace)
 	resp, err := runner.info.KibanaClient.Send(
 		http.MethodPut,
 		fmt.Sprintf("/api/fleet/agent_policies/%s", runner.policyID),
