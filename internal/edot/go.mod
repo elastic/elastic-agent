@@ -737,11 +737,7 @@ require (
 	golang.org/x/tools v0.46.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
-<<<<<<< HEAD
-	google.golang.org/api v0.279.0 // indirect
-=======
-	google.golang.org/api v0.284.0
->>>>>>> e9de4fe1e ([deps] Bump google.golang.org/* dependencies (#14954))
+	google.golang.org/api v0.284.0 // indirect
 	google.golang.org/genproto v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
