@@ -65,9 +65,11 @@ func TestInitUpgradeDetails(t *testing.T) {
 	require.Equal(t, details.StateRollback, testMarker.Details.State)
 	require.Equal(t, 0, obs.Len())
 
-	// Verify state after clearing details state
+	// Verify state after StateCompleted: observer must write StateCompleted explicitly
+	// (not nil) so the coordinator can detect it and remove the marker file.
 	upgradeDetails.SetState(details.StateCompleted)
-	require.Nil(t, testMarker.Details)
+	require.NotNil(t, testMarker.Details)
+	require.Equal(t, details.StateCompleted, testMarker.Details.State)
 	require.Equal(t, 0, obs.Len())
 
 	// Verify state after changing details state and there's an
@@ -79,14 +81,14 @@ func TestInitUpgradeDetails(t *testing.T) {
 	require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
 	require.Equal(t, `unable to save upgrade marker after setting upgrade details (state = UPG_ROLLBACK): some error`, logs[0].Message)
 
-	// Verify state after clearing details state and there's an
-	// error saving the marker
+	// Verify state after StateCompleted and there's an error saving the marker
 	upgradeDetails.SetState(details.StateCompleted)
-	require.Nil(t, testMarker.Details)
+	require.NotNil(t, testMarker.Details)
+	require.Equal(t, details.StateCompleted, testMarker.Details.State)
 	require.Equal(t, 1, obs.Len())
 	logs = obs.TakeAll()
 	require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
-	require.Equal(t, `unable to save upgrade marker after clearing upgrade details: some error`, logs[0].Message)
+	require.Equal(t, `unable to save upgrade marker after setting upgrade details (state = UPG_COMPLETED): some error`, logs[0].Message)
 }
 
 func Test_watchCmd(t *testing.T) {

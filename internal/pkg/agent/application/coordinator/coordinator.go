@@ -1659,7 +1659,13 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		c.setOverrideState(overrideState)
 
 	case upgradeDetails := <-c.upgradeDetailsChan:
-		c.setUpgradeDetails(upgradeDetails)
+		// StateCompleted on this channel means the upgrade was handled entirely
+		// within this process and is already resolved; clear the details.
+		if upgradeDetails != nil && upgradeDetails.State == details.StateCompleted {
+			c.setUpgradeDetails(nil)
+		} else {
+			c.setUpgradeDetails(upgradeDetails)
+		}
 
 	case c.heartbeatChan <- struct{}{}:
 
