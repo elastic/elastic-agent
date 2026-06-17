@@ -1321,14 +1321,17 @@ agent.monitoring.enabled: false
 	var componentID, componentWorkDir string
 	var workDirCreated time.Time
 
-	// wait for component to appear in status and be healthy
+	// wait for component to appear in status and be healthy or degraded
+	// (output points at localhost:9200 which is unreachable, so DEGRADED is expected)
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		require.NoError(collect, statusErr)
 		require.Equal(collect, 1, len(status.Components))
 		componentStatus := status.Components[0]
-		assert.Equal(collect, cproto.State_HEALTHY, cproto.State(componentStatus.State))
+		componentState := cproto.State(componentStatus.State)
+		assert.Truef(collect, componentState == cproto.State_HEALTHY || componentState == cproto.State_DEGRADED,
+			"component state should be HEALTHY or DEGRADED, got %s", componentState.String())
 		componentID = componentStatus.ID
 	}, 2*time.Minute, 5*time.Second)
 
