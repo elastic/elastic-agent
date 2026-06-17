@@ -185,15 +185,13 @@ func TestOtelFileProcessing(t *testing.T) {
 	tmpDir := t.TempDir()
 	// create input file
 	numEvents := 50
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
+	inputFilePath := filepath.Join(tmpDir, "input.txt")
+	var inputContent bytes.Buffer
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 	t.Cleanup(func() {
 		if t.Failed() {
 			contents, err := os.ReadFile(inputFilePath)
@@ -316,15 +314,13 @@ func TestOtelHybridFileProcessing(t *testing.T) {
 	tmpDir := t.TempDir()
 	// create input file
 	numEvents := 50
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
+	inputFilePath := filepath.Join(tmpDir, "input.txt")
+	var inputContent bytes.Buffer
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 	t.Cleanup(func() {
 		if t.Failed() {
 			contents, err := os.ReadFile(inputFilePath)
@@ -878,15 +874,13 @@ func TestOtelFilestreamInput(t *testing.T) {
 	tmpDir := t.TempDir()
 	numEvents := 50
 	// Create the data file to ingest
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
+	inputFilePath := filepath.Join(tmpDir, "input.txt")
+	var inputContent bytes.Buffer
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 	t.Cleanup(func() {
 		if t.Failed() {
 			contents, err := os.ReadFile(inputFilePath)
@@ -1173,18 +1167,13 @@ func TestHybridAgentE2E(t *testing.T) {
 	fbIndex := "logs-generic-default"
 	fbReceiverIndex := "logs-generic-default"
 
-	inputFile, err := os.CreateTemp(tmpDir, "input-*.log")
-	require.NoError(t, err, "failed to create input log file")
-	inputFilePath := inputFile.Name()
+	inputFilePath := filepath.Join(tmpDir, "input.log")
+	var inputContent bytes.Buffer
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
-		_, err = inputFile.Write([]byte("\n"))
-		require.NoErrorf(t, err, "failed to write newline to input file")
-		time.Sleep(100 * time.Millisecond)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data input file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 
 	t.Cleanup(func() {
 		if t.Failed() {
@@ -1394,18 +1383,13 @@ func TestHybridAgentGlobalProcessors(t *testing.T) {
 	numEvents := 1
 	fbIndex := "logs-generic-default"
 
-	inputFile, err := os.CreateTemp(tmpDir, "input-*.log")
-	require.NoError(t, err, "failed to create input log file")
-	inputFilePath := inputFile.Name()
+	inputFilePath := filepath.Join(tmpDir, "input.log")
+	var inputContent bytes.Buffer
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
-		_, err = inputFile.Write([]byte("\n"))
-		require.NoErrorf(t, err, "failed to write newline to input file")
-		time.Sleep(100 * time.Millisecond)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data input file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 
 	t.Cleanup(func() {
 		if t.Failed() {

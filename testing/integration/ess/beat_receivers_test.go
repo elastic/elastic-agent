@@ -1479,17 +1479,14 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	tmpDir := t.TempDir()
 	numEvents := 50
 	// Create the data file to ingest
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
-
+	inputFilePath := filepath.Join(tmpDir, "input.txt")
+	var inputContent bytes.Buffer
 	// these messages will fail to index as message is expected to be of integer type
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -1661,17 +1658,14 @@ func TestSensitiveIncludeSourceOnError(t *testing.T) {
 	tmpDir := t.TempDir()
 	numEvents := 50
 	// Create the data file to ingest
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
-
+	inputFilePath := filepath.Join(tmpDir, "input.txt")
+	var inputContent bytes.Buffer
 	// these messages will fail to index as message is expected to be of integer type
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
