@@ -1,6 +1,6 @@
 function ess_up {
   param (
-      [string]$StackVersion
+      [string]$StackVersion,
       [string]$StackBuildId
   )
 
@@ -196,7 +196,7 @@ function Retry-Command {
 
 function Get-Ess-Stack {
   param (
-      [string]$StackVersion
+      [string]$StackVersion,
       [string]$StackBuildId
   )
 
