@@ -20,8 +20,9 @@ function ess_up() {
     --parameter "ExpireInHours=2"
   )
 
-  oblt_cmd+=(--parameter "ElasticsearchDockerImage=docker.elastic.co/elasticsearch/elasticsearch-cloud:${STACK_BUILD_ID}")
-  oblt_cmd+=(--parameter "KibanaDockerImage=docker.elastic.co/elasticsearch/kibana-cloud:${STACK_BUILD_ID}")
+  # TODO: use the new template parameter to pass the stack build id, and simplify how to use this.
+  oblt_cmd+=(--parameter "ElasticsearchDockerImage=docker.elastic.co/cloud-release/elasticsearch-cloud-ess:${STACK_BUILD_ID}")
+  oblt_cmd+=(--parameter "KibanaDockerImage=docker.elastic.co/cloud-release/kibana-cloud:${STACK_BUILD_ID}")
 
   if [ -n "${INTEGRATION_SERVER_DOCKER_IMAGE:-}" ]; then
     oblt_cmd+=(--parameter "ElasticAgentDockerImage=${INTEGRATION_SERVER_DOCKER_IMAGE}")
