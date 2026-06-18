@@ -1,12 +1,18 @@
 function ess_up {
   param (
       [string]$StackVersion
+      [string]$StackBuildId
   )
 
   Write-Output "~~~ Starting ESS Stack"
 
   if (-not $StackVersion) {
-      Write-Error "Error: Specify stack version: ess_up [stack_version]"
+      Write-Error "Error: Specify stack version: ess_up [stack_version] [stack_build_id]"
+      return 1
+  }
+
+  if (-not $StackBuildId) {
+      Write-Error "Error: Specify stack build ID: ess_up [stack_build_id]"
       return 1
   }
 
@@ -24,6 +30,9 @@ function ess_up {
   if ($Env:INTEGRATION_SERVER_DOCKER_IMAGE) {
       $params.ElasticAgentDockerImage = $Env:INTEGRATION_SERVER_DOCKER_IMAGE
   }
+
+  $params.ElasticsearchDockerImage = "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:$StackBuildId"
+  $params.KibanaDockerImage = "docker.elastic.co/cloud-release/kibana-cloud:$StackBuildId"
 
   $params | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
 
@@ -188,10 +197,11 @@ function Retry-Command {
 function Get-Ess-Stack {
   param (
       [string]$StackVersion
+      [string]$StackBuildId
   )
 
   if ($Env:BUILDKITE_RETRY_COUNT -gt 0) {
       Write-Output "The step is retried, starting the ESS stack again"
-      ess_up $StackVersion
+      ess_up $StackVersion $StackBuildId
   }
 }
