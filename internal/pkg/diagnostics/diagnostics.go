@@ -461,6 +461,8 @@ func zipLogsWithPath(pathsHome, commitName string, excludeEvents bool, zw *zip.W
 }
 
 func walkLogPath(logRoot, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer) error {
+	// Trailing separator is required: zipLogWalkFunc uses logPath as a TrimPrefix argument,
+	// so it must end with a separator to avoid a leading slash on relative names.
 	logPath := logRoot + string(filepath.Separator)
 	return filepath.WalkDir(logPath, zipLogWalkFunc(logPath, commitName, excludeEvents, zw, ts, errOut))
 }
