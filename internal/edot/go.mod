@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260616144311-f95b013df3c9
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260617103413-5b9ce1863cc3
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.43.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -462,7 +462,7 @@ require (
 	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/googleapis/enterprise-certificate-proxy v0.3.15 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.3.16 // indirect
 	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
 	github.com/gophercloud/gophercloud/v2 v2.11.1 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
@@ -757,7 +757,7 @@ require (
 	golang.org/x/tools v0.46.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
-	google.golang.org/api v0.279.0
+	google.golang.org/api v0.284.0
 	google.golang.org/genproto v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
