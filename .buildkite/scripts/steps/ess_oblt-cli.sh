@@ -2,13 +2,12 @@
 set -euo pipefail
 
 function ess_up() {
+  : "${1:?Error: Specify stack version: ess_up [stack_version] [stack_build_id]}"
+  : "${2:?Error: Specify stack build version: ess_up [stack_version] [stack_build_id]}"
+
   echo "~~~ Starting ESS Stack"
   local STACK_VERSION=$1
-
-  if [ -z "$STACK_VERSION" ]; then
-    echo "Error: Specify stack version: ess_up [stack_version]" >&2
-    return 1
-  fi
+  local STACK_BUILD_ID=$2
 
   # Build the oblt-cli command with conditional ElasticAgentDockerImage parameter
   local oblt_cmd=(
@@ -17,7 +16,7 @@ function ess_up() {
     --cluster-name-prefix hosted
     --output-file="${PWD}/cluster-info.json"
     --wait 20
-    --parameter "StackVersion=$STACK_VERSION"
+    --parameter "StackVersion=$STACK_BUILD_ID"
     --parameter "ExpireInHours=2"
   )
 
