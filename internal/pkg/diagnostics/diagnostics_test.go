@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/hex"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -477,7 +478,7 @@ func TestZipLogsComponentsLogs(t *testing.T) {
 	// Create the versioned home so zipLogs iterates the current version.
 	require.NoError(t, os.MkdirAll(filepath.Join(homePath, "logs"), 0o700))
 
-	// Beat receivers write their trace logs under {pathsHome}/components/logs.
+	// Components may write logs under {pathsHome}/components/logs.
 	traceDir := filepath.Join(homePath, "components", "logs", "httpjson")
 	require.NoError(t, os.MkdirAll(traceDir, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(traceDir, "http-request-trace-test.ndjson"), []byte(".\n"), 0o600))
@@ -517,7 +518,7 @@ func TestZipLogsComponentsLogsMultiVersionedHome(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(dataPath, currentDir, "logs"), 0o700))
 	require.NoError(t, os.MkdirAll(filepath.Join(dataPath, oldDir, "logs"), 0o700))
 
-	// Beat receivers write their trace logs under each version's own components/logs.
+	// Components may write logs under each version's own components/logs.
 	traceDir := filepath.Join(dataPath, currentDir, "components", "logs", "httpjson")
 	require.NoError(t, os.MkdirAll(traceDir, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(traceDir, "http-request-trace-test.ndjson"), []byte(".\n"), 0o600))
@@ -609,9 +610,12 @@ func TestZipLogsUnversionedHome(t *testing.T) {
 	paths.SetVersionHome(false)
 
 	topPath := t.TempDir()
-	logsDir := filepath.Join(topPath, "logs")
-	require.NoError(t, os.MkdirAll(logsDir, 0o700))
-	require.NoError(t, os.WriteFile(filepath.Join(logsDir, "log.ndjson"), []byte(".\n"), 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(topPath, "logs"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(topPath, "logs", "log.ndjson"), []byte(".\n"), 0o600))
+
+	// Component logs (e.g. beat receiver trace logs) live under components/logs.
+	require.NoError(t, os.MkdirAll(filepath.Join(topPath, "components", "logs", "httpjson"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(topPath, "components", "logs", "httpjson", "trace.ndjson"), []byte(".\n"), 0o600))
 
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
@@ -621,15 +625,63 @@ func TestZipLogsUnversionedHome(t *testing.T) {
 	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
 	require.NoError(t, err)
 
-	wantName := "logs/" + filepath.Base(topPath) + "/log.ndjson"
-	var found bool
+	names := make(map[string]struct{}, len(r.File))
 	for _, f := range r.File {
-		if f.Name == wantName {
-			found = true
-		}
+		names[f.Name] = struct{}{}
 	}
-	assert.Truef(t, found, "expected %q in zip", wantName)
+
+	base := filepath.Base(topPath)
+	assert.Contains(t, names, "logs/"+base+"/log.ndjson", "agent log should be in zip")
+	assert.Contains(t, names, "logs/"+base+"/components/httpjson/trace.ndjson", "component log should be in zip")
 }
+
+// TestSaveLogs verifies the error-handling contract of saveLogs:
+// source-file errors are non-fatal (warning logged, nil returned) and
+// zip-writer errors are fatal (error returned, no warning logged).
+func TestSaveLogs(t *testing.T) {
+	t.Run("missing source file is non-fatal", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		w := zip.NewWriter(buf)
+		errOut := new(bytes.Buffer)
+
+		err := saveLogs("test.ndjson", filepath.Join(t.TempDir(), "nonexistent.ndjson"), w, errOut)
+
+		assert.NoError(t, err)
+		assert.Empty(t, errOut.String())
+	})
+
+	t.Run("broken zip writer is fatal", func(t *testing.T) {
+		// zip.NewWriter wraps the underlying writer in a bufio.Writer (4 KB buffer),
+		// so small writes never reach the broken writer — they sit in the bufio.
+		// The deflate compressor emits a compressed block every ~32 768 tokens; for
+		// truly incompressible data (LCG bytes, no back-references) each token is one
+		// literal byte, so a 40 KB incompressible file forces the compressor to emit a
+		// ~32 KB block during io.Copy, overflowing the bufio and surfacing the error
+		// inside saveLogs before it returns.
+		const dataSize = 40 * 1024
+		data := make([]byte, dataSize)
+		v := uint32(0xdeadbeef)
+		for i := range data {
+			v = v*1664525 + 1013904223 // Knuth LCG — uniform, no short repetitions
+			data[i] = byte(v >> 24)
+		}
+		logFile := filepath.Join(t.TempDir(), "agent.ndjson")
+		require.NoError(t, os.WriteFile(logFile, data, 0o600))
+
+		w := zip.NewWriter(alwaysErrWriter{})
+		errOut := new(bytes.Buffer)
+
+		err := saveLogs("test.ndjson", logFile, w, errOut)
+
+		assert.Error(t, err)
+		assert.Empty(t, errOut.String()) // returned as error, not logged as warning
+	})
+}
+
+// alwaysErrWriter is an io.Writer that always returns an error, used to simulate a broken zip writer.
+type alwaysErrWriter struct{}
+
+func (alwaysErrWriter) Write([]byte) (int, error) { return 0, errors.New("write error") }
 
 func zipLogsAndAssertFiles(t *testing.T, topPath string, excludeEvents bool, expected []zippedItem) {
 	t.Helper()
