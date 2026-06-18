@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,6 +21,9 @@ import (
 // remotely as "permission denied" when, e.g., a Dockerfile entrypoint script built
 // from the copied tree is executed.
 func TestCreateRepoZipArchivePreservesMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("executable permission bits are not supported on Windows")
+	}
 	_, err := exec.LookPath("git")
 	if err != nil {
 		t.Skip("git not available")
