@@ -505,8 +505,6 @@ func zipLogWalkFunc(logPath, commitName string, excludeEvents bool, zw *zip.Writ
 			return nil
 		}
 
-		// saveLogs handles source-file errors (missing, permission denied) internally as
-		// warnings; it only returns zip-writer errors, which terminate the walk.
 		return saveLogs(name, path, zw, errOut)
 	}
 }
