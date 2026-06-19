@@ -1190,9 +1190,9 @@ func TestExtensionsAreMerged(t *testing.T) {
 	testLogger, _ := loggertest.New("")
 
 	registry := featuregate.GlobalRegistry()
-	registry.Set("confmap.enableMergeAppendOption", true)
+	require.NoError(t, registry.Set("confmap.enableMergeAppendOption", true))
 	t.Cleanup(func() {
-		registry.Set("confmap.enableMergeAppendOption", false)
+		_ = registry.Set("confmap.enableMergeAppendOption", false)
 	})
 
 	err = applyPersistedConfig(testLogger, fleetCfg, filepath.Join(".", "testdata", "service_populated.yaml"))

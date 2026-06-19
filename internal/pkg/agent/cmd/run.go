@@ -196,7 +196,8 @@ func runElasticAgentCritical(
 	}
 
 	// enabled feature gate for merging configuration, important for merging persisted configuration with fleet configuration
-	featuregate.GlobalRegistry().Set("confmap.enableMergeAppendOption", true)
+	// no need to check for error, this is guarded in tests
+	_ = featuregate.GlobalRegistry().Set("confmap.enableMergeAppendOption", true)
 
 	// try load config, but don't error yet
 	cfg, err := configuration.LoadConfig(ctx, override)
