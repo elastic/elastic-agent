@@ -212,6 +212,94 @@ func TestSyncExpected(t *testing.T) {
 
 }
 
+// TestProcessCheckinIgnoredAfterStop verifies that a late observed check-in is
+// dropped once the component is no longer meant to be running, so it cannot
+// resurrect non-stopped unit states or emit an observed update after the
+// terminal Stopped state. See https://github.com/elastic/elastic-agent/issues/14298
+func TestProcessCheckinIgnoredAfterStop(t *testing.T) {
+	comp := component.Component{
+		ID: "test-component",
+		Units: []component.Unit{
+			{
+				ID:   "test-unit",
+				Type: client.UnitTypeInput,
+			},
+		},
+	}
+
+	// A check-in reporting the unit as healthy. Processing it would change the
+	// observed state and trigger sendObserved if not ignored.
+	checkin := &proto.CheckinObserved{
+		Units: []*proto.UnitObserved{
+			{
+				Id:      "test-unit",
+				Type:    proto.UnitType_INPUT,
+				State:   proto.State_HEALTHY,
+				Message: "Healthy",
+			},
+		},
+	}
+
+	t.Run("dropped after Stopped", func(t *testing.T) {
+		state := newComponentState(&comp)
+		state.forceState(client.UnitStateStopped, "Stopped")
+		c := &commandRuntime{
+			ch:          make(chan ComponentState, 1),
+			state:       state,
+			actionState: actionStop,
+		}
+
+		c.processCheckin(checkin, newMockCommunicator(""))
+
+		select {
+		case s := <-c.ch:
+			t.Fatalf("expected no observed state after Stopped, got %+v", s)
+		default:
+		}
+	})
+
+	t.Run("dropped while Stopping", func(t *testing.T) {
+		state := newComponentState(&comp)
+		state.forceState(client.UnitStateStopping, "Stopping")
+		c := &commandRuntime{
+			ch:          make(chan ComponentState, 1),
+			state:       state,
+			actionState: actionStop,
+		}
+
+		c.processCheckin(checkin, newMockCommunicator(""))
+
+		select {
+		case s := <-c.ch:
+			t.Fatalf("expected no observed state while Stopping, got %+v", s)
+		default:
+		}
+	})
+
+	t.Run("processed while running", func(t *testing.T) {
+		state := newComponentState(&comp)
+		// Force a starting-ish message that differs from the check-in below so
+		// syncCheckin observes a change and emits an observed state.
+		state.forceState(client.UnitStateHealthy, "starting up")
+		c := &commandRuntime{
+			ch:          make(chan ComponentState, 1),
+			state:       state,
+			actionState: actionStart,
+		}
+
+		c.processCheckin(checkin, newMockCommunicator(""))
+
+		select {
+		case s := <-c.ch:
+			unit, ok := s.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "test-unit"}]
+			require.True(t, ok, "expected the test unit in the observed state")
+			assert.Equal(t, client.UnitStateHealthy, unit.State)
+		default:
+			t.Fatal("expected an observed state to be emitted while running")
+		}
+	})
+}
+
 func TestCreateLogWriterJSONEncoder(t *testing.T) {
 	componentType := "test-type"
 	componentBinary := "test-binary"

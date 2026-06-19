@@ -32,7 +32,7 @@ outputs:
     type: elasticsearch
     hosts: [%s]
     api_key: "example-key"
-    preset: balanced
+    preset: latency
     allow_older_versions: true
 
 inputs:

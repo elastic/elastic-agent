@@ -51,7 +51,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -123,7 +122,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func run(override application.CfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
+func run(override configuration.CfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -164,7 +163,7 @@ func logReturn(l *logger.Logger, err error) error {
 func runElasticAgentCritical(
 	ctx context.Context,
 	cancel context.CancelFunc,
-	override application.CfgOverrider,
+	override configuration.CfgOverrider,
 	stop chan bool,
 	testingMode bool,
 	fleetInitTimeout time.Duration,
@@ -195,7 +194,7 @@ func runElasticAgentCritical(
 	}
 
 	// try load config, but don't error yet
-	cfg, err := loadConfig(ctx, override)
+	cfg, err := configuration.LoadConfig(ctx, override)
 	if err != nil {
 		// failed to load configuration, just load the default to create the logger
 		errs = append(errs, fmt.Errorf("failed to load configuration: %w", err))
@@ -254,7 +253,7 @@ func runElasticAgent(
 	baseLogger *logger.Logger,
 	l *logger.Logger,
 	cfg *configuration.Configuration,
-	override application.CfgOverrider,
+	override configuration.CfgOverrider,
 	stop chan bool,
 	testingMode bool,
 	fleetInitTimeout time.Duration,
@@ -355,6 +354,12 @@ func runElasticAgent(
 		return errors.New(err, "error migrating agent state")
 	}
 
+	// Reload in case migration wrote fleet.enc.
+	cfg, err = configuration.LoadConfig(ctx, override)
+	if err != nil {
+		return errors.New(err, "failed to reload configuration")
+	}
+
 	agentInfo, err := info.NewAgentInfoWithLog(ctx, defaultLogLevel(cfg, logLvl.String()), createAgentID)
 	if err != nil {
 		return errors.New(err,
@@ -409,7 +414,7 @@ func runElasticAgent(
 	availableRollbacksSource := ttl.NewTTLMarkerRegistry(l, paths.Top())
 
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, override, initialUpgradeMarker, availableRollbacksSource, modifiers...)
+		fleetInitTimeout, isBootstrap, cfg, initialUpgradeMarker, availableRollbacksSource, modifiers...)
 	if err != nil {
 		return err
 	}
@@ -547,35 +552,6 @@ LOOP:
 	return err
 }
 
-func loadConfig(ctx context.Context, override application.CfgOverrider) (*configuration.Configuration, error) {
-	pathConfigFile := paths.ConfigFile()
-	rawConfig, err := config.LoadFile(pathConfigFile)
-	if err != nil {
-		return nil, errors.New(err,
-			fmt.Sprintf("could not read configuration file %s", pathConfigFile),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, pathConfigFile))
-	}
-
-	if err := getOverwrites(ctx, rawConfig); err != nil {
-		return nil, errors.New(err, "could not read overwrites")
-	}
-
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return nil, errors.New(err,
-			fmt.Sprintf("could not parse configuration file %s", pathConfigFile),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, pathConfigFile))
-	}
-
-	if override != nil {
-		override(cfg)
-	}
-
-	return cfg, nil
-}
-
 func reexecPath() (string, error) {
 	// set executable path to symlink instead of binary
 	// in case of updated symlinks we should spin up new agent
@@ -587,51 +563,6 @@ func reexecPath() (string, error) {
 	}
 
 	return potentialReexec, nil
-}
-
-func getOverwrites(ctx context.Context, rawConfig *config.Config) error {
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return err
-	}
-
-	if !cfg.Fleet.Enabled {
-		// overrides should apply only for fleet mode
-		return nil
-	}
-	path := paths.AgentConfigFile()
-	store, err := storage.NewEncryptedDiskStore(ctx, path)
-	if err != nil {
-		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
-	}
-
-	reader, err := store.Load()
-	if err != nil && errors.Is(err, os.ErrNotExist) {
-		// no fleet file ignore
-		return nil
-	} else if err != nil {
-		return errors.New(err, "could not initialize config store",
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	config, err := config.NewConfigFrom(reader)
-	if err != nil {
-		return errors.New(err,
-			fmt.Sprintf("fail to read configuration %s for the elastic-agent", path),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	err = rawConfig.Merge(config)
-	if err != nil {
-		return errors.New(err,
-			fmt.Sprintf("fail to merge configuration with %s for the elastic-agent", path),
-			errors.TypeConfig,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	return nil
 }
 
 // applyCustomLogsPath overrides the logging config to write to the user-specified
@@ -670,7 +601,7 @@ func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) stri
 	return ""
 }
 
-func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override application.CfgOverrider) (*configuration.Configuration, error) {
+func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override configuration.CfgOverrider) (*configuration.Configuration, error) {
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
 		//nolint:nilerr // ignore the error, this is expected
@@ -747,7 +678,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 			errors.M("path", enrollPath)))
 	}
 	logger.Info("Successfully performed delayed enrollment of this Elastic Agent.")
-	return loadConfig(ctx, override)
+	return configuration.LoadConfig(ctx, override)
 }
 
 func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig) (*apm.Tracer, error) {

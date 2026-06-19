@@ -165,7 +165,7 @@ func (c *Client) Send(
 	method, path string,
 	params url.Values,
 	headers http.Header,
-	body io.Reader,
+	body io.ReadSeeker,
 ) (*http.Response, error) {
 	// Generate a request ID for tracking
 	var reqID string
@@ -181,6 +181,9 @@ func (c *Client) Send(
 	clients := c.sortClients()
 
 	for i, requester := range clients {
+		if body != nil {
+			_, _ = body.Seek(0, io.SeekStart)
+		}
 		req, err := requester.newRequest(method, path, params, body)
 		if err != nil {
 			return nil, fmt.Errorf(

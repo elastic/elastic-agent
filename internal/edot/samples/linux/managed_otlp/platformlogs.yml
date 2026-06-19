@@ -1,6 +1,6 @@
 receivers:
   # Receiver for platform specific log files
-  filelog/platformlogs:
+  file_log/platformlogs:
     include: [/var/log/*.log]
     retry_on_failure:
       enabled: true
@@ -53,7 +53,7 @@ exporters:
     sampling_thereafter: 1000
 
   # Exporter to send logs and metrics to Elasticsearch Managed OTLP Input
-  otlp/ingest:
+  otlp_grpc/ingest:
     endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
     headers:
       Authorization: ApiKey ${env:ELASTIC_API_KEY}
@@ -71,6 +71,6 @@ service:
   extensions: [file_storage]
   pipelines:
     logs/platformlogs:
-      receivers: [filelog/platformlogs]
+      receivers: [file_log/platformlogs]
       processors: [resourcedetection]
-      exporters: [debug, otlp/ingest]
+      exporters: [debug, otlp_grpc/ingest]

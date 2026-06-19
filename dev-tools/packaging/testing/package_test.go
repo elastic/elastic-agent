@@ -15,7 +15,6 @@ import (
 	"compress/gzip"
 	"crypto/sha512"
 	"debug/buildinfo"
-	"debug/elf"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -66,6 +65,7 @@ var (
 	otelSamplesFilePattern      = regexp.MustCompile(`otel_samples/.+[^/]$`)
 	otelCollectorSpecPattern    = regexp.MustCompile(`elastic-otel-collector\.spec\.yml$`)
 	endpointResourcesZipPattern = regexp.MustCompile(`endpoint-security-resources\.zip$`)
+	cloudDefendPattern          = regexp.MustCompile(`/cloud-defend(\.spec\.yml)?$`)
 
 	licenseFiles = []string{"LICENSE.txt", "NOTICE.txt"}
 )
@@ -248,6 +248,7 @@ func checkTar(t *testing.T, file string, fipsCheck bool) {
 	checkFilePermissions(t, p, otelCollectorSpecPattern, expectedManifestMode)
 	checkFilePermissions(t, p, endpointResourcesZipPattern, expectedManifestMode)
 	checkLicensesPresent(t, "", p)
+	checkCloudDefendNotPresent(t, p)
 
 	// extract archive in a temporary directory
 	tempExtractionPath := t.TempDir()
@@ -643,6 +644,18 @@ func checkModulesOwner(t *testing.T, p *packageFile, expectRoot bool) {
 	})
 }
 
+// checkCloudDefendNotPresent verifies cloud-defend is absent from tar.gz packages.
+// Cloud Defend is only supported in Docker images.
+func checkCloudDefendNotPresent(t *testing.T, p *packageFile) {
+	t.Run("cloud-defend not present", func(t *testing.T) {
+		for name := range p.Contents {
+			if cloudDefendPattern.MatchString(name) {
+				t.Errorf("cloud-defend must not be included in tar.gz packages, found: %s", name)
+			}
+		}
+	})
+}
+
 func checkSystemdUnitPermissions(t *testing.T, p *packageFile) {
 	t.Run("systemd unit file permissions", func(t *testing.T) {
 		if matched := checkFilePermissions(t, p, systemdUnitFilePattern, os.FileMode(0644)); matched == 0 {
@@ -854,47 +867,29 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 			require.NoError(t, err)
 
 			foundTags := false
-			foundExperiment := false
+			foundFIPS := false
+			foundFIPSDefault := false
 			for _, setting := range info.Settings {
 				switch setting.Key {
 				case "-tags":
 					foundTags = true
 					require.Contains(t, setting.Value, "requirefips")
-
-					// Check if the ms_tls13kdf build tag is set only if the binary was built
-					// with go1.24.x (see https://github.com/microsoft/go/pull/1662).
-					if strings.HasPrefix(info.GoVersion, "go1.24") {
-						require.Contains(t, setting.Value, "ms_tls13kdf")
-					}
 					continue
-				case "GOEXPERIMENT":
-					foundExperiment = true
-					require.Contains(t, setting.Value, "systemcrypto")
+				case "GOFIPS140":
+					foundFIPS = true
+					require.NotEmpty(t, setting.Value, "GOFIPS140 must be set in binary build info")
+					continue
+				case "DefaultGODEBUG":
+					if strings.Contains(setting.Value, "fips140=on") {
+						foundFIPSDefault = true
+					}
 					continue
 				}
 			}
 
 			require.True(t, foundTags, "Did not find -tags within binary version information")
-			require.True(t, foundExperiment, "Did not find GOEXPERIMENT within binary version information")
-
-			// TODO only elf is supported at the moment, in the future we will need to use macho (darwin) and pe (windows)
-			f, err := elf.Open(binary)
-			require.NoError(t, err, "unable to open ELF file")
-
-			symbols, err := f.Symbols()
-			if err != nil {
-				t.Logf("no symbols present in %q: %v", binary, err)
-				return
-			}
-
-			hasOpenSSL := false
-			for _, symbol := range symbols {
-				if strings.Contains(symbol.Name, "OpenSSL_version") {
-					hasOpenSSL = true
-					break
-				}
-			}
-			require.True(t, hasOpenSSL, "unable to find OpenSSL_version symbol")
+			require.True(t, foundFIPS, "Did not find GOFIPS140 within binary version information")
+			require.True(t, foundFIPSDefault, "Did not find fips140=on in DefaultGODEBUG — binary will not enforce FIPS mode at runtime")
 		})
 	}
 }

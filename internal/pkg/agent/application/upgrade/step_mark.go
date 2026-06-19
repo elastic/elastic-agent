@@ -14,11 +14,11 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -49,6 +49,8 @@ type UpdateMarker struct {
 
 	Details *details.Details `json:"details,omitempty" yaml:"details,omitempty"`
 
+	// Agents older than 9.5.0 read rollback targets from this field on Windows.
+	// TODO: remove once the minimum supported upgrade-from version is 9.5.0.
 	RollbacksAvailable map[string]ttl.TTLMarker `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
 }
 
@@ -134,10 +136,10 @@ type agentInstall struct {
 
 type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, writeFile writeFileFunc) error
 
-// markUpgrade marks update happened so we can handle grace period
-func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
+// writeUpgradeMarkerProvider returns a function that writes the upgrade marker file.
+// It does not update active.commit; use it to protect the target directory before unpacking starts.
+func writeUpgradeMarkerProvider() writeUpgradeMarkerFunc {
 	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
-
 		if len(previousAgent.hash) > HashLen {
 			previousAgent.hash = previousAgent.hash[:HashLen]
 		}
@@ -166,11 +168,19 @@ func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile wr
 			return goerrors.Join(err, errors.New(errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath)))
 		}
 
-		if err := updateActiveCommit(log, paths.Top(), agent.hash, writeFile); err != nil {
+		return nil
+	}
+}
+
+// markUpgradeProvider returns a function that writes the upgrade marker file and updates active.commit.
+// Use it after the symlink has been flipped to the new binary.
+func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
+	writeMarker := writeUpgradeMarkerProvider()
+	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
+		if err := writeMarker(log, dataDirPath, updatedOn, agent, previousAgent, action, upgradeDetails, availableRollbacks); err != nil {
 			return err
 		}
-
-		return nil
+		return updateActiveCommit(log, paths.Top(), agent.hash, writeFile)
 	}
 }
 

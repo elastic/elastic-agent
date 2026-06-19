@@ -247,6 +247,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -291,6 +293,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -339,6 +343,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -387,6 +393,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -436,6 +444,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -484,6 +494,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -533,6 +545,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -581,6 +595,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:

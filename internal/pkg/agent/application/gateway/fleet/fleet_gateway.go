@@ -6,6 +6,7 @@ package fleet
 
 import (
 	"context"
+	"encoding/json"
 	stderrors "errors"
 	"sync"
 	"time"
@@ -26,10 +27,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
-	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/scheduler"
 )
 
 // Max number of times an invalid API Key is checked
@@ -80,10 +82,6 @@ type stateStore interface {
 	Action() fleetapi.Action
 }
 
-type rollbacksSource interface {
-	Get() (map[string]ttl.TTLMarker, error)
-}
-
 type FleetGateway struct {
 	log                *logger.Logger
 	client             client.Sender
@@ -97,7 +95,7 @@ type FleetGateway struct {
 	stateFetcher       StateFetcher
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
-	rollbackSource     rollbacksSource
+	rollbackSource     ttl.ReadOnlySource
 	compression        string
 }
 
@@ -110,7 +108,7 @@ func New(
 	stateStore stateStore,
 	stateFetcher StateFetcher,
 	cfg *configuration.FleetCheckin,
-	source rollbacksSource,
+	source ttl.ReadOnlySource,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
@@ -142,7 +140,7 @@ func newFleetGatewayWithScheduler(
 	acker acker.Acker,
 	stateStore stateStore,
 	stateFetcher StateFetcher,
-	source rollbacksSource,
+	source ttl.ReadOnlySource,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
 		log:            log,
@@ -193,8 +191,11 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 				continue
 			}
 
-			actions := make([]fleetapi.Action, len(resp.Actions))
-			copy(actions, resp.Actions)
+			var actions fleetapi.Actions
+			if err := json.Unmarshal(resp.Actions, &actions); err != nil {
+				f.log.Errorf("failed to unmarshal checkin actions: %v", err)
+				continue
+			}
 			if len(actions) > 0 {
 				f.actionCh <- actions
 			}
@@ -207,7 +208,7 @@ func (f *FleetGateway) Errors() <-chan error {
 	return f.errCh
 }
 
-func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*fleetapi.CheckinResponse, error) {
+func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*pkgfleetapi.CheckinResponse, error) {
 	bo.Reset()
 
 	// Guard if the context is stopped by a out of bound call,
@@ -281,7 +282,7 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	return nil, ctx.Err()
 }
 
-func convertToCheckinComponents(logger *logp.Logger, components []runtime.ComponentComponentState, collector *status.AggregateStatus) []fleetapi.CheckinComponent {
+func convertToCheckinComponents(logger *logp.Logger, components []runtime.ComponentComponentState, collector *status.AggregateStatus) []pkgfleetapi.CheckinComponent {
 	if components == nil && (collector == nil || len(collector.ComponentStatusMap) == 0) {
 		return nil
 	}
@@ -318,13 +319,13 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 	if collector != nil {
 		size += len(collector.ComponentStatusMap)
 	}
-	checkinComponents := make([]fleetapi.CheckinComponent, 0, size)
+	checkinComponents := make([]pkgfleetapi.CheckinComponent, 0, size)
 
 	for _, item := range components {
 		component := item.Component
 		state := item.State
 
-		checkinComponent := fleetapi.CheckinComponent{
+		checkinComponent := pkgfleetapi.CheckinComponent{
 			ID:      component.ID,
 			Type:    component.Type(),
 			Status:  stateString(state.State),
@@ -332,10 +333,10 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 		}
 
 		if state.Units != nil {
-			units := make([]fleetapi.CheckinUnit, 0, len(state.Units))
+			units := make([]pkgfleetapi.CheckinUnit, 0, len(state.Units))
 
 			for unitKey, unitState := range state.Units {
-				units = append(units, fleetapi.CheckinUnit{
+				units = append(units, pkgfleetapi.CheckinUnit{
 					ID:      unitKey.UnitID,
 					Type:    unitTypeString(unitKey.UnitType),
 					Status:  stateString(unitState.State),
@@ -354,7 +355,7 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 		for id, item := range collector.ComponentStatusMap {
 			state, msg := translate.StateWithMessage(item)
 
-			checkinComponent := fleetapi.CheckinComponent{
+			checkinComponent := pkgfleetapi.CheckinComponent{
 				ID:      id,
 				Type:    "otel",
 				Status:  stateString(state),
@@ -362,10 +363,10 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 			}
 
 			if len(item.ComponentStatusMap) > 0 {
-				units := make([]fleetapi.CheckinUnit, 0, len(item.ComponentStatusMap))
+				units := make([]pkgfleetapi.CheckinUnit, 0, len(item.ComponentStatusMap))
 				for unitId, unitItem := range item.ComponentStatusMap {
 					unitState, unitMsg := translate.StateWithMessage(unitItem)
-					units = append(units, fleetapi.CheckinUnit{
+					units = append(units, pkgfleetapi.CheckinUnit{
 						ID:      unitId,
 						Status:  stateString(unitState),
 						Message: unitMsg,
@@ -382,7 +383,7 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 	return checkinComponents
 }
 
-func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
+func (f *FleetGateway) execute(ctx context.Context) (*pkgfleetapi.CheckinResponse, time.Duration, error) {
 	ecsMeta, err := info.Metadata(ctx, f.log)
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
@@ -415,21 +416,20 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get available rollbacks
-	rollbacks, err := f.rollbackSource.Get()
+	rollbacks, _, err := f.rollbackSource.GetAll()
 	if err != nil {
 		f.log.Warnf("error getting available rollbacks: %s", err.Error())
-		// this should already be nil but let's make sure that we don't include rollbacks in checkin body when encountering errors
 		rollbacks = nil
 	}
 
-	var validRollbacks []fleetapi.CheckinRollback
+	var validRollbacks []pkgfleetapi.CheckinRollback
 	if len(rollbacks) > 0 {
 		now := time.Now()
-		validRollbacks = make([]fleetapi.CheckinRollback, 0, len(rollbacks))
+		validRollbacks = make([]pkgfleetapi.CheckinRollback, 0, len(rollbacks))
 		for _, rollback := range rollbacks {
 			if rollback.ValidUntil.After(now) {
-				// map the `ttl.Marker` to the `fleetapi.CheckinRollback`
-				validRollbacks = append(validRollbacks, fleetapi.CheckinRollback{
+				// map the `ttl.Marker` to the `pkgfleetapi.CheckinRollback`
+				validRollbacks = append(validRollbacks, pkgfleetapi.CheckinRollback{
 					Version:    rollback.Version,
 					ValidUntil: rollback.ValidUntil,
 				})
@@ -438,8 +438,8 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// checkin
-	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client, f.compression)
-	req := &fleetapi.CheckinRequest{
+	cmd := pkgfleetapi.NewCheckinCmd(f.agentInfo, f.client, f.compression)
+	req := &pkgfleetapi.CheckinRequest{
 		AckToken:          ackToken,
 		Metadata:          ecsMeta,
 		Status:            agentStateToString(state.State),
@@ -460,7 +460,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		if f.shouldUseLongSched() {
 			f.log.Warnf("retrieved an invalid api key error '%d' times. will use long scheduler", f.unauthCounter)
 			f.scheduler.SetDuration(defaultGatewaySettings.ErrConsecutiveUnauthDuration)
-			return &fleetapi.CheckinResponse{}, took, nil
+			return &pkgfleetapi.CheckinResponse{}, took, nil
 		}
 
 		return nil, took, err
@@ -494,7 +494,7 @@ func (f *FleetGateway) shouldUseLongSched() bool {
 }
 
 func isUnauth(err error) bool {
-	return errors.Is(err, client.ErrInvalidAPIKey)
+	return errors.Is(err, pkgfleetapi.ErrInvalidAPIKey)
 }
 
 func (f *FleetGateway) SetClient(c client.Sender) {

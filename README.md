@@ -105,7 +105,8 @@ To build a local version of the agent for development, run the command below. Th
 # EXTERNAL=true downloads the matching version of the binaries that are packaged with agent, not necessary if only using Beats.
 # SNAPSHOT=true indicates that this is a snapshot version and not a release version.
 # PLATFORMS=linux/amd64 builds an agent that will run on 64 bit X86 Linux systems.
-# PACKAGES is required. Use PACKAGES=all to build all package types, or specify types (e.g. tar.gz,rpm,deb,zip,docker).
+# PACKAGES selects package types; if unset, defaults to tar.gz for non-Windows platforms and zip for Windows.
+# Use PACKAGES=all to build all package types, or specify types (e.g. tar.gz,rpm,deb,zip,docker).
 EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz mage -v package
 ```
 
@@ -116,10 +117,10 @@ To install the agent extract the package and run the install command:
 cd build/distributions
 tar xvfz elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64.tar.gz
 cd elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64
-sudo elastic-agent install
+sudo ./elastic-agent install
 ```
 
-For basic use the agent binary can be run directly, with the `sudo elastic-agent run` command.
+For basic use the agent binary can be run directly, with the `./elastic-agent run` command.
 
 #### Packaging for other architectures
 When packaging for an architecture different than the host machine,

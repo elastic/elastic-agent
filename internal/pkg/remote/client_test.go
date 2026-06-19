@@ -328,7 +328,7 @@ func TestHTTPClient(t *testing.T) {
 			})
 
 			require.NoError(t, err)
-			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, bytes.NewBuffer([]byte("hello")))
+			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, bytes.NewReader([]byte("hello")))
 			require.NoError(t, err)
 
 			body, err := io.ReadAll(resp.Body)
@@ -542,6 +542,80 @@ func withServer(m func(t *testing.T) *http.ServeMux, test func(t *testing.T, hos
 		defer s.Close()
 		test(t, s.Listener.Addr().String())
 	}
+}
+
+// TestSendRetriesAcrossHosts reproduces the bug described in
+// https://github.com/elastic/elastic-agent/issues/14773: Client.Send passes the
+// same io.Reader to every host attempt, so after the first host consumes the body
+// the remaining hosts receive an empty body and fail even though they are healthy.
+func TestSendRetriesAcrossHosts(t *testing.T) {
+	ctx := context.Background()
+	l, err := logger.New("", false)
+	require.NoError(t, err)
+
+	const payload = `{"agent_id":"test-agent"}`
+
+	// secondBodyReceived is populated by the second server's handler.
+	var secondBodyReceived []byte
+
+	// Second server: records the body it receives and returns 200 only when
+	// the body matches the expected payload.
+	secondServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		secondBodyReceived = b
+		if string(b) != payload {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"status":"ok"}`)
+	}))
+	defer secondServer.Close()
+
+	// First host transport: reads (consumes) the request body then returns a
+	// transport-level error, simulating a connection reset after bytes were sent.
+	firstTransport := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		if req.Body != nil {
+			_, _ = io.ReadAll(req.Body)
+			_ = req.Body.Close()
+		}
+		return nil, fmt.Errorf("connection reset by peer")
+	})
+
+	firstRequester := &requestClient{
+		// lastUsed is zero (never used) so sortClients picks it first.
+		host:   "not a real URL",
+		client: http.Client{Transport: firstTransport},
+	}
+	secondRequester := &requestClient{
+		// lastUsed is non-zero so sortClients places it after firstRequester.
+		host:     fmt.Sprintf("http://%s/", secondServer.Listener.Addr().String()),
+		lastUsed: time.Now().UTC(),
+	}
+
+	c := &Client{
+		log:     l,
+		clients: []*requestClient{firstRequester, secondRequester},
+	}
+
+	resp, err := c.Send(ctx, http.MethodPost, "/checkin", nil, nil, bytes.NewReader([]byte(payload)))
+	require.NoError(t, err, "Send should succeed when the second host is healthy")
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode,
+		"second host returned non-200; body it received: %q", secondBodyReceived)
+	assert.Equal(t, payload, string(secondBodyReceived),
+		"second host must receive the full request body, not an empty or truncated one")
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 type debugStack struct {

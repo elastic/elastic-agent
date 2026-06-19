@@ -9,9 +9,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -22,8 +24,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
@@ -1314,4 +1320,41 @@ func TestKibanaFetchToken(t *testing.T) {
 		require.Error(t, err)
 		require.Empty(t, token)
 	})
+}
+
+// Regression test for #13810: ensure env vars override fleet.enc for certs
+func TestContainerEnvOverridesFleetTLSPaths(t *testing.T) {
+	_, childPair, err := certutil.NewRSARootAndChildCerts()
+	require.NoError(t, err)
+	certDir := t.TempDir()
+	envCertPath := filepath.Join(certDir, "tls.crt")
+	envKeyPath := filepath.Join(certDir, "tls.key")
+	require.NoError(t, os.WriteFile(envCertPath, childPair.Cert, 0o644))
+	require.NoError(t, os.WriteFile(envKeyPath, childPair.Key, 0o600))
+
+	t.Setenv("ELASTIC_AGENT_CERT", envCertPath)
+	t.Setenv("ELASTIC_AGENT_CERT_KEY", envKeyPath)
+
+	origCfg := paths.Config()
+	t.Cleanup(func() { paths.SetConfig(origCfg) })
+	paths.SetConfig(t.TempDir())
+
+	ctx := t.Context()
+	require.NoError(t, secret.CreateAgentSecret(ctx, vault.WithUnprivileged(true)))
+	require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte("fleet:\n  enabled: true\n"), 0o644))
+
+	store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+	require.NoError(t, err)
+	require.NoError(t, store.Save(strings.NewReader(`fleet:
+  ssl:
+    certificate: "/nonexistent/tls.crt"
+    key: "/nonexistent/tls.key"`)))
+
+	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
+	require.NotErrorIs(t, err, fs.ErrNotExist, "unpack must not try to open stale stored TLS path")
+
+	loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+	require.NoError(t, err)
+	require.Equal(t, envCertPath, loaded.Fleet.Client.Transport.TLS.Certificate.Certificate)
+	require.Equal(t, envKeyPath, loaded.Fleet.Client.Transport.TLS.Certificate.Key)
 }
