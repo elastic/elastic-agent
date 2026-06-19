@@ -992,4 +992,6 @@ steps:
           format: "junit"
           debug: true
           annotation-link: true
+          tags:
+            - "fips=false"
       - *google_oidc_observability_plugin
