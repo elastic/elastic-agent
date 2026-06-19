@@ -37,6 +37,11 @@ extensions:
             - action: upsert
               key: User-Agent
               value: Elastic-edot agentless
+    headers_setter/api_key:
+        headers:
+            - action: upsert
+              key: APIKEY
+              value: SECRET_API_KEY
 exporters:
     nop/fleet: null
 processors:
@@ -46,6 +51,7 @@ processors:
 service:
     extensions:
         - headers_setter/fleet
+        - headers_setter/api_key
     pipelines:
         logs/fleet:
             receivers:

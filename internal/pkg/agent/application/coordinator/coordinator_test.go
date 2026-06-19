@@ -1168,7 +1168,73 @@ func Test_ApplyPersistedConfig(t *testing.T) {
 	}
 }
 
-func TestExtensionsAreMerged(t *testing.T) {
+func TestExtensionsAreMergedInOrder(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		fleetFile               string
+		persistedFile           string
+		expectedExtensionsOrder []string
+	}{
+		{
+			name:          "extensions are merged in the order of the source file",
+			fleetFile:     filepath.Join(".", "testdata", "config_fleet.yaml"),
+			persistedFile: filepath.Join(".", "testdata", "service_populated.yaml"),
+			expectedExtensionsOrder: []string{
+				"headers_setter/fleet",
+				"headers_setter/api_key",
+				"headers_setter/persisted",
+			},
+		},
+		{
+			name:          "extensions are merged in the order of the source file",
+			fleetFile:     filepath.Join(".", "testdata", "config_fleet.yaml"),
+			persistedFile: filepath.Join(".", "testdata", "service_populated_with_dup.yaml"),
+			expectedExtensionsOrder: []string{
+				"headers_setter/fleet",
+				"headers_setter/api_key",
+				"headers_setter/persisted",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fleetCfg, err := config.LoadFile(tc.fleetFile)
+			require.NoError(t, err)
+
+			testLogger, _ := loggertest.New("")
+
+			registry := featuregate.GlobalRegistry()
+			require.NoError(t, registry.Set("confmap.enableMergeAppendOption", true))
+			t.Cleanup(func() {
+				_ = registry.Set("confmap.enableMergeAppendOption", false)
+			})
+
+			err = applyPersistedConfig(testLogger, fleetCfg, tc.persistedFile)
+			require.NoError(t, err)
+
+			// verify extensions contain both values
+			extensions, ok := fleetCfg.OTel.Get("extensions").(map[string]interface{})
+			require.True(t, ok)
+			require.Equal(t, len(tc.expectedExtensionsOrder), len(extensions))
+			for _, ext := range tc.expectedExtensionsOrder {
+				_, ok = extensions[ext]
+				require.True(t, ok)
+			}
+
+			// verify service contains both values in service.extensions array
+
+			serviceExtensions, ok := fleetCfg.OTel.Get("service::extensions").([]any)
+			require.True(t, ok)
+			require.Equal(t, len(tc.expectedExtensionsOrder), len(serviceExtensions))
+			for i := range len(tc.expectedExtensionsOrder) {
+				require.Equal(t, tc.expectedExtensionsOrder[i], serviceExtensions[i].(string))
+			}
+		})
+	}
+}
+
+func TestOtelConfigIsMerged(t *testing.T) {
 	// this test loads config from service_populated.yaml and verifies that the extensions are merged
 	// with already prepopulated extensions in agent configuration
 	// we are testing extensions, processors, pipelines, exporters
@@ -1201,8 +1267,10 @@ func TestExtensionsAreMerged(t *testing.T) {
 	// verify extensions contain both values
 	extensions, ok := fleetCfg.OTel.Get("extensions").(map[string]interface{})
 	require.True(t, ok)
-	require.Equal(t, 2, len(extensions))
+	require.Equal(t, 3, len(extensions))
 	_, ok = extensions["headers_setter/persisted"]
+	require.True(t, ok)
+	_, ok = extensions["headers_setter/api_key"]
 	require.True(t, ok)
 	_, ok = extensions["headers_setter/fleet"]
 	require.True(t, ok)
@@ -1211,9 +1279,10 @@ func TestExtensionsAreMerged(t *testing.T) {
 
 	serviceExtensions, ok := fleetCfg.OTel.Get("service::extensions").([]any)
 	require.True(t, ok)
-	require.Equal(t, 2, len(serviceExtensions))
+	require.Equal(t, 3, len(serviceExtensions))
 	require.Equal(t, "headers_setter/fleet", serviceExtensions[0].(string))
-	require.Equal(t, "headers_setter/persisted", serviceExtensions[1].(string))
+	require.Equal(t, "headers_setter/api_key", serviceExtensions[1].(string))
+	require.Equal(t, "headers_setter/persisted", serviceExtensions[2].(string))
 
 	// verify processors contain both values
 	processors, ok := fleetCfg.OTel.Get("processors").(map[string]interface{})
@@ -1250,6 +1319,7 @@ func TestExtensionsAreMerged(t *testing.T) {
 	require.True(t, ok)
 	_, ok = receivers["nop/fleet"]
 	require.True(t, ok)
+
 }
 
 // Test_Coordinator_OTelManagerReceivesPersistedConfig verifies that the OTel manager
