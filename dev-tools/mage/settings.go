@@ -702,6 +702,7 @@ func (s *Settings) setBuildDefaults() {
 	s.Build.GOARCH = build.Default.GOARCH
 	s.Build.MaxParallel = runtime.NumCPU()
 	s.BuildDate = time.Now().UTC()
+	s.Build.Snapshot = true
 }
 
 // setBeatDefaults sets default values for BeatSettings.
@@ -948,14 +949,8 @@ type BuildSettings struct {
 	// GOARM is the ARM version for compilation (from GOARM env var)
 	GOARM string
 
-	// Snapshot indicates whether this is a snapshot build (from SNAPSHOT env var)
+	// Snapshot indicates whether this is a snapshot build (from SNAPSHOT env var, default true)
 	Snapshot bool
-
-	// SnapshotSet indicates whether SNAPSHOT env var was explicitly set.
-	// This is needed to distinguish "not set" from "explicitly set to false"
-	// in contexts where the default varies (e.g., cloud images default to true).
-	// TODO: consider refactoring to use *bool or restructuring context-specific defaults.
-	SnapshotSet bool
 
 	// DevBuild indicates whether this is a development build (from DEV env var)
 	DevBuild bool
@@ -1374,7 +1369,6 @@ func (s *Settings) loadBuildSettingsFromEnv() error {
 
 	var err error
 
-	_, s.Build.SnapshotSet = os.LookupEnv("SNAPSHOT")
 	s.Build.Snapshot, err = parseBoolEnv("SNAPSHOT", s.Build.Snapshot)
 	if err != nil {
 		return fmt.Errorf("failed to parse SNAPSHOT: %w", err)
