@@ -348,7 +348,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	reqBody := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "internal": {
@@ -361,7 +361,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
     }
   }
 }
-`, policyName)
+`, policyName, info.Namespace)
 
 	status, result, err := info.KibanaClient.Request(
 		http.MethodPut,
@@ -820,7 +820,7 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
 	reqBody := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "monitoring": {
@@ -829,7 +829,7 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
     }
   }
 }
-`, policyName, runtime)
+`, policyName, info.Namespace, runtime)
 
 	status, result, err := info.KibanaClient.Request(
 		http.MethodPut,
