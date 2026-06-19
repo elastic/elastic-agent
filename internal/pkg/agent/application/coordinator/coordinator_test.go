@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/v2/apmtest"
 	"go.opentelemetry.io/collector/confmap"
+	"go.opentelemetry.io/collector/featuregate"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -1165,6 +1166,90 @@ func Test_ApplyPersistedConfig(t *testing.T) {
 			assert.Equal(t, tc.expectedOutputType, outputType, "output type should be %s, got %s", tc.expectedOutputType, outputType)
 		})
 	}
+}
+
+func TestExtensionsAreMerged(t *testing.T) {
+	// this test loads config from service_populated.yaml and verifies that the extensions are merged
+	// with already prepopulated extensions in agent configuration
+	// we are testing extensions, processors, pipelines, exporters
+	// those coming from file are named type/persisted those from config type/fleet
+	// test passes when all extensions, processors, pipelines, exporters are present in the merged config
+	// single test for all of those
+	// we're testing these keys:
+	// - extensions
+	// - service.extensions
+	// - service.pipelines
+	// - processors
+	// - pipelines
+	// - exporters
+	// - receivers
+
+	fleetCfg, err := config.LoadFile(filepath.Join(".", "testdata", "config_fleet.yaml"))
+	require.NoError(t, err)
+
+	testLogger, _ := loggertest.New("")
+
+	registry := featuregate.GlobalRegistry()
+	registry.Set("confmap.enableMergeAppendOption", true)
+	t.Cleanup(func() {
+		registry.Set("confmap.enableMergeAppendOption", false)
+	})
+
+	err = applyPersistedConfig(testLogger, fleetCfg, filepath.Join(".", "testdata", "service_populated.yaml"))
+	require.NoError(t, err)
+
+	// verify extensions contain both values
+	extensions, ok := fleetCfg.OTel.Get("extensions").(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, 2, len(extensions))
+	_, ok = extensions["headers_setter/persisted"]
+	require.True(t, ok)
+	_, ok = extensions["headers_setter/fleet"]
+	require.True(t, ok)
+
+	// verify service contains both values in service.extensions array
+
+	serviceExtensions, ok := fleetCfg.OTel.Get("service::extensions").([]any)
+	require.True(t, ok)
+	require.Equal(t, 2, len(serviceExtensions))
+	require.Equal(t, "headers_setter/fleet", serviceExtensions[0].(string))
+	require.Equal(t, "headers_setter/persisted", serviceExtensions[1].(string))
+
+	// verify processors contain both values
+	processors, ok := fleetCfg.OTel.Get("processors").(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, 2, len(processors))
+	_, ok = processors["batch/persisted"]
+	require.True(t, ok)
+	_, ok = processors["batch/fleet"]
+	require.True(t, ok)
+
+	// verify service contains both values in service.pipelines map
+	pipelines, ok := fleetCfg.OTel.Get("service::pipelines").(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, 2, len(pipelines))
+	_, ok = pipelines["logs/persisted"]
+	require.True(t, ok)
+	_, ok = pipelines["logs/fleet"]
+	require.True(t, ok)
+
+	// verify exporters contain both values
+	exporters, ok := fleetCfg.OTel.Get("exporters").(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, 2, len(exporters))
+	_, ok = exporters["nop/persisted"]
+	require.True(t, ok)
+	_, ok = exporters["nop/fleet"]
+	require.True(t, ok)
+
+	// verify receivers contain both values
+	receivers, ok := fleetCfg.OTel.Get("receivers").(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, 2, len(receivers))
+	_, ok = receivers["nop/persisted"]
+	require.True(t, ok)
+	_, ok = receivers["nop/fleet"]
+	require.True(t, ok)
 }
 
 // Test_Coordinator_OTelManagerReceivesPersistedConfig verifies that the OTel manager

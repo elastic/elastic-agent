@@ -22,6 +22,7 @@ import (
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
+	"go.opentelemetry.io/collector/featuregate"
 
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
@@ -192,6 +193,9 @@ func runElasticAgentCritical(
 			errs = append(errs, fmt.Errorf("failed to restore configuration: %w", err))
 		}
 	}
+
+	// enabled feature gate for merging configuration, important for merging persisted configuration with fleet configuration
+	featuregate.GlobalRegistry().Set("confmap.enableMergeAppendOption", true)
 
 	// try load config, but don't error yet
 	cfg, err := configuration.LoadConfig(ctx, override)

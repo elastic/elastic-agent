@@ -1,0 +1,54 @@
+outputs:
+    es-default-output-internal:
+        type: elasticsearch
+        ssl:
+            verification_mode: none
+agent:
+    monitoring:
+        enabled: true
+        http:
+            enabled: true
+            host: 0.0.0.0
+            port: 1234
+        logs: false
+        metrics: false
+    logging:
+        level: info
+        to_stderr: true
+        rotateeverybytes: 1
+    providers:
+        initial_default: false
+    internal:
+        runtime:
+            filebeat:
+                default: otel
+            metricbeat:
+                default: otel
+fleet:
+    enabled: true
+providers:
+    local:
+        enabled: true
+receivers:
+    nop/fleet: null
+extensions:
+    headers_setter/fleet:
+        headers:
+            - action: upsert
+              key: User-Agent
+              value: Elastic-edot agentless
+exporters:
+    nop/fleet: null
+processors:
+    batch/fleet:
+        type: batch
+        timeout: 1s
+service:
+    extensions:
+        - headers_setter/fleet
+    pipelines:
+        logs/fleet:
+            receivers:
+                - nop
+            exporters:
+                - nop

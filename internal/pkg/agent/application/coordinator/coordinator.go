@@ -19,6 +19,7 @@ import (
 	"go.opentelemetry.io/collector/component/componentstatus"
 
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -1882,7 +1883,10 @@ func applyPersistedConfig(logger *logger.Logger, cfg *config.Config, configFile 
 		return fmt.Errorf("parsing persisted config: %w", err)
 	}
 
-	err = cfg.Merge(persisted)
+	err = cfg.Merge(persisted,
+		ucfg.FieldPrependValues("extensions"),
+		ucfg.FieldPrependValues("service.extensions"),
+	)
 	if err != nil {
 		return fmt.Errorf("merging persisted config: %w", err)
 	}
