@@ -1152,8 +1152,6 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 		paths.SetTop(top)
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
 	logger := logp.NewLogger("testing")
 
 	configChan := make(chan ConfigChange, 1)
@@ -1211,6 +1209,8 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 	var workDirCreated time.Time
 
 	t.Run("run in process manager", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		t.Cleanup(cancel)
 		// Create a policy with one input and one output (no otel configuration)
 		cfg := config.MustNewConfigFrom(`
 agent.internal.runtime.filebeat.filestream: process
@@ -1240,6 +1240,8 @@ inputs:
 	})
 
 	t.Run("run in otel manager", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		t.Cleanup(cancel)
 		// Create a policy with one input and one output (no otel configuration)
 		cfg := config.MustNewConfigFrom(`
 agent.internal.runtime.filebeat.filestream: otel
@@ -1277,6 +1279,8 @@ inputs:
 		assert.Equal(t, workDirCreated, stat.ModTime(), "component working directory shouldn't have been modified")
 	})
 	t.Run("remove component", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		t.Cleanup(cancel)
 		// Create a policy with one input and one output (no otel configuration)
 		cfg := config.MustNewConfigFrom(`
 outputs:
