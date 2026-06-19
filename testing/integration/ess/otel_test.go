@@ -139,6 +139,7 @@ service:
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
+	t.Cleanup(wg.Wait)
 	go func() {
 		defer wg.Done()
 		assert.NoError(t, fixture.RunOtelWithClient(ctx))
@@ -184,15 +185,13 @@ func TestOtelFileProcessing(t *testing.T) {
 	tmpDir := t.TempDir()
 	// create input file
 	numEvents := 50
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
+	inputFilePath := filepath.Join(tmpDir, "input.txt")
+	var inputContent bytes.Buffer
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 	t.Cleanup(func() {
 		if t.Failed() {
 			contents, err := os.ReadFile(inputFilePath)
@@ -315,15 +314,13 @@ func TestOtelHybridFileProcessing(t *testing.T) {
 	tmpDir := t.TempDir()
 	// create input file
 	numEvents := 50
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
+	inputFilePath := filepath.Join(tmpDir, "input.txt")
+	var inputContent bytes.Buffer
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 	t.Cleanup(func() {
 		if t.Failed() {
 			contents, err := os.ReadFile(inputFilePath)
@@ -367,6 +364,9 @@ service:
         - filelog
       exporters:
         - file
+  telemetry:
+    metrics:
+      level: none
 `
 	var otelConfigBuffer bytes.Buffer
 	require.NoError(t,
@@ -877,15 +877,13 @@ func TestOtelFilestreamInput(t *testing.T) {
 	tmpDir := t.TempDir()
 	numEvents := 50
 	// Create the data file to ingest
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
+	inputFilePath := filepath.Join(tmpDir, "input.txt")
+	var inputContent bytes.Buffer
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 	t.Cleanup(func() {
 		if t.Failed() {
 			contents, err := os.ReadFile(inputFilePath)
@@ -1172,18 +1170,13 @@ func TestHybridAgentE2E(t *testing.T) {
 	fbIndex := "logs-generic-default"
 	fbReceiverIndex := "logs-generic-default"
 
-	inputFile, err := os.CreateTemp(tmpDir, "input-*.log")
-	require.NoError(t, err, "failed to create input log file")
-	inputFilePath := inputFile.Name()
+	inputFilePath := filepath.Join(tmpDir, "input.log")
+	var inputContent bytes.Buffer
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
-		_, err = inputFile.Write([]byte("\n"))
-		require.NoErrorf(t, err, "failed to write newline to input file")
-		time.Sleep(100 * time.Millisecond)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data input file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 
 	t.Cleanup(func() {
 		if t.Failed() {
@@ -1282,6 +1275,9 @@ service:
       exporters:
         - elasticsearch/log
         - debug
+  telemetry:
+    metrics:
+      level: none
 `
 
 	beatsApiKey, err := getDecodedApiKey(esApiKey)
@@ -1348,19 +1344,19 @@ service:
 	actualHits := &struct {
 		Hits int
 	}{}
-	require.Eventually(t,
-		func() bool {
+	require.EventuallyWithT(t,
+		func(collect *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
 			docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbIndex+"*", map[string]interface{}{
 				"log.file.path": inputFilePath,
 			})
-			require.NoError(t, err)
+			require.NoError(collect, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
 
-			return actualHits.Hits == numEvents*2 // filebeat + fbreceiver
+			assert.Equal(collect, numEvents*2, actualHits.Hits) // filebeat + fbreceiver
 		},
 		1*time.Minute, 1*time.Second,
 		"Expected %d logs in elasticsearch, got: %v", numEvents, actualHits)
@@ -1406,18 +1402,13 @@ func TestHybridAgentGlobalProcessors(t *testing.T) {
 	numEvents := 1
 	fbIndex := "logs-generic-default"
 
-	inputFile, err := os.CreateTemp(tmpDir, "input-*.log")
-	require.NoError(t, err, "failed to create input log file")
-	inputFilePath := inputFile.Name()
+	inputFilePath := filepath.Join(tmpDir, "input.log")
+	var inputContent bytes.Buffer
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
-		_, err = inputFile.Write([]byte("\n"))
-		require.NoErrorf(t, err, "failed to write newline to input file")
-		time.Sleep(100 * time.Millisecond)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data input file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 
 	t.Cleanup(func() {
 		if t.Failed() {
@@ -1544,19 +1535,19 @@ processors:
 	actualHits := &struct {
 		Hits int
 	}{}
-	require.Eventually(t,
-		func() bool {
+	require.EventuallyWithT(t,
+		func(collect *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
 			docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbIndex+"*", map[string]interface{}{
 				"log.file.path": inputFilePath,
 			})
-			require.NoError(t, err)
+			require.NoError(collect, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
 
-			return actualHits.Hits == numEvents
+			assert.Equal(collect, numEvents, actualHits.Hits)
 		},
 		1*time.Minute, 1*time.Second,
 		"Expected %d logs in elasticsearch, got: %v", numEvents, actualHits)
@@ -1925,6 +1916,9 @@ service:
         - metricbeatreceiver
       exporters:
         - elasticsearch/log
+  telemetry:
+    metrics:
+      level: none
 `
 	var otelConfigBuffer bytes.Buffer
 	require.NoError(t,
@@ -1969,18 +1963,18 @@ service:
 
 	// Make sure find the logs
 	actualHits := &struct{ Hits int }{}
-	require.Eventually(t,
-		func() bool {
+	require.EventuallyWithT(t,
+		func(collect *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
 
 			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]interface{}{
 				"metricset.name": "cpu",
 			})
-			require.NoError(t, err)
+			require.NoError(collect, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
-			return actualHits.Hits >= 1
+			assert.GreaterOrEqual(collect, actualHits.Hits, 1)
 		},
 		2*time.Minute, 1*time.Second,
 		"Expected at least %d logs, got %v", 1, actualHits)
@@ -2065,6 +2059,9 @@ service:
         - metricbeatreceiver
       exporters:
         - elasticsearch/log
+  telemetry:
+    metrics:
+      level: none
 `
 	var otelConfigBuffer bytes.Buffer
 	require.NoError(t,
