@@ -197,6 +197,9 @@ func runElasticAgentCritical(
 
 	// enabled feature gate for merging configuration, important for merging persisted configuration with fleet configuration
 	// no need to check for error, this is guarded in tests
+	// agentless controller needs this feature gate to be enabled to merge persisted configuration with fleet configuration
+	// we inject some common extensions and processors in the persisted configuration that are overriding
+	// the ones from the fleet configuration in case this feature is disabled.
 	_ = featuregate.GlobalRegistry().Set("confmap.enableMergeAppendOption", true)
 
 	// try load config, but don't error yet
