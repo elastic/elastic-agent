@@ -229,9 +229,9 @@ func verifyHostNameInIndices(t *testing.T, indices, hostname, namespace string, 
 
 	search := esClient.Search
 
-	require.Eventually(
+	require.EventuallyWithT(
 		t,
-		func() bool {
+		func(collect *assert.CollectT) {
 			resp, err := search(
 				search.WithIndex(indices),
 				search.WithSort("@timestamp:desc"),
@@ -239,8 +239,8 @@ func verifyHostNameInIndices(t *testing.T, indices, hostname, namespace string, 
 				search.WithSize(1),
 				search.WithBody(&buf),
 			)
-			require.NoError(t, err)
-			require.False(t, resp.IsError())
+			require.NoError(collect, err)
+			require.False(collect, resp.IsError())
 			defer resp.Body.Close()
 
 			var body struct {
@@ -256,9 +256,9 @@ func verifyHostNameInIndices(t *testing.T, indices, hostname, namespace string, 
 			}
 			decoder := json.NewDecoder(resp.Body)
 			err = decoder.Decode(&body)
-			require.NoError(t, err)
+			require.NoError(collect, err)
 
-			return len(body.Hits.Hits) == 1
+			assert.Len(collect, body.Hits.Hits, 1)
 		},
 		2*time.Minute,
 		5*time.Second,

@@ -344,6 +344,40 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
 		outputID)
 
+<<<<<<< HEAD
+=======
+	reqBody := fmt.Sprintf(`
+{
+  "name": "%s",
+  "namespace": "%s",
+  "overrides": {
+    "agent": {
+      "internal": {
+        "runtime": {
+          "filebeat": {
+            "default": "process"
+          }
+        }
+      }
+    }
+  }
+}
+`, policyName, info.Namespace)
+
+	status, result, err := info.KibanaClient.Request(
+		http.MethodPut,
+		fmt.Sprintf("/api/fleet/agent_policies/%s", policyID),
+		nil,
+		nil,
+		bytes.NewBufferString(reqBody))
+	if err != nil {
+		t.Fatalf("could not execute request to update policy: %s", err)
+	}
+	if status != http.StatusOK {
+		t.Fatalf("updating policy failed. Status code %d, response:\n%s", status, string(result))
+	}
+
+>>>>>>> 294efa35a (Fix potential sources of flakiness in integration tests (#14956))
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	if err != nil {
 		t.Fatalf("could not get Fleet URL: %s", err)
@@ -790,7 +824,7 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
 	reqBody := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "monitoring": {
@@ -799,7 +833,7 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
     }
   }
 }
-`, policyName, runtime)
+`, policyName, info.Namespace, runtime)
 
 	status, result, err := info.KibanaClient.Request(
 		http.MethodPut,
