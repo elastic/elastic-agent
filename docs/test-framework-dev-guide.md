@@ -510,8 +510,8 @@ out weight the benefits of creating another group.
           - test-collector#v1.11.0:
               files: "build/TEST-*.xml"
               format: "junit"
-              branches: "main"
               debug: true
+              annotation-link: true
         matrix:
           - default
           - container
