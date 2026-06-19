@@ -12,7 +12,7 @@ function ess_up {
   }
 
   if (-not $StackBuildId) {
-      Write-Error "Error: Specify stack build ID: ess_up [stack_build_id]"
+      Write-Error "Error: Specify stack build id: ess_up [stack_version] [stack_build_id]"
       return 1
   }
 

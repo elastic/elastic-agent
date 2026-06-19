@@ -3,7 +3,7 @@ set -euo pipefail
 
 function ess_up() {
   : "${1:?Error: Specify stack version: ess_up [stack_version] [stack_build_id]}"
-  : "${2:?Error: Specify stack build version: ess_up [stack_version] [stack_build_id]}"
+  : "${2:?Error: Specify stack build id: ess_up [stack_version] [stack_build_id]}"
 
   echo "~~~ Starting ESS Stack"
   local STACK_VERSION=$1
