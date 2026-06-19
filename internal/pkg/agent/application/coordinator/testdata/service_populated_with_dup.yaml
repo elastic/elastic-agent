@@ -1,0 +1,36 @@
+
+providers:
+    local:
+        enabled: true
+receivers:
+    nop/persisted: null
+extensions:
+    headers_setter/persisted:
+        headers:
+            - action: upsert
+              key: User-Agent
+              value: Elastic-edot agentless
+    headers_setter/api_key:
+        headers:
+            - action: upsert
+              key: APIKEY
+              value: SECRET_API_KEY_2
+exporters:
+    nop/persisted: null
+processors:
+    batch/persisted:
+        type: batch
+        timeout: 1s
+service:
+    extensions:
+        - headers_setter/persisted
+        - headers_setter/api_key
+    pipelines:
+        logs/persisted:
+            receivers:
+                - nop
+            exporters:
+                - nop
+agent:
+    logging:
+        rotateeverybytes: 1
