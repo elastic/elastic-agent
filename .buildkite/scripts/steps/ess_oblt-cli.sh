@@ -18,6 +18,8 @@ function ess_up() {
     --wait 20
     --parameter "StackVersion=$STACK_VERSION"
     --parameter "ExpireInHours=2"
+    --parameter "ElasticTeam=elastic-agent-control-plane"
+    --parameter "ElasticProject=elastic-agent-ci"
   )
 
   # TODO: use the new template parameter to pass the stack build id, and simplify how to use this.
