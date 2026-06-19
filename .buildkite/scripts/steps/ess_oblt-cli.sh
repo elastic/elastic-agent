@@ -2,13 +2,12 @@
 set -euo pipefail
 
 function ess_up() {
+  : "${1:?Error: Specify stack version: ess_up [stack_version] [stack_build_id]}"
+  : "${2:?Error: Specify stack build id: ess_up [stack_version] [stack_build_id]}"
+
   echo "~~~ Starting ESS Stack"
   local STACK_VERSION=$1
-
-  if [ -z "$STACK_VERSION" ]; then
-    echo "Error: Specify stack version: ess_up [stack_version]" >&2
-    return 1
-  fi
+  local STACK_BUILD_ID=$2
 
   # Build the oblt-cli command with conditional ElasticAgentDockerImage parameter
   local oblt_cmd=(
@@ -20,6 +19,10 @@ function ess_up() {
     --parameter "StackVersion=$STACK_VERSION"
     --parameter "ExpireInHours=2"
   )
+
+  # TODO: use the new template parameter to pass the stack build id, and simplify how to use this.
+  oblt_cmd+=(--parameter "ElasticsearchDockerImage=docker.elastic.co/cloud-release/elasticsearch-cloud-ess:${STACK_BUILD_ID}")
+  oblt_cmd+=(--parameter "KibanaDockerImage=docker.elastic.co/cloud-release/kibana-cloud:${STACK_BUILD_ID}")
 
   if [ -n "${INTEGRATION_SERVER_DOCKER_IMAGE:-}" ]; then
     oblt_cmd+=(--parameter "ElasticAgentDockerImage=${INTEGRATION_SERVER_DOCKER_IMAGE}")
