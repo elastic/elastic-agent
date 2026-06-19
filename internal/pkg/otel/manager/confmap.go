@@ -6,9 +6,27 @@ package manager
 
 import (
 	"fmt"
+	"strings"
 
 	"go.opentelemetry.io/collector/confmap"
 )
+
+// hasProfilesPipeline reports whether cfg contains at least one pipeline whose
+// signal type is "profiles" (i.e. the pipeline ID is "profiles" or starts with
+// "profiles/").
+func hasProfilesPipeline(cfg *confmap.Conf) bool {
+	raw := cfg.Get("service::pipelines")
+	pipelines, ok := raw.(map[string]any)
+	if !ok {
+		return false
+	}
+	for id := range pipelines {
+		if id == "profiles" || strings.HasPrefix(id, "profiles/") {
+			return true
+		}
+	}
+	return false
+}
 
 // serviceExtensionsList returns a copy of the service::extensions list from
 // config, or nil if the key is not set. It returns an error if the value is
