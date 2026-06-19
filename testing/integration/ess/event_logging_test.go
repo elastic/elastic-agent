@@ -295,7 +295,7 @@ func addOverwriteToPolicy(t *testing.T, info *define.Info, policyName, policyID 
 	body := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "logging": {
@@ -314,7 +314,7 @@ func addOverwriteToPolicy(t *testing.T, info *define.Info, policyName, policyID 
 	  }
     }
   }
-}`, policyName)
+}`, policyName, info.Namespace)
 	sendPolicyUpdate(t, info, policyID, body)
 }
 
