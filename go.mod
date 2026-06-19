@@ -122,11 +122,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
-<<<<<<< HEAD
-	github.com/StackExchange/wmi v1.2.1 // indirect
-=======
-	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
->>>>>>> 9bc78ce3a ([deps] Bump github.com/jaypipes/ghw v0.12.0 -> v0.24.0 (#14982))
 	github.com/akavel/rsrc v0.10.2 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
@@ -195,12 +190,7 @@ require (
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-<<<<<<< HEAD
-	github.com/jaypipes/pcidb v1.0.0 // indirect
-=======
-	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf // indirect
 	github.com/jaypipes/pcidb v1.1.1 // indirect
->>>>>>> 9bc78ce3a ([deps] Bump github.com/jaypipes/ghw v0.12.0 -> v0.24.0 (#14982))
 	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
 	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
 	github.com/jcmturner/gofork v1.7.6 // indirect
