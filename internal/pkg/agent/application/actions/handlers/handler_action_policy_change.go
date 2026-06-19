@@ -297,6 +297,8 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	// compare the next policy against. If we updated them before a failure, the
 	// resent policy would look unchanged and we would skip re-applying it.
 	hasEventLoggingChanged := h.applyEventLoggingOutputChange(partialCfg)
+	hasLoggingChanged := h.applyLoggingConfigChange(cfg, loggingConfig)
+
 	if validatedFleetConfig != nil {
 		h.config.Fleet.Client = *validatedFleetConfig
 	}
@@ -317,7 +319,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	}
 
 	// Re-exec so the new event logging output is applied on restart.
-	if hasEventLoggingChanged {
+	if hasEventLoggingChanged || hasLoggingChanged {
 		h.runtimeLogLevelSetter.ReExec(nil)
 	}
 
@@ -338,6 +340,23 @@ func (h *PolicyChangeHandler) applyEventLoggingOutputChange(new *configuration.C
 
 	current.ToFiles = incoming.ToFiles
 	current.ToStderr = incoming.ToStderr
+	return true
+}
+
+func (h *PolicyChangeHandler) applyLoggingConfigChange(new *configuration.Configuration, loggingConfig *logger.Config) bool {
+	if loggingConfig == nil {
+		return false
+	}
+	current := h.config.Settings.LoggingConfig
+	incoming := new.Settings.LoggingConfig
+	if current.ToFiles == incoming.ToFiles && current.ToStderr == incoming.ToStderr && current.Files.Path == incoming.Files.Path {
+		// if there is no change in the logging output settings, we consider that there is no change to the logging config
+		return false
+	}
+
+	current.ToFiles = incoming.ToFiles
+	current.ToStderr = incoming.ToStderr
+	current.Files.Path = incoming.Files.Path
 	return true
 }
 
@@ -447,6 +466,9 @@ func fleetToReader(agentID string, headers map[string]string, logLevelOverride s
 		"id":                           agentID,
 		"headers":                      headers,
 		"logging.level":                cfg.Settings.LoggingConfig.Level,
+		"logging.to_files":             cfg.Settings.LoggingConfig.ToFiles,
+		"logging.to_stderr":            cfg.Settings.LoggingConfig.ToStderr,
+		"logging.files.path":           cfg.Settings.LoggingConfig.Files.Path,
 		"logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
 		"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
 		"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,

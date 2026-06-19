@@ -29,6 +29,11 @@ extensions:
   azure_auth:
     managed_identity:
   azure_encoding:
+  awscredentialsprovider:
+    credentials:
+      access_key_id: tom 
+      secret_access_key: tom
+      session_token: dG9tCg==
 
 processors:
   attributes:
@@ -106,6 +111,20 @@ receivers:
       s3_prefix: 'test'
     encodings:
       - extension: awslogs_encoding/elbaccess
+  awscloudwatch:
+    credentials_provider: awscredentialsprovider
+    region: us-east-1
+    logs:
+      poll_interval: 1m
+      groups:
+        autodiscover:
+          limit: 1
+    metrics:
+      collection_interval: 5m
+      period: 5m
+      queries:
+        - namespace: AWS/Lambda
+          metric_name: Invocations
   prometheusremotewrite:
     endpoint: 0.0.0.0:9090
   statsd:
@@ -224,6 +243,7 @@ service:
         - elasticapmintake
         - elasticmonitoringreceiver
         - azure_event_hub
+        - awscloudwatch
         - verifier
 
     logs/forward_receive:
@@ -276,6 +296,7 @@ service:
         - vcenter
         - zookeeper
         - azure_event_hub
+        - awscloudwatch
 
     metrics/aggregated:
       receivers:

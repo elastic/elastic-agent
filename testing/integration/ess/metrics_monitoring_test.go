@@ -72,6 +72,12 @@ func (runner *MetricsRunner) SetupSuite() {
 			kibana.MonitoringEnabledLogs,
 			kibana.MonitoringEnabledMetrics,
 		},
+		AgentFeatures: []map[string]interface{}{
+			{
+				"name":    "default_processors",
+				"enabled": false,
+			},
+		},
 	}
 
 	installOpts := atesting.InstallOpts{
@@ -211,6 +217,32 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 		}
 		return true
 	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install")
+
+	query = genESQuery(agentStatus.Info.ID,
+		[][]string{
+			{"match", "component.binary", "elastic-otel-collector"},
+			{"exists", "field", "data_stream.dataset"},
+			{"exists", "field", "data_stream.namespace"},
+			{"exists", "field", "data_stream.type"},
+			{"exists", "field", "event.dataset"},
+			{"exists", "field", "elastic_agent.id"},
+			{"exists", "field", "elastic_agent.process"},
+			{"exists", "field", "elastic_agent.snapshot"},
+			{"exists", "field", "elastic_agent.version"},
+			{"exists", "field", "agent.id"},
+			{"exists", "field", "agent.version"},
+			{"exists", "field", "agent.name"},
+			{"exists", "field", "component.id"},
+			{"exists", "field", "metricset.name"},
+			{"exists", "field", "host.hostname"},
+		})
+	require.Eventually(t, func() bool {
+		now = time.Now()
+		res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
+		require.NoError(t, err)
+		t.Logf("Fetched monitoring metrics with event template fields, got %d hits", res.Hits.Total.Value)
+		return res.Hits.Total.Value >= 1
+	}, time.Minute*10, time.Second*10, "monitoring metrics missing expected event template fields")
 
 	// Add a policy overwrite to change the agent monitoring to use Otel runtime
 	runner.addMonitoringToOtelRuntimeOverwrite()

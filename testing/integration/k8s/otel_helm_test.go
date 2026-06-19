@@ -248,7 +248,7 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 						continue
 					}
 
-					if container.RestartCount == 0 && container.State.Running != nil {
+					if container.Ready {
 						checkedAgentContainers++
 					}
 				}

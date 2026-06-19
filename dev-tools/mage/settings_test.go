@@ -349,12 +349,33 @@ func TestSettingsGetPackageTypes(t *testing.T) {
 		assert.Equal(t, []PackageType{TarGz, Zip}, types)
 	})
 
-	t.Run("returns nil when both are empty", func(t *testing.T) {
+	t.Run("returns platform-derived default when both are empty", func(t *testing.T) {
 		s := DefaultSettings()
+		// Default platforms include both Unix and Windows entries, so the derived
+		// default should contain both tar.gz and zip.
+		s.CrossBuild.Platforms = "linux/amd64,windows/amd64"
 
 		types := s.GetPackageTypes()
 
-		assert.Nil(t, types)
+		assert.Equal(t, []PackageType{TarGz, Zip}, types)
+	})
+
+	t.Run("returns only tar.gz for unix-only platforms", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Platforms = "linux/amd64,darwin/arm64"
+
+		types := s.GetPackageTypes()
+
+		assert.Equal(t, []PackageType{TarGz}, types)
+	})
+
+	t.Run("returns only zip for windows-only platforms", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Platforms = "windows/amd64"
+
+		types := s.GetPackageTypes()
+
+		assert.Equal(t, []PackageType{Zip}, types)
 	})
 
 	t.Run("returns all package types when PACKAGES is all", func(t *testing.T) {
@@ -644,10 +665,6 @@ func TestDefaultSettings(t *testing.T) {
 		// CrossBuild defaults
 		assert.Equal(t, "linux", settings.CrossBuild.DevOS)
 		assert.Equal(t, "amd64", settings.CrossBuild.DevArch)
-		assert.True(t, settings.CrossBuild.MountModcache)
-		assert.True(t, settings.CrossBuild.MountBuildCache)
-		assert.Equal(t, "elastic-agent-crossbuild-build-cache", settings.CrossBuild.BuildCacheVolumeName)
-
 		// IntegrationTest defaults
 		assert.False(t, settings.IntegrationTest.CleanOnExit)
 		assert.True(t, settings.IntegrationTest.TestEnvironmentEnabled)
@@ -678,9 +695,6 @@ func TestLoadSettings(t *testing.T) {
 		// CrossBuild defaults
 		assert.Equal(t, "linux", settings.CrossBuild.DevOS)
 		assert.Equal(t, "amd64", settings.CrossBuild.DevArch)
-		assert.True(t, settings.CrossBuild.MountModcache)
-		assert.True(t, settings.CrossBuild.MountBuildCache)
-
 		// IntegrationTest defaults
 		assert.False(t, settings.IntegrationTest.CleanOnExit)
 		assert.True(t, settings.IntegrationTest.TestEnvironmentEnabled)
@@ -758,8 +772,6 @@ func TestLoadSettings(t *testing.T) {
 		t.Setenv("PLATFORMS", "linux/amd64,darwin/arm64")
 		t.Setenv("PACKAGES", "targz,zip")
 		t.Setenv("DOCKER_VARIANTS", "basic,cloud")
-		t.Setenv("CROSSBUILD_MOUNT_MODCACHE", "false")
-		t.Setenv("CROSSBUILD_MOUNT_GOCACHE", "false")
 		t.Setenv("DEV_OS", "darwin")
 		t.Setenv("DEV_ARCH", "arm64")
 
@@ -769,8 +781,6 @@ func TestLoadSettings(t *testing.T) {
 		assert.Equal(t, "linux/amd64,darwin/arm64", settings.CrossBuild.Platforms)
 		assert.Equal(t, "targz,zip", settings.CrossBuild.Packages)
 		assert.Equal(t, "basic,cloud", settings.CrossBuild.DockerVariants)
-		assert.False(t, settings.CrossBuild.MountModcache)
-		assert.False(t, settings.CrossBuild.MountBuildCache)
 		assert.Equal(t, "darwin", settings.CrossBuild.DevOS)
 		assert.Equal(t, "arm64", settings.CrossBuild.DevArch)
 	})
