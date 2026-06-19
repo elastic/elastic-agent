@@ -28,13 +28,13 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
 // Fixture handles the setup and management of the Elastic Agent.
@@ -56,6 +56,10 @@ type Fixture struct {
 	additionalArgs  []string
 	fipsArtifact    bool
 	cmdOutput       io.Writer
+
+	// useStandardCheckinMode disables the on_state_change Fleet checkin
+	// mode used in tests by default.
+	useStandardCheckinMode bool
 
 	srcPackage string
 	workDir    string
@@ -174,6 +178,15 @@ func WithAdditionalArgs(args []string) FixtureOpt {
 func WithFIPSArtifact() FixtureOpt {
 	return func(f *Fixture) {
 		f.fipsArtifact = true
+	}
+}
+
+// WithStandardCheckinMode opts the fixture out of the default on_state_change
+// Fleet checkin mode. Use this when a test specifically requires standard
+// checkin behavior where changes can take up to 5 minutes to be reported to Fleet.
+func WithStandardCheckinMode() FixtureOpt {
+	return func(f *Fixture) {
+		f.useStandardCheckinMode = true
 	}
 }
 
@@ -1760,7 +1773,12 @@ type AgentInspectOutput struct {
 		Headers  interface{} `yaml:"headers"`
 		ID       string      `yaml:"id"`
 		Logging  struct {
-			Level string `yaml:"level"`
+			Level    string `yaml:"level"`
+			ToFiles  bool   `yaml:"to_files"`
+			ToStderr bool   `yaml:"to_stderr"`
+			Files    struct {
+				Path string `yaml:"path"`
+			} `yaml:"files"`
 		} `yaml:"logging"`
 		Monitoring struct {
 			Enabled bool `yaml:"enabled"`

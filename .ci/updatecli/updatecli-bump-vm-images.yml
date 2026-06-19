@@ -55,14 +55,9 @@ targets:
     scmid: githubConfig
     kind: file
     spec:
+      searchpattern: true
       files:
-        - .buildkite/pipeline.yml
-        - .buildkite/bk.integration.pipeline.yml
-        - .buildkite/bk.integration-fips.pipeline.yml
-        - .buildkite/integration.pipeline.yml
-        - .buildkite/pipeline.elastic-agent-binary-dra.yml
-        - .buildkite/pipeline.elastic-agent-package.yml
-        - .buildkite/k8s-testing-pipeline.yml
+        - .buildkite/*.yml
       matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-([0-9]+)"'
       replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
 
@@ -72,9 +67,8 @@ targets:
     scmid: githubConfig
     kind: file
     spec:
+      searchpattern: true
       files:
-        - .buildkite/pipeline.yml
-        - .buildkite/bk.integration.pipeline.yml
-        - .buildkite/bk.integration-fips.pipeline.yml
+        - .buildkite/*.yml
       matchpattern: '(IMAGE_.+): "1.0.([\d]+)"'
       replacepattern: '$1: "1.0.{{ source "latestVersion" }}"'

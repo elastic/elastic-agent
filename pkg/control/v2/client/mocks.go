@@ -614,8 +614,16 @@ func (_c *MockClient_State_Call) RunAndReturn(run func(ctx context.Context) (*Ag
 }
 
 // StateWatch provides a mock function for the type MockClient
-func (_mock *MockClient) StateWatch(ctx context.Context) (ClientStateWatch, error) {
-	ret := _mock.Called(ctx)
+func (_mock *MockClient) StateWatch(ctx context.Context, opts ...StateWatchOption) (ClientStateWatch, error) {
+	// StateWatchOption
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx)
+	_ca = append(_ca, _va...)
+	ret := _mock.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StateWatch")
@@ -623,18 +631,18 @@ func (_mock *MockClient) StateWatch(ctx context.Context) (ClientStateWatch, erro
 
 	var r0 ClientStateWatch
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) (ClientStateWatch, error)); ok {
-		return returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, ...StateWatchOption) (ClientStateWatch, error)); ok {
+		return returnFunc(ctx, opts...)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) ClientStateWatch); ok {
-		r0 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, ...StateWatchOption) ClientStateWatch); ok {
+		r0 = returnFunc(ctx, opts...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(ClientStateWatch)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, ...StateWatchOption) error); ok {
+		r1 = returnFunc(ctx, opts...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -648,18 +656,29 @@ type MockClient_StateWatch_Call struct {
 
 // StateWatch is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClient_Expecter) StateWatch(ctx interface{}) *MockClient_StateWatch_Call {
-	return &MockClient_StateWatch_Call{Call: _e.mock.On("StateWatch", ctx)}
+//   - opts ...StateWatchOption
+func (_e *MockClient_Expecter) StateWatch(ctx interface{}, opts ...interface{}) *MockClient_StateWatch_Call {
+	return &MockClient_StateWatch_Call{Call: _e.mock.On("StateWatch",
+		append([]interface{}{ctx}, opts...)...)}
 }
 
-func (_c *MockClient_StateWatch_Call) Run(run func(ctx context.Context)) *MockClient_StateWatch_Call {
+func (_c *MockClient_StateWatch_Call) Run(run func(ctx context.Context, opts ...StateWatchOption)) *MockClient_StateWatch_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
+		var arg1 []StateWatchOption
+		variadicArgs := make([]StateWatchOption, len(args)-1)
+		for i, a := range args[1:] {
+			if a != nil {
+				variadicArgs[i] = a.(StateWatchOption)
+			}
+		}
+		arg1 = variadicArgs
 		run(
 			arg0,
+			arg1...,
 		)
 	})
 	return _c
@@ -670,7 +689,7 @@ func (_c *MockClient_StateWatch_Call) Return(clientStateWatch ClientStateWatch, 
 	return _c
 }
 
-func (_c *MockClient_StateWatch_Call) RunAndReturn(run func(ctx context.Context) (ClientStateWatch, error)) *MockClient_StateWatch_Call {
+func (_c *MockClient_StateWatch_Call) RunAndReturn(run func(ctx context.Context, opts ...StateWatchOption) (ClientStateWatch, error)) *MockClient_StateWatch_Call {
 	_c.Call.Return(run)
 	return _c
 }

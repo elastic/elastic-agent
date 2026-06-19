@@ -26,7 +26,6 @@ import (
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
-	"github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -257,7 +256,7 @@ func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(kafkapartitionerextension.Type.String()), extensionName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartitioner"), extensionName)
 }
 
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
@@ -396,9 +395,6 @@ func getReceiversConfigForComponent(
 	}
 
 	receiverId := GetReceiverID(receiverType, comp.ID)
-	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
-	// always safe. We should either ensure this is always the case, or have an explicit mapping.
-	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
 	binaryName := comp.BeatName()
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 
@@ -423,17 +419,33 @@ func getReceiversConfigForComponent(
 			},
 		},
 	}
-	switch beatName {
+	switch binaryName {
 	case "filebeat":
-		receiverConfig[beatName] = map[string]any{
+		receiverConfig[binaryName] = map[string]any{
 			"inputs": inputs,
 		}
 		if fbfeatures.IsElasticsearchStateStoreEnabled() {
 			receiverConfig["storage"] = elasticsearchStateStoreExtensionName
 		}
 	case "metricbeat":
-		receiverConfig[beatName] = map[string]any{
+		receiverConfig[binaryName] = map[string]any{
 			"modules": inputs,
+		}
+	case "auditbeat":
+		receiverConfig[binaryName] = map[string]any{
+			"modules": inputs,
+		}
+	case "heartbeat":
+		receiverConfig[binaryName] = map[string]any{
+			"monitors": inputs,
+		}
+	case "osquerybeat":
+		receiverConfig[binaryName] = map[string]any{
+			"inputs": inputs,
+		}
+	case "packetbeat":
+		receiverConfig[binaryName] = map[string]any{
+			"protocols": inputs,
 		}
 	}
 
@@ -500,7 +512,7 @@ func getExporterConfigForComponent(comp *component.Component, exporterType otelc
 func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
 	beatName := comp.BeatName()
 	switch beatName {
-	case "filebeat", "metricbeat":
+	case "filebeat", "metricbeat", "auditbeat", "heartbeat", "osquerybeat", "packetbeat":
 		return pipeline.SignalLogs, nil
 	default:
 		return pipeline.Signal{}, fmt.Errorf("unknown otel signal for input type: %s", comp.InputType)
@@ -515,6 +527,14 @@ func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type,
 		return otelcomponent.MustNewType("filebeatreceiver"), nil
 	case "metricbeat":
 		return otelcomponent.MustNewType("metricbeatreceiver"), nil
+	case "auditbeat":
+		return otelcomponent.MustNewType("abreceiver"), nil
+	case "heartbeat":
+		return otelcomponent.MustNewType("hbreceiver"), nil
+	case "osquerybeat":
+		return otelcomponent.MustNewType("osqreceiver"), nil
+	case "packetbeat":
+		return otelcomponent.MustNewType("pbreceiver"), nil
 	default:
 		return otelcomponent.Type{}, fmt.Errorf("unknown otel receiver type for input type: %s", comp.InputType)
 	}
@@ -720,7 +740,7 @@ func OutputConfigToExporterConfig(logger *logp.Logger,
 func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, error) {
 	beatName := comp.BeatName()
 	switch beatName {
-	case "filebeat":
+	case "filebeat", "auditbeat", "heartbeat", "osquerybeat", "packetbeat":
 		return "logs", nil
 	case "metricbeat":
 		return "metrics", nil

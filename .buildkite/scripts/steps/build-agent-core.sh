@@ -5,7 +5,7 @@ set -euo pipefail
 source .buildkite/scripts/common.sh
 
 echo "+++ Build Agent artifacts"
-SNAPSHOT=""
+SNAPSHOT="false"
 VERSION_QUALIFIER="${VERSION_QUALIFIER:=""}"
 BEAT_VERSION_FULL=$BEAT_VERSION
 

@@ -96,6 +96,19 @@ func (psv ParsedSemVer) VersionWithPrerelease() string {
 	return b.String()
 }
 
+// VersionWithBuildMetadata returns major.minor.patch with build metadata appended when present,
+// omitting the prerelease string. Use this when the build ID must be preserved (e.g. Independent
+// Agent Releases) but prerelease state is tracked separately.
+func (psv ParsedSemVer) VersionWithBuildMetadata() string {
+	b := new(strings.Builder)
+	b.WriteString(psv.CoreVersion())
+	if psv.buildMetadata != "" {
+		b.WriteString(metadataSeparator)
+		b.WriteString(psv.buildMetadata)
+	}
+	return b.String()
+}
+
 func (psv ParsedSemVer) ExtractSnapshotFromVersionString() (string, bool) {
 
 	b := new(strings.Builder)

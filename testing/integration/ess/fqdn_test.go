@@ -89,6 +89,7 @@ func TestFQDN(t *testing.T) {
 		NonInteractive: true,
 		Force:          true,
 	}
+	require.NoError(t, fleettools.UpdateESOutputPreset(ctx, kibClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
 	policy, agentID, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
 
@@ -128,14 +129,13 @@ func TestFQDN(t *testing.T) {
 		Namespace:     info.Namespace,
 		AgentFeatures: policy.AgentFeatures,
 	}
-	_, err = kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
+	updatedPolicy, err := kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Wait until policy has been applied by Agent")
-	expectedAgentPolicyRevision := agent.PolicyRevision + 1
 	require.Eventually(
 		t,
-		tools.IsPolicyRevision(ctx, t, kibClient, agent.ID, expectedAgentPolicyRevision),
+		tools.IsMinPolicyRevision(ctx, t, kibClient, agent.ID, updatedPolicy.Revision),
 		2*time.Minute,
 		1*time.Second,
 	)
@@ -159,14 +159,13 @@ func TestFQDN(t *testing.T) {
 		Namespace:     info.Namespace,
 		AgentFeatures: policy.AgentFeatures,
 	}
-	_, err = kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
+	updatedPolicy, err = kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Wait until policy has been applied by Agent")
-	expectedAgentPolicyRevision++
 	require.Eventually(
 		t,
-		tools.IsPolicyRevision(ctx, t, kibClient, agent.ID, expectedAgentPolicyRevision),
+		tools.IsMinPolicyRevision(ctx, t, kibClient, agent.ID, updatedPolicy.Revision),
 		2*time.Minute,
 		1*time.Second,
 	)

@@ -18,6 +18,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -212,40 +213,7 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 				c.sendObserved()
 			}
 		case checkin := <-comm.CheckinObserved():
-			sendExpected := false
-			changed := false
-			if c.state.State == client.UnitStateStarting {
-				// first observation after start set component to healthy
-				c.state.State = client.UnitStateHealthy
-				c.state.Message = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
-				changed = true
-			}
-			if c.lastCheckin.IsZero() {
-				// first check-in
-				sendExpected = true
-			}
-			// Warning lastCheckin must contain a
-			// monotonic clock.  Functions like Local(),
-			// UTC(), Round(), AddDate(), etc. remove the
-			// monotonic clock.  See
-			// https://pkg.go.dev/time
-			c.lastCheckin = time.Now()
-			if c.state.syncCheckin(checkin) {
-				changed = true
-			}
-			if c.state.unsettled() {
-				sendExpected = true
-			}
-			if sendExpected {
-				checkinExpected := c.state.toCheckinExpected()
-				comm.CheckinExpected(checkinExpected, checkin)
-			}
-			if changed {
-				c.sendObserved()
-			}
-			if c.state.cleanupStopped() {
-				c.sendObserved()
-			}
+			c.processCheckin(checkin, comm)
 		case <-t.C:
 			t.Reset(checkinPeriod)
 			if c.actionState == actionStart {
@@ -374,6 +342,56 @@ func (c *commandRuntime) compState(state client.UnitState) {
 
 func (c *commandRuntime) sendObserved() {
 	c.ch <- c.state.Copy()
+}
+
+// processCheckin handles an observed check-in message from the running process.
+func (c *commandRuntime) processCheckin(checkin *proto.CheckinObserved, comm Communicator) {
+	// Ignore late check-ins once the component is no longer meant to be
+	// running. The checkinObserved channel is unbuffered, so a final check-in
+	// emitted by a dying process can be parked on it while stop() blocks the
+	// Run() loop reaping the process, then delivered after stop() has already
+	// forced UnitStateStopped. Processing it would resurrect non-stopped unit
+	// states via syncCheckin and emit a state update after the terminal
+	// Stopped state, re-broadcasting stale health for a component that has
+	// been removed. This mirrors serviceRuntime's isRunning() guard in its
+	// own processCheckin.
+	if c.actionState != actionStart || c.state.State == client.UnitStateStopping || c.state.State == client.UnitStateStopped {
+		return
+	}
+	sendExpected := false
+	changed := false
+	if c.state.State == client.UnitStateStarting {
+		// first observation after start set component to healthy
+		c.state.State = client.UnitStateHealthy
+		c.state.Message = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
+		changed = true
+	}
+	if c.lastCheckin.IsZero() {
+		// first check-in
+		sendExpected = true
+	}
+	// Warning lastCheckin must contain a
+	// monotonic clock.  Functions like Local(),
+	// UTC(), Round(), AddDate(), etc. remove the
+	// monotonic clock.  See
+	// https://pkg.go.dev/time
+	c.lastCheckin = time.Now()
+	if c.state.syncCheckin(checkin) {
+		changed = true
+	}
+	if c.state.unsettled() {
+		sendExpected = true
+	}
+	if sendExpected {
+		checkinExpected := c.state.toCheckinExpected()
+		comm.CheckinExpected(checkinExpected, checkin)
+	}
+	if changed {
+		c.sendObserved()
+	}
+	if c.state.cleanupStopped() {
+		c.sendObserved()
+	}
 }
 
 func (c *commandRuntime) start(comm Communicator) error {

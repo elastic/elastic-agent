@@ -36,6 +36,7 @@ import (
 	comprt "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -161,6 +162,11 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		}
 	}
 
+	// Notify Fleet of the uninstall before removing the top path, at this point the service is stopped and won't run anymore.
+	// Doing this after RemovePath has been linked to some difficult to diagnose runtime panics on Windows, where the implementation
+	// of RemovePath is more complex. See https://github.com/elastic/elastic-agent/issues/14142 and https://github.com/elastic/elastic-agent/issues/8428.
+	notifyFleetIfNeeded(ctx, log, pt, cfg, agentID, notifyFleet, localFleet, skipFleetAudit, notifyFleetAuditUninstall)
+
 	// remove existing directory
 	pt.Describe("Removing install directory")
 	err = RemovePath(log, topPath)
@@ -173,7 +179,6 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	}
 	pt.Describe("Removed install directory")
 
-	notifyFleetIfNeeded(ctx, log, pt, cfg, agentID, notifyFleet, localFleet, skipFleetAudit, notifyFleetAuditUninstall)
 	return nil
 }
 
@@ -184,12 +189,12 @@ func notifyFleetIfNeeded(ctx context.Context, log *logp.Logger, pt ProgressDescr
 	}
 }
 
-type NotifyFleetAuditUninstall func(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai fleetapi.AgentInfo) error
+type NotifyFleetAuditUninstall func(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) error
 
 // notifyFleetAuditUninstall will attempt to notify fleet-server of the agent's uninstall.
 //
 // There are retries for the attempt after a 10s wait, but it is a best-effort approach.
-func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai fleetapi.AgentInfo) error {
+func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	pt.Describe("Attempting to notify Fleet of uninstall")

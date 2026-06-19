@@ -45,7 +45,7 @@ func (_m *MockSender) EXPECT() *MockSender_Expecter {
 }
 
 // Send provides a mock function for the type MockSender
-func (_mock *MockSender) Send(ctx context.Context, method string, path string, params url.Values, headers http.Header, body io.Reader) (*http.Response, error) {
+func (_mock *MockSender) Send(ctx context.Context, method string, path string, params url.Values, headers http.Header, body io.ReadSeeker) (*http.Response, error) {
 	ret := _mock.Called(ctx, method, path, params, headers, body)
 
 	if len(ret) == 0 {
@@ -54,17 +54,17 @@ func (_mock *MockSender) Send(ctx context.Context, method string, path string, p
 
 	var r0 *http.Response
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, url.Values, http.Header, io.Reader) (*http.Response, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, url.Values, http.Header, io.ReadSeeker) (*http.Response, error)); ok {
 		return returnFunc(ctx, method, path, params, headers, body)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, url.Values, http.Header, io.Reader) *http.Response); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, url.Values, http.Header, io.ReadSeeker) *http.Response); ok {
 		r0 = returnFunc(ctx, method, path, params, headers, body)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*http.Response)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, url.Values, http.Header, io.Reader) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, url.Values, http.Header, io.ReadSeeker) error); ok {
 		r1 = returnFunc(ctx, method, path, params, headers, body)
 	} else {
 		r1 = ret.Error(1)
@@ -83,12 +83,12 @@ type MockSender_Send_Call struct {
 //   - path string
 //   - params url.Values
 //   - headers http.Header
-//   - body io.Reader
+//   - body io.ReadSeeker
 func (_e *MockSender_Expecter) Send(ctx interface{}, method interface{}, path interface{}, params interface{}, headers interface{}, body interface{}) *MockSender_Send_Call {
 	return &MockSender_Send_Call{Call: _e.mock.On("Send", ctx, method, path, params, headers, body)}
 }
 
-func (_c *MockSender_Send_Call) Run(run func(ctx context.Context, method string, path string, params url.Values, headers http.Header, body io.Reader)) *MockSender_Send_Call {
+func (_c *MockSender_Send_Call) Run(run func(ctx context.Context, method string, path string, params url.Values, headers http.Header, body io.ReadSeeker)) *MockSender_Send_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -110,9 +110,9 @@ func (_c *MockSender_Send_Call) Run(run func(ctx context.Context, method string,
 		if args[4] != nil {
 			arg4 = args[4].(http.Header)
 		}
-		var arg5 io.Reader
+		var arg5 io.ReadSeeker
 		if args[5] != nil {
-			arg5 = args[5].(io.Reader)
+			arg5 = args[5].(io.ReadSeeker)
 		}
 		run(
 			arg0,
@@ -131,7 +131,7 @@ func (_c *MockSender_Send_Call) Return(response *http.Response, err error) *Mock
 	return _c
 }
 
-func (_c *MockSender_Send_Call) RunAndReturn(run func(ctx context.Context, method string, path string, params url.Values, headers http.Header, body io.Reader) (*http.Response, error)) *MockSender_Send_Call {
+func (_c *MockSender_Send_Call) RunAndReturn(run func(ctx context.Context, method string, path string, params url.Values, headers http.Header, body io.ReadSeeker) (*http.Response, error)) *MockSender_Send_Call {
 	_c.Call.Return(run)
 	return _c
 }

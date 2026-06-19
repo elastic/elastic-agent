@@ -826,3 +826,71 @@ func TestUnpack(t *testing.T) {
 		})
 	}
 }
+
+// TestPredictVersionedHomeFromMetadata verifies that predictVersionedHomeFromMetadata derives the correct path
+// from each metadata shape. The upgrade flow writes the marker (using predictVersionedHomeFromMetadata) before
+// unpacking, so a divergence would mean the marker protects the wrong directory.
+func TestPredictVersionedHomeFromMetadata(t *testing.T) {
+	tests := []struct {
+		name     string
+		metadata packageMetadata
+	}{
+		{
+			name:     "no manifest falls back to hash",
+			metadata: packageMetadata{hash: "abcdef1234567890"},
+		},
+		{
+			name: "manifest with VersionedHome, no path mappings",
+			metadata: packageMetadata{
+				hash: "abcdef1234567890",
+				manifest: &v1.PackageManifest{
+					Package: v1.PackageDesc{
+						VersionedHome: "data/elastic-agent-abcdef",
+					},
+				},
+			},
+		},
+		{
+			name: "manifest with empty VersionedHome returns empty string",
+			metadata: packageMetadata{
+				hash: "abcdef1234567890",
+				manifest: &v1.PackageManifest{
+					Package: v1.PackageDesc{
+						VersionedHome: "", // empty — must return "" so Upgrade() can guard against it
+					},
+				},
+			},
+		},
+		{
+			name: "manifest with VersionedHome and path mappings",
+			metadata: packageMetadata{
+				hash: "abcdef1234567890",
+				manifest: &v1.PackageManifest{
+					Package: v1.PackageDesc{
+						VersionedHome: "data/elastic-agent-abcdef",
+						PathMappings: []map[string]string{
+							{"data/elastic-agent-abcdef": "data/elastic-agent-remapped"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Derive the expected versioned home the same way the unpacker does.
+			pm := pathMapper{}
+			var unpackerVersionedHome string
+			if tt.metadata.manifest != nil {
+				pm.mappings = tt.metadata.manifest.Package.PathMappings
+				unpackerVersionedHome = filepath.FromSlash(pm.Map(tt.metadata.manifest.Package.VersionedHome))
+			} else {
+				unpackerVersionedHome = createVersionedHomeFromHash(tt.metadata.hash)
+			}
+
+			assert.Equal(t, unpackerVersionedHome, predictVersionedHomeFromMetadata(tt.metadata),
+				"predictVersionedHomeFromMetadata must agree with the unpacker for metadata %+v", tt.metadata)
+		})
+	}
+}

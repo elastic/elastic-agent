@@ -78,7 +78,7 @@ Before you can run any test, you first need to package the Elastic
 Agent version you want to test. For that you'll need to run `mage package`, for example:
 
 ```
-DEV=true SNAPSHOT=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
+DEV=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
 ```
 
 The packaging process has many leavers that need to be correctly set:
@@ -87,19 +87,20 @@ The packaging process has many leavers that need to be correctly set:
  - `EXTERNAL=true|false`: If `false` it will not download any components
    and only include the `elastic-otel-collector` which has `beats` bundled in
    the resulting package.
- - `SNAPSHOT=true|false`: When downloading dependencies (like Beats)
-   use snapshot versions. That is required to package from the `main`
-   branch with `EXTERNAL=true`.
+ - `SNAPSHOT=true|false`: Whether to use snapshot versions of dependencies
+   (like Beats). Defaults to `true`, which is required to package from the
+   `main` branch with `EXTERNAL=true`. Set `SNAPSHOT=false` for release builds.
  - `PLATFORMS`: Comma separated list of platforms you want to build. If
   not set, it defaults to **ALL** platforms. [Selecting specific
   platform](#selecting-specific-platform) contains a list of common
   values. For a full list look at [`elastic-agent/dev-tools/mage/platforms.go`](https://github.com/elastic/elastic-agent/blob/main/dev-tools/mage/platforms.go#L15).
- - `PACKAGES`: **Required.** Comma separated list of packages you want
-  to build. Use `PACKAGES=all` to build all package types.
-  The packages are defined in
+ - `PACKAGES`: Comma separated list of packages you want to build.
+  If not set, defaults to `tar.gz` for non-Windows platforms and `zip`
+  for Windows platforms (based on `PLATFORMS`). Use `PACKAGES=all` to
+  build all package types. The packages are defined in
   [`elastic-agent/dev-tools/mage/pkgtypes.go`](https://github.com/elastic/elastic-agent/blob/main/dev-tools/mage/pkgtypes.go#L72).
-  To run Linux tests you need to package `tar.gz` ,`deb` and `rpm`.
-The possible options are:
+  To run Linux tests you need to package `tar.gz`, `deb` and `rpm`.
+  The possible options are:
     - `tar.gz`
     - `zip` (Windows only)
     - `deb`
@@ -127,10 +128,10 @@ The test are run with mage using the `integration` namespace, they
 share similar leavers as the packaging process.
 
  - `AGENT_VERSION`: The version to test, in the format
-   `9.2.0-SNAPSHOT`. It is **REQUIRED** to be set if you built the
-   packages with `SNAPTHOST=true`. Currently there is no way to tell
-   the integration tests framework to use snapshot versions if testing
-   on VMs.
+   `9.2.0-SNAPSHOT`. It is **REQUIRED** to be set when packages were
+   built with `SNAPSHOT=true` (the default). Currently there is no way
+   to tell the integration tests framework to use snapshot versions if
+   testing on VMs.
 
  - `SNAPSHOT=true|false`: Use snapshot build when running Kubernetes
    tests.
@@ -144,20 +145,22 @@ share similar leavers as the packaging process.
        in Docker. This needs to be set if running Kubernetes integration
        tests.
 
+When running local mode integration tests, `BUILD_AGENT=true` will build the agent for the current platform before running.
+
 An example for running a single test, including packaging the artifacts for it is:
 ```
-EXTERNAL=true DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" SNAPSHOT=true mage package # create elastic-agent SNAPSHOT package using external sources for components
-SNAPSHOT=true INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME # Run TEST_NAME on a multipass VM
+EXTERNAL=true DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package # create elastic-agent snapshot package (default) using external sources for components
+INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME # Run TEST_NAME on a multipass VM
 ```
 
 ### TL;DR: Packaging and running tests
 **Package the Elastic Agent**
 ```
-# If testing on VMs.
-DEV=true SNAPSHOT=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
+# If testing on VMs. SNAPSHOT=true is the default; omit or pass SNAPSHOT=false for release builds.
+DEV=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
 
 # If running Kubernetes tests. Adjust the variants according to your tests
-DEV=true SNAPSHOT=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" DOCKER_VARIANTS="basic,complete,elastic-otel-collector" PLATFORMS=linux/amd64 mage -v package
+DEV=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" DOCKER_VARIANTS="basic,complete,elastic-otel-collector" PLATFORMS=linux/amd64 mage -v package
 ```
 
 **Run the tests**
@@ -298,6 +301,8 @@ Tests with external dependencies might need more environment variables to be set
 when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
 `ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, `KIBANA_PASSWORD`, and
 `ELASTIC_APM_SERVER_URL`.
+
+`TEST_INTEG_CLEAN_ON_EXIT=true|false` will determine whether mage artifacts and .integration-cache are cleaned on exit automatically. Defaults to `false` (no automatic cleanup) for local runs; CI sets this to `true` explicitly.
 
 ### Debugging tests
 
@@ -574,7 +579,7 @@ Run `mage package` with the appropriate value(s) in `PLATFORMS`, as suggested by
 error message, to build the necessary Agent packages first.
 
 If the issue is that the built Agent packages contain `-SNAPSHOT` in their versions,
-whereas the package names in the error message do not, either omit `SNAPSHOT=true` from
+whereas the package names in the error message do not, either pass `SNAPSHOT=false` to
 the `mage package` command OR set the `AGENT_VERSION` environment variable to a version
 that includes the `-SNAPSHOT` suffix when running `mage integration:test` or
 `mage integration:local`.
