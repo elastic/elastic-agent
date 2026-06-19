@@ -44,7 +44,7 @@ func TestCreateRepoZipArchivePreservesMode(t *testing.T) {
 	git("add", "-A")
 
 	dest := filepath.Join(t.TempDir(), "repo.zip")
-	require.NoError(t, createRepoZipArchive(t.Context(), dir, dest), "createRepoZipArchive")
+	require.NoError(t, createRepoZipArchive(t.Context(), dir, dest), "createRepoZipArchive should succeed")
 
 	zr, err := zip.OpenReader(dest)
 	require.NoError(t, err)
