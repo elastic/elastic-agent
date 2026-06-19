@@ -31,9 +31,9 @@ import (
 var testVersion = agtversion.NewParsedSemVer(7, 5, 1, "", "")
 
 var agentSpec = artifact.Artifact{
-	Name:     "Elastic Agent",
-	Cmd:      "elastic-agent",
-	Artifact: "beat/elastic-agent",
+	Name:     "elastic-agent",
+	Version:  testVersion,
+	FileName: "elastic-agent-7.5.1-linux-x86.tar.gz",
 }
 
 func TestFetchVerify(t *testing.T) {
@@ -47,12 +47,14 @@ func TestFetchVerify(t *testing.T) {
 	installPath := filepath.Join("testdata", "install")
 	targetPath := filepath.Join("testdata", "download")
 	ctx := context.Background()
-	a := artifact.Artifact{
-		Name: "elastic-agent", Cmd: "elastic-agent", Artifact: "beats/elastic-agent",
-	}
 	version := agtversion.NewParsedSemVer(8, 0, 0, "", "")
 
 	filename := "elastic-agent-8.0.0-darwin-x86_64.tar.gz"
+	a := artifact.Artifact{
+		Name:     "elastic-agent",
+		Version:  version,
+		FileName: filename,
+	}
 	targetFilePath := filepath.Join(targetPath, filename)
 	hashTargetFilePath := filepath.Join(targetPath, filename+".sha512")
 	ascTargetFilePath := filepath.Join(targetPath, filename+".asc")
@@ -82,7 +84,7 @@ func TestFetchVerify(t *testing.T) {
 	// first download verify should fail:
 	// download skipped, as invalid package is prepared upfront
 	// verify fails and cleans download
-	err = verifier.Verify(ctx, a, *version, false)
+	err = verifier.Verify(ctx, a, filepath.Join(dropPath, filename), targetFilePath, false)
 	var checksumErr *download.ChecksumMismatchError
 	require.ErrorAs(t, err, &checksumErr)
 
@@ -95,7 +97,7 @@ func TestFetchVerify(t *testing.T) {
 	// second one should pass
 	// download not skipped: package missing
 	// verify passes because hash is not correct
-	_, err = NewDownloader(config).Download(ctx, a, version)
+	err = NewDownloader(config).Download(ctx, a, filepath.Join(dropPath, filename), filepath.Join(config.TargetDirectory, a.FileName))
 	require.NoError(t, err)
 	asc, err := os.ReadFile(filepath.Join(dropPath, filename+".asc"))
 	require.NoErrorf(t, err, "could not open .asc for copy")
@@ -111,7 +113,7 @@ func TestFetchVerify(t *testing.T) {
 	_, err = os.Stat(ascTargetFilePath)
 	require.NoError(t, err)
 
-	err = verifier.Verify(ctx, a, *version, false)
+	err = verifier.Verify(ctx, a, filepath.Join(dropPath, filename), targetFilePath, false)
 	require.NoError(t, err)
 
 	// Bad GPG public key.
@@ -128,7 +130,7 @@ func TestFetchVerify(t *testing.T) {
 
 	// Missing .asc file.
 	{
-		err = verifier.Verify(ctx, a, *version, false)
+		err = verifier.Verify(ctx, a, filepath.Join(dropPath, filename), targetFilePath, false)
 		require.Error(t, err)
 
 		// Don't delete these files when GPG validation failure.
@@ -141,7 +143,7 @@ func TestFetchVerify(t *testing.T) {
 		err = os.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
 		require.NoError(t, err)
 
-		err = verifier.Verify(ctx, a, *version, false)
+		err = verifier.Verify(ctx, a, filepath.Join(dropPath, filename), targetFilePath, false)
 		var invalidSigErr *download.InvalidSignatureError
 		assert.ErrorAs(t, err, &invalidSigErr)
 
@@ -212,6 +214,7 @@ func TestVerify(t *testing.T) {
 
 			timeout := 30 * time.Second
 
+			srcDir := t.TempDir()
 			config := &artifact.Config{
 				TargetDirectory: targetDir,
 				DropPath:        filepath.Join(targetDir, "drop"),
@@ -222,13 +225,13 @@ func TestVerify(t *testing.T) {
 				},
 			}
 
-			pgpKey := prepareTestCase(t, agentSpec, testVersion, config)
+			pgpKey := prepareTestCase(t, agentSpec, &artifact.Config{DropPath: srcDir})
 
 			testClient := NewDownloader(config)
-			artifactPath, err := testClient.Download(ctx, agentSpec, testVersion)
+			srcPath := filepath.Join(srcDir, agentSpec.FileName)
+			artifactPath := filepath.Join(config.TargetDirectory, agentSpec.FileName)
+			err := testClient.Download(ctx, agentSpec, srcPath, artifactPath)
 			require.NoError(t, err, "fs.Downloader could not download artifacts")
-			_, err = testClient.DownloadAsc(context.Background(), agentSpec, *testVersion)
-			require.NoError(t, err, "fs.Downloader could not download artifacts .asc file")
 
 			_, err = os.Stat(artifactPath)
 			require.NoError(t, err)
@@ -236,7 +239,7 @@ func TestVerify(t *testing.T) {
 			testVerifier, err := NewVerifier(log, config, pgpKey)
 			require.NoError(t, err)
 
-			err = testVerifier.Verify(ctx, agentSpec, *testVersion, false, tc.RemotePGPUris...)
+			err = testVerifier.Verify(ctx, agentSpec, srcPath, artifactPath, false, tc.RemotePGPUris...)
 			require.NoError(t, err)
 
 			// log message informing remote PGP was skipped
@@ -250,11 +253,10 @@ func TestVerify(t *testing.T) {
 // its corresponding checksum (.sha512) and signature (.asc) files.
 // It creates the necessary key to sing the artifact and returns the public key
 // to verify the signature.
-func prepareTestCase(t *testing.T, a artifact.Artifact, version *agtversion.ParsedSemVer, cfg *artifact.Config) []byte {
-	filename, err := artifact.GetArtifactName(a, *version, cfg.OperatingSystem, cfg.Architecture)
-	require.NoErrorf(t, err, "could not get artifact name")
+func prepareTestCase(t *testing.T, a artifact.Artifact, cfg *artifact.Config) []byte {
+	filename := a.FileName
 
-	err = os.MkdirAll(cfg.DropPath, 0777)
+	err := os.MkdirAll(cfg.DropPath, 0777)
 	require.NoErrorf(t, err, "failed creating directory %q", cfg.DropPath)
 
 	filePath := filepath.Join(cfg.DropPath, filename)

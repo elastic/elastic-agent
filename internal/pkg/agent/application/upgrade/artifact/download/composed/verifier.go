@@ -12,7 +12,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 // Verifier is a verifier with a predefined set of verifiers.
@@ -40,11 +39,11 @@ func NewVerifier(log *logger.Logger, verifiers ...download.Verifier) *Verifier {
 }
 
 // Verify checks the package from configured source.
-func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
+func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, src, dst string, skipDefaultPgp bool, pgpBytes ...string) error {
 	var errs []error
 
 	for _, verifier := range v.vv {
-		e := verifier.Verify(ctx, a, version, skipDefaultPgp, pgpBytes...)
+		e := verifier.Verify(ctx, a, src, dst, skipDefaultPgp, pgpBytes...)
 		if e == nil {
 			// Success
 			return nil

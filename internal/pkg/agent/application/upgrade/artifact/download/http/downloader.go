@@ -10,12 +10,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -25,7 +22,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
-	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -104,10 +100,9 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 	return nil
 }
 
-// Download fetches the package from configured source.
+// Download fetches the package from the given URI.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
-	remoteArtifact := a.Artifact
+func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, src, dst string) (err error) {
 	downloadedFiles := make([]string, 0, 2)
 	defer func() {
 		if err != nil {
@@ -119,72 +114,18 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 		}
 	}()
 
-	// download from source to dest
-	path, err := e.download(ctx, remoteArtifact, e.config.OS(), a, *version)
+	path, err := e.downloadFile(ctx, src, dst)
 	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
+	hashPath, err := e.downloadFile(ctx, src+".sha512", dst+".sha512")
 	downloadedFiles = append(downloadedFiles, hashPath)
-	return path, err
+	return err
 }
 
-func (e *Downloader) composeURI(artifactName, packageName string) (string, error) {
-	upstream := e.config.SourceURI
-	if !strings.HasPrefix(upstream, "http") && !strings.HasPrefix(upstream, "file") && !strings.HasPrefix(upstream, "/") {
-		// always default to https
-		upstream = fmt.Sprintf("https://%s", upstream)
-	}
-
-	// example: https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.1.1-x86_64.rpm
-	uri, err := url.Parse(upstream)
-	if err != nil {
-		return "", errors.New(err, "invalid upstream URI", errors.TypeConfig)
-	}
-
-	uri.Path = path.Join(uri.Path, artifactName, packageName)
-	return uri.String(), nil
-}
-
-func (e *Downloader) download(ctx context.Context, remoteArtifact string, operatingSystem string, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
-	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
-	if err != nil {
-		return "", errors.New(err, "generating package name failed")
-	}
-
-	fullPath, err := artifact.GetArtifactPath(a, version, operatingSystem, e.config.Arch(), e.config.TargetDirectory)
-	if err != nil {
-		return "", errors.New(err, "generating package path failed")
-	}
-
-	return e.downloadFile(ctx, remoteArtifact, filename, fullPath)
-}
-
-func (e *Downloader) downloadHash(ctx context.Context, remoteArtifact string, operatingSystem string, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
-	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
-	if err != nil {
-		return "", errors.New(err, "generating package name failed")
-	}
-
-	fullPath, err := artifact.GetArtifactPath(a, version, operatingSystem, e.config.Arch(), e.config.TargetDirectory)
-	if err != nil {
-		return "", errors.New(err, "generating package path failed")
-	}
-
-	filename = filename + ".sha512"
-	fullPath = fullPath + ".sha512"
-
-	return e.downloadFile(ctx, remoteArtifact, filename, fullPath)
-}
-
-func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, fullPath string) (string, error) {
-	sourceURI, err := e.composeURI(artifactName, filename)
-	if err != nil {
-		return "", err
-	}
-
+func (e *Downloader) downloadFile(ctx context.Context, sourceURI, fullPath string) (string, error) {
 	req, err := http.NewRequest("GET", sourceURI, nil)
 	if err != nil {
 		return "", errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))

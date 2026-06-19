@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -98,9 +99,13 @@ func runTests(t *testing.T, testCases []testCase, td *testDials, config *artifac
 			downloader, err := NewDownloader(log, config, upgradeDetails)
 			require.NoError(t, err, "could not create new downloader")
 
-			pkgPath, err := downloader.Download(cancelCtx, beatSpec, version)
+			fileName := fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, tc.suffix)
+			a := artifact.Artifact{Name: beatSpec.Name, FileName: fileName}
+			srcURI := config.SourceURI + "/beats/agentbeat/" + fileName
+			pkgPath := filepath.Join(config.TargetDirectory, a.FileName)
+			err = downloader.Download(cancelCtx, a, srcURI, pkgPath)
 			require.NoErrorf(t, err, "failed downloading %s v%s",
-				beatSpec.Artifact, version)
+				beatSpec.Name, version)
 
 			_, err = os.Stat(pkgPath)
 			if err != nil {
@@ -112,7 +117,7 @@ func runTests(t *testing.T, testCases []testCase, td *testDials, config *artifac
 				t.Fatal(err)
 			}
 
-			err = testVerifier.Verify(cancelCtx, beatSpec, *version, false)
+			err = testVerifier.Verify(cancelCtx, a, srcURI, pkgPath, false)
 			require.NoError(t, err)
 		})
 	}

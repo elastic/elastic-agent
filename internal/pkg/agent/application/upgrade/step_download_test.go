@@ -5,15 +5,22 @@
 package upgrade
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -29,12 +36,11 @@ import (
 )
 
 type mockDownloader struct {
-	downloadPath string
-	downloadErr  error
+	downloadErr error
 }
 
-func (md *mockDownloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (string, error) {
-	return md.downloadPath, md.downloadErr
+func (md *mockDownloader) Download(ctx context.Context, a artifact.Artifact, src, dst string) error {
+	return md.downloadErr
 }
 
 func TestFallbackIsAppended(t *testing.T) {
@@ -90,8 +96,8 @@ func TestDownloadWithRetries(t *testing.T) {
 
 	// Successful immediately (no retries)
 	t.Run("successful_immediately", func(t *testing.T) {
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
-			return &mockDownloader{expectedDownloadPath, nil}, nil
+		mockDownloaderCtor := func(log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+			return &mockDownloader{}, nil
 		}
 
 		a := newArtifactDownloader(&settings, testLogger)
@@ -99,12 +105,16 @@ func TestDownloadWithRetries(t *testing.T) {
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 
+		target, err := artifact.New(parsedVersion, runtime.GOOS, runtime.GOARCH, false)
+		require.NoError(t, err)
+		src := expectedDownloadPath + "/" + target.FileName
+		dst := filepath.Join(t.TempDir(), target.FileName)
+
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		err = a.downloadWithRetries(context.Background(), mockDownloaderCtor, target, &settings, src, dst, upgradeDetails)
 		require.NoError(t, err)
-		require.Equal(t, expectedDownloadPath, path)
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 1)
@@ -124,7 +134,7 @@ func TestDownloadWithRetries(t *testing.T) {
 	// Downloader constructor failing on first attempt, but succeeding on second attempt (= first retry)
 	t.Run("constructor_failure_once", func(t *testing.T) {
 		attemptIdx := 0
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+		mockDownloaderCtor := func(log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
 			defer func() {
 				attemptIdx++
 			}()
@@ -135,7 +145,7 @@ func TestDownloadWithRetries(t *testing.T) {
 				return nil, errors.New("failed to construct downloader")
 			case 1:
 				// Second attempt: succeed
-				return &mockDownloader{expectedDownloadPath, nil}, nil
+				return &mockDownloader{}, nil
 			default:
 				require.Fail(t, "should have succeeded after 2 attempts")
 			}
@@ -148,12 +158,16 @@ func TestDownloadWithRetries(t *testing.T) {
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 
+		target, err := artifact.New(parsedVersion, runtime.GOOS, runtime.GOARCH, false)
+		require.NoError(t, err)
+		src := expectedDownloadPath + "/" + target.FileName
+		dst := filepath.Join(t.TempDir(), target.FileName)
+
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		err = a.downloadWithRetries(context.Background(), mockDownloaderCtor, target, &settings, src, dst, upgradeDetails)
 		require.NoError(t, err)
-		require.Equal(t, expectedDownloadPath, path)
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 3)
@@ -178,7 +192,7 @@ func TestDownloadWithRetries(t *testing.T) {
 	// Download failing on first attempt, but succeeding on second attempt (= first retry)
 	t.Run("download_failure_once", func(t *testing.T) {
 		attemptIdx := 0
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+		mockDownloaderCtor := func(log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
 			defer func() {
 				attemptIdx++
 			}()
@@ -186,10 +200,10 @@ func TestDownloadWithRetries(t *testing.T) {
 			switch attemptIdx {
 			case 0:
 				// First attempt: fail
-				return &mockDownloader{"", errors.New("download failed")}, nil
+				return &mockDownloader{errors.New("download failed")}, nil
 			case 1:
 				// Second attempt: succeed
-				return &mockDownloader{expectedDownloadPath, nil}, nil
+				return &mockDownloader{}, nil
 			default:
 				require.Fail(t, "should have succeeded after 2 attempts")
 			}
@@ -202,12 +216,16 @@ func TestDownloadWithRetries(t *testing.T) {
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 
+		target, err := artifact.New(parsedVersion, runtime.GOOS, runtime.GOARCH, false)
+		require.NoError(t, err)
+		src := expectedDownloadPath + "/" + target.FileName
+		dst := filepath.Join(t.TempDir(), target.FileName)
+
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		err = a.downloadWithRetries(context.Background(), mockDownloaderCtor, target, &settings, src, dst, upgradeDetails)
 		require.NoError(t, err)
-		require.Equal(t, expectedDownloadPath, path)
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 3)
@@ -237,8 +255,8 @@ func TestDownloadWithRetries(t *testing.T) {
 		// exponential backoff with 10ms init and 500ms timeout should fit at least 3 attempts.
 		minNmExpectedAttempts := 3
 
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
-			return &mockDownloader{"", errors.New("download failed")}, nil
+		mockDownloaderCtor := func(log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+			return &mockDownloader{errors.New("download failed")}, nil
 		}
 
 		a := newArtifactDownloader(&settings, testLogger)
@@ -246,12 +264,16 @@ func TestDownloadWithRetries(t *testing.T) {
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 
+		target, err := artifact.New(parsedVersion, runtime.GOOS, runtime.GOARCH, false)
+		require.NoError(t, err)
+		src := expectedDownloadPath + "/" + target.FileName
+		dst := filepath.Join(t.TempDir(), target.FileName)
+
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(testCaseSettings.Timeout)
 
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &testCaseSettings, upgradeDetails)
+		err = a.downloadWithRetries(context.Background(), mockDownloaderCtor, target, &testCaseSettings, src, dst, upgradeDetails)
 		require.Equal(t, "context deadline exceeded", err.Error())
-		require.Equal(t, "", path)
 
 		logs := obs.TakeAll()
 		logsJSON, err := json.MarshalIndent(logs, "", " ")
@@ -279,9 +301,9 @@ func TestDownloadWithRetries(t *testing.T) {
 	t.Run("insufficient disk space stops retries", func(t *testing.T) {
 		numberOfAttempts := 0
 		diskSpaceError := downloadErrors.OS_DiskSpaceErrors[0]
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+		mockDownloaderCtor := func(log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
 			numberOfAttempts++
-			return &mockDownloader{"", diskSpaceError}, nil
+			return &mockDownloader{diskSpaceError}, nil
 		}
 
 		a := newArtifactDownloader(&settings, testLogger)
@@ -289,12 +311,16 @@ func TestDownloadWithRetries(t *testing.T) {
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 
+		target, err := artifact.New(parsedVersion, runtime.GOOS, runtime.GOARCH, false)
+		require.NoError(t, err)
+		src := expectedDownloadPath + "/" + target.FileName
+		dst := filepath.Join(t.TempDir(), target.FileName)
+
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		err = a.downloadWithRetries(context.Background(), mockDownloaderCtor, target, &settings, src, dst, upgradeDetails)
 
 		require.Error(t, err)
-		require.Equal(t, "", path)
 
 		require.Equal(t, 1, numberOfAttempts)
 		require.ErrorIs(t, err, diskSpaceError)
@@ -315,16 +341,19 @@ func (mv *mockVerifier) Name() string {
 	return ""
 }
 
-func (mv *mockVerifier) Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
+func (mv *mockVerifier) Verify(ctx context.Context, a artifact.Artifact, src, dst string, skipDefaultPgp bool, pgpBytes ...string) error {
 	mv.called = true
 	return mv.returnError
 }
 
 func TestDownloadArtifact(t *testing.T) {
 	testLogger, _ := loggertest.New("TestDownloadArtifact")
-	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
+	tempConfig := &artifact.Config{} // used only to get os and arch
 
 	parsedVersion, err := agtversion.ParseVersion("8.9.0")
+	require.NoError(t, err)
+
+	target, err := artifact.New(parsedVersion, tempConfig.OS(), tempConfig.Arch(), false)
 	require.NoError(t, err)
 
 	upgradeDeatils := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
@@ -347,13 +376,13 @@ func TestDownloadArtifact(t *testing.T) {
 
 	testCases := map[string]testCase{
 		"should return path if verifier constructor fails": {
-			mockNewVerifierFactory: func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+			mockNewVerifierFactory: func(log *logger.Logger, settings *artifact.Config, pgp []byte) (download.Verifier, error) {
 				return nil, testError
 			},
 			expectedError: testError,
 		},
 		"should return path if verifier fails": {
-			mockNewVerifierFactory: func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+			mockNewVerifierFactory: func(log *logger.Logger, settings *artifact.Config, pgp []byte) (download.Verifier, error) {
 				return &mockVerifier{returnError: testError}, nil
 			},
 			expectedError: testError,
@@ -364,7 +393,7 @@ func TestDownloadArtifact(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			paths.SetTop(t.TempDir())
 
-			artifactPath, err := artifact.GetArtifactPath(agentArtifact, *parsedVersion, tempConfig.OS(), tempConfig.Arch(), paths.Downloads())
+			artifactPath := filepath.Join(paths.Downloads(), target.FileName)
 			require.NoError(t, err)
 
 			settings := artifact.Config{
@@ -379,7 +408,8 @@ func TestDownloadArtifact(t *testing.T) {
 			a := newArtifactDownloader(&settings, testLogger)
 			a.newVerifier = tc.mockNewVerifierFactory
 
-			path, err := a.downloadArtifact(t.Context(), parsedVersion, testServer.URL, upgradeDeatils, false, true)
+			sourceURL := testServer.URL + "/beats/elastic-agent/" + target.FileName
+			path, err := a.downloadArtifact(t.Context(), target, sourceURL, upgradeDeatils, false, true)
 			require.ErrorIs(t, err, tc.expectedError)
 			require.Equal(t, artifactPath, path)
 		})
@@ -420,4 +450,162 @@ func TestWithFleetServerURI(t *testing.T) {
 	a := &artifactDownloader{}
 	a.withFleetServerURI("mockURI")
 	require.Equal(t, "mockURI", a.fleetServerURI)
+}
+
+func TestResolve(t *testing.T) {
+	snapshotJSON, err := os.ReadFile(filepath.Join("testdata", "latest-snapshot.json"))
+	require.NoError(t, err)
+	files := map[string][]byte{
+		// link to the latest snapshot build for the version
+		"/latest/8.14.0-SNAPSHOT.json": snapshotJSON,
+	}
+	dropPath := t.TempDir()
+
+	tests := []struct {
+		name      string
+		sourceURI string
+		os        string
+		arch      string
+		version   *agtversion.ParsedSemVer
+		want      string
+		wantLocal bool
+	}{
+		{
+			name:      "empty source URI defaults to the released artifacts location",
+			sourceURI: "",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "released version",
+			sourceURI: artifact.DefaultSourceURI,
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "released version on windows",
+			sourceURI: artifact.DefaultSourceURI,
+			os:        "windows",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-1.2.3-windows-x86_64.zip",
+		},
+		{
+			name:      "released version on darwin",
+			sourceURI: artifact.DefaultSourceURI,
+			os:        "darwin",
+			arch:      "arm64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-1.2.3-darwin-aarch64.tar.gz",
+		},
+		{
+			name:      "released version with build metadata is dropped",
+			sourceURI: artifact.DefaultSourceURI,
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", "build19700101"),
+			want:      "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "snapshot version resolves the latest build",
+			sourceURI: artifact.DefaultSourceURI,
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(8, 14, 0, "SNAPSHOT", ""),
+			want:      "https://snapshots.elastic.co/8.14.0-6d69ee76/downloads/beats/elastic-agent/elastic-agent-8.14.0-SNAPSHOT-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "snapshot version with build metadata targets that build",
+			sourceURI: artifact.DefaultSourceURI,
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(8, 13, 3, "SNAPSHOT", "76ce1a63"),
+			want:      "https://snapshots.elastic.co/8.13.3-76ce1a63/downloads/beats/elastic-agent/elastic-agent-8.13.3-SNAPSHOT-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "custom source URI is used as-is for a released version",
+			sourceURI: "https://mirror.example.com/downloads",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://mirror.example.com/downloads/beats/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "custom source URI skips the snapshot build lookup",
+			sourceURI: "https://mirror.example.com/downloads",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(8, 14, 0, "SNAPSHOT", ""),
+			want:      "https://mirror.example.com/downloads/beats/elastic-agent/elastic-agent-8.14.0-SNAPSHOT-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "scheme-less source URI defaults to https",
+			sourceURI: "mirror.example.com/downloads",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://mirror.example.com/downloads/beats/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "file:// URI",
+			sourceURI: "file://" + dropPath,
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      dropPath + "/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+			wantLocal: true,
+		},
+		{
+			name:      "file:// URI with trailing slash",
+			sourceURI: "file://" + dropPath + "/",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      dropPath + "/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+			wantLocal: true,
+		},
+		{
+			name:      "non file:// URI is resolved as a remote path",
+			sourceURI: "https://artifacts.elastic.co/downloads/",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handleDownload := func(rw http.ResponseWriter, req *http.Request) {
+				file, ok := files[req.URL.Path]
+				if !ok {
+					rw.WriteHeader(http.StatusNotFound)
+					return
+				}
+				_, err := io.Copy(rw, bytes.NewReader(file))
+				assert.NoError(t, err, "error writing out response body")
+			}
+			server := httptest.NewTLSServer(http.HandlerFunc(handleDownload))
+			defer server.Close()
+
+			client := server.Client()
+			transport := client.Transport.(*http.Transport)
+			transport.TLSClientConfig.InsecureSkipVerify = true
+			transport.DialContext = func(_ context.Context, network, _ string) (net.Conn, error) {
+				return net.Dial(network, server.Listener.Addr().String())
+			}
+
+			a, err := artifact.New(tt.version, tt.os, tt.arch, false)
+			require.NoError(t, err)
+
+			isLocal, got, err := Resolve(context.TODO(), client, a, tt.sourceURI)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantLocal, isLocal)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

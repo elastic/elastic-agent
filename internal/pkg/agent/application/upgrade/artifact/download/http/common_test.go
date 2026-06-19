@@ -31,27 +31,25 @@ const (
 var (
 	version  = agtversion.NewParsedSemVer(7, 5, 1, "", "")
 	beatSpec = artifact.Artifact{
-		Name:     "agentbeat",
-		Cmd:      "agentbeat",
-		Artifact: "beats/agentbeat",
+		Name: "agentbeat",
 	}
 )
 
 type testCase struct {
 	system string
 	arch   string
+	suffix string
 }
 
 func getTestCases() []testCase {
 	// always test random package to save time
 	return []testCase{
-		{"linux", "32"},
-		{"linux", "64"},
-		{"linux", "arm64"},
-		{"darwin", "32"},
-		{"darwin", "64"},
-		{"windows", "32"},
-		{"windows", "64"},
+		{"linux", "386", "linux-x86.tar.gz"},
+		{"linux", "amd64", "linux-x86_64.tar.gz"},
+		{"linux", "arm64", "linux-arm64.tar.gz"},
+		{"darwin", "amd64", "darwin-x86_64.tar.gz"},
+		{"windows", "386", "windows-x86.zip"},
+		{"windows", "amd64", "windows-x86_64.zip"},
 	}
 }
 
@@ -78,16 +76,16 @@ func (td *testDials) reset() {
 func getElasticCoServer(t *testing.T) (*httptest.Server, []byte, *testDials) {
 	td := testDials{extResCode: make(extResCode)}
 	correctValues := map[string]struct{}{
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "i386.deb"):             {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "amd64.deb"):            {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "i686.rpm"):             {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "x86_64.rpm"):           {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "linux-x86.tar.gz"):     {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "linux-arm64.tar.gz"):   {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "linux-x86_64.tar.gz"):  {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "windows-x86.zip"):      {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "windows-x86_64.zip"):   {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "darwin-x86_64.tar.gz"): {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "i386.deb"):             {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "amd64.deb"):            {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "i686.rpm"):             {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "x86_64.rpm"):           {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "linux-x86.tar.gz"):     {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "linux-arm64.tar.gz"):   {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "linux-x86_64.tar.gz"):  {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "windows-x86.zip"):      {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "windows-x86_64.zip"):   {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "darwin-x86_64.tar.gz"): {},
 	}
 	var resp []byte
 	content := []byte("anything will do")

@@ -12,41 +12,37 @@ import (
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
-func TestGetArtifactName(t *testing.T) {
+func TestNewArtifact(t *testing.T) {
 	version, err := agtversion.ParseVersion("9.1.0")
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		a            Artifact
-		version      agtversion.ParsedSemVer
+		fips         bool
 		arch         string
 		expectedName string
 	}{
 		"no_fips_arm64": {
-			a:            Artifact{Cmd: "elastic-agent"},
-			version:      *version,
+			fips:         false,
 			arch:         "arm64",
 			expectedName: "elastic-agent-9.1.0-linux-arm64.tar.gz",
 		},
 		"fips_x86": {
-			a:            Artifact{Cmd: "elastic-agent-fips"},
-			version:      *version,
-			arch:         "32",
+			fips:         true,
+			arch:         "386",
 			expectedName: "elastic-agent-fips-9.1.0-linux-x86.tar.gz",
 		},
 		"fips_x86_64": {
-			a:            Artifact{Cmd: "elastic-agent-fips"},
-			version:      *version,
-			arch:         "64",
+			fips:         true,
+			arch:         "amd64",
 			expectedName: "elastic-agent-fips-9.1.0-linux-x86_64.tar.gz",
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			artifactName, err := GetArtifactName(test.a, test.version, "linux", test.arch)
+			a, err := New(version, "linux", test.arch, test.fips)
 			require.NoError(t, err)
-			require.Equal(t, test.expectedName, artifactName)
+			require.Equal(t, test.expectedName, a.FileName)
 		})
 	}
 
