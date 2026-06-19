@@ -61,6 +61,14 @@ fully_qualified_group_name="${GROUP_NAME}${root_suffix}_${os_data}"
 outputXML="build/${fully_qualified_group_name}.integration.xml"
 outputJSON="build/${fully_qualified_group_name}.integration.out.json"
 
+echo "~~~ Pre-warming Go module cache"
+# Download all modules declared in go.mod so that the 'go test' compilation step
+# (run by gotestsum below) does not pay the cost of downloading ~100 module zips
+# at test-run time. This is especially important for the integration test packages
+# which import heavy dependencies (testcontainers-go, sarama, mock-es, etc.) that
+# are not compiled by the earlier 'mage build:integrationTestBinaries' step.
+go mod download
+
 echo "~~~ Integration tests: ${GROUP_NAME}"
 # -test.timeout=2h0m0s is set because some tests normally take up to 45 minutes.
 # This 2-hour timeout provides enough room for future, potentially longer tests,
