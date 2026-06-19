@@ -18,11 +18,12 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/collector/featuregate"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
-	"go.opentelemetry.io/collector/featuregate"
 
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
