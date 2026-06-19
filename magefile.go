@@ -608,7 +608,7 @@ func (Format) License() error {
 }
 
 // Package packages the Beat for distribution.
-// Use SNAPSHOT=true to build snapshots.
+// Snapshot builds are the default; use SNAPSHOT=false to build a release package.
 // Use PLATFORMS to control the target platforms.
 // Use VERSION_QUALIFIER to control the version qualifier.
 // Use PACKAGES to override the package types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker).
@@ -989,14 +989,6 @@ func (Cloud) Image(ctx context.Context) {
 		WithPackageTypes([]devtools.PackageType{devtools.Docker}).
 		WithDevBuild(true).
 		WithDockerVariants([]devtools.DockerVariant{devtools.Cloud})
-
-	// Only disable SNAPSHOT build when explicitly defined as false
-	// Default to snapshot=true for cloud images
-	if cfg.Build.SnapshotSet && !cfg.Build.Snapshot {
-		cfg = cfg.WithSnapshot(false)
-	} else {
-		cfg = cfg.WithSnapshot(true)
-	}
 
 	// Preserve FIPS setting from config (already parsed from environment)
 	cfg = cfg.WithFIPSBuild(cfg.Build.FIPSBuild)
@@ -1951,7 +1943,7 @@ type checksumFile struct {
 // Ironbank packages elastic-agent for the IronBank distribution, relying on the
 // binaries having already been built.
 //
-// Use SNAPSHOT=true to build snapshots.
+// Snapshot builds are the default; use SNAPSHOT=false to build a release package.
 func Ironbank(ctx context.Context) error {
 	fmt.Println("--- Package Ironbank distribution")
 	if runtime.GOARCH != "amd64" {
@@ -4224,8 +4216,7 @@ func (h Helm) Package(ctx context.Context) error {
 	mg.SerialDeps(h.BuildDependencies)
 
 	cfg := devtools.SettingsFromContext(ctx)
-	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
-	productionPackage := cfg.Build.SnapshotSet && !cfg.Build.Snapshot
+	productionPackage := !cfg.Build.Snapshot
 
 	cfg, err := cfg.WithManifestInfo(ctx)
 	if err != nil {
