@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -287,6 +288,45 @@ func TestSettingsPlatform(t *testing.T) {
 	assert.Equal(t, "amd64", platform.Arch)
 }
 
+func TestSettingsGetPlatforms(t *testing.T) {
+	t.Run("returns host platform when PLATFORMS is unset", func(t *testing.T) {
+		s := DefaultSettings()
+		// CrossBuild.Platforms is "" by default — simulates no PLATFORMS env var.
+
+		platforms := s.GetPlatforms()
+
+		hostName := runtime.GOOS + "/" + runtime.GOARCH
+		if _, known := BuildPlatforms.Get(hostName); known {
+			require.Len(t, platforms, 1)
+			assert.Equal(t, hostName, platforms[0].Name)
+		} else {
+			// Exotic host not in BuildPlatforms: falls back to Defaults().
+			assert.Equal(t, BuildPlatforms.Defaults(), platforms)
+		}
+	})
+
+	t.Run("returns specified platforms when PLATFORMS is set", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Platforms = "linux/amd64,darwin/arm64"
+
+		platforms := s.GetPlatforms()
+
+		assert.ElementsMatch(t, []string{"linux/amd64", "darwin/arm64"}, platforms.Names())
+	})
+
+	t.Run("always filters linux/386 and windows/386", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Platforms = "linux/386 windows/386 linux/amd64"
+
+		platforms := s.GetPlatforms()
+
+		names := platforms.Names()
+		assert.NotContains(t, names, "linux/386")
+		assert.NotContains(t, names, "windows/386")
+		assert.Contains(t, names, "linux/amd64")
+	})
+}
+
 func TestSettingsTestTagsWithFIPS(t *testing.T) {
 	t.Run("returns original tags when FIPS disabled", func(t *testing.T) {
 		s := DefaultSettings()
@@ -429,6 +469,9 @@ func TestSettingsGetDockerVariants(t *testing.T) {
 func TestSettingsIsPackageTypeSelected(t *testing.T) {
 	t.Run("returns true when no types selected", func(t *testing.T) {
 		s := DefaultSettings()
+		// Simulate a cross-platform build so defaultPackageTypesForPlatforms
+		// produces both TarGz (Unix) and Zip (Windows).
+		s.CrossBuild.Platforms = "linux/amd64 windows/amd64"
 
 		assert.True(t, s.IsPackageTypeSelected(TarGz))
 		assert.True(t, s.IsPackageTypeSelected(Zip))

@@ -91,7 +91,7 @@ The packaging process has many leavers that need to be correctly set:
    use snapshot versions. That is required to package from the `main`
    branch with `EXTERNAL=true`.
  - `PLATFORMS`: Comma separated list of platforms you want to build. If
-  not set, it defaults to **ALL** platforms. [Selecting specific
+  not set, it defaults to the **host platform** only. [Selecting specific
   platform](#selecting-specific-platform) contains a list of common
   values. For a full list look at [`elastic-agent/dev-tools/mage/platforms.go`](https://github.com/elastic/elastic-agent/blob/main/dev-tools/mage/platforms.go#L15).
  - `PACKAGES`: Comma separated list of packages you want to build.
