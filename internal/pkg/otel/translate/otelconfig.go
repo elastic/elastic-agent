@@ -528,13 +528,13 @@ func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type,
 	case "metricbeat":
 		return otelcomponent.MustNewType("metricbeatreceiver"), nil
 	case "auditbeat":
-		return otelcomponent.MustNewType("abreceiver"), nil
+		return otelcomponent.MustNewType("auditbeatreceiver"), nil
 	case "heartbeat":
-		return otelcomponent.MustNewType("hbreceiver"), nil
+		return otelcomponent.MustNewType("heartbeatreceiver"), nil
 	case "osquerybeat":
-		return otelcomponent.MustNewType("osqreceiver"), nil
+		return otelcomponent.MustNewType("osquerybeatreceiver"), nil
 	case "packetbeat":
-		return otelcomponent.MustNewType("pbreceiver"), nil
+		return otelcomponent.MustNewType("packetbeatreceiver"), nil
 	default:
 		return otelcomponent.Type{}, fmt.Errorf("unknown otel receiver type for input type: %s", comp.InputType)
 	}

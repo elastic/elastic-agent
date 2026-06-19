@@ -2071,7 +2071,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"receivers": map[string]any{
-					"abreceiver/_agent-component/auditbeat-default": expectedAuditbeatReceiverConfig("auditbeat-default"),
+					"auditbeatreceiver/_agent-component/auditbeat-default": expectedAuditbeatReceiverConfig("auditbeat-default"),
 				},
 				"service": map[string]any{
 					"extensions": []any{"beatsauth/_agent-component/default"},
@@ -2079,7 +2079,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"logs/_agent-component/auditbeat-default": map[string][]string{
 							"exporters":  {"elasticsearch/_agent-component/default"},
 							"processors": {"beat/_agent-component"},
-							"receivers":  {"abreceiver/_agent-component/auditbeat-default"},
+							"receivers":  {"auditbeatreceiver/_agent-component/auditbeat-default"},
 						},
 					},
 				},
@@ -2130,7 +2130,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"receivers": map[string]any{
-					"hbreceiver/_agent-component/heartbeat-default": expectedHeartbeatReceiverConfig("heartbeat-default"),
+					"heartbeatreceiver/_agent-component/heartbeat-default": expectedHeartbeatReceiverConfig("heartbeat-default"),
 				},
 				"service": map[string]any{
 					"extensions": []any{"beatsauth/_agent-component/default"},
@@ -2138,7 +2138,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"logs/_agent-component/heartbeat-default": map[string][]string{
 							"exporters":  {"elasticsearch/_agent-component/default"},
 							"processors": {"beat/_agent-component"},
-							"receivers":  {"hbreceiver/_agent-component/heartbeat-default"},
+							"receivers":  {"heartbeatreceiver/_agent-component/heartbeat-default"},
 						},
 					},
 				},
@@ -2189,7 +2189,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"receivers": map[string]any{
-					"osqreceiver/_agent-component/osquerybeat-default": expectedOsquerybeatReceiverConfig("osquerybeat-default"),
+					"osquerybeatreceiver/_agent-component/osquerybeat-default": expectedOsquerybeatReceiverConfig("osquerybeat-default"),
 				},
 				"service": map[string]any{
 					"extensions": []any{"beatsauth/_agent-component/default"},
@@ -2197,7 +2197,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"logs/_agent-component/osquerybeat-default": map[string][]string{
 							"exporters":  {"elasticsearch/_agent-component/default"},
 							"processors": {"beat/_agent-component"},
-							"receivers":  {"osqreceiver/_agent-component/osquerybeat-default"},
+							"receivers":  {"osquerybeatreceiver/_agent-component/osquerybeat-default"},
 						},
 					},
 				},
@@ -2248,7 +2248,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"receivers": map[string]any{
-					"pbreceiver/_agent-component/packetbeat-default": expectedPacketbeatReceiverConfig("packetbeat-default"),
+					"packetbeatreceiver/_agent-component/packetbeat-default": expectedPacketbeatReceiverConfig("packetbeat-default"),
 				},
 				"service": map[string]any{
 					"extensions": []any{"beatsauth/_agent-component/default"},
@@ -2256,7 +2256,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"logs/_agent-component/packetbeat-default": map[string][]string{
 							"exporters":  {"elasticsearch/_agent-component/default"},
 							"processors": {"beat/_agent-component"},
-							"receivers":  {"pbreceiver/_agent-component/packetbeat-default"},
+							"receivers":  {"packetbeatreceiver/_agent-component/packetbeat-default"},
 						},
 					},
 				},
@@ -2542,28 +2542,28 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			name:                 "auditbeat component",
 			component:            auditbeatComponent,
 			outputQueueConfig:    nil,
-			expectedReceiverType: "abreceiver",
+			expectedReceiverType: "auditbeatreceiver",
 			expectedBeatName:     "auditbeat",
 		},
 		{
 			name:                 "heartbeat component",
 			component:            heartbeatComponent,
 			outputQueueConfig:    nil,
-			expectedReceiverType: "hbreceiver",
+			expectedReceiverType: "heartbeatreceiver",
 			expectedBeatName:     "heartbeat",
 		},
 		{
 			name:                 "osquerybeat component",
 			component:            osquerybeatComponent,
 			outputQueueConfig:    nil,
-			expectedReceiverType: "osqreceiver",
+			expectedReceiverType: "osquerybeatreceiver",
 			expectedBeatName:     "osquerybeat",
 		},
 		{
 			name:                 "packetbeat component",
 			component:            packetbeatComponent,
 			outputQueueConfig:    nil,
-			expectedReceiverType: "pbreceiver",
+			expectedReceiverType: "packetbeatreceiver",
 			expectedBeatName:     "packetbeat",
 		},
 		{
