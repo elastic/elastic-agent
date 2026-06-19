@@ -91,13 +91,8 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/gotestsum v1.13.0
-<<<<<<< HEAD
 	helm.sh/helm/v3 v3.20.2
-	howett.net/plist v1.0.1
-=======
-	helm.sh/helm/v3 v3.21.0
 	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9
->>>>>>> 9bc78ce3a ([deps] Bump github.com/jaypipes/ghw v0.12.0 -> v0.24.0 (#14982))
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
 	k8s.io/cli-runtime v0.35.2
