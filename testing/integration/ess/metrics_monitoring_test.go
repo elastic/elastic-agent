@@ -172,9 +172,8 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 		}
 	}()
 
-<<<<<<< HEAD
-	t.Logf("starting to ES for metrics at %s", now.Format(time.RFC3339Nano))
-	require.Eventually(t, func() bool {
+	t.Logf("starting to query ES for metrics at %s", now.Format(time.RFC3339Nano))
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		for _, cid := range componentIds {
 			query = genESQuery(agentStatus.Info.ID,
 				[][]string{
@@ -183,53 +182,11 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 				})
 			now = time.Now()
 			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
-			require.NoError(t, err)
-			t.Logf("Fetched metrics for %s, got %d hits", cid, res.Hits.Total.Value)
-			if res.Hits.Total.Value < 1 {
-				return false
-			}
-		}
-		return true
-	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install: %v", componentIds)
-=======
-	t.Logf("starting to query ES for metrics at %s", now.Format(time.RFC3339Nano))
-	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		for _, check := range componentChecks {
-			query = genESQuery(agentStatus.Info.ID, check.fields)
-			now = time.Now()
-			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
 			require.NoError(collect, err)
-			t.Logf("Fetched metrics for %s, got %d hits", check.name, res.Hits.Total.Value)
+			t.Logf("Fetched metrics for %s, got %d hits", cid, res.Hits.Total.Value)
 			assert.GreaterOrEqual(collect, res.Hits.Total.Value, 1)
 		}
 	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install")
-
-	query = genESQuery(agentStatus.Info.ID,
-		[][]string{
-			{"match", "component.binary", "elastic-otel-collector"},
-			{"exists", "field", "data_stream.dataset"},
-			{"exists", "field", "data_stream.namespace"},
-			{"exists", "field", "data_stream.type"},
-			{"exists", "field", "event.dataset"},
-			{"exists", "field", "elastic_agent.id"},
-			{"exists", "field", "elastic_agent.process"},
-			{"exists", "field", "elastic_agent.snapshot"},
-			{"exists", "field", "elastic_agent.version"},
-			{"exists", "field", "agent.id"},
-			{"exists", "field", "agent.version"},
-			{"exists", "field", "agent.name"},
-			{"exists", "field", "component.id"},
-			{"exists", "field", "metricset.name"},
-			{"exists", "field", "host.hostname"},
-		})
-	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		now = time.Now()
-		res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
-		require.NoError(collect, err)
-		t.Logf("Fetched monitoring metrics with event template fields, got %d hits", res.Hits.Total.Value)
-		assert.GreaterOrEqual(collect, res.Hits.Total.Value, 1)
-	}, time.Minute*10, time.Second*10, "monitoring metrics missing expected event template fields")
->>>>>>> 294efa35a (Fix potential sources of flakiness in integration tests (#14956))
 
 	// Add a policy overwrite to change the agent monitoring to use Otel runtime
 	runner.addMonitoringToOtelRuntimeOverwrite()
