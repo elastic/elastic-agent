@@ -57,6 +57,7 @@ inputs:
 	require.NoError(t, fixture.Configure(ctx, []byte(config)))
 	var wg sync.WaitGroup
 	wg.Add(1)
+	t.Cleanup(wg.Wait)
 	go func() {
 		defer wg.Done()
 		assert.NoError(t, fixture.Run(ctx))
