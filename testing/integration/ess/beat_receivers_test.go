@@ -1703,7 +1703,6 @@ outputs:
 	combinedOutput, err := fut.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 
-<<<<<<< HEAD
 	// Switch to otel monitoring
 	require.NoError(t, fut.Configure(ctx, renderConfig("otel")))
 	_, err = fut.Install(ctx, &atesting.InstallOpts{
@@ -1712,17 +1711,6 @@ outputs:
 		Develop:    true,
 	})
 	require.NoError(t, err)
-=======
-	// wait until policy is applied
-	policyCheck := func(expectedRevision int) {
-		require.EventuallyWithT(t, func(collect *assert.CollectT) {
-			inspectOutput, err := fut.ExecInspect(ctx)
-			require.NoError(collect, err)
-			assert.Equal(collect, expectedRevision, inspectOutput.Revision)
-		}, 3*time.Minute, 1*time.Second)
-	}
-	policyCheck(otelMonResp.Revision)
->>>>>>> 294efa35a (Fix potential sources of flakiness in integration tests (#14956))
 
 	// make sure running and logs are making it to ES
 	healthCheck(ctx,

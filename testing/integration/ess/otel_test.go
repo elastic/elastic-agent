@@ -125,22 +125,12 @@ service:
 	err = fixture.ConfigureOtel(t.Context(), []byte(otelConfig))
 	require.NoError(t, err)
 
-<<<<<<< HEAD
 	cmd, err := fixture.PrepareAgentCommand(ctx, []string{"otel"})
 	require.NoError(t, err)
 
 	output := strings.Builder{}
 	cmd.Stderr = &output
 	cmd.Stdout = &output
-=======
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	t.Cleanup(wg.Wait)
-	go func() {
-		defer wg.Done()
-		assert.NoError(t, fixture.RunOtelWithClient(ctx))
-	}()
->>>>>>> 294efa35a (Fix potential sources of flakiness in integration tests (#14956))
 
 	t.Cleanup(func() {
 		if t.Failed() {
@@ -1378,7 +1368,6 @@ service:
 func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
 	t.Helper()
 
-<<<<<<< HEAD
 	flatM1 := m1.Flatten()
 	flatM2 := m2.Flatten()
 	for _, f := range ignoredFields {
@@ -1395,167 +1384,6 @@ func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 		flatM2.Delete(f)
 	}
 	require.Zero(t, cmp.Diff(flatM1, flatM2), msg)
-=======
-	inputFilePath := filepath.Join(tmpDir, "input.log")
-	var inputContent bytes.Buffer
-	for i := 0; i < numEvents; i++ {
-		fmt.Fprintf(&inputContent, "Line %d\n", i)
-	}
-	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
-	require.NoError(t, err, "failed to write data to temp file")
-
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(inputFilePath)
-			if err != nil {
-				t.Logf("no data file to import at %s", inputFilePath)
-				return
-			}
-			t.Logf("contents of input file: %s\n", string(contents))
-		}
-	})
-
-	type configOptions struct {
-		InputPath     string
-		HomeDir       string
-		ESEndpoint    string
-		BeatsESApiKey string
-	}
-	esEndpoint, err := integration.GetESHost()
-	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey := createESApiKey(t, info.ESClient)
-
-	configTemplate := `agent:
-  grpc:
-    port: 0
-  internal:
-    runtime:
-      default: otel
-  logging:
-    level: info
-    to_stderr: true
-inputs:
-  - id: filestream-filebeat
-    type: filestream
-    paths:
-      - {{.InputPath}}
-    prospector.scanner.fingerprint.enabled: false
-    file_identity.native: ~
-    use_output: default
-    queue.mem.flush.timeout: 0s
-    path.home: {{.HomeDir}}/filebeat
-outputs:
-  default:
-    type: elasticsearch
-    preset: latency
-    hosts: [{{.ESEndpoint}}]
-    api_key: {{.BeatsESApiKey}}
-    compression_level: 0
-    processors:
-      - beat/host
-      - beat/field
-      - batch
-processors:
-  beat/host:
-    processors:
-      - add_host_metadata: ~
-  beat/field:
-    processors:
-      - add_fields:
-          fields:
-            custom_field: "custom-value"
-  batch:
-`
-
-	beatsApiKey, err := getDecodedApiKey(esApiKey)
-	require.NoError(t, err, "error decoding api key")
-
-	var configBuffer bytes.Buffer
-	require.NoError(t,
-		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-			configOptions{
-				InputPath:     inputFilePath,
-				HomeDir:       tmpDir,
-				ESEndpoint:    esEndpoint,
-				BeatsESApiKey: string(beatsApiKey),
-			}))
-	configContents := configBuffer.Bytes()
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Logf("Contents of agent config file:\n%s\n", string(configContents))
-		}
-	})
-
-	// Now we can actually create the fixture and run it
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-	defer cancel()
-
-	err = fixture.Prepare(ctx)
-	require.NoError(t, err)
-	err = fixture.Configure(ctx, configContents)
-	require.NoError(t, err)
-
-	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
-	require.NoError(t, err)
-	cmd.WaitDelay = 1 * time.Second
-
-	var output strings.Builder
-	cmd.Stderr = &output
-	cmd.Stdout = &output
-
-	err = cmd.Start()
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Log("Elastic-Agent output:")
-			t.Log(output.String())
-		}
-	})
-
-	require.Eventually(t, func() bool {
-		err = fixture.IsHealthy(ctx)
-		if err != nil {
-			t.Logf("waiting for agent healthy: %s", err.Error())
-			return false
-		}
-		return true
-	}, 1*time.Minute, 1*time.Second)
-
-	var docs estools.Documents
-	actualHits := &struct {
-		Hits int
-	}{}
-	require.EventuallyWithT(t,
-		func(collect *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer findCancel()
-
-			docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbIndex+"*", map[string]interface{}{
-				"log.file.path": inputFilePath,
-			})
-			require.NoError(collect, err)
-
-			actualHits.Hits = docs.Hits.Total.Value
-
-			assert.Equal(collect, numEvents, actualHits.Hits)
-		},
-		1*time.Minute, 1*time.Second,
-		"Expected %d logs in elasticsearch, got: %v", numEvents, actualHits)
-
-	require.Equal(t, 1, len(docs.Hits.Hits), "should have exactly 1 document")
-	doc := mapstr.M(docs.Hits.Hits[0].Source)
-
-	_, err = doc.GetValue("host.architecture")
-	require.NoError(t, err, "document should include host.architecture added by add_host_metadata processor")
-
-	customFieldValue, err := doc.GetValue("fields.custom_field")
-	require.NoError(t, err, "document should include custom_field added by add_fields processor")
-	require.Equal(t, "custom-value", customFieldValue, "custom_field should be equal to custom-value")
->>>>>>> 294efa35a (Fix potential sources of flakiness in integration tests (#14956))
 }
 
 func AssertMapstrKeysEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
