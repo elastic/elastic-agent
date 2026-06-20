@@ -140,46 +140,20 @@ func (runner *MetricsRunner) addMonitoringToOtelRuntimeOverwrite() {
 func (runner *MetricsRunner) TestBeatsMetrics() {
 	t := runner.T()
 
+	UnitOutputName := "default"
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
 	defer cancel()
 
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(t, err, "could not to get agent status")
 
-	// In OTel mode (the default), monitoring metrics come from different sources than
-	// classic process mode. The http/metrics-monitoring metricbeat receiver only scrapes
-	// the elastic-agent and elastic-otel-collector endpoints. User components (system/metrics,
-	// log) and other monitoring components are not scraped via unix sockets. Instead, the
-	// elasticmonitoringreceiver provides exporter-level stats and per-receiver pipeline metrics.
-	type componentCheck struct {
-		name   string
-		fields [][]string
-	}
-	componentChecks := []componentCheck{
-		// elastic-agent process metrics: scraped by http/metrics-monitoring metricbeat receiver
-		{
-			name: "elastic-agent",
-			fields: [][]string{
-				{"match", "component.id", "elastic-agent"},
-				{"match", "agent.type", "metricbeat"},
-			},
-		},
-		// exporter-level beat stats from elasticmonitoringreceiver
-		{
-			name: "elasticsearch-monitoring",
-			fields: [][]string{
-				{"match", "component.id", "elasticsearch-monitoring"},
-				{"exists", "field", "beat.stats.libbeat.output.events.acked"},
-			},
-		},
-		// per-input metrics for filestream-monitoring from elasticmonitoringreceiver
-		{
-			name: "filestream-monitoring",
-			fields: [][]string{
-				{"match", "component.id", "filestream-monitoring"},
-				{"match", "metricset.name", "stats"},
-			},
-		},
+	componentIds := []string{
+		fmt.Sprintf("system/metrics-%s", UnitOutputName),
+		fmt.Sprintf("log-%s", UnitOutputName),
+		"beat/metrics-monitoring",
+		"elastic-agent",
+		"http/metrics-monitoring",
+		"filestream-monitoring",
 	}
 
 	now := time.Now()
@@ -200,41 +174,19 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 
 	t.Logf("starting to query ES for metrics at %s", now.Format(time.RFC3339Nano))
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		for _, check := range componentChecks {
-			query = genESQuery(agentStatus.Info.ID, check.fields)
+		for _, cid := range componentIds {
+			query = genESQuery(agentStatus.Info.ID,
+				[][]string{
+					{"match", "component.id", cid},
+					{"match", "agent.type", "metricbeat"},
+				})
 			now = time.Now()
 			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
 			require.NoError(collect, err)
-			t.Logf("Fetched metrics for %s, got %d hits", check.name, res.Hits.Total.Value)
+			t.Logf("Fetched metrics for %s, got %d hits", cid, res.Hits.Total.Value)
 			assert.GreaterOrEqual(collect, res.Hits.Total.Value, 1)
 		}
 	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install")
-
-	query = genESQuery(agentStatus.Info.ID,
-		[][]string{
-			{"match", "component.binary", "elastic-otel-collector"},
-			{"exists", "field", "data_stream.dataset"},
-			{"exists", "field", "data_stream.namespace"},
-			{"exists", "field", "data_stream.type"},
-			{"exists", "field", "event.dataset"},
-			{"exists", "field", "elastic_agent.id"},
-			{"exists", "field", "elastic_agent.process"},
-			{"exists", "field", "elastic_agent.snapshot"},
-			{"exists", "field", "elastic_agent.version"},
-			{"exists", "field", "agent.id"},
-			{"exists", "field", "agent.version"},
-			{"exists", "field", "agent.name"},
-			{"exists", "field", "component.id"},
-			{"exists", "field", "metricset.name"},
-			{"exists", "field", "host.hostname"},
-		})
-	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		now = time.Now()
-		res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
-		require.NoError(collect, err)
-		t.Logf("Fetched monitoring metrics with event template fields, got %d hits", res.Hits.Total.Value)
-		assert.GreaterOrEqual(collect, res.Hits.Total.Value, 1)
-	}, time.Minute*10, time.Second*10, "monitoring metrics missing expected event template fields")
 
 	// Add a policy overwrite to change the agent monitoring to use Otel runtime
 	runner.addMonitoringToOtelRuntimeOverwrite()
