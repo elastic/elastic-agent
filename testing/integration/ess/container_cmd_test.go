@@ -344,7 +344,6 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
 		outputID)
 
-
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	if err != nil {
 		t.Fatalf("could not get Fleet URL: %s", err)
