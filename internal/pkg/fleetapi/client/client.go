@@ -27,7 +27,7 @@ type Sender interface {
 		path string,
 		params url.Values,
 		headers http.Header,
-		body io.Reader,
+		body io.ReadSeeker,
 	) (*http.Response, error)
 
 	URI() string

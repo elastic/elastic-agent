@@ -1,6 +1,7 @@
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts:
       - ${ES_HOST}
     username: ${ELASTICSEARCH_USERNAME}

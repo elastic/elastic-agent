@@ -14,6 +14,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 // ReqError is an error wrapper to wrap errors with a request.
@@ -58,10 +59,10 @@ func (e *AuditUnenrollRequest) Validate() error {
 
 type AuditUnenrollCmd struct {
 	client client.Sender
-	info   AgentInfo
+	info   pkgfleetapi.AgentInfo
 }
 
-func NewAuditUnenrollCmd(info AgentInfo, client client.Sender) *AuditUnenrollCmd {
+func NewAuditUnenrollCmd(info pkgfleetapi.AgentInfo, client client.Sender) *AuditUnenrollCmd {
 	return &AuditUnenrollCmd{
 		client: client,
 		info:   info,
@@ -80,7 +81,7 @@ func (e *AuditUnenrollCmd) Execute(ctx context.Context, r *AuditUnenrollRequest)
 		return nil, &ReqError{err}
 	}
 	path := fmt.Sprintf(auditUnenrollPath, e.info.AgentID())
-	resp, err := e.client.Send(ctx, http.MethodPost, path, nil, nil, bytes.NewBuffer(p))
+	resp, err := e.client.Send(ctx, http.MethodPost, path, nil, nil, bytes.NewReader(p))
 	if err != nil {
 		// Invalid credentials should result in no retries
 		if errors.Is(err, client.ErrInvalidAPIKey) {

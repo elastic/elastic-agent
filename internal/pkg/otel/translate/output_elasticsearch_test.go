@@ -84,6 +84,7 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -140,6 +141,7 @@ sending_queue:
   wait_for_result: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -195,6 +197,7 @@ sending_queue:
   wait_for_result: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -254,6 +257,7 @@ sending_queue:
   wait_for_result: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -280,7 +284,7 @@ preset: %s
 
 		commonOTelCfg := `
 logs_dynamic_pipeline:
-  enabled: true    
+  enabled: true
 endpoints:
   - http://localhost:9200
 retry:
@@ -304,6 +308,7 @@ retry:
 logs_index: some-index
 password: changeme
 user: elastic
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -351,7 +356,7 @@ sending_queue:
 				presetName: "scale",
 				output: `
 logs_dynamic_pipeline:
-  enabled: true        
+  enabled: true
 endpoints:
   - http://localhost:9200
 retry:
@@ -387,6 +392,7 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -500,6 +506,7 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -556,6 +563,7 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -582,7 +590,7 @@ compression_level: %d`
 
 	otelConfig := `
 logs_dynamic_pipeline:
-  enabled: true 
+  enabled: true
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
@@ -619,6 +627,7 @@ sending_queue:
   num_consumers: 2
   queue_size: 3200
   wait_for_result: true
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 {{ if gt . 0 }}
 compression: gzip
 compression_params:

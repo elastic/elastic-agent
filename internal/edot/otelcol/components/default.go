@@ -65,6 +65,7 @@ import (
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
 	// Extensions
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/azureauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension"
 	headersetterextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension"
@@ -176,6 +177,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 		}
 
 		extensions := []extension.Factory{
+			azureauthextension.NewFactory(),
 			k8sleaderelector.NewFactory(),
 			healthcheckv2extension.NewFactory(),
 			memorylimiterextension.NewFactory(),

@@ -141,7 +141,7 @@ common:
     command: &k8s_test_command |
       buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
-    command: &k8s_test_command_with_sleep |
+    command_retry: &k8s_test_command_with_sleep |
       MIN=0
       MAX=9
       # echo let's avoid running multiple requests at the same time to avoid overwhelming the cluster and causing deployment issues
@@ -339,6 +339,9 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 2)"
+    # NOTE: scheduler should run only tier 3 tests.
+    #       PRs or release branches should run tier 2 if there are relevant changes.
+    if: '!(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")'
     if_changed:
       include:
         - .buildkite/**
@@ -418,7 +421,9 @@ steps:
 
   - group: "Stateful: Windows (tier 3)"
     key: integration-tests-win-tier-3
-    if: build.source == "schedule"
+    # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
+    #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
+    if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Windows - tier 3"
@@ -553,6 +558,9 @@ steps:
             variant: *linux_deb_variants
 
   - group: "Stateful: Linux (tier 2)"
+    # NOTE: scheduler should run only tier 3 tests.
+    #       PRs or release branches should run tier 2 if there are relevant changes.
+    if: '!(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")'
     if_changed:
       include:
         - .buildkite/**
@@ -658,7 +666,9 @@ steps:
 
   - group: "Stateful: Linux (tier 3)"
     key: integration-tests-linux-tier-3
-    if: build.source == "schedule"
+    # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
+    #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
+    if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Linux - tier 3"
@@ -851,6 +861,9 @@ steps:
 
   - group: ":kubernetes: Kubernetes (tier 2)"
     key: integration-tests-kubernetes-tier-2
+    # NOTE: scheduler should run only tier 3 tests.
+    #       PRs or release branches should run tier 2 if there are relevant changes.
+    if: '!(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")'
     if_changed:
       include:
         - .buildkite/**
@@ -891,7 +904,9 @@ steps:
 
   - group: ":kubernetes: Kubernetes (tier 3)"
     key: integration-tests-kubernetes-tier-3
-    if: build.source == "schedule"
+    # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
+    #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
+    if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Kubernetes - tier 3"
@@ -1048,7 +1063,9 @@ steps:
       - test-collector#v1.11.0:
           files: "build/*.xml"
           format: "junit"
-          branches: "main"
           debug: true
+          annotation-link: true
+          tags:
+            - "fips=false"
       - *google_oidc_observability_plugin
 

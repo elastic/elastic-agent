@@ -721,9 +721,6 @@ func (s *Settings) setTestDefaults() {
 
 // setCrossBuildDefaults sets default values for CrossBuildSettings.
 func (s *Settings) setCrossBuildDefaults() {
-	s.CrossBuild.MountModcache = true
-	s.CrossBuild.MountBuildCache = true
-	s.CrossBuild.BuildCacheVolumeName = "elastic-agent-crossbuild-build-cache"
 	s.CrossBuild.DevOS = "linux"
 	s.CrossBuild.DevArch = "amd64"
 }
@@ -736,7 +733,7 @@ func (s *Settings) setPackagingDefaults() {
 
 // setIntegrationTestDefaults sets default values for IntegrationTestSettings.
 func (s *Settings) setIntegrationTestDefaults() {
-	s.IntegrationTest.CleanOnExit = true
+	s.IntegrationTest.CleanOnExit = false
 	s.IntegrationTest.TestEnvironmentEnabled = true
 }
 
@@ -894,7 +891,9 @@ func (s *Settings) WithManifestInfo(ctx context.Context) (*Settings, error) {
 	clone.Packaging.Manifest = &resp
 	clone.Build.Snapshot = parsedVersion.IsSnapshot()
 	clone.Build.AgentCoreVersion = parsedVersion.CoreVersion()
-	clone.Packaging.AgentPackageVersion = parsedVersion.CoreVersion()
+	// VersionWithBuildMetadata preserves the build ID for Independent Agent Releases while
+	// omitting the prerelease — snapshot state is captured in Build.Snapshot.
+	clone.Packaging.AgentPackageVersion = parsedVersion.VersionWithBuildMetadata()
 	clone.Build.AgentCoreCommitHash = agentCoreProject.CommitHash
 	clone.Build.DependenciesVersion = parsedVersion.VersionWithPrerelease()
 	return clone, nil
@@ -1110,15 +1109,6 @@ type CrossBuildSettings struct {
 
 	// DockerVariants is the comma-separated list of Docker variants (from DOCKER_VARIANTS env var)
 	DockerVariants string
-
-	// MountModcache enables mounting $GOPATH/pkg/mod into crossbuild containers (from CROSSBUILD_MOUNT_MODCACHE env var)
-	MountModcache bool
-
-	// MountBuildCache enables mounting Go build cache into crossbuild containers (from CROSSBUILD_MOUNT_GOCACHE env var)
-	MountBuildCache bool
-
-	// BuildCacheVolumeName is the Docker volume name for the build cache
-	BuildCacheVolumeName string
 
 	// DevOS is the target OS for config generation (from DEV_OS env var, default "linux")
 	DevOS string
@@ -1510,12 +1500,6 @@ func (s *Settings) loadCrossBuildSettingsFromEnv() {
 	if v := os.Getenv("DOCKER_VARIANTS"); v != "" {
 		s.CrossBuild.DockerVariants = v
 	}
-	if v, ok := os.LookupEnv("CROSSBUILD_MOUNT_MODCACHE"); ok {
-		s.CrossBuild.MountModcache = v == "true"
-	}
-	if v, ok := os.LookupEnv("CROSSBUILD_MOUNT_GOCACHE"); ok {
-		s.CrossBuild.MountBuildCache = v == "true"
-	}
 	if v := os.Getenv("DEV_OS"); v != "" {
 		s.CrossBuild.DevOS = v
 	}
@@ -1630,7 +1614,9 @@ func (s *Settings) loadIntegrationTestSettingsFromEnv() error {
 	if os.Getenv("TEST_RUN_UNTIL_FAILURE") == "true" {
 		s.IntegrationTest.RunUntilFailure = true
 	}
-	if os.Getenv("TEST_INTEG_CLEAN_ON_EXIT") == "false" {
+	if v := os.Getenv("TEST_INTEG_CLEAN_ON_EXIT"); v == "true" {
+		s.IntegrationTest.CleanOnExit = true
+	} else if v == "false" {
 		s.IntegrationTest.CleanOnExit = false
 	}
 	if v := os.Getenv("TEST_LONG_RUNNING"); v != "" {
@@ -1876,7 +1862,8 @@ func (s *Settings) GetPlatforms() BuildPlatformList {
 // If SelectedPackageTypes is set in the settings, returns that.
 // Otherwise parses from PACKAGES env var.
 // If PACKAGES is "all", returns all available package types.
-// If PACKAGES is empty, returns nil.
+// If PACKAGES is empty, returns a platform-derived default: tar.gz for non-Windows
+// platforms and zip for Windows platforms.
 func (s *Settings) GetPackageTypes() []PackageType {
 	// Check settings override first
 	if s.SelectedPackageTypes != nil {
@@ -1884,7 +1871,7 @@ func (s *Settings) GetPackageTypes() []PackageType {
 	}
 	// Fall back to env var
 	if s.CrossBuild.Packages == "" {
-		return nil
+		return s.defaultPackageTypesForPlatforms()
 	}
 	if strings.ToLower(s.CrossBuild.Packages) == "all" {
 		return AllPackageTypes
@@ -1895,6 +1882,28 @@ func (s *Settings) GetPackageTypes() []PackageType {
 		if err := p.UnmarshalText([]byte(pkgtype)); err == nil {
 			types = append(types, p)
 		}
+	}
+	return types
+}
+
+// defaultPackageTypesForPlatforms returns the default package types derived from the
+// configured platforms: tar.gz for non-Windows platforms, zip for Windows platforms.
+func (s *Settings) defaultPackageTypesForPlatforms() []PackageType {
+	platforms := s.GetPlatforms()
+	var hasUnix, hasWindows bool
+	for _, p := range platforms {
+		if p.GOOS() == "windows" {
+			hasWindows = true
+		} else {
+			hasUnix = true
+		}
+	}
+	var types []PackageType
+	if hasUnix {
+		types = append(types, TarGz)
+	}
+	if hasWindows {
+		types = append(types, Zip)
 	}
 	return types
 }

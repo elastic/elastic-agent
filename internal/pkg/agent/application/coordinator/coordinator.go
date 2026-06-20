@@ -31,7 +31,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
@@ -47,6 +46,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -73,7 +73,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -620,7 +620,7 @@ type upgradeOpts struct {
 	skipVerifyOverride bool
 	skipDefaultPgp     bool
 	pgpBytes           []string
-	preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error
+	upgradeOpts        []upgrade.Option
 }
 
 type UpgradeOpt func(*upgradeOpts)
@@ -645,7 +645,7 @@ func WithPgpBytes(pgpBytes []string) UpgradeOpt {
 
 func WithPreUpgradeCallback(preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
-		opts.preUpgradeCallback = preUpgradeCallback
+		opts.upgradeOpts = append(opts.upgradeOpts, upgrade.WithPreSymlinkCallback(preUpgradeCallback))
 	}
 }
 
@@ -700,16 +700,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		}
 	}
 
-	// run any pre upgrade callback
-	if uOpts.preUpgradeCallback != nil {
-		if err := uOpts.preUpgradeCallback(ctx, c.logger, action); err != nil {
-			c.ClearOverrideState()
-			det.Fail(err)
-			return err
-		}
-	}
-
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes...)
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes, uOpts.upgradeOpts...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
@@ -726,7 +717,17 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 			err = upgradeErrors.ErrInsufficientDiskSpace
 		}
 
-		det.Fail(err)
+		// MarkUpgradeFailed updates det in-memory and, when an upgrade marker
+		// is present on disk (i.e. the failure happened after markUpgrade ran),
+		// persists state=Failed so the watcher started on next boot recognizes
+		// the upgrade as terminal and skips the grace-period watch instead of
+		// treating it as an in-progress upgrade. Returns an error only when a
+		// marker is present but cannot be loaded or written; absent markers are
+		// a no-op.
+		if mErr := upgrade.MarkUpgradeFailed(paths.Data(), det, err); mErr != nil {
+			c.logger.Warnw("failed to persist failed-state marker; reconcile deferred to next boot",
+				"error.message", mErr.Error())
+		}
 		return err
 	}
 	if cb != nil {

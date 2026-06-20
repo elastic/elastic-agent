@@ -28,8 +28,7 @@ func (c *FleetServerConfig) Validate() error {
 	// by default so it does not land silently in a patch release. Operators who
 	// want it can set ssl.certificate_reload.enabled: true in their config.
 	if c.TLS != nil && c.TLS.CertificateReload.Enabled == nil {
-		enabled := false
-		c.TLS.CertificateReload.Enabled = &enabled
+		c.TLS.CertificateReload.Enabled = new(false)
 	}
 	return nil
 }
@@ -71,8 +70,7 @@ func (c *Elasticsearch) Validate() error {
 	// by default so it does not land silently in a patch release. Operators who
 	// want it can set ssl.certificate_reload.enabled: true in their config.
 	if c.TLS != nil && c.TLS.CertificateReload.Enabled == nil {
-		enabled := false
-		c.TLS.CertificateReload.Enabled = &enabled
+		c.TLS.CertificateReload.Enabled = new(false)
 	}
 	return nil
 }

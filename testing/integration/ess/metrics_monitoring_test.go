@@ -30,6 +30,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
@@ -82,6 +83,7 @@ func (runner *MetricsRunner) SetupSuite() {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
+	require.NoError(runner.T(), fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
 	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
@@ -98,7 +100,7 @@ func (runner *MetricsRunner) addMonitoringToOtelRuntimeOverwrite() {
 	addMonitoringOverwriteBody := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "monitoring": {
@@ -107,7 +109,7 @@ func (runner *MetricsRunner) addMonitoringToOtelRuntimeOverwrite() {
     }
   }
 }
-`, runner.policyName)
+`, runner.policyName, runner.info.Namespace)
 	resp, err := runner.info.KibanaClient.Send(
 		http.MethodPut,
 		fmt.Sprintf("/api/fleet/agent_policies/%s", runner.policyID),
@@ -193,15 +195,12 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 	edotCollectorComponentID := otelMonitoring.EDOTComponentID
 	query = genESQuery(agentStatus.Info.ID, edotCollectorComponentID)
 
-	require.Eventually(t, func() bool {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		now = time.Now()
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
-		require.NoError(t, err)
+		require.NoError(collect, err)
 		t.Logf("Fetched metrics for %s, got %d hits", edotCollectorComponentID, res.Hits.Total.Value)
-		if res.Hits.Total.Value < 1 {
-			return false
-		}
-		return true
+		assert.GreaterOrEqual(collect, res.Hits.Total.Value, 1)
 	}, time.Minute*10, time.Second*10, "could not fetch metrics for edot collector")
 
 	if runtime.GOOS == "windows" {

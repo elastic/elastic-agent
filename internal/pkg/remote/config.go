@@ -75,8 +75,7 @@ func (c *Config) Validate() error {
 		// by default so it does not land silently in a patch release. Operators who
 		// want it can set ssl.certificate_reload.enabled: true in their config.
 		if c.Transport.TLS.CertificateReload.Enabled == nil {
-			enabled := false
-			c.Transport.TLS.CertificateReload.Enabled = &enabled
+			c.Transport.TLS.CertificateReload.Enabled = new(false)
 		}
 		return c.Transport.TLS.Validate()
 	}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 const ackPath = "/api/fleet/agents/%s/acks"
@@ -84,11 +85,11 @@ func (e *AckResponse) Validate() error {
 // AckCmd is a fleet API command.
 type AckCmd struct {
 	client client.Sender
-	info   AgentInfo
+	info   pkgfleetapi.AgentInfo
 }
 
 // NewAckCmd creates a new api command.
-func NewAckCmd(info AgentInfo, client client.Sender) *AckCmd {
+func NewAckCmd(info pkgfleetapi.AgentInfo, client client.Sender) *AckCmd {
 	return &AckCmd{
 		client: client,
 		info:   info,
@@ -114,7 +115,7 @@ func (e *AckCmd) Execute(ctx context.Context, r *AckRequest) (_ *AckResponse, er
 	}
 
 	ap := fmt.Sprintf(ackPath, e.info.AgentID())
-	resp, err := e.client.Send(ctx, "POST", ap, nil, nil, bytes.NewBuffer(b))
+	resp, err := e.client.Send(ctx, "POST", ap, nil, nil, bytes.NewReader(b))
 	if err != nil {
 		return nil, errors.New(err,
 			"fail to ack to fleet",
