@@ -336,16 +336,15 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	require.NoError(t, agentFixture.Prepare(ctx), "failed preparing agent fixture")
 
 	_, outputID := createMockESOutput(t, info, 0, 0, 100, 0)
+	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String())
 	policyID, enrollmentAPIKey := createPolicy(
 		t,
 		ctx,
 		agentFixture,
 		info,
-		fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
+		policyName,
 		outputID)
 
-<<<<<<< HEAD
-=======
 	reqBody := fmt.Sprintf(`
 {
   "name": "%s",
@@ -377,7 +376,6 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		t.Fatalf("updating policy failed. Status code %d, response:\n%s", status, string(result))
 	}
 
->>>>>>> 294efa35a (Fix potential sources of flakiness in integration tests (#14956))
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	if err != nil {
 		t.Fatalf("could not get Fleet URL: %s", err)
