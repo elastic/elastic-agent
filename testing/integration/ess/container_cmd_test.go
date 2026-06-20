@@ -790,7 +790,7 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
 	reqBody := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "monitoring": {
@@ -799,7 +799,7 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
     }
   }
 }
-`, policyName, runtime)
+`, policyName, info.Namespace, runtime)
 
 	status, result, err := info.KibanaClient.Request(
 		http.MethodPut,
