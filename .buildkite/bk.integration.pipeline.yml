@@ -1063,7 +1063,9 @@ steps:
       - test-collector#v1.11.0:
           files: "build/*.xml"
           format: "junit"
-          branches: "main"
           debug: true
+          annotation-link: true
+          tags:
+            - "fips=false"
       - *google_oidc_observability_plugin
 
