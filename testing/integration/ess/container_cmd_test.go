@@ -336,13 +336,45 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	require.NoError(t, agentFixture.Prepare(ctx), "failed preparing agent fixture")
 
 	_, outputID := createMockESOutput(t, info, 0, 0, 100, 0)
+	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String())
 	policyID, enrollmentAPIKey := createPolicy(
 		t,
 		ctx,
 		agentFixture,
 		info,
-		fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
+		policyName,
 		outputID)
+
+	reqBody := fmt.Sprintf(`
+{
+  "name": "%s",
+  "namespace": "%s",
+  "overrides": {
+    "agent": {
+      "internal": {
+        "runtime": {
+          "filebeat": {
+            "default": "process"
+          }
+        }
+      }
+    }
+  }
+}
+`, policyName, info.Namespace)
+
+	status, result, err := info.KibanaClient.Request(
+		http.MethodPut,
+		fmt.Sprintf("/api/fleet/agent_policies/%s", policyID),
+		nil,
+		nil,
+		bytes.NewBufferString(reqBody))
+	if err != nil {
+		t.Fatalf("could not execute request to update policy: %s", err)
+	}
+	if status != http.StatusOK {
+		t.Fatalf("updating policy failed. Status code %d, response:\n%s", status, string(result))
+	}
 
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	if err != nil {
@@ -788,7 +820,7 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
 	reqBody := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "monitoring": {
@@ -797,7 +829,7 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
     }
   }
 }
-`, policyName, runtime)
+`, policyName, info.Namespace, runtime)
 
 	status, result, err := info.KibanaClient.Request(
 		http.MethodPut,
