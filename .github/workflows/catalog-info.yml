@@ -19,8 +19,6 @@ jobs:
       packages: read
     steps:
       - uses: actions/checkout@v7
-        with:
-          submodules: true
 
       - uses: elastic/oblt-actions/elastic/validate-catalog@v1
 

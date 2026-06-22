@@ -20,9 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        # NOTE: no need for submodules here.
-        #with:
-        #  submodules: true
 
       - uses: elastic/oblt-actions/updatecli/run@v1
         with:
