@@ -58,7 +58,10 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 			} else {
 				u.log.Infow("upgrade watcher is still running cleanup, waiting before starting rollback watcher")
 				if tErr := withTakeOverWatcher(ctx, u.log, topDir, u.watcherHelper, func() error { return nil }); tErr != nil {
-					u.log.Warnw("failed to acquire watcher lock before rollback", "error.message", tErr)
+					if cleanErr := os.Remove(updateMarkerPath); cleanErr != nil {
+						u.log.Errorf("Error cleaning up fake upgrade marker: %v", cleanErr)
+					}
+					return nil, fmt.Errorf("waiting for upgrade watcher to release lock before rollback: %w", tErr)
 				}
 			}
 		}

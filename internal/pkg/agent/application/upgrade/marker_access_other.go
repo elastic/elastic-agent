@@ -31,6 +31,8 @@ func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool) er
 
 // On non-Windows platforms, removeMarkerFile simply removes the marker file.
 // See marker_access_windows.go for behavior on Windows platforms.
+// Unlike the Windows version, this may return os.ErrNotExist; callers such as
+// CleanMarker filter that out and treat it as success.
 func removeMarkerFile(markerFile string) error {
 	return os.Remove(markerFile)
 }

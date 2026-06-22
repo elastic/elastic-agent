@@ -71,7 +71,7 @@ func removeMarkerFile(markerFile string) error {
 	removeFn := func() error {
 		err := os.Remove(markerFile)
 		if errors.Is(err, os.ErrNotExist) {
-			// Already gone — treat as success, same as readMarkerFile.
+			// Already gone; treat as success, same as readMarkerFile.
 			return nil
 		}
 		return err

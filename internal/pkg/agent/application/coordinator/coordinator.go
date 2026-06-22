@@ -377,6 +377,10 @@ type Coordinator struct {
 	// SetUpgradeDetails helper to the Coordinator goroutine.
 	upgradeDetailsChan chan *details.Details
 
+	// upgradeMarkerCleanCh receives a signal when a StateCompleted checkin has been confirmed, triggering upgrade marker cleanup.
+	// The send side is exposed via UpgradeMarkerCleanCh; the receive-only view is wired into managerChans.
+	upgradeMarkerCleanCh chan struct{}
+
 	// loglevelCh forwards log level changes from the public API (SetLogLevel)
 	// to the run loop in Coordinator's main goroutine.
 	logLevelCh chan logp.Level
@@ -484,8 +488,8 @@ type managerChans struct {
 
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
 
-	// upgradeMarkerCleanCh receives a signal when a StateCompleted checkin has been confirmed, triggering upgrade marker cleanup.
-	upgradeMarkerCleanCh chan struct{}
+	// upgradeMarkerCleanCh is the receive side of Coordinator.upgradeMarkerCleanCh.
+	upgradeMarkerCleanCh <-chan struct{}
 }
 
 // diffCheck is a container used by checkAndLogUpdate()
@@ -626,7 +630,8 @@ func New(
 	if upgradeMgr != nil && upgradeMgr.MarkerWatcher() != nil {
 		c.managerChans.upgradeMarkerUpdate = upgradeMgr.MarkerWatcher().Watch()
 	}
-	c.managerChans.upgradeMarkerCleanCh = make(chan struct{}, 1)
+	c.upgradeMarkerCleanCh = make(chan struct{}, 1)
+	c.managerChans.upgradeMarkerCleanCh = c.upgradeMarkerCleanCh
 	return c
 }
 
@@ -1001,7 +1006,7 @@ func (c *Coordinator) logUpgradeDetails(details *details.Details) {
 
 // UpgradeMarkerCleanCh returns the send side of the channel used to signal that a StateCompleted checkin was confirmed and the upgrade marker can be deleted.
 func (c *Coordinator) UpgradeMarkerCleanCh() chan<- struct{} {
-	return c.managerChans.upgradeMarkerCleanCh
+	return c.upgradeMarkerCleanCh
 }
 
 // AckUpgrade is the method used on startup to ack a previously successful upgrade action.
@@ -1715,18 +1720,24 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 			if !c.isManaged &&
 				upgradeMarker.Details != nil &&
 				upgradeMarker.Details.State == details.StateCompleted {
-				if err := upgrade.CleanMarker(c.logger, paths.Data()); err != nil {
-					c.logger.Warnw("failed to clean upgrade marker", "error.message", err)
-				}
+				log, dataDir := c.logger, paths.Data()
+				go func() {
+					if err := upgrade.CleanMarker(log, dataDir); err != nil {
+						log.Warnw("failed to clean upgrade marker", "error.message", err)
+					}
+				}()
 				c.setUpgradeDetails(nil)
 			}
 		}
 
 	case <-c.managerChans.upgradeMarkerCleanCh:
-		if ctx.Err() == nil && c.state.UpgradeDetails != nil {
-			if err := upgrade.CleanMarker(c.logger, paths.Data()); err != nil {
-				c.logger.Warnw("failed to clean upgrade marker after Fleet confirmation", "error.message", err)
-			}
+		if ctx.Err() == nil && c.state.UpgradeDetails != nil && c.state.UpgradeDetails.State == details.StateCompleted {
+			log, dataDir := c.logger, paths.Data()
+			go func() {
+				if err := upgrade.CleanMarker(log, dataDir); err != nil {
+					log.Warnw("failed to clean upgrade marker after Fleet confirmation", "error.message", err)
+				}
+			}()
 			c.setUpgradeDetails(nil)
 		}
 	}

@@ -176,6 +176,9 @@ func (d *Details) Fail(err error) {
 // RegisterObserver allows an interested consumer of Details to register
 // themselves as an Observer. The registered observer is immediately notified
 // of the current upgrade details.
+// Observers always receive a non-nil copy of the current details, including
+// when the state is StateCompleted. Observers must not rely on receiving nil
+// to detect completion; check d.State == StateCompleted instead.
 func (d *Details) RegisterObserver(observer Observer) {
 	d.mu.Lock()
 	defer d.mu.Unlock()

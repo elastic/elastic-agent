@@ -289,15 +289,15 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	// watch succeeded - upgrade was successful!
 	upgradeDetails.SetState(details.StateCompleted)
 
-	// When removeMarker is true the watcher deletes the marker; the coordinator receives
-	// nil from the fsnotify Remove event.
-	// When false (9.5.0+ target), the coordinator handles cleanup: via upgradeMarkerCleanCh
-	// in managed mode, or on StateCompleted in standalone mode.
 	newVersionedHome := marker.VersionedHome
 	if newVersionedHome == "" {
 		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
 		newVersionedHome = filepath.Join("data", fmt.Sprintf("elastic-agent-%s", marker.Hash[:6]))
 	}
+	// When removeMarker is true the watcher deletes the marker; the coordinator receives
+	// nil from the fsnotify Remove event.
+	// When false (9.5.0+ target), the coordinator handles cleanup: via upgradeMarkerCleanCh
+	// in managed mode, or on StateCompleted in standalone mode.
 	// Only newVersionedHome is explicitly kept here; rollback candidates are preserved by
 	// cleanupAgentDirectories reading the TTL registry and retaining unexpired entries.
 	err = installModifier.Cleanup(log, topDir, removeMarker, false /* keepLogs */, newVersionedHome)

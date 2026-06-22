@@ -406,10 +406,9 @@ func TestFleetManagedUpgradeRollback(t *testing.T) {
 			assert.Nil(ct, agentResp.UpgradeDetails,
 				"Fleet upgrade_details should be nil after upgrade completes")
 		}
+		assert.NoFileExists(ct, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"),
+			"upgrade marker must be removed after upgrade completes")
 	}, 5*time.Minute, 15*time.Second)
-
-	assert.NoFileExists(t, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"),
-		"upgrade marker must be removed after upgrade completes")
 
 	// 3. Request rollback via Fleet API
 	t.Logf("Requesting rollback via Fleet API for agent %s", agentID)

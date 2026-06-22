@@ -206,6 +206,43 @@ func Test_watchCmd(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			// When marker.Version is unparseable, targetVersionErr != nil → removeMarker=true.
+			// The watcher falls back to old protocol regardless of versions.
+			name: "happy path: unparseable marker version falls back to old protocol (removeMarker=true)",
+			setupUpgradeMarker: func(t *testing.T, topDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
+				dataDirPath := paths.DataFrom(topDir)
+				err := os.MkdirAll(dataDirPath, 0755)
+				require.NoError(t, err)
+				err = upgrade.SaveMarker(
+					dataDirPath,
+					&upgrade.UpdateMarker{
+						Version:           "", // unparseable: triggers targetVersionErr != nil branch
+						Hash:              "newver",
+						VersionedHome:     filepath.Join("data", "elastic-agent-newver"),
+						UpdatedOn:         time.Now(),
+						PrevVersion:       "9.4.0",
+						PrevHash:          "prvver",
+						PrevVersionedHome: filepath.Join("data", "elastic-agent-prvver"),
+					},
+					true,
+				)
+				require.NoError(t, err)
+
+				watcher.EXPECT().
+					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil)
+
+				// removeMarker=true: unparseable target version falls back to old protocol.
+				installModifier.EXPECT().
+					Cleanup(mock.Anything, topDir, true, false, filepath.Join("data", "elastic-agent-newver")).
+					Return(nil)
+			},
+			args: args{
+				cfg: configuration.DefaultUpgradeConfig().Watcher,
+			},
+			wantErr: assert.NoError,
+		},
+		{
 			// The watcher binary version (version.GetParsedAgentPackageVersion(), which
 			// defaults to 9.5.0 in tests) is newer than the target SNAPSHOT. The watcher
 			// falls back to old protocol: it removes the marker so the coordinator sees nil

@@ -2801,12 +2801,16 @@ func TestCoordinatorCleansMarkerOnStateCompletedStandalone(t *testing.T) {
 		managerChans: managerChans{
 			upgradeMarkerUpdate: markerChan,
 		},
-		componentPIDTicker: time.NewTicker(time.Second * 30),
+		componentPIDTicker: func() *time.Ticker {
+			tk := time.NewTicker(time.Second * 30)
+			t.Cleanup(tk.Stop)
+			return tk
+		}(),
 	}
 
 	// Write a marker file so we can verify it gets cleaned.
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o750))
-	det := details.NewDetails("8.99.0", details.StateCompleted, "test-action-id")
+	det := details.NewDetails("9.5.0", details.StateCompleted, "test-action-id")
 	marker := upgrade.UpdateMarker{Details: det}
 	require.NoError(t, upgrade.SaveMarker(paths.Data(), &marker, false))
 
@@ -2814,10 +2818,13 @@ func TestCoordinatorCleansMarkerOnStateCompletedStandalone(t *testing.T) {
 	markerChan <- marker
 	coord.runLoopIteration(ctx)
 
-	// Marker file must be gone.
-	assert.NoFileExists(t, filepath.Join(paths.Data(), ".update-marker"))
-	// Coordinator state must have UpgradeDetails cleared.
+	// Coordinator state must have UpgradeDetails cleared synchronously.
 	assert.Nil(t, coord.state.UpgradeDetails)
+	// Marker file removal runs in a goroutine; wait for it.
+	assert.Eventually(t, func() bool {
+		_, err := os.Stat(filepath.Join(paths.Data(), ".update-marker"))
+		return os.IsNotExist(err)
+	}, time.Second, time.Millisecond, "upgrade marker must be removed after standalone upgrade completes")
 }
 
 func TestCoordinatorDoesNotCleanMarkerOnStateCompletedManaged(t *testing.T) {
@@ -2845,12 +2852,16 @@ func TestCoordinatorDoesNotCleanMarkerOnStateCompletedManaged(t *testing.T) {
 		managerChans: managerChans{
 			upgradeMarkerUpdate: markerChan,
 		},
-		componentPIDTicker: time.NewTicker(time.Second * 30),
+		componentPIDTicker: func() *time.Ticker {
+			tk := time.NewTicker(time.Second * 30)
+			t.Cleanup(tk.Stop)
+			return tk
+		}(),
 	}
 
 	// Write a marker file — it must survive this iteration.
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o750))
-	det := details.NewDetails("8.99.0", details.StateCompleted, "test-action-id")
+	det := details.NewDetails("9.5.0", details.StateCompleted, "test-action-id")
 	marker := upgrade.UpdateMarker{Details: det}
 	require.NoError(t, upgrade.SaveMarker(paths.Data(), &marker, false))
 
@@ -2889,20 +2900,27 @@ func TestCoordinatorCleansMarkerOnFleetConfirmation(t *testing.T) {
 		managerChans: managerChans{
 			upgradeMarkerCleanCh: cleanCh,
 		},
-		componentPIDTicker: time.NewTicker(time.Second * 30),
+		componentPIDTicker: func() *time.Ticker {
+			tk := time.NewTicker(time.Second * 30)
+			t.Cleanup(tk.Stop)
+			return tk
+		}(),
 	}
 
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o750))
 	marker := upgrade.UpdateMarker{}
 	require.NoError(t, upgrade.SaveMarker(paths.Data(), &marker, false))
-	det := details.NewDetails("8.99.0", details.StateCompleted, "test-action-id")
+	det := details.NewDetails("9.5.0", details.StateCompleted, "test-action-id")
 	coord.state.UpgradeDetails = det
 
 	cleanCh <- struct{}{}
 	coord.runLoopIteration(ctx)
 
-	// Marker file must be gone.
-	assert.NoFileExists(t, filepath.Join(paths.Data(), ".update-marker"))
-	// Coordinator state must have UpgradeDetails cleared.
+	// Coordinator state must have UpgradeDetails cleared synchronously.
 	assert.Nil(t, coord.state.UpgradeDetails)
+	// Marker file removal runs in a goroutine; wait for it.
+	assert.Eventually(t, func() bool {
+		_, err := os.Stat(filepath.Join(paths.Data(), ".update-marker"))
+		return os.IsNotExist(err)
+	}, time.Second, time.Millisecond, "upgrade marker must be removed after Fleet confirmation")
 }
