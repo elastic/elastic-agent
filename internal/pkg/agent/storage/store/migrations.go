@@ -13,8 +13,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store/internal/migrations"
 	"github.com/elastic/elastic-agent/internal/pkg/conv"
-	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 var ErrInvalidYAML = errors.New("could not parse YAML")

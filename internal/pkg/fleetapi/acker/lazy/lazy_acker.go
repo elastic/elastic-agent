@@ -10,8 +10,8 @@ import (
 
 	"go.elastic.co/apm/v2"
 
-	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 type batchAcker interface {

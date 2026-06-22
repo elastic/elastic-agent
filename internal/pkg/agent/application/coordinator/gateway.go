@@ -7,8 +7,8 @@ package coordinator
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 // FleetGateway is a gateway between the Agent and the Fleet API, it's take cares of all the
