@@ -1010,7 +1010,7 @@ agent.internal.runtime.filebeat.filestream: otel
 			defer findCancel()
 
 			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, metricsIndex, map[string]interface{}{
-				"component.id": "filestream-default",
+				"component.id": "filestream-default/e2e",
 			})
 			require.NoError(ct, err)
 
