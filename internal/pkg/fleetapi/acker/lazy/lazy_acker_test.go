@@ -13,7 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
