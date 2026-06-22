@@ -1,0 +1,51 @@
+name: k8s-tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+      - '8.19'
+      - 9.*
+
+permissions:
+  contents: read
+
+## Concurrency only allowed in the main branch.
+## So old builds running for old commits within the same Pull Request are cancelled
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  k8s-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        k8s_version:
+          - "1.33.0"
+          - "1.32.0"
+          - "1.31.0"
+          - "1.30.0"
+          - "1.29.4"
+          - "1.28.9"
+    env:
+      K8S_VERSION: "v${{ matrix.k8s_version }}"
+      KIND_VERSION: "v0.27.0"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: .go-version
+
+      - name: Install mage
+        run: make mage
+
+      - name: k8s-tests
+        run: .buildkite/scripts/steps/k8s-tests.sh

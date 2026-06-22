@@ -1,9 +1,8 @@
-name: macos-unit-tests
+name: unit-tests
 
 on:
   workflow_dispatch:
-  # Temporary disabled for PRs
-  # pull_request:
+  pull_request:
   push:
     branches:
       - main
@@ -21,8 +20,25 @@ concurrency:
 
 jobs:
   unit-tests:
-    runs-on: macos-15
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+          - ubuntu-22.04-arm
+          - macos-15-intel
+          - macos-15
+        include:
+          - os: ubuntu-22.04
+            fips_variant: "requirefips"
+            fips_env: "true"
+          - os: ubuntu-22.04
+            fips_variant: "fips140-only"
+            fips_env: "true"
+            godebug: "fips140=only,tlsmlkem=0"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -35,12 +51,17 @@ jobs:
           go-version-file: .go-version
 
       - name: Install make
+        if: runner.os == 'macOS'
         run: |
           brew install make
-          export PATH="/usr/local/opt/make/libexec/gnubin:$PATH"
 
       - name: Install mage
         run: make mage
 
       - name: mage unitTest
-        run: RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
+        run: mage unitTest
+        env:
+          RACE_DETECTOR: true
+          TEST_COVERAGE: true
+          FIPS: ${{ matrix.fips_env }}
+          GODEBUG: ${{ matrix.godebug }}
