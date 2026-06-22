@@ -39,7 +39,7 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 	}
 
 	// Get list of submodules and archive them as well
-	submodules, err := getSubmodulePaths(absDir)
+	submodules, err := getSubmodulePaths(ctx, absDir)
 	if err != nil {
 		return fmt.Errorf("failed to get submodule paths: %w", err)
 	}
@@ -61,9 +61,9 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 }
 
 // getSubmodulePaths returns the paths of all submodules (including nested ones) in the repository.
-func getSubmodulePaths(repoDir string) ([]string, error) {
+func getSubmodulePaths(ctx context.Context, repoDir string) ([]string, error) {
 	// Use git submodule status --recursive to get all submodules including nested ones
-	output, err := cmdBufferedOutput(exec.Command("git", "submodule", "status", "--recursive"), repoDir)
+	output, err := cmdBufferedOutput(exec.CommandContext(ctx, "git", "submodule", "status", "--recursive"), repoDir)
 	if err != nil {
 		return nil, err
 	}
@@ -89,13 +89,13 @@ func getSubmodulePaths(repoDir string) ([]string, error) {
 // archiveGitRepo archives all files (tracked and untracked) from a git repository into the zip writer.
 // pathPrefix is prepended to all file paths in the archive (used for submodules).
 func archiveGitRepo(ctx context.Context, zw *zip.Writer, repoDir string, pathPrefix string) error {
-	projectFilesOutput, err := cmdBufferedOutput(exec.Command("git", "ls-files", "-z"), repoDir)
+	projectFilesOutput, err := cmdBufferedOutput(exec.CommandContext(ctx, "git", "ls-files", "-z"), repoDir)
 	if err != nil {
 		return err
 	}
 
 	// Add files that are not yet tracked in git. Prevents a footcannon where someone writes code to a new file, then tests it before they add to git
-	untrackedOutput, err := cmdBufferedOutput(exec.Command("git", "ls-files", "--exclude-standard", "-o", "-z"), repoDir)
+	untrackedOutput, err := cmdBufferedOutput(exec.CommandContext(ctx, "git", "ls-files", "--exclude-standard", "-o", "-z"), repoDir)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,16 @@ func archiveGitRepo(ctx context.Context, zw *zip.Writer, repoDir string, pathPre
 				archivePath = filepath.Join(pathPrefix, line)
 			}
 
-			w, err := zw.Create(archivePath)
+			// Preserve the file's mode (notably the executable bit) so scripts that
+			// are extracted and run on the remote — e.g. a Dockerfile entrypoint built
+			// from this tree — stay executable. zip.Writer.Create would otherwise use a
+			// default mode and drop the exec bit, surfacing as "permission denied".
+			header := &zip.FileHeader{
+				Name:   archivePath,
+				Method: zip.Deflate,
+			}
+			header.SetMode(stat.Mode())
+			w, err := zw.CreateHeader(header)
 			if err != nil {
 				return fmt.Errorf("failed to create zip entry %s: %w", archivePath, err)
 			}

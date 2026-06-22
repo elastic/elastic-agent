@@ -39,6 +39,7 @@ const (
 	OtelSupervisedMonitoringURLFlagName       = "supervised.monitoring.url"
 	OtelFeatureGatesFlagName                  = "feature-gates"
 	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
+	OtelProfilingSupportFeature               = "service.profilesSupport"
 )
 
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
@@ -135,6 +136,9 @@ func (r *subprocessExecution) startCollector(
 
 	// set collector args
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+	if hasProfilesPipeline(cfg) {
+		collectorArgs = append(collectorArgs, fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelProfilingSupportFeature))
+	}
 
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(collectorArgs),

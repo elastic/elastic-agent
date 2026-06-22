@@ -5,6 +5,7 @@ source .buildkite/scripts/steps/ess_oblt-cli.sh
 source .buildkite/scripts/steps/fleet.sh
 
 STACK_VERSION="$(jq -r '.stack_version' .package-version)"
+STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
 
 METADATA_PREFIX=""
 if [[ "${FIPS:-false}" == "true" ]]; then
@@ -13,7 +14,7 @@ if [[ "${FIPS:-false}" == "true" ]]; then
 fi
 export METADATA_PREFIX
 
-ess_up "$STACK_VERSION"
+ess_up "$STACK_VERSION" "$STACK_BUILD_ID"
 
 # Publish the shared cluster name via meta-data so the global cleanup step
 # (ess_down_oblt-cli.sh) can find and destroy it. Per-step retries intentionally

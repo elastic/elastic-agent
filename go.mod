@@ -15,7 +15,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260617201957-5edad0d2526e
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260620162439-f9280499aaf2
 	github.com/elastic/cloud-on-k8s/v3 v3.4.0
 	github.com/elastic/elastic-agent-autodiscover v0.10.3-0.20260423154939-e990715f9426
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
@@ -36,7 +36,7 @@ require (
 	github.com/google/go-containerregistry v0.21.4
 	github.com/google/pprof v0.0.0-20250923004556-9e5a51aed1e8
 	github.com/gorilla/mux v1.8.1
-	github.com/jaypipes/ghw v0.12.0
+	github.com/jaypipes/ghw v0.24.0
 	github.com/jedib0t/go-pretty/v6 v6.4.6
 	github.com/josephspurrier/goversioninfo v1.5.0
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
@@ -47,7 +47,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.153.0
 	github.com/otiai10/copy v1.14.0
 	github.com/rednafi/link-patrol v0.0.0-20240826150821-057643e74d4d
-	github.com/rs/zerolog v1.27.0
+	github.com/rs/zerolog v1.35.1
 	github.com/sajari/regression v1.0.1
 	github.com/schollz/progressbar/v3 v3.13.1
 	github.com/spf13/cobra v1.10.2
@@ -64,6 +64,7 @@ require (
 	go.opentelemetry.io/collector/extension/extensiontest v0.153.0
 	go.opentelemetry.io/collector/pdata v1.59.0
 	go.opentelemetry.io/collector/pipeline v1.59.0
+	go.opentelemetry.io/collector/pipeline/xpipeline v0.153.0
 	go.opentelemetry.io/otel/sdk/metric v1.44.0
 	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v3 v3.0.4
@@ -85,7 +86,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/gotestsum v1.13.0
 	helm.sh/helm/v3 v3.21.0
-	howett.net/plist v1.0.1
+	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
 	k8s.io/cli-runtime v0.35.1
@@ -122,7 +123,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
-	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/akavel/rsrc v0.10.2 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
@@ -153,7 +153,6 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
-	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -192,7 +191,7 @@ require (
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/jaypipes/pcidb v1.0.0 // indirect
+	github.com/jaypipes/pcidb v1.1.1 // indirect
 	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
 	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
 	github.com/jcmturner/gofork v1.7.6 // indirect
@@ -213,7 +212,6 @@ require (
 	github.com/mileusna/useragent v1.3.5 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
-	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
@@ -280,7 +278,6 @@ require (
 	go.opentelemetry.io/collector/pdata/pprofile v0.153.0 // indirect
 	go.opentelemetry.io/collector/pdata/testdata v0.153.0 // indirect
 	go.opentelemetry.io/collector/pdata/xpdata v0.153.0 // indirect
-	go.opentelemetry.io/collector/pipeline/xpipeline v0.153.0 // indirect
 	go.opentelemetry.io/collector/processor/processortest v0.153.0 // indirect
 	go.opentelemetry.io/collector/processor/xprocessor v0.153.0 // indirect
 	go.opentelemetry.io/collector/receiver/receivertest v0.153.0 // indirect
