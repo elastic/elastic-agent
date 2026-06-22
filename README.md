@@ -100,14 +100,8 @@ To build a local version of the agent for development, run the command below. Th
 * windows/amd64
 
 ```sh
-<<<<<<< HEAD
-# DEV=true disable signature verification to allow replacing binaries in the components sub-directory of the package.
-# EXTERNAL=true downloads the matching version of the binaries that are packaged with agent (Beats for example).
-# SNAPSHOT=true indicates that this is a snapshot version and not a release version.
-=======
 # EXTERNAL=true downloads the matching version of the binaries that are packaged with agent, not necessary if only using Beats.
 # SNAPSHOT is true by default (snapshot build); set SNAPSHOT=false to build a release package.
->>>>>>> ff4469b9e ([mage] Set SNAPSHOT=true by default (#14805))
 # PLATFORMS=linux/amd64 builds an agent that will run on 64 bit X86 Linux systems.
 # PACKAGES selects package types; if unset, defaults to tar.gz for non-Windows platforms and zip for Windows.
 # Use PACKAGES=all to build all package types, or specify types (e.g. tar.gz,rpm,deb,zip,docker).
