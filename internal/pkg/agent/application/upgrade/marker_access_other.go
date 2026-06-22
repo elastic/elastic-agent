@@ -28,3 +28,9 @@ func readMarkerFile(markerFile string) ([]byte, error) {
 func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool) error {
 	return writeMarkerFileCommon(markerFile, markerBytes, shouldFsync)
 }
+
+// On non-Windows platforms, removeMarkerFile simply removes the marker file.
+// See marker_access_windows.go for behavior on Windows platforms.
+func removeMarkerFile(markerFile string) error {
+	return os.Remove(markerFile)
+}

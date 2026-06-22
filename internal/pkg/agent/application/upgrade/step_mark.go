@@ -236,7 +236,7 @@ func CleanMarker(log *logger.Logger, dataDirPath string) error {
 	// (err == nil) to also enter the return branch. Currently harmless
 	// because there's no work after this block, but brittle to future
 	// additions; keep the guard.
-	if err := os.Remove(markerFile); err != nil && !goerrors.Is(err, fs.ErrNotExist) {
+	if err := removeMarkerFile(markerFile); err != nil && !goerrors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 

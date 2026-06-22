@@ -142,7 +142,41 @@ func Test_watchCmd(t *testing.T) {
 					Return(nil)
 
 				installModifier.EXPECT().
-					Cleanup(mock.Anything, topDir, false, false, filepath.Join("data", "elastic-agent-4.5.6-newver")).
+					Cleanup(mock.Anything, topDir, true, false, filepath.Join("data", "elastic-agent-4.5.6-newver")).
+					Return(nil)
+			},
+			args: args{
+				cfg: configuration.DefaultUpgradeConfig().Watcher,
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "happy path: target version >= 9.5.0, coordinator owns marker cleanup",
+			setupUpgradeMarker: func(t *testing.T, topDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
+				dataDirPath := paths.DataFrom(topDir)
+				err := os.MkdirAll(dataDirPath, 0755)
+				require.NoError(t, err)
+				err = upgrade.SaveMarker(
+					dataDirPath,
+					&upgrade.UpdateMarker{
+						Version:           "9.5.0",
+						Hash:              "newver",
+						VersionedHome:     filepath.Join("data", "elastic-agent-9.5.0-newver"),
+						UpdatedOn:         time.Now(),
+						PrevVersion:       "9.4.0",
+						PrevHash:          "prvver",
+						PrevVersionedHome: filepath.Join("data", "elastic-agent-prvver"),
+					},
+					true,
+				)
+				require.NoError(t, err)
+
+				watcher.EXPECT().
+					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil)
+
+				installModifier.EXPECT().
+					Cleanup(mock.Anything, topDir, false, false, filepath.Join("data", "elastic-agent-9.5.0-newver")).
 					Return(nil)
 			},
 			args: args{
@@ -460,7 +494,7 @@ func Test_watchCmd_MarkerPointsToSelf(t *testing.T) {
 
 	loaded, loadErr := upgrade.LoadMarker(dataDir)
 	require.NoError(t, loadErr)
-	assert.NotNil(t, loaded, "marker should be preserved after successful watch")
+	assert.Nil(t, loaded, "marker should be removed after successful watch")
 }
 
 // writeFakeInstallForWatcherTest builds the on-disk shape that step_unpack

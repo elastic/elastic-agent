@@ -274,8 +274,12 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	// watch succeeded - upgrade was successful!
 	upgradeDetails.SetState(details.StateCompleted)
 
-	// cleanup older versions
-	removeMarker := false
+	// For agents predating the coordinator-owned marker cleanup (< 9.5.0), the
+	// running agent after this upgrade has no upgradeMarkerCleanCh. The watcher
+	// removes the marker so the old coordinator receives nil via the fsnotify
+	// Remove path. For 9.5.0+ the coordinator handles cleanup itself.
+	targetVersion, targetVersionErr := semver.ParseVersion(marker.Version)
+	removeMarker := targetVersionErr != nil || targetVersion.Less(*upgrade.Version_9_5_0_SNAPSHOT)
 	newVersionedHome := marker.VersionedHome
 	if newVersionedHome == "" {
 		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
