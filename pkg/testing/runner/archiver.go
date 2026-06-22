@@ -23,13 +23,13 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 		return fmt.Errorf("failed to get absolute path to %s: %w", dir, err)
 	}
 
-	projectFilesOutput, err := cmdBufferedOutput(exec.Command("git", "ls-files", "-z"), dir)
+	projectFilesOutput, err := cmdBufferedOutput(exec.CommandContext(ctx, "git", "ls-files", "-z"), dir)
 	if err != nil {
 		return err
 	}
 
 	// Add files that are not yet tracked in git. Prevents a footcannon where someone writes code to a new file, then tests it before they add to git
-	untrackedOutput, err := cmdBufferedOutput(exec.Command("git", "ls-files", "--exclude-standard", "-o", "-z"), dir)
+	untrackedOutput, err := cmdBufferedOutput(exec.CommandContext(ctx, "git", "ls-files", "--exclude-standard", "-o", "-z"), dir)
 	if err != nil {
 		return err
 	}
@@ -70,11 +70,11 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 				return nil
 			}
 			fullPath := filepath.Join(absDir, line)
-			s, err := os.Stat(fullPath)
+			stat, err := os.Stat(fullPath)
 			if err != nil {
 				return fmt.Errorf("failed to stat file %s: %w", fullPath, err)
 			}
-			if s.IsDir() {
+			if stat.IsDir() {
 				// skip directories
 				return nil
 			}
@@ -83,7 +83,17 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 				return fmt.Errorf("failed to open file %s: %w", fullPath, err)
 			}
 			defer f.Close()
-			w, err := zw.Create(line)
+
+			// Preserve the file's mode (notably the executable bit) so scripts that
+			// are extracted and run on the remote — e.g. a Dockerfile entrypoint built
+			// from this tree — stay executable. zip.Writer.Create would otherwise use a
+			// default mode and drop the exec bit, surfacing as "permission denied".
+			header := &zip.FileHeader{
+				Name:   line,
+				Method: zip.Deflate,
+			}
+			header.SetMode(stat.Mode())
+			w, err := zw.CreateHeader(header)
 			if err != nil {
 				return fmt.Errorf("failed to create zip entry %s: %w", line, err)
 			}
