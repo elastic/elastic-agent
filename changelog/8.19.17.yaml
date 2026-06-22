@@ -5,13 +5,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14443
       issue: []
       impact: ""
       action: ""
@@ -24,13 +18,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14714
       issue: []
       impact: ""
       action: ""
@@ -47,13 +35,7 @@ entries:
         been restarted.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14430
       issue:
         - https://github.com/elastic/elastic-agent/issues/13196
       impact: ""
@@ -67,13 +49,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14481
       issue: []
       impact: ""
       action: ""
@@ -87,13 +63,7 @@ entries:
         When --path.logs is explicitly set on the CLI, the agent now writes logs to the specified path even if the configuration file has agent.logging.to_stderr: true (the shipped default).
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14476
       issue:
         - https://github.com/elastic/elastic-agent/issues/13320
       impact: ""
@@ -121,13 +91,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14473
       issue: []
       impact: ""
       action: ""
@@ -140,13 +104,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14665
       issue: []
       impact: ""
       action: ""
@@ -159,13 +117,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14599
       issue: []
       impact: ""
       action: ""
@@ -192,13 +144,7 @@ entries:
       description: TLS certificate paths will now always be read from ELASTIC_AGENT_CERT and ELASTIC_AGENT_CERT_KEY in container mode rather than reading from potentially stale fleet.enc values.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14758
       issue: []
       impact: ""
       action: ""
@@ -211,13 +157,7 @@ entries:
       description: Fixes a bug where container-mode overrides were correctly applied to the running agent but were overwritten by fleet.enc before being passed to the coordinator. This could result in incorrect config diagnostics and unnecessary restarts on policy updates.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14758
       issue: []
       impact: ""
       action: ""
@@ -230,13 +170,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14844
       issue:
         - https://github.com/elastic/elastic-agent/issues/14773
       impact: ""
@@ -250,13 +184,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14902
       issue: []
       impact: ""
       action: ""
@@ -269,13 +197,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14954
-        - https://github.com/elastic/elastic-agent/pull/14997
-        - https://github.com/elastic/elastic-agent/pull/14998
-        - https://github.com/elastic/elastic-agent/pull/14805
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/15048
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14963
       issue: []
       impact: ""
       action: ""
