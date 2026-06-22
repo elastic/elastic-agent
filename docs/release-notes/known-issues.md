@@ -83,7 +83,7 @@ A performance optimization in {{agent}} 9.3.4 causes timestamp fields produced b
 
 Because most {{agent}} integrations and inputs rely on Beats-based collectors, the impact is wide-ranging. Examples of affected functionality include:
 
-* **Synthetics monitoring** — Synthetics monitors rely on Heartbeat and may stop reporting expected data, resulting in a loss of monitoring visibility.
+* **Synthetics monitoring** — Synthetics monitors rely on Heartbeat and might stop reporting expected data, resulting in a loss of monitoring visibility.
 * **SentinelOne integration** — Response actions stop functioning when `event.created` is missing. For details, refer to [Issue #266355](https://github.com/elastic/kibana/issues/266355).
 * **Other data-collection integrations** — Any integration that sends events through Beats-based inputs may emit affected documents.
 
