@@ -69,22 +69,34 @@ Affected users can uncheck the **Disable policy change acknowledgments** option 
 For more information check [Issue #264983](https://github.com/elastic/kibana/issues/264983).
 :::
 
-:::{dropdown} Events from Beats based integrations in Elastic Agent 9.3.4 incorrectly convert timestamps to an empty {} JSON object.
+:::{dropdown} Events from Beats-based inputs and integrations in Elastic Agent 9.3.4 incorrectly convert timestamps to an empty {} JSON object.
 :name: events-beats-9-3-4-timestamp-empty-object
 **Applies to: {{agent}} 9.3.4**
 
-A performance optimization in Elastic Agent 9.3.4 causes timestamp fields sent from Beats based inputs and integrations to be incorrectly serialized to an empty `{}` JSON object. This does not affect the primary `@timestamp` field, only other timestamps fields in the event body.
+A performance optimization in {{agent}} 9.3.4 causes timestamp fields produced by Beats-based inputs to be incorrectly serialized as an empty `{}` JSON object. This affects time fields in the event body (for example, `event.created`) but does not affect the primary `@timestamp` field.
 
-The most notable field affected is `event.created` which when missing prevents some features like SentinelOne response actions from functioning as described in [Issue #266355](https://github.com/elastic/kibana/issues/266355). Documents affected will have timestamps like `event.created` set to empty JSON objects as shown in the example below:
+**Impact**
+
+Because most {{agent}} integrations and inputs rely on Beats-based collectors, the impact is wide-ranging. Examples of affected functionality include:
+
+* **Synthetics monitoring** — Synthetics monitors rely on Heartbeat and may stop reporting expected data, resulting in a loss of monitoring visibility.
+* **SentinelOne integration** — Response actions stop functioning when `event.created` is missing. For details, refer to [Issue #266355](https://github.com/elastic/kibana/issues/266355).
+* **Other data-collection integrations** — Any integration that sends events through Beats-based inputs may emit affected documents.
+
+**Symptoms**
+
+Documents from Beats-based inputs contain one or more time fields serialized as an empty object, for example:
 
 ```json
-  "event": {
-    "dataset": "sentinel_one.agent",
-    "created": {}
-  }
+"event": {
+  "dataset": "sentinel_one.agent",
+  "created": {}
+}
 ```
 
-The performance optimization has been removed and a fix will be available in the next 9.3.5 release. This issue does not affect version 9.4.0.
+**Resolution**
+
+The performance optimization has been removed. The fix is included in {{agent}} 9.3.5. This issue does not affect {{agent}} 9.4.0.
 :::
 
 :::{dropdown} Elastic Agent 9.3.x fails to start on MacOS when OSQuery Manager integration is used
