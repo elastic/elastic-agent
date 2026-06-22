@@ -1,0 +1,290 @@
+version: 9.3.6
+entries:
+    - kind: bug-fix
+      summary: Fix the bug where logging settings fail to apply in fleet-managed mode.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/19663
+      impact: ""
+      action: ""
+      timestamp: 1774000686
+      file:
+        name: 1774000686-fix-logging.yaml
+        checksum: db6e421e9b12ee2b717918520ba926e5e63277e6
+    - kind: bug-fix
+      summary: Preserve live install during upgrade cleanup and report aborted upgrades to Fleet
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/19663
+      impact: ""
+      action: ""
+      timestamp: 1777551882
+      file:
+        name: 1777551882-drosiek-marker-stale.yaml
+        checksum: 7007cf607ed0cddef1891599315f7e55847fb6a8
+    - kind: bug-fix
+      summary: Fix deprecated component name warnings in EDOT collector Helm values
+      description: ""
+      component: edot-collector
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/19663
+      impact: ""
+      action: ""
+      timestamp: 1779287880
+      file:
+        name: 1779287880-edot-collector-fix-deprecated-warnings-on-names.yaml
+        checksum: fdd2811296b45903c9d957869f71486afb9f6336
+    - kind: feature
+      summary: Change bulk_response_filter_path in elasticsearch exporter configurations to match beats.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14452
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12688
+      impact: ""
+      action: ""
+      timestamp: 1779393592
+      file:
+        name: 1779393592-change-bulk_response_filter_path-in-elasticsearch-exporter-configurations.yaml
+        checksum: 2a9fc6198aa397564fdfbe7866a195215c954215
+    - kind: feature
+      summary: Add Azure auth extension to EDOT Collector
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/19663
+      impact: ""
+      action: ""
+      timestamp: 1779748227
+      file:
+        name: 1779748227-Add-Azure-auth-extension-to-EDOT-Collector.yaml
+        checksum: 315fbe489a68dd799808b438889dc2b8eadf0959
+    - kind: enhancement
+      summary: Add health checks to EDOT collectors used in K8s Onboarding flow
+      description: ""
+      component: edot-collector
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/19663
+      impact: ""
+      action: ""
+      timestamp: 1779881482
+      file:
+        name: 1779881482-otel-kube-stack-healthcheck.yaml
+        checksum: 7bbb338de4eb592c5ba090b65e4730051ccb8684
+    - kind: enhancement
+      summary: Disable TLS certificate hot-reload by default
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/19663
+      impact: ""
+      action: ""
+      timestamp: 1779933702
+      file:
+        name: 1779933702-disable-tls-certificate-hot-reload-by-default.yaml
+        checksum: 67d7d7daf6bc9068b004f7bf1da08281b9fae3a2
+    - kind: bug-fix
+      summary: Move fleet uninstall notification before installation directory removal as likely fix for runtime panic during uninstall on Windows.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14581
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14142
+      impact: ""
+      action: ""
+      timestamp: 1779979535
+      file:
+        name: 1779979535-move-fleet-uninstall-notification-before-installation-directory-removal.yaml
+        checksum: 37511da15155992574844203e56a71d6cf5656e2
+    - kind: bug-fix
+      summary: Read TLS config from environment variables in container mode
+      description: TLS certificate paths will now always be read from ELASTIC_AGENT_CERT and ELASTIC_AGENT_CERT_KEY in container mode rather than reading from potentially stale fleet.enc values.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/19663
+      impact: ""
+      action: ""
+      timestamp: 1779995943
+      file:
+        name: 1779995943-read-container-tls-from-env.yaml
+        checksum: 811169545b21d2614cf29e08920e2180f4063567
+    - kind: bug-fix
+      summary: Fix container config override inconsistencies
+      description: Fixes a bug where container-mode overrides were correctly applied to the running agent but were overwritten by fleet.enc before being passed to the coordinator. This could result in incorrect config diagnostics and unnecessary restarts on policy updates.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/19663
+      impact: ""
+      action: ""
+      timestamp: 1779996772
+      file:
+        name: 1779996772-fix-container-override-inconsistencies.yaml
+        checksum: f67af5ec0a67ea14b617b18cb7f6872bc56f6a75
+    - kind: other
+      summary: remove unused synthetics dependencies
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/19663
+      impact: ""
+      action: ""
+      timestamp: 1780060974
+      file:
+        name: 1780060974-remove-synthetics-dependencies.yaml
+        checksum: b9bba82ae489e886802ee153af8d5a27c2bea8cb
+    - kind: bug-fix
+      summary: Fix accidental inclusion of cloud-defend in the Linux .tar.gz saving 151 MB of disk space.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/19663
+      impact: ""
+      action: ""
+      timestamp: 1780517113
+      file:
+        name: 1780517113-fix-accidental-inclusion-of-cloud-defend-in-linux-.tar.gz-saving-151m.yaml
+        checksum: add6cbd6ba64fa44b53db8f05dbc01f6b154f884
+    - kind: bug-fix
+      summary: Fix bug where an empty request body could be sent after failing over to an alternate fleet host.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14773
+      impact: ""
+      action: ""
+      timestamp: 1780926122
+      file:
+        name: 1780926122-fix-bug-where-an-empty-request-body-could-be-sent-after-failing-over-to-an-alternate-fleet-host..yaml
+        checksum: 617d9eb2d47fa7ff90c7df3e82031c02a97b3746
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.153.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/19663
+      impact: ""
+      action: ""
+      timestamp: 1781512818
+      file:
+        name: 1781512818-update-otel-components-to-v0.153.0.yaml
+        checksum: f9f924c97b15b6f86e968672802e7632ed53261e
+    - kind: other
+      summary: Bump NPM to 11.17.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14912
+        - https://github.com/elastic/elastic-agent/pull/14938
+        - https://github.com/elastic/elastic-agent/pull/14999
+        - https://github.com/elastic/elastic-agent/pull/15001
+        - https://github.com/elastic/elastic-agent/pull/15012
+        - https://github.com/elastic/elastic-agent/pull/14981
+        - https://github.com/elastic/elastic-agent/pull/14966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/19663
+      impact: ""
+      action: ""
+      timestamp: 1781639318
+      file:
+        name: 1781639318-heartbeat-bump-npm-11.17.0.yaml
+        checksum: 5721066e381b7a8a848ba90ed049716c14032860
