@@ -206,6 +206,45 @@ func Test_watchCmd(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			// The watcher binary version (version.GetParsedAgentPackageVersion(), which
+			// defaults to 9.5.0 in tests) is newer than the target SNAPSHOT. The watcher
+			// falls back to old protocol: it removes the marker so the coordinator sees nil
+			// rather than StateCompleted.
+			name: "happy path: watcher newer than target SNAPSHOT, falls back to old protocol (removeMarker=true)",
+			setupUpgradeMarker: func(t *testing.T, topDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
+				dataDirPath := paths.DataFrom(topDir)
+				err := os.MkdirAll(dataDirPath, 0755)
+				require.NoError(t, err)
+				err = upgrade.SaveMarker(
+					dataDirPath,
+					&upgrade.UpdateMarker{
+						Version:           "9.5.0-SNAPSHOT",
+						Hash:              "newver",
+						VersionedHome:     filepath.Join("data", "elastic-agent-9.5.0-SNAPSHOT-newver"),
+						UpdatedOn:         time.Now(),
+						PrevVersion:       "9.4.0",
+						PrevHash:          "prvver",
+						PrevVersionedHome: filepath.Join("data", "elastic-agent-prvver"),
+					},
+					true,
+				)
+				require.NoError(t, err)
+
+				watcher.EXPECT().
+					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil)
+
+				// removeMarker=true: watcher removes the marker (old protocol).
+				installModifier.EXPECT().
+					Cleanup(mock.Anything, topDir, true, false, filepath.Join("data", "elastic-agent-9.5.0-SNAPSHOT-newver")).
+					Return(nil)
+			},
+			args: args{
+				cfg: configuration.DefaultUpgradeConfig().Watcher,
+			},
+			wantErr: assert.NoError,
+		},
+		{
 			name: "unhappy path: error watching, rollback to previous install, leaving the upgrade marker",
 			setupUpgradeMarker: func(t *testing.T, topDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
 				dataDirPath := paths.DataFrom(topDir)

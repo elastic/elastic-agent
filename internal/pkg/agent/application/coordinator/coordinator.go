@@ -1723,7 +1723,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		}
 
 	case <-c.managerChans.upgradeMarkerCleanCh:
-		if ctx.Err() == nil {
+		if ctx.Err() == nil && c.state.UpgradeDetails != nil {
 			if err := upgrade.CleanMarker(c.logger, paths.Data()); err != nil {
 				c.logger.Warnw("failed to clean upgrade marker after Fleet confirmation", "error.message", err)
 			}

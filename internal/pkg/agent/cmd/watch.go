@@ -236,7 +236,9 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		// coordinator may not understand StateCompleted and would get stuck.
 		// Fall back to old protocol: skip writing StateCompleted and let the
 		// watcher remove the marker so the coordinator receives nil instead.
-		removeMarker = targetVersion.Less(*version.GetParsedAgentPackageVersion())
+		// If the watcher version is unknown, fall back to old protocol as well.
+		watcherVersion := version.GetParsedAgentPackageVersion()
+		removeMarker = watcherVersion == nil || targetVersion.Less(*watcherVersion)
 	}
 
 	upgradeDetails := initUpgradeDetails(marker, saveMarkerFunc, log, removeMarker)
@@ -287,9 +289,10 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	// watch succeeded - upgrade was successful!
 	upgradeDetails.SetState(details.StateCompleted)
 
-	// removeMarker was computed before the watch started (see above).
-	// When true, the watcher deletes the marker so the coordinator receives nil
-	// via the fsnotify Remove event. When false, the coordinator handles cleanup.
+	// When removeMarker is true the watcher deletes the marker; the coordinator receives
+	// nil from the fsnotify Remove event.
+	// When false (9.5.0+ target), the coordinator handles cleanup: via upgradeMarkerCleanCh
+	// in managed mode, or on StateCompleted in standalone mode.
 	newVersionedHome := marker.VersionedHome
 	if newVersionedHome == "" {
 		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`

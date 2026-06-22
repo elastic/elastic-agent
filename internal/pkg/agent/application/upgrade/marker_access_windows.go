@@ -69,7 +69,12 @@ func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool) er
 // which could fail on Windows.
 func removeMarkerFile(markerFile string) error {
 	removeFn := func() error {
-		return os.Remove(markerFile)
+		err := os.Remove(markerFile)
+		if errors.Is(err, os.ErrNotExist) {
+			// Already gone — treat as success, same as readMarkerFile.
+			return nil
+		}
+		return err
 	}
 
 	if err := accessMarkerFileWithRetries(removeFn); err != nil {
@@ -108,6 +113,6 @@ func accessMarkerFileWithRetries(accessFn func() error) error {
 		count++
 	}
 
-	return fmt.Errorf("could not write narker after %s and %d retries. Last error: %w",
+	return fmt.Errorf("could not access marker file after %s and %d retries. Last error: %w",
 		time.Since(start), count, err)
 }
