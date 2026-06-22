@@ -69,7 +69,7 @@ Affected users can uncheck the **Disable policy change acknowledgments** option 
 For more information check [Issue #264983](https://github.com/elastic/kibana/issues/264983).
 :::
 
-:::{dropdown} Events from Beats-based inputs and integrations in Elastic Agent 9.3.4 incorrectly convert timestamps to an empty {} JSON object.
+::::{dropdown} Events from Beats-based inputs and integrations in Elastic Agent 9.3.4 incorrectly convert timestamps to an empty {} JSON object.
 :name: events-beats-9-3-4-timestamp-empty-object
 **Applies to: {{agent}} 9.3.4**
 
@@ -101,7 +101,7 @@ Documents from Beats-based inputs contain one or more time fields serialized as 
 **Resolution**
 
 The performance optimization has been removed. The fix is included in {{agent}} 9.3.5. This issue does not affect {{agent}} 9.4.0.
-:::
+::::
 
 :::{dropdown} Elastic Agent 9.3.x fails to start on MacOS when OSQuery Manager integration is used
 **Applies to: {{agent}} 9.3.0, 9.3.1**
