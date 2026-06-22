@@ -39,6 +39,15 @@ const (
 	OtelSupervisedMonitoringURLFlagName       = "supervised.monitoring.url"
 	OtelFeatureGatesFlagName                  = "feature-gates"
 	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
+<<<<<<< HEAD
+=======
+	OtelProfilingSupportFeature               = "service.profilesSupport"
+
+	// stdinGobProviderScheme must match agentprovider.StdinGobProviderSchemeName.
+	// Duplicated here to avoid a cross-module import from the main module into
+	// the internal/edot submodule.
+	stdinGobProviderScheme = "stdingob"
+>>>>>>> 8c221f1a6 ([otel]: set profiles feature-gates flag if profiles pipeline is configured (#15012))
 )
 
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
@@ -135,6 +144,16 @@ func (r *subprocessExecution) startCollector(
 
 	// set collector args
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+<<<<<<< HEAD
+=======
+	if hasProfilesPipeline(cfg) {
+		collectorArgs = append(collectorArgs, fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelProfilingSupportFeature))
+	}
+	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:", stdinGobProviderScheme))
+	// Override the health check endpoint placeholder (port 0) with the actual resolved port.
+	// Uses the OTel collector --set flag to override a specific config value after all config sources are merged.
+	collectorArgs = append(collectorArgs, fmt.Sprintf("--set=extensions::%s::http::endpoint=localhost:%d", r.healthCheckExtensionID, httpHealthCheckPort))
+>>>>>>> 8c221f1a6 ([otel]: set profiles feature-gates flag if profiles pipeline is configured (#15012))
 
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(collectorArgs),
