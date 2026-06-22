@@ -877,7 +877,7 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 					continue
 				case "GOFIPS140":
 					foundFIPS = true
-					require.NotEmpty(t, setting.Value, "GOFIPS140 must be set in binary build info")
+					require.Equal(t, "v1.0.0", setting.Value, "GOFIPS140 must reference the certified module version")
 					continue
 				case "DefaultGODEBUG":
 					if strings.Contains(setting.Value, "fips140=on") {
@@ -889,7 +889,7 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 
 			require.True(t, foundTags, "Did not find -tags within binary version information")
 			require.True(t, foundFIPS, "Did not find GOFIPS140 within binary version information")
-			require.True(t, foundFIPSDefault, "Did not find fips140=on in DefaultGODEBUG — binary will not enforce FIPS mode at runtime")
+			require.True(t, foundFIPSDefault, "Did not find fips140=on in DefaultGODEBUG — binary will not enforce FIPS mode at runtime (check GOFIPS140 env at build time)")
 		})
 	}
 }
