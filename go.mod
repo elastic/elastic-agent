@@ -72,6 +72,7 @@ require (
 	go.opentelemetry.io/collector/extension/extensiontest v0.154.0
 	go.opentelemetry.io/collector/pdata v1.60.0
 	go.opentelemetry.io/collector/pipeline v1.60.0
+	go.opentelemetry.io/collector/pipeline/xpipeline v0.154.0
 	go.opentelemetry.io/otel/sdk/metric v1.44.0
 	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v3 v3.0.4
@@ -378,7 +379,6 @@ require (
 	go.opentelemetry.io/collector/pdata/pprofile v0.154.0 // indirect
 	go.opentelemetry.io/collector/pdata/testdata v0.154.0 // indirect
 	go.opentelemetry.io/collector/pdata/xpdata v0.154.0 // indirect
-	go.opentelemetry.io/collector/pipeline/xpipeline v0.154.0 // indirect
 	go.opentelemetry.io/collector/processor/processortest v0.154.0 // indirect
 	go.opentelemetry.io/collector/processor/xprocessor v0.154.0 // indirect
 	go.opentelemetry.io/collector/receiver/receivertest v0.154.0 // indirect
