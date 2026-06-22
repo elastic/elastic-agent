@@ -5,15 +5,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/19663
+        - https://github.com/elastic/elastic-agent/pull/14814
+      issue: []
       impact: ""
       action: ""
       timestamp: 1774000686
@@ -25,15 +18,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/19663
+        - https://github.com/elastic/elastic-agent/pull/14713
+      issue: []
       impact: ""
       action: ""
       timestamp: 1777551882
@@ -45,15 +31,8 @@ entries:
       description: ""
       component: edot-collector
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/19663
+        - https://github.com/elastic/elastic-agent/pull/14557
+      issue: []
       impact: ""
       action: ""
       timestamp: 1779287880
@@ -79,15 +58,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/19663
+        - https://github.com/elastic/elastic-agent/pull/14664
+      issue: []
       impact: ""
       action: ""
       timestamp: 1779748227
@@ -99,15 +71,8 @@ entries:
       description: ""
       component: edot-collector
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/19663
+        - https://github.com/elastic/elastic-agent/pull/14798
+      issue: []
       impact: ""
       action: ""
       timestamp: 1779881482
@@ -119,15 +84,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/19663
+        - https://github.com/elastic/elastic-agent/pull/14598
+      issue: []
       impact: ""
       action: ""
       timestamp: 1779933702
@@ -153,15 +111,8 @@ entries:
       description: TLS certificate paths will now always be read from ELASTIC_AGENT_CERT and ELASTIC_AGENT_CERT_KEY in container mode rather than reading from potentially stale fleet.enc values.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/19663
+        - https://github.com/elastic/elastic-agent/pull/14649
+      issue: []
       impact: ""
       action: ""
       timestamp: 1779995943
@@ -173,15 +124,8 @@ entries:
       description: Fixes a bug where container-mode overrides were correctly applied to the running agent but were overwritten by fleet.enc before being passed to the coordinator. This could result in incorrect config diagnostics and unnecessary restarts on policy updates.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/19663
+        - https://github.com/elastic/elastic-agent/pull/14649
+      issue: []
       impact: ""
       action: ""
       timestamp: 1779996772
@@ -193,15 +137,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/19663
+        - https://github.com/elastic/elastic-agent/pull/14639
+      issue: []
       impact: ""
       action: ""
       timestamp: 1780060974
@@ -213,15 +150,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/19663
+        - https://github.com/elastic/elastic-agent/pull/14771
+      issue: []
       impact: ""
       action: ""
       timestamp: 1780517113
@@ -233,13 +163,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
+        - https://github.com/elastic/elastic-agent/pull/14843
       issue:
         - https://github.com/elastic/elastic-agent/issues/14773
       impact: ""
@@ -253,15 +177,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/19663
+        - https://github.com/elastic/elastic-agent/pull/14904
+      issue: []
       impact: ""
       action: ""
       timestamp: 1781512818
@@ -273,15 +190,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/14912
-        - https://github.com/elastic/elastic-agent/pull/14938
-        - https://github.com/elastic/elastic-agent/pull/14999
-        - https://github.com/elastic/elastic-agent/pull/15001
-        - https://github.com/elastic/elastic-agent/pull/15012
-        - https://github.com/elastic/elastic-agent/pull/14981
-        - https://github.com/elastic/elastic-agent/pull/14966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/19663
+        - https://github.com/elastic/elastic-agent/pull/14962
+      issue: []
       impact: ""
       action: ""
       timestamp: 1781639318
