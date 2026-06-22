@@ -543,8 +543,8 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 					"audit_rules": "-a exit,always -F arch=b64 -S open",
 					"index":       "logs-generic-1-default",
+					"module":      "auditd",
 					"processors":  defaultInputProcessors("test-1", "generic-1", "logs"),
-					"type":        "audit/auditd",
 				},
 			},
 		}
@@ -565,7 +565,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"schedule":   "@every 5s",
 					"index":      "logs-generic-1-default",
 					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
-					"type":       "synthetics/http",
+					"type":       "http",
 				},
 			},
 		}
@@ -2520,6 +2520,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		expectedError        string
 		expectedReceiverType string
 		expectedBeatName     string
+		verifyBeatConfig     func(t *testing.T, beatConfig map[string]any)
 	}{
 		{
 			name:                 "filebeat component",
@@ -2544,6 +2545,14 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			outputQueueConfig:    nil,
 			expectedReceiverType: "auditbeatreceiver",
 			expectedBeatName:     "auditbeat",
+			verifyBeatConfig: func(t *testing.T, beatConfig map[string]any) {
+				modules, ok := beatConfig["modules"].([]map[string]any)
+				require.True(t, ok, "auditbeat modules should be a slice of maps")
+				require.NotEmpty(t, modules, "auditbeat modules should not be empty")
+				for i, mod := range modules {
+					assert.Equal(t, "auditd", mod["module"], "auditbeat module[%d] must have module=auditd", i)
+				}
+			},
 		},
 		{
 			name:                 "heartbeat component",
@@ -2648,6 +2657,13 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			httpConfig, ok := receiverConfig["http"].(map[string]any)
 			require.True(t, ok, "http config should be a map")
 			assert.Equal(t, false, httpConfig["enabled"], "http monitoring should be disabled for OTel-managed components")
+
+			// Run any beat-specific assertions
+			if tt.verifyBeatConfig != nil {
+				beatConfig, ok := receiverConfig[tt.expectedBeatName].(map[string]any)
+				require.True(t, ok, "%s config should be a map", tt.expectedBeatName)
+				tt.verifyBeatConfig(t, beatConfig)
+			}
 		})
 	}
 }
