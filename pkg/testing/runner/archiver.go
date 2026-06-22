@@ -23,13 +23,87 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 		return fmt.Errorf("failed to get absolute path to %s: %w", dir, err)
 	}
 
+<<<<<<< HEAD
 	projectFilesOutput, err := cmdBufferedOutput(exec.Command("git", "ls-files", "-z"), dir)
+=======
+	archive, err := os.Create(dest)
+	if err != nil {
+		return fmt.Errorf("failed to create file %s: %w", dest, err)
+	}
+	defer archive.Close()
+
+	zw := zip.NewWriter(archive)
+	defer zw.Close()
+
+	// Archive the main repository files
+	err = archiveGitRepo(ctx, zw, absDir, "")
+	if err != nil {
+		return err
+	}
+
+	// Get list of submodules and archive them as well
+	submodules, err := getSubmodulePaths(ctx, absDir)
+	if err != nil {
+		return fmt.Errorf("failed to get submodule paths: %w", err)
+	}
+
+	for _, submodulePath := range submodules {
+		if ctx.Err() != nil {
+			_ = archive.Close()
+			_ = os.Remove(dest)
+			return ctx.Err()
+		}
+		submoduleAbsPath := filepath.Join(absDir, submodulePath)
+		err = archiveGitRepo(ctx, zw, submoduleAbsPath, submodulePath)
+		if err != nil {
+			return fmt.Errorf("failed to archive submodule %s: %w", submodulePath, err)
+		}
+	}
+
+	return nil
+}
+
+// getSubmodulePaths returns the paths of all submodules (including nested ones) in the repository.
+func getSubmodulePaths(ctx context.Context, repoDir string) ([]string, error) {
+	// Use git submodule status --recursive to get all submodules including nested ones
+	output, err := cmdBufferedOutput(exec.CommandContext(ctx, "git", "submodule", "status", "--recursive"), repoDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var submodules []string
+	scanner := bufio.NewScanner(&output)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+		// Output format: " <sha1> <path> (<describe>)" or "+<sha1> <path> (<describe>)" for modified
+		// The path is the second field, after the SHA (which may be prefixed with -, +, or U)
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			submodules = append(submodules, fields[1])
+		}
+	}
+
+	return submodules, scanner.Err()
+}
+
+// archiveGitRepo archives all files (tracked and untracked) from a git repository into the zip writer.
+// pathPrefix is prepended to all file paths in the archive (used for submodules).
+func archiveGitRepo(ctx context.Context, zw *zip.Writer, repoDir string, pathPrefix string) error {
+	projectFilesOutput, err := cmdBufferedOutput(exec.CommandContext(ctx, "git", "ls-files", "-z"), repoDir)
+>>>>>>> 33c62da5c (Preserve file modes in test repo archive (#14966))
 	if err != nil {
 		return err
 	}
 
 	// Add files that are not yet tracked in git. Prevents a footcannon where someone writes code to a new file, then tests it before they add to git
+<<<<<<< HEAD
 	untrackedOutput, err := cmdBufferedOutput(exec.Command("git", "ls-files", "--exclude-standard", "-o", "-z"), dir)
+=======
+	untrackedOutput, err := cmdBufferedOutput(exec.CommandContext(ctx, "git", "ls-files", "--exclude-standard", "-o", "-z"), repoDir)
+>>>>>>> 33c62da5c (Preserve file modes in test repo archive (#14966))
 	if err != nil {
 		return err
 	}
@@ -83,7 +157,27 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 				return fmt.Errorf("failed to open file %s: %w", fullPath, err)
 			}
 			defer f.Close()
+<<<<<<< HEAD
 			w, err := zw.Create(line)
+=======
+
+			// Combine pathPrefix with the file's relative path for the archive entry
+			archivePath := line
+			if pathPrefix != "" {
+				archivePath = filepath.Join(pathPrefix, line)
+			}
+
+			// Preserve the file's mode (notably the executable bit) so scripts that
+			// are extracted and run on the remote — e.g. a Dockerfile entrypoint built
+			// from this tree — stay executable. zip.Writer.Create would otherwise use a
+			// default mode and drop the exec bit, surfacing as "permission denied".
+			header := &zip.FileHeader{
+				Name:   archivePath,
+				Method: zip.Deflate,
+			}
+			header.SetMode(stat.Mode())
+			w, err := zw.CreateHeader(header)
+>>>>>>> 33c62da5c (Preserve file modes in test repo archive (#14966))
 			if err != nil {
 				return fmt.Errorf("failed to create zip entry %s: %w", line, err)
 			}
