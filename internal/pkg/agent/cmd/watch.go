@@ -226,7 +226,20 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	saveMarkerFunc := func(marker *upgrade.UpdateMarker, b bool) error {
 		return upgrade.SaveMarker(dataDir, marker, b)
 	}
-	upgradeDetails := initUpgradeDetails(marker, saveMarkerFunc, log)
+
+	// Determine whether the watcher should remove the marker on success (old protocol)
+	// or leave it for the coordinator to clean up (new protocol, coordinator >= 9.5.0).
+	targetVersion, targetVersionErr := semver.ParseVersion(marker.Version)
+	removeMarker := targetVersionErr != nil || targetVersion.Less(*upgrade.Version_9_5_0_SNAPSHOT)
+	if !removeMarker && targetVersionErr == nil {
+		// When the watcher binary is newer than the upgrade target, the target
+		// coordinator may not understand StateCompleted and would get stuck.
+		// Fall back to old protocol: skip writing StateCompleted and let the
+		// watcher remove the marker so the coordinator receives nil instead.
+		removeMarker = targetVersion.Less(*version.GetParsedAgentPackageVersion())
+	}
+
+	upgradeDetails := initUpgradeDetails(marker, saveMarkerFunc, log, removeMarker)
 
 	errorCheckInterval := cfg.ErrorCheck.Interval
 	ctx := context.Background()
@@ -274,12 +287,9 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	// watch succeeded - upgrade was successful!
 	upgradeDetails.SetState(details.StateCompleted)
 
-	// For agents predating the coordinator-owned marker cleanup (< 9.5.0), the
-	// running agent after this upgrade has no upgradeMarkerCleanCh. The watcher
-	// removes the marker so the old coordinator receives nil via the fsnotify
-	// Remove path. For 9.5.0+ the coordinator handles cleanup itself.
-	targetVersion, targetVersionErr := semver.ParseVersion(marker.Version)
-	removeMarker := targetVersionErr != nil || targetVersion.Less(*upgrade.Version_9_5_0_SNAPSHOT)
+	// removeMarker was computed before the watch started (see above).
+	// When true, the watcher deletes the marker so the coordinator receives nil
+	// via the fsnotify Remove event. When false, the coordinator handles cleanup.
 	newVersionedHome := marker.VersionedHome
 	if newVersionedHome == "" {
 		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
@@ -397,13 +407,19 @@ func getConfig(streams *cli.IOStreams) *configuration.Configuration {
 	return cfg
 }
 
-func initUpgradeDetails(marker *upgrade.UpdateMarker, saveMarker func(*upgrade.UpdateMarker, bool) error, log *logp.Logger) *details.Details {
+func initUpgradeDetails(marker *upgrade.UpdateMarker, saveMarker func(*upgrade.UpdateMarker, bool) error, log *logp.Logger, removeMarker bool) *details.Details {
 	upgradeDetails := details.NewDetails(version.GetAgentPackageVersion(), details.StateWatching, marker.GetActionID())
-	upgradeDetails.RegisterObserver(func(details *details.Details) {
-		marker.Details = details
+	upgradeDetails.RegisterObserver(func(d *details.Details) {
+		// When the watcher will remove the marker on success, skip writing
+		// StateCompleted. The coordinator will receive nil from the Remove
+		// fsnotify event, which works for both old and new coordinators.
+		if removeMarker && d != nil && d.State == details.StateCompleted {
+			return
+		}
+		marker.Details = d
 		if err := saveMarker(marker, true); err != nil {
-			if details != nil {
-				log.Errorf("unable to save upgrade marker after setting upgrade details (state = %s): %s", details.State, err.Error())
+			if d != nil {
+				log.Errorf("unable to save upgrade marker after setting upgrade details (state = %s): %s", d.State, err.Error())
 			} else {
 				log.Errorf("unable to save upgrade marker after clearing upgrade details: %s", err.Error())
 			}

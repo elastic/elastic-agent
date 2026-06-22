@@ -34,61 +34,82 @@ import (
 )
 
 func TestInitUpgradeDetails(t *testing.T) {
-	testMarker := &upgrade.UpdateMarker{
-		Action: &fleetapi.ActionUpgrade{
-			ActionID: "foobar",
-		},
-	}
+	t.Run("removeMarker=false: StateCompleted is written to marker", func(t *testing.T) {
+		testMarker := &upgrade.UpdateMarker{
+			Action: &fleetapi.ActionUpgrade{ActionID: "foobar"},
+		}
 
-	saveCount := 0
-	mockSaveMarker := func(marker *upgrade.UpdateMarker, _ bool) error {
-		saveCount++
-		if saveCount <= 3 {
-			testMarker = marker
+		saveCount := 0
+		mockSaveMarker := func(marker *upgrade.UpdateMarker, _ bool) error {
+			saveCount++
+			if saveCount <= 3 {
+				testMarker = marker
+				return nil
+			}
+			return errors.New("some error")
+		}
+
+		log, obs := loggertest.New("initUpgradeDetails")
+		upgradeDetails := initUpgradeDetails(testMarker, mockSaveMarker, log, false)
+
+		require.NotNil(t, testMarker.Details)
+		require.Equal(t, details.StateWatching, testMarker.Details.State)
+		require.Equal(t, 0, obs.Len())
+
+		upgradeDetails.SetState(details.StateRollback)
+		require.Equal(t, details.StateRollback, testMarker.Details.State)
+		require.Equal(t, 0, obs.Len())
+
+		// StateCompleted must be written so the coordinator can detect and clean the marker.
+		upgradeDetails.SetState(details.StateCompleted)
+		require.NotNil(t, testMarker.Details)
+		require.Equal(t, details.StateCompleted, testMarker.Details.State)
+		require.Equal(t, 0, obs.Len())
+
+		upgradeDetails.SetState(details.StateRollback)
+		require.Equal(t, 1, obs.Len())
+		logs := obs.TakeAll()
+		require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
+		require.Equal(t, `unable to save upgrade marker after setting upgrade details (state = UPG_ROLLBACK): some error`, logs[0].Message)
+
+		upgradeDetails.SetState(details.StateCompleted)
+		require.NotNil(t, testMarker.Details)
+		require.Equal(t, details.StateCompleted, testMarker.Details.State)
+		require.Equal(t, 1, obs.Len())
+		logs = obs.TakeAll()
+		require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
+		require.Equal(t, `unable to save upgrade marker after setting upgrade details (state = UPG_COMPLETED): some error`, logs[0].Message)
+	})
+
+	t.Run("removeMarker=true: StateCompleted is not written to marker", func(t *testing.T) {
+		testMarker := &upgrade.UpdateMarker{
+			Action: &fleetapi.ActionUpgrade{ActionID: "foobar"},
+		}
+
+		var lastSavedMarker *upgrade.UpdateMarker
+		mockSaveMarker := func(marker *upgrade.UpdateMarker, _ bool) error {
+			lastSavedMarker = marker
 			return nil
 		}
-		return errors.New("some error")
-	}
 
-	log, obs := loggertest.New("initUpgradeDetails")
+		log, _ := loggertest.New("initUpgradeDetails")
+		upgradeDetails := initUpgradeDetails(testMarker, mockSaveMarker, log, true)
 
-	upgradeDetails := initUpgradeDetails(testMarker, mockSaveMarker, log)
+		// Initial StateWatching must still be saved.
+		require.NotNil(t, lastSavedMarker)
+		require.Equal(t, details.StateWatching, lastSavedMarker.Details.State)
 
-	// Verify initial state
-	require.NotNil(t, testMarker.Details)
-	require.Equal(t, details.StateWatching, testMarker.Details.State)
-	require.Equal(t, 0, obs.Len())
+		// StateCompleted must be skipped: the watcher will remove the marker,
+		// so writing StateCompleted would leave old coordinators stuck at UPG_COMPLETED.
+		lastSavedMarker = nil
+		upgradeDetails.SetState(details.StateCompleted)
+		require.Nil(t, lastSavedMarker, "observer must not write StateCompleted when removeMarker=true")
 
-	// Verify state after changing details state
-	upgradeDetails.SetState(details.StateRollback)
-	require.NotNil(t, testMarker.Details)
-	require.Equal(t, details.StateRollback, testMarker.Details.State)
-	require.Equal(t, 0, obs.Len())
-
-	// Verify state after StateCompleted: observer must write StateCompleted explicitly
-	// (not nil) so the coordinator can detect it and remove the marker file.
-	upgradeDetails.SetState(details.StateCompleted)
-	require.NotNil(t, testMarker.Details)
-	require.Equal(t, details.StateCompleted, testMarker.Details.State)
-	require.Equal(t, 0, obs.Len())
-
-	// Verify state after changing details state and there's an
-	// error saving the marker
-	upgradeDetails.SetState(details.StateRollback)
-	require.NotNil(t, testMarker.Details)
-	require.Equal(t, 1, obs.Len())
-	logs := obs.TakeAll()
-	require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
-	require.Equal(t, `unable to save upgrade marker after setting upgrade details (state = UPG_ROLLBACK): some error`, logs[0].Message)
-
-	// Verify state after StateCompleted and there's an error saving the marker
-	upgradeDetails.SetState(details.StateCompleted)
-	require.NotNil(t, testMarker.Details)
-	require.Equal(t, details.StateCompleted, testMarker.Details.State)
-	require.Equal(t, 1, obs.Len())
-	logs = obs.TakeAll()
-	require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
-	require.Equal(t, `unable to save upgrade marker after setting upgrade details (state = UPG_COMPLETED): some error`, logs[0].Message)
+		// Other state transitions must still be saved.
+		upgradeDetails.SetState(details.StateRollback)
+		require.NotNil(t, lastSavedMarker)
+		require.Equal(t, details.StateRollback, lastSavedMarker.Details.State)
+	})
 }
 
 func Test_watchCmd(t *testing.T) {
