@@ -47,6 +47,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	internalfleetapi "github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	fleetapiClient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -2687,9 +2688,9 @@ func logBasedOnState(l *logger.Logger, state client.UnitState, msg string, args 
 }
 
 func (c *Coordinator) unenroll(ctx context.Context, client fleetapiClient.Sender) error {
-	unenrollCmd := fleetapi.NewAuditUnenrollCmd(c.agentInfo, client)
-	unenrollReq := &fleetapi.AuditUnenrollRequest{
-		Reason:    fleetapi.ReasonMigration,
+	unenrollCmd := internalfleetapi.NewAuditUnenrollCmd(c.agentInfo, client)
+	unenrollReq := &internalfleetapi.AuditUnenrollRequest{
+		Reason:    internalfleetapi.ReasonMigration,
 		Timestamp: time.Now().UTC(),
 	}
 	unenrollResp, err := unenrollCmd.Execute(ctx, unenrollReq)
