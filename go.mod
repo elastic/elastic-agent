@@ -59,23 +59,12 @@ require (
 	go.elastic.co/apm/v2 v2.7.12
 	go.elastic.co/ecszap v1.0.3
 	go.elastic.co/go-licence-detector v0.10.0
-<<<<<<< HEAD
 	go.opentelemetry.io/collector/component/componentstatus v0.153.0
 	go.opentelemetry.io/collector/component/componenttest v0.153.0
 	go.opentelemetry.io/collector/extension/extensiontest v0.153.0
 	go.opentelemetry.io/collector/pdata v1.59.0
 	go.opentelemetry.io/collector/pipeline v1.59.0
-=======
-	go.opentelemetry.io/collector/component/componentstatus v0.154.0
-	go.opentelemetry.io/collector/component/componenttest v0.154.0
-	go.opentelemetry.io/collector/config/configtls v1.60.0
-	go.opentelemetry.io/collector/confmap/xconfmap v0.154.0
-	go.opentelemetry.io/collector/exporter/exportertest v0.154.0
-	go.opentelemetry.io/collector/extension/extensiontest v0.154.0
-	go.opentelemetry.io/collector/pdata v1.60.0
-	go.opentelemetry.io/collector/pipeline v1.60.0
-	go.opentelemetry.io/collector/pipeline/xpipeline v0.154.0
->>>>>>> 8c221f1a6 ([otel]: set profiles feature-gates flag if profiles pipeline is configured (#15012))
+	go.opentelemetry.io/collector/pipeline/xpipeline v0.153.0
 	go.opentelemetry.io/otel/sdk/metric v1.44.0
 	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v3 v3.0.4
@@ -271,7 +260,6 @@ require (
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.12 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-<<<<<<< HEAD
 	go.opentelemetry.io/collector/config/configtelemetry v0.153.0 // indirect
 	go.opentelemetry.io/collector/confmap/xconfmap v0.153.0 // indirect
 	go.opentelemetry.io/collector/connector/connectortest v0.153.0 // indirect
@@ -290,7 +278,6 @@ require (
 	go.opentelemetry.io/collector/pdata/pprofile v0.153.0 // indirect
 	go.opentelemetry.io/collector/pdata/testdata v0.153.0 // indirect
 	go.opentelemetry.io/collector/pdata/xpdata v0.153.0 // indirect
-	go.opentelemetry.io/collector/pipeline/xpipeline v0.153.0 // indirect
 	go.opentelemetry.io/collector/processor/processortest v0.153.0 // indirect
 	go.opentelemetry.io/collector/processor/xprocessor v0.153.0 // indirect
 	go.opentelemetry.io/collector/receiver/receivertest v0.153.0 // indirect
@@ -299,49 +286,6 @@ require (
 	go.opentelemetry.io/collector/service/hostcapabilities v0.153.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0 // indirect
 	go.opentelemetry.io/contrib/otelconf v0.23.0 // indirect
-=======
-	go.opentelemetry.io/collector/client v1.60.0 // indirect
-	go.opentelemetry.io/collector/config/configauth v1.60.0 // indirect
-	go.opentelemetry.io/collector/config/configcompression v1.60.0 // indirect
-	go.opentelemetry.io/collector/config/confighttp v0.154.0 // indirect
-	go.opentelemetry.io/collector/config/configmiddleware v1.60.0 // indirect
-	go.opentelemetry.io/collector/config/confignet v1.60.0 // indirect
-	go.opentelemetry.io/collector/config/configopaque v1.60.0 // indirect
-	go.opentelemetry.io/collector/config/configoptional v1.60.0 // indirect
-	go.opentelemetry.io/collector/config/configretry v1.60.0 // indirect
-	go.opentelemetry.io/collector/config/configtelemetry v0.154.0 // indirect
-	go.opentelemetry.io/collector/connector/connectortest v0.154.0 // indirect
-	go.opentelemetry.io/collector/connector/xconnector v0.154.0 // indirect
-	go.opentelemetry.io/collector/consumer v1.60.0 // indirect
-	go.opentelemetry.io/collector/consumer/consumererror v0.154.0 // indirect
-	go.opentelemetry.io/collector/consumer/consumererror/xconsumererror v0.154.0 // indirect
-	go.opentelemetry.io/collector/consumer/consumertest v0.154.0 // indirect
-	go.opentelemetry.io/collector/consumer/xconsumer v0.154.0 // indirect
-	go.opentelemetry.io/collector/exporter/exporterhelper v0.154.0 // indirect
-	go.opentelemetry.io/collector/exporter/exporterhelper/xexporterhelper v0.154.0 // indirect
-	go.opentelemetry.io/collector/exporter/xexporter v0.154.0 // indirect
-	go.opentelemetry.io/collector/extension/extensionauth v1.60.0 // indirect
-	go.opentelemetry.io/collector/extension/extensioncapabilities v0.154.0 // indirect
-	go.opentelemetry.io/collector/extension/extensionmiddleware v0.154.0 // indirect
-	go.opentelemetry.io/collector/extension/xextension v0.154.0 // indirect
-	go.opentelemetry.io/collector/internal/componentalias v0.154.0 // indirect
-	go.opentelemetry.io/collector/internal/fanoutconsumer v0.154.0 // indirect
-	go.opentelemetry.io/collector/internal/telemetry v0.154.0 // indirect
-	go.opentelemetry.io/collector/pdata/pprofile v0.154.0 // indirect
-	go.opentelemetry.io/collector/pdata/testdata v0.154.0 // indirect
-	go.opentelemetry.io/collector/pdata/xpdata v0.154.0 // indirect
-	go.opentelemetry.io/collector/processor/processortest v0.154.0 // indirect
-	go.opentelemetry.io/collector/processor/xprocessor v0.154.0 // indirect
-	go.opentelemetry.io/collector/receiver/receivertest v0.154.0 // indirect
-	go.opentelemetry.io/collector/receiver/xreceiver v0.154.0 // indirect
-	go.opentelemetry.io/collector/service v0.154.0 // indirect
-	go.opentelemetry.io/collector/service/hostcapabilities v0.154.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.63.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
-	go.opentelemetry.io/contrib/otelconf v0.24.0 // indirect
-	go.opentelemetry.io/ebpf-profiler v0.0.202622 // indirect
->>>>>>> 8c221f1a6 ([otel]: set profiles feature-gates flag if profiles pipeline is configured (#15012))
 	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.19.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.19.0 // indirect
