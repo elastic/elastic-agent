@@ -608,17 +608,15 @@ func (Format) License() error {
 }
 
 // Package packages the Beat for distribution.
-// Use SNAPSHOT=true to build snapshots.
+// Snapshot builds are the default; use SNAPSHOT=false to build a release package.
 // Use PLATFORMS to control the target platforms.
 // Use VERSION_QUALIFIER to control the version qualifier.
+// Use PACKAGES to override the package types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker).
+// If PACKAGES is not set, defaults to tar.gz for non-Windows platforms and zip for Windows.
 func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
-
-	if len(cfg.GetPackageTypes()) == 0 {
-		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
-	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
@@ -641,7 +639,7 @@ func Package(ctx context.Context) error {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 	// only take the snapshot and version from the manifest, we don't want the commit hash or dependency version
-	cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithBeatVersion(cfgWithManifest.BeatVersion())
+	cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithAgentCoreVersion(cfgWithManifest.AgentCoreVersion())
 
 	if cfg.Packaging.ManifestURL != "" {
 		// don't download the elastic-agent-core components; built above
@@ -992,14 +990,6 @@ func (Cloud) Image(ctx context.Context) {
 		WithDevBuild(true).
 		WithDockerVariants([]devtools.DockerVariant{devtools.Cloud})
 
-	// Only disable SNAPSHOT build when explicitly defined as false
-	// Default to snapshot=true for cloud images
-	if cfg.Build.SnapshotSet && !cfg.Build.Snapshot {
-		cfg = cfg.WithSnapshot(false)
-	} else {
-		cfg = cfg.WithSnapshot(true)
-	}
-
 	// Preserve FIPS setting from config (already parsed from environment)
 	cfg = cfg.WithFIPSBuild(cfg.Build.FIPSBuild)
 
@@ -1173,14 +1163,12 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 	fmt.Println("--- Package elastic-agent")
 
 	if dependenciesVersion == "" {
-		// Get beat version - first check BEAT_VERSION env var, then fall back to default
-		beatVersion := cfg.BeatQualifiedVersion()
-		if beatVersion == "" {
+		agentCoreVersion := cfg.AgentQualifiedCoreVersion()
+		if agentCoreVersion == "" {
 			dependenciesVersion = bversion.GetDefaultVersion()
 		} else {
-			dependenciesVersion = beatVersion
+			dependenciesVersion = agentCoreVersion
 		}
-		// add the snapshot suffix if needed
 		dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
 	}
 	log.Printf("Packaging with dependenciesVersion: %s", dependenciesVersion)
@@ -1505,10 +1493,6 @@ func PackageUsingDRA(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
-
-	if len(cfg.GetPackageTypes()) == 0 {
-		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
-	}
 
 	if len(cfg.GetPlatforms()) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
@@ -1959,7 +1943,7 @@ type checksumFile struct {
 // Ironbank packages elastic-agent for the IronBank distribution, relying on the
 // binaries having already been built.
 //
-// Use SNAPSHOT=true to build snapshots.
+// Snapshot builds are the default; use SNAPSHOT=false to build a release package.
 func Ironbank(ctx context.Context) error {
 	fmt.Println("--- Package Ironbank distribution")
 	if runtime.GOARCH != "amd64" {
@@ -2020,7 +2004,7 @@ func saveIronbank(cfg *devtools.Settings) error {
 }
 
 func getIronbankContextName(cfg *devtools.Settings) string {
-	ver := cfg.BeatQualifiedVersion()
+	ver := cfg.AgentPackageVersion()
 	defaultBinaryName := "{{.Name}}-ironbank-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}"
 	outputDir, _ := devtools.Expand(cfg, defaultBinaryName+"-docker-build-context", map[string]interface{}{
 		"Name":    "elastic-agent",
@@ -2065,7 +2049,7 @@ func prepareIronbankBuild(cfg *devtools.Settings) error {
 }
 
 func majorMinor(cfg *devtools.Settings) string {
-	if v := cfg.BeatQualifiedVersion(); v != "" {
+	if v := cfg.AgentPackageVersion(); v != "" {
 		parts := strings.SplitN(v, ".", 3)
 		return parts[0] + "." + parts[1]
 	}
@@ -3025,7 +3009,7 @@ func getTestRunnerVersions(cfg *devtools.Settings) (string, string, error) {
 	agentStackVersion := cfg.IntegrationTest.AgentStackVersion
 	agentVersion := cfg.IntegrationTest.AgentVersion
 	if agentVersion == "" {
-		agentVersion = cfg.BeatVersion()
+		agentVersion = cfg.AgentPackageVersion()
 		if agentStackVersion == "" {
 			// always use snapshot for stack version
 			agentStackVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
@@ -3609,17 +3593,6 @@ func (Otel) CrossBuild(ctx context.Context) error {
 	mg.Deps(EnsureCrossBuildOutputDir)
 
 	cfg := devtools.SettingsFromContext(ctx)
-
-	// Download modules from internal/edot before crossbuilding.
-	// The crossbuild process mounts the host's module cache read-only into the container,
-	// so all dependencies must be downloaded before the build starts.
-	// internal/edot has its own go.mod with different dependencies than the main module.
-	if cfg.CrossBuild.MountModcache {
-		fmt.Println(">> Downloading modules for internal/edot")
-		if err := sh.Run("go", "-C", "internal/edot", "mod", "download"); err != nil {
-			return fmt.Errorf("failed to download modules for internal/edot: %w", err)
-		}
-	}
 
 	opts := []devtools.CrossBuildOption{devtools.WithName("elastic-otel-collector"), devtools.WithTarget("otel:golangCrossBuild")}
 
@@ -4243,16 +4216,15 @@ func (h Helm) Package(ctx context.Context) error {
 	mg.SerialDeps(h.BuildDependencies)
 
 	cfg := devtools.SettingsFromContext(ctx)
-	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
-	productionPackage := cfg.Build.SnapshotSet && !cfg.Build.Snapshot
+	productionPackage := !cfg.Build.Snapshot
 
 	cfg, err := cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
-	agentCoreVersion := cfg.BeatVersion()
-	agentImageTag := agentCoreVersion
-	agentChartVersion := agentCoreVersion
+	agentPackageVersion := cfg.AgentPackageVersion()
+	agentImageTag := agentPackageVersion
+	agentChartVersion := agentPackageVersion
 	if !productionPackage {
 		// always use the SNAPSHOT version for image tag if not a production package
 		agentImageTag = agentImageTag + devtools.SnapshotSuffix
@@ -4265,14 +4237,14 @@ func (h Helm) Package(ctx context.Context) error {
 	}{
 		// values file for elastic-agent Helm Chart
 		filepath.Join(helmChartPath, "values.yaml"): {
-			{"agent.version", agentCoreVersion},
+			{"agent.version", agentPackageVersion},
 			// always use the SNAPSHOT version for image tag
 			// for the chart that resides in the git repo
 			{"agent.image.tag", agentImageTag},
 		},
 		// Chart.yaml for elastic-agent Helm Chart
 		filepath.Join(helmChartPath, "Chart.yaml"): {
-			{"appVersion", agentCoreVersion},
+			{"appVersion", agentPackageVersion},
 			{"version", agentChartVersion},
 		},
 	} {

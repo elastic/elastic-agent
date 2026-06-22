@@ -8,7 +8,29 @@ import (
 	"fmt"
 
 	"go.opentelemetry.io/collector/confmap"
+	"go.opentelemetry.io/collector/pipeline"
+	"go.opentelemetry.io/collector/pipeline/xpipeline"
 )
+
+// hasProfilesPipeline reports whether cfg contains at least one pipeline whose
+// signal type is profiles.
+func hasProfilesPipeline(cfg *confmap.Conf) bool {
+	raw := cfg.Get("service::pipelines")
+	pipelines, ok := raw.(map[string]any)
+	if !ok {
+		return false
+	}
+	for idStr := range pipelines {
+		var id pipeline.ID
+		if err := id.UnmarshalText([]byte(idStr)); err != nil {
+			continue
+		}
+		if id.Signal() == xpipeline.SignalProfiles {
+			return true
+		}
+	}
+	return false
+}
 
 // serviceExtensionsList returns a copy of the service::extensions list from
 // config, or nil if the key is not set. It returns an error if the value is

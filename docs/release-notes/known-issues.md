@@ -23,6 +23,38 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} [Windows] {{agent}} fails to upgrade when the host has 100 or more installed programs
+
+**Applies to: {{agent}} 9.4.0, 9.4.1, 9.4.2 (Windows only)**
+
+On June 4, 2026, a known issue was discovered where upgrading {{agent}} from a pre-9.4.0 version on a Windows host with 100 or more entries in Add/Remove Programs causes the new agent to hang indefinitely during startup. The Upgrade Watcher detects the hang and rolls back the upgrade.
+
+To check the number of entries on a host, run the following command in PowerShell:
+
+```powershell
+(Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall').Count
+```
+
+If the count is more than 100, upgrade directly to a version that is not affected by this issue.
+
+For more information, check [Issue #14764](https://github.com/elastic/elastic-agent/issues/14764).
+:::
+
+:::{dropdown} Missing APM service_destination metrics and empty service map in the APM UI
+
+**Applies to: {{agent}} 9.2.6, 9.2.7, 9.3.1, 9.3.2**
+
+On June 17, 2026, a known issue was discovered where the aggregated `service_destination` metric that the APM UI uses can be missing from the `metrics/aggregated-otel-metrics` EDOT Collector pipeline, even when trace traffic is present and other telemetry paths appear healthy. As a result, the APM service map appears empty.
+
+The issue occurs when two EDOT components, `elasticapmprocessor` and `elasticapmconnector`, are both at v0.29.0, which is the version bundled with the affected {{agent}} releases.
+
+**Resolution**
+
+This issue is fixed in {{agent}} 9.2.8 and 9.3.3, which include updated versions of these components.
+
+For more information, check [Issue #14964](https://github.com/elastic/elastic-agent/issues/14964).
+:::
+
 :::{dropdown} Elastic Agent reports policy is outdated when agent.features.disable_policy_change_acks is enabled.
 **Applies to: {{agent}} 9.4.0, 9.3.4, 9.3.3, 9.3.2, 9.3.1, 9.3.0, 9.2.7, 9.2.6, 9.2.5, 9.2.4, 9.2.3, 9.2.2, 9.2.1, 9.2.0**
 
@@ -38,6 +70,7 @@ For more information check [Issue #264983](https://github.com/elastic/kibana/iss
 :::
 
 :::{dropdown} Events from Beats based integrations in Elastic Agent 9.3.4 incorrectly convert timestamps to an empty {} JSON object.
+:name: events-beats-9-3-4-timestamp-empty-object
 **Applies to: {{agent}} 9.3.4**
 
 A performance optimization in Elastic Agent 9.3.4 causes timestamp fields sent from Beats based inputs and integrations to be incorrectly serialized to an empty `{}` JSON object. This does not affect the primary `@timestamp` field, only other timestamps fields in the event body.

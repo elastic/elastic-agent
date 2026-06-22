@@ -22,7 +22,7 @@ import (
 // TestTTLMarkerRegistry_GetAll_PartialReturnsMalformedAlongsideParsed proves
 // that GetAll keeps returning successfully parsed entries even when a sibling
 // .ttl file is unparseable, and surfaces the broken entry via the malformed
-// map instead of discarding the whole read. This is the contract InTTLRollbacks
+// map instead of discarding the whole read. This is the contract cleanupAgentDirectories
 // relies on to preserve recoverable installs whose metadata got corrupted.
 func TestTTLMarkerRegistry_GetAll_PartialReturnsMalformedAlongsideParsed(t *testing.T) {
 	tmpDir := t.TempDir()

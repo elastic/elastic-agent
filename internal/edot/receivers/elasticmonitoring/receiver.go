@@ -167,9 +167,6 @@ func (mr *monitoringReceiver) sendLogRecord(beatEvent mapstr.M, componentID stri
 	logRecord.SetTimestamp(timestamp)
 	logRecord.SetObservedTimestamp(timestamp)
 
-	// Convert fields to OTel-primitive types, if needed
-	otelmap.ConvertNonPrimitive(beatEvent)
-
 	// Add data_stream metadata to the log record attributes
 	if val, _ := beatEvent.GetValue("data_stream"); val != nil {
 		for _, subField := range []string{"dataset", "namespace", "type"} {
@@ -182,7 +179,7 @@ func (mr *monitoringReceiver) sendLogRecord(beatEvent mapstr.M, componentID stri
 	}
 
 	// Set log record body to computed fields
-	if err := logRecord.Body().SetEmptyMap().FromRaw(map[string]any(beatEvent)); err != nil {
+	if err := otelmap.FromMapstr(logRecord.Body().SetEmptyMap(), beatEvent); err != nil {
 		mr.logger.Error("couldn't convert map to plog.Log, some fields might be missing", zap.Error(err))
 	}
 

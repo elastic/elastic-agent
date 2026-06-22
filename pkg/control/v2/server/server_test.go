@@ -5,11 +5,15 @@
 package server
 
 import (
+	"context"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,12 +22,82 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
+
+// TestStateWatch_BufferSize verifies that StateWatch passes the requested
+// buffer_size to StateSubscribe, and falls back to AllAvailable (32) when
+// buffer_size is unset.
+func TestStateWatch_BufferSize(t *testing.T) {
+	allAvail := cproto.StateWatchBufferSizeAllAvailable
+	latestOnly := cproto.StateWatchBufferSizeLatestOnly
+	custom := int32(8)
+	tests := []struct {
+		name       string
+		bufferSize *int32
+		wantBufLen int
+	}{
+		{"unset uses AllAvailable (32)", nil, 32},
+		{"LatestOnly (0) passes 0", &latestOnly, 0},
+		{"AllAvailable (32) passes 32", &allAvail, 32},
+		{"custom value (8) passes 8", &custom, 8},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotBufLen := make(chan int, 1)
+			sub := &fakeStateSubscriber{
+				subscribeFunc: func(ctx context.Context, bufferLen int) chan coordinator.State {
+					gotBufLen <- bufferLen
+					ch := make(chan coordinator.State)
+					go func() { <-ctx.Done(); close(ch) }()
+					return ch
+				},
+			}
+
+			s := &Server{
+				stateSub:  sub,
+				agentInfo: new(info.AgentInfo),
+			}
+
+			lis, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "localhost:0")
+			require.NoError(t, err)
+			grpcSrv := grpc.NewServer()
+			cproto.RegisterElasticAgentControlServer(grpcSrv, s)
+			go grpcSrv.Serve(lis) //nolint:errcheck // server stops via grpcSrv.Stop() in defer
+			defer grpcSrv.Stop()
+
+			conn, err := grpc.NewClient(lis.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+			require.NoError(t, err)
+			defer conn.Close()
+
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+
+			stream, err := cproto.NewElasticAgentControlClient(conn).StateWatch(ctx, &cproto.StateWatchRequest{BufferSize: tc.bufferSize})
+			require.NoError(t, err)
+			_ = stream
+
+			select {
+			case buf := <-gotBufLen:
+				assert.Equal(t, tc.wantBufLen, buf)
+			case <-ctx.Done():
+				t.Fatal("timed out waiting for StateSubscribe to be called")
+			}
+		})
+	}
+}
+
+type fakeStateSubscriber struct {
+	subscribeFunc func(ctx context.Context, bufferLen int) chan coordinator.State
+}
+
+func (f *fakeStateSubscriber) StateSubscribe(ctx context.Context, bufferLen int) chan coordinator.State {
+	return f.subscribeFunc(ctx, bufferLen)
+}
 
 func TestStateMapping(t *testing.T) {
 	now := time.Now()

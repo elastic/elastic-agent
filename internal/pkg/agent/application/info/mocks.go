@@ -14,6 +14,7 @@ import (
 	mock "github.com/stretchr/testify/mock"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
 // NewMockAgent creates a new instance of MockAgent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -88,23 +89,23 @@ func (_c *MockAgent_AgentID_Call) RunAndReturn(run func() string) *MockAgent_Age
 }
 
 // ECSMetadata provides a mock function for the type MockAgent
-func (_mock *MockAgent) ECSMetadata(v *logger.Logger) (*ECSMeta, error) {
+func (_mock *MockAgent) ECSMetadata(v *logger.Logger) (*ecsmeta.ECSMeta, error) {
 	ret := _mock.Called(v)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ECSMetadata")
 	}
 
-	var r0 *ECSMeta
+	var r0 *ecsmeta.ECSMeta
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) (*ECSMeta, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) (*ecsmeta.ECSMeta, error)); ok {
 		return returnFunc(v)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) *ECSMeta); ok {
+	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) *ecsmeta.ECSMeta); ok {
 		r0 = returnFunc(v)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*ECSMeta)
+			r0 = ret.Get(0).(*ecsmeta.ECSMeta)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(*logger.Logger) error); ok {
@@ -139,12 +140,12 @@ func (_c *MockAgent_ECSMetadata_Call) Run(run func(v *logger.Logger)) *MockAgent
 	return _c
 }
 
-func (_c *MockAgent_ECSMetadata_Call) Return(eCSMeta *ECSMeta, err error) *MockAgent_ECSMetadata_Call {
+func (_c *MockAgent_ECSMetadata_Call) Return(eCSMeta *ecsmeta.ECSMeta, err error) *MockAgent_ECSMetadata_Call {
 	_c.Call.Return(eCSMeta, err)
 	return _c
 }
 
-func (_c *MockAgent_ECSMetadata_Call) RunAndReturn(run func(v *logger.Logger) (*ECSMeta, error)) *MockAgent_ECSMetadata_Call {
+func (_c *MockAgent_ECSMetadata_Call) RunAndReturn(run func(v *logger.Logger) (*ecsmeta.ECSMeta, error)) *MockAgent_ECSMetadata_Call {
 	_c.Call.Return(run)
 	return _c
 }

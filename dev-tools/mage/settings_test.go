@@ -6,18 +6,24 @@ package mage
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 )
 
 func TestGetVersion(t *testing.T) {
 	cfg, err := LoadSettings()
 	require.NoError(t, err)
-	bp := cfg.BeatQualifiedVersion()
+	bp := cfg.AgentQualifiedCoreVersion()
 	assert.NotEmpty(t, bp)
 }
 
@@ -25,7 +31,7 @@ func TestAgentPackageVersion(t *testing.T) {
 	t.Run("agent package version without env var", func(t *testing.T) {
 		cfg, err := LoadSettings()
 		require.NoError(t, err)
-		expectedPkgVersion := cfg.BeatQualifiedVersion()
+		expectedPkgVersion := cfg.AgentQualifiedCoreVersion()
 		actualPkgVersion := cfg.AgentPackageVersion()
 		assert.Equal(t, expectedPkgVersion, actualPkgVersion)
 	})
@@ -131,10 +137,10 @@ func TestSettingsWithMethods(t *testing.T) {
 	t.Run("WithSnapshot", func(t *testing.T) {
 		original := DefaultSettings()
 
-		modified := original.WithSnapshot(true)
+		modified := original.WithSnapshot(false)
 
-		assert.True(t, modified.Build.Snapshot)
-		assert.False(t, original.Build.Snapshot)
+		assert.False(t, modified.Build.Snapshot)
+		assert.True(t, original.Build.Snapshot)
 	})
 
 	t.Run("WithPlatformFilter", func(t *testing.T) {
@@ -194,13 +200,13 @@ func TestSettingsWithMethods(t *testing.T) {
 		assert.Equal(t, []PackageType{TarGz, Zip}, modified.SelectedPackageTypes)
 	})
 
-	t.Run("WithBeatVersion", func(t *testing.T) {
+	t.Run("WithAgentCoreVersion", func(t *testing.T) {
 		original := DefaultSettings()
 
-		modified := original.WithBeatVersion("1.2.3")
+		modified := original.WithAgentCoreVersion("1.2.3")
 
-		assert.Equal(t, "1.2.3", modified.Build.BeatVersion)
-		assert.Empty(t, original.Build.BeatVersion)
+		assert.Equal(t, "1.2.3", modified.Build.AgentCoreVersion)
+		assert.Empty(t, original.Build.AgentCoreVersion)
 	})
 
 	t.Run("WithAgentDropPath", func(t *testing.T) {
@@ -343,12 +349,33 @@ func TestSettingsGetPackageTypes(t *testing.T) {
 		assert.Equal(t, []PackageType{TarGz, Zip}, types)
 	})
 
-	t.Run("returns nil when both are empty", func(t *testing.T) {
+	t.Run("returns platform-derived default when both are empty", func(t *testing.T) {
 		s := DefaultSettings()
+		// Default platforms include both Unix and Windows entries, so the derived
+		// default should contain both tar.gz and zip.
+		s.CrossBuild.Platforms = "linux/amd64,windows/amd64"
 
 		types := s.GetPackageTypes()
 
-		assert.Nil(t, types)
+		assert.Equal(t, []PackageType{TarGz, Zip}, types)
+	})
+
+	t.Run("returns only tar.gz for unix-only platforms", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Platforms = "linux/amd64,darwin/arm64"
+
+		types := s.GetPackageTypes()
+
+		assert.Equal(t, []PackageType{TarGz}, types)
+	})
+
+	t.Run("returns only zip for windows-only platforms", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Platforms = "windows/amd64"
+
+		types := s.GetPackageTypes()
+
+		assert.Equal(t, []PackageType{Zip}, types)
 	})
 
 	t.Run("returns all package types when PACKAGES is all", func(t *testing.T) {
@@ -454,7 +481,7 @@ func TestSettingsContext(t *testing.T) {
 		original := DefaultSettings()
 		original.Build.DevBuild = true
 
-		ctx := ContextWithSettings(context.Background(), original)
+		ctx := ContextWithSettings(t.Context(), original)
 		retrieved := SettingsFromContext(ctx)
 
 		assert.Same(t, original, retrieved)
@@ -462,7 +489,7 @@ func TestSettingsContext(t *testing.T) {
 	})
 
 	t.Run("SettingsFromContext returns fresh settings when not in context", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 
 		settings := SettingsFromContext(ctx)
 
@@ -470,7 +497,7 @@ func TestSettingsContext(t *testing.T) {
 	})
 
 	t.Run("SettingsFromContext returns fresh settings for nil value", func(t *testing.T) {
-		ctx := context.WithValue(context.Background(), settingsContextKey{}, (*Settings)(nil))
+		ctx := context.WithValue(t.Context(), settingsContextKey{}, (*Settings)(nil))
 
 		settings := SettingsFromContext(ctx)
 
@@ -626,7 +653,7 @@ func TestDefaultSettings(t *testing.T) {
 		assert.Equal(t, "https://www.elastic.co/beats/"+DefaultName, settings.Beat.URL)
 
 		// Build defaults - should not be affected by env vars
-		assert.False(t, settings.Build.Snapshot)
+		assert.True(t, settings.Build.Snapshot)
 		assert.False(t, settings.Build.DevBuild)
 		assert.Greater(t, settings.Build.MaxParallel, 0)
 		assert.NotZero(t, settings.BuildDate)
@@ -638,12 +665,8 @@ func TestDefaultSettings(t *testing.T) {
 		// CrossBuild defaults
 		assert.Equal(t, "linux", settings.CrossBuild.DevOS)
 		assert.Equal(t, "amd64", settings.CrossBuild.DevArch)
-		assert.True(t, settings.CrossBuild.MountModcache)
-		assert.True(t, settings.CrossBuild.MountBuildCache)
-		assert.Equal(t, "elastic-agent-crossbuild-build-cache", settings.CrossBuild.BuildCacheVolumeName)
-
 		// IntegrationTest defaults
-		assert.True(t, settings.IntegrationTest.CleanOnExit)
+		assert.False(t, settings.IntegrationTest.CleanOnExit)
 		assert.True(t, settings.IntegrationTest.TestEnvironmentEnabled)
 	})
 }
@@ -672,11 +695,8 @@ func TestLoadSettings(t *testing.T) {
 		// CrossBuild defaults
 		assert.Equal(t, "linux", settings.CrossBuild.DevOS)
 		assert.Equal(t, "amd64", settings.CrossBuild.DevArch)
-		assert.True(t, settings.CrossBuild.MountModcache)
-		assert.True(t, settings.CrossBuild.MountBuildCache)
-
 		// IntegrationTest defaults
-		assert.True(t, settings.IntegrationTest.CleanOnExit)
+		assert.False(t, settings.IntegrationTest.CleanOnExit)
 		assert.True(t, settings.IntegrationTest.TestEnvironmentEnabled)
 	})
 
@@ -697,7 +717,6 @@ func TestLoadSettings(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.True(t, settings.Build.Snapshot)
-		assert.True(t, settings.Build.SnapshotSet)
 		assert.True(t, settings.Build.DevBuild)
 		assert.True(t, settings.Build.ExternalBuild)
 		assert.True(t, settings.Build.ExternalBuildSet)
@@ -706,7 +725,7 @@ func TestLoadSettings(t *testing.T) {
 		assert.True(t, settings.Build.VersionQualified)
 		assert.Equal(t, "true", settings.Build.CI)
 		assert.Equal(t, 8, settings.Build.MaxParallel)
-		assert.Equal(t, "1.2.3", settings.Build.BeatVersion)
+		assert.Equal(t, "1.2.3", settings.Build.AgentCoreVersion)
 		assert.True(t, settings.Build.GolangCrossBuild)
 		assert.Equal(t, "1.21.0", settings.Build.BeatGoVersion)
 		assert.Equal(t, "main", settings.Build.BeatDocBranch)
@@ -752,8 +771,6 @@ func TestLoadSettings(t *testing.T) {
 		t.Setenv("PLATFORMS", "linux/amd64,darwin/arm64")
 		t.Setenv("PACKAGES", "targz,zip")
 		t.Setenv("DOCKER_VARIANTS", "basic,cloud")
-		t.Setenv("CROSSBUILD_MOUNT_MODCACHE", "false")
-		t.Setenv("CROSSBUILD_MOUNT_GOCACHE", "false")
 		t.Setenv("DEV_OS", "darwin")
 		t.Setenv("DEV_ARCH", "arm64")
 
@@ -763,8 +780,6 @@ func TestLoadSettings(t *testing.T) {
 		assert.Equal(t, "linux/amd64,darwin/arm64", settings.CrossBuild.Platforms)
 		assert.Equal(t, "targz,zip", settings.CrossBuild.Packages)
 		assert.Equal(t, "basic,cloud", settings.CrossBuild.DockerVariants)
-		assert.False(t, settings.CrossBuild.MountModcache)
-		assert.False(t, settings.CrossBuild.MountBuildCache)
 		assert.Equal(t, "darwin", settings.CrossBuild.DevOS)
 		assert.Equal(t, "arm64", settings.CrossBuild.DevArch)
 	})
@@ -797,7 +812,6 @@ func TestLoadSettings(t *testing.T) {
 		isSnapshot := strings.HasSuffix(pv.Version, SnapshotSuffix)
 		assert.Equal(t, pv.ManifestURL, settings.Packaging.ManifestURL)
 		assert.Equal(t, pv.CoreVersion, settings.Packaging.AgentPackageVersion)
-		assert.Equal(t, pv.CoreVersion, settings.Build.BeatVersion)
 		assert.Equal(t, isSnapshot, settings.Build.Snapshot)
 		assert.Equal(t, pv.Version, settings.IntegrationTest.AgentVersion)
 		assert.Equal(t, pv.StackVersion, settings.IntegrationTest.AgentStackVersion)
@@ -837,6 +851,15 @@ func TestLoadSettings(t *testing.T) {
 		assert.True(t, settings.IntegrationTest.BuildAgent)
 		assert.Equal(t, "-v -count=1", settings.IntegrationTest.GoTestFlags)
 		assert.False(t, settings.IntegrationTest.TestEnvironmentEnabled)
+	})
+
+	t.Run("enables clean on exit via env var", func(t *testing.T) {
+		t.Setenv("TEST_INTEG_CLEAN_ON_EXIT", "true")
+
+		settings, err := LoadSettings()
+
+		require.NoError(t, err)
+		assert.True(t, settings.IntegrationTest.CleanOnExit)
 	})
 
 	t.Run("loads docker settings from env vars", func(t *testing.T) {
@@ -952,5 +975,166 @@ func TestEnvMap(t *testing.T) {
 		})
 
 		assert.Equal(t, "CustomValue", envMap["CustomKey"])
+	})
+}
+
+// newTestManifestServer starts a TLS httptest server serving b as JSON, adds the server host to
+// manifest.AllowedManifestHosts, and replaces http.DefaultClient with one that trusts the test
+// certificate. All mutations are reverted via t.Cleanup. Returns a manifest URL ready for use in
+// Settings.Packaging.ManifestURL.
+//
+// DownloadManifest rewrites every URL to https://<host><path>, so a TLS server is required.
+// Tests using this helper must not run in parallel since http.DefaultClient is global.
+func newTestManifestServer(t *testing.T, b manifest.Build) string {
+	t.Helper()
+
+	data, err := json.Marshal(b)
+	require.NoError(t, err)
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(data)
+	}))
+	t.Cleanup(server.Close)
+
+	parsedURL, err := url.Parse(server.URL)
+	require.NoError(t, err)
+
+	origHosts := manifest.AllowedManifestHosts
+	manifest.AllowedManifestHosts = append(append([]string{}, origHosts...), parsedURL.Host)
+	t.Cleanup(func() { manifest.AllowedManifestHosts = origHosts })
+
+	origClient := http.DefaultClient
+	http.DefaultClient = server.Client()
+	t.Cleanup(func() { http.DefaultClient = origClient })
+
+	return server.URL + "/manifest.json"
+}
+
+func TestWithManifestInfo(t *testing.T) {
+	t.Run("no-op when ManifestURL is empty", func(t *testing.T) {
+		s := DefaultSettings()
+
+		result, err := s.WithManifestInfo(t.Context())
+
+		require.NoError(t, err)
+		assert.Same(t, s, result)
+	})
+
+	t.Run("standard release version", func(t *testing.T) {
+		const commitHash = "abc123def456789abc123def456789abc12345"
+		manifestURL := newTestManifestServer(t, manifest.Build{
+			Version: "9.3.5",
+			Projects: map[string]manifest.Project{
+				AgentCoreProjectName: {CommitHash: commitHash},
+			},
+		})
+
+		s := DefaultSettings()
+		s.Packaging.ManifestURL = manifestURL
+
+		result, err := s.WithManifestInfo(t.Context())
+
+		require.NoError(t, err)
+		assert.False(t, result.Build.Snapshot)
+		assert.Equal(t, "9.3.5", result.Build.AgentCoreVersion)
+		assert.Equal(t, "9.3.5", result.Packaging.AgentPackageVersion)
+		assert.Equal(t, "9.3.5", result.Build.DependenciesVersion)
+		assert.Equal(t, commitHash, result.Build.AgentCoreCommitHash)
+		assert.NotNil(t, result.Packaging.Manifest)
+	})
+
+	t.Run("snapshot version", func(t *testing.T) {
+		const commitHash = "def456abc123def456abc123def456abc12345"
+		manifestURL := newTestManifestServer(t, manifest.Build{
+			Version: "9.3.5-SNAPSHOT",
+			Projects: map[string]manifest.Project{
+				AgentCoreProjectName: {CommitHash: commitHash},
+			},
+		})
+
+		s := DefaultSettings()
+		s.Packaging.ManifestURL = manifestURL
+
+		result, err := s.WithManifestInfo(t.Context())
+
+		require.NoError(t, err)
+		assert.True(t, result.Build.Snapshot)
+		assert.Equal(t, "9.3.5", result.Build.AgentCoreVersion)
+		assert.Equal(t, "9.3.5", result.Packaging.AgentPackageVersion) // prerelease stripped; snapshot state is in Build.Snapshot
+		assert.Equal(t, "9.3.5-SNAPSHOT", result.Build.DependenciesVersion)
+		assert.Equal(t, commitHash, result.Build.AgentCoreCommitHash)
+	})
+
+	// Independent Agent Releases use a version like "9.3.5+build202605290902".
+	// WithManifestInfo must set AgentPackageVersion to the full string (including build metadata)
+	// so package layout matches the wrapped core, while AgentCoreVersion and DependenciesVersion
+	// receive only major.minor.patch so they can be used for package filename resolution.
+	t.Run("version with build ID (Independent Agent Release)", func(t *testing.T) {
+		const (
+			commitHash = "abc123def456789abc123def456789abc12345"
+			buildID    = "build202605290902"
+		)
+		manifestURL := newTestManifestServer(t, manifest.Build{
+			Version: "9.3.5+" + buildID,
+			Projects: map[string]manifest.Project{
+				AgentCoreProjectName: {CommitHash: commitHash},
+			},
+		})
+
+		s := DefaultSettings()
+		s.Packaging.ManifestURL = manifestURL
+
+		result, err := s.WithManifestInfo(t.Context())
+
+		require.NoError(t, err)
+		assert.False(t, result.Build.Snapshot)
+		// AgentCoreVersion is major.minor.patch only.
+		assert.Equal(t, "9.3.5", result.Build.AgentCoreVersion)
+		// AgentPackageVersion keeps the full version including build metadata.
+		assert.Equal(t, "9.3.5+"+buildID, result.Packaging.AgentPackageVersion)
+		// DependenciesVersion strips build metadata; used for resolving package filenames.
+		assert.Equal(t, "9.3.5", result.Build.DependenciesVersion)
+		assert.Equal(t, commitHash, result.Build.AgentCoreCommitHash)
+	})
+
+	t.Run("missing agent-core project returns error", func(t *testing.T) {
+		manifestURL := newTestManifestServer(t, manifest.Build{
+			Version:  "9.3.5",
+			Projects: map[string]manifest.Project{},
+		})
+
+		s := DefaultSettings()
+		s.Packaging.ManifestURL = manifestURL
+
+		_, err := s.WithManifestInfo(t.Context())
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), AgentCoreProjectName)
+	})
+
+	t.Run("original settings are not mutated", func(t *testing.T) {
+		const commitHash = "abc123def456789abc123def456789abc12345"
+		manifestURL := newTestManifestServer(t, manifest.Build{
+			Version: "9.3.5",
+			Projects: map[string]manifest.Project{
+				AgentCoreProjectName: {CommitHash: commitHash},
+			},
+		})
+
+		s := DefaultSettings()
+		s.Packaging.ManifestURL = manifestURL
+		origSnapshot := s.Build.Snapshot
+		origCoreVersion := s.Build.AgentCoreVersion
+		origPackageVersion := s.Packaging.AgentPackageVersion
+		origManifest := s.Packaging.Manifest
+
+		_, err := s.WithManifestInfo(t.Context())
+		require.NoError(t, err)
+
+		assert.Equal(t, origSnapshot, s.Build.Snapshot)
+		assert.Equal(t, origCoreVersion, s.Build.AgentCoreVersion)
+		assert.Equal(t, origPackageVersion, s.Packaging.AgentPackageVersion)
+		assert.Equal(t, origManifest, s.Packaging.Manifest)
 	})
 }

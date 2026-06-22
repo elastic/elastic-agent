@@ -26,18 +26,28 @@ checkout_merge() {
         echo "${fetched_sha}"
     })
 
-    git checkout "${pinned_sha}"
-    echo "Current branch: $(git rev-parse --abbrev-ref HEAD)"
+    # Sparse-checkout pipeline-upload steps use a shallow clone: they have the
+    # working-tree files they need but lack the history required for a 3-way
+    # merge.  Unshallow so git can locate the merge base and access the blob
+    # versions it needs for conflict resolution.  git only downloads objects
+    # absent from the local store, so tip blobs already present from the
+    # depth-1 fetch are not re-transferred.  Full checkouts skip this block.
+    if [[ "$(git rev-parse --is-shallow-repository 2>/dev/null)" == "true" ]]; then
+        echo "Shallow repository detected; unshallowing to enable merge"
+        git fetch --unshallow origin
+    fi
 
-    # create temporal branch to merge the PR with the target branch
-    git checkout -b ${merge_branch}
+    # Create the merge branch directly from the pinned base SHA.  This works
+    # whether HEAD is currently on a symbolic ref (normal checkout) or detached
+    # (sparse-checkout steps that do git checkout <sha>).
+    git checkout -b "${merge_branch}" "${pinned_sha}"
     echo "New branch created: $(git rev-parse --abbrev-ref HEAD)"
 
     # set author identity so it can be run git merge
     git config user.name "github-merged-pr-post-checkout"
     git config user.email "auto-merge@buildkite"
 
-    git merge --no-edit "${BUILDKITE_COMMIT}" || {
+    git merge --no-edit "${pr_commit}" || {
         local merge_result=$?
         echo "Merge failed: ${merge_result}"
         git merge --abort
@@ -51,12 +61,6 @@ if [[ "${pull_request}" == "false" ]]; then
     echo "Not a pull request, skipping"
     exit 0
 fi
-
-if ! git symbolic-ref -q HEAD; then
-    echo "Detached HEAD, skipping"
-    exit 0
-fi
-
 
 TARGET_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-master}"
 PR_COMMIT="${BUILDKITE_COMMIT}"

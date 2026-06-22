@@ -22,41 +22,96 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-func TestMergeFleetConfig(t *testing.T) {
-	testutils.InitStorage(t)
+func TestLoadConfig(t *testing.T) {
+	validFleetEnc := `fleet:
+  enabled: true
+  kibana:
+    host: demo
+  access_api_key: "123"
+agent:
+  grpc:
+    port: 6790`
 
-	cfg := map[string]interface{}{
-		"fleet": map[string]interface{}{
-			"enabled":        true,
-			"kibana":         map[string]interface{}{"host": "demo"},
-			"access_api_key": "123",
+	cases := []struct {
+		name     string
+		baseCfg  string
+		fleetEnc string
+		assert   func(t *testing.T, cfg *configuration.Configuration)
+	}{
+		{
+			name:     "fleet enabled, fleet.enc merged",
+			baseCfg:  "fleet:\n  enabled: true\n",
+			fleetEnc: validFleetEnc,
+			assert: func(t *testing.T, cfg *configuration.Configuration) {
+				assert.True(t, cfg.Fleet.Enabled)
+				assert.Equal(t, "123", cfg.Fleet.AccessAPIKey)
+				assert.Equal(t, uint16(6790), cfg.Settings.GRPC.Port)
+			},
 		},
-		"agent": map[string]interface{}{
-			"grpc": map[string]interface{}{
-				"port": uint16(6790),
+		{
+			name:     "standalone ignores fleet.enc",
+			baseCfg:  "fleet:\n  enabled: false\n",
+			fleetEnc: validFleetEnc,
+			assert: func(t *testing.T, cfg *configuration.Configuration) {
+				assert.False(t, cfg.Fleet.Enabled)
+				assert.Empty(t, cfg.Fleet.AccessAPIKey)
+			},
+		},
+		{
+			name: "overlapping agent.logging.level",
+			baseCfg: `fleet:
+  enabled: true
+agent:
+  logging:
+    level: info
+`,
+			fleetEnc: `fleet:
+  enabled: true
+  kibana:
+    host: demo
+  access_api_key: "123"
+agent:
+  logging:
+    level: debug`,
+			assert: func(t *testing.T, cfg *configuration.Configuration) {
+				assert.True(t, cfg.Fleet.Enabled)
+				assert.Equal(t, logp.DebugLevel, cfg.Settings.LoggingConfig.Level)
 			},
 		},
 	}
 
-	rawConfig := config.MustNewConfigFrom(cfg)
-	storage, conf, err := mergeFleetConfig(context.Background(), rawConfig)
-	require.NoError(t, err)
-	assert.NotNil(t, storage)
-	assert.NotNil(t, conf)
-	assert.Equal(t, conf.Fleet.Enabled, cfg["fleet"].(map[string]interface{})["enabled"])
-	assert.Equal(t, conf.Fleet.AccessAPIKey, cfg["fleet"].(map[string]interface{})["access_api_key"])
-	assert.Equal(t, conf.Settings.GRPC.Port, cfg["agent"].(map[string]interface{})["grpc"].(map[string]interface{})["port"].(uint16))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			origCfg := paths.Config()
+			t.Cleanup(func() { paths.SetConfig(origCfg) })
+			paths.SetConfig(t.TempDir())
+			testutils.InitStorage(t)
+			require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte(tc.baseCfg), 0o644))
+
+			if tc.fleetEnc != "" {
+				store, err := storage.NewEncryptedDiskStore(t.Context(), paths.AgentConfigFile())
+				require.NoError(t, err)
+				require.NoError(t, store.Save(strings.NewReader(tc.fleetEnc)))
+			}
+
+			cfg, err := configuration.LoadConfig(t.Context(), nil)
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+			tc.assert(t, cfg)
+		})
+	}
 }
 
 func TestLimitsLog(t *testing.T) {
@@ -77,7 +132,7 @@ func TestLimitsLog(t *testing.T) {
 		true,              // testingMode
 		time.Millisecond,  // fleetInitTimeout
 		true,              // disable monitoring
-		nil,               // no configuration overrides
+		configuration.DefaultConfiguration(),
 		nil,
 		rollbackSrc,
 	)
@@ -381,7 +436,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 			postNormalizeAssertions: nil,
 		},
 		{
-			name: "Entries not having a matching install directory will be removed from the list",
+			name: "Non-existent install directory with unexpired TTL does not cause errors",
 			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, ttl.Source) {
 				_ = createFakeAgentInstall(t, topDir, "4.5.6", "newversionhash", true)
 				oldAgentInstallPath := createFakeAgentInstall(t, topDir, "1.2.3", "oldversionhash", true)
@@ -400,7 +455,6 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 						ValidUntil: tomorrow,
 					},
 				}, nil, nil)
-
 				return nil, mockRollbackSource
 			},
 			postNormalizeAssertions: nil,
@@ -408,12 +462,14 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 		{
 			name: "Expired installs still existing on disk will be removed from the install list and removed from disk",
 			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, ttl.Source) {
-				_ = createFakeAgentInstall(t, topDir, "4.5.6", "newversionhash", true)
+				newAgentInstallPath := createFakeAgentInstall(t, topDir, "4.5.6", "newversionhash", true)
 				oldAgentInstallPath := createFakeAgentInstall(t, topDir, "1.2.3", "oldversionhash", true)
 
 				// assert that the versionedHome of the old install is the same we check in postNormalizeAssertions
 				assert.Equal(t, oldAgentInstallPath, filepath.Join("data", "elastic-agent-1.2.3-oldver"),
 					"Unexpected old install versioned home. Post normalize assertions may not be working")
+
+				createLink(t, topDir, newAgentInstallPath)
 
 				mockRollbackSource := ttl.NewMockSource(t)
 				mockRollbackSource.EXPECT().GetAll().Return(
@@ -426,8 +482,6 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 					},
 					nil, nil,
 				)
-
-				mockRollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-1.2.3-oldver")).Return(nil)
 				return nil, mockRollbackSource
 			},
 			postNormalizeAssertions: func(t *testing.T, topDir string, _ *upgrade.UpdateMarker) {
@@ -496,6 +550,20 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 	return relVersionedHomePath
 }
 
+// createLink (copied from the upgrade package tests) creates the top-level elastic-agent symlink
+// pointing at the binary inside the given versioned home (relative to topDir).
+func createLink(t *testing.T, topDir string, relVersionedHomePath string) {
+	t.Helper()
+	linkName := upgrade.AgentName
+	linkTarget := paths.BinaryPath(relVersionedHomePath, upgrade.AgentName)
+	if runtime.GOOS == "windows" {
+		linkName += ".exe"
+		linkTarget += ".exe"
+	}
+	err := os.Symlink(linkTarget, filepath.Join(topDir, linkName))
+	require.NoError(t, err, "error creating symlink for fake agent install")
+}
+
 func TestApplicationStandaloneEncrypted(t *testing.T) {
 	log, _ := loggertest.New("TestApplicationStandaloneEncrypted")
 
@@ -512,6 +580,8 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Ensure New encrypts config")
+	cfg, err := configuration.LoadConfig(t.Context(), nil)
+	require.NoError(t, err)
 	_, _, _, err = New(
 		t.Context(),
 		log,
@@ -523,7 +593,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
+		cfg,
 		nil,
 		nil,
 	)
@@ -537,6 +607,8 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 	require.EqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
 
 	t.Log("Ensure New does not alter contents when no changes are made")
+	cfg, err = configuration.LoadConfig(t.Context(), nil)
+	require.NoError(t, err)
 	_, _, _, err = New(
 		t.Context(),
 		log,
@@ -548,7 +620,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
+		cfg,
 		nil,
 		nil,
 	)
@@ -568,6 +640,8 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
       enabled: true`), 0640)
 	require.NoError(t, err)
 
+	cfg, err = configuration.LoadConfig(t.Context(), nil)
+	require.NoError(t, err)
 	_, _, _, err = New(
 		t.Context(),
 		log,
@@ -579,7 +653,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
+		cfg,
 		nil,
 		nil,
 	)
@@ -601,6 +675,8 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
     level: debug`), 0640)
 	require.NoError(t, err)
 
+	cfg, err = configuration.LoadConfig(t.Context(), nil)
+	require.NoError(t, err)
 	_, _, _, err = New(
 		t.Context(),
 		log,
@@ -612,7 +688,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
+		cfg,
 		nil,
 		nil,
 	)
@@ -663,9 +739,7 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 	t.Cleanup(func() { paths.SetConfig(cfgPath) })
 	paths.SetConfig(t.TempDir())
 
-	p, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "_meta", "elastic-agent.fleet.yml"))
-	require.NoError(t, err)
-	err = os.WriteFile(paths.ConfigFile(), p, 0640) //nolint:gosec // test fixture writing to controlled temp path
+	err := os.WriteFile(paths.ConfigFile(), DefaultAgentFleetConfig, 0640)
 	require.NoError(t, err)
 
 	isRoot, err := utils.HasRoot()
@@ -680,6 +754,8 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
   host: https://localhost:8220`))
 	require.NoError(t, err)
 
+	cfg, err := configuration.LoadConfig(t.Context(), nil)
+	require.NoError(t, err)
 	_, _, _, err = New(
 		t.Context(),
 		log,
@@ -691,7 +767,7 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
+		cfg,
 		nil,
 		nil,
 	)
@@ -699,5 +775,5 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 
 	ymlBytes, err := os.ReadFile(paths.ConfigFile())
 	require.NoError(t, err)
-	require.EqualValues(t, p, ymlBytes, "unexpected contents in elastic-agent.yml")
+	require.EqualValues(t, DefaultAgentFleetConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
 }

@@ -12,6 +12,62 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 )
 
+func TestHasProfilesPipeline(t *testing.T) {
+	pipeline := func(id string) map[string]any {
+		return map[string]any{
+			"service": map[string]any{
+				"pipelines": map[string]any{
+					id: map[string]any{
+						"receivers": []any{"otlp"},
+						"exporters": []any{"debug"},
+					},
+				},
+			},
+		}
+	}
+
+	for _, tc := range []struct {
+		name string
+		cfg  *confmap.Conf
+		want bool
+	}{
+		{
+			name: "no pipelines key",
+			cfg:  confmap.New(),
+			want: false,
+		},
+		{
+			name: "logs pipeline only",
+			cfg:  confmap.NewFromStringMap(pipeline("logs/default")),
+			want: false,
+		},
+		{
+			name: "traces pipeline only",
+			cfg:  confmap.NewFromStringMap(pipeline("traces")),
+			want: false,
+		},
+		{
+			name: "profiles pipeline bare",
+			cfg:  confmap.NewFromStringMap(pipeline("profiles")),
+			want: true,
+		},
+		{
+			name: "profiles pipeline with instance name",
+			cfg:  confmap.NewFromStringMap(pipeline("profiles/my-pipeline")),
+			want: true,
+		},
+		{
+			name: "profiles-like name that is not profiles signal",
+			cfg:  confmap.NewFromStringMap(pipeline("profilesextra")),
+			want: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, hasProfilesPipeline(tc.cfg))
+		})
+	}
+}
+
 func TestServiceExtensionsList(t *testing.T) {
 	t.Run("not set returns nil", func(t *testing.T) {
 		cfg := confmap.New()

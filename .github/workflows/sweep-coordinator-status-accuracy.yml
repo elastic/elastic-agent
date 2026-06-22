@@ -7,6 +7,7 @@ on:
 permissions:
   actions: read
   contents: read
+  copilot-requests: write
   issues: write
   pull-requests: read
 
@@ -129,5 +130,3 @@ jobs:
         - A priority ranking: permanent incorrect states first, then transient inaccuracies,
           then cosmetic issues
         - State transitions and aggregation paths you audited and found correct
-    secrets:
-      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
