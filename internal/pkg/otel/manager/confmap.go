@@ -6,22 +6,26 @@ package manager
 
 import (
 	"fmt"
-	"strings"
 
 	"go.opentelemetry.io/collector/confmap"
+	"go.opentelemetry.io/collector/pipeline"
+	"go.opentelemetry.io/collector/pipeline/xpipeline"
 )
 
 // hasProfilesPipeline reports whether cfg contains at least one pipeline whose
-// signal type is "profiles" (i.e. the pipeline ID is "profiles" or starts with
-// "profiles/").
+// signal type is profiles.
 func hasProfilesPipeline(cfg *confmap.Conf) bool {
 	raw := cfg.Get("service::pipelines")
 	pipelines, ok := raw.(map[string]any)
 	if !ok {
 		return false
 	}
-	for id := range pipelines {
-		if id == "profiles" || strings.HasPrefix(id, "profiles/") {
+	for idStr := range pipelines {
+		var id pipeline.ID
+		if err := id.UnmarshalText([]byte(idStr)); err != nil {
+			continue
+		}
+		if id.Signal() == xpipeline.SignalProfiles {
 			return true
 		}
 	}
