@@ -316,8 +316,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.30 // indirect
 	github.com/aws/aws-sdk-go-v2/service/apigateway v1.31.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/apigatewayv2 v1.28.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.57.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.74.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.58.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.74.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.51.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.305.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.45.4 // indirect
@@ -814,5 +814,5 @@ replace (
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
 	github.com/google/gopacket => github.com/elastic/gopacket v1.1.20-0.20241002174017-e8c5fda595e6
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260615132925-c7aa5d05d232
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260622165532-f5e30669f373
 )
