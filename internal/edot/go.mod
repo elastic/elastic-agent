@@ -124,11 +124,7 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.5 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
-<<<<<<< HEAD
-	github.com/google/pprof v0.0.0-20260302011040-a15ffb7f9dcc // indirect
-=======
 	github.com/google/pprof v0.0.0-20260604005048-7023385849c0 // indirect
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
 	github.com/gosnmp/gosnmp v1.43.2 // indirect
 	github.com/grobie/gomemcache v0.0.0-20230213081705-239240bbc445 // indirect
@@ -769,11 +765,7 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-<<<<<<< HEAD
-	gopkg.in/ini.v1 v1.67.1 // indirect
-=======
 	gopkg.in/ini.v1 v1.67.3 // indirect
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9 // indirect

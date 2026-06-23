@@ -14,13 +14,8 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
-<<<<<<< HEAD
-	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260622142405-370568f40539
-=======
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260622140928-a16802447057
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260622142405-370568f40539
 	github.com/elastic/cloud-on-k8s/v3 v3.4.0
 	github.com/elastic/elastic-agent-autodiscover v0.10.3-0.20260423154939-e990715f9426
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
