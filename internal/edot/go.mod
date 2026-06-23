@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260617204644-c76242830c37
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260622140928-a16802447057
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.43.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -316,8 +316,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.30 // indirect
 	github.com/aws/aws-sdk-go-v2/service/apigateway v1.31.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/apigatewayv2 v1.28.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.57.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.74.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.58.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.74.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.51.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.305.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.45.4 // indirect
@@ -778,7 +778,7 @@ require (
 	gopkg.in/ini.v1 v1.67.2 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	howett.net/plist v1.0.1 // indirect
+	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9 // indirect
 	k8s.io/api v0.35.4 // indirect
 	k8s.io/apimachinery v0.35.4 // indirect
 	k8s.io/client-go v0.35.4 // indirect
@@ -814,5 +814,5 @@ replace (
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
 	github.com/google/gopacket => github.com/elastic/gopacket v1.1.20-0.20241002174017-e8c5fda595e6
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260615132925-c7aa5d05d232
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260622165532-f5e30669f373
 )

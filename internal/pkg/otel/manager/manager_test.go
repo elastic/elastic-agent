@@ -1500,7 +1500,10 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 					"pipeline:logs/_agent-component/test-component": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							"receiver:filebeat/_agent-component/test-component": {
+							"receiver:filebeat/_agent-component/test-component/test-1": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							"receiver:filebeat/_agent-component/test-component/test-2": {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							"exporter:elasticsearch/_agent-component/test-component": {
@@ -1836,7 +1839,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receivers)
 		assert.True(t, receivers.IsSet("nop"))
-		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test/test-1"))
 	})
 
 	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
@@ -1852,7 +1855,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receivers)
 		assert.False(t, receivers.IsSet("nop"))
-		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test/test-1"))
 	})
 
 	t.Run("collector status with components is passed up to the component manager", func(t *testing.T) {
@@ -1863,7 +1866,10 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 				"pipeline:logs/_agent-component/test": {
 					Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					ComponentStatusMap: map[string]*status.AggregateStatus{
-						"receiver:filebeatreceiver/_agent-component/test": {
+						"receiver:filebeatreceiver/_agent-component/test/test-1": {
+							Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						},
+						"receiver:filebeatreceiver/_agent-component/test/test-2": {
 							Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						},
 						"exporter:elasticsearch/_agent-component/test": {
@@ -2098,7 +2104,10 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 			"pipeline:logs/_agent-component/test": {
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					"receiver:filebeatreceiver/_agent-component/test": {
+					"receiver:filebeatreceiver/_agent-component/test/test-1": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+					"receiver:filebeatreceiver/_agent-component/test/test-2": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
 					"exporter:elasticsearch/_agent-component/test": {
