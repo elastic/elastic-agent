@@ -443,7 +443,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"batch": map[string]any{
 					"flush_timeout": "10s",
 					"max_size":      1600,
-					"min_size":      0,
+					"min_size":      1600,
 					"sizer":         "items",
 				},
 			},
