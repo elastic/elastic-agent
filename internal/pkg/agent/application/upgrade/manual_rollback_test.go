@@ -676,6 +676,10 @@ func TestManualRollback(t *testing.T) {
 				locker := filelock.NewAppLocker(topDir, "watcher.lock")
 				err := locker.TryLock()
 				require.NoError(t, err, "error locking watcher AppLocker")
+				t.Cleanup(func() {
+					unlockErr := locker.Unlock()
+					assert.NoError(t, unlockErr, "error unlocking watcher AppLocker")
+				})
 				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(nil, errors.New("error taking over watcher"))
 				// InvokeWatcher must NOT be called.
 			},
