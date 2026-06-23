@@ -191,6 +191,31 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 	// Add a policy overwrite to change the agent monitoring to use Otel runtime
 	runner.addMonitoringToOtelRuntimeOverwrite()
 
+	query = genESQuery(agentStatus.Info.ID,
+		[][]string{
+			{"match", "component.binary", "elastic-otel-collector"},
+			{"exists", "field", "data_stream.dataset"},
+			{"exists", "field", "data_stream.namespace"},
+			{"exists", "field", "data_stream.type"},
+			{"exists", "field", "elastic_agent.id"},
+			{"exists", "field", "elastic_agent.process"},
+			{"exists", "field", "elastic_agent.snapshot"},
+			{"exists", "field", "elastic_agent.version"},
+			{"exists", "field", "agent.id"},
+			{"exists", "field", "agent.version"},
+			{"exists", "field", "agent.name"},
+			{"exists", "field", "component.id"},
+			{"exists", "field", "metricset.name"},
+			{"exists", "field", "host.hostname"},
+		})
+	require.Eventually(t, func() bool {
+		now = time.Now()
+		res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
+		require.NoError(t, err)
+		t.Logf("Fetched monitoring metrics with event template fields, got %d hits", res.Hits.Total.Value)
+		return res.Hits.Total.Value >= 1
+	}, time.Minute*10, time.Second*10, "monitoring metrics missing expected event template fields")
+
 	// since the default execution mode of Otel runtime is sub-process we should see resource
 	// metrics for elastic-agent/collector component.
 	edotCollectorComponentID := otelMonitoring.EDOTComponentID
