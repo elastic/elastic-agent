@@ -549,26 +549,15 @@ agent.internal.runtime.filebeat.httpjson: process
 
 			var configBuffer bytes.Buffer
 			require.NoError(t,
-<<<<<<< HEAD
-				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
-					"Runtime":   tc.runtime,
-					"InputFile": inputFilePath,
-					"ESHost":    esURL.Host,
-=======
 				template.Must(template.New("config").Parse(tc.configTemplate)).Execute(&configBuffer, map[string]any{
-					"Runtime":           tc.runtime,
-					"InputFile":         inputFilePath,
-					"ESHost":            esURL.Host,
-					"MonitoringEnabled": tc.monitoringEnabled,
-					"MockServerURL":     httpjsonServer.URL,
->>>>>>> 3b6747e03 (Fix missing components logs from diagnostic bundle (#14716))
+					"Runtime":       tc.runtime,
+					"InputFile":     inputFilePath,
+					"ESHost":        esURL.Host,
+					"MockServerURL": httpjsonServer.URL,
 				}))
 
 			expDiagFiles := append([]string{}, diagnosticsFiles...)
-<<<<<<< HEAD
-=======
 			extraPatterns := append([]filePattern{}, tc.extraPatterns...)
->>>>>>> 3b6747e03 (Fix missing components logs from diagnostic bundle (#14716))
 			if tc.runtime == "otel" {
 				// EDOT adds these extra files.
 				// TestBeatDiagnostics is quite strict about what it expects to see in the archive.
@@ -584,13 +573,8 @@ agent.internal.runtime.filebeat.httpjson: process
 			err = f.Run(ctx, integrationtest.State{
 				Configure:  configBuffer.String(),
 				AgentState: expectedAgentState,
-<<<<<<< HEAD
-				Components: expectedComponentState,
-				After:      testDiagnosticsFactory(t, filebeatSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
-=======
 				Components: tc.agentCompState,
 				After:      testDiagnosticsFactory(t, tc.diagCompSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}, tc.checkBeatReceiverTraceLogs, extraPatterns...),
->>>>>>> 3b6747e03 (Fix missing components logs from diagnostic bundle (#14716))
 			})
 			assert.NoError(t, err)
 		})
@@ -692,10 +676,6 @@ agent.internal.runtime.filebeat.filestream: otel
 	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
 }
 
-<<<<<<< HEAD
-func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
-	return func(ctx context.Context) error {
-=======
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string, checkBeatReceiverTraceLogs bool, extraPatterns ...filePattern) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
 		// If any required extra patterns are present (e.g. the metrics file
@@ -719,16 +699,12 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 			}
 		}
 
->>>>>>> 3b6747e03 (Fix missing components logs from diagnostic bundle (#14716))
 		diagZip, err := fix.ExecDiagnostics(ctx, cmd...)
 
 		// get the version of the running agent
 		avi, err := getRunningAgentVersion(ctx, fix)
 		require.NoError(t, err)
 
-<<<<<<< HEAD
-		verifyDiagnosticArchive(t, compSetup, diagZip, diagFiles, diagCompFiles, avi)
-=======
 		if checkBeatReceiverTraceLogs {
 			// The diagnostic bundle places logs under logs/<commit>/components. Use the real
 			// commit hash so the pattern matches the exact path in the bundle.
@@ -739,7 +715,6 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 		}
 
 		verifyDiagnosticArchive(t, compSetup, diagZip, diagFiles, diagCompFiles, avi, extraPatterns...)
->>>>>>> 3b6747e03 (Fix missing components logs from diagnostic bundle (#14716))
 
 		// preserve the diagnostic archive if the test failed
 		if t.Failed() {
@@ -750,7 +725,7 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 	}
 }
 
-func verifyDiagnosticArchive(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagArchive string, diagFiles []string, diagCompFiles []string, avi *client.Version) {
+func verifyDiagnosticArchive(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagArchive string, diagFiles []string, diagCompFiles []string, avi *client.Version, extraPatterns ...filePattern) {
 	// check that the archive is not an empty file
 	stat, err := os.Stat(diagArchive)
 	require.NoErrorf(t, err, "stat file %q failed", diagArchive)
@@ -763,6 +738,7 @@ func verifyDiagnosticArchive(t *testing.T, compSetup map[string]integrationtest.
 
 	compAndUnitNames := extractComponentAndUnitNames(compSetup)
 	expectedDiagArchiveFilePatterns := compileExpectedDiagnosticFilePatterns(avi, diagFiles, diagCompFiles, compAndUnitNames)
+	expectedDiagArchiveFilePatterns = append(expectedDiagArchiveFilePatterns, extraPatterns...)
 
 	expectedExtractedFiles := map[string]struct{}{}
 	for _, filePattern := range expectedDiagArchiveFilePatterns {
