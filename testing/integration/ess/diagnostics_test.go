@@ -535,15 +535,10 @@ agent.internal.runtime.filebeat.httpjson: process
 			err = f.Prepare(ctx)
 			require.NoError(t, err)
 
-<<<<<<< HEAD
 			// Create the data file to ingest.
 			// Use createTempDir instead of t.TempDir here to avoid cleanup problems on Windows.
 			tmpDir := createTempDir(t)
 			inputFilePath := filepath.Join(tmpDir, "input.txt")
-=======
-			// Create the data file to ingest (used by filestream cases).
-			inputFilePath := filepath.Join(t.TempDir(), "input.txt")
->>>>>>> 3b6747e03 (Fix missing components logs from diagnostic bundle (#14716))
 			err = os.WriteFile(inputFilePath, []byte("hello world\n"), 0o600)
 			require.NoError(t, err, "failed to create input file for ingestion")
 
