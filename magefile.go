@@ -3797,7 +3797,7 @@ func restoreBeatsSubmodule() error {
 	return nil
 }
 
-func (Otel) OsquerybeatCrossBuildExt() error {
+func (Otel) OsquerybeatCrossBuildExt(ctx context.Context) error {
 	mg.Deps(Otel.PrepareBeats)
 	defer func() {
 		if err := restoreBeatsSubmodule(); err != nil {
@@ -3806,8 +3806,16 @@ func (Otel) OsquerybeatCrossBuildExt() error {
 	}()
 	fmt.Println("--- CrossBuild osquery-extension")
 	osquerybeatDir := filepath.Join("beats", "x-pack", "osquerybeat")
-	err := sh.RunV("mage", "-d", osquerybeatDir, "crossBuildExt")
-	if err != nil {
+
+	// The child mage process runs in the beats submodule, which has its own
+	// magefile and its own default platform list. Without an explicit
+	// PLATFORMS it would rebuild the osquery extension for every default
+	// platform, not the host-only set our own magefile computed.
+	cfg := devtools.SettingsFromContext(ctx)
+	env := map[string]string{
+		"PLATFORMS": strings.Join(cfg.GetPlatforms().Names(), " "),
+	}
+	if _, err := sh.Exec(env, os.Stdout, os.Stderr, "mage", "-d", osquerybeatDir, "crossBuildExt"); err != nil {
 		return fmt.Errorf("failed to run mage -d %s crossBuildExt: %w", osquerybeatDir, err)
 	}
 	return nil
