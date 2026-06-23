@@ -74,7 +74,7 @@ For more information check [Issue #264983](https://github.com/elastic/kibana/iss
 **Applies to: {{agent}} 9.3.4**
 
 :::{warning}
-Due to the broad impact of this issue, {{agent}} 9.3.4 has been removed from the downloads page. We recommend that you skip {{agent}} 9.3.4 and upgrade directly to 9.3.5 or later.
+Due to the broad impact of this issue, {{agent}} 9.3.4 has been removed from the downloads page. We recommend upgrading directly to {{agent}} 9.3.5 or later.
 :::
 
 A performance optimization in {{agent}} 9.3.4 causes timestamp fields produced by Beats-based inputs to be incorrectly serialized as an empty `{}` JSON object. This affects time fields in the event body (for example, `event.created`) but does not affect the primary `@timestamp` field.
