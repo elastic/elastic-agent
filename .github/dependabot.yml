@@ -12,20 +12,35 @@ updates:
       - skip-changelog
       - Team:Elastic-Agent-Control-Plane
       - backport-active-all
-    allow:
-      - dependency-name: "github.com/elastic/*"
-      - dependency-name: "helm.sh/helm/*"
-    groups:
-      go-dependencies:
-        patterns:
-          - "github.com/elastic/*"
-          - "helm.sh/helm/*"
     ignore:
+      # beats is a git submodule; bumped separately
       - dependency-name: "github.com/elastic/beats/*"
-      # Otel dependency updates are done in lock-step with Otel core framework updates
-      - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
-      # elastic/sarama fork should be managed manually to avoid path mismatch issues
+      # elastic/sarama fork must be managed manually to avoid module path mismatch issues
       - dependency-name: "github.com/elastic/sarama"
+      # Otel dependency updates are done in lock-step with the upstream Otel release cycle
+      - dependency-name: "go.opentelemetry.io/*"
+      - dependency-name: "github.com/open-telemetry/*"
+      - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
+      # k8s dependencies are bumped transitively by Otel dependency updates; do not update independently
+      - dependency-name: "k8s.io/*"
+      - dependency-name: "sigs.k8s.io/*"
+    groups:
+      elastic:
+        patterns:
+          # github.com/elastic/* and go.elastic.co/* cover all Elastic and APM Go packages
+          - "github.com/elastic/*"
+          - "go.elastic.co/*"
+      golang-x:
+        patterns:
+          - "golang.org/x/*"
+      tooling-test:
+        patterns:
+          - "github.com/magefile/*"
+          - "github.com/stretchr/*"
+          - "github.com/testcontainers/*"
+      misc:
+        patterns:
+          - "*"
     open-pull-requests-limit: 10
 
   - package-ecosystem: "github-actions"
