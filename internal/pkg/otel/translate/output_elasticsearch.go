@@ -122,7 +122,7 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
 				"flush_timeout": getFlushTimeout(logger, output),
-				"max_size":      escfg.BulkMaxSize,             // bulk_max_size
+				"max_size":      escfg.BulkMaxSize,                 // bulk_max_size
 				"min_size":      getFlushMinEvents(logger, output), // queue.mem.flush.min_events
 				"sizer":         "items",
 			},
