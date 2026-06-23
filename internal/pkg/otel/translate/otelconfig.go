@@ -534,18 +534,8 @@ func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
 func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type, error) {
 	beatName := comp.BeatName()
 	switch beatName {
-	case "filebeat":
-		return otelcomponent.MustNewType("filebeatreceiver"), nil
-	case "metricbeat":
-		return otelcomponent.MustNewType("metricbeatreceiver"), nil
-	case "auditbeat":
-		return otelcomponent.MustNewType("abreceiver"), nil
-	case "heartbeat":
-		return otelcomponent.MustNewType("hbreceiver"), nil
-	case "osquerybeat":
-		return otelcomponent.MustNewType("osqreceiver"), nil
-	case "packetbeat":
-		return otelcomponent.MustNewType("pbreceiver"), nil
+	case "filebeat", "metricbeat", "auditbeat", "heartbeat", "osquerybeat", "packetbeat":
+		return otelcomponent.MustNewType(beatName + "receiver"), nil
 	default:
 		return otelcomponent.Type{}, fmt.Errorf("unknown otel receiver type for input type: %s", comp.InputType)
 	}
@@ -712,15 +702,30 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 	// returns one input per stream in order, so we can zip them together.
 	streams := unit.Config.GetStreams()
 
-	// Add the type to each input. CreateInputsFromStreams doesn't do this, each beat does it on its own in a transform
+	// Handle input types that are namespaced to their component type by either a prefix or suffix.
+	// CreateInputsFromStreams doesn't do this, each beat does it on its own in a transform
 	// function. For filebeat, see: https://github.com/elastic/beats/blob/main/x-pack/filebeat/cmd/agent.go
+	inputTypePrefix, inputTypeSuffix, inputTypeHasSlash := strings.Cut(inputType, "/")
 	result := make([]receiverInput, len(inputs))
 	for i, input := range inputs {
-		// If inputType contains /metrics, use modules to create inputs
-		if strings.Contains(inputType, "/metrics") {
-			input["module"] = strings.TrimSuffix(inputType, "/metrics")
-		} else if _, ok := input["type"]; !ok {
-			input["type"] = inputType
+		switch {
+		case inputTypeHasSlash && inputTypeSuffix == "metrics":
+			// metricbeat: "system/metrics" → "module: system" per https://www.elastic.co/docs/reference/beats/metricbeat/configuration-metricbeat
+			input["module"] = inputTypePrefix
+		case inputTypeHasSlash && inputTypePrefix == "audit":
+			// auditbeat: "audit/auditd" → "module: auditd" per https://www.elastic.co/docs/reference/beats/auditbeat/configuration-auditbeat
+			if _, ok := input["module"]; !ok {
+				input["module"] = inputTypeSuffix
+			}
+		case inputTypeHasSlash && inputTypePrefix == "synthetics":
+			// heartbeat: "synthetics/http" → "type: http" per https://www.elastic.co/docs/reference/beats/heartbeat/configuration-heartbeat-options
+			if _, ok := input["type"]; !ok {
+				input["type"] = inputTypeSuffix
+			}
+		default:
+			if _, ok := input["type"]; !ok {
+				input["type"] = inputType
+			}
 		}
 
 		var protoStreamID string
