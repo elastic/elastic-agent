@@ -445,7 +445,7 @@ sending_queue:
   batch:
     flush_timeout: 1s
     max_size: 50
-    min_size: 2050
+    min_size: 50
     sizer: items
   block_on_overflow: true
   enabled: true
