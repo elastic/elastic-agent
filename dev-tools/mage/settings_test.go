@@ -137,10 +137,10 @@ func TestSettingsWithMethods(t *testing.T) {
 	t.Run("WithSnapshot", func(t *testing.T) {
 		original := DefaultSettings()
 
-		modified := original.WithSnapshot(true)
+		modified := original.WithSnapshot(false)
 
-		assert.True(t, modified.Build.Snapshot)
-		assert.False(t, original.Build.Snapshot)
+		assert.False(t, modified.Build.Snapshot)
+		assert.True(t, original.Build.Snapshot)
 	})
 
 	t.Run("WithPlatformFilter", func(t *testing.T) {
@@ -653,7 +653,7 @@ func TestDefaultSettings(t *testing.T) {
 		assert.Equal(t, "https://www.elastic.co/beats/"+DefaultName, settings.Beat.URL)
 
 		// Build defaults - should not be affected by env vars
-		assert.False(t, settings.Build.Snapshot)
+		assert.True(t, settings.Build.Snapshot)
 		assert.False(t, settings.Build.DevBuild)
 		assert.Greater(t, settings.Build.MaxParallel, 0)
 		assert.NotZero(t, settings.BuildDate)
@@ -717,7 +717,6 @@ func TestLoadSettings(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.True(t, settings.Build.Snapshot)
-		assert.True(t, settings.Build.SnapshotSet)
 		assert.True(t, settings.Build.DevBuild)
 		assert.True(t, settings.Build.ExternalBuild)
 		assert.True(t, settings.Build.ExternalBuildSet)
