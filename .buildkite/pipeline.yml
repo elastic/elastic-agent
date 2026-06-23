@@ -380,8 +380,6 @@ steps:
         - .buildkite/scripts/**
         - .buildkite/hooks/**
 
-  # NOTE: we won't run automatically for merge commits but on schedules and manually,
-  # as they are not relevant for pull requests and we want to avoid running them twice for the same pull request
   # Trigger for branches
   - label: "Triggering Extended tests for branches"
     if: build.pull_request.id == null && build.source != "schedule"
