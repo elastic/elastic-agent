@@ -25,7 +25,7 @@ require (
 	github.com/elastic/fleet-server/pkg/api v0.0.0-20260515154942-99dc973fd52e
 	github.com/elastic/go-elasticsearch/v8 v8.19.6
 	github.com/elastic/go-licenser v0.4.2
-	github.com/elastic/go-sysinfo v1.15.4
+	github.com/elastic/go-sysinfo v1.15.5
 	github.com/elastic/go-ucfg v0.9.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603
