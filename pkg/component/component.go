@@ -38,16 +38,15 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default              string            `yaml:"default" config:"default" json:"default"`
-	Auditbeat            BeatRuntimeConfig `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
-	Filebeat             BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Heartbeat            BeatRuntimeConfig `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
-	Metricbeat           BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
-	Osquerybeat          BeatRuntimeConfig `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
-	Packetbeat           BeatRuntimeConfig `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
-	DynamicInputs        string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
-	SharedReceiverQueues bool              `yaml:"shared_receiver_queues" config:"shared_receiver_queues"`
-	Output               map[string]string `yaml:"output" config:"output" json:"output"`
+	Default       string            `yaml:"default" config:"default" json:"default"`
+	Auditbeat     BeatRuntimeConfig `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
+	Filebeat      BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Heartbeat     BeatRuntimeConfig `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
+	Metricbeat    BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	Osquerybeat   BeatRuntimeConfig `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
+	Packetbeat    BeatRuntimeConfig `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
+	DynamicInputs string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	Output        map[string]string `yaml:"output" config:"output" json:"output"`
 }
 
 type BeatRuntimeConfig struct {
