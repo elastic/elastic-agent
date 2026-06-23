@@ -12,13 +12,8 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
-<<<<<<< HEAD
-	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260622202735-ab38d70d120b
-=======
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260622140928-a16802447057
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260622202735-ab38d70d120b
 	github.com/elastic/cloud-on-k8s/v3 v3.4.0
 	github.com/elastic/elastic-agent-autodiscover v0.10.3-0.20260423154939-e990715f9426
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
@@ -31,24 +26,14 @@ require (
 	github.com/elastic/go-sysinfo v1.15.4
 	github.com/elastic/go-ucfg v0.9.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
-<<<<<<< HEAD
-	github.com/fatih/color v1.18.0
-=======
-	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603
 	github.com/fatih/color v1.19.0
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/gofrs/flock v0.13.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/google/go-cmp v0.7.0
-<<<<<<< HEAD
-	github.com/google/go-containerregistry v0.21.4
-	github.com/google/pprof v0.0.0-20260302011040-a15ffb7f9dcc
-=======
 	github.com/google/go-containerregistry v0.21.6
 	github.com/google/pprof v0.0.0-20260604005048-7023385849c0
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.24.0
 	github.com/jedib0t/go-pretty/v6 v6.8.1
@@ -67,13 +52,7 @@ require (
 	github.com/schollz/progressbar/v3 v3.13.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-<<<<<<< HEAD
-	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639
-=======
-	github.com/testcontainers/testcontainers-go v0.42.0
-	github.com/testcontainers/testcontainers-go/modules/compose v0.42.0
 	github.com/winlabs/gowin32 v0.0.0-20260308155911-6a6dc53430f0
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.12
 	go.elastic.co/apm/module/apmgrpc/v2 v2.7.12
 	go.elastic.co/apm/v2 v2.7.12
@@ -102,29 +81,16 @@ require (
 	golang.org/x/tools v0.46.0
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
-<<<<<<< HEAD
-	gopkg.in/ini.v1 v1.67.1
-=======
 	gopkg.in/ini.v1 v1.67.3
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/gotestsum v1.13.0
 	helm.sh/helm/v3 v3.21.0
-<<<<<<< HEAD
 	k8s.io/api v0.35.4
 	k8s.io/apimachinery v0.35.4
 	k8s.io/cli-runtime v0.35.1
 	k8s.io/client-go v0.35.4
-	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
-=======
-	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9
-	k8s.io/api v0.35.3
-	k8s.io/apimachinery v0.35.3
-	k8s.io/cli-runtime v0.35.2
-	k8s.io/client-go v0.35.3
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	sigs.k8s.io/e2e-framework v0.7.0
 	sigs.k8s.io/kustomize/api v0.20.1
 	sigs.k8s.io/kustomize/kyaml v0.20.1
@@ -296,15 +262,8 @@ require (
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v1.0.0-rc.4 // indirect
-<<<<<<< HEAD
-	github.com/containerd/stargz-snapshotter/estargz v0.18.2 // indirect
 	github.com/coreos/go-oidc/v3 v3.18.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.7.0 // indirect
-=======
-	github.com/containerd/ttrpc v1.2.8 // indirect
-	github.com/containerd/typeurl/v2 v2.2.3 // indirect
-	github.com/cpuguy83/dockercfg v0.3.2 // indirect
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -318,14 +277,6 @@ require (
 	github.com/digitalocean/godo v1.178.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
-<<<<<<< HEAD
-	github.com/docker/cli v29.4.0+incompatible // indirect
-=======
-	github.com/docker/buildx v0.33.0 // indirect
-	github.com/docker/cli v29.4.3+incompatible // indirect
-	github.com/docker/compose/v5 v5.1.2 // indirect
-	github.com/docker/docker v28.5.2+incompatible // indirect
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	github.com/docker/docker-credential-helpers v0.9.5 // indirect
 	github.com/docker/go-connections v0.7.0 // indirect
 	github.com/dop251/goja v0.0.0-20250630131328-58d95d85e994 // indirect
@@ -675,7 +626,6 @@ require (
 	github.com/tilinna/clock v1.1.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
-<<<<<<< HEAD
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80 // indirect
 	github.com/twmb/franz-go v1.21.2 // indirect
 	github.com/twmb/franz-go/pkg/kadm v1.18.0 // indirect
@@ -685,19 +635,10 @@ require (
 	github.com/twmb/murmur3 v1.1.8 // indirect
 	github.com/ua-parser/uap-go v0.0.0-20251207011819-db9adb27a0b8 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
-	github.com/urfave/cli/v2 v2.27.4 // indirect
+	github.com/urfave/cli/v2 v2.27.7 // indirect
 	github.com/valyala/fastjson v1.6.10 // indirect
-	github.com/vbatts/tar-split v0.12.2 // indirect
 	github.com/vmware/govmomi v0.52.0 // indirect
 	github.com/vultr/govultr/v3 v3.28.1 // indirect
-=======
-	github.com/tonistiigi/dchapes-mode v0.0.0-20250318174251-73d941a28323 // indirect
-	github.com/tonistiigi/fsutil v0.0.0-20251211185533-a2aa163d723f // indirect
-	github.com/tonistiigi/go-csvvalue v0.0.0-20240814133006-030d3b2625d0 // indirect
-	github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea // indirect
-	github.com/tonistiigi/vt100 v0.0.0-20240514184818-90bafcd6abab // indirect
-	github.com/urfave/cli/v2 v2.27.7 // indirect
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.2.0 // indirect
@@ -705,12 +646,8 @@ require (
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-<<<<<<< HEAD
-	github.com/yuin/goldmark v1.7.13 // indirect
-	github.com/yuin/gopher-lua v1.1.1 // indirect
-=======
 	github.com/yuin/goldmark v1.8.2 // indirect
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
@@ -836,14 +773,9 @@ require (
 	k8s.io/component-base v0.35.4 // indirect
 	k8s.io/kube-openapi v0.0.0-20260330154417-16be699c7b31 // indirect
 	k8s.io/kubectl v0.35.1 // indirect
-<<<<<<< HEAD
 	k8s.io/kubelet v0.35.4 // indirect
 	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5 // indirect
-	kernel.org/pub/linux/libs/security/libcap/psx v1.2.70 // indirect
-=======
-	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect
 	kernel.org/pub/linux/libs/security/libcap/psx v1.2.78 // indirect
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	oras.land/oras-go/v2 v2.6.0 // indirect
 	sigs.k8s.io/controller-runtime v0.23.3 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect

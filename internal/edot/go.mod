@@ -77,15 +77,7 @@ require (
 	github.com/go-openapi/swag/stringutils v0.25.5 // indirect
 	github.com/go-openapi/swag/typeutils v0.25.5 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
-<<<<<<< HEAD
-	github.com/google/pprof v0.0.0-20260302011040-a15ffb7f9dcc // indirect
-=======
-	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20260604005048-7023385849c0 // indirect
-	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
-	github.com/gosnmp/gosnmp v1.43.2 // indirect
-	github.com/grobie/gomemcache v0.0.0-20230213081705-239240bbc445 // indirect
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	github.com/huandu/go-clone v1.7.3 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
@@ -695,11 +687,7 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-<<<<<<< HEAD
-	gopkg.in/ini.v1 v1.67.1 // indirect
-=======
 	gopkg.in/ini.v1 v1.67.3 // indirect
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9 // indirect
@@ -709,13 +697,8 @@ require (
 	k8s.io/kube-openapi v0.0.0-20260330154417-16be699c7b31 // indirect
 	k8s.io/kubelet v0.35.4 // indirect
 	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5 // indirect
-<<<<<<< HEAD
-	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70 // indirect
-	kernel.org/pub/linux/libs/security/libcap/psx v1.2.70 // indirect
-=======
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78 // indirect
 	kernel.org/pub/linux/libs/security/libcap/psx v1.2.78 // indirect
->>>>>>> b00e075b3 ([deps] Bump miscellaneous non-Dependabot dependencies (#15067))
 	sigs.k8s.io/controller-runtime v0.23.3 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
