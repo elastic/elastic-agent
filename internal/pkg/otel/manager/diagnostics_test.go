@@ -6,12 +6,12 @@ package manager
 
 import (
 	"encoding/json"
-	"fmt"
 	"runtime"
 	"testing"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -41,21 +41,17 @@ func TestPerformComponentDiagnostics(t *testing.T) {
 	}
 
 	expectedDiags := []componentruntime.ComponentDiagnostic{
-		{
-			Component: filebeatComp,
-		},
-		{
-			Component: otherComp,
-		},
+		{Component: filebeatComp},
+		{Component: otherComp},
 	}
 
 	diags, err := m.PerformComponentDiagnostics(t.Context(), nil)
 	require.NoError(t, err)
+	require.Len(t, diags, len(expectedDiags))
 	for i, d := range diags {
 		assert.Equal(t, expectedDiags[i].Component.ID, d.Component.ID)
-		// we should have errors set about not being able to connect to diagnostics extension
-		require.NotNil(t, d.Err)
-		assert.ErrorContains(t, d.Err, fmt.Sprintf("failed to get diagnostics for %s", d.Component.ID))
+		assert.Nil(t, d.Err)
+		assert.Empty(t, d.Results)
 	}
 }
 
@@ -122,10 +118,13 @@ func TestBeatMetrics(t *testing.T) {
 	}
 	setTemporaryAgentPath(t)
 	logger, obs := loggertest.New("test")
-	compID := "filebeat-comp-1"
 
-	filebeatComp := testComponent(compID)
+	filebeatComp := testComponent("filebeat-comp-1")
 	filebeatComp.InputSpec.Spec.Command.Args = []string{"filebeat"}
+
+	// Beat receivers register hooks under the OTel receiver instance ID, which has the form
+	// "<receiverType>/_agent-component/<comp.ID>" (see translate.OtelNamePrefix).
+	receiverName := "filebeatreceiver/" + translate.OtelNamePrefix + filebeatComp.ID
 
 	m := &OTelManager{
 		managerLogger: logger,
@@ -137,14 +136,14 @@ func TestBeatMetrics(t *testing.T) {
 	expectedResponse := elasticdiagnostics.Response{
 		ComponentDiagnostics: []*proto.ActionDiagnosticUnitResult{
 			{
-				Name:        compID,
+				Name:        receiverName,
 				Filename:    "beat_metrics.json",
 				ContentType: "application/json",
 				Description: "Metrics from the default monitoring namespace and expvar.",
 				Content:     expectedMetricData,
 			},
 			{
-				Name:        compID,
+				Name:        receiverName,
 				Filename:    "input_metrics.json",
 				ContentType: "application/json",
 				Description: "Metrics from active inputs.",
@@ -161,19 +160,19 @@ func TestBeatMetrics(t *testing.T) {
 	})
 
 	diags, err := m.PerformComponentDiagnostics(t.Context(), nil)
-	require.NoError(t, err)
 	assert.Len(t, obs.All(), 0)
+	require.NoError(t, err)
 	require.Len(t, diags, 1)
 	require.True(t, called)
 
-	diag := diags[0]
-	assert.Equal(t, filebeatComp, diag.Component)
-	// two metrics diagnostics and one filebeat registry
-	require.Len(t, diag.Results, 2, "expected 2 diagnostics, got error: %w", diag.Err)
+	compDiag := diags[0]
+	assert.Equal(t, filebeatComp, compDiag.Component)
+	require.Nil(t, compDiag.Err)
+	require.Len(t, compDiag.Results, 2)
 
 	t.Run("stats beat metrics", func(t *testing.T) {
-		beatMetrics := diag.Results[0]
-		assert.Equal(t, compID, beatMetrics.Name)
+		beatMetrics := compDiag.Results[0]
+		assert.Equal(t, receiverName, beatMetrics.Name)
 		assert.Equal(t, "Metrics from the default monitoring namespace and expvar.", beatMetrics.Description)
 		assert.Equal(t, "beat_metrics.json", beatMetrics.Filename)
 		assert.Equal(t, "application/json", beatMetrics.ContentType)
@@ -181,8 +180,8 @@ func TestBeatMetrics(t *testing.T) {
 	})
 
 	t.Run("input beat metrics", func(t *testing.T) {
-		inputMetrics := diag.Results[1]
-		assert.Equal(t, compID, inputMetrics.Name)
+		inputMetrics := compDiag.Results[1]
+		assert.Equal(t, receiverName, inputMetrics.Name)
 		assert.Equal(t, "Metrics from active inputs.", inputMetrics.Description)
 		assert.Equal(t, "input_metrics.json", inputMetrics.Filename)
 		assert.Equal(t, "application/json", inputMetrics.ContentType)

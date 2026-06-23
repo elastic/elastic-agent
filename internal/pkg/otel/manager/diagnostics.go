@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -37,38 +38,39 @@ func (m *OTelManager) PerformDiagnostics(ctx context.Context, req ...runtime.Com
 				})
 			}
 		}
-		return diagnostics
-	}
-
-	// create a map of unit by component and unit id, this is used to filter out units that
-	// do not exist in the manager
-	unitByID := make(map[string]map[string]*component.Unit)
-	for _, r := range req {
-		if unitByID[r.Component.ID] == nil {
-			unitByID[r.Component.ID] = make(map[string]*component.Unit)
+	} else {
+		// create a map of unit by component and unit id, this is used to filter out units that
+		// do not exist in the manager
+		unitByID := make(map[string]map[string]*component.Unit)
+		for _, r := range req {
+			if unitByID[r.Component.ID] == nil {
+				unitByID[r.Component.ID] = make(map[string]*component.Unit)
+			}
+			unitByID[r.Component.ID][r.Unit.ID] = &r.Unit
 		}
-		unitByID[r.Component.ID][r.Unit.ID] = &r.Unit
-	}
 
-	// create empty diagnostics for units that exist in the manager
-	for _, existingComp := range currentComponents {
-		inputComp, ok := unitByID[existingComp.ID]
-		if !ok {
-			m.managerLogger.Warnf("requested diagnostics for component %s, but it does not exist in the manager", existingComp.ID)
-			continue
-		}
-		for _, unit := range existingComp.Units {
-			if _, ok := inputComp[unit.ID]; ok {
-				diagnostics = append(diagnostics, runtime.ComponentUnitDiagnostic{
-					Component: existingComp,
-					Unit:      unit,
-				})
-			} else {
-				m.managerLogger.Warnf("requested diagnostics for unit %s, but it does not exist in the manager", unit.ID)
+		// create empty diagnostics for units that exist in the manager
+		for _, existingComp := range currentComponents {
+			inputComp, ok := unitByID[existingComp.ID]
+			if !ok {
+				m.managerLogger.Warnf("requested diagnostics for component %s, but it does not exist in the manager", existingComp.ID)
+				continue
+			}
+			for _, unit := range existingComp.Units {
+				if _, ok := inputComp[unit.ID]; ok {
+					diagnostics = append(diagnostics, runtime.ComponentUnitDiagnostic{
+						Component: existingComp,
+						Unit:      unit,
+					})
+				} else {
+					m.managerLogger.Warnf("requested diagnostics for unit %s, but it does not exist in the manager", unit.ID)
+				}
 			}
 		}
 	}
 
+	// Beat receivers register diagnostic hooks at the component level (one receiver per component),
+	// so EDOT results are fetched and assigned in PerformComponentDiagnostics, not here.
 	return diagnostics
 }
 
@@ -93,7 +95,6 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		compByID[comp.ID] = comp
 	}
 
-	// create empty diagnostics for components that exist in the manager
 	for _, existingComp := range currentComponents {
 		if inputComp, ok := compByID[existingComp.ID]; ok {
 			diagnostics = append(diagnostics, runtime.ComponentDiagnostic{
@@ -105,28 +106,30 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	}
 
 	extDiagnostics, err := otel.PerformDiagnosticsExt(ctx, false)
-
-	// We're not running the EDOT if:
-	//  1. Either the socket doesn't exist
-	//	2. It is refusing the connections.
-	// Return error for any other scenario.
 	if err != nil {
 		m.managerLogger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
 		if !errors.Is(err, syscall.ENOENT) && !errors.Is(err, syscall.ECONNREFUSED) {
-			return nil, fmt.Errorf("error fetching otel diagnostics: %w", err)
-		}
-	}
-
-	for idx, diag := range diagnostics {
-		found := false
-		for _, extDiag := range extDiagnostics.ComponentDiagnostics {
-			if strings.Contains(extDiag.Name, diag.Component.ID) {
-				found = true
-				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
+			for idx := range diagnostics {
+				diagnostics[idx].Err = fmt.Errorf("error fetching otel diagnostics: %w", err)
 			}
 		}
-		if !found {
-			diagnostics[idx].Err = fmt.Errorf("failed to get diagnostics for %s", diag.Component.ID)
+		return diagnostics, nil
+	}
+
+	// Beat receivers register hooks under the OTel receiver instance ID, which has the form
+	// "<receiverType>/_agent-component/<comp.ID>" (see translate.OtelNamePrefix).
+	// Use HasSuffix on the name suffix "_agent-component/<comp.ID>" for an exact component match
+	// that avoids false positives from substring overlap between component IDs.
+	compSuffix := make(map[string]int) // "_agent-component/<comp.ID>" → index in diagnostics
+	for idx, diag := range diagnostics {
+		compSuffix[translate.OtelNamePrefix+diag.Component.ID] = idx
+	}
+	for _, extDiag := range extDiagnostics.ComponentDiagnostics {
+		for suffix, idx := range compSuffix {
+			if strings.HasSuffix(extDiag.Name, suffix) {
+				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
+				break
+			}
 		}
 	}
 

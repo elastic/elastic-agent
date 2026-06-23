@@ -423,6 +423,79 @@ type zippedItem struct {
 	IsDir bool
 }
 
+func TestZipArchiveUnitDirSkip(t *testing.T) {
+	compID := "my-component"
+	compDiags := []client.DiagnosticComponentResult{{ComponentID: compID}}
+
+	tests := []struct {
+		name          string
+		unitDiags     []client.DiagnosticUnitResult
+		expectedPaths []string
+	}{
+		{
+			name: "unit with no results and no error is skipped",
+			unitDiags: []client.DiagnosticUnitResult{
+				{ComponentID: compID, UnitID: compID + "-input"},
+			},
+			expectedPaths: []string{
+				"components/",
+				"components/my-component/",
+			},
+		},
+		{
+			name: "unit with error creates dir and error.txt",
+			unitDiags: []client.DiagnosticUnitResult{
+				{ComponentID: compID, UnitID: compID + "-input", Err: errors.New("something failed")},
+			},
+			expectedPaths: []string{
+				"components/",
+				"components/my-component/",
+				"components/my-component/input/",
+				"components/my-component/input/error.txt",
+			},
+		},
+		{
+			name: "unit with results creates dir and file",
+			unitDiags: []client.DiagnosticUnitResult{
+				{
+					ComponentID: compID,
+					UnitID:      compID + "-input",
+					Results: []client.DiagnosticFileResult{
+						{Filename: "beat_metrics.json", ContentType: "application/json", Content: []byte(`{}`)},
+					},
+				},
+			},
+			expectedPaths: []string{
+				"components/",
+				"components/my-component/",
+				"components/my-component/input/",
+				"components/my-component/input/beat_metrics.json",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			topPath := t.TempDir()
+			// zipLogs opens topPath/data; create it so ZipArchive doesn't fail
+			require.NoError(t, os.MkdirAll(filepath.Join(topPath, "data"), 0o700))
+
+			buf := new(bytes.Buffer)
+			err := ZipArchive(io.Discard, buf, topPath, nil, tc.unitDiags, compDiags, true)
+			require.NoError(t, err)
+
+			r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+			require.NoError(t, err)
+
+			var paths []string
+			for _, f := range r.File {
+				paths = append(paths, f.Name)
+			}
+			assert.Equal(t, tc.expectedPaths, paths)
+		})
+	}
+}
+
 func TestZipLogs(t *testing.T) {
 	topPath := t.TempDir()
 	dir := filepath.Join(paths.HomeFrom(topPath), "logs", "sub-dir")
