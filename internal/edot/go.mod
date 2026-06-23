@@ -7,6 +7,7 @@ replace github.com/elastic/elastic-agent => ../../
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260622202735-ab38d70d120b
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-libs v0.43.1
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.47.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.47.0
@@ -14,6 +15,21 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.47.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.47.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.47.0
+=======
+	github.com/elastic/elastic-agent-libs v0.44.0
+	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.59.0
+	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.59.0
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.59.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.59.0
+	github.com/elastic/opentelemetry-collector-components/extension/awscredentialsproviderextension v0.59.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.59.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.59.0
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.59.0
+	github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.59.0
+	github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver v0.1.0
+	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.59.0
+>>>>>>> 3c5403c03 (build(deps): bump the go-dependencies group across 1 directory with 5 updates (#15113))
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.153.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.153.0
@@ -302,7 +318,7 @@ require (
 	github.com/eclipse/paho.mqtt.golang v1.5.1 // indirect
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
-	github.com/elastic/elastic-agent-autodiscover v0.10.3-0.20260423154939-e990715f9426 // indirect
+	github.com/elastic/elastic-agent-autodiscover v0.10.3 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.18.1 // indirect
 	github.com/elastic/elastic-agent-system-metrics v0.14.4 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
@@ -316,7 +332,7 @@ require (
 	github.com/elastic/go-seccomp-bpf v1.6.0 // indirect
 	github.com/elastic/go-sfdc v0.0.0-20260504130806-a46e22d049d9 // indirect
 	github.com/elastic/go-structform v0.0.12 // indirect
-	github.com/elastic/go-sysinfo v1.15.4 // indirect
+	github.com/elastic/go-sysinfo v1.15.5 // indirect
 	github.com/elastic/go-ucfg v0.9.1 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
