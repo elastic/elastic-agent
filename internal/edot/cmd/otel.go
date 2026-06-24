@@ -20,10 +20,12 @@ import (
 	"github.com/elastic/elastic-agent-libs/service"
 
 	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+=======
+>>>>>>> 7f1194a79 (Don't inject elasticdiagnostics extension in plain otel mode (#15105))
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -139,11 +141,7 @@ type edotSettings struct {
 
 func prepareCollectorSettings(configFiles []string, supervised bool, supervisedLoggingLevel string, componentsFn func() (otelcol.Factories, error)) (edotSettings, error) {
 	var settings edotSettings
-	conf := map[string]any{
-		"endpoint": paths.DiagnosticsExtensionSocket(),
-	}
 	baseOpts := []edotOtelCol.SettingOpt{
-		edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
 		edotOtelCol.WithComponents(componentsFn),
 	}
 	if supervised {
