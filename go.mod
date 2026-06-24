@@ -238,10 +238,6 @@ require (
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-<<<<<<< HEAD
-=======
-	github.com/rs/cors v1.11.1 // indirect
->>>>>>> 9c0c35196 (Bump github.com/schollz/progressbar/v3 v3.13.1 -> v3.19.0 (#15120))
 	github.com/rubenv/sql-migrate v1.8.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
