@@ -440,6 +440,7 @@ func TestZipArchiveUnitDirSkip(t *testing.T) {
 			expectedPaths: []string{
 				"components/",
 				"components/my-component/",
+				"logs/",
 			},
 		},
 		{
@@ -452,6 +453,7 @@ func TestZipArchiveUnitDirSkip(t *testing.T) {
 				"components/my-component/",
 				"components/my-component/input/",
 				"components/my-component/input/error.txt",
+				"logs/",
 			},
 		},
 		{
@@ -470,6 +472,7 @@ func TestZipArchiveUnitDirSkip(t *testing.T) {
 				"components/my-component/",
 				"components/my-component/input/",
 				"components/my-component/input/beat_metrics.json",
+				"logs/",
 			},
 		},
 	}
@@ -487,6 +490,7 @@ func TestZipArchiveUnitDirSkip(t *testing.T) {
 			r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
 			require.NoError(t, err)
 
+			// One component per case, so the zip entry order is deterministic and safe to assert.
 			var paths []string
 			for _, f := range r.File {
 				paths = append(paths, f.Name)

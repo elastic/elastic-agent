@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"strings"
 	"syscall"
 
@@ -69,8 +70,9 @@ func (m *OTelManager) PerformDiagnostics(ctx context.Context, req ...runtime.Com
 		}
 	}
 
-	// Beat receivers register diagnostic hooks at the component level (one receiver per component),
-	// so EDOT results are fetched and assigned in PerformComponentDiagnostics, not here.
+	// Beat receivers register diagnostic hooks per input stream (one receiver per input/stream),
+	// but the results are grouped at the component level in the diagnostics archive. So EDOT
+	// results are fetched and assigned in PerformComponentDiagnostics, not here.
 	return diagnostics
 }
 
@@ -107,8 +109,16 @@ func (m *OTelManager) PerformComponentDiagnostics(
 
 	extDiagnostics, err := otel.PerformDiagnosticsExt(ctx, false)
 	if err != nil {
-		m.managerLogger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
-		if !errors.Is(err, syscall.ENOENT) && !errors.Is(err, syscall.ECONNREFUSED) {
+		// These three errors mean EDOT is not running, which is expected.
+		// fs.ErrNotExist: the socket file is missing (POSIX ENOENT / Windows ERROR_FILE_NOT_FOUND).
+		// syscall.ECONNREFUSED: the socket file exists but nothing is listening (EDOT crashed or mid-restart).
+		// context.DeadlineExceeded: a Windows pipe-busy dial timed out. This is defensive: production does not
+		// set a dial deadline, so this only fires if the caller passes a deadline.
+		// Any other error is unexpected, so surface it on each component so it ends up in the diagnostics archive.
+		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, context.DeadlineExceeded) {
+			m.managerLogger.Debugf("EDOT not reachable, no diagnostics available: %v", err)
+		} else {
+			m.managerLogger.Warnf("failed to fetch diagnostics from EDOT: %v", err)
 			for idx := range diagnostics {
 				diagnostics[idx].Err = fmt.Errorf("error fetching otel diagnostics: %w", err)
 			}
@@ -117,16 +127,24 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	}
 
 	// Beat receivers register hooks under the OTel receiver instance ID, which has the form
-	// "<receiverType>/_agent-component/<comp.ID>" (see translate.OtelNamePrefix).
-	// Use HasSuffix on the name suffix "_agent-component/<comp.ID>" for an exact component match
-	// that avoids false positives from substring overlap between component IDs.
-	compSuffix := make(map[string]int) // "_agent-component/<comp.ID>" → index in diagnostics
+	// "<receiverType>/_agent-component/<comp.ID>/<streamID>". The "<receiverType>/" prefix is the
+	// string representation produced by otelcomponent.ID.String(); the "_agent-component/" segment
+	// is translate.OtelNamePrefix.
+	// Match on the segment "_agent-component/<comp.ID>/" to avoid false positives from
+	// component IDs that are prefixes of other component IDs.
+	compSegment := make(map[string]int) // "_agent-component/<comp.ID>/" -> index in diagnostics
 	for idx, diag := range diagnostics {
-		compSuffix[translate.OtelNamePrefix+diag.Component.ID] = idx
+		compSegment[translate.OtelNamePrefix+diag.Component.ID+"/"] = idx
 	}
 	for _, extDiag := range extDiagnostics.ComponentDiagnostics {
-		for suffix, idx := range compSuffix {
-			if strings.HasSuffix(extDiag.Name, suffix) {
+		// For standard component IDs the "_agent-component/<comp.ID>/" framing is unambiguous:
+		// such IDs are built by joining parts with "-", so "/" only appears as the prefix and
+		// suffix delimiter and one ID cannot be a substring of another in this framing. We assume
+		// this holds, so at most one segment matches a given name and the map iteration order does
+		// not affect correctness. A policy input id that itself contains "/" could break the
+		// assumption, but normal IDs do not.
+		for segment, idx := range compSegment {
+			if strings.Contains(extDiag.Name, segment) {
 				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
 				break
 			}
