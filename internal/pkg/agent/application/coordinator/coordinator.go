@@ -1721,8 +1721,9 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 				upgradeMarker.Details != nil &&
 				upgradeMarker.Details.State == details.StateCompleted {
 				log, dataDir := c.logger, paths.Data()
+				completedVersion := upgradeMarker.Details.TargetVersion
 				go func() {
-					if err := upgrade.CleanMarker(log, dataDir); err != nil {
+					if err := upgrade.CleanMarkerIfCompleted(log, dataDir, completedVersion); err != nil {
 						log.Warnw("failed to clean upgrade marker", "error.message", err)
 					}
 				}()
@@ -1733,8 +1734,9 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 	case <-c.managerChans.upgradeMarkerCleanCh:
 		if ctx.Err() == nil && c.state.UpgradeDetails != nil && c.state.UpgradeDetails.State == details.StateCompleted {
 			log, dataDir := c.logger, paths.Data()
+			completedVersion := c.state.UpgradeDetails.TargetVersion
 			go func() {
-				if err := upgrade.CleanMarker(log, dataDir); err != nil {
+				if err := upgrade.CleanMarkerIfCompleted(log, dataDir, completedVersion); err != nil {
 					log.Warnw("failed to clean upgrade marker after Fleet confirmation", "error.message", err)
 				}
 			}()

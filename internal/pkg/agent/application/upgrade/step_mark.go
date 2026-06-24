@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -23,6 +24,13 @@ import (
 )
 
 const markerFilename = ".update-marker"
+
+// markerMu guards marker reads and writes in this package. Its purpose is to
+// prevent a concurrent cleanup from deleting a marker that a new upgrade just
+// wrote.
+//
+// CleanMarker does not hold this lock; see its doc for why that is safe.
+var markerMu sync.RWMutex
 
 // UpdateMarker is a marker holding necessary information about ongoing upgrade.
 type UpdateMarker struct {
@@ -164,7 +172,12 @@ func writeUpgradeMarkerProvider() writeUpgradeMarkerFunc {
 
 		markerPath := markerFilePath(dataDirPath)
 		log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash)
-		if err := writeMarkerFile(markerPath, markerBytes, true); err != nil {
+		err = func() error {
+			markerMu.Lock()
+			defer markerMu.Unlock()
+			return writeMarkerFile(markerPath, markerBytes, true)
+		}()
+		if err != nil {
 			return goerrors.Join(err, errors.New(errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath)))
 		}
 
@@ -227,7 +240,15 @@ func MarkUpgradeFailed(dataDirPath string, det *details.Details, cause error) er
 	return nil
 }
 
-// CleanMarker removes a marker from disk.
+// CleanMarker removes a marker from disk. It does not hold markerMu, so callers
+// must ensure no concurrent upgrade can write a marker at the same time.
+//
+// The two call-sites are safe for different reasons:
+//
+//   - coordinator process: a process-wide guard prevents a second upgrade from
+//     starting while the first is still in cleanup, so no concurrent writer exists.
+//   - upgrade-watcher process: markerMu is process-local and cannot guard
+//     cross-process writes anyway; the watcher is the sole writer in that process.
 func CleanMarker(log *logger.Logger, dataDirPath string) error {
 	markerFile := markerFilePath(dataDirPath)
 	log.Infow("Removing marker file", "file.path", markerFile)
@@ -241,6 +262,69 @@ func CleanMarker(log *logger.Logger, dataDirPath string) error {
 	}
 
 	return nil
+}
+
+// CleanMarkerIfCompleted removes the marker only when it still describes the
+// expected upgrade and that upgrade has reached a terminal state. The whole
+// read-verify-delete sequence runs under the marker write lock so it cannot
+// race with a new upgrade writing a fresh marker. If the marker is missing,
+// points at a different version, or is not in a terminal state, it is left
+// untouched and the function returns nil.
+func CleanMarkerIfCompleted(log *logger.Logger, dataDirPath string, expectedVersion string) error {
+	markerMu.Lock()
+	defer markerMu.Unlock()
+
+	markerFile := markerFilePath(dataDirPath)
+	marker, err := loadMarkerLocked(markerFile)
+	if err != nil {
+		return err
+	}
+
+	if marker == nil || !versionsMatch(log, marker.Version, expectedVersion) || !IsTerminalState(marker) {
+		return nil
+	}
+
+	log.Infow("Removing marker file", "file.path", markerFile)
+	if err := removeMarkerFile(markerFile); err != nil && !goerrors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+
+	return nil
+}
+
+// versionsMatch reports whether the marker version and the expected version
+// describe the same release.
+//
+// In production both strings always come from the same source expression, so
+// they are byte-identical and always match. The parsed-semver comparison is
+// kept as defense for future callers that might pass differently-formatted
+// strings; if parsing fails for either string we fall back to raw equality.
+//
+// SNAPSHOT suffixes are part of the comparison and must match. Build metadata
+// is handled in two ways: generic metadata (e.g. +abc123) is ignored, so
+// differences there do not cause a mismatch; independent-release metadata (the
+// +buildNNNNNNNNNNNN form) is compared, so two strings that differ only in
+// that field compare as not-equal.
+//
+// A mismatch is logged at info level: it is a normal, benign condition (a
+// leftover marker from a prior upgrade pointing at a different version), not an
+// error, so the marker is simply left in place.
+func versionsMatch(log *logger.Logger, markerVersion, expectedVersion string) bool {
+	markerParsed, markerErr := version.ParseVersion(markerVersion)
+	expectedParsed, expectedErr := version.ParseVersion(expectedVersion)
+
+	var match bool
+	if markerErr != nil || expectedErr != nil {
+		match = markerVersion == expectedVersion
+	} else {
+		match = markerParsed.Equal(*expectedParsed)
+	}
+
+	if !match {
+		log.Infof("upgrade marker version %q does not match expected completed version %q; leaving marker in place",
+			markerVersion, expectedVersion)
+	}
+	return match
 }
 
 // LoadMarker loads the update marker. If the file does not exist it returns nil
@@ -274,6 +358,14 @@ func TryLoadMarker(log *logger.Logger, dataDirPath string) (*UpdateMarker, error
 }
 
 func loadMarker(markerFile string) (*UpdateMarker, error) {
+	markerMu.RLock()
+	defer markerMu.RUnlock()
+	return loadMarkerLocked(markerFile)
+}
+
+// loadMarkerLocked reads and parses the marker without taking markerMu. Callers
+// must already hold markerMu (read or write).
+func loadMarkerLocked(markerFile string) (*UpdateMarker, error) {
 	markerBytes, err := readMarkerFile(markerFile)
 	if err != nil {
 		return nil, err
@@ -329,6 +421,8 @@ func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool)
 		return err
 	}
 
+	markerMu.Lock()
+	defer markerMu.Unlock()
 	return writeMarkerFile(markerFile, markerBytes, shouldFsync)
 }
 

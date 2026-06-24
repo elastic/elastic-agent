@@ -20,6 +20,9 @@ func readMarkerFile(markerFile string) ([]byte, error) {
 		// marker doesn't exist, nothing to do
 		return nil, nil
 	}
+	if err != nil {
+		return nil, err
+	}
 	return markerFileBytes, nil
 }
 
@@ -31,8 +34,8 @@ func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool) er
 
 // On non-Windows platforms, removeMarkerFile simply removes the marker file.
 // See marker_access_windows.go for behavior on Windows platforms.
-// Unlike the Windows version, this may return os.ErrNotExist; callers such as
-// CleanMarker filter that out and treat it as success.
+// Unlike the Windows version, this may return os.ErrNotExist; callers must
+// handle it (the Windows version swallows it).
 func removeMarkerFile(markerFile string) error {
 	return os.Remove(markerFile)
 }

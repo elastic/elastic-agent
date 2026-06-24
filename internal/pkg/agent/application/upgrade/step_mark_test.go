@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -239,6 +240,99 @@ func TestMarkUpgrade(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCleanMarkerIfCompleted(t *testing.T) {
+	testcases := []struct {
+		name            string
+		marker          *UpdateMarker
+		expectedVersion string
+		wantDeleted     bool
+		wantMismatchLog bool
+	}{
+		{
+			name: "version matches and terminal state - deleted",
+			marker: &UpdateMarker{
+				Version: "9.5.0",
+				Details: details.NewDetails("9.5.0", details.StateCompleted, ""),
+			},
+			expectedVersion: "9.5.0",
+			wantDeleted:     true,
+		},
+		{
+			name: "version mismatch - not deleted",
+			marker: &UpdateMarker{
+				Version: "9.5.0",
+				Details: details.NewDetails("9.5.0", details.StateCompleted, ""),
+			},
+			expectedVersion: "9.6.0",
+			wantDeleted:     false,
+			wantMismatchLog: true,
+		},
+		{
+			name: "non-terminal state - not deleted",
+			marker: &UpdateMarker{
+				Version: "9.5.0",
+				Details: details.NewDetails("9.5.0", details.StateReplacing, ""),
+			},
+			expectedVersion: "9.5.0",
+			wantDeleted:     false,
+		},
+		{
+			name: "snapshot suffix differs - not deleted",
+			marker: &UpdateMarker{
+				Version: "9.5.0-SNAPSHOT",
+				Details: details.NewDetails("9.5.0-SNAPSHOT", details.StateCompleted, ""),
+			},
+			expectedVersion: "9.5.0",
+			wantDeleted:     false,
+			wantMismatchLog: true,
+		},
+		{
+			name: "unparseable but identical - deleted via raw equality",
+			marker: &UpdateMarker{
+				Version: "not-a-version",
+				Details: details.NewDetails("not-a-version", details.StateCompleted, ""),
+			},
+			expectedVersion: "not-a-version",
+			wantDeleted:     true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			dataDir := t.TempDir()
+			log, observed := loggertest.New(t.Name())
+
+			require.NoError(t, SaveMarker(dataDir, tc.marker, false), "seed marker")
+
+			err := CleanMarkerIfCompleted(log, dataDir, tc.expectedVersion)
+			require.NoError(t, err)
+
+			if tc.wantDeleted {
+				require.NoFileExists(t, markerFilePath(dataDir))
+			} else {
+				require.FileExists(t, markerFilePath(dataDir))
+			}
+
+			mismatchLogs := observed.FilterMessageSnippet("does not match expected completed version").TakeAll()
+			if tc.wantMismatchLog {
+				require.Len(t, mismatchLogs, 1, "expected exactly one version-mismatch log entry")
+				require.Equal(t, zapcore.InfoLevel, mismatchLogs[0].Level)
+			} else {
+				require.Empty(t, mismatchLogs, "did not expect a version-mismatch log entry")
+			}
+		})
+	}
+
+	t.Run("nil marker - no error and no delete", func(t *testing.T) {
+		dataDir := t.TempDir()
+		log, _ := loggertest.New(t.Name())
+
+		err := CleanMarkerIfCompleted(log, dataDir, "9.5.0")
+		require.NoError(t, err)
+		require.NoFileExists(t, markerFilePath(dataDir))
+	})
 }
 
 func TestMarkUpgradeFailed(t *testing.T) {

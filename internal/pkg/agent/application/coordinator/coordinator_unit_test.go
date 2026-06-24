@@ -2811,7 +2811,7 @@ func TestCoordinatorCleansMarkerOnStateCompletedStandalone(t *testing.T) {
 	// Write a marker file so we can verify it gets cleaned.
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o750))
 	det := details.NewDetails("9.5.0", details.StateCompleted, "test-action-id")
-	marker := upgrade.UpdateMarker{Details: det}
+	marker := upgrade.UpdateMarker{Version: "9.5.0", Details: det}
 	require.NoError(t, upgrade.SaveMarker(paths.Data(), &marker, false))
 
 	// Send StateCompleted through the marker update channel.
@@ -2862,7 +2862,7 @@ func TestCoordinatorDoesNotCleanMarkerOnStateCompletedManaged(t *testing.T) {
 	// Write a marker file — it must survive this iteration.
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o750))
 	det := details.NewDetails("9.5.0", details.StateCompleted, "test-action-id")
-	marker := upgrade.UpdateMarker{Details: det}
+	marker := upgrade.UpdateMarker{Version: "9.5.0", Details: det}
 	require.NoError(t, upgrade.SaveMarker(paths.Data(), &marker, false))
 
 	markerChan <- marker
@@ -2908,7 +2908,7 @@ func TestCoordinatorCleansMarkerOnFleetConfirmation(t *testing.T) {
 	}
 
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o750))
-	marker := upgrade.UpdateMarker{}
+	marker := upgrade.UpdateMarker{Version: "9.5.0", Details: details.NewDetails("9.5.0", details.StateCompleted, "test-action-id")}
 	require.NoError(t, upgrade.SaveMarker(paths.Data(), &marker, false))
 	det := details.NewDetails("9.5.0", details.StateCompleted, "test-action-id")
 	coord.state.UpgradeDetails = det
@@ -2923,4 +2923,54 @@ func TestCoordinatorCleansMarkerOnFleetConfirmation(t *testing.T) {
 		_, err := os.Stat(filepath.Join(paths.Data(), ".update-marker"))
 		return os.IsNotExist(err)
 	}, time.Second, time.Millisecond, "upgrade marker must be removed after Fleet confirmation")
+}
+
+func TestCoordinatorDoesNotCleanMarkerOnVersionMismatch(t *testing.T) {
+	top := paths.Top()
+	paths.SetTop(t.TempDir())
+	t.Cleanup(func() { paths.SetTop(top) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	log, _ := loggertest.New("coordinator-marker-test")
+	stateChan := make(chan State, 1)
+	cleanCh := make(chan struct{}, 1)
+
+	coord := &Coordinator{
+		isManaged: true,
+		logger:    log,
+		state: State{
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
+		},
+		stateBroadcaster: &broadcaster.Broadcaster[State]{
+			InputChan: stateChan,
+		},
+		managerChans: managerChans{
+			upgradeMarkerCleanCh: cleanCh,
+		},
+		componentPIDTicker: func() *time.Ticker {
+			tk := time.NewTicker(time.Second * 30)
+			t.Cleanup(tk.Stop)
+			return tk
+		}(),
+	}
+
+	// The marker on disk points at 9.5.0, but the confirmed upgrade targets
+	// 9.6.0; the cleanup must leave the marker alone when versions mismatch.
+	require.NoError(t, os.MkdirAll(paths.Data(), 0o750))
+	marker := upgrade.UpdateMarker{Version: "9.5.0", Details: details.NewDetails("9.5.0", details.StateCompleted, "test-action-id")}
+	require.NoError(t, upgrade.SaveMarker(paths.Data(), &marker, false))
+	coord.state.UpgradeDetails = details.NewDetails("9.6.0", details.StateCompleted, "test-action-id")
+
+	cleanCh <- struct{}{}
+	coord.runLoopIteration(ctx)
+
+	// Marker removal runs in a goroutine; give it time to run, then confirm it
+	// stayed in place because of the version mismatch.
+	assert.Never(t, func() bool {
+		_, err := os.Stat(filepath.Join(paths.Data(), ".update-marker"))
+		return os.IsNotExist(err)
+	}, 200*time.Millisecond, time.Millisecond, "upgrade marker must not be removed when versions mismatch")
 }
