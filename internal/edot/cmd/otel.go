@@ -148,7 +148,6 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		}
 		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), []string{configProvider.URI()},
 			edotOtelCol.WithConfigProviderFactory(configProvider.NewFactory()),
-			edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
 			edotOtelCol.WithComponents(componentsFn),
 		)
 
