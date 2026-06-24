@@ -2820,9 +2820,12 @@ func TestCoordinatorCleansMarkerOnStateCompletedStandalone(t *testing.T) {
 
 	// Coordinator state must have UpgradeDetails cleared synchronously.
 	assert.Nil(t, coord.state.UpgradeDetails)
+	// Capture before the async callback: paths.Data() must not be called from a
+	// polling goroutine while t.Cleanup may concurrently restore paths.Top().
+	markerPath := filepath.Join(paths.Data(), ".update-marker")
 	// Marker file removal runs in a goroutine; wait for it.
 	assert.Eventually(t, func() bool {
-		_, err := os.Stat(filepath.Join(paths.Data(), ".update-marker"))
+		_, err := os.Stat(markerPath)
 		return os.IsNotExist(err)
 	}, time.Second, time.Millisecond, "upgrade marker must be removed after standalone upgrade completes")
 }
@@ -2918,9 +2921,10 @@ func TestCoordinatorCleansMarkerOnFleetConfirmation(t *testing.T) {
 
 	// Coordinator state must have UpgradeDetails cleared synchronously.
 	assert.Nil(t, coord.state.UpgradeDetails)
+	markerPath := filepath.Join(paths.Data(), ".update-marker")
 	// Marker file removal runs in a goroutine; wait for it.
 	assert.Eventually(t, func() bool {
-		_, err := os.Stat(filepath.Join(paths.Data(), ".update-marker"))
+		_, err := os.Stat(markerPath)
 		return os.IsNotExist(err)
 	}, time.Second, time.Millisecond, "upgrade marker must be removed after Fleet confirmation")
 }
@@ -2967,10 +2971,11 @@ func TestCoordinatorDoesNotCleanMarkerOnVersionMismatch(t *testing.T) {
 	cleanCh <- struct{}{}
 	coord.runLoopIteration(ctx)
 
+	markerPath := filepath.Join(paths.Data(), ".update-marker")
 	// Marker removal runs in a goroutine; give it time to run, then confirm it
 	// stayed in place because of the version mismatch.
 	assert.Never(t, func() bool {
-		_, err := os.Stat(filepath.Join(paths.Data(), ".update-marker"))
+		_, err := os.Stat(markerPath)
 		return os.IsNotExist(err)
 	}, 200*time.Millisecond, time.Millisecond, "upgrade marker must not be removed when versions mismatch")
 }
