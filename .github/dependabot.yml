@@ -35,9 +35,27 @@ updates:
           - "golang.org/x/*"
       tooling-test:
         patterns:
-          - "github.com/magefile/*"
+          # Test frameworks and helpers
           - "github.com/stretchr/*"
           - "github.com/testcontainers/*"
+          # Helm: only used in k8s integration tests
+          - "helm.sh/helm/*"
+          # Only used in *_test.go files
+          - "github.com/google/pprof"
+          - "github.com/google/go-containerregistry"
+          - "github.com/cavaliergopher/*"
+          - "github.com/blakesmith/*"
+          # Only used in pkg/testing/
+          - "github.com/sajari/*"
+          - "github.com/moby/*"
+      packaging:
+        patterns:
+          # Build tooling: only used in magefile.go, dev-tools/, or tools/tools.go
+          - "github.com/magefile/*"
+          - "github.com/Jeffail/gabs/*"
+          - "github.com/josephspurrier/goversioninfo"
+          - "github.com/rednafi/link-patrol"
+          - "gotest.tools/*"
       misc:
         patterns:
           - "*"
