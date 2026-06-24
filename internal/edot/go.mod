@@ -7,29 +7,13 @@ replace github.com/elastic/elastic-agent => ../../
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260622202735-ab38d70d120b
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.43.1
+	github.com/elastic/elastic-agent-libs v0.44.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.47.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.47.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.47.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.47.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.47.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.47.0
-=======
-	github.com/elastic/elastic-agent-libs v0.44.0
-	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
-	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.59.0
-	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.59.0
-	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.59.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.59.0
-	github.com/elastic/opentelemetry-collector-components/extension/awscredentialsproviderextension v0.59.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.59.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.59.0
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.59.0
-	github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.59.0
-	github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver v0.1.0
-	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.59.0
->>>>>>> 3c5403c03 (build(deps): bump the go-dependencies group across 1 directory with 5 updates (#15113))
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.153.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.153.0
@@ -413,7 +397,7 @@ require (
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/grafana/regexp v0.0.0-20250905093917-f7b3be9d1853 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/h2non/filetype v1.1.1 // indirect
 	github.com/hashicorp/consul/api v1.32.1 // indirect
 	github.com/hashicorp/cronexpr v1.1.3 // indirect
@@ -658,8 +642,8 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.19.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.43.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.44.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.44.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/prometheus v0.65.0 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdoutlog v0.19.0 // indirect
@@ -697,7 +681,7 @@ require (
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/api v0.284.0 // indirect
 	google.golang.org/genproto v0.0.0-20260401024825-9d38bb4040a9 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260406210006-6f92a3bedf2d // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/grpc v1.81.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
