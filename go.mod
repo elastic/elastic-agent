@@ -49,7 +49,7 @@ require (
 	github.com/rednafi/link-patrol v0.0.0-20260330172412-4756d3323a08
 	github.com/rs/zerolog v1.35.1
 	github.com/sajari/regression v1.0.1
-	github.com/schollz/progressbar/v3 v3.13.1
+	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/winlabs/gowin32 v0.0.0-20260308155911-6a6dc53430f0
@@ -601,9 +601,13 @@ require (
 	github.com/prometheus/sigv4 v0.4.1 // indirect
 	github.com/puzpuzpuz/xsync/v4 v4.5.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
+<<<<<<< HEAD
 	github.com/redis/go-redis/v9 v9.19.0 // indirect
 	github.com/relvacode/iso8601 v1.7.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
+=======
+	github.com/rivo/uniseg v0.4.7 // indirect
+>>>>>>> 9c0c35196 (Bump github.com/schollz/progressbar/v3 v3.13.1 -> v3.19.0 (#15120))
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/rubenv/sql-migrate v1.8.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
