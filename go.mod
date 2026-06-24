@@ -51,7 +51,7 @@ require (
 	github.com/rednafi/link-patrol v0.0.0-20260330172412-4756d3323a08
 	github.com/rs/zerolog v1.35.1
 	github.com/sajari/regression v1.0.1
-	github.com/schollz/progressbar/v3 v3.13.1
+	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
