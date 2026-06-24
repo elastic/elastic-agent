@@ -20,11 +20,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/service"
 
 	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-=======
->>>>>>> 7f1194a79 (Don't inject elasticdiagnostics extension in plain otel mode (#15105))
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
