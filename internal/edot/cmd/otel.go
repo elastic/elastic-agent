@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/service"
 
 	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
