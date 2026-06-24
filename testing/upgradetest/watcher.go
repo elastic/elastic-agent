@@ -11,6 +11,7 @@ import (
 	"time"
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -31,6 +32,114 @@ agent.upgrade.watcher:
 // watcher stops or is killed before continuing.
 func ConfigureFastWatcher(ctx context.Context, f *atesting.Fixture) error {
 	return f.Configure(ctx, []byte(FastWatcherCfg))
+}
+
+// WaitForWatchingState polls UpgradeDetails.State until the upgrade reaches
+// StateWatching or the timeout is exceeded.
+//
+// It returns immediately on StateFailed or StateRollback so the test does not
+// burn the full timeout when an upgrade genuinely fails. If the test may have
+// a stale UPG_FAILED from a prior upgrade, call WaitForUpgradeInProgress first
+// to confirm the new upgrade has started before calling this function.
+//
+// It also returns nil if UpgradeDetails transitions from an in-progress state
+// to nil, which happens when the watcher finishes its grace period and the
+// coordinator clears UpgradeDetails (StateCompleted maps to nil in status).
+// This prevents a 15-minute hang when the polling interval misses the short
+// StateWatching window between agent restart and watcher completion.
+//
+// Once this returns nil, a separate WaitForWatcher call is not needed.
+//
+// Use a generous timeout: artifact downloads can take 10+ minutes on slow CI
+// links.
+func WaitForWatchingState(ctx context.Context, f *atesting.Fixture, timeout time.Duration, interval time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	var lastState details.State
+	var lastErr error
+	var sawInProgress bool
+
+	for {
+		select {
+		case <-ctx.Done():
+			if lastState != "" {
+				return fmt.Errorf("timed out waiting for upgrade to reach %s, last observed state: %s: %w", details.StateWatching, lastState, ctx.Err())
+			}
+			if lastErr != nil {
+				return fmt.Errorf("timed out waiting for upgrade to reach %s: %w", details.StateWatching, lastErr)
+			}
+			return fmt.Errorf("timed out waiting for upgrade to reach %s: %w", details.StateWatching, ctx.Err())
+		case <-ticker.C:
+			status, err := f.ExecStatus(ctx)
+			if err != nil || status.IsZero() {
+				// Status may be briefly unavailable during agent restart; retry.
+				lastErr = err
+				continue
+			}
+			if status.UpgradeDetails == nil {
+				// If the upgrade was previously in progress, nil means the watcher
+				// completed its grace period and the coordinator cleared UpgradeDetails.
+				if sawInProgress {
+					return nil
+				}
+				continue
+			}
+
+			state := status.UpgradeDetails.State
+			lastState = state
+
+			switch state {
+			case details.StateWatching:
+				return nil
+			case details.StateFailed:
+				errMsg := status.UpgradeDetails.Metadata.ErrorMsg
+				if errMsg == "" {
+					errMsg = fmt.Sprintf("failed from state %s", status.UpgradeDetails.Metadata.FailedState)
+				}
+				return fmt.Errorf("upgrade failed while waiting for %s: %s", details.StateWatching, errMsg)
+			case details.StateRollback:
+				errMsg := status.UpgradeDetails.Metadata.ErrorMsg
+				if errMsg == "" {
+					errMsg = fmt.Sprintf("rollback from state %s", status.UpgradeDetails.Metadata.FailedState)
+				}
+				return fmt.Errorf("upgrade watcher triggered rollback while waiting for %s: %s", details.StateWatching, errMsg)
+			default:
+				sawInProgress = true
+			}
+		}
+	}
+}
+
+// WaitForUpgradeInProgress polls until UpgradeDetails.State is non-nil and
+// not StateFailed. Use this before WaitForWatchingState when a prior upgrade
+// may have left a stale UPG_FAILED in the agent status that would otherwise
+// cause WaitForWatchingState to fail immediately.
+func WaitForUpgradeInProgress(ctx context.Context, f *atesting.Fixture, timeout time.Duration, interval time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for upgrade to start: %w", ctx.Err())
+		case <-ticker.C:
+			status, err := f.ExecStatus(ctx)
+			if err != nil || status.IsZero() {
+				continue
+			}
+			if status.UpgradeDetails == nil || status.UpgradeDetails.State == details.StateFailed {
+				continue
+			}
+			return nil
+		}
+	}
 }
 
 // WaitForWatcher loops until a watcher is found running or times out.
