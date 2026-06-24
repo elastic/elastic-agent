@@ -6,6 +6,7 @@ package upgradetest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -35,7 +36,9 @@ func ConfigureFastWatcher(ctx context.Context, f *atesting.Fixture) error {
 }
 
 // WaitForWatchingState polls UpgradeDetails.State until the upgrade reaches
-// StateWatching or the timeout is exceeded.
+// StateWatching or the timeout is exceeded. Both the start agent and the target
+// agent must be >= 8.12.0 for UpgradeDetails to appear in status; older agents
+// always return nil details and this function will time out.
 //
 // It returns immediately on StateFailed or StateRollback so the test does not
 // burn the full timeout when an upgrade genuinely fails. If the test may have
@@ -45,18 +48,28 @@ func ConfigureFastWatcher(ctx context.Context, f *atesting.Fixture) error {
 // It also returns nil if UpgradeDetails transitions from an in-progress state
 // to nil, which happens when the watcher finishes its grace period and the
 // coordinator clears UpgradeDetails (StateCompleted maps to nil in status).
-// This prevents a 15-minute hang when the polling interval misses the short
-// StateWatching window between agent restart and watcher completion.
+// This prevents burning the full timeout when the polling interval misses the short
+// StateWatching window between agent restart and watcher grace-period expiry. Note: if
+// a rollback also completes between two polls (StateRollback → nil), this path
+// returns nil as well; WaitHealthyAndVersion and WaitForNoWatcher downstream
+// will catch the wrong version or unexpected watcher state in that case.
 //
 // During StateDownloading, it tracks DownloadPercent and returns an error if
-// the percentage does not advance for stallTimeout. This catches a stalled
-// download without waiting for the full timeout. For larger artifacts, increase
-// stallTimeout accordingly.
+// the percentage does not advance for stallTimeout. Stalls in other states
+// (extracting, replacing) are not detected and rely on the outer timeout.
+// For larger artifacts, increase stallTimeout accordingly.
 //
 // Once this returns nil, a separate WaitForWatcher call is not needed.
+// WaitForNoWatcher is still needed afterwards to confirm the watcher process
+// has actually exited.
 //
 // Use a generous timeout: artifact downloads can take 10+ minutes on slow CI
 // links.
+//
+// This duplicates the polling pattern in waitUpgradeDetailsState
+// (upgradetest/upgrader.go) on purpose. That helper only waits for a target
+// state; it does not fail fast on StateFailed/StateRollback and has no download
+// stall detection, both of which this function needs.
 func WaitForWatchingState(ctx context.Context, f *atesting.Fixture, timeout time.Duration, interval time.Duration, stallTimeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -74,19 +87,27 @@ func WaitForWatchingState(ctx context.Context, f *atesting.Fixture, timeout time
 		select {
 		case <-ctx.Done():
 			if lastState != "" {
-				return fmt.Errorf("timed out waiting for upgrade to reach %s, last observed state: %s: %w", details.StateWatching, lastState, ctx.Err())
+				return fmt.Errorf("upgrade did not reach %s, last observed state: %s: %w", details.StateWatching, lastState, errors.Join(lastErr, ctx.Err()))
 			}
 			if lastErr != nil {
-				return fmt.Errorf("timed out waiting for upgrade to reach %s: %w", details.StateWatching, lastErr)
+				return fmt.Errorf("upgrade did not reach %s: %w", details.StateWatching, errors.Join(lastErr, ctx.Err()))
 			}
-			return fmt.Errorf("timed out waiting for upgrade to reach %s: %w", details.StateWatching, ctx.Err())
+			return fmt.Errorf("upgrade did not reach %s: %w", details.StateWatching, ctx.Err())
 		case <-ticker.C:
+			// Note: ExecStatus retries internally for up to ~1 minute, so the
+			// effective poll cadence may be longer than interval when the agent
+			// is restarting. Stall timing is based on wall-clock, not tick count.
 			status, err := f.ExecStatus(ctx)
 			if err != nil || status.IsZero() {
 				// Status may be briefly unavailable during agent restart; retry.
-				lastErr = err
+				if err != nil {
+					lastErr = err
+				} else {
+					lastErr = nil // transient zero status; don't carry over a prior error
+				}
 				continue
 			}
+			lastErr = nil
 			if status.UpgradeDetails == nil {
 				// If the upgrade was previously in progress, nil means the watcher
 				// completed its grace period and the coordinator cleared UpgradeDetails.
@@ -117,11 +138,11 @@ func WaitForWatchingState(ctx context.Context, f *atesting.Fixture, timeout time
 			case details.StateDownloading:
 				sawInProgress = true
 				pct := status.UpgradeDetails.Metadata.DownloadPercent
-				if lastProgressAt.IsZero() || pct > lastPercent {
+				if lastProgressAt.IsZero() || pct != lastPercent {
 					lastPercent = pct
 					lastProgressAt = time.Now()
 				} else if time.Since(lastProgressAt) > stallTimeout {
-					return fmt.Errorf("download stalled at %.1f%% for %s", lastPercent*100, stallTimeout)
+					return fmt.Errorf("download stalled at %.1f%% for %s", lastPercent*100, time.Since(lastProgressAt).Round(time.Second))
 				}
 			default:
 				sawInProgress = true
@@ -131,9 +152,18 @@ func WaitForWatchingState(ctx context.Context, f *atesting.Fixture, timeout time
 }
 
 // WaitForUpgradeInProgress polls until UpgradeDetails.State is non-nil and
-// not StateFailed. Use this before WaitForWatchingState when a prior upgrade
-// may have left a stale UPG_FAILED in the agent status that would otherwise
-// cause WaitForWatchingState to fail immediately.
+// not StateFailed. Any other state (including StateRollback) is treated as
+// in-progress; WaitForWatchingState will fail fast on StateRollback if the
+// caller invokes it next. Use this before WaitForWatchingState when a prior
+// upgrade may have left a stale UPG_FAILED in the agent status that would
+// otherwise cause WaitForWatchingState to fail immediately. Requires the
+// running agent to be >= 8.12.0 for UpgradeDetails to appear in status.
+//
+// Note: if the new upgrade fails fast (before the poller observes a non-failed
+// state), this function will time out rather than return an error. In that
+// case the failure will only surface as a generic timeout message. Use this
+// function only when a stale UPG_FAILED is expected; otherwise call
+// WaitForWatchingState directly, which fails fast on StateFailed.
 func WaitForUpgradeInProgress(ctx context.Context, f *atesting.Fixture, timeout time.Duration, interval time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -141,15 +171,26 @@ func WaitForUpgradeInProgress(ctx context.Context, f *atesting.Fixture, timeout 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	var lastErr error
+
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timed out waiting for upgrade to start: %w", ctx.Err())
+			if lastErr != nil {
+				return fmt.Errorf("upgrade did not start: %w", errors.Join(lastErr, ctx.Err()))
+			}
+			return fmt.Errorf("upgrade did not start: %w", ctx.Err())
 		case <-ticker.C:
 			status, err := f.ExecStatus(ctx)
 			if err != nil || status.IsZero() {
+				if err != nil {
+					lastErr = err
+				} else {
+					lastErr = nil
+				}
 				continue
 			}
+			lastErr = nil
 			if status.UpgradeDetails == nil || status.UpgradeDetails.State == details.StateFailed {
 				continue
 			}
