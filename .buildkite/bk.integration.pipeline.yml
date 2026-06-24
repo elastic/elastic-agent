@@ -119,6 +119,13 @@ common:
       - v1.32.0
       - v1.33.0
       - &k8s_max_test_version v1.34.0
+    versions_without_min_max: &k8s_test_versions_without_min_max
+      - v1.28.15
+      - v1.29.14
+      - v1.30.0
+      - v1.31.0
+      - v1.32.0
+      - v1.33.0
     variants: &k8s_test_variants
       - basic
       - complete
@@ -343,9 +350,6 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 2)"
-    # NOTE: scheduler should run only tier 3 tests.
-    #       PRs or release branches should run tier 2 if there are relevant changes.
-    if: '!(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")'
     if_changed:
       include:
         - .buildkite/**
@@ -462,7 +466,6 @@ steps:
         matrix:
           setup:
             os:
-              - "${IMAGE_WIN_2016}"
               - "${IMAGE_WIN_2022}"
               - "${IMAGE_WIN_2025}"
             variant: *windows_variants
@@ -651,9 +654,6 @@ steps:
             variant: *linux_deb_variants
 
   - group: "Stateful: Linux (tier 2)"
-    # NOTE: scheduler should run only tier 3 tests.
-    #       PRs or release branches should run tier 2 if there are relevant changes.
-    if: '!(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")'
     if_changed:
       include:
         - .buildkite/**
@@ -796,7 +796,6 @@ steps:
               - "${IMAGE_UBUNTU_2204_X86_64}"
               - "${IMAGE_UBUNTU_2404_X86_64}"
               - "${IMAGE_DEBIAN_11}"
-              - "${IMAGE_DEBIAN_13}"
             variant:
               - default
 
@@ -830,7 +829,6 @@ steps:
               - "${IMAGE_UBUNTU_2204_X86_64}"
               - "${IMAGE_UBUNTU_2404_X86_64}"
               - "${IMAGE_DEBIAN_11}"
-              - "${IMAGE_DEBIAN_13}"
             variant: *linux_deb_variants
 
       - label: "linux:amd64:tier3:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
@@ -860,7 +858,6 @@ steps:
           setup:
             os:
               - "${IMAGE_RHEL_8}"
-              - "${IMAGE_RHEL_10}"
             sudo:
               - "true"
               - "false"
@@ -954,9 +951,6 @@ steps:
 
   - group: ":kubernetes: Kubernetes (tier 2)"
     key: integration-tests-kubernetes-tier-2
-    # NOTE: scheduler should run only tier 3 tests.
-    #       PRs or release branches should run tier 2 if there are relevant changes.
-    if: '!(build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler")'
     if_changed:
       include:
         - .buildkite/**
@@ -1027,7 +1021,7 @@ steps:
             variants:
               *k8s_test_variants
             version:
-              *k8s_test_versions
+              *k8s_test_versions_without_min_max
 
   - group: "Serverless integration test"
     key: integration-tests-serverless
