@@ -48,11 +48,16 @@ func ConfigureFastWatcher(ctx context.Context, f *atesting.Fixture) error {
 // This prevents a 15-minute hang when the polling interval misses the short
 // StateWatching window between agent restart and watcher completion.
 //
+// During StateDownloading, it tracks DownloadPercent and returns an error if
+// the percentage does not advance for stallTimeout. This catches a stalled
+// download without waiting for the full timeout. For larger artifacts, increase
+// stallTimeout accordingly.
+//
 // Once this returns nil, a separate WaitForWatcher call is not needed.
 //
 // Use a generous timeout: artifact downloads can take 10+ minutes on slow CI
 // links.
-func WaitForWatchingState(ctx context.Context, f *atesting.Fixture, timeout time.Duration, interval time.Duration) error {
+func WaitForWatchingState(ctx context.Context, f *atesting.Fixture, timeout time.Duration, interval time.Duration, stallTimeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -62,6 +67,8 @@ func WaitForWatchingState(ctx context.Context, f *atesting.Fixture, timeout time
 	var lastState details.State
 	var lastErr error
 	var sawInProgress bool
+	var lastPercent float64
+	var lastProgressAt time.Time
 
 	for {
 		select {
@@ -107,6 +114,15 @@ func WaitForWatchingState(ctx context.Context, f *atesting.Fixture, timeout time
 					errMsg = fmt.Sprintf("rollback from state %s", status.UpgradeDetails.Metadata.FailedState)
 				}
 				return fmt.Errorf("upgrade watcher triggered rollback while waiting for %s: %s", details.StateWatching, errMsg)
+			case details.StateDownloading:
+				sawInProgress = true
+				pct := status.UpgradeDetails.Metadata.DownloadPercent
+				if lastProgressAt.IsZero() || pct > lastPercent {
+					lastPercent = pct
+					lastProgressAt = time.Now()
+				} else if time.Since(lastProgressAt) > stallTimeout {
+					return fmt.Errorf("download stalled at %.1f%% for %s", lastPercent*100, stallTimeout)
+				}
 			default:
 				sawInProgress = true
 			}

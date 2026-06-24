@@ -1004,7 +1004,7 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Waiting for upgrade to reach watching state...")
-	err = upgradetest.WaitForWatchingState(ctx, startFixture, 15*time.Minute, 10*time.Second)
+	err = upgradetest.WaitForWatchingState(ctx, startFixture, 15*time.Minute, 10*time.Second, 2*time.Minute)
 	require.NoError(t, err)
 
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
@@ -1173,7 +1173,7 @@ func TestFleetDownloadAuthUpgrade(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Waiting for upgrade to reach watching state...")
-	err = upgradetest.WaitForWatchingState(t.Context(), startFixture, 15*time.Minute, 10*time.Second)
+	err = upgradetest.WaitForWatchingState(t.Context(), startFixture, 15*time.Minute, 10*time.Second, 2*time.Minute)
 	require.NoError(t, err)
 
 	err = upgradetest.WaitHealthyAndVersion(t.Context(), startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
