@@ -23,6 +23,8 @@ import (
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 // it performs diagnostics for all current units. If a given unit does not exist in the manager, then a warning
 // is logged.
+// Note: this function returns unit-level diagnostics only. EDOT groups beat receiver results at the
+// component level, so they are not included here.
 func (m *OTelManager) PerformDiagnostics(ctx context.Context, req ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
 	var diagnostics []runtime.ComponentUnitDiagnostic
 	m.mx.RLock()
@@ -39,40 +41,37 @@ func (m *OTelManager) PerformDiagnostics(ctx context.Context, req ...runtime.Com
 				})
 			}
 		}
-	} else {
-		// create a map of unit by component and unit id, this is used to filter out units that
-		// do not exist in the manager
-		unitByID := make(map[string]map[string]*component.Unit)
-		for _, r := range req {
-			if unitByID[r.Component.ID] == nil {
-				unitByID[r.Component.ID] = make(map[string]*component.Unit)
-			}
-			unitByID[r.Component.ID][r.Unit.ID] = &r.Unit
-		}
+		return diagnostics
+	}
 
-		// create empty diagnostics for units that exist in the manager
-		for _, existingComp := range currentComponents {
-			inputComp, ok := unitByID[existingComp.ID]
-			if !ok {
-				m.managerLogger.Warnf("requested diagnostics for component %s, but it does not exist in the manager", existingComp.ID)
-				continue
-			}
-			for _, unit := range existingComp.Units {
-				if _, ok := inputComp[unit.ID]; ok {
-					diagnostics = append(diagnostics, runtime.ComponentUnitDiagnostic{
-						Component: existingComp,
-						Unit:      unit,
-					})
-				} else {
-					m.managerLogger.Warnf("requested diagnostics for unit %s, but it does not exist in the manager", unit.ID)
-				}
+	// create a map of unit by component and unit id, this is used to filter out units that
+	// do not exist in the manager
+	unitByID := make(map[string]map[string]*component.Unit)
+	for _, r := range req {
+		if unitByID[r.Component.ID] == nil {
+			unitByID[r.Component.ID] = make(map[string]*component.Unit)
+		}
+		unitByID[r.Component.ID][r.Unit.ID] = &r.Unit
+	}
+
+	// create empty diagnostics for units that exist in the manager
+	for _, existingComp := range currentComponents {
+		inputComp, ok := unitByID[existingComp.ID]
+		if !ok {
+			m.managerLogger.Warnf("requested diagnostics for component %s, but it does not exist in the manager", existingComp.ID)
+			continue
+		}
+		for _, unit := range existingComp.Units {
+			if _, ok := inputComp[unit.ID]; ok {
+				diagnostics = append(diagnostics, runtime.ComponentUnitDiagnostic{
+					Component: existingComp,
+					Unit:      unit,
+				})
+			} else {
+				m.managerLogger.Warnf("requested diagnostics for unit %s, but it does not exist in the manager", unit.ID)
 			}
 		}
 	}
-
-	// Beat receivers register diagnostic hooks per input stream (one receiver per input/stream),
-	// but the results are grouped at the component level in the diagnostics archive. So EDOT
-	// results are fetched and assigned in PerformComponentDiagnostics, not here.
 	return diagnostics
 }
 
