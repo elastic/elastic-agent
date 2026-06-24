@@ -126,28 +126,29 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		return diagnostics, nil
 	}
 
-	// Beat receivers register hooks under the OTel receiver instance ID, which has the form
-	// "<receiverType>/_agent-component/<comp.ID>/<streamID>". The "<receiverType>/" prefix is the
-	// string representation produced by otelcomponent.ID.String(); the "_agent-component/" segment
-	// is translate.OtelNamePrefix.
-	// Match on the segment "_agent-component/<comp.ID>/" to avoid false positives from
-	// component IDs that are prefixes of other component IDs.
-	compSegment := make(map[string]int) // "_agent-component/<comp.ID>/" -> index in diagnostics
+	// Receiver names have the form "<receiverType>/_agent-component/<comp.ID>/<streamID>".
+	// All "/" characters are literal string delimiters, not filesystem path separators,
+	// so this is consistent across platforms including Windows.
+	// We extract comp.ID as the segment between OtelNamePrefix and the next "/". This is
+	// exact and unambiguous for normal IDs. Both comp.ID and streamID are user-supplied
+	// (from the policy input "id" field), so either could contain "/" — making the format
+	// ambiguous in that case. The warning below flags such IDs. A proper fix requires
+	// escaping "/" in IDs at the source in the beat receiver.
+	diagIdxByCompID := make(map[string]int)
 	for idx, diag := range diagnostics {
-		compSegment[translate.OtelNamePrefix+diag.Component.ID+"/"] = idx
+		if strings.Contains(diag.Component.ID, "/") {
+			m.managerLogger.Warnf("component ID %q contains '/', its EDOT diagnostics will be missing from the archive", diag.Component.ID)
+		}
+		diagIdxByCompID[diag.Component.ID] = idx
 	}
 	for _, extDiag := range extDiagnostics.ComponentDiagnostics {
-		// For standard component IDs the "_agent-component/<comp.ID>/" framing is unambiguous:
-		// such IDs are built by joining parts with "-", so "/" only appears as the prefix and
-		// suffix delimiter and one ID cannot be a substring of another in this framing. We assume
-		// this holds, so at most one segment matches a given name and the map iteration order does
-		// not affect correctness. A policy input id that itself contains "/" could break the
-		// assumption, but normal IDs do not.
-		for segment, idx := range compSegment {
-			if strings.Contains(extDiag.Name, segment) {
-				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
-				break
-			}
+		parts := strings.SplitN(extDiag.Name, translate.OtelNamePrefix, 2)
+		if len(parts) != 2 {
+			continue
+		}
+		compID, _, _ := strings.Cut(parts[1], "/")
+		if idx, ok := diagIdxByCompID[compID]; ok {
+			diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
 		}
 	}
 

@@ -129,8 +129,8 @@ func TestBeatMetrics(t *testing.T) {
 	filebeatComp := testComponent("filebeat-comp-1")
 	filebeatComp.InputSpec.Spec.Command.Args = []string{"filebeat"}
 
-	// The receiver name format must match what EDOT registers, otherwise the segment match in
-	// production would not find this result.
+	// The receiver name format must match what EDOT registers, otherwise the comp.ID extraction
+	// in production would not find this result.
 	receiverName := translate.GetReceiverID(otelcomponent.MustNewType("filebeatreceiver"), filebeatComp.ID+"/stream-1").String()
 
 	m := &OTelManager{
@@ -196,10 +196,9 @@ func TestBeatMetrics(t *testing.T) {
 	})
 }
 
-// TestBeatMetricsPrefixOverlap guards that each EDOT result is assigned to exactly one component:
-// the one whose receiver ID contains the result's name segment. When one component ID is a prefix
-// of another (e.g. "filebeat" and "filebeat-2"), the prefix component must not receive the result
-// of the component whose ID it is a prefix of.
+// TestBeatMetricsPrefixOverlap guards that each EDOT result is assigned to exactly one component.
+// When one component ID is a prefix of another (e.g. "filebeat" and "filebeat-2"), the prefix
+// component must not receive the result of the longer one.
 func TestBeatMetricsPrefixOverlap(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Skip test on Windows.",
