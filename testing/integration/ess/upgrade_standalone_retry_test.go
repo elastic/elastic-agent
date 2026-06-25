@@ -77,10 +77,10 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 		r.URL.Path = upath
 
 		if path.Base(r.URL.Path) == filepath.Base(srcPackage) && count < 2 {
-			// first 2 requests return 404
+			// the first 2 requests fail with a retryable error
 			count += 1
-			t.Logf("request #%d; returning not found", count)
-			rw.WriteHeader(http.StatusNotFound)
+			t.Logf("request #%d; returning internal server error", count)
+			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 

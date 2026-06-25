@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-// you may not use this file except in compliance with the Elastic License 2.0.
-
 package download
 
 import (
@@ -25,13 +23,18 @@ import (
 
 	"golang.org/x/crypto/openpgp" //nolint:staticcheck // crypto/openpgp is only receiving security updates.
 
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
-	PgpSourceRawPrefix = "pgp_raw:"
-	PgpSourceURIPrefix = "pgp_uri:"
+	PgpSourceRawPrefix            = "pgp_raw:"
+	PgpSourceURIPrefix            = "pgp_uri:"
+	defaultUpgradeFallbackPGP     = "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
+	fleetUpgradeFallbackPGPFormat = "/api/agents/upgrades/%d.%d.%d/pgp-public-key"
 )
 
 var (
@@ -45,7 +48,7 @@ type warnLogger interface {
 	Warnf(format string, args ...interface{})
 }
 
-// loggerInfofWarnf is a logger that only needs to implement Infof and Warnf.
+// infoWarnLogger is a logger that only needs to implement Infof and Warnf.
 type infoWarnLogger interface {
 	warnLogger
 
@@ -77,55 +80,38 @@ func (e *InvalidSignatureError) Error() string {
 // Unwrap returns the cause.
 func (e *InvalidSignatureError) Unwrap() error { return e.Err }
 
-// Verifier is an interface verifying the SHA512 checksum and PGP signature and
-// of a downloaded artifact.
-type Verifier interface {
-	Name() string
-	// Verify should verify the artifact, returning an error if any checks fail.
-	// If the checksum does no match Verify returns a *download.ChecksumMismatchError.
-	// If the PGP signature check fails then Verify returns a
-	// *download.InvalidSignatureError.
-	Verify(ctx context.Context, a artifact.Artifact, filename, sourceDir, targetDir string, skipDefaultPgp bool, pgpBytes ...string) error
-}
-
-// VerifySHA512HashWithCleanup calls VerifySHA512Hash and, in case of a
-// *ChecksumMismatchError, performs a cleanup by deleting both the filename and
-// filename.sha512 files. If the cleanup fails, it logs a warning.
-func VerifySHA512HashWithCleanup(log infoWarnLogger, filename string) error {
-	if err := VerifySHA512Hash(filename); err != nil {
-		var checksumMismatchErr *ChecksumMismatchError
-		if errors.As(err, &checksumMismatchErr) {
-			if err := os.Remove(filename); err != nil {
-				log.Warnf("failed clean up after sha512 verification: failed to remove %q: %v",
-					filename, err)
-			}
-			if err := os.Remove(filename + ".sha512"); err != nil {
-				log.Warnf("failed clean up after sha512 check: failed to remove %q: %v",
-					filename+".sha512", err)
-			}
-		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
-			// it's not a simple hash mismatch, probably something is wrong with the hash file
-			hashFileName := AddHashExtension(filename)
-			hashFileBytes, readErr := os.ReadFile(hashFileName)
-			if readErr != nil {
-				log.Warnf("error verifying the package using hash file %q, unable do read contents for logging: %v", AddHashExtension(filename), readErr)
-			} else {
-				log.Warnf("error verifying the package using hash file %q, contents: %q", AddHashExtension(filename), string(hashFileBytes))
-			}
-		}
-
-		return err
-	}
-
-	return nil
-}
-
 func AddHashExtension(file string) string {
 	const hashFileExt = ".sha512"
 	if strings.HasSuffix(file, hashFileExt) {
 		return file
 	}
 	return file + hashFileExt
+}
+
+func AppendFallbackPGP(log *logger.Logger, fleetServerURI string, targetVersion *agtversion.ParsedSemVer, pgpSources []string) []string {
+	if pgpSources == nil {
+		pgpSources = make([]string, 0, 1)
+	}
+
+	fallbackPGP := PgpSourceURIPrefix + defaultUpgradeFallbackPGP
+	pgpSources = append(pgpSources, fallbackPGP)
+
+	// add a secondary fallback if fleet server is configured
+	log.Debugf("Considering fleet server uri for pgp check fallback %q", fleetServerURI)
+	if fleetServerURI != "" {
+		secondaryPath, err := url.JoinPath(
+			fleetServerURI,
+			fmt.Sprintf(fleetUpgradeFallbackPGPFormat, targetVersion.Major(), targetVersion.Minor(), targetVersion.Patch()),
+		)
+		if err != nil {
+			log.Warnf("failed to compose Fleet Server URI: %v", err)
+		} else {
+			secondaryFallback := PgpSourceURIPrefix + secondaryPath
+			pgpSources = append(pgpSources, secondaryFallback)
+		}
+	}
+
+	return pgpSources
 }
 
 // VerifySHA512Hash checks that a sidecar file containing a sha512 checksum
@@ -154,7 +140,7 @@ func VerifyChecksum(hasher hash.Hash, filename, checksumFileName string) error {
 	defer f.Close()
 
 	if _, err := io.Copy(hasher, f); err != nil {
-		return fmt.Errorf("faled to read file to calculate hash")
+		return fmt.Errorf("failed to read %q to calculate hash: %w", filename, err)
 	}
 
 	computedHash := hex.EncodeToString(hasher.Sum(nil))
@@ -171,8 +157,7 @@ func VerifyChecksum(hasher hash.Hash, filename, checksumFileName string) error {
 
 // readChecksumFile reads the checksum of the file named in filename from
 // checksumFile. checksumFile is expected to contain the output from the
-// shasum family of tools (e.g. sha512sum). If the checksum does not match then
-// a *download.ChecksumMismatchError is returned.
+// shasum family of tools (e.g. sha512sum).
 func readChecksumFile(checksumFile, filename string) (string, error) {
 	f, err := os.Open(checksumFile)
 	if err != nil {
@@ -201,6 +186,10 @@ func readChecksumFile(checksumFile, filename string) (string, error) {
 		}
 
 		checksum = parts[0]
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("failed to read checksum file %q: %w", checksumFile, err)
 	}
 
 	if len(checksum) == 0 {
@@ -251,11 +240,24 @@ func VerifyPGPSignature(file string, asciiArmorSignature, publicKey []byte) erro
 	return nil
 }
 
-func FetchPGPKeys(log infoWarnLogger, client http.Client, defaultPGPKey []byte, skipDefaultPGP bool, pgpSources []string) ([][]byte, error) {
+func FetchPGPKeys(log *logger.Logger, config *artifact.Config, defaultPGPKey []byte, skipDefaultPGP bool, pgpSources []string) ([][]byte, error) {
 	var pgpKeys [][]byte
 	if len(defaultPGPKey) > 0 && !skipDefaultPGP {
 		pgpKeys = append(pgpKeys, defaultPGPKey)
 		log.Infof("Default PGP appended")
+	}
+
+	client, err := config.Client(
+		httpcommon.WithAPMHTTPInstrumentation(),
+		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
+			return WithHeaders(rt, Headers)
+		}),
+		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
+			return WithBackoff(rt, log)
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP client for fetching PGP keys: %w", err)
 	}
 
 	for _, check := range pgpSources {
@@ -263,7 +265,7 @@ func FetchPGPKeys(log infoWarnLogger, client http.Client, defaultPGPKey []byte, 
 			continue
 		}
 
-		raw, err := PgpBytesFromSource(log, check, &client)
+		raw, err := PgpBytesFromSource(log, check, client)
 		if err != nil {
 			return nil, err
 		}
@@ -290,12 +292,12 @@ func PgpBytesFromSource(log warnLogger, source string, client HTTPClient) ([]byt
 	}
 
 	if strings.HasPrefix(source, PgpSourceURIPrefix) {
-		pgpBytes, err := fetchPgpFromURI(strings.TrimPrefix(source, PgpSourceURIPrefix), client)
+		uri := strings.TrimPrefix(source, PgpSourceURIPrefix)
+		pgpBytes, err := fetchPgpFromURI(uri, client)
 		if errors.Is(err, ErrRemotePGPDownloadFailed) || errors.Is(err, ErrInvalidLocation) {
-			log.Warnf("Skipped remote PGP located at %q because it's unavailable: %v", strings.TrimPrefix(source, PgpSourceURIPrefix), err)
+			log.Warnf("Skipped remote PGP located at %q because it's unavailable: %v", uri, err)
 		} else if err != nil {
-			log.Warnf("Failed to fetch remote PGP key from %q: %v",
-				strings.TrimPrefix(source, PgpSourceURIPrefix), err)
+			log.Warnf("Failed to fetch remote PGP key from %q: %v", uri, err)
 		}
 
 		return pgpBytes, nil
@@ -324,7 +326,6 @@ func fetchPgpFromURI(uri string, client HTTPClient) ([]byte, error) {
 
 	ctx, cancelFn := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFn()
-	// Change NewRequest to NewRequestWithContext and pass context it
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 	if err != nil {
 		return nil, err
@@ -344,4 +345,70 @@ func fetchPgpFromURI(uri string, client HTTPClient) ([]byte, error) {
 
 type HTTPClient interface {
 	Do(*http.Request) (*http.Response, error)
+}
+
+const ascSuffix = ".asc"
+
+func FetchPGPSignature(ctx context.Context, log *logger.Logger, config *artifact.Config, src string) ([]byte, error) {
+	if IsLocal(src) {
+		return os.ReadFile(strings.TrimPrefix(src, "file://"))
+	}
+
+	client, err := config.Client(
+		httpcommon.WithAPMHTTPInstrumentation(),
+		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
+			return WithHeaders(rt, Headers)
+		}),
+		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
+			return WithBackoff(rt, log)
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d fetching %q", resp.StatusCode, src)
+	}
+
+	return io.ReadAll(resp.Body)
+}
+
+func Verify(ctx context.Context, log *logger.Logger, config *artifact.Config, defaultPGP []byte, src, dst string, skipDefaultPgp bool, pgpBytes ...string) error {
+	if err := VerifySHA512Hash(dst); err != nil {
+		return fmt.Errorf("failed to verify checksum: %w", err)
+	}
+
+	signature, err := FetchPGPSignature(ctx, log, config, src+ascSuffix)
+	if err != nil {
+		return fmt.Errorf("could not get .asc file: %w", err)
+	}
+
+	keys, err := FetchPGPKeys(log, config, defaultPGP, skipDefaultPgp, pgpBytes)
+	if err != nil {
+		return fmt.Errorf("could not get pgp keys: %w", err)
+	}
+	if len(keys) == 0 {
+		return fmt.Errorf("no PGP keys available to verify %q", dst)
+	}
+
+	if err := VerifyPGPSignatureWithKeys(log, dst, signature, keys); err != nil {
+		return fmt.Errorf("could not verify PGP signature: %w", err)
+	}
+
+	return nil
 }
