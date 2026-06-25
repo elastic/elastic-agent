@@ -27,7 +27,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -86,7 +85,7 @@ type Verifier interface {
 	// If the checksum does no match Verify returns a *download.ChecksumMismatchError.
 	// If the PGP signature check fails then Verify returns a
 	// *download.InvalidSignatureError.
-	Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error
+	Verify(ctx context.Context, a artifact.Artifact, filename, sourceDir, targetDir string, skipDefaultPgp bool, pgpBytes ...string) error
 }
 
 // VerifySHA512HashWithCleanup calls VerifySHA512Hash and, in case of a

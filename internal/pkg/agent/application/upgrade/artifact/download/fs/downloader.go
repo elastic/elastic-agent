@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.elastic.co/apm/v2"
 
@@ -47,7 +48,7 @@ func NewDownloader(config *artifact.Config) *Downloader {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
+func (e *Downloader) Download(ctx context.Context, _ artifact.Artifact, filename, sourceDir, targetDir string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
 	downloadedFiles := make([]string, 0, 2)
@@ -60,22 +61,31 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 		}
 	}()
 
-	// download from source to dest
-	path, err := e.download(e.config.OS(), a, *version, "")
+	var sourcePath string
+	if strings.HasPrefix(sourceDir, "http://") || strings.HasPrefix(sourceDir, "https://") {
+		sourcePath = filepath.Join(getDropPath(e.config), filename)
+	} else {
+		sourcePath = filepath.Join(strings.TrimPrefix(sourceDir, "file://"), filename)
+	}
+	targetPath := filepath.Join(targetDir, filename)
+
+	path, err := e.download(sourcePath, targetPath)
 	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
 
-	hashPath, err := e.download(e.config.OS(), a, *version, ".sha512")
+	hashPath, err := e.download(sourcePath+".sha512", targetPath+".sha512")
 	downloadedFiles = append(downloadedFiles, hashPath)
 	return path, err
 }
 
 // DownloadAsc downloads the package .asc file from configured source.
 // It returns absolute path to the downloaded file and a no-nil error if any occurs.
-func (e *Downloader) DownloadAsc(_ context.Context, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
-	path, err := e.download(e.config.OS(), a, version, ".asc")
+func (e *Downloader) DownloadAsc(_ context.Context, a artifact.Artifact, _ agtversion.ParsedSemVer) (string, error) {
+	sourcePath := filepath.Join(e.dropPath, a.FileName()+".asc")
+	targetPath := filepath.Join(e.config.TargetDirectory, a.FileName()+".asc")
+	path, err := e.download(sourcePath, targetPath)
 	if err != nil {
 		os.Remove(path)
 		return "", err
@@ -84,55 +94,31 @@ func (e *Downloader) DownloadAsc(_ context.Context, a artifact.Artifact, version
 	return path, nil
 }
 
-func (e *Downloader) download(
-	operatingSystem string,
-	a artifact.Artifact,
-	version agtversion.ParsedSemVer,
-	extension string) (string, error) {
-	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
-	if err != nil {
-		return "", errors.New(err, "generating package name failed")
-	}
-
-	fullPath, err := artifact.GetArtifactPath(a, version, operatingSystem, e.config.Arch(), e.config.TargetDirectory)
-	if err != nil {
-		return "", errors.New(err, "generating package path failed")
-	}
-
-	if extension != "" {
-		filename += extension
-		fullPath += extension
-	}
-
-	return e.downloadFile(filename, fullPath)
-}
-
-func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
-	sourcePath := filepath.Join(e.dropPath, filename)
+func (e *Downloader) download(sourcePath, targetPath string) (string, error) {
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
-		return "", errors.New(err, fmt.Sprintf("package '%s' not found", sourcePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
+		return "", errors.New(err, fmt.Sprintf("package '%s' not found", sourcePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, targetPath))
 	}
 	defer sourceFile.Close()
 
-	if destinationDir := filepath.Dir(fullPath); destinationDir != "" && destinationDir != "." {
+	if destinationDir := filepath.Dir(targetPath); destinationDir != "" && destinationDir != "." {
 		if err := e.mkdirAll(destinationDir, 0755); err != nil {
 			return "", err
 		}
 	}
 
-	destinationFile, err := e.openFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
+	destinationFile, err := e.openFile(targetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
-		return "", goerrors.Join(errors.New("creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath)), err)
+		return "", goerrors.Join(errors.New("creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, targetPath)), err)
 	}
 	defer destinationFile.Close()
 
 	_, err = e.copy(destinationFile, sourceFile)
 	if err != nil {
-		return "", err
+		return targetPath, err
 	}
 
-	return fullPath, nil
+	return targetPath, nil
 }
 
 func getDropPath(cfg *artifact.Config) string {
@@ -142,7 +128,7 @@ func getDropPath(cfg *artifact.Config) string {
 	}
 
 	// if droppath does not exist fallback to beats subfolder
-	stat, err := os.Stat(cfg.DropPath)
+	stat, err := os.Stat(filepath.Clean(cfg.DropPath))
 	if err != nil || !stat.IsDir() {
 		return paths.Downloads()
 	}

@@ -6,7 +6,7 @@ package artifact
 
 import (
 	"fmt"
-	"path/filepath"
+	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -27,29 +27,32 @@ var packageArchMap = map[string]string{
 
 // Artifact provides info for fetching from artifact store.
 type Artifact struct {
-	Name     string
-	Cmd      string
-	Artifact string
+	Name    string
+	FIPS    bool
+	OS      string
+	Arch    string
+	Version *agtversion.ParsedSemVer
 }
 
-// GetArtifactName constructs a path to a downloaded artifact
-func GetArtifactName(a Artifact, version agtversion.ParsedSemVer, operatingSystem, arch string) (string, error) {
-	key := fmt.Sprintf("%s-binary-%s", operatingSystem, arch)
-	suffix, found := packageArchMap[key]
+func New(name string, fips bool, version *agtversion.ParsedSemVer, os, arch string) (Artifact, error) {
+	key := fmt.Sprintf("%s-binary-%s", os, arch)
+	_, found := packageArchMap[key]
 	if !found {
-		return "", errors.New(fmt.Sprintf("'%s' is not a valid combination for a package", key), errors.TypeConfig)
+		return Artifact{}, errors.New(fmt.Sprintf("'%s' is not a valid combination for a package", key), errors.TypeConfig)
 	}
 
-	return fmt.Sprintf("%s-%s-%s", a.Cmd, version.String(), suffix), nil
+	return Artifact{Name: name, FIPS: fips, OS: os, Arch: arch, Version: version}, nil
 }
 
-// GetArtifactPath returns a full path of artifact for a program in specific version
-func GetArtifactPath(a Artifact, version agtversion.ParsedSemVer, operatingSystem, arch, targetDir string) (string, error) {
-	artifactName, err := GetArtifactName(a, version, operatingSystem, arch)
-	if err != nil {
-		return "", err
+func (a *Artifact) FileName() string {
+	parts := []string{a.Name}
+	if a.FIPS {
+		parts = append(parts, "fips")
 	}
 
-	fullPath := filepath.Join(targetDir, artifactName)
-	return fullPath, nil
+	key := fmt.Sprintf("%s-binary-%s", a.OS, a.Arch)
+	suffix := packageArchMap[key] // already checked os/arch in New so should never return no result
+	parts = append(parts, a.Version.String(), suffix)
+
+	return strings.Join(parts, "-")
 }
