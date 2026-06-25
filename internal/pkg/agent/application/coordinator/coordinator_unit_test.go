@@ -48,8 +48,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
-	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -472,7 +471,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	tmpDir := t.TempDir()
 	agentInfo, err := info.NewAgentInfo(ctx, false)
 	require.NoError(t, err)
-	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, agentInfo, new(upgrade.AgentWatcherHelper), ttl.NewTTLMarkerRegistry(nil, tmpDir))
+	upgradeMgr, err := upgrade.NewUpgrader(log, &download.Config{}, nil, agentInfo, new(upgrade.AgentWatcherHelper), ttl.NewTTLMarkerRegistry(nil, tmpDir))
 	require.NoError(t, err, "errored when creating a new upgrader")
 
 	// Channels have buffer length 1, so we don't have to run on multiple
@@ -2610,7 +2609,7 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 	log, _ := loggertest.New("coordinator-insufficient-disk-space-test")
 
 	mockUpgradeManager := &mockUpgradeManager{
-		upgradeErr: fmt.Errorf("wrapped: %w", upgradeErrors.ErrInsufficientDiskSpace),
+		upgradeErr: fmt.Errorf("wrapped: %w", download.ErrInsufficientDiskSpace),
 	}
 
 	initialState := State{
@@ -2652,7 +2651,7 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 
 	err := coord.Upgrade(t.Context(), "", "", nil)
 	require.Error(t, err)
-	require.Equal(t, err, upgradeErrors.ErrInsufficientDiskSpace)
+	require.Equal(t, err, download.ErrInsufficientDiskSpace)
 
 	wg.Wait()
 
@@ -2669,7 +2668,7 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 			State:         details.StateFailed,
 			Metadata: details.Metadata{
 				FailedState: details.StateRequested,
-				ErrorMsg:    upgradeErrors.ErrInsufficientDiskSpace.Error(),
+				ErrorMsg:    download.ErrInsufficientDiskSpace.Error(),
 			},
 		},
 	}, upgradeDetails)

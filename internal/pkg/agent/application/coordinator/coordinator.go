@@ -39,7 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
-	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -961,8 +961,8 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		// If ErrInsufficientDiskSpace is in the error chain, we want to set the
 		// the error to ErrInsufficientDiskSpace so that the error message is
 		// more concise and clear.
-		if errors.Is(err, upgradeErrors.ErrInsufficientDiskSpace) {
-			err = upgradeErrors.ErrInsufficientDiskSpace
+		if errors.Is(err, download.ErrInsufficientDiskSpace) {
+			err = download.ErrInsufficientDiskSpace
 		}
 
 		// MarkUpgradeFailed updates det in-memory and, when an upgrade marker

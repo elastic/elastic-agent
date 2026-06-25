@@ -23,9 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
-	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -69,7 +67,7 @@ var (
 )
 
 type artifactDownloadHandler interface {
-	downloadArtifact(ctx context.Context, target artifact.Artifact, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error)
+	downloadArtifact(ctx context.Context, log *logger.Logger, target download.Artifact, sourcePath string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error)
 	withFleetServerURI(fleetServerURI string)
 }
 type unpackHandler interface {
@@ -111,7 +109,7 @@ type WatcherHelper interface {
 // Upgrader performs an upgrade
 type Upgrader struct {
 	log                      *logger.Logger
-	settings                 *artifact.Config
+	settings                 *download.Config
 	upgradeSettings          *configuration.UpgradeConfig
 	agentInfo                info.Agent
 	upgradeable              bool
@@ -141,7 +139,7 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper, ars ttl.Source) (*Upgrader, error) {
+func NewUpgrader(log *logger.Logger, settings *download.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper, ars ttl.Source) (*Upgrader, error) {
 	return &Upgrader{
 		log:                      log,
 		settings:                 settings,
@@ -153,7 +151,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *c
 		availableRollbacksSource: ars,
 		artifactDownloader:       newArtifactDownloader(settings, log),
 		unpacker:                 newUnpacker(log),
-		isDiskSpaceErrorFunc:     upgradeErrors.IsDiskSpaceError,
+		isDiskSpaceErrorFunc:     download.IsDiskSpaceError,
 		extractAgentVersion:      extractAgentVersion,
 		copyActionStore:          copyActionStoreProvider(os.ReadFile, os.WriteFile),
 		copyRunDirectory:         copyRunDirectoryProvider(os.MkdirAll, filecopy.Copy),
@@ -179,7 +177,7 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 
 // Reload reloads the artifact configuration for the upgrader.
 // As of today, December 2023, fleet-server does not send most of the configuration
-// defined in artifact.Config, what will likely change in the near future.
+// defined in download.Config, what will likely change in the near future.
 func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
@@ -209,8 +207,8 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 		// source uri unset, reset to default
 		u.log.Infof("Source URI reset from %q to %q",
 			u.settings.SourceURI,
-			artifact.DefaultSourceURI)
-		cfg.Settings.DownloadConfig.SourceURI = artifact.DefaultSourceURI
+			download.DefaultSourceURI)
+		cfg.Settings.DownloadConfig.SourceURI = download.DefaultSourceURI
 	}
 
 	u.settings = cfg.Settings.DownloadConfig
@@ -310,7 +308,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 			// Add the disk space error to the error chain if it is a disk space error
 			// so that we can use errors.Is to check for it
 			if u.isDiskSpaceErrorFunc(err) {
-				err = goerrors.Join(err, upgradeErrors.ErrInsufficientDiskSpace)
+				err = goerrors.Join(err, download.ErrInsufficientDiskSpace)
 			}
 			// If there is an error, we need to clean up downloads and any
 			// extracted agent files.
@@ -400,12 +398,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
 	}
 
-	target, err := artifact.New("elastic-agent", release.FIPSDistribution(), parsedVersion, runtime.GOOS, runtime.GOARCH)
+	target, err := download.New("elastic-agent", release.FIPSDistribution(), parsedVersion, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build agent artifact: %w", err)
+		return nil, fmt.Errorf("error building agent artifact: %w", err)
 	}
 
-	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, target, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, u.log, target, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 
 	// If the artifactPath is not empty, then the artifact was downloaded.
 	// There may still be an error in the download process, so we need to add

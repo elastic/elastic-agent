@@ -7,7 +7,7 @@ package upgrade
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"crypto/sha512"
 	"fmt"
 	"io"
 	"net"
@@ -15,7 +15,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -24,404 +24,476 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
-	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/download"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/pgptest"
 )
 
-type mockDownloader struct {
-	downloadPath string
-	downloadErr  error
-}
-
-func (md *mockDownloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (string, error) {
-	return md.downloadPath, md.downloadErr
-}
-
-func TestFallbackIsAppended(t *testing.T) {
-	testAgentVersion123 := agtversion.NewParsedSemVer(1, 2, 3, "", "")
-	testCases := []struct {
-		name                 string
-		passedBytes          []string
-		expectedLen          int
-		expectedDefaultIdx   int
-		expectedSecondaryIdx int
-		fleetServerURI       string
-		targetVersion        *agtversion.ParsedSemVer
-	}{
-		{"nil input", nil, 1, 0, -1, "", testAgentVersion123},
-		{"empty input", []string{}, 1, 0, -1, "", testAgentVersion123},
-		{"valid input with pgp", []string{"pgp-bytes"}, 2, 1, -1, "", nil},
-		{"valid input with pgp and version, no fleet uri", []string{"pgp-bytes"}, 2, 1, -1, "", testAgentVersion123},
-		{"valid input with pgp and version and fleet uri", []string{"pgp-bytes"}, 3, 1, 2, "some-uri", testAgentVersion123},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			l, _ := loggertest.New(tc.name)
-			a := artifactDownloader{
-				fleetServerURI: tc.fleetServerURI,
-				log:            l,
-			}
-			res := a.appendFallbackPGP(tc.targetVersion, tc.passedBytes)
-			// check default fallback is passed and is very last
-			require.NotNil(t, res)
-			require.Equal(t, tc.expectedLen, len(res))
-			require.Equal(t, download.PgpSourceURIPrefix+defaultUpgradeFallbackPGP, res[tc.expectedDefaultIdx])
-
-			if tc.expectedSecondaryIdx >= 0 {
-				// last element is fleet uri
-				expectedPgpURI := download.PgpSourceURIPrefix + tc.fleetServerURI + strings.Replace(fleetUpgradeFallbackPGPFormat, "%d.%d.%d", tc.targetVersion.CoreVersion(), 1)
-				require.Equal(t, expectedPgpURI, res[len(res)-1])
-			}
-		})
-	}
-}
-
-func TestDownloadWithRetries(t *testing.T) {
-	expectedDownloadPath := "https://artifacts.elastic.co/downloads/beats/elastic-agent"
-	testLogger, obs := loggertest.New("TestDownloadWithRetries")
-
-	settings := artifact.Config{
-		RetrySleepInitDuration: 20 * time.Millisecond,
-		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
-			Timeout: 2 * time.Second,
-		},
-	}
-
-	// Successful immediately (no retries)
-	t.Run("successful_immediately", func(t *testing.T) {
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
-			return &mockDownloader{expectedDownloadPath, nil}, nil
-		}
-
-		a := newArtifactDownloader(&settings, testLogger)
-
-		parsedVersion, err := agtversion.ParseVersion("8.9.0")
-		require.NoError(t, err)
-
-		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
-		minRetryDeadline := time.Now().Add(settings.Timeout)
-
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, artifact.Artifact{Version: parsedVersion}, &settings, upgradeDetails)
-		require.NoError(t, err)
-		require.Equal(t, expectedDownloadPath, path)
-
-		logs := obs.TakeAll()
-		require.Len(t, logs, 1)
-		require.Equal(t, "download attempt 1", logs[0].Message)
-
-		// Check that upgradeDetails.Metadata.RetryUntil was set at some point
-		// during the retryable download and then check that it was unset upon
-		// successful download.
-		require.GreaterOrEqual(t, *upgradeDetailsRetryUntil, minRetryDeadline)
-		require.True(t, *upgradeDetailsRetryUntilWasUnset)
-		require.Nil(t, upgradeDetails.Metadata.RetryUntil)
-
-		// Check that upgradeDetails.Metadata.RetryErrorMsg was never set.
-		require.Empty(t, *upgradeDetailsRetryErrorMsg)
-	})
-
-	// Downloader constructor failing on first attempt, but succeeding on second attempt (= first retry)
-	t.Run("constructor_failure_once", func(t *testing.T) {
-		attemptIdx := 0
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
-			defer func() {
-				attemptIdx++
-			}()
-
-			switch attemptIdx {
-			case 0:
-				// First attempt: fail
-				return nil, errors.New("failed to construct downloader")
-			case 1:
-				// Second attempt: succeed
-				return &mockDownloader{expectedDownloadPath, nil}, nil
-			default:
-				require.Fail(t, "should have succeeded after 2 attempts")
-			}
-
-			return nil, nil
-		}
-
-		a := newArtifactDownloader(&settings, testLogger)
-
-		parsedVersion, err := agtversion.ParseVersion("8.9.0")
-		require.NoError(t, err)
-
-		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
-		minRetryDeadline := time.Now().Add(settings.Timeout)
-
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, artifact.Artifact{Version: parsedVersion}, &settings, upgradeDetails)
-		require.NoError(t, err)
-		require.Equal(t, expectedDownloadPath, path)
-
-		logs := obs.TakeAll()
-		require.Len(t, logs, 3)
-		require.Equal(t, "download attempt 1", logs[0].Message)
-		require.Contains(t, logs[1].Message, "unable to create fetcher: failed to construct downloader")
-		require.Equal(t, "download attempt 2", logs[2].Message)
-
-		// Check that upgradeDetails.Metadata.RetryUntil was set at some point
-		// during the retryable download and then check that it was unset upon
-		// successful download.
-		require.GreaterOrEqual(t, *upgradeDetailsRetryUntil, minRetryDeadline)
-		require.True(t, *upgradeDetailsRetryUntilWasUnset)
-		require.Nil(t, upgradeDetails.Metadata.RetryUntil)
-
-		// Check that upgradeDetails.Metadata.RetryErrorMsg was set at some point
-		// during the retryable download and then check that it was unset upon
-		// successful download.
-		require.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
-		require.Empty(t, upgradeDetails.Metadata.RetryErrorMsg)
-	})
-
-	// Download failing on first attempt, but succeeding on second attempt (= first retry)
-	t.Run("download_failure_once", func(t *testing.T) {
-		attemptIdx := 0
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
-			defer func() {
-				attemptIdx++
-			}()
-
-			switch attemptIdx {
-			case 0:
-				// First attempt: fail
-				return &mockDownloader{"", errors.New("download failed")}, nil
-			case 1:
-				// Second attempt: succeed
-				return &mockDownloader{expectedDownloadPath, nil}, nil
-			default:
-				require.Fail(t, "should have succeeded after 2 attempts")
-			}
-
-			return nil, nil
-		}
-
-		a := newArtifactDownloader(&settings, testLogger)
-
-		parsedVersion, err := agtversion.ParseVersion("8.9.0")
-		require.NoError(t, err)
-
-		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
-		minRetryDeadline := time.Now().Add(settings.Timeout)
-
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, artifact.Artifact{Version: parsedVersion}, &settings, upgradeDetails)
-		require.NoError(t, err)
-		require.Equal(t, expectedDownloadPath, path)
-
-		logs := obs.TakeAll()
-		require.Len(t, logs, 3)
-		require.Equal(t, "download attempt 1", logs[0].Message)
-		require.Contains(t, logs[1].Message, "unable to download package: download failed; retrying")
-		require.Equal(t, "download attempt 2", logs[2].Message)
-
-		// Check that upgradeDetails.Metadata.RetryUntil was set at some point
-		// during the retryable download and then check that it was unset upon
-		// successful download.
-		require.GreaterOrEqual(t, *upgradeDetailsRetryUntil, minRetryDeadline)
-		require.True(t, *upgradeDetailsRetryUntilWasUnset)
-		require.Nil(t, upgradeDetails.Metadata.RetryUntil)
-
-		// Check that upgradeDetails.Metadata.RetryErrorMsg was set at some point
-		// during the retryable download and then check that it was unset upon
-		// successful download.
-		require.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
-		require.Empty(t, upgradeDetails.Metadata.RetryErrorMsg)
-	})
-
-	// Download timeout expired (before all retries are exhausted)
-	t.Run("download_timeout_expired", func(t *testing.T) {
-		testCaseSettings := settings
-		testCaseSettings.Timeout = 500 * time.Millisecond
-		testCaseSettings.RetrySleepInitDuration = 10 * time.Millisecond
-		// exponential backoff with 10ms init and 500ms timeout should fit at least 3 attempts.
-		minNmExpectedAttempts := 3
-
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
-			return &mockDownloader{"", errors.New("download failed")}, nil
-		}
-
-		a := newArtifactDownloader(&settings, testLogger)
-
-		parsedVersion, err := agtversion.ParseVersion("8.9.0")
-		require.NoError(t, err)
-
-		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
-		minRetryDeadline := time.Now().Add(testCaseSettings.Timeout)
-
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, artifact.Artifact{Version: parsedVersion}, &testCaseSettings, upgradeDetails)
-		require.Equal(t, "context deadline exceeded", err.Error())
-		require.Equal(t, "", path)
-
-		logs := obs.TakeAll()
-		logsJSON, err := json.MarshalIndent(logs, "", " ")
-		require.NoError(t, err)
-		require.GreaterOrEqualf(t, len(logs), minNmExpectedAttempts*2, "logs output: %s", logsJSON)
-		for i := 0; i < minNmExpectedAttempts; i++ {
-			require.Equal(t, fmt.Sprintf("download attempt %d", i+1), logs[(2*i)].Message)
-			require.Contains(t, logs[(2*i+1)].Message, "unable to download package: download failed; retrying")
-		}
-
-		// Check that upgradeDetails.Metadata.RetryUntil was set at some point
-		// during the retryable download and then check that it was never unset,
-		// since we didn't have a successful download.
-		require.GreaterOrEqual(t, *upgradeDetailsRetryUntil, minRetryDeadline)
-		require.False(t, *upgradeDetailsRetryUntilWasUnset)
-		require.Equal(t, *upgradeDetailsRetryUntil, *upgradeDetails.Metadata.RetryUntil)
-
-		// Check that upgradeDetails.Metadata.RetryErrorMsg was set at some point
-		// during the retryable download and then check that it was never unset,
-		// since we didn't have a successful download.
-		require.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
-		require.Equal(t, *upgradeDetailsRetryErrorMsg, upgradeDetails.Metadata.RetryErrorMsg)
-	})
-
-	t.Run("insufficient disk space stops retries", func(t *testing.T) {
-		numberOfAttempts := 0
-		diskSpaceError := downloadErrors.OS_DiskSpaceErrors[0]
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
-			numberOfAttempts++
-			return &mockDownloader{"", diskSpaceError}, nil
-		}
-
-		a := newArtifactDownloader(&settings, testLogger)
-
-		parsedVersion, err := agtversion.ParseVersion("8.9.0")
-		require.NoError(t, err)
-
-		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
-
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, artifact.Artifact{Version: parsedVersion}, &settings, upgradeDetails)
-
-		require.Error(t, err)
-		require.Equal(t, "", path)
-
-		require.Equal(t, 1, numberOfAttempts)
-		require.ErrorIs(t, err, diskSpaceError)
-
-		require.NotZero(t, *upgradeDetailsRetryUntil)
-		require.False(t, *upgradeDetailsRetryUntilWasUnset)
-
-		require.Empty(t, *upgradeDetailsRetryErrorMsg)
-	})
-}
-
-type mockVerifier struct {
-	called      bool
-	returnError error
-}
-
-func (mv *mockVerifier) Name() string {
-	return ""
-}
-
-func (mv *mockVerifier) Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
-	mv.called = true
-	return mv.returnError
-}
-
 func TestDownloadArtifact(t *testing.T) {
-	testLogger, _ := loggertest.New("TestDownloadArtifact")
-
-	parsedVersion, err := agtversion.ParseVersion("8.9.0")
-	require.NoError(t, err)
-
-	upgradeDeatils := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
-
-	mockContent := []byte("mock content")
-
-	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, err := w.Write(mockContent)
-		require.NoError(t, err)
-	}))
-	defer testServer.Close()
-
-	testError := errors.New("test error")
-
-	type testCase struct {
-		mockNewVerifierFactory verifierFactory
-		expectedError          error
-	}
-
-	testCases := map[string]testCase{
-		"should return path if verifier constructor fails": {
-			mockNewVerifierFactory: func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
-				return nil, testError
-			},
-			expectedError: testError,
-		},
-		"should return path if verifier fails": {
-			mockNewVerifierFactory: func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
-				return &mockVerifier{returnError: testError}, nil
-			},
-			expectedError: testError,
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			paths.SetTop(t.TempDir())
-
-			expectedArtifact, err := artifact.New("elastic-agent", release.FIPSDistribution(), parsedVersion, runtime.GOOS, runtime.GOARCH)
-			require.NoError(t, err)
-			artifactPath := filepath.Join(paths.Downloads(), expectedArtifact.FileName)
-
-			settings := artifact.Config{
-				RetrySleepInitDuration: 20 * time.Millisecond,
-				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
-					Timeout: 2 * time.Second,
-				},
-				SourceURI:       testServer.URL,
-				TargetDirectory: paths.Downloads(),
-			}
-
-			a := newArtifactDownloader(&settings, testLogger)
-			a.newVerifier = tc.mockNewVerifierFactory
-
-			path, err := a.downloadArtifact(t.Context(), expectedArtifact, testServer.URL, upgradeDeatils, false, true)
-			require.ErrorIs(t, err, tc.expectedError)
-			require.Equal(t, artifactPath, path)
-		})
-	}
-}
-
-// mockUpgradeDetails returns a *details.Details value that has an observer registered on it for inspecting
-// certain properties of the object being set and unset.  It also returns:
-// - a *time.Time value, which will be not nil if Metadata.RetryUntil is set on the mock value,
-// - a *bool value, which will be true if Metadata.RetryUntil is set and then unset on the mock value,
-// - a *string value, which will be non-empty if Metadata.RetryErrorMsg is set on the mock value.
-func mockUpgradeDetails(parsedVersion *agtversion.ParsedSemVer) (*details.Details, *time.Time, *bool, *string) {
-	var upgradeDetailsRetryUntil time.Time
-	var upgradeDetailsRetryUntilWasUnset bool
-	var upgradeDetailsRetryErrorMsg string
-
-	upgradeDetails := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
-	upgradeDetails.RegisterObserver(func(details *details.Details) {
-		if details.Metadata.RetryUntil != nil {
-			upgradeDetailsRetryUntil = *details.Metadata.RetryUntil
-		}
-
-		if !upgradeDetailsRetryUntil.IsZero() && details.Metadata.RetryUntil == nil {
-			upgradeDetailsRetryUntilWasUnset = true
-		}
-
-		if details.Metadata.RetryErrorMsg != "" {
-			upgradeDetailsRetryErrorMsg = details.Metadata.RetryErrorMsg
-		}
+	originalTop := paths.Top()
+	originalDownloads := paths.Downloads()
+	t.Cleanup(func() {
+		paths.SetTop(originalTop)
+		paths.SetDownloads(originalDownloads)
 	})
 
-	return upgradeDetails,
-		&upgradeDetailsRetryUntil, &upgradeDetailsRetryUntilWasUnset,
-		&upgradeDetailsRetryErrorMsg
+	parsedVersion := agtversion.NewParsedSemVer(8, 9, 0, "", "")
+	newSettings := func() download.Config {
+		return download.Config{
+			TargetDirectory:        paths.Downloads(),
+			RetrySleepInitDuration: time.Millisecond,
+			HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+				Timeout: time.Second,
+			},
+		}
+	}
+	writeArtifact := func(t *testing.T, dir string, filename string, content []byte) {
+		t.Helper()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, filename), content, 0o644))
+	}
+	writeArtifactHash := func(t *testing.T, dir string, filename string, content []byte) {
+		t.Helper()
+
+		hash := sha512.Sum512(content)
+		require.NoError(t, os.WriteFile(
+			filepath.Join(dir, filename+".sha512"),
+			[]byte(fmt.Sprintf("%x %s", hash, filename)),
+			0o644,
+		))
+	}
+	setupPGP := func(t *testing.T, content []byte) ([]string, []byte) {
+		t.Helper()
+
+		pgpKey, signature := pgptest.Sign(t, bytes.NewReader(content))
+		return []string{download.PgpSourceRawPrefix + string(pgpKey)}, signature
+	}
+	setupHTTPServer := func(t *testing.T, files map[string][]byte, missingStatus int) (string, map[string]int) {
+		t.Helper()
+
+		requestCounts := map[string]int{}
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			path := r.URL.Path
+			requestCounts[path]++
+
+			file, ok := files[path]
+			if !ok {
+				w.WriteHeader(missingStatus)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			_, writeErr := w.Write(file)
+			require.NoError(t, writeErr, "error writing response content")
+		}))
+		t.Cleanup(testServer.Close)
+
+		return testServer.URL, requestCounts
+	}
+	setupHTTPSProxy := func(t *testing.T, files map[string][]byte, missingStatus int) (*httpcommon.ProxyURI, map[string]int) {
+		t.Helper()
+
+		requestCounts := map[string]int{}
+		upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			path := r.URL.Path
+			requestCounts[path]++
+
+			file, ok := files[path]
+			if !ok {
+				w.WriteHeader(missingStatus)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			_, writeErr := w.Write(file)
+			require.NoError(t, writeErr, "error writing response content")
+		}))
+		t.Cleanup(upstream.Close)
+
+		proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodConnect, r.Method)
+
+			upstreamConn, err := net.Dial("tcp", upstream.Listener.Addr().String())
+			require.NoError(t, err)
+
+			hijacker, ok := w.(http.Hijacker)
+			require.True(t, ok)
+			clientConn, _, err := hijacker.Hijack()
+			require.NoError(t, err)
+
+			_, err = clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+			if err != nil {
+				require.NoError(t, clientConn.Close())
+				require.NoError(t, upstreamConn.Close())
+				return
+			}
+
+			go func() {
+				_, _ = io.Copy(upstreamConn, clientConn)
+				_ = upstreamConn.Close()
+				_ = clientConn.Close()
+			}()
+			go func() {
+				_, _ = io.Copy(clientConn, upstreamConn)
+				_ = upstreamConn.Close()
+				_ = clientConn.Close()
+			}()
+		}))
+		t.Cleanup(proxy.Close)
+
+		proxyURI, err := httpcommon.NewProxyURIFromString(proxy.URL)
+		require.NoError(t, err)
+
+		return proxyURI, requestCounts
+	}
+
+	type downloadArtifactTestCase struct {
+		name          string
+		skipVerify    bool
+		version       *agtversion.ParsedSemVer
+		expectedFiles []string
+		setup         func(*testing.T, download.Artifact) (download.Config, string, []string, func(*testing.T, string, error))
+	}
+
+	tests := []downloadArtifactTestCase{
+		{
+			name:          "local sourceURI copies from local source",
+			expectedFiles: []string{"artifact", "hash"},
+			setup: func(t *testing.T, target download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				dropPath := t.TempDir()
+				content := []byte("signed local artifact")
+				pgpSources, signature := setupPGP(t, content)
+				writeArtifact(t, dropPath, target.FileName, content)
+				writeArtifactHash(t, dropPath, target.FileName, content)
+				require.NoError(t, os.WriteFile(filepath.Join(dropPath, target.FileName+".asc"), signature, 0o644))
+
+				settings := newSettings()
+
+				return settings, "file://" + dropPath, pgpSources, func(t *testing.T, artifactPath string, err error) {
+					require.NoError(t, err)
+					require.Equal(t, filepath.Join(paths.Downloads(), target.FileName), artifactPath)
+				}
+			},
+		},
+		{
+			name:          "skip verification for local sourceURI if skipVerify is set",
+			skipVerify:    true,
+			expectedFiles: []string{"artifact"},
+			setup: func(t *testing.T, target download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				dropPath := t.TempDir()
+				writeArtifact(t, dropPath, target.FileName, []byte("local artifact"))
+
+				return newSettings(), "file://" + dropPath, nil, func(t *testing.T, artifactPath string, err error) {
+					require.NoError(t, err)
+					require.Equal(t, filepath.Join(paths.Downloads(), target.FileName), artifactPath)
+				}
+			},
+		},
+		{
+			name:          "local sourceURI fails when local verification fails",
+			expectedFiles: []string{"artifact", "hash"},
+			setup: func(t *testing.T, target download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				dropPath := t.TempDir()
+				content := []byte("local artifact")
+				pgpSources, _ := setupPGP(t, content)
+				writeArtifact(t, dropPath, target.FileName, content)
+				writeArtifactHash(t, dropPath, target.FileName, content)
+				require.NoError(t, os.WriteFile(filepath.Join(dropPath, target.FileName+".asc"), []byte("not a valid signature"), 0o644))
+
+				settings := newSettings()
+
+				return settings, "file://" + dropPath, pgpSources, func(t *testing.T, artifactPath string, err error) {
+					require.Error(t, err)
+					require.ErrorContains(t, err, "verification failed")
+					require.Equal(t, filepath.Join(paths.Downloads(), target.FileName), artifactPath)
+				}
+			},
+		},
+		{
+			name: "local sourceURI fails when local artifact is missing",
+			setup: func(t *testing.T, _ download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				serverURL, requestCounts := setupHTTPServer(t, nil, http.StatusOK)
+
+				settings := newSettings()
+				settings.SourceURI = serverURL
+
+				return settings, "file://" + t.TempDir(), nil, func(t *testing.T, _ string, err error) {
+					require.Error(t, err)
+					require.ErrorContains(t, err, "could not fetch artifact")
+					require.Empty(t, requestCounts)
+				}
+			},
+		},
+		{
+			name:          "local sourceURI fails when local artifact is missing its hash",
+			expectedFiles: []string{"artifact"},
+			setup: func(t *testing.T, target download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				dropPath := t.TempDir()
+				writeArtifact(t, dropPath, target.FileName, []byte("local artifact"))
+
+				return newSettings(), "file://" + dropPath, nil, func(t *testing.T, _ string, err error) {
+					require.Error(t, err)
+					require.ErrorContains(t, err, "could not fetch artifact sha512")
+				}
+			},
+		},
+		{
+			name:          "remote sourceURI copies from local drop path if available",
+			expectedFiles: []string{"artifact", "hash"},
+			setup: func(t *testing.T, target download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				dropPath := t.TempDir()
+				content := []byte("signed local artifact")
+				pgpSources, signature := setupPGP(t, content)
+				writeArtifact(t, dropPath, target.FileName, content)
+				writeArtifactHash(t, dropPath, target.FileName, content)
+				require.NoError(t, os.WriteFile(filepath.Join(dropPath, target.FileName+".asc"), signature, 0o644))
+
+				serverURL, requestCounts := setupHTTPServer(t, nil, http.StatusInternalServerError)
+
+				settings := newSettings()
+				settings.DropPath = dropPath
+				settings.SourceURI = serverURL
+
+				return settings, serverURL, pgpSources, func(t *testing.T, artifactPath string, err error) {
+					require.NoError(t, err)
+					require.Equal(t, filepath.Join(paths.Downloads(), target.FileName), artifactPath)
+					require.Empty(t, requestCounts)
+				}
+			},
+		},
+		{
+			name:          "remote sourceURI uses remote source when drop path is set but artifact is missing",
+			expectedFiles: []string{"artifact", "hash"},
+			setup: func(t *testing.T, target download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				dropPath := t.TempDir()
+
+				remoteContent := []byte("signed remote artifact")
+				pgpSources, signature := setupPGP(t, remoteContent)
+				remoteHash := sha512.Sum512(remoteContent)
+				remoteFiles := map[string][]byte{
+					"/beats/elastic-agent/" + target.FileName:             remoteContent,
+					"/beats/elastic-agent/" + target.FileName + ".sha512": []byte(fmt.Sprintf("%x %s", remoteHash, target.FileName)),
+					"/beats/elastic-agent/" + target.FileName + ".asc":    signature,
+				}
+
+				serverURL, requestCounts := setupHTTPServer(t, remoteFiles, http.StatusNotFound)
+
+				settings := newSettings()
+				settings.DropPath = dropPath
+				settings.SourceURI = serverURL
+
+				return settings, serverURL, pgpSources, func(t *testing.T, artifactPath string, err error) {
+					require.NoError(t, err)
+					require.Equal(t, filepath.Join(paths.Downloads(), target.FileName), artifactPath)
+					require.NotEmpty(t, requestCounts)
+				}
+			},
+		},
+		{
+			name:          "remote sourceURI uses remote source if local drop path verification fails",
+			expectedFiles: []string{"artifact", "hash"},
+			setup: func(t *testing.T, target download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				dropPath := t.TempDir()
+				writeArtifact(t, dropPath, target.FileName, []byte("local artifact"))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(dropPath, target.FileName+".sha512"),
+					[]byte(strings.Repeat("0", 128)+" "+target.FileName),
+					0o644,
+				))
+
+				remoteContent := []byte("signed remote artifact")
+				pgpSources, signature := setupPGP(t, remoteContent)
+				remoteHash := sha512.Sum512(remoteContent)
+				remoteFiles := map[string][]byte{
+					"/beats/elastic-agent/" + target.FileName:             remoteContent,
+					"/beats/elastic-agent/" + target.FileName + ".sha512": []byte(fmt.Sprintf("%x %s", remoteHash, target.FileName)),
+					"/beats/elastic-agent/" + target.FileName + ".asc":    signature,
+				}
+
+				serverURL, requestCounts := setupHTTPServer(t, remoteFiles, http.StatusNotFound)
+
+				settings := newSettings()
+				settings.DropPath = dropPath
+				settings.SourceURI = serverURL
+
+				return settings, serverURL, pgpSources, func(t *testing.T, artifactPath string, err error) {
+					require.NoError(t, err)
+					require.Equal(t, filepath.Join(paths.Downloads(), target.FileName), artifactPath)
+					require.NotEmpty(t, requestCounts)
+					got, err := os.ReadFile(artifactPath)
+					require.NoError(t, err)
+					require.Equal(t, remoteContent, got)
+				}
+			},
+		},
+		{
+			name:          "remote sourceURI uses remote source when drop path is unset",
+			expectedFiles: []string{"artifact", "hash"},
+			setup: func(t *testing.T, target download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				remoteContent := []byte("signed remote artifact")
+				pgpSources, signature := setupPGP(t, remoteContent)
+				remoteHash := sha512.Sum512(remoteContent)
+				remoteFiles := map[string][]byte{
+					"/beats/elastic-agent/" + target.FileName:             remoteContent,
+					"/beats/elastic-agent/" + target.FileName + ".sha512": []byte(fmt.Sprintf("%x %s", remoteHash, target.FileName)),
+					"/beats/elastic-agent/" + target.FileName + ".asc":    signature,
+				}
+
+				serverURL, requestCounts := setupHTTPServer(t, remoteFiles, http.StatusNotFound)
+
+				settings := newSettings()
+				settings.SourceURI = serverURL
+
+				return settings, serverURL, pgpSources, func(t *testing.T, artifactPath string, err error) {
+					require.NoError(t, err)
+					require.Equal(t, filepath.Join(paths.Downloads(), target.FileName), artifactPath)
+					require.NotEmpty(t, requestCounts)
+				}
+			},
+		},
+		{
+			name:          "remote sourceURI fails when remote artifact is missing its hash",
+			expectedFiles: []string{"artifact"},
+			setup: func(t *testing.T, target download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				files := map[string][]byte{
+					"/beats/elastic-agent/" + target.FileName: []byte("This is a fake linux elastic agent archive"),
+				}
+				serverURL, requestCounts := setupHTTPServer(t, files, http.StatusNotFound)
+
+				settings := newSettings()
+				settings.SourceURI = serverURL
+
+				return settings, serverURL, nil, func(t *testing.T, _ string, err error) {
+					require.Error(t, err)
+					require.ErrorContains(t, err, "could not fetch artifact sha512")
+					require.Greater(t, requestCounts["/beats/elastic-agent/"+target.FileName+".sha512"], 0)
+				}
+			},
+		},
+		{
+			name:          "skip verification for remote sourceURI if skipVerify is set",
+			skipVerify:    true,
+			expectedFiles: []string{"artifact"},
+			setup: func(t *testing.T, target download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				files := map[string][]byte{
+					"/beats/elastic-agent/" + target.FileName: []byte("remote artifact"),
+				}
+				serverURL, requestCounts := setupHTTPServer(t, files, http.StatusNotFound)
+
+				return newSettings(), serverURL, nil, func(t *testing.T, artifactPath string, err error) {
+					require.NoError(t, err)
+					require.Equal(t, filepath.Join(paths.Downloads(), target.FileName), artifactPath)
+					require.Greater(t, requestCounts["/beats/elastic-agent/"+target.FileName], 0)
+					require.Zero(t, requestCounts["/beats/elastic-agent/"+target.FileName+".sha512"])
+				}
+			},
+		},
+		{
+			name:          "default snapshot sourceURI looks up latest build ID",
+			version:       agtversion.NewParsedSemVer(8, 14, 0, "SNAPSHOT", ""),
+			expectedFiles: []string{"artifact", "hash"},
+			setup: func(t *testing.T, target download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				remoteContent := []byte("signed snapshot artifact")
+				pgpSources, signature := setupPGP(t, remoteContent)
+				remoteHash := sha512.Sum512(remoteContent)
+				remoteFiles := map[string][]byte{
+					"/latest/8.14.0-SNAPSHOT.json":                                                  []byte(`{"build_id":"8.14.0-6d69ee76"}`),
+					"/8.14.0-6d69ee76/downloads/beats/elastic-agent/" + target.FileName:             remoteContent,
+					"/8.14.0-6d69ee76/downloads/beats/elastic-agent/" + target.FileName + ".sha512": []byte(fmt.Sprintf("%x %s", remoteHash, target.FileName)),
+					"/8.14.0-6d69ee76/downloads/beats/elastic-agent/" + target.FileName + ".asc":    signature,
+				}
+
+				proxyURL, requestCounts := setupHTTPSProxy(t, remoteFiles, http.StatusNotFound)
+				enabled := true
+				settings := newSettings()
+				settings.HTTPTransportSettings.Proxy.URL = proxyURL
+				settings.HTTPTransportSettings.TLS = &tlscommon.Config{
+					Enabled:          &enabled,
+					VerificationMode: tlscommon.VerifyNone,
+				}
+
+				return settings, "", pgpSources, func(t *testing.T, artifactPath string, err error) {
+					require.NoError(t, err)
+					require.Equal(t, filepath.Join(paths.Downloads(), target.FileName), artifactPath)
+					require.Greater(t, requestCounts["/latest/8.14.0-SNAPSHOT.json"], 0)
+					require.Greater(t, requestCounts["/8.14.0-6d69ee76/downloads/beats/elastic-agent/"+target.FileName], 0)
+				}
+			},
+		},
+		{
+			name:          "remote sourceURI fails when remote verification fails",
+			expectedFiles: []string{"artifact", "hash"},
+			setup: func(t *testing.T, target download.Artifact) (download.Config, string, []string, func(*testing.T, string, error)) {
+				remoteContent := []byte("remote artifact")
+				pgpSources, _ := setupPGP(t, remoteContent)
+				remoteHash := sha512.Sum512(remoteContent)
+				remoteFiles := map[string][]byte{
+					"/beats/elastic-agent/" + target.FileName:             remoteContent,
+					"/beats/elastic-agent/" + target.FileName + ".sha512": []byte(fmt.Sprintf("%x %s", remoteHash, target.FileName)),
+					"/beats/elastic-agent/" + target.FileName + ".asc":    []byte("not a valid signature"),
+				}
+
+				serverURL, requestCounts := setupHTTPServer(t, remoteFiles, http.StatusNotFound)
+
+				settings := newSettings()
+				settings.SourceURI = serverURL
+
+				return settings, serverURL, pgpSources, func(t *testing.T, artifactPath string, err error) {
+					require.Error(t, err)
+					require.ErrorContains(t, err, "verification failed")
+					require.Equal(t, filepath.Join(paths.Downloads(), target.FileName), artifactPath)
+					require.Greater(t, requestCounts["/beats/elastic-agent/"+target.FileName+".asc"], 0)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			paths.SetTop(t.TempDir())
+			targetVersion := parsedVersion
+			if tt.version != nil {
+				targetVersion = tt.version
+			}
+			target, err := download.New("elastic-agent", false, targetVersion, "linux", "amd64")
+			require.NoError(t, err)
+
+			downloadsPath := filepath.Join(paths.Top(), "downloads")
+			paths.SetDownloads(downloadsPath)
+			settings, sourceURI, pgpSources, assertResult := tt.setup(t, target)
+			testLogger, _ := loggertest.New(t.Name())
+			artifactPath, err := newArtifactDownloader(&settings, testLogger).downloadArtifact(
+				t.Context(),
+				testLogger,
+				target,
+				sourceURI,
+				details.NewDetails(parsedVersion.String(), details.StateRequested, ""),
+				tt.skipVerify,
+				true,
+				pgpSources...,
+			)
+			assertResult(t, artifactPath, err)
+
+			expectedArtifactPath := filepath.Join(paths.Downloads(), target.FileName)
+			require.Equal(t, expectedArtifactPath, artifactPath)
+			expectedHashPath := download.AddHashExtension(expectedArtifactPath)
+
+			expectedFiles := map[string]string{
+				"artifact": expectedArtifactPath,
+				"hash":     expectedHashPath,
+			}
+			for expectedFile, expectedPath := range expectedFiles {
+				if slices.Contains(tt.expectedFiles, expectedFile) {
+					require.FileExists(t, expectedPath)
+				} else {
+					require.NoFileExists(t, expectedPath)
+				}
+			}
+		})
+	}
 }
 
 func TestWithFleetServerURI(t *testing.T) {
@@ -431,85 +503,169 @@ func TestWithFleetServerURI(t *testing.T) {
 }
 
 func TestResolve(t *testing.T) {
-	type args struct {
-		version   *agtversion.ParsedSemVer
-		sourceURI string
-	}
+	dropPath := t.TempDir()
+
 	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr assert.ErrorAssertionFunc
+		name      string
+		sourceURI string
+		os        string
+		arch      string
+		version   *agtversion.ParsedSemVer
+		want      string
+		wantLocal bool
 	}{
 		{
-			name: "non-default source URI is respected",
-			args: args{
-				version:   agtversion.NewParsedSemVer(8, 12, 0, "SNAPSHOT", ""),
-				sourceURI: "localhost:1234",
-			},
-			want:    "localhost:1234",
-			wantErr: assert.NoError,
+			name:      "empty source URI resolves as the default remote base",
+			sourceURI: "",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz",
 		},
 		{
-			name: "build metadata targets a specific snapshot build",
-			args: args{
-				version:   agtversion.NewParsedSemVer(8, 13, 3, "SNAPSHOT", "76ce1a63"),
-				sourceURI: artifact.DefaultSourceURI,
-			},
-			want:    "https://snapshots.elastic.co/8.13.3-76ce1a63/downloads/",
-			wantErr: assert.NoError,
+			name:      "release version",
+			sourceURI: download.DefaultSourceURI,
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz",
 		},
 		{
-			name: "latest snapshot build is looked up",
-			args: args{
-				version:   agtversion.NewParsedSemVer(8, 14, 0, "SNAPSHOT", ""),
-				sourceURI: artifact.DefaultSourceURI,
-			},
-			want:    "https://snapshots.elastic.co/8.14.0-6d69ee76/downloads/",
-			wantErr: assert.NoError,
+			name:      "release version on windows",
+			sourceURI: download.DefaultSourceURI,
+			os:        "windows",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-1.2.3-windows-x86_64.zip",
 		},
-	}
-
-	files := map[string][]byte{
-		"/latest/8.14.0-SNAPSHOT.json": readSnapshotFile(t, "./artifact/download/testdata/latest-snapshot.json"),
-	}
-
-	handleRequest := func(rw http.ResponseWriter, req *http.Request) {
-		file, ok := files[req.URL.Path]
-		if !ok {
-			rw.WriteHeader(http.StatusNotFound)
-			return
-		}
-		_, err := io.Copy(rw, bytes.NewReader(file))
-		assert.NoError(t, err, "error writing out response body")
-	}
-
-	server := httptest.NewTLSServer(http.HandlerFunc(handleRequest))
-	defer server.Close()
-
-	// Redirect requests to snapshots.elastic.co at the test server.
-	client := server.Client()
-	transport := client.Transport.(*http.Transport)
-	transport.TLSClientConfig.InsecureSkipVerify = true
-	transport.DialContext = func(_ context.Context, network, _ string) (net.Conn, error) {
-		return net.Dial(network, server.Listener.Addr().String())
+		{
+			name:      "release version on darwin",
+			sourceURI: download.DefaultSourceURI,
+			os:        "darwin",
+			arch:      "arm64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-1.2.3-darwin-aarch64.tar.gz",
+		},
+		{
+			name:      "release version with build metadata",
+			sourceURI: download.DefaultSourceURI,
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", "build19700101"),
+			want:      "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-1.2.3+build19700101-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "snapshot version with build metadata uses that buildID",
+			sourceURI: download.DefaultSourceURI,
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(8, 13, 3, "SNAPSHOT", "76ce1a63"),
+			want:      "https://snapshots.elastic.co/8.13.3-76ce1a63/downloads/beats/elastic-agent/elastic-agent-8.13.3-SNAPSHOT-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "custom source URI",
+			sourceURI: "https://mirror.example.com/downloads",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://mirror.example.com/downloads/beats/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "custom source URI snapshot build",
+			sourceURI: "https://mirror.example.com/downloads",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(8, 14, 0, "SNAPSHOT", ""),
+			want:      "https://mirror.example.com/downloads/beats/elastic-agent/elastic-agent-8.14.0-SNAPSHOT-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "scheme-less source URI defaults to https",
+			sourceURI: "mirror.example.com/downloads",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://mirror.example.com/downloads/beats/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+		},
+		{
+			name:      "file:// URI",
+			sourceURI: "file://" + dropPath,
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "file://" + dropPath + "/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+			wantLocal: true,
+		},
+		{
+			name:      "file:// URI with trailing slash",
+			sourceURI: "file://" + dropPath + "/",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "file://" + dropPath + "/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+			wantLocal: true,
+		},
+		{
+			name:      "remote URI preserves query while joining artifact path",
+			sourceURI: "https://mirror.example.com/downloads?token=abc",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://mirror.example.com/downloads/beats/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz?token=abc",
+		},
+		{
+			name:      "remote URI path elements are cleaned while joining artifact path",
+			sourceURI: "https://mirror.example.com/downloads/../artifacts",
+			os:        "linux",
+			arch:      "amd64",
+			version:   agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+			want:      "https://mirror.example.com/artifacts/beats/elastic-agent/elastic-agent-1.2.3-linux-x86_64.tar.gz",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			isLocal, got, err := Resolve(context.Background(), client, tt.args.version, tt.args.sourceURI)
-			if !tt.wantErr(t, err) {
-				return
-			}
-			assert.False(t, isLocal)
-			assert.Equal(t, tt.want, got)
+			a, err := download.New("elastic-agent", false, tt.version, tt.os, tt.arch)
+			require.NoError(t, err)
+
+			source, err := Resolve(a, tt.sourceURI)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, source)
+			assert.Equal(t, tt.wantLocal, download.IsLocal(source))
 		})
 	}
 }
 
-func readSnapshotFile(t *testing.T, name string) []byte {
-	t.Helper()
-	b, err := os.ReadFile(name)
-	require.NoError(t, err)
-	return b
+func TestLatestSnapshotBuildID(t *testing.T) {
+	t.Run("looks up latest build", func(t *testing.T) {
+		snapshotJSON, err := os.ReadFile(filepath.Join("download", "testdata", "latest-snapshot.json"))
+		require.NoError(t, err)
+		files := map[string][]byte{
+			"/latest/8.14.0-SNAPSHOT.json": snapshotJSON,
+		}
+		handleDownload := func(rw http.ResponseWriter, req *http.Request) {
+			file, ok := files[req.URL.Path]
+			if !ok {
+				rw.WriteHeader(http.StatusNotFound)
+				return
+			}
+			_, err := io.Copy(rw, bytes.NewReader(file))
+			assert.NoError(t, err, "error writing out response body")
+		}
+		server := httptest.NewTLSServer(http.HandlerFunc(handleDownload))
+		defer server.Close()
+
+		client := server.Client()
+		transport := client.Transport.(*http.Transport)
+		transport.TLSClientConfig.InsecureSkipVerify = true
+		transport.DialContext = func(_ context.Context, network, _ string) (net.Conn, error) {
+			return net.Dial(network, server.Listener.Addr().String())
+		}
+
+		a, err := download.New("elastic-agent", false, agtversion.NewParsedSemVer(8, 14, 0, "SNAPSHOT", ""), "linux", "amd64")
+		require.NoError(t, err)
+
+		buildID, err := latestSnapshotBuildID(context.TODO(), client, a.Version)
+		require.NoError(t, err)
+		assert.Equal(t, "6d69ee76", buildID)
+	})
 }

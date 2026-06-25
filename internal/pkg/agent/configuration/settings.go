@@ -5,7 +5,7 @@
 package configuration
 
 import (
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/download"
 
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -15,7 +15,7 @@ import (
 // SettingsConfig is an collection of agent settings configuration.
 type SettingsConfig struct {
 	ID                 string                          `yaml:"id" config:"id" json:"id"`
-	DownloadConfig     *artifact.Config                `yaml:"download" config:"download" json:"download"`
+	DownloadConfig     *download.Config                `yaml:"download" config:"download" json:"download"`
 	ProcessConfig      *process.Config                 `yaml:"process" config:"process" json:"process"`
 	GRPC               *GRPCConfig                     `yaml:"grpc" config:"grpc" json:"grpc"`
 	MonitoringConfig   *monitoringCfg.MonitoringConfig `yaml:"monitoring" config:"monitoring" json:"monitoring"`
@@ -35,7 +35,7 @@ type SettingsConfig struct {
 func DefaultSettingsConfig() *SettingsConfig {
 	return &SettingsConfig{
 		ProcessConfig:       process.DefaultConfig(),
-		DownloadConfig:      artifact.DefaultConfig(),
+		DownloadConfig:      download.DefaultConfig(),
 		LoggingConfig:       logger.DefaultLoggingConfig(),
 		EventLoggingConfig:  logger.DefaultEventLoggingConfig(),
 		MonitoringConfig:    monitoringCfg.DefaultConfig(),

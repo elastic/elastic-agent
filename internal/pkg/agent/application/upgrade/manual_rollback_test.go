@@ -23,7 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -163,7 +163,7 @@ func TestManualRollback(t *testing.T) {
 	type testcase struct {
 		name              string
 		setup             setupF
-		artifactSettings  *artifact.Config
+		artifactSettings  *download.Config
 		upgradeSettings   *configuration.UpgradeConfig
 		now               time.Time
 		version           string
@@ -177,7 +177,7 @@ func TestManualRollback(t *testing.T) {
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
 				//do not setup anything here, let the rollback fail
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
 			version:          "",
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
@@ -191,7 +191,7 @@ func TestManualRollback(t *testing.T) {
 				//do not setup anything here, let the rollback fail
 				rollbacksSource.EXPECT().GetAll().Return(nil, nil, nil)
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
 			version:          "1.2.3",
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
@@ -213,7 +213,7 @@ func TestManualRollback(t *testing.T) {
 					assert.NoError(t, unlockErr, "error unlocking initial watcher AppLocker")
 				})
 			},
-			artifactSettings:  artifact.DefaultConfig(),
+			artifactSettings:  download.DefaultConfig(),
 			upgradeSettings:   configuration.DefaultUpgradeConfig(),
 			version:           "1.2.3",
 			wantErr:           assert.Error,
@@ -233,7 +233,7 @@ func TestManualRollback(t *testing.T) {
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
 				rollbacksSource.EXPECT().GetAll().Return(nil, nil, nil)
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
 			version:          "2.3.4-unknown",
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
@@ -263,7 +263,7 @@ func TestManualRollback(t *testing.T) {
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
 				rollbacksSource.EXPECT().GetAll().Return(nil, nil, errors.New("disk error"))
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
 			version:          "1.2.3",
 			wantErr:          assert.Error,
@@ -291,7 +291,7 @@ func TestManualRollback(t *testing.T) {
 					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {Version: "1.2.3", ValidUntil: nowBeforeTTL.Add(24 * time.Hour)},
 				}, nil, nil)
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
 			now:              nowBeforeTTL,
 			version:          "2.3.4-unknown",
@@ -324,7 +324,7 @@ func TestManualRollback(t *testing.T) {
 					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {Version: "1.2.3", ValidUntil: nowAfterTTL.Add(-24 * time.Hour)},
 				}, nil, nil)
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
 			now:              nowAfterTTL,
 			version:          "1.2.3",
@@ -357,7 +357,7 @@ func TestManualRollback(t *testing.T) {
 					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {Version: "1.2.3", ValidUntil: nowAfterTTL.Add(-24 * time.Hour)},
 				}, nil, nil)
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
 			now:              nowAfterTTL,
 			version:          "1.2.3",
@@ -390,7 +390,7 @@ func TestManualRollback(t *testing.T) {
 					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {Version: "1.2.3", ValidUntil: nowBeforeTTL.Add(24 * time.Hour)},
 				}, nil, nil)
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
 			now:              nowBeforeTTL,
 			version:          "1.2.3",
@@ -422,7 +422,7 @@ func TestManualRollback(t *testing.T) {
 					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {Version: "1.2.3", ValidUntil: nowBeforeTTL.Add(24 * time.Hour)},
 				}, nil, nil)
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
 			now:              nowBeforeTTL,
 			version:          "1.2.3",
@@ -455,7 +455,7 @@ func TestManualRollback(t *testing.T) {
 					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {Version: "1.2.3", ValidUntil: nowBeforeTTL.Add(24 * time.Hour)},
 				}, nil, nil)
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
 			now:              nowBeforeTTL,
 			version:          "1.2.3",
@@ -483,7 +483,7 @@ func TestManualRollback(t *testing.T) {
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", filepath.Join("data", "elastic-agent-1.2.3-oldver")).
 					Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for rollbacksies"}, Process: &os.Process{Pid: 123}}, nil)
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings: &configuration.UpgradeConfig{
 				Rollback: &configuration.UpgradeRollbackConfig{
 					Window: 24 * time.Hour,
@@ -530,7 +530,7 @@ func TestManualRollback(t *testing.T) {
 					},
 					nil, nil)
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings: &configuration.UpgradeConfig{
 				Rollback: &configuration.UpgradeRollbackConfig{
 					Window: 24 * time.Hour,
@@ -560,7 +560,7 @@ func TestManualRollback(t *testing.T) {
 					},
 					nil, nil)
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings: &configuration.UpgradeConfig{
 				Rollback: &configuration.UpgradeRollbackConfig{
 					Window: 24 * time.Hour,
@@ -582,7 +582,7 @@ func TestManualRollback(t *testing.T) {
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
 				rollbacksSource.EXPECT().GetAll().Return(nil, nil, errors.New("error retrieving agent rollbacks"))
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings: &configuration.UpgradeConfig{
 				Rollback: &configuration.UpgradeRollbackConfig{
 					Window: 24 * time.Hour,
@@ -610,7 +610,7 @@ func TestManualRollback(t *testing.T) {
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", filepath.Join("data", "elastic-agent-1.2.3-oldver")).
 					Return(nil, errors.New("error invoking watcher"))
 			},
-			artifactSettings: artifact.DefaultConfig(),
+			artifactSettings: download.DefaultConfig(),
 			upgradeSettings: &configuration.UpgradeConfig{
 				Rollback: &configuration.UpgradeRollbackConfig{
 					Window: 24 * time.Hour,

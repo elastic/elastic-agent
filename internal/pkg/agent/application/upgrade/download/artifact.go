@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package artifact
+package download
 
 import (
 	"fmt"
@@ -28,6 +28,10 @@ type Artifact struct {
 	Name     string
 	Version  *agtversion.ParsedSemVer
 	FileName string
+}
+
+func IsLocal(source string) bool {
+	return strings.HasPrefix(source, "file://")
 }
 
 func New(name string, fips bool, version *agtversion.ParsedSemVer, os, arch string) (Artifact, error) {

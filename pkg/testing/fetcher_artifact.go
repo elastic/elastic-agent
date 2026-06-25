@@ -19,7 +19,7 @@ import (
 
 	"github.com/cenkalti/backoff/v5"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/download"
 	semver "github.com/elastic/elastic-agent/pkg/version"
 )
 

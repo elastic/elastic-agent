@@ -29,8 +29,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
-	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -267,7 +266,7 @@ func TestIsInProgress(t *testing.T) {
 	}
 }
 
-// TestUpgraderReload ensures the download configs (artifact.Config) are all
+// TestUpgraderReload ensures the download configs (download.Config) are all
 // applied. However, as of today, most of them cannot be set through Fleet UI.
 func TestUpgraderReload(t *testing.T) {
 	// if needed to regenerate the certificates, use the `elasticsearch-certgen`
@@ -278,7 +277,7 @@ func TestUpgraderReload(t *testing.T) {
 	log, _ := loggertest.New("")
 	u := Upgrader{
 		log:      log,
-		settings: artifact.DefaultConfig(),
+		settings: download.DefaultConfig(),
 	}
 
 	err := u.Reload(config.MustNewConfigFrom(cfgyaml))
@@ -291,7 +290,7 @@ func TestUpgraderAckAction(t *testing.T) {
 	log, _ := loggertest.New("")
 	u := Upgrader{
 		log:      log,
-		settings: artifact.DefaultConfig(),
+		settings: download.DefaultConfig(),
 	}
 
 	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
@@ -327,7 +326,7 @@ func TestUpgraderAckAction(t *testing.T) {
 	})
 }
 
-func prepareTestUpgraderReload() (string, artifact.Config) {
+func prepareTestUpgraderReload() (string, download.Config) {
 	cfgyaml := `
 agent.download:
   source_uri: "https://tardis.elastic.co/downloads/"
@@ -426,7 +425,7 @@ agent.download:
   idle_connection_timeout: 15s`
 
 	enabled := true
-	want := artifact.Config{
+	want := download.Config{
 		SourceURI:              "https://tardis.elastic.co/downloads/",
 		TargetDirectory:        "/tardis",
 		InstallPath:            "/sonic_screwdriver",
@@ -575,7 +574,7 @@ agent.download:
 
 			u := Upgrader{
 				log:      log,
-				settings: artifact.DefaultConfig(),
+				settings: download.DefaultConfig(),
 			}
 
 			cfg, err := config.NewConfigFrom(tc.cfg)
@@ -1047,7 +1046,7 @@ type mockArtifactDownloader struct {
 	fleetServerURI    string
 }
 
-func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, target artifact.Artifact, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, log *logger.Logger, target download.Artifact, sourcePath string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	return m.returnArchivePath, m.returnError
 }
 
@@ -1332,7 +1331,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		},
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
 			isDiskSpaceErrorResult: true,
-			expectedError:          upgradeErrors.ErrInsufficientDiskSpace,
+			expectedError:          download.ErrInsufficientDiskSpace,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnError: testError,
@@ -1451,7 +1450,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				t.Log("skipping mocks setup as the testcase does not define a setupMocks()")
 			}
 
-			upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockRollbackSource)
+			upgrader, err := NewUpgrader(log, &download.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockRollbackSource)
 			require.NoError(t, err)
 
 			tc.upgraderMocker(upgrader, filepath.Join(baseDir, "mockArchive"), "versionedHome")
@@ -1533,7 +1532,7 @@ func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
 	// install. With a nil/zero config the map would be empty and Set would take
 	// the sweep path instead of the rewrite path, silently turning this test
 	// vacuous as a regression tripwire for the self-heal contract.
-	upgrader, err := NewUpgrader(log, &artifact.Config{}, configuration.DefaultUpgradeConfig(), mockAgentInfo, mockWatcherHelper, realRegistry)
+	upgrader, err := NewUpgrader(log, &download.Config{}, configuration.DefaultUpgradeConfig(), mockAgentInfo, mockWatcherHelper, realRegistry)
 	require.NoError(t, err)
 
 	archivePath := filepath.Join(baseDir, "mockArchive")
@@ -1603,7 +1602,7 @@ func TestUpgrade_RestoresActiveCommitAfterPostSymlinkFailure(t *testing.T) {
 	invokeErr := errors.New("watcher invoke failed")
 	mockWatcherHelper.EXPECT().InvokeWatcher(mock.Anything, mock.Anything).Return(nil, invokeErr)
 
-	upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockRollbackSource)
+	upgrader, err := NewUpgrader(log, &download.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockRollbackSource)
 	require.NoError(t, err)
 
 	archivePath := filepath.Join(baseDir, "mockArchive")
@@ -1685,7 +1684,7 @@ func TestUpgrade_CleansMarkerOnPreSymlinkFailure(t *testing.T) {
 
 	mockWatcherHelper := NewMockWatcherHelper(t)
 
-	upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockRollbackSource)
+	upgrader, err := NewUpgrader(log, &download.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockRollbackSource)
 	require.NoError(t, err)
 
 	archivePath := filepath.Join(baseDir, "mockArchive")
@@ -1747,7 +1746,7 @@ func TestUpgrade_MismatchedUnpackDestination(t *testing.T) {
 
 	mockWatcherHelper := NewMockWatcherHelper(t)
 
-	upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockRollbackSource)
+	upgrader, err := NewUpgrader(log, &download.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockRollbackSource)
 	require.NoError(t, err)
 
 	archivePath := filepath.Join(baseDir, "mockArchive")

@@ -4,7 +4,7 @@
 
 //go:build !windows
 
-package errors
+package download
 
 import "syscall"
 
