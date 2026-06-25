@@ -407,8 +407,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	det.SetState(details.StateDownloading)
 
-	sourceURI = u.sourceURI(sourceURI)
-
 	parsedVersion, err := agtversion.ParseVersion(version)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
@@ -654,14 +652,6 @@ func (u *Upgrader) AckAction(ctx context.Context, acker acker.Acker, action flee
 
 func (u *Upgrader) MarkerWatcher() MarkerWatcher {
 	return u.markerWatcher
-}
-
-func (u *Upgrader) sourceURI(retrievedURI string) string {
-	if retrievedURI != "" {
-		return retrievedURI
-	}
-
-	return u.settings.SourceURI
 }
 
 func extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentVersion {

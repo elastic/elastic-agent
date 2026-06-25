@@ -127,15 +127,15 @@ func TestDownloader_Download(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "happy path snapshot version with build metadata",
+			name: "build metadata is dropped from the snapshot version file name",
 			files: []file{
 				{
-					"elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz",
+					"elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
 					[]byte("This is a fake linux elastic agent archive"),
 				},
 				{
-					"elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz.sha512",
-					[]byte("somesha512 elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz"),
+					"elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz.sha512",
+					[]byte("somesha512 elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz"),
 				},
 			},
 			fields: fields{
@@ -145,7 +145,7 @@ func TestDownloader_Download(t *testing.T) {
 				},
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "build19700101")},
-			want:    "elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz",
+			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
 			wantErr: assert.NoError,
 		},
 	}
@@ -256,10 +256,10 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "happy path snapshot version with build metadata",
+			name: "build metadata is dropped from the snapshot version file name",
 			files: []file{
 				{
-					"elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz.asc",
+					"elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz.asc",
 					[]byte("fake signature for elastic-agent package"),
 				},
 			},
@@ -270,7 +270,7 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 				},
 			},
 			args:    args{a: agentSpec, version: *agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "build19700101")},
-			want:    "elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz.asc",
+			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz.asc",
 			wantErr: assert.NoError,
 		},
 	}

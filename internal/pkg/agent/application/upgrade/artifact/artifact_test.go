@@ -40,6 +40,12 @@ func TestGetArtifactName(t *testing.T) {
 			arch:         "64",
 			expectedName: "elastic-agent-fips-9.1.0-linux-x86_64.tar.gz",
 		},
+		"snapshot_build_metadata_is_dropped": {
+			a:            Artifact{Cmd: "elastic-agent"},
+			version:      *agtversion.NewParsedSemVer(8, 13, 3, "SNAPSHOT", "76ce1a63"),
+			arch:         "64",
+			expectedName: "elastic-agent-8.13.3-SNAPSHOT-linux-x86_64.tar.gz",
+		},
 	}
 
 	for name, test := range tests {

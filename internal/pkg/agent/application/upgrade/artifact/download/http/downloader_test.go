@@ -463,15 +463,15 @@ func TestDownloadVersion(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "happy path snapshot version with build metadata",
+			name: "build metadata is dropped from the snapshot version file name",
 			files: map[string]downloadHttpResponse{
-				"/beat/elastic-agent/elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz": {
+				"/beat/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz": {
 					statusCode: http.StatusOK,
 					Body:       []byte("This is a fake linux elastic agent archive"),
 				},
-				"/beat/elastic-agent/elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz.sha512": {
+				"/beat/elastic-agent/elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz.sha512": {
 					statusCode: http.StatusOK,
-					Body:       []byte("somesha512 elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz"),
+					Body:       []byte("somesha512 elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz"),
 				},
 			},
 			fields: fields{
@@ -481,7 +481,7 @@ func TestDownloadVersion(t *testing.T) {
 				},
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "build19700101")},
-			want:    "elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz",
+			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
 			wantErr: assert.NoError,
 		},
 	}

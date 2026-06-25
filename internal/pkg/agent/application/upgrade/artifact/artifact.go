@@ -40,6 +40,9 @@ func GetArtifactName(a Artifact, version agtversion.ParsedSemVer, operatingSyste
 		return "", errors.New(fmt.Sprintf("'%s' is not a valid combination for a package", key), errors.TypeConfig)
 	}
 
+	if version.IsSnapshot() {
+		return fmt.Sprintf("%s-%s-%s", a.Cmd, version.VersionWithPrerelease(), suffix), nil
+	}
 	return fmt.Sprintf("%s-%s-%s", a.Cmd, version.String(), suffix), nil
 }
 

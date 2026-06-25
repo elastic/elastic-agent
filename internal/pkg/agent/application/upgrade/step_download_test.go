@@ -5,15 +5,20 @@
 package upgrade
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -420,4 +425,88 @@ func TestWithFleetServerURI(t *testing.T) {
 	a := &artifactDownloader{}
 	a.withFleetServerURI("mockURI")
 	require.Equal(t, "mockURI", a.fleetServerURI)
+}
+
+func TestResolve(t *testing.T) {
+	type args struct {
+		version   *agtversion.ParsedSemVer
+		sourceURI string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "non-default source URI is respected",
+			args: args{
+				version:   agtversion.NewParsedSemVer(8, 12, 0, "SNAPSHOT", ""),
+				sourceURI: "localhost:1234",
+			},
+			want:    "localhost:1234",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "build metadata targets a specific snapshot build",
+			args: args{
+				version:   agtversion.NewParsedSemVer(8, 13, 3, "SNAPSHOT", "76ce1a63"),
+				sourceURI: artifact.DefaultSourceURI,
+			},
+			want:    "https://snapshots.elastic.co/8.13.3-76ce1a63/downloads/",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "latest snapshot build is looked up",
+			args: args{
+				version:   agtversion.NewParsedSemVer(8, 14, 0, "SNAPSHOT", ""),
+				sourceURI: artifact.DefaultSourceURI,
+			},
+			want:    "https://snapshots.elastic.co/8.14.0-6d69ee76/downloads/",
+			wantErr: assert.NoError,
+		},
+	}
+
+	files := map[string][]byte{
+		"/latest/8.14.0-SNAPSHOT.json": readSnapshotFile(t, "./artifact/download/testdata/latest-snapshot.json"),
+	}
+
+	handleRequest := func(rw http.ResponseWriter, req *http.Request) {
+		file, ok := files[req.URL.Path]
+		if !ok {
+			rw.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_, err := io.Copy(rw, bytes.NewReader(file))
+		assert.NoError(t, err, "error writing out response body")
+	}
+
+	server := httptest.NewTLSServer(http.HandlerFunc(handleRequest))
+	defer server.Close()
+
+	// Redirect requests to snapshots.elastic.co at the test server.
+	client := server.Client()
+	transport := client.Transport.(*http.Transport)
+	transport.TLSClientConfig.InsecureSkipVerify = true
+	transport.DialContext = func(_ context.Context, network, _ string) (net.Conn, error) {
+		return net.Dial(network, server.Listener.Addr().String())
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isLocal, got, err := Resolve(context.Background(), client, tt.args.version, tt.args.sourceURI)
+			if !tt.wantErr(t, err) {
+				return
+			}
+			assert.False(t, isLocal)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func readSnapshotFile(t *testing.T, name string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(name)
+	require.NoError(t, err)
+	return b
 }

@@ -6,7 +6,9 @@ package upgrade
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -16,15 +18,13 @@ import (
 
 	"go.elastic.co/apm/v2"
 
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/composed"
 	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/fs"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/localremote"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/snapshot"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -74,49 +74,61 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, parsedVersion
 
 	// do not update source config
 	settings := *a.settings
+
+	client, err := settings.HTTPTransportSettings.Client(
+		httpcommon.WithAPMHTTPInstrumentation(),
+		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
+			return download.WithHeaders(rt, download.Headers)
+		}),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to create HTTP client for resolving agent binary download url: %w", err)
+	}
+
+	if sourceURI == "" {
+		sourceURI = settings.SourceURI
+	}
+
+	isLocal, resolvedSourceURI, err := Resolve(ctx, client, parsedVersion, sourceURI)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve agent binary download url: %w", err)
+	}
+
 	var downloaderFunc downloader
 	var factory downloaderFactory
 	var verifier download.Verifier
-	if sourceURI != "" {
-		if strings.HasPrefix(sourceURI, "file://") {
-			// update the DropPath so the fs.Downloader can download from this
-			// path instead of looking into the installed downloads directory
-			settings.DropPath = strings.TrimPrefix(sourceURI, "file://")
+	if isLocal {
+		// update the DropPath so the fs.Downloader can download from this
+		// path instead of looking into the installed downloads directory
+		settings.DropPath = strings.TrimPrefix(resolvedSourceURI, "file://")
 
-			// use specific function that doesn't perform retries on download as its
-			// local and no retry should be performed
-			downloaderFunc = a.downloadOnce
+		// use specific function that doesn't perform retries on download as its
+		// local and no retry should be performed
+		downloaderFunc = a.downloadOnce
 
-			// set specific downloader, local file just uses the fs.NewDownloader
-			// no fallback is allowed because it was requested that this specific source be used
-			factory = func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
-				return fs.NewDownloader(config), nil
-			}
-
-			// set specific verifier, local file verifies locally only
-			verifier, err = fs.NewVerifier(a.log, &settings, release.PGP())
-			if err != nil {
-				return "", errors.New(err, "initiating verifier")
-			}
-
-			// log that a local upgrade artifact is being used
-			a.log.Infow("Using local upgrade artifact", "version", parsedVersion,
-				"drop_path", settings.DropPath,
-				"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
-		} else {
-			settings.SourceURI = sourceURI
+		// set specific downloader, local file just uses the fs.NewDownloader
+		// no fallback is allowed because it was requested that this specific source be used
+		factory = func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+			return fs.NewDownloader(config), nil
 		}
-	}
 
-	if factory == nil {
-		// set the factory to the newDownloader factory
+		// set specific verifier, local file verifies locally only
+		verifier, err = fs.NewVerifier(a.log, &settings, release.PGP())
+		if err != nil {
+			return "", errors.New(err, "initiating verifier")
+		}
+
+		// log that a local upgrade artifact is being used
+		a.log.Infow("Using local upgrade artifact", "version", parsedVersion,
+			"drop_path", settings.DropPath,
+			"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
+	} else {
+		settings.SourceURI = resolvedSourceURI
+		downloaderFunc = a.downloadWithRetries
 		factory = newDownloader
 		a.log.Infow("Downloading upgrade artifact", "version", parsedVersion,
 			"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
 			"target_path", settings.TargetDirectory, "install_path", settings.InstallPath, "proxy_uri", settings.Proxy.URL, "proxy_disable", settings.Proxy.Disable)
-	}
-	if downloaderFunc == nil {
-		downloaderFunc = a.downloadWithRetries
 	}
 
 	if err := os.MkdirAll(paths.Downloads(), 0750); err != nil {
@@ -173,50 +185,12 @@ func (a *artifactDownloader) appendFallbackPGP(targetVersion *agtversion.ParsedS
 	return pgpBytes
 }
 
-func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
-	if !version.IsSnapshot() {
-		return localremote.NewDownloader(log, settings, upgradeDetails)
-	}
-
-	// TODO since we know if it's a snapshot or not, shouldn't we add EITHER the snapshot downloader OR the release one ?
-
-	// try snapshot repo before official
-	snapDownloader, err := snapshot.NewDownloader(log, settings, version, upgradeDetails)
-	if err != nil {
-		return nil, err
-	}
-
-	httpDownloader, err := http.NewDownloader(log, settings, upgradeDetails)
-	if err != nil {
-		return nil, err
-	}
-
-	return composed.NewDownloader(fs.NewDownloader(settings), snapDownloader, httpDownloader), nil
+func newDownloader(_ *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+	return localremote.NewDownloader(log, settings, upgradeDetails)
 }
 
-func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
-	pgp := release.PGP()
-
-	if !version.IsSnapshot() {
-		return localremote.NewVerifier(log, settings, pgp)
-	}
-
-	fsVerifier, err := fs.NewVerifier(log, settings, pgp)
-	if err != nil {
-		return nil, err
-	}
-
-	snapshotVerifier, err := snapshot.NewVerifier(log, settings, pgp, version)
-	if err != nil {
-		return nil, err
-	}
-
-	remoteVerifier, err := http.NewVerifier(log, settings, pgp)
-	if err != nil {
-		return nil, err
-	}
-
-	return composed.NewVerifier(log, fsVerifier, snapshotVerifier, remoteVerifier), nil
+func newVerifier(_ *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+	return localremote.NewVerifier(log, settings, release.PGP())
 }
 
 func (a *artifactDownloader) downloadOnce(
@@ -230,9 +204,6 @@ func (a *artifactDownloader) downloadOnce(
 	if err != nil {
 		return "", fmt.Errorf("unable to create fetcher: %w", err)
 	}
-	// All download artifacts expect a name that includes <major>.<minor.<patch>[-SNAPSHOT] so we have to
-	// make sure not to include build metadata we might have in the parsed version (for snapshots we already
-	// used that to configure the URL we download the files from)
 	path, err := downloader.Download(ctx, agentArtifact, version)
 	if err != nil {
 		return "", fmt.Errorf("unable to download package: %w", err)
@@ -292,4 +263,71 @@ func (a *artifactDownloader) downloadWithRetries(
 	upgradeDetails.SetRetryUntil(nil)
 
 	return path, nil
+}
+
+func Resolve(ctx context.Context, client *http.Client, version *agtversion.ParsedSemVer, sourceURI string) (bool, string, error) {
+	if sourceURI == "" {
+		sourceURI = artifact.DefaultSourceURI
+	}
+
+	if strings.HasPrefix(sourceURI, "file://") {
+		return true, sourceURI, nil
+	}
+
+	// Only snapshots pulled from the default snapshot repository need a build ID
+	// lookup; a non-default source URI is used unchanged.
+	if version.IsSnapshot() && sourceURI == artifact.DefaultSourceURI {
+		if buildID := version.BuildMetadata(); buildID != "" {
+			// we know exactly which snapshot build we want to target
+			return false, fmt.Sprintf(snapshotURIFormat, version.CoreVersion(), buildID), nil
+		}
+
+		buildID, err := findLatestSnapshot(ctx, client, version.CoreVersion())
+		if err != nil {
+			return false, "", fmt.Errorf("failed to find snapshot information for version %q: %w", version.CoreVersion(), err)
+		}
+		return false, fmt.Sprintf(snapshotURIFormat, version.CoreVersion(), buildID), nil
+	}
+
+	return false, sourceURI, nil
+}
+
+const snapshotURIFormat = "https://snapshots.elastic.co/%s-%s/downloads/"
+
+func findLatestSnapshot(ctx context.Context, client *http.Client, version string) (string, error) {
+	latestSnapshotURI := fmt.Sprintf("https://snapshots.elastic.co/latest/%s-SNAPSHOT.json", version)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, latestSnapshotURI, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request to the snapshot API: %w", err)
+	}
+
+	resp, err := client.Do(request)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusNotFound:
+		return "", fmt.Errorf("snapshot for version %q not found", version)
+
+	case http.StatusOK:
+		var info struct {
+			BuildID string `json:"build_id"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+			return "", err
+		}
+
+		parts := strings.Split(info.BuildID, "-")
+		if len(parts) != 2 {
+			return "", fmt.Errorf("wrong format for a build ID: %s", info.BuildID)
+		}
+
+		return parts[1], nil
+
+	default:
+		return "", fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, latestSnapshotURI)
+	}
 }
