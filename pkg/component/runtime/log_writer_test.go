@@ -327,6 +327,138 @@ func TestLogWriter(t *testing.T) {
 	}
 }
 
+func TestLogWriterOtelRouting(t *testing.T) {
+	cfg := component.CommandLogSpec{
+		LevelKey:   "log.level",
+		TimeKey:    "@timestamp",
+		TimeFormat: time.RFC3339Nano,
+		MessageKey: "message",
+	}
+	scenarios := []struct {
+		Name  string
+		Line  string
+		Wrote []wrote
+	}{
+		{
+			Name: "native OTel component debug line gets log.type event injected",
+			Line: `{"@timestamp": "2009-11-10T23:00:00Z", "log.level": "debug", "message": "failed to index document", "otelcol.component.id": "elasticsearchexporter"}` + "\n",
+			Wrote: []wrote{
+				{
+					entry: zapcore.Entry{
+						Level:   zapcore.DebugLevel,
+						Time:    parseTime("2009-11-10T23:00:00Z", time.RFC3339Nano),
+						Message: "failed to index document",
+					},
+					fields: []zapcore.Field{
+						zap.String("log.type", "event"),
+						zap.String("otelcol.component.id", "elasticsearchexporter"),
+					},
+				},
+			},
+		},
+		{
+			Name: "native OTel component info line does not get log.type event injected",
+			Line: `{"@timestamp": "2009-11-10T23:00:00Z", "log.level": "info", "message": "Extension is starting", "otelcol.component.id": "elasticsearchexporter"}` + "\n",
+			Wrote: []wrote{
+				{
+					entry: zapcore.Entry{
+						Level:   zapcore.InfoLevel,
+						Time:    parseTime("2009-11-10T23:00:00Z", time.RFC3339Nano),
+						Message: "Extension is starting",
+					},
+					fields: []zapcore.Field{
+						zap.String("otelcol.component.id", "elasticsearchexporter"),
+					},
+				},
+			},
+		},
+		{
+			Name: "native OTel component error line does not get log.type event injected",
+			Line: `{"@timestamp": "2009-11-10T23:00:00Z", "log.level": "error", "message": "bulk indexer flush error", "otelcol.component.id": "elasticsearchexporter"}` + "\n",
+			Wrote: []wrote{
+				{
+					entry: zapcore.Entry{
+						Level:   zapcore.ErrorLevel,
+						Time:    parseTime("2009-11-10T23:00:00Z", time.RFC3339Nano),
+						Message: "bulk indexer flush error",
+					},
+					fields: []zapcore.Field{
+						zap.String("otelcol.component.id", "elasticsearchexporter"),
+					},
+				},
+			},
+		},
+		{
+			Name: "beat-managed OTel component debug line does not get log.type event injected",
+			Line: `{"@timestamp": "2009-11-10T23:00:00Z", "log.level": "debug", "message": "harvester started", "otelcol.component.id": "filebeatreceiver/_agent-component/filestream-default", "component": {"binary": "filebeat", "id": "filestream-default"}}` + "\n",
+			Wrote: []wrote{
+				{
+					entry: zapcore.Entry{
+						Level:   zapcore.DebugLevel,
+						Time:    parseTime("2009-11-10T23:00:00Z", time.RFC3339Nano),
+						Message: "harvester started",
+					},
+					fields: []zapcore.Field{
+						zap.Any("component", map[string]interface{}{"binary": "filebeat", "id": "filestream-default"}),
+						zap.String("otelcol.component.id", "filebeatreceiver/_agent-component/filestream-default"),
+					},
+				},
+			},
+		},
+		{
+			Name: "beat-managed OTel component debug line preserves existing log.type event",
+			Line: `{"@timestamp": "2009-11-10T23:00:00Z", "log.level": "debug", "message": "Publish event", "otelcol.component.id": "filebeatreceiver/_agent-component/filestream-default", "component": {"binary": "filebeat", "id": "filestream-default"}, "log.type": "event"}` + "\n",
+			Wrote: []wrote{
+				{
+					entry: zapcore.Entry{
+						Level:   zapcore.DebugLevel,
+						Time:    parseTime("2009-11-10T23:00:00Z", time.RFC3339Nano),
+						Message: "Publish event",
+					},
+					fields: []zapcore.Field{
+						zap.Any("component", map[string]interface{}{"binary": "filebeat", "id": "filestream-default"}),
+						zap.String("log.type", "event"),
+						zap.String("otelcol.component.id", "filebeatreceiver/_agent-component/filestream-default"),
+					},
+				},
+			},
+		},
+		{
+			Name: "line without otelcol.component.id at debug level does not get log.type event injected",
+			Line: `{"@timestamp": "2009-11-10T23:00:00Z", "log.level": "debug", "message": "some agent debug message"}` + "\n",
+			Wrote: []wrote{
+				{
+					entry: zapcore.Entry{
+						Level:   zapcore.DebugLevel,
+						Time:    parseTime("2009-11-10T23:00:00Z", time.RFC3339Nano),
+						Message: "some agent debug message",
+					},
+					fields: []zapcore.Field{},
+				},
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.Name, func(t *testing.T) {
+			c := &captureCore{}
+			w := newLogWriter(c, cfg, zapcore.DebugLevel, nil, logSourceStdout)
+			n, err := w.Write([]byte(scenario.Line))
+			require.NoError(t, err)
+			require.Equal(t, len([]byte(scenario.Line)), n)
+			require.Len(t, c.wrote, len(scenario.Wrote))
+			for i := 0; i < len(scenario.Wrote); i++ {
+				e := scenario.Wrote[i]
+				o := c.wrote[i]
+				assert.Equal(t, e.entry, o.entry)
+				sortFields(e.fields)
+				sortFields(o.fields)
+				assert.EqualValues(t, e.fields, o.fields)
+			}
+		})
+	}
+}
+
 type captureCore struct {
 	wrote []wrote
 }

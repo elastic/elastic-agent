@@ -157,6 +157,12 @@ func (r *logWriter) handleJSON(line string) bool {
 		}
 	}
 	if allowedLvl.Enabled(lvl) {
+		// Unlike beats, native OTel components have no built-in way to distinguish
+		// control plane from data plane logs, so we use log level as a heuristic
+		// where debug lines may contain customer data and info/warn/error are operational.
+		if lvl == zapcore.DebugLevel && isNonBeatsOtelComponentLine(evt) {
+			fields = append(fields, zap.String("log.type", "event"))
+		}
 		_ = r.loggerCore.Write(zapcore.Entry{
 			Level:   lvl,
 			Time:    ts,
@@ -254,4 +260,14 @@ func getUnitId(evt map[string]interface{}) string {
 		}
 	}
 	return ""
+}
+
+func isNonBeatsOtelComponentLine(evt map[string]interface{}) bool {
+	if getStrVal(evt, "otelcol.component.id") == "" {
+		return false
+	}
+	// The "component" field is injected into every beat receiver log line via logging.with_fields
+	// (see internal/pkg/otel/translate/otelconfig.go).
+	_, hasComponent := evt["component"]
+	return !hasComponent
 }

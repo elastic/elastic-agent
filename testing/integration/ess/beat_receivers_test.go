@@ -1632,15 +1632,42 @@ agent.logging.stderr: true
 		},
 	}
 
-	findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer findCancel()
+	require.Never(t,
+		func() bool {
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer findCancel()
 
-	docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, "logs-elastic_agent*", map[string]any{
-		"log.type": "event",
-	})
+			docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, "logs-elastic_agent*", info.ESClient)
+			if err != nil {
+				t.Logf("error querying for event logs in ES: %v", err)
+				return false
+			}
+			return docs.Hits.Total.Value > 0
+		},
+		1*time.Minute, 5*time.Second,
+		"expected no event logs to be shipped to ES")
 
-	assert.NoError(t, err)
-	assert.Zero(t, docs.Hits.Total.Value)
+	// Check 3:
+	// Ensure debug logs from the elasticsearch exporter are captured in the events log file.
+	foundESExporterDebugLine := false
+	for _, line := range strings.Split(readEventLogFile(t, fixture), "\n") {
+		if line == "" {
+			continue
+		}
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue
+		}
+		componentID, _ := entry["otelcol.component.id"].(string)
+		if componentID != "elasticsearch/_agent-component/default" {
+			continue
+		}
+		if level, _ := entry["log.level"].(string); level == "debug" {
+			foundESExporterDebugLine = true
+			break
+		}
+	}
+	assert.True(t, foundESExporterDebugLine, "expected elasticsearch exporter debug lines in events log file")
 }
 
 func TestSensitiveIncludeSourceOnError(t *testing.T) {
