@@ -153,7 +153,7 @@ func (runner *HeartbeatRunner) validateHeartbeatEvents(t *testing.T, ctx context
 			},
 		}
 		now = time.Now()
-		res, err := estools.PerformQueryForRawQuery(ctx, query, "synthetics-http.summary*", runner.info.ESClient)
+		res, err := estools.PerformQueryForRawQuery(ctx, query, "synthetics-http*", runner.info.ESClient)
 		require.NoError(collect, err)
 		require.NotEmpty(collect, res.Hits.Hits)
 		doc = res.Hits.Hits[0].Source
