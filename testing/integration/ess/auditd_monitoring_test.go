@@ -9,6 +9,7 @@ package ess
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -98,10 +99,15 @@ func (runner *AuditDRunner) SetupSuite() {
 
 }
 
-func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) mapstr.M {
+// auditdDocsByMessageType queries ES for auditd_manager events from the given
+// agent since the given time and returns, per auditd.message_type, the union of
+// document keys seen for that type. auditd records are heterogeneous, so the
+// caller compares each message_type independently rather than an arbitrary
+// single record.
+func (runner *AuditDRunner) auditdDocsByMessageType(t *testing.T, ctx context.Context, agentID string, since time.Time) map[string]mapstr.M {
 	now := time.Now()
 	var query map[string]any
-	var doc mapstr.M
+	docs := map[string]mapstr.M{}
 	defer func() {
 		if t.Failed() {
 			bs, err := json.Marshal(query)
@@ -117,22 +123,40 @@ func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Conte
 
 	t.Logf("starting to query ES for auditd events at %s", now.Format(time.RFC3339Nano))
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		query = genESQuery(agentID,
-			[][]string{
-				{"exists", "field", "auditd.summary.actor.primary"},
-			})
+		query = genESQuery(agentID, [][]string{
+			{"exists", "field", "auditd.summary.actor.primary"},
+		})
 		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
 			"range": map[string]any{
 				"@timestamp": map[string]any{"gte": since.UTC().Format("2006-01-02T15:04:05.000Z")},
 			},
 		}
+		query["size"] = 1000
 		now = time.Now()
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-auditd_manager.auditd*", runner.info.ESClient)
 		require.NoError(collect, err)
 		require.NotEmpty(collect, res.Hits.Hits)
-		doc = res.Hits.Hits[0].Source
+
+		grouped := map[string]mapstr.M{}
+		for _, hit := range res.Hits.Hits {
+			src := mapstr.M(hit.Source)
+			mt, err := src.GetValue("auditd.message_type")
+			if err != nil {
+				continue
+			}
+			mtStr, ok := mt.(string)
+			if !ok {
+				continue
+			}
+			if existing, ok := grouped[mtStr]; ok {
+				existing.DeepUpdate(src) // union of keys for this message_type
+			} else {
+				grouped[mtStr] = src
+			}
+		}
+		docs = grouped
 	}, time.Minute*10, time.Second*10, "could not fetch events for auditd_manager")
-	return doc
+	return docs
 }
 
 func (runner *AuditDRunner) TestBeatsMetrics() {
@@ -147,13 +171,13 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 	testStart := time.Now()
 
 	// Validate process mode
-	var processDoc mapstr.M
+	var processDocs map[string]mapstr.M
 	t.Run("process", func(t *testing.T) {
-		processDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, testStart)
+		processDocs = runner.auditdDocsByMessageType(t, ctx, agentStatus.Info.ID, testStart)
 	})
 
 	// Switch to OTel runtime and validate the same data
-	var otelDoc mapstr.M
+	var otelDocs map[string]mapstr.M
 	t.Run("otel", func(t *testing.T) {
 		otelSince := time.Now()
 		policyRevision := switchPolicyToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
@@ -181,14 +205,25 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 			assert.True(collect, foundReceiver, "expected an audit/auditd component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
-		otelDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, otelSince)
+		otelDocs = runner.auditdDocsByMessageType(t, ctx, agentStatus.Info.ID, otelSince)
 	})
 
-	// Compare documents from process and otel modes have the same keys
+	// Compare keys per message_type for the types seen in both runtimes.
 	t.Run("compare", func(t *testing.T) {
-		if processDoc == nil || otelDoc == nil {
+		if processDocs == nil || otelDocs == nil {
 			t.Skip("skipping comparison because a previous subtest failed")
 		}
-		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields, "expected auditd document keys to be equal between process and otel modes")
+		var compared int
+		for mt, processDoc := range processDocs {
+			otelDoc, ok := otelDocs[mt]
+			if !ok {
+				t.Logf("message_type %q seen in process mode but not otel mode, skipping", mt)
+				continue
+			}
+			compared++
+			AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields,
+				fmt.Sprintf("auditd document keys differ between process and otel modes for message_type %q", mt))
+		}
+		require.NotZero(t, compared, "expected at least one auditd message_type present in both process and otel modes")
 	})
 }
