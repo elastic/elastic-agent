@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -55,10 +56,7 @@ func TestDownloader_Download(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "")},
 			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz",
@@ -73,10 +71,7 @@ func TestDownloader_Download(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "")},
 			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz",
@@ -95,10 +90,7 @@ func TestDownloader_Download(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")},
 			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
@@ -117,10 +109,7 @@ func TestDownloader_Download(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "build19700101")},
 			want:    "elastic-agent-1.2.3+build19700101-linux-x86_64.tar.gz",
@@ -139,10 +128,7 @@ func TestDownloader_Download(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "build19700101")},
 			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
@@ -168,7 +154,7 @@ func TestDownloader_Download(t *testing.T) {
 				mkdirAll: os.MkdirAll,
 				openFile: os.OpenFile,
 			}
-			a, err := artifact.New("elastic-agent", false, tt.args.version, config.OS(), config.Arch())
+			a, err := artifact.New("elastic-agent", false, tt.args.version, "linux", "amd64")
 			require.NoError(t, err)
 			got, err := e.Download(context.TODO(), a, tt.args.version)
 			if !tt.wantErr(t, err, fmt.Sprintf("Download(%v, %v)", tt.args.a, tt.args.version)) {
@@ -212,10 +198,7 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: *agtversion.NewParsedSemVer(1, 2, 3, "", "")},
 			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz.asc",
@@ -230,10 +213,7 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: *agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")},
 			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz.asc",
@@ -248,10 +228,7 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: *agtversion.NewParsedSemVer(1, 2, 3, "", "build19700101")},
 			want:    "elastic-agent-1.2.3+build19700101-linux-x86_64.tar.gz.asc",
@@ -266,10 +243,7 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: *agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "build19700101")},
 			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz.asc",
@@ -294,7 +268,7 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 				mkdirAll: os.MkdirAll,
 				openFile: os.OpenFile,
 			}
-			a, err := artifact.New("elastic-agent", false, &tt.args.version, config.OS(), config.Arch())
+			a, err := artifact.New("elastic-agent", false, &tt.args.version, "linux", "amd64")
 			require.NoError(t, err)
 			got, err := e.DownloadAsc(context.TODO(), a, tt.args.version)
 			if !tt.wantErr(t, err, fmt.Sprintf("DownloadAsc(%v, %v)", tt.args.a, tt.args.version)) {
@@ -355,7 +329,7 @@ func TestDownloadDiskSpaceError(t *testing.T) {
 
 			parsedVersion := agtversion.NewParsedSemVer(1, 2, 3, "", "")
 
-			a, err := artifact.New("elastic-agent", false, parsedVersion, config.OS(), config.Arch())
+			a, err := artifact.New("elastic-agent", false, parsedVersion, runtime.GOOS, runtime.GOARCH)
 			require.NoError(t, err)
 
 			sourceArtifactPath := filepath.Join(config.DropPath, a.FileName)

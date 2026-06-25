@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"time"
 
 	"go.elastic.co/apm/v2"
@@ -113,7 +114,7 @@ func New(
 	}
 	monitor := componentmonitoring.New(
 		isMonitoringSupported,
-		cfg.Settings.DownloadConfig.OS(),
+		goruntime.GOOS,
 		cfg.Settings.MonitoringConfig,
 		agentInfo,
 		log,

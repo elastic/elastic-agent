@@ -43,13 +43,12 @@ type testCase struct {
 func getTestCases() []testCase {
 	// always test random package to save time
 	return []testCase{
-		{"linux", "32"},
-		{"linux", "64"},
+		{"linux", "386"},
+		{"linux", "amd64"},
 		{"linux", "arm64"},
-		{"darwin", "32"},
-		{"darwin", "64"},
-		{"windows", "32"},
-		{"windows", "64"},
+		{"darwin", "amd64"},
+		{"windows", "386"},
+		{"windows", "amd64"},
 	}
 }
 

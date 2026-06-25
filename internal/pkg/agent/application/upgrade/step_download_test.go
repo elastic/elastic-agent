@@ -15,6 +15,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -329,7 +330,6 @@ func (mv *mockVerifier) Verify(ctx context.Context, a artifact.Artifact, version
 
 func TestDownloadArtifact(t *testing.T) {
 	testLogger, _ := loggertest.New("TestDownloadArtifact")
-	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used to build the artifact name
 
 	parsedVersion, err := agtversion.ParseVersion("8.9.0")
 	require.NoError(t, err)
@@ -371,7 +371,7 @@ func TestDownloadArtifact(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			paths.SetTop(t.TempDir())
 
-			expectedArtifact, err := artifact.New("elastic-agent", release.FIPSDistribution(), parsedVersion, tempConfig.OS(), tempConfig.Arch())
+			expectedArtifact, err := artifact.New("elastic-agent", release.FIPSDistribution(), parsedVersion, runtime.GOOS, runtime.GOARCH)
 			require.NoError(t, err)
 			artifactPath := filepath.Join(paths.Downloads(), expectedArtifact.FileName)
 

@@ -62,8 +62,6 @@ func TestDownload(t *testing.T) {
 	for _, testCase := range testCases {
 		testName := fmt.Sprintf("%s-binary-%s", testCase.system, testCase.arch)
 		t.Run(testName, func(t *testing.T) {
-			config.OperatingSystem = testCase.system
-			config.Architecture = testCase.arch
 
 			upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 			testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
@@ -112,14 +110,12 @@ func TestDownloadBodyError(t *testing.T) {
 	config := &artifact.Config{
 		SourceURI:       srv.URL,
 		TargetDirectory: targetDir,
-		OperatingSystem: "linux",
-		Architecture:    "64",
 	}
 
 	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
-	a, err := artifact.New(beatSpec.Name, false, version, "linux", "64")
+	a, err := artifact.New(beatSpec.Name, false, version, "linux", "amd64")
 	require.NoError(t, err)
 	artifactPath, err := testClient.Download(context.Background(), a, version)
 	os.Remove(artifactPath)
@@ -168,8 +164,6 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	config := &artifact.Config{
 		SourceURI:       srv.URL,
 		TargetDirectory: targetDir,
-		OperatingSystem: "linux",
-		Architecture:    "64",
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: totalTime,
 		},
@@ -178,7 +172,7 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
-	a, err := artifact.New(beatSpec.Name, false, version, "linux", "64")
+	a, err := artifact.New(beatSpec.Name, false, version, "linux", "amd64")
 	require.NoError(t, err)
 	artifactPath, err := testClient.Download(context.Background(), a, version)
 	os.Remove(artifactPath)
@@ -253,8 +247,6 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	config := &artifact.Config{
 		SourceURI:       srv.URL,
 		TargetDirectory: targetDir,
-		OperatingSystem: "linux",
-		Architecture:    "64",
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: totalTime,
 		},
@@ -263,7 +255,7 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
-	a, err := artifact.New(beatSpec.Name, false, version, "linux", "64")
+	a, err := artifact.New(beatSpec.Name, false, version, "linux", "amd64")
 	require.NoError(t, err)
 	artifactPath, err := testClient.Download(context.Background(), a, version)
 	os.Remove(artifactPath)
@@ -397,10 +389,7 @@ func TestDownloadVersion(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "")},
 			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz",
@@ -415,10 +404,7 @@ func TestDownloadVersion(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "")},
 			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz",
@@ -437,10 +423,7 @@ func TestDownloadVersion(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")},
 			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
@@ -459,10 +442,7 @@ func TestDownloadVersion(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "build19700101")},
 			want:    "elastic-agent-1.2.3+build19700101-linux-x86_64.tar.gz",
@@ -481,10 +461,7 @@ func TestDownloadVersion(t *testing.T) {
 				},
 			},
 			fields: fields{
-				config: &artifact.Config{
-					OperatingSystem: "linux",
-					Architecture:    "64",
-				},
+				config: &artifact.Config{},
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "build19700101")},
 			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
@@ -526,7 +503,7 @@ func TestDownloadVersion(t *testing.T) {
 			config.TargetDirectory = targetDirPath
 			downloader := NewDownloaderWithClient(log, config, *elasticClient, upgradeDetails)
 
-			a, err := artifact.New("elastic-agent", false, tt.args.version, config.OS(), config.Arch())
+			a, err := artifact.New("elastic-agent", false, tt.args.version, "linux", "amd64")
 			require.NoError(t, err)
 
 			got, err := downloader.Download(context.TODO(), a, tt.args.version)
@@ -610,8 +587,6 @@ func TestDownloadDiskSpaceError(t *testing.T) {
 
 			testName := fmt.Sprintf("%s-binary-%s-%s", testCase.system, testCase.arch, name)
 			t.Run(testName, func(t *testing.T) {
-				config.OperatingSystem = testCase.system
-				config.Architecture = testCase.arch
 
 				upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 				testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)

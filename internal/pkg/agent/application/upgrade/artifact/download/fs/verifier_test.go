@@ -60,8 +60,6 @@ func TestFetchVerify(t *testing.T) {
 		TargetDirectory: targetPath,
 		DropPath:        dropPath,
 		InstallPath:     installPath,
-		OperatingSystem: "darwin",
-		Architecture:    "32",
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: timeout,
 		},
@@ -211,14 +209,12 @@ func TestVerify(t *testing.T) {
 			config := &artifact.Config{
 				TargetDirectory: targetDir,
 				DropPath:        filepath.Join(targetDir, "drop"),
-				OperatingSystem: "linux",
-				Architecture:    "32",
 				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 					Timeout: timeout,
 				},
 			}
 
-			spec, err := artifact.New("elastic-agent", false, testVersion, config.OS(), config.Arch())
+			spec, err := artifact.New("elastic-agent", false, testVersion, "linux", "386")
 			require.NoError(t, err)
 
 			pgpKey := prepareTestCase(t, spec, testVersion, config)

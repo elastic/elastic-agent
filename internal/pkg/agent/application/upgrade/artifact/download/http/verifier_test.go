@@ -90,9 +90,6 @@ func runTests(t *testing.T, testCases []testCase, td *testDials, config *artifac
 			cancelCtx, cancel := context.WithDeadline(context.Background(), cancelDeadline)
 			defer cancel()
 
-			config.OperatingSystem = tc.system
-			config.Architecture = tc.arch
-
 			upgradeDetails := details.NewDetails(
 				"8.12.0", details.StateRequested, "")
 			downloader, err := NewDownloader(log, config, upgradeDetails)

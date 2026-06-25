@@ -6,8 +6,6 @@ package artifact
 
 import (
 	"reflect"
-	"runtime"
-	"strings"
 	"time"
 
 	c "github.com/elastic/elastic-agent-libs/config"
@@ -17,10 +15,6 @@ import (
 )
 
 const (
-	darwin  = "darwin"
-	linux   = "linux"
-	windows = "windows"
-
 	// DefaultSourceURI is the default source URI for downloading artifacts.
 	DefaultSourceURI = "https://artifacts.elastic.co/downloads/"
 )
@@ -33,12 +27,6 @@ type ConfigReloader interface {
 // httpcommon.HTTPTransportSettings so we can handle the  HTTPTransportSettings
 // config separately during *Config.Unpack
 type configWithoutHTTPTransportSettings struct {
-	// OperatingSystem: operating system [linux, windows, darwin]
-	OperatingSystem string `json:"-" config:",ignore"`
-
-	// Architecture: target architecture [32, 64]
-	Architecture string `json:"-" config:",ignore"`
-
 	// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
 	SourceURI string `json:"sourceURI" config:"sourceURI"`
 
@@ -63,12 +51,6 @@ type configWithoutHTTPTransportSettings struct {
 
 // Config is a configuration used for verifier and downloader
 type Config struct {
-	// OperatingSystem: operating system [linux, windows, darwin]
-	OperatingSystem string `json:"-" config:",ignore"`
-
-	// Architecture: target architecture [32, 64]
-	Architecture string `json:"-" config:",ignore"`
-
 	// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
 	SourceURI string `json:"sourceURI" config:"sourceURI"`
 
@@ -108,41 +90,6 @@ func DefaultConfig() *Config {
 		RetrySleepInitDuration: 30 * time.Second,
 		HTTPTransportSettings:  transport,
 	}
-}
-
-// OS returns the configured operating system or falls back to runtime.GOOS
-func (c *Config) OS() string {
-	if c.OperatingSystem != "" {
-		return c.OperatingSystem
-	}
-
-	switch runtime.GOOS {
-	case windows:
-		c.OperatingSystem = windows
-	case darwin:
-		c.OperatingSystem = darwin
-	default:
-		c.OperatingSystem = linux
-	}
-
-	return c.OperatingSystem
-}
-
-// Arch returns the configured architecture or falls back to 32bit
-func (c *Config) Arch() string {
-	if c.Architecture != "" {
-		return c.Architecture
-	}
-
-	arch := "32"
-	if strings.Contains(runtime.GOARCH, "arm64") {
-		arch = "arm64"
-	} else if strings.Contains(runtime.GOARCH, "64") {
-		arch = "64"
-	}
-
-	c.Architecture = arch
-	return c.Architecture
 }
 
 // Unpack reads a config object into the settings.
