@@ -140,9 +140,15 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
+<<<<<<< HEAD
 				"flush_timeout": "10s",
 				"max_size":      escfg.BulkMaxSize, // bulk_max_size
 				"min_size":      0,                 // 0 means immediately trigger a flush
+=======
+				"flush_timeout": getFlushTimeout(logger, output),
+				"max_size":      escfg.BulkMaxSize,                                         // bulk_max_size
+				"min_size":      min(getFlushMinEvents(logger, output), escfg.BulkMaxSize), // queue.mem.flush.min_events, capped at max_size
+>>>>>>> 5713e79bb (Set the correct minimum batch size for ES and Kafka exporters (#15122))
 				"sizer":         "items",
 			},
 			"enabled":           true,
