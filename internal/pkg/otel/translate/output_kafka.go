@@ -57,7 +57,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			"batch": map[string]any{
 				"max_size":      kConfig.BulkMaxSize,
 				"flush_timeout": getFlushTimeout(logger, config),
-				"min_size":      0, // 0 means immediately trigger a flush
+				"min_size":      min(getFlushMinEvents(logger, config), kConfig.BulkMaxSize), // queue.mem.flush.min_events, capped at max_size
 				"sizer":         "items",
 			},
 			"queue_size": getQueueSize(logger, config),

@@ -73,7 +73,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -138,7 +138,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -202,7 +202,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -268,7 +268,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -357,7 +357,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -375,7 +375,7 @@ sending_queue:
   batch:
     flush_timeout: 5s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -418,7 +418,7 @@ sending_queue:
   batch:
     flush_timeout: 20s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -445,7 +445,7 @@ sending_queue:
   batch:
     flush_timeout: 1s
     max_size: 50
-    min_size: 0
+    min_size: 50
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -463,7 +463,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -536,7 +536,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -599,7 +599,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -673,7 +673,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true

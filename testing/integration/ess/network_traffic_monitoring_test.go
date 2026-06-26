@@ -186,7 +186,6 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 			assert.True(collect, foundReceiver, "expected a packet (network_traffic) component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
-		t.Skip("pbreceiver does not yet produce events, skipping OTel data validation")
 		otelDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, otelSince)
 	})
 
