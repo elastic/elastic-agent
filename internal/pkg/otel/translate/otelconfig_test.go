@@ -528,6 +528,11 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": false,
 			},
 			"management.otel.enabled": true,
+			"features": map[string]any{
+				"fqdn": map[string]any{
+					"enabled": false,
+				},
+			},
 		}
 	}
 
@@ -662,6 +667,11 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": false,
 			},
 			"management.otel.enabled": true,
+			"features": map[string]any{
+				"fqdn": map[string]any{
+					"enabled": false,
+				},
+			},
 		}
 	}
 
@@ -711,6 +721,11 @@ func TestGetOtelConfig(t *testing.T) {
 			"enabled": false,
 		},
 		"management.otel.enabled": true,
+		"features": map[string]any{
+			"fqdn": map[string]any{
+				"enabled": false,
+			},
+		},
 	}
 
 	tests := []struct {
@@ -1025,6 +1040,11 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": false,
 						},
 						"management.otel.enabled": true,
+						"features": map[string]any{
+							"fqdn": map[string]any{
+								"enabled": false,
+							},
+						},
 					},
 				},
 				"service": map[string]any{
@@ -1598,6 +1618,11 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": false,
 						},
 						"management.otel.enabled": true,
+						"features": map[string]any{
+							"fqdn": map[string]any{
+								"enabled": false,
+							},
+						},
 					},
 				},
 				"service": map[string]any{
@@ -1800,6 +1825,11 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": false,
 						},
 						"management.otel.enabled": true,
+						"features": map[string]any{
+							"fqdn": map[string]any{
+								"enabled": false,
+							},
+						},
 					},
 				},
 				"service": map[string]any{
@@ -1915,6 +1945,11 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": false,
 						},
 						"management.otel.enabled": true,
+						"features": map[string]any{
+							"fqdn": map[string]any{
+								"enabled": false,
+							},
+						},
 					},
 				},
 				"service": map[string]any{
@@ -2568,6 +2603,86 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGetReceiversConfigForComponentFQDN verifies that the agent's FQDN feature flag is
+// propagated into the generated beat receiver config.
+func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-fqdn",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"streams": []any{
+						map[string]any{
+							"id": "test-1",
+							"data_stream": map[string]any{
+								"dataset": "generic-1",
+							},
+							"paths": []any{
+								"/var/log/*.log",
+							},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	fqdnConfig := func(t *testing.T, enabled bool) map[string]any {
+		t.Helper()
+		cfg := internalConfig.MustNewConfigFrom(map[string]any{
+			"agent": map[string]any{
+				"features": map[string]any{
+					"fqdn": map[string]any{
+						"enabled": enabled,
+					},
+				},
+			},
+		})
+		require.NoError(t, features.Apply(cfg))
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+
+		var receiverConfig map[string]any
+		for _, v := range result {
+			receiverConfig = v.(map[string]any)
+		}
+		featuresConfig, ok := receiverConfig["features"].(map[string]any)
+		require.True(t, ok, "features config should be present and a map")
+		return featuresConfig
+	}
+
+	// reset the global feature flags after the test so we don't leak state
+	t.Cleanup(func() {
+		require.NoError(t, features.Apply(internalConfig.MustNewConfigFrom(map[string]any{})))
+	})
+
+	t.Run("enabled", func(t *testing.T) {
+		featuresConfig := fqdnConfig(t, true)
+		assert.Equal(t, map[string]any{"fqdn": map[string]any{"enabled": true}}, featuresConfig)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		featuresConfig := fqdnConfig(t, false)
+		assert.Equal(t, map[string]any{"fqdn": map[string]any{"enabled": false}}, featuresConfig)
+	})
 }
 
 func TestVerifyComponentIsOtelSupported(t *testing.T) {

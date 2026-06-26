@@ -435,6 +435,13 @@ func getReceiversConfigForComponent(
 	// indicate that beat receivers are managed by the elastic-agent
 	sharedConfig["management.otel.enabled"] = true
 
+	// propagate the FQDN feature flag into the receiver config
+	sharedConfig["features"] = map[string]any{
+		"fqdn": map[string]any{
+			"enabled": features.FQDN(),
+		},
+	}
+
 	// Create one receiver per input
 	receiversConfig := make(map[string]any, len(inputs))
 	for _, ri := range inputs {
