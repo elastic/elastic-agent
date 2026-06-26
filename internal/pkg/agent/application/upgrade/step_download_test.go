@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
@@ -107,7 +109,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, artifact.Artifact{Version: parsedVersion}, &settings, upgradeDetails)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
 
@@ -156,7 +158,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, artifact.Artifact{Version: parsedVersion}, &settings, upgradeDetails)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
 
@@ -210,7 +212,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, artifact.Artifact{Version: parsedVersion}, &settings, upgradeDetails)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
 
@@ -254,7 +256,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(testCaseSettings.Timeout)
 
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &testCaseSettings, upgradeDetails)
+		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, artifact.Artifact{Version: parsedVersion}, &testCaseSettings, upgradeDetails)
 		require.Equal(t, "context deadline exceeded", err.Error())
 		require.Equal(t, "", path)
 
@@ -296,7 +298,7 @@ func TestDownloadWithRetries(t *testing.T) {
 
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 
-		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, artifact.Artifact{Version: parsedVersion}, &settings, upgradeDetails)
 
 		require.Error(t, err)
 		require.Equal(t, "", path)
@@ -327,7 +329,7 @@ func (mv *mockVerifier) Verify(ctx context.Context, a artifact.Artifact, version
 
 func TestDownloadArtifact(t *testing.T) {
 	testLogger, _ := loggertest.New("TestDownloadArtifact")
-	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
+	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used to build the artifact name
 
 	parsedVersion, err := agtversion.ParseVersion("8.9.0")
 	require.NoError(t, err)
@@ -369,8 +371,9 @@ func TestDownloadArtifact(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			paths.SetTop(t.TempDir())
 
-			artifactPath, err := artifact.GetArtifactPath(agentArtifact, *parsedVersion, tempConfig.OS(), tempConfig.Arch(), paths.Downloads())
+			expectedArtifact, err := artifact.New("elastic-agent", release.FIPSDistribution(), parsedVersion, tempConfig.OS(), tempConfig.Arch())
 			require.NoError(t, err)
+			artifactPath := filepath.Join(paths.Downloads(), expectedArtifact.FileName)
 
 			settings := artifact.Config{
 				RetrySleepInitDuration: 20 * time.Millisecond,
@@ -384,7 +387,7 @@ func TestDownloadArtifact(t *testing.T) {
 			a := newArtifactDownloader(&settings, testLogger)
 			a.newVerifier = tc.mockNewVerifierFactory
 
-			path, err := a.downloadArtifact(t.Context(), parsedVersion, testServer.URL, upgradeDeatils, false, true)
+			path, err := a.downloadArtifact(t.Context(), expectedArtifact, testServer.URL, upgradeDeatils, false, true)
 			require.ErrorIs(t, err, tc.expectedError)
 			require.Equal(t, artifactPath, path)
 		})

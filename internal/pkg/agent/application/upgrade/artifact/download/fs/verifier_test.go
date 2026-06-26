@@ -31,9 +31,7 @@ import (
 var testVersion = agtversion.NewParsedSemVer(7, 5, 1, "", "")
 
 var agentSpec = artifact.Artifact{
-	Name:     "Elastic Agent",
-	Cmd:      "elastic-agent",
-	Artifact: "beat/elastic-agent",
+	Name: "elastic-agent",
 }
 
 func TestFetchVerify(t *testing.T) {
@@ -47,12 +45,10 @@ func TestFetchVerify(t *testing.T) {
 	installPath := filepath.Join("testdata", "install")
 	targetPath := filepath.Join("testdata", "download")
 	ctx := context.Background()
-	a := artifact.Artifact{
-		Name: "elastic-agent", Cmd: "elastic-agent", Artifact: "beats/elastic-agent",
-	}
 	version := agtversion.NewParsedSemVer(8, 0, 0, "", "")
 
 	filename := "elastic-agent-8.0.0-darwin-x86_64.tar.gz"
+	a := artifact.Artifact{Name: "elastic-agent", Version: version, FileName: filename}
 	targetFilePath := filepath.Join(targetPath, filename)
 	hashTargetFilePath := filepath.Join(targetPath, filename+".sha512")
 	ascTargetFilePath := filepath.Join(targetPath, filename+".asc")
@@ -222,12 +218,15 @@ func TestVerify(t *testing.T) {
 				},
 			}
 
-			pgpKey := prepareTestCase(t, agentSpec, testVersion, config)
+			spec, err := artifact.New("elastic-agent", false, testVersion, config.OS(), config.Arch())
+			require.NoError(t, err)
+
+			pgpKey := prepareTestCase(t, spec, testVersion, config)
 
 			testClient := NewDownloader(config)
-			artifactPath, err := testClient.Download(ctx, agentSpec, testVersion)
+			artifactPath, err := testClient.Download(ctx, spec, testVersion)
 			require.NoError(t, err, "fs.Downloader could not download artifacts")
-			_, err = testClient.DownloadAsc(context.Background(), agentSpec, *testVersion)
+			_, err = testClient.DownloadAsc(context.Background(), spec, *testVersion)
 			require.NoError(t, err, "fs.Downloader could not download artifacts .asc file")
 
 			_, err = os.Stat(artifactPath)
@@ -236,7 +235,7 @@ func TestVerify(t *testing.T) {
 			testVerifier, err := NewVerifier(log, config, pgpKey)
 			require.NoError(t, err)
 
-			err = testVerifier.Verify(ctx, agentSpec, *testVersion, false, tc.RemotePGPUris...)
+			err = testVerifier.Verify(ctx, spec, *testVersion, false, tc.RemotePGPUris...)
 			require.NoError(t, err)
 
 			// log message informing remote PGP was skipped
@@ -251,13 +250,10 @@ func TestVerify(t *testing.T) {
 // It creates the necessary key to sing the artifact and returns the public key
 // to verify the signature.
 func prepareTestCase(t *testing.T, a artifact.Artifact, version *agtversion.ParsedSemVer, cfg *artifact.Config) []byte {
-	filename, err := artifact.GetArtifactName(a, *version, cfg.OperatingSystem, cfg.Architecture)
-	require.NoErrorf(t, err, "could not get artifact name")
-
-	err = os.MkdirAll(cfg.DropPath, 0777)
+	err := os.MkdirAll(cfg.DropPath, 0777)
 	require.NoErrorf(t, err, "failed creating directory %q", cfg.DropPath)
 
-	filePath := filepath.Join(cfg.DropPath, filename)
+	filePath := filepath.Join(cfg.DropPath, a.FileName)
 	filePathSHA := filePath + ".sha512"
 	filePathASC := filePath + ".asc"
 
@@ -266,7 +262,7 @@ func prepareTestCase(t *testing.T, a artifact.Artifact, version *agtversion.Pars
 	require.NoErrorf(t, err, "could not write %q file", filePath)
 
 	hash := sha512.Sum512(content)
-	hashContent := fmt.Sprintf("%x %s", hash, filename)
+	hashContent := fmt.Sprintf("%x %s", hash, a.FileName)
 	err = os.WriteFile(filePathSHA, []byte(hashContent), 0644)
 	require.NoErrorf(t, err, "could not write %q file", filePathSHA)
 

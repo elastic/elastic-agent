@@ -31,9 +31,7 @@ const (
 var (
 	version  = agtversion.NewParsedSemVer(7, 5, 1, "", "")
 	beatSpec = artifact.Artifact{
-		Name:     "agentbeat",
-		Cmd:      "agentbeat",
-		Artifact: "beats/agentbeat",
+		Name: "agentbeat",
 	}
 )
 
@@ -78,16 +76,16 @@ func (td *testDials) reset() {
 func getElasticCoServer(t *testing.T) (*httptest.Server, []byte, *testDials) {
 	td := testDials{extResCode: make(extResCode)}
 	correctValues := map[string]struct{}{
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "i386.deb"):             {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "amd64.deb"):            {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "i686.rpm"):             {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "x86_64.rpm"):           {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "linux-x86.tar.gz"):     {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "linux-arm64.tar.gz"):   {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "linux-x86_64.tar.gz"):  {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "windows-x86.zip"):      {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "windows-x86_64.zip"):   {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "darwin-x86_64.tar.gz"): {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "i386.deb"):             {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "amd64.deb"):            {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "i686.rpm"):             {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "x86_64.rpm"):           {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "linux-x86.tar.gz"):     {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "linux-arm64.tar.gz"):   {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "linux-x86_64.tar.gz"):  {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "windows-x86.zip"):      {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "windows-x86_64.zip"):   {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.Name, version, "darwin-x86_64.tar.gz"): {},
 	}
 	var resp []byte
 	content := []byte("anything will do")

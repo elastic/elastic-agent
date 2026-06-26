@@ -53,12 +53,6 @@ const (
 	fipsPrefix         = "-fips"
 )
 
-var agentArtifact = artifact.Artifact{
-	Name:     "Elastic Agent",
-	Cmd:      AgentName,
-	Artifact: "beats/" + AgentName,
-}
-
 var (
 	ErrWatcherNotStarted    = errors.New("watcher did not start in time")
 	ErrUpgradeSameVersion   = errors.New("upgrade did not occur because it is the same version")
@@ -74,14 +68,8 @@ var (
 	Version_9_4_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 4, 0, "SNAPSHOT", "")
 )
 
-func init() {
-	if release.FIPSDistribution() {
-		agentArtifact.Cmd += fipsPrefix
-	}
-}
-
 type artifactDownloadHandler interface {
-	downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error)
+	downloadArtifact(ctx context.Context, target artifact.Artifact, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error)
 	withFleetServerURI(fleetServerURI string)
 }
 type unpackHandler interface {
@@ -412,7 +400,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
 	}
 
-	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, parsedVersion, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	target, err := artifact.New("elastic-agent", release.FIPSDistribution(), parsedVersion, u.settings.OS(), u.settings.Arch())
+	if err != nil {
+		return nil, fmt.Errorf("failed to build agent artifact: %w", err)
+	}
+
+	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, target, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 
 	// If the artifactPath is not empty, then the artifact was downloaded.
 	// There may still be an error in the download process, so we need to add

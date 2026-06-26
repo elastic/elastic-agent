@@ -91,7 +91,7 @@ func TestVerifier(t *testing.T) {
 	testVersion := agtversion.NewParsedSemVer(1, 2, 3, "", "")
 	for _, tc := range testCases {
 		d := NewVerifier(log, tc.verifiers[0], tc.verifiers[1], tc.verifiers[2])
-		err := d.Verify(context.Background(), artifact.Artifact{Name: "a", Cmd: "a", Artifact: "a/a"}, *testVersion, false)
+		err := d.Verify(context.Background(), artifact.Artifact{Name: "a"}, *testVersion, false)
 
 		assert.Equal(t, tc.expectedResult, err == nil)
 

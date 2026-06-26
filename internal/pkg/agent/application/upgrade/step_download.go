@@ -39,7 +39,7 @@ const (
 
 type downloaderFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config, *details.Details) (download.Downloader, error)
 
-type downloader func(context.Context, downloaderFactory, *agtversion.ParsedSemVer, *artifact.Config, *details.Details) (string, error)
+type downloader func(context.Context, downloaderFactory, artifact.Artifact, *artifact.Config, *details.Details) (string, error)
 
 // abstraction for testability for newVerifier
 type verifierFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config) (download.Verifier, error)
@@ -63,12 +63,14 @@ func (a *artifactDownloader) withFleetServerURI(fleetServerURI string) {
 	a.fleetServerURI = fleetServerURI
 }
 
-func (a *artifactDownloader) downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifact.Artifact, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
+
+	parsedVersion := target.Version
 
 	pgpBytes = a.appendFallbackPGP(parsedVersion, pgpBytes)
 
@@ -135,7 +137,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, parsedVersion
 		return "", fmt.Errorf("failed to create download directory at %s: %w", paths.Downloads(), err)
 	}
 
-	path, err := downloaderFunc(ctx, factory, parsedVersion, &settings, upgradeDetails)
+	path, err := downloaderFunc(ctx, factory, target, &settings, upgradeDetails)
 	if err != nil {
 		return "", fmt.Errorf("failed download of agent binary: %w", err)
 	}
@@ -153,7 +155,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, parsedVersion
 		}
 	}
 
-	if err := verifier.Verify(ctx, agentArtifact, *parsedVersion, skipDefaultPgp, pgpBytes...); err != nil {
+	if err := verifier.Verify(ctx, target, *parsedVersion, skipDefaultPgp, pgpBytes...); err != nil {
 		return path, errors.New(err, "failed verification of agent binary")
 	}
 	return path, nil
@@ -196,15 +198,15 @@ func newVerifier(_ *agtversion.ParsedSemVer, log *logger.Logger, settings *artif
 func (a *artifactDownloader) downloadOnce(
 	ctx context.Context,
 	factory downloaderFactory,
-	version *agtversion.ParsedSemVer,
+	target artifact.Artifact,
 	settings *artifact.Config,
 	upgradeDetails *details.Details,
 ) (string, error) {
-	downloader, err := factory(version, a.log, settings, upgradeDetails)
+	downloader, err := factory(target.Version, a.log, settings, upgradeDetails)
 	if err != nil {
 		return "", fmt.Errorf("unable to create fetcher: %w", err)
 	}
-	path, err := downloader.Download(ctx, agentArtifact, version)
+	path, err := downloader.Download(ctx, target, target.Version)
 	if err != nil {
 		return "", fmt.Errorf("unable to download package: %w", err)
 	}
@@ -216,7 +218,7 @@ func (a *artifactDownloader) downloadOnce(
 func (a *artifactDownloader) downloadWithRetries(
 	ctx context.Context,
 	factory downloaderFactory,
-	version *agtversion.ParsedSemVer,
+	target artifact.Artifact,
 	settings *artifact.Config,
 	upgradeDetails *details.Details,
 ) (string, error) {
@@ -237,7 +239,7 @@ func (a *artifactDownloader) downloadWithRetries(
 		attempt++
 		a.log.Infof("download attempt %d", attempt)
 		var err error
-		path, err = a.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails)
+		path, err = a.downloadOnce(cancelCtx, factory, target, settings, upgradeDetails)
 		if err != nil {
 			if downloadErrors.IsDiskSpaceError(err) {
 				a.log.Infof("insufficient disk space error detected, stopping retries")

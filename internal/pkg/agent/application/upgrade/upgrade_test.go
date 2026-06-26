@@ -44,7 +44,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
-	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 func Test_CopyFile(t *testing.T) {
@@ -1048,7 +1047,7 @@ type mockArtifactDownloader struct {
 	fleetServerURI    string
 }
 
-func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, target artifact.Artifact, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	return m.returnArchivePath, m.returnError
 }
 

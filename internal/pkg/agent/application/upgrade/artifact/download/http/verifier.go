@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -92,16 +93,13 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
 func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
-	artifactPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
-	if err != nil {
-		return errors.New(err, "retrieving package path")
-	}
+	artifactPath := filepath.Join(v.config.TargetDirectory, a.FileName)
 
-	if err = download.VerifySHA512HashWithCleanup(v.log, artifactPath); err != nil {
+	if err := download.VerifySHA512HashWithCleanup(v.log, artifactPath); err != nil {
 		return fmt.Errorf("failed to verify SHA512 hash: %w", err)
 	}
 
-	if err = v.verifyAsc(ctx, a, version, skipDefaultPgp, pgpBytes...); err != nil {
+	if err := v.verifyAsc(ctx, a, version, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
 			if err := os.Remove(artifactPath); err != nil {
@@ -120,17 +118,9 @@ func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtv
 }
 
 func (v *Verifier) verifyAsc(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultKey bool, pgpSources ...string) error {
-	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
-	if err != nil {
-		return errors.New(err, "retrieving package name")
-	}
+	fullPath := filepath.Join(v.config.TargetDirectory, a.FileName)
 
-	fullPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
-	if err != nil {
-		return errors.New(err, "retrieving package path")
-	}
-
-	ascURI, err := v.composeURI(filename, a.Artifact)
+	ascURI, err := v.composeURI(a.FileName, "beats/"+a.Name)
 	if err != nil {
 		return errors.New(err, "composing URI for fetching asc file", errors.TypeNetwork)
 	}

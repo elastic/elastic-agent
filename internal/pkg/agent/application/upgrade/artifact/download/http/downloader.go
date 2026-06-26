@@ -107,7 +107,7 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
 func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
-	remoteArtifact := a.Artifact
+	remoteArtifact := "beats/" + a.Name
 	downloadedFiles := make([]string, 0, 2)
 	defer func() {
 		if err != nil {
@@ -120,13 +120,13 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	}()
 
 	// download from source to dest
-	path, err := e.download(ctx, remoteArtifact, e.config.OS(), a, *version)
+	path, err := e.download(ctx, remoteArtifact, a, *version)
 	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
 
-	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
+	hashPath, err := e.downloadHash(ctx, remoteArtifact, a, *version)
 	downloadedFiles = append(downloadedFiles, hashPath)
 	return path, err
 }
@@ -148,33 +148,15 @@ func (e *Downloader) composeURI(artifactName, packageName string) (string, error
 	return uri.String(), nil
 }
 
-func (e *Downloader) download(ctx context.Context, remoteArtifact string, operatingSystem string, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
-	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
-	if err != nil {
-		return "", errors.New(err, "generating package name failed")
-	}
+func (e *Downloader) download(ctx context.Context, remoteArtifact string, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
+	fullPath := filepath.Join(e.config.TargetDirectory, a.FileName)
 
-	fullPath, err := artifact.GetArtifactPath(a, version, operatingSystem, e.config.Arch(), e.config.TargetDirectory)
-	if err != nil {
-		return "", errors.New(err, "generating package path failed")
-	}
-
-	return e.downloadFile(ctx, remoteArtifact, filename, fullPath)
+	return e.downloadFile(ctx, remoteArtifact, a.FileName, fullPath)
 }
 
-func (e *Downloader) downloadHash(ctx context.Context, remoteArtifact string, operatingSystem string, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
-	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
-	if err != nil {
-		return "", errors.New(err, "generating package name failed")
-	}
-
-	fullPath, err := artifact.GetArtifactPath(a, version, operatingSystem, e.config.Arch(), e.config.TargetDirectory)
-	if err != nil {
-		return "", errors.New(err, "generating package path failed")
-	}
-
-	filename = filename + ".sha512"
-	fullPath = fullPath + ".sha512"
+func (e *Downloader) downloadHash(ctx context.Context, remoteArtifact string, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
+	filename := a.FileName + ".sha512"
+	fullPath := filepath.Join(e.config.TargetDirectory, a.FileName) + ".sha512"
 
 	return e.downloadFile(ctx, remoteArtifact, filename, fullPath)
 }

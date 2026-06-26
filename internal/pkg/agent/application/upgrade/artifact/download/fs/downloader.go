@@ -61,13 +61,13 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	}()
 
 	// download from source to dest
-	path, err := e.download(e.config.OS(), a, *version, "")
+	path, err := e.download(a, *version, "")
 	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
 
-	hashPath, err := e.download(e.config.OS(), a, *version, ".sha512")
+	hashPath, err := e.download(a, *version, ".sha512")
 	downloadedFiles = append(downloadedFiles, hashPath)
 	return path, err
 }
@@ -75,7 +75,7 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 // DownloadAsc downloads the package .asc file from configured source.
 // It returns absolute path to the downloaded file and a no-nil error if any occurs.
 func (e *Downloader) DownloadAsc(_ context.Context, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
-	path, err := e.download(e.config.OS(), a, version, ".asc")
+	path, err := e.download(a, version, ".asc")
 	if err != nil {
 		os.Remove(path)
 		return "", err
@@ -85,19 +85,11 @@ func (e *Downloader) DownloadAsc(_ context.Context, a artifact.Artifact, version
 }
 
 func (e *Downloader) download(
-	operatingSystem string,
 	a artifact.Artifact,
 	version agtversion.ParsedSemVer,
 	extension string) (string, error) {
-	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
-	if err != nil {
-		return "", errors.New(err, "generating package name failed")
-	}
-
-	fullPath, err := artifact.GetArtifactPath(a, version, operatingSystem, e.config.Arch(), e.config.TargetDirectory)
-	if err != nil {
-		return "", errors.New(err, "generating package path failed")
-	}
+	filename := a.FileName
+	fullPath := filepath.Join(e.config.TargetDirectory, a.FileName)
 
 	if extension != "" {
 		filename += extension

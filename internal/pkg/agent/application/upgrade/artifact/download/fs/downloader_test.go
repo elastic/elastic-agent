@@ -168,7 +168,9 @@ func TestDownloader_Download(t *testing.T) {
 				mkdirAll: os.MkdirAll,
 				openFile: os.OpenFile,
 			}
-			got, err := e.Download(context.TODO(), tt.args.a, tt.args.version)
+			a, err := artifact.New("elastic-agent", false, tt.args.version, config.OS(), config.Arch())
+			require.NoError(t, err)
+			got, err := e.Download(context.TODO(), a, tt.args.version)
 			if !tt.wantErr(t, err, fmt.Sprintf("Download(%v, %v)", tt.args.a, tt.args.version)) {
 				return
 			}
@@ -292,7 +294,9 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 				mkdirAll: os.MkdirAll,
 				openFile: os.OpenFile,
 			}
-			got, err := e.DownloadAsc(context.TODO(), tt.args.a, tt.args.version)
+			a, err := artifact.New("elastic-agent", false, &tt.args.version, config.OS(), config.Arch())
+			require.NoError(t, err)
+			got, err := e.DownloadAsc(context.TODO(), a, tt.args.version)
 			if !tt.wantErr(t, err, fmt.Sprintf("DownloadAsc(%v, %v)", tt.args.a, tt.args.version)) {
 				return
 			}
@@ -351,10 +355,10 @@ func TestDownloadDiskSpaceError(t *testing.T) {
 
 			parsedVersion := agtversion.NewParsedSemVer(1, 2, 3, "", "")
 
-			artifactName, err := artifact.GetArtifactName(agentSpec, *parsedVersion, config.OS(), config.Arch())
+			a, err := artifact.New("elastic-agent", false, parsedVersion, config.OS(), config.Arch())
 			require.NoError(t, err)
 
-			sourceArtifactPath := filepath.Join(config.DropPath, artifactName)
+			sourceArtifactPath := filepath.Join(config.DropPath, a.FileName)
 			sourceArtifactHashPath := sourceArtifactPath + ".sha512"
 
 			err = os.WriteFile(sourceArtifactPath, []byte("test"), 0o666)
@@ -365,7 +369,7 @@ func TestDownloadDiskSpaceError(t *testing.T) {
 
 			downloader := NewDownloader(config)
 			tc.mockStdlibFuncs(downloader)
-			targetArtifactPath, err := downloader.Download(context.Background(), agentSpec, parsedVersion)
+			targetArtifactPath, err := downloader.Download(context.Background(), a, parsedVersion)
 
 			require.ErrorIs(t, err, tc.expectedError)
 
