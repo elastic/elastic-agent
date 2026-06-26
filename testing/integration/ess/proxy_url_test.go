@@ -1172,6 +1172,10 @@ func TestFleetDownloadAuthUpgrade(t *testing.T) {
 	err = fleettools.UpgradeAgent(t.Context(), kibClient, agentID, endVersionInfo.Binary.String(), true)
 	require.NoError(t, err)
 
+	t.Log("Waiting for upgrade to start...")
+	err = upgradetest.WaitForUpgradeInProgress(t.Context(), startFixture, 2*time.Minute, 10*time.Second)
+	require.NoError(t, err)
+
 	t.Log("Waiting for upgrade to reach watching state...")
 	err = upgradetest.WaitForWatchingState(t.Context(), startFixture, 15*time.Minute, 10*time.Second, 2*time.Minute)
 	require.NoError(t, err)
