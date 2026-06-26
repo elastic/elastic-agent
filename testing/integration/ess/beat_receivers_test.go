@@ -282,9 +282,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	err = classicFixture.Configure(ctx, updatedPolicyBytes)
 	require.NoError(t, err, "error configuring fixture")
 
-	// capture before install — "Determined allowed capabilities" is logged during startup
-	// (inside InstallWithoutEnroll), so the timestamp must predate the install or the log's
-	// @timestamp will fall below the gte filter and no documents will be found.
+	// must be captured before install — the agent logs this during startup
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	output, err := classicFixture.InstallWithoutEnroll(ctx, &installOpts)
 	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
@@ -353,9 +351,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	require.NoError(t, err)
 	err = beatReceiverFixture.Configure(ctx, updatedPolicyBytes)
 	require.NoError(t, err)
-	// store timestamp before install to filter otel docs; agent logs "Determined allowed
-	// capabilities" during startup (inside InstallWithoutEnroll), so the timestamp must be
-	// captured before the install or the log's @timestamp will predate the filter.
+	// must be captured before install — the agent logs this during startup
 	timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	combinedOutput, err = beatReceiverFixture.InstallWithoutEnroll(ctx, &installOpts)
 	require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
