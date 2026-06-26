@@ -78,7 +78,12 @@ require (
 	golang.org/x/term v0.44.0
 	golang.org/x/text v0.38.0
 	golang.org/x/time v0.15.0
+<<<<<<< HEAD
 	golang.org/x/tools v0.46.0
+=======
+	golang.org/x/tools v0.47.0
+	google.golang.org/api v0.284.0
+>>>>>>> 103d657fb (build(deps): bump golang.org/x/tools from 0.46.0 to 0.47.0 in the golang-x group (#15174))
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/ini.v1 v1.67.3
@@ -757,8 +762,12 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0-rc.4 // indirect
 	golang.org/x/arch v0.26.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
+<<<<<<< HEAD
 	golang.org/x/telemetry v0.0.0-20260610154732-fb80ec83bdd9 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
+=======
+	golang.org/x/telemetry v0.0.0-20260625142307-59b4966ccb57 // indirect
+>>>>>>> 103d657fb (build(deps): bump golang.org/x/tools from 0.46.0 to 0.47.0 in the golang-x group (#15174))
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/api v0.284.0 // indirect
