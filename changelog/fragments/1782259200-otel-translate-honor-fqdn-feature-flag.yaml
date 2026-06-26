@@ -15,12 +15,7 @@ summary: Propagate the `agent.features.fqdn.enabled` feature flag to beat receiv
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: |
-  When a beats input runs as a receiver inside the OTel collector, the
-  `agent.features.fqdn.enabled` feature flag is now propagated into the generated
-  receiver configuration. Previously the flag was only delivered to beats running
-  as processes, so `add_host_metadata` fell back to the short hostname and
-  `host.name` lost the FQDN for inputs running on the OTel pipeline.
+# description:
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent

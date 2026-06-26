@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/component"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -54,7 +55,7 @@ func TestFQDN(t *testing.T) {
 	origEtcHosts, err := getEtcHosts()
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(20*time.Minute))
 	defer cancel()
 
 	// Save original hostname so we can restore it at the end of each test
@@ -110,56 +111,79 @@ func TestFQDN(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	startedAt := time.Now().UTC().Format(time.RFC3339)
+
 	t.Log("Verify that agent name is short hostname")
 	agent := verifyAgentName(ctx, t, agentID, shortName, info.KibanaClient)
 
 	t.Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname")
-	verifyHostNameInIndices(t, "logs-*", shortName, info.Namespace, info.ESClient)
-	verifyHostNameInIndices(t, "metrics-*", shortName, info.Namespace, info.ESClient)
+	verifyHostNameInIndices(t, "logs-*", shortName, startedAt, info.Namespace, info.ESClient)
+	verifyHostNameInIndices(t, "metrics-*", shortName, startedAt, info.Namespace, info.ESClient)
 
-	t.Log("Update Agent policy to enable FQDN")
-	policy.AgentFeatures = []map[string]interface{}{
-		{
-			"name":    "fqdn",
-			"enabled": true,
-		},
+	runtimes := []struct {
+		name    string
+		runtime component.RuntimeManager
+	}{
+		{"process", component.ProcessRuntimeManager},
+		{"beatreceiver", component.OtelRuntimeManager},
 	}
-	updatePolicyReq := kibana.AgentPolicyUpdateRequest{
-		Name:          policy.Name,
-		Namespace:     info.Namespace,
-		AgentFeatures: policy.AgentFeatures,
+	for _, rt := range runtimes {
+		t.Run(rt.name, func(t *testing.T) {
+			since := time.Now().UTC().Format(time.RFC3339)
+
+			t.Logf("Update Agent policy to enable FQDN with monitoring runtime %q", rt.runtime)
+			updatePolicyReq := kibana.AgentPolicyUpdateRequest{
+				Name:      policy.Name,
+				Namespace: info.Namespace,
+				AgentFeatures: []map[string]interface{}{
+					{
+						"name":    "fqdn",
+						"enabled": true,
+					},
+				},
+				Overrides: map[string]interface{}{
+					"agent": map[string]interface{}{
+						"monitoring": map[string]interface{}{
+							"_runtime_experimental": string(rt.runtime),
+						},
+					},
+				},
+			}
+			updatedPolicy, err := kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
+			require.NoError(t, err)
+
+			t.Log("Wait until policy has been applied by Agent")
+			require.Eventually(
+				t,
+				tools.IsMinPolicyRevision(ctx, t, kibClient, agent.ID, updatedPolicy.Revision),
+				2*time.Minute,
+				1*time.Second,
+			)
+
+			t.Logf("Verify that the monitoring beats are running as %q", rt.runtime)
+			assertMonitoringRuntime(ctx, t, agentFixture, rt.runtime)
+
+			t.Log("Verify that agent name is FQDN")
+			verifyAgentName(ctx, t, agentID, fqdn, info.KibanaClient)
+
+			t.Log("Verify that hostname in `logs-*` and `metrics-*` is FQDN")
+			verifyHostNameInIndices(t, "logs-*", fqdn, since, info.Namespace, info.ESClient)
+			verifyHostNameInIndices(t, "metrics-*", fqdn, since, info.Namespace, info.ESClient)
+		})
 	}
-	updatedPolicy, err := kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
-	require.NoError(t, err)
-
-	t.Log("Wait until policy has been applied by Agent")
-	require.Eventually(
-		t,
-		tools.IsMinPolicyRevision(ctx, t, kibClient, agent.ID, updatedPolicy.Revision),
-		2*time.Minute,
-		1*time.Second,
-	)
-
-	t.Log("Verify that agent name is FQDN")
-	verifyAgentName(ctx, t, agentID, fqdn, info.KibanaClient)
-
-	t.Log("Verify that hostname in `logs-*` and `metrics-*` is FQDN")
-	verifyHostNameInIndices(t, "logs-*", fqdn, info.Namespace, info.ESClient)
-	verifyHostNameInIndices(t, "metrics-*", fqdn, info.Namespace, info.ESClient)
 
 	t.Log("Update Agent policy to disable FQDN")
-	policy.AgentFeatures = []map[string]interface{}{
-		{
-			"name":    "fqdn",
-			"enabled": false,
+	updatePolicyReq := kibana.AgentPolicyUpdateRequest{
+		Name:      policy.Name,
+		Namespace: info.Namespace,
+		AgentFeatures: []map[string]interface{}{
+			{
+				"name":    "fqdn",
+				"enabled": false,
+			},
 		},
 	}
-	updatePolicyReq = kibana.AgentPolicyUpdateRequest{
-		Name:          policy.Name,
-		Namespace:     info.Namespace,
-		AgentFeatures: policy.AgentFeatures,
-	}
-	updatedPolicy, err = kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
+	updatedPolicy, err := kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Wait until policy has been applied by Agent")
@@ -178,6 +202,26 @@ func TestFQDN(t *testing.T) {
 	// t.Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname again")
 	// verifyHostNameInIndices(t, "logs-*", shortName, info.ESClient)
 	// verifyHostNameInIndices(t, "metrics-*", shortName, info.ESClient)
+}
+
+// assertMonitoringRuntime waits until at least one of the agent's components reports that it is
+// running under the given runtime manager.
+func assertMonitoringRuntime(ctx context.Context, t *testing.T, fixture *atesting.Fixture, runtime component.RuntimeManager) {
+	t.Helper()
+	want := componentVersionInfoNameForRuntime(runtime)
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+
+		var found bool
+		for _, comp := range status.Components {
+			if comp.VersionInfo.Name == want {
+				found = true
+				break
+			}
+		}
+		assert.True(collect, found, "expected at least one component running as %q (runtime %s)", want, runtime)
+	}, 2*time.Minute, 5*time.Second)
 }
 
 func verifyAgentName(ctx context.Context, t *testing.T, agentID, hostname string, kibClient *kibana.Client) kibana.GetAgentResponse {
@@ -199,7 +243,9 @@ func verifyAgentName(ctx context.Context, t *testing.T, agentID, hostname string
 	return agent
 }
 
-func verifyHostNameInIndices(t *testing.T, indices, hostname, namespace string, esClient *elasticsearch.Client) {
+// verifyHostNameInIndices asserts that at least one document written to the given indices since
+// the provided timestamp.
+func verifyHostNameInIndices(t *testing.T, indices, hostname, since, namespace string, esClient *elasticsearch.Client) {
 	queryRaw := map[string]interface{}{
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
@@ -215,6 +261,15 @@ func verifyHostNameInIndices(t *testing.T, indices, hostname, namespace string, 
 						"term": map[string]interface{}{
 							"data_stream.namespace": map[string]interface{}{
 								"value": namespace,
+							},
+						},
+					},
+				},
+				"filter": []map[string]interface{}{
+					{
+						"range": map[string]interface{}{
+							"@timestamp": map[string]interface{}{
+								"gte": since,
 							},
 						},
 					},
