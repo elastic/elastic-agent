@@ -5,10 +5,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15155
-        - https://github.com/elastic/elastic-agent/pull/15174
-        - https://github.com/elastic/elastic-agent/pull/15181
-        - https://github.com/elastic/elastic-agent/pull/15182
+        - https://github.com/elastic/elastic-agent/pull/14454
       issue: []
       impact: ""
       action: ""
@@ -21,10 +18,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15155
-        - https://github.com/elastic/elastic-agent/pull/15174
-        - https://github.com/elastic/elastic-agent/pull/15181
-        - https://github.com/elastic/elastic-agent/pull/15182
+        - https://github.com/elastic/elastic-agent/pull/15082
       issue: []
       impact: ""
       action: ""
@@ -51,10 +45,7 @@ entries:
       description: ""
       component: otel
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15155
-        - https://github.com/elastic/elastic-agent/pull/15174
-        - https://github.com/elastic/elastic-agent/pull/15181
-        - https://github.com/elastic/elastic-agent/pull/15182
+        - https://github.com/elastic/elastic-agent/pull/15061
       issue: []
       impact: ""
       action: ""
