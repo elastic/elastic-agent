@@ -485,12 +485,29 @@ func TestGetOtelConfig(t *testing.T) {
 	defaultGlobalProcessors := []map[string]any{
 		{
 			"add_host_metadata": map[string]any{
-				"when.not.contains.tags": "forwarded",
+				"when": map[string]any{
+					"and": []any{
+						map[string]any{"not": map[string]any{"contains": map[string]any{"tags": "forwarded"}}},
+						map[string]any{"not": map[string]any{"equals": map[string]any{"data_stream.type": "synthetics"}}},
+					},
+				},
+			},
+		},
+		{
+			"add_observer_metadata": map[string]any{
+				"when": map[string]any{
+					"equals": map[string]any{"data_stream.type": "synthetics"},
+				},
 			},
 		},
 		{"add_cloud_metadata": nil},
 		{"add_docker_metadata": nil},
 		{"add_kubernetes_metadata": nil},
+	}
+	defaultExpectedProcessors := map[string]any{
+		"beat/_agent-component": map[string]any{
+			"processors": defaultGlobalProcessors,
+		},
 	}
 
 	// expected receiver config shared shape for ES-output beats with a single stream.
@@ -772,11 +789,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-default/test-1": expectedFilestreamConfig("filestream-default", "test-1", "generic-1"),
 					"filebeatreceiver/_agent-component/filestream-default/test-2": expectedFilestreamConfig("filestream-default", "test-2", "generic-2"),
@@ -890,11 +903,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-default/test-1": expectedFilestreamConfig("filestream-default", "test-1", "generic-1"),
 					"filebeatreceiver/_agent-component/filestream-default/test-2": expectedFilestreamConfig("filestream-default", "test-2", "generic-2"),
@@ -973,11 +982,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"workers":                  int64(0),
 					},
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": map[string]any{
 						"include_metadata": true,
@@ -1241,11 +1246,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 					},
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": expectedBeatMetricConfig,
 				},
@@ -1352,11 +1353,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 					},
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": expectedBeatMetricConfig,
 				},
@@ -1545,11 +1542,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 					},
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": expectedBeatMetricConfig,
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring2/test-1": map[string]any{
@@ -1682,11 +1675,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream1-default/test-1": expectedFilestreamConfig("filestream1-default", "test-1", "generic-1"),
 					"filebeatreceiver/_agent-component/filestream1-default/test-2": expectedFilestreamConfig("filestream1-default", "test-2", "generic-2"),
@@ -1749,11 +1738,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": map[string]any{
 						"metricbeat": map[string]any{
@@ -1853,11 +1838,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/system-metrics/test-1": map[string]any{
 						"metricbeat": map[string]any{
@@ -1968,11 +1949,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"auditbeatreceiver/_agent-component/auditbeat-default/test-1": expectedAuditbeatReceiverConfig("auditbeat-default"),
 				},
@@ -2027,11 +2004,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"heartbeatreceiver/_agent-component/heartbeat-default/test-1": expectedHeartbeatReceiverConfig("heartbeat-default"),
 				},
@@ -2086,11 +2059,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"osquerybeatreceiver/_agent-component/osquerybeat-default/test-1": expectedOsquerybeatReceiverConfig("osquerybeat-default"),
 				},
@@ -2145,11 +2114,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors,
 				"receivers": map[string]any{
 					"packetbeatreceiver/_agent-component/packetbeat-default/test-1": expectedPacketbeatReceiverConfig("packetbeat-default"),
 				},

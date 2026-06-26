@@ -210,12 +210,15 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 		otelDoc = runner.validateHeartbeatEvents(t, ctx, agentStatus.Info.ID, otelSince)
 	})
 
-	// Compare that documents produced by process and OTel modes have the same keys
+	// Compare that documents produced by process and OTel modes have the same keys.
+	// host.* fields are excluded: the OTel collector's resource detection processor
+	// adds host metadata that heartbeat doesn't emit in process mode.
+	heartbeatIgnoredFields := append(RuntimeComparisonIgnoredFields, "host")
 	t.Run("compare", func(t *testing.T) {
 		if processDoc == nil || otelDoc == nil {
 			t.Skip("skipping comparison because a previous subtest failed")
 		}
-		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields,
+		AssertMapstrKeysEqual(t, processDoc, otelDoc, heartbeatIgnoredFields,
 			"expected heartbeat document keys to be equal between process and otel modes")
 	})
 }

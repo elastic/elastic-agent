@@ -477,11 +477,44 @@ func beatInputsKey(beatName string) string {
 }
 
 // GetDefaultProcessors returns the default beat processors used across all pipelines.
+// Synthetics (heartbeat) data is identified by data_stream.type == "synthetics":
+// it skips add_host_metadata (which would add irrelevant host fields) and instead
+// runs add_observer_metadata to match the observer.* fields emitted in process mode.
 func GetDefaultProcessors() []map[string]any {
+	notSynthetics := map[string]any{
+		"not": map[string]any{
+			"equals": map[string]any{
+				"data_stream.type": "synthetics",
+			},
+		},
+	}
+	isSynthetics := map[string]any{
+		"equals": map[string]any{
+			"data_stream.type": "synthetics",
+		},
+	}
 	return []map[string]any{
 		{
 			"add_host_metadata": map[string]any{
-				"when.not.contains.tags": "forwarded",
+				"when": map[string]any{
+					"and": []any{
+						map[string]any{
+							"not": map[string]any{
+								"contains": map[string]any{
+									"tags": "forwarded",
+								},
+							},
+						},
+						notSynthetics,
+					},
+				},
+			},
+		},
+		{
+			// Heartbeat/synthetics monitors use add_observer_metadata (the observer is the
+			// monitoring agent, not the monitored host), matching process-mode behaviour.
+			"add_observer_metadata": map[string]any{
+				"when": isSynthetics,
 			},
 		},
 		{"add_cloud_metadata": nil},
