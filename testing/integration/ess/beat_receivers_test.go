@@ -201,12 +201,10 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 7. Compare both documents are equivalent
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-	t.Cleanup(cancel)
+	ctx := t.Context()
 
 	// prepare the policy and marshalled configuration
-	policyCtx, policyCancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-	t.Cleanup(policyCancel)
+	policyCtx := t.Context()
 
 	// 1. Create and install policy with just monitoring
 	createPolicyReq := kibana.AgentPolicy{
@@ -284,6 +282,9 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	err = classicFixture.Configure(ctx, updatedPolicyBytes)
 	require.NoError(t, err, "error configuring fixture")
 
+	// capture before install — "Determined allowed capabilities" is logged during startup
+	// (inside InstallWithoutEnroll), so the timestamp must predate the install or the log's
+	// @timestamp will fall below the gte filter and no documents will be found.
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	output, err := classicFixture.InstallWithoutEnroll(ctx, &installOpts)
 	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
@@ -298,7 +299,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	// 2. Assert monitoring logs and metrics are available on ES
 	for _, tc := range tests {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
 			mustClauses := []map[string]any{
 				{"match": map[string]any{"data_stream.type": tc.dsType}},
@@ -352,10 +353,12 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	require.NoError(t, err)
 	err = beatReceiverFixture.Configure(ctx, updatedPolicyBytes)
 	require.NoError(t, err)
+	// store timestamp before install to filter otel docs; agent logs "Determined allowed
+	// capabilities" during startup (inside InstallWithoutEnroll), so the timestamp must be
+	// captured before the install or the log's @timestamp will predate the filter.
+	timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	combinedOutput, err = beatReceiverFixture.InstallWithoutEnroll(ctx, &installOpts)
 	require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
-	// store timestamp to filter otel docs with timestamp greater than this value
-	timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
@@ -367,7 +370,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
 	for _, tc := range otelTests {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
 			mustClauses := []map[string]any{
 				{"match": map[string]any{"data_stream.type": tc.dsType}},
@@ -436,7 +439,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	assert.Equal(t, agentStatus, otelStatus, "expected agent status to be equal to otel status")
 
 	// Make sure we haven't transferred any logs that are supposed to be dropped
-	findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+	findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer findCancel()
 	rawQuery := map[string]any{
 		"query": map[string]any{
