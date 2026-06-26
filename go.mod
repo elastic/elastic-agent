@@ -93,7 +93,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/gotestsum v1.13.0
-	helm.sh/helm/v3 v3.21.2
+	helm.sh/helm/v3 v3.21.0
 	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9
 	k8s.io/api v0.36.2
 	k8s.io/apimachinery v0.36.2
