@@ -1,0 +1,64 @@
+version: 9.3.7
+entries:
+    - kind: bug-fix
+      summary: Add missing host.hostname to monitoring-metrics
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15155
+        - https://github.com/elastic/elastic-agent/pull/15174
+        - https://github.com/elastic/elastic-agent/pull/15181
+        - https://github.com/elastic/elastic-agent/pull/15182
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1779390024
+      file:
+        name: 1779390024-add-hostname-monitoring-metrics.yaml
+        checksum: 30a072c47323839d4e7bad30039641632b3f1ddf
+    - kind: bug-fix
+      summary: fix missing beat receiver trace logs from diagnostic bundle
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15155
+        - https://github.com/elastic/elastic-agent/pull/15174
+        - https://github.com/elastic/elastic-agent/pull/15181
+        - https://github.com/elastic/elastic-agent/pull/15182
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1780322182
+      file:
+        name: 1780322182-fix-missing-beat-receiver-trace-logs-from-diagnostic-bundle.yaml
+        checksum: d2ef2799871feb998cb28d9016f5c522e100cc8f
+    - kind: enhancement
+      summary: Adds system.cpu.cores field to self monitoring data
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14885
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14862
+      impact: ""
+      action: ""
+      timestamp: 1781273333
+      file:
+        name: 1781273333-add-system.cpu.cores-field-to-self-monitoring-data.yaml
+        checksum: f8a8088117985f7b9fcec98a05f00352304ca633
+    - kind: enhancement
+      summary: Set profiles feature gate for OTel profiles pipelines
+      description: ""
+      component: otel
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15155
+        - https://github.com/elastic/elastic-agent/pull/15174
+        - https://github.com/elastic/elastic-agent/pull/15181
+        - https://github.com/elastic/elastic-agent/pull/15182
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1781862490
+      file:
+        name: 1781862490-profiles-feature-gate.yaml
+        checksum: e563d9e62fa95b733102bdc437d8f19c462b0838
