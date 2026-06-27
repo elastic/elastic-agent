@@ -10,8 +10,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	pkgcomponent "github.com/elastic/elastic-agent/pkg/component"
@@ -234,4 +236,112 @@ func TestApplyComponentState_StartingFromNewRuntimeReplacesExisting(t *testing.T
 	assert.Equal(t, pkgcomponent.ProcessRuntimeManager, coord.state.Components[0].Component.RuntimeManager,
 		"component should now be under process runtime")
 	assert.Equal(t, client.UnitStateStarting, coord.state.Components[0].State.State)
+}
+
+func TestHasStateSuppressHealthDegradation(t *testing.T) {
+	const unitID = "metrics-unit"
+
+	build := func(unitState client.UnitState, statusReporting map[string]any) []runtime.ComponentComponentState {
+		var src *structpb.Struct
+		if statusReporting != nil {
+			s, err := structpb.NewStruct(map[string]any{"status_reporting": statusReporting})
+			require.NoError(t, err)
+			src = s
+		}
+		key := runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: unitID}
+		return []runtime.ComponentComponentState{{
+			Component: pkgcomponent.Component{
+				ID: "test-comp",
+				Units: []pkgcomponent.Unit{{
+					ID:     unitID,
+					Type:   client.UnitTypeInput,
+					Config: &proto.UnitExpectedConfig{Source: src},
+				}},
+			},
+			State: runtime.ComponentState{
+				State: client.UnitStateHealthy,
+				Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+					key: {State: unitState},
+				},
+			},
+		}}
+	}
+
+	tests := []struct {
+		name       string
+		unitState  client.UnitState
+		reporting  map[string]any
+		queryState client.UnitState
+		want       bool
+	}{
+		{"failed, no config -> counts", client.UnitStateFailed, nil, client.UnitStateFailed, true},
+		{"failed, report_failed=false -> suppressed", client.UnitStateFailed, map[string]any{"report_failed": false}, client.UnitStateFailed, false},
+		{"failed, report_failed=true -> counts", client.UnitStateFailed, map[string]any{"report_failed": true}, client.UnitStateFailed, true},
+		{"degraded, no config -> counts", client.UnitStateDegraded, nil, client.UnitStateDegraded, true},
+		{"degraded, report_degraded=false -> suppressed", client.UnitStateDegraded, map[string]any{"report_degraded": false}, client.UnitStateDegraded, false},
+		{"failed, only report_degraded=false -> failed still counts", client.UnitStateFailed, map[string]any{"report_degraded": false}, client.UnitStateFailed, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, hasState(build(tc.unitState, tc.reporting), tc.queryState))
+		})
+	}
+}
+
+// TestGenerateReportableStateSuppressHealthDegradation drives the real
+// generateReportableState() (the function the Fleet-reported agent status comes
+// from) with components/units in various states and status_reporting configs,
+// to validate the end-to-end aggregate-health behavior of the change.
+func TestGenerateReportableStateSuppressHealthDegradation(t *testing.T) {
+	unit := func(id string, st client.UnitState, sr map[string]any) runtime.ComponentComponentState {
+		var src *structpb.Struct
+		if sr != nil {
+			s, err := structpb.NewStruct(map[string]any{"status_reporting": sr})
+			require.NoError(t, err)
+			src = s
+		}
+		key := runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: id}
+		return runtime.ComponentComponentState{
+			Component: pkgcomponent.Component{
+				ID:    id,
+				Units: []pkgcomponent.Unit{{ID: id, Type: client.UnitTypeInput, Config: &proto.UnitExpectedConfig{Source: src}}},
+			},
+			State: runtime.ComponentState{
+				State: client.UnitStateHealthy,
+				Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{key: {State: st}},
+			},
+		}
+	}
+
+	suppressFailed := map[string]any{"report_failed": false}
+	suppressDegraded := map[string]any{"report_degraded": false}
+	suppressBoth := map[string]any{"report_failed": false, "report_degraded": false}
+
+	tests := []struct {
+		name  string
+		comps []runtime.ComponentComponentState
+		want  agentclient.State
+	}{
+		{"no components -> Healthy", nil, agentclient.Healthy},
+		{"healthy unit -> Healthy", []runtime.ComponentComponentState{unit("a", client.UnitStateHealthy, nil)}, agentclient.Healthy},
+		{"failed, unsuppressed -> Degraded", []runtime.ComponentComponentState{unit("a", client.UnitStateFailed, nil)}, agentclient.Degraded},
+		{"failed, suppressed -> Healthy", []runtime.ComponentComponentState{unit("a", client.UnitStateFailed, suppressFailed)}, agentclient.Healthy},
+		{"degraded, unsuppressed -> Degraded", []runtime.ComponentComponentState{unit("a", client.UnitStateDegraded, nil)}, agentclient.Degraded},
+		{"degraded, suppressed -> Healthy", []runtime.ComponentComponentState{unit("a", client.UnitStateDegraded, suppressDegraded)}, agentclient.Healthy},
+		{"mixed: suppressed-failed + unsuppressed-degraded -> Degraded", []runtime.ComponentComponentState{unit("a", client.UnitStateFailed, suppressBoth), unit("b", client.UnitStateDegraded, nil)}, agentclient.Degraded},
+		{"mixed: all suppressed -> Healthy", []runtime.ComponentComponentState{unit("a", client.UnitStateFailed, suppressBoth), unit("b", client.UnitStateDegraded, suppressDegraded)}, agentclient.Healthy},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			coord := &Coordinator{
+				state: State{
+					CoordinatorState:   agentclient.Healthy,
+					CoordinatorMessage: "Running",
+					Components:         tc.comps,
+				},
+			}
+			s := coord.generateReportableState()
+			assert.Equal(t, tc.want, s.State, "message: %s", s.Message)
+		})
+	}
 }
