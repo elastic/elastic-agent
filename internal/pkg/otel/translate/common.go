@@ -140,6 +140,15 @@ func getFlushTimeout(logger *logp.Logger, output *config.C) string {
 	return timeout
 }
 
+func getFlushMinEvents(logger *logp.Logger, output *config.C) int {
+	minEvents, err := output.Int("queue.mem.flush.min_events", -1)
+	if err != nil {
+		logger.Debugf("Failed to get flush min events: %v", err)
+		return 1600 // return default queue.mem.flush.min_events for sending_queue in case of an error
+	}
+	return int(minEvents)
+}
+
 // TLSCommonToOTel converts a tlscommon.Config into the OTel configtls.ClientConfig
 // ca_trusted_fingerprint, ca_sha_256 and verification_mode: strict/certificate are not handled by this method
 func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any, error) {

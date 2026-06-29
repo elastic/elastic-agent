@@ -11,9 +11,9 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260622140928-a16802447057
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260625220907-106a4c7a4a0a
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.43.1
+	github.com/elastic/elastic-agent-libs v0.44.0
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.59.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.59.0
@@ -129,7 +129,7 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.5 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
-	github.com/google/pprof v0.0.0-20260507013755-92041b743c96 // indirect
+	github.com/google/pprof v0.0.0-20260604005048-7023385849c0 // indirect
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
 	github.com/gosnmp/gosnmp v1.43.2 // indirect
 	github.com/grobie/gomemcache v0.0.0-20230213081705-239240bbc445 // indirect
@@ -374,7 +374,7 @@ require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/docker/go-connections v0.7.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5 // indirect
+	github.com/dolmen-go/contextio v1.0.0 // indirect
 	github.com/dop251/goja v0.0.0-20250630131328-58d95d85e994 // indirect
 	github.com/dop251/goja_nodejs v0.0.0-20250409162600-f7acab6894b0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -386,7 +386,7 @@ require (
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
 	github.com/elastic/apm-data v1.22.0 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
-	github.com/elastic/elastic-agent-autodiscover v0.10.3-0.20260423154939-e990715f9426 // indirect
+	github.com/elastic/elastic-agent-autodiscover v0.10.3 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.18.1 // indirect
 	github.com/elastic/elastic-agent-system-metrics v0.14.4 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
@@ -395,18 +395,18 @@ require (
 	github.com/elastic/go-elasticsearch/v8 v8.19.6 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
-	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
+	github.com/elastic/go-lumber v0.2.0 // indirect
 	github.com/elastic/go-perf v0.0.0-20260224073651-af0ee0c731b7 // indirect
 	github.com/elastic/go-seccomp-bpf v1.6.0 // indirect
 	github.com/elastic/go-sfdc v0.0.0-20260504130806-a46e22d049d9 // indirect
 	github.com/elastic/go-structform v0.0.12 // indirect
-	github.com/elastic/go-sysinfo v1.15.4 // indirect
+	github.com/elastic/go-sysinfo v1.15.5 // indirect
 	github.com/elastic/go-ucfg v0.9.1 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.4 // indirect
 	github.com/elastic/lunes v0.2.2 // indirect
-	github.com/elastic/mito v1.25.1 // indirect
+	github.com/elastic/mito v1.27.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.59.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.39.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 // indirect
@@ -415,7 +415,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/expr-lang/expr v1.17.8 // indirect
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb // indirect
-	github.com/fatih/color v1.18.0 // indirect
+	github.com/fatih/color v1.19.0 // indirect
 	github.com/fearful-symmetry/gomsr v0.0.1 // indirect
 	github.com/fearful-symmetry/gorapl v0.0.4 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -514,7 +514,7 @@ require (
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/kamstrup/intmap v0.5.2 // indirect
-	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7 // indirect
+	github.com/kardianos/service v1.2.4 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
@@ -760,11 +760,11 @@ require (
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/telemetry v0.0.0-20260610154732-fb80ec83bdd9 // indirect
+	golang.org/x/telemetry v0.0.0-20260625142307-59b4966ccb57 // indirect
 	golang.org/x/term v0.44.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.46.0 // indirect
+	golang.org/x/tools v0.47.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/api v0.284.0
@@ -775,7 +775,7 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/ini.v1 v1.67.2 // indirect
+	gopkg.in/ini.v1 v1.67.3 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9 // indirect
@@ -785,8 +785,8 @@ require (
 	k8s.io/kube-openapi v0.0.0-20260330154417-16be699c7b31 // indirect
 	k8s.io/kubelet v0.35.4 // indirect
 	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5 // indirect
-	kernel.org/pub/linux/libs/security/libcap/cap v1.2.77 // indirect
-	kernel.org/pub/linux/libs/security/libcap/psx v1.2.77 // indirect
+	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78 // indirect
+	kernel.org/pub/linux/libs/security/libcap/psx v1.2.78 // indirect
 	sigs.k8s.io/controller-runtime v0.23.3 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
@@ -814,5 +814,5 @@ replace (
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
 	github.com/google/gopacket => github.com/elastic/gopacket v1.1.20-0.20241002174017-e8c5fda595e6
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260622165532-f5e30669f373
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260623161606-914313578a72
 )

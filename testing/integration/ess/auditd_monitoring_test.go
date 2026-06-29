@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -97,7 +98,11 @@ func (runner *AuditDRunner) SetupSuite() {
 
 }
 
-func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) mapstr.M {
+// validateAuditdEvents waits for an ambient auditd event to appear in ES from
+// the given agent since the given time. If eventAction is non-empty, only
+// events with that event.action value are returned so that the caller can
+// compare documents of the same audit event type across runtime modes.
+func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Context, agentID string, since time.Time, eventAction string) mapstr.M {
 	now := time.Now()
 	var query map[string]any
 	var doc mapstr.M
@@ -114,12 +119,16 @@ func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Conte
 		}
 	}()
 
+	requiredFields := [][]string{
+		{"exists", "field", "auditd.summary.actor.primary"},
+	}
+	if eventAction != "" {
+		requiredFields = append(requiredFields, []string{"match", "event.action", eventAction})
+	}
+
 	t.Logf("starting to query ES for auditd events at %s", now.Format(time.RFC3339Nano))
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		query = genESQuery(agentID,
-			[][]string{
-				{"exists", "field", "auditd.summary.actor.primary"},
-			})
+		query = genESQuery(agentID, requiredFields)
 		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
 			"range": map[string]any{
 				"@timestamp": map[string]any{"gte": since.UTC().Format("2006-01-02T15:04:05.000Z")},
@@ -148,7 +157,7 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 	// Validate process mode
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
-		processDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, testStart)
+		processDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, testStart, "")
 	})
 
 	// Switch to OTel runtime and validate the same data
@@ -171,6 +180,8 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 			for _, comp := range status.Components {
 				if strings.HasPrefix(comp.ID, "audit/auditd") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
+					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
+						"expected audit/auditd component to be healthy, got %s", cproto.State(comp.State))
 					foundReceiver = true
 					break
 				}
@@ -178,15 +189,28 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 			assert.True(collect, foundReceiver, "expected an audit/auditd component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
-		t.Skip("abreceiver does not yet produce events, skipping OTel data validation")
-		otelDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, otelSince)
+		// Use the same event.action as the process document to ensure we compare
+		// semantically equivalent events across runtime modes. auditd.data fields
+		// are excluded from the key comparison because they are audit event type-
+		// specific and vary even within the same event.action depending on kernel
+		// version and PAM configuration (e.g. grantors may or may not be present).
+		var otelEventAction string
+		if processDoc != nil {
+			if v, err := processDoc.GetValue("event.action"); err == nil {
+				otelEventAction, _ = v.(string)
+			}
+		}
+		otelDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, otelSince, otelEventAction)
 	})
 
-	// Compare documents from process and otel modes have the same keys
+	// Compare documents from process and otel modes have the same keys.
+	// auditd.data fields are excluded because they are audit event type-specific
+	// and can legitimately differ even for the same event.action.
 	t.Run("compare", func(t *testing.T) {
 		if processDoc == nil || otelDoc == nil {
 			t.Skip("skipping comparison because a previous subtest failed")
 		}
-		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields, "expected auditd document keys to be equal between process and otel modes")
+		ignoredFields := append(RuntimeComparisonIgnoredFields, "auditd.data")
+		AssertMapstrKeysEqual(t, processDoc, otelDoc, ignoredFields, "expected auditd document keys to be equal between process and otel modes")
 	})
 }
