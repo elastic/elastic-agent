@@ -129,7 +129,7 @@ func (runner *OsqueryManagerRunner) validateOsqueryEvents(t *testing.T, ctx cont
 		require.NoError(collect, err)
 		require.NotEmpty(collect, res.Hits.Hits)
 		doc = res.Hits.Hits[0].Source
-	}, time.Minute*15, time.Second*10, "could not fetch events for osquery_manager")
+	}, time.Minute*5, time.Second*10, "could not fetch events for osquery_manager")
 	return doc
 }
 
