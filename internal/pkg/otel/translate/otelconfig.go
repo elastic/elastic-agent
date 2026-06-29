@@ -357,7 +357,8 @@ func getCollectorConfigForComponent(
 }
 
 // getReceiversConfigForComponent returns the receivers configuration for a component.
-// Each input produces its own receiver, so a component with N inputs will have N receivers.
+// By default each input stream produces its own receiver. When the component's InputSpec has
+// SingleReceiver set, all streams are merged into one receiver keyed by component ID alone.
 func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
@@ -435,7 +436,23 @@ func getReceiversConfigForComponent(
 	// indicate that beat receivers are managed by the elastic-agent
 	sharedConfig["management.otel.enabled"] = true
 
-	// Create one receiver per input
+	// When SingleReceiver is set, merge all stream inputs into one receiver keyed by
+	// component ID instead of creating one receiver per stream. Some components have
+	// shared state that cannot easily be split across receivers.
+	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
+		allInputConfigs := make([]map[string]any, 0, len(inputs))
+		for _, ri := range inputs {
+			allInputConfigs = append(allInputConfigs, ri.config)
+		}
+		receiverID := GetReceiverID(receiverType, comp.ID)
+		receiverConfig := maps.Clone(sharedConfig)
+		receiverConfig[beatName] = map[string]any{
+			beatInputsKey(beatName): allInputConfigs,
+		}
+		return map[string]any{receiverID.String(): receiverConfig}, nil
+	}
+
+	// Create one receiver per input stream.
 	receiversConfig := make(map[string]any, len(inputs))
 	for _, ri := range inputs {
 		if ri.streamID == "" {
@@ -446,10 +463,7 @@ func getReceiversConfigForComponent(
 		// Create a new config map for this receiver, copying shared config entries.
 		// This is a shallow copy — nested map values (path, logging, http) are shared
 		// across receivers. This is safe because nothing mutates them after construction.
-		receiverConfig := make(map[string]any, len(sharedConfig)+1)
-		for k, v := range sharedConfig {
-			receiverConfig[k] = v
-		}
+		receiverConfig := maps.Clone(sharedConfig)
 		receiverConfig[beatName] = map[string]any{
 			beatInputsKey(beatName): []map[string]any{ri.config},
 		}
