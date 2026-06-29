@@ -52,10 +52,10 @@ inputs:
         paths:
           - %s
 
-# Disable monitoring so there are less Beats running and less logs being generated.
+# Disable metrics monitoring so there are less beats running and less logs being generated.
 agent.monitoring:
-  enabled: false
-  logs: false
+  enabled: true
+  logs: true
   metrics: false
   pprof.enabled: false
   use_output: default
