@@ -1,0 +1,50 @@
+version: 8.19.18
+entries:
+    - kind: bug-fix
+      summary: fix missing beat receiver trace logs from diagnostic bundle
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15120
+        - https://github.com/elastic/elastic-agent/pull/15166
+        - https://github.com/elastic/elastic-agent/pull/15167
+        - https://github.com/elastic/elastic-agent/pull/15174
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1780322182
+      file:
+        name: 1780322182-fix-missing-beat-receiver-trace-logs-from-diagnostic-bundle.yaml
+        checksum: d2ef2799871feb998cb28d9016f5c522e100cc8f
+    - kind: enhancement
+      summary: Adds system.cpu.cores field to self monitoring data
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14885
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14862
+      impact: ""
+      action: ""
+      timestamp: 1781273333
+      file:
+        name: 1781273333-add-system.cpu.cores-field-to-self-monitoring-data.yaml
+        checksum: f8a8088117985f7b9fcec98a05f00352304ca633
+    - kind: enhancement
+      summary: Don't forcibly inject the elasticdiagnostic extension when running in plain otel mode
+      description: |
+        When running in hybrid mode, supervised by the Elastic Agent, the extension continues to be injected.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15120
+        - https://github.com/elastic/elastic-agent/pull/15166
+        - https://github.com/elastic/elastic-agent/pull/15167
+        - https://github.com/elastic/elastic-agent/pull/15174
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14606
+      impact: ""
+      action: ""
+      timestamp: 1782147307
+      file:
+        name: 1782147307-drop-force-extension-converter.yaml
+        checksum: 1caf1e8e5deb232655ae987658e03e5dd62404e2
