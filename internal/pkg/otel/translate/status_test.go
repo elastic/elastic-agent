@@ -571,6 +571,18 @@ func TestGetComponentStateSingleReceiver(t *testing.T) {
 	outputKey := runtime.ComponentUnitKey{UnitID: "output-osquery-default", UnitType: client.UnitTypeOutput}
 	assert.Contains(t, result.State.Units, inputKey, "input unit must be present in component state")
 	assert.Contains(t, result.State.Units, outputKey, "output unit must be present in component state")
+
+	// Both streams must be individually reported in the input unit payload, even
+	// though they share a single receiver. This confirms getComponentState correctly
+	// maps each stream to the single receiver under single_receiver: true.
+	inputUnitState := result.State.Units[inputKey]
+	assert.Equal(t, client.UnitStateHealthy, inputUnitState.State)
+	require.NotNil(t, inputUnitState.Payload, "input unit payload must not be nil")
+	streams, ok := inputUnitState.Payload["streams"].(map[string]map[string]string)
+	require.True(t, ok, "payload streams must be map[string]map[string]string")
+	healthyStream := map[string]string{"error": "", "status": client.UnitStateHealthy.String()}
+	assert.Equal(t, healthyStream, streams["action-responses"], "action-responses stream must be healthy")
+	assert.Equal(t, healthyStream, streams["results"], "results stream must be healthy")
 }
 
 func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
