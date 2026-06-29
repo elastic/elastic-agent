@@ -24,7 +24,7 @@ Review important information about the  8.19.18 release.
 
 
 * Adds system.cpu.cores field to self monitoring data. https://github.com/elastic/elastic-agent/pull/14885[#14885] https://github.com/elastic/elastic-agent/issues/14862[#14862]
-* Don&#39;t forcibly inject the elasticdiagnostic extension when running in plain otel mode. https://github.com/elastic/elastic-agent/pull/15120[#15120] https://github.com/elastic/elastic-agent/pull/15166[#15166] https://github.com/elastic/elastic-agent/pull/15167[#15167] https://github.com/elastic/elastic-agent/pull/15174[#15174] https://github.com/elastic/elastic-agent/issues/14606[#14606]
+* Don&#39;t forcibly inject the elasticdiagnostic extension when running in plain otel mode. https://github.com/elastic/elastic-agent/pull/15105[#15105] https://github.com/elastic/elastic-agent/issues/14606[#14606]
 
 
 
@@ -36,6 +36,6 @@ Review important information about the  8.19.18 release.
 
 
 
-* Fix missing beat receiver trace logs from diagnostic bundle. https://github.com/elastic/elastic-agent/pull/15120[#15120] https://github.com/elastic/elastic-agent/pull/15166[#15166] https://github.com/elastic/elastic-agent/pull/15167[#15167] https://github.com/elastic/elastic-agent/pull/15174[#15174] 
+* Fix missing beat receiver trace logs from diagnostic bundle. https://github.com/elastic/elastic-agent/pull/14716[#14716] 
 
 // end 8.19.18 relnotes

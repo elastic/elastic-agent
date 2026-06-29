@@ -5,10 +5,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15120
-        - https://github.com/elastic/elastic-agent/pull/15166
-        - https://github.com/elastic/elastic-agent/pull/15167
-        - https://github.com/elastic/elastic-agent/pull/15174
+        - https://github.com/elastic/elastic-agent/pull/14716
       issue: []
       impact: ""
       action: ""
@@ -36,10 +33,7 @@ entries:
         When running in hybrid mode, supervised by the Elastic Agent, the extension continues to be injected.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15120
-        - https://github.com/elastic/elastic-agent/pull/15166
-        - https://github.com/elastic/elastic-agent/pull/15167
-        - https://github.com/elastic/elastic-agent/pull/15174
+        - https://github.com/elastic/elastic-agent/pull/15105
       issue:
         - https://github.com/elastic/elastic-agent/issues/14606
       impact: ""
