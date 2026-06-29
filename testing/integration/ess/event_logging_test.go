@@ -59,10 +59,8 @@ agent.monitoring:
   metrics: false
   pprof.enabled: false
   use_output: default
-
-# Needed if you already have an Elastic-Agent running on your machine
-# That's very helpful for running the tests locally
-agent.monitoring:
+  # Needed if you already have an Elastic-Agent running on your machine
+  # That's very helpful for running the tests locally
   http:
     enabled: false
     port: 7002
