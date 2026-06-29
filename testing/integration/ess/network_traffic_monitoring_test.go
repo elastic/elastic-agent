@@ -8,7 +8,11 @@ package ess
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
+	"net"
+	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -103,12 +107,14 @@ func (runner *NetworkTrafficRunner) SetupSuite() {
 
 }
 
-// validateNetworkTrafficEvents waits for TLS events in ES and returns one
-// document per destination hostname (SNI).
-func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) map[string]mapstr.M {
+// validateNetworkTrafficEvents generates TLS traffic to serverName and waits
+// for the matching event to be available in ES, returning that document. The
+// traffic is generated inside the poll loop so a single missed capture does not
+// fail the test.
+func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, ctx context.Context, agentID, serverName string, since time.Time) mapstr.M {
 	now := time.Now()
 	var query map[string]any
-	var docsByHost map[string]mapstr.M
+	var doc mapstr.M
 	defer func() {
 		if t.Failed() {
 			bs, err := json.Marshal(query)
@@ -124,9 +130,11 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, c
 
 	t.Logf("starting to query ES for network traffic events at %s", now.Format(time.RFC3339Nano))
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		dialTLS(t, serverName)
+
 		query = genESQuery(agentID,
 			[][]string{
-				{"exists", "field", "tls.client.server_name"},
+				{"match", "tls.client.server_name", serverName},
 			})
 		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
 			"range": map[string]any{
@@ -138,21 +146,38 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, c
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-network_traffic.tls*", runner.info.ESClient)
 		require.NoError(collect, err)
 		require.NotEmpty(collect, res.Hits.Hits)
-		docs := make(map[string]mapstr.M)
-		for _, hit := range res.Hits.Hits {
-			source := mapstr.M(hit.Source)
-			sn, _ := source.Flatten()["tls.client.server_name"].(string)
-			if sn == "" {
-				continue
-			}
-			if _, exists := docs[sn]; !exists {
-				docs[sn] = source
-			}
-		}
-		require.NotEmpty(collect, docs)
-		docsByHost = docs
-	}, time.Minute*10, time.Second*10, "could not fetch events for network_traffic")
-	return docsByHost
+		doc = mapstr.M(res.Hits.Hits[0].Source)
+	}, time.Minute*10, time.Second*10, "could not fetch events for network_traffic to %s", serverName)
+	return doc
+}
+
+// esServerName returns the hostname of the Elasticsearch endpoint, used as the
+// TLS SNI for the controlled connection the test generates.
+func esServerName(t *testing.T) string {
+	raw := os.Getenv("ELASTICSEARCH_HOST")
+	require.NotEmpty(t, raw, "ELASTICSEARCH_HOST must be set")
+	u, err := url.Parse(raw)
+	require.NoError(t, err, "parsing ELASTICSEARCH_HOST")
+	require.NotEmpty(t, u.Hostname(), "ELASTICSEARCH_HOST has no hostname")
+	return u.Hostname()
+}
+
+// dialTLS opens and closes a TLS connection to host:443 so the packet component
+// captures a fresh handshake with a known SNI. The ClientHello carrying the SNI
+// is sent before any certificate verification, so the captured event is produced
+// even if the handshake does not complete.
+func dialTLS(t *testing.T, host string) {
+	conn, err := tls.DialWithDialer(
+		&net.Dialer{Timeout: 10 * time.Second},
+		"tcp",
+		net.JoinHostPort(host, "443"),
+		&tls.Config{ServerName: host},
+	)
+	if err != nil {
+		t.Logf("TLS dial to %s returned %v (handshake still captured)", host, err)
+		return
+	}
+	_ = conn.Close()
 }
 
 func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
@@ -164,14 +189,17 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(t, err, "could not get agent status")
 
-	testStart := time.Now()
+	// Compare the same destination in both runtimes: the test generates its own
+	// TLS traffic to the ES endpoint, so the captured handshake (SNI, extensions,
+	// geo enrichment) is identical by construction.
+	serverName := esServerName(t)
 
-	var processDocs map[string]mapstr.M
+	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
-		processDocs = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, testStart)
+		processDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, serverName, time.Now())
 	})
 
-	var otelDocs map[string]mapstr.M
+	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
 		otelSince := time.Now()
 		policyRevision := switchPolicyToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
@@ -196,37 +224,13 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 			assert.True(collect, foundReceiver, "expected a packet (network_traffic) component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
-		otelDocs = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, otelSince)
+		otelDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, serverName, otelSince)
 	})
 
-	// Compare per host: for the same destination the two modes must produce identical fields.
 	t.Run("compare", func(t *testing.T) {
-		require.NotNil(t, processDocs, "process subtest did not produce documents")
-		require.NotNil(t, otelDocs, "otel subtest did not produce documents")
-		var commonHosts []string
-		for host := range processDocs {
-			if _, ok := otelDocs[host]; ok {
-				commonHosts = append(commonHosts, host)
-			}
-		}
-		require.NotEmpty(t, commonHosts,
-			"no common tls.client.server_name found between process and otel phases; process=%v otel=%v",
-			hostKeys(processDocs), hostKeys(otelDocs))
-		for _, host := range commonHosts {
-			host := host
-			t.Run(host, func(t *testing.T) {
-				AssertMapstrKeysEqual(t, processDocs[host], otelDocs[host], RuntimeComparisonIgnoredFields,
-					"expected network_traffic document keys to be equal between process and otel modes")
-			})
-		}
+		require.NotNil(t, processDoc, "process subtest did not produce a document")
+		require.NotNil(t, otelDoc, "otel subtest did not produce a document")
+		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields,
+			"expected network_traffic document keys to be equal between process and otel modes")
 	})
-}
-
-// hostKeys returns the hostnames from a per-host document map, for use in error messages.
-func hostKeys(m map[string]mapstr.M) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
 }
