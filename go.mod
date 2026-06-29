@@ -15,7 +15,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260625234205-8f8c201abb9c
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260626185006-de90704aa30c
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-autodiscover v0.10.3
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
@@ -172,7 +172,7 @@ require (
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203 // indirect
 	github.com/elastic/go-docappender/v2 v2.14.1 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
-	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
+	github.com/elastic/go-lumber v0.2.0 // indirect
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
