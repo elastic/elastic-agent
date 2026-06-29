@@ -798,6 +798,7 @@ steps:
               - "${IMAGE_DEBIAN_11}"
             variant:
               - default
+              - stress
 
       - label: "linux:amd64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
