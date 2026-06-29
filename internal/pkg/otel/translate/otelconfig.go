@@ -737,7 +737,43 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 		result[i] = receiverInput{streamID: streamID, config: input}
 	}
 
+	if inputType == "osquery" {
+		result = injectOsqueryConfig(result, unit)
+	}
+
 	return result, nil
+}
+
+const (
+	// osqueryResultDataset is the dataset of the stream that carries osquery scheduled
+	// query results and must receive the input-level osquery configuration.
+	osqueryResultDataset = "osquery_manager.result"
+)
+
+// injectOsqueryConfig replicates what osquerybeatCfgFromStreams does in process
+// mode: it attaches the input-level "osquery" field (schedule, packs, decorators,
+// etc.) to the osquery_manager.result stream and moves that stream to position 0
+// so that inputs[0].Osquery is non-nil when config_plugin.Set() reads it at
+// beat startup.
+func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiverInput {
+	// Mirror the implementation from https://github.com/elastic/beats/blob/7764586737b76758db262a06fb3c594c52185c48/x-pack/osquerybeat/cmd/root.go#L92
+	osqVal := unit.Config.GetSource().AsMap()["osquery"]
+	if osqVal == nil {
+		return result
+	}
+	for i, ri := range result {
+		ds, ok := ri.config["data_stream"].(map[string]any)
+		if !ok || ds["dataset"] != osqueryResultDataset {
+			continue
+		}
+		if _, exists := result[i].config["osquery"]; !exists {
+			result[i].config["osquery"] = osqVal
+		}
+		// Place the result stream first so inputs[0].Osquery is set.
+		result[0], result[i] = result[i], result[0]
+		break
+	}
+	return result
 }
 
 // extractOtelProcessors extracts the processor IDs from the output configuration.

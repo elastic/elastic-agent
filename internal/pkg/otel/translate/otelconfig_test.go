@@ -2646,6 +2646,105 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			},
 		},
 		{
+			// single_receiver with input-level osquery schedule: the osquery field lives at
+			// the fleet policy input level (not stream level), so getInputsForUnit must inject
+			// it into each stream config so the beat can read its scheduled queries.
+			name: "osquerybeat single_receiver injects input-level schedule into streams",
+			component: &component.Component{
+				ID:        "osquerybeat-test-id",
+				InputType: "osquery",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Name: "osquery",
+						Command: &component.CommandSpec{
+							Args: []string{"osquerybeat"},
+						},
+						SingleReceiver: true,
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:   "osquerybeat-test-id-unit",
+						Type: client.UnitTypeInput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"id":         "test",
+							"use_output": "default",
+							"type":       "osquery",
+							"streams": []any{
+								map[string]any{
+									"id": "action-responses",
+									"data_stream": map[string]any{
+										"dataset": "osquery_manager.action.responses",
+									},
+									"query": nil,
+								},
+								map[string]any{
+									"id": "results",
+									"data_stream": map[string]any{
+										"dataset": "osquery_manager.result",
+									},
+									"query":    "SELECT * FROM processes",
+									"interval": "3600",
+								},
+							},
+							// osquery.schedule is a map from query name to query definition,
+						// matching the real fleet policy structure (same as pre-config.yaml).
+						"osquery": map[string]any{
+							"schedule": map[string]any{
+								"system_info": map[string]any{
+									"query":    "SELECT hostname FROM system_info",
+									"interval": 60,
+								},
+							},
+							"decorators": map[string]any{
+								"load": []any{
+									"SELECT uuid AS host_uuid FROM system_info;",
+								},
+							},
+						},
+					}),
+				},
+			},
+		},
+		outputQueueConfig:  nil,
+		expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id",
+		expectedBeatName:   "osquerybeat",
+		verifyBeatConfig: func(t *testing.T, beatConfig map[string]any) {
+			inputs, ok := beatConfig["inputs"].([]map[string]any)
+			require.True(t, ok, "osquerybeat inputs should be a slice of maps")
+			require.Len(t, inputs, 2, "both streams must be merged into the single receiver")
+
+			// The result stream must be placed first (matching osquerybeatCfgFromStreams
+			// which "set it as a first stream"), so inputs[0].Osquery is non-nil when
+			// config_plugin reads it at beat startup.
+			assert.Equal(t, "results", inputs[0]["id"], "osquery_manager.result stream must be first")
+
+			// Only the result stream gets the osquery section injected from the input
+			// level — not the action-responses stream. This is equivalent to what
+			// osquerybeatCfgFromStreams does: "Attach osquery configuration to the
+			// osquery_manager.result stream and set it as a first stream".
+			resultInput := inputs[0]
+			osquery, ok := resultInput["osquery"]
+			require.True(t, ok, "inputs[0] (result stream) must have osquery section injected from input level")
+			osqueryMap, ok := osquery.(map[string]any)
+			require.True(t, ok, "inputs[0].osquery must be a map")
+			// schedule must be present and contain the named query
+			schedule, ok := osqueryMap["schedule"]
+			assert.True(t, ok, "inputs[0].osquery must have schedule")
+			scheduleMap, ok := schedule.(map[string]any)
+			assert.True(t, ok, "inputs[0].osquery.schedule must be a map (query name → definition)")
+			assert.Contains(t, scheduleMap, "system_info", "inputs[0].osquery.schedule must have system_info query")
+			// decorators must also be present
+			assert.Contains(t, osqueryMap, "decorators", "inputs[0].osquery must have decorators")
+
+			// The action-responses stream must NOT have osquery injected.
+			actionInput := inputs[1]
+			_, hasOsquery := actionInput["osquery"]
+			assert.False(t, hasOsquery, "action-responses stream must not have osquery injected")
+		},
+	},
+		{
 			name:               "packetbeat component",
 			component:          packetbeatComponent,
 			outputQueueConfig:  nil,

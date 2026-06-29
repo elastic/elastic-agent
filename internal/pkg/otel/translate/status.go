@@ -285,13 +285,37 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		return runtime.ComponentComponentState{}, err
 	}
 
-	// Build a map from input ID to receiver status. Each receiver corresponds to one input,
-	// and its otel component ID encodes the input ID as compID/inputID.
+	// Build a map from input ID to receiver status.
 	receiverByInputID := make(map[string]*status.AggregateStatus)
-	receiverPrefix := OtelNamePrefix + comp.ID + "/"
-	for receiverOtelID, rs := range receiverStatuses {
-		if inputID, found := strings.CutPrefix(receiverOtelID.Name(), receiverPrefix); found {
-			receiverByInputID[inputID] = rs
+	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
+		// single_receiver: true means all streams share one receiver named after the
+		// component ID only (no stream suffix). Map every stream's resolved ID to it.
+		singleReceiverName := OtelNamePrefix + comp.ID
+		for receiverOtelID, rs := range receiverStatuses {
+			if receiverOtelID.Name() != singleReceiverName {
+				continue
+			}
+			for _, u := range comp.Units {
+				if u.Type != client.UnitTypeInput || u.Config == nil {
+					continue
+				}
+				for i, stream := range u.Config.Streams {
+					var src map[string]any
+					if s := stream.GetSource(); s != nil {
+						src = s.AsMap()
+					}
+					streamID := resolveStreamID(stream.Id, src, u.ID, i)
+					receiverByInputID[streamID] = rs
+				}
+			}
+		}
+	} else {
+		// Default: each receiver is named compID/streamID.
+		receiverPrefix := OtelNamePrefix + comp.ID + "/"
+		for receiverOtelID, rs := range receiverStatuses {
+			if inputID, found := strings.CutPrefix(receiverOtelID.Name(), receiverPrefix); found {
+				receiverByInputID[inputID] = rs
+			}
 		}
 	}
 
