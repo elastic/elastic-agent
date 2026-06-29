@@ -107,10 +107,9 @@ func (runner *NetworkTrafficRunner) SetupSuite() {
 
 }
 
-// validateNetworkTrafficEvents generates TLS traffic to serverName and waits
-// for the matching event to be available in ES, returning that document. The
-// traffic is generated inside the poll loop so a single missed capture does not
-// fail the test.
+// validateNetworkTrafficEvents generates TLS traffic to serverName and returns
+// the captured event for it. Traffic is generated on every poll so a missed
+// capture is retried rather than failing the test.
 func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, ctx context.Context, agentID, serverName string, since time.Time) mapstr.M {
 	now := time.Now()
 	var query map[string]any
@@ -151,8 +150,7 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, c
 	return doc
 }
 
-// esServerName returns the hostname of the Elasticsearch endpoint, used as the
-// TLS SNI for the controlled connection the test generates.
+// esServerName returns the Elasticsearch hostname, used as the TLS SNI.
 func esServerName(t *testing.T) string {
 	raw := os.Getenv("ELASTICSEARCH_HOST")
 	require.NotEmpty(t, raw, "ELASTICSEARCH_HOST must be set")
@@ -162,10 +160,8 @@ func esServerName(t *testing.T) string {
 	return u.Hostname()
 }
 
-// dialTLS opens and closes a TLS connection to host:443 so the packet component
-// captures a fresh handshake with a known SNI. The ClientHello carrying the SNI
-// is sent before any certificate verification, so the captured event is produced
-// even if the handshake does not complete.
+// dialTLS triggers a TLS handshake to host:443 for the packet component to
+// capture. A dial error is fine: the SNI is sent before cert verification.
 func dialTLS(t *testing.T, host string) {
 	conn, err := tls.DialWithDialer(
 		&net.Dialer{Timeout: 10 * time.Second},
@@ -189,9 +185,8 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(t, err, "could not get agent status")
 
-	// Compare the same destination in both runtimes: the test generates its own
-	// TLS traffic to the ES endpoint, so the captured handshake (SNI, extensions,
-	// geo enrichment) is identical by construction.
+	// Use one fixed destination for both runtimes so the captured handshakes are
+	// directly comparable.
 	serverName := esServerName(t)
 
 	var processDoc mapstr.M
