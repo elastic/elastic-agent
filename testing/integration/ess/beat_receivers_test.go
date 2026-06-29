@@ -201,10 +201,12 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 7. Compare both documents are equivalent
 
-	ctx := t.Context()
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+	t.Cleanup(cancel)
 
 	// prepare the policy and marshalled configuration
-	policyCtx := t.Context()
+	policyCtx, policyCancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	t.Cleanup(policyCancel)
 
 	// 1. Create and install policy with just monitoring
 	createPolicyReq := kibana.AgentPolicy{
