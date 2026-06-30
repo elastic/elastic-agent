@@ -39,7 +39,7 @@ func TestSwitchPrivilegedWithoutBasePath(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -85,7 +85,7 @@ func TestSwitchPrivilegedWithBasePath(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.

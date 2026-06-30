@@ -48,7 +48,7 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 		Local: false,
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	t.Log("Ensure base path is clean")

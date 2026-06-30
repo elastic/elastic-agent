@@ -54,7 +54,7 @@ func TestFQDN(t *testing.T) {
 	origEtcHosts, err := getEtcHosts()
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Save original hostname so we can restore it at the end of each test

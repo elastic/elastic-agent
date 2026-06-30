@@ -48,7 +48,7 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 		Sudo:  true,
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
@@ -96,7 +96,7 @@ func TestDebInstallsServers(t *testing.T) {
 		Sudo:  true,
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
@@ -219,7 +219,7 @@ func TestDebFleetUpgrade(t *testing.T) {
 }
 
 func testDebUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info *define.Info, installingServers bool, expectingServers bool) {
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// start from previous minor
