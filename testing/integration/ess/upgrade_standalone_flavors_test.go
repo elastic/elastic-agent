@@ -240,7 +240,7 @@ func TestStandaloneUpgrade_Flavor_UpgradeFromUnflavored(t *testing.T) {
 }
 
 func testStandaloneUpgradeFlavorCheck(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, unprivileged bool, hasServers bool, flavorCheck func(t *testing.T, f *atesting.Fixture)) {
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	startFixture, err := atesting.NewFixture(

@@ -68,7 +68,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 		t.Run(fmt.Sprintf("%s_to_%s", startVersion.String(), endVersion), func(t *testing.T) {
 			// Create ECH deployment with start version
 			t.Logf("Creating ECH deployment with version [%s] in region [%s]", startVersion.String(), echRegion)
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
 			deployment, err := statefulProv.Create(ctx, common.StackRequest{
 				ID:      "it-upgrade-integrations-server",

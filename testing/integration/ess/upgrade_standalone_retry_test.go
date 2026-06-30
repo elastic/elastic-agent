@@ -34,7 +34,7 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Start at the build version as we want to test the retry
