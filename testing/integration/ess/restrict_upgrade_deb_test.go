@@ -37,7 +37,7 @@ func TestRestrictUpgradeDeb(t *testing.T) {
 		},
 	})
 	t.Run("when agent is deployed via deb, a user should not be able to upgrade the agent using the cli", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 
 		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
 		require.NoError(t, err)

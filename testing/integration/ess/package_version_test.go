@@ -68,7 +68,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err, "could not create new fixture")

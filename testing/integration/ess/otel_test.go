@@ -995,7 +995,7 @@ agent.internal.runtime.filebeat.filestream: otel
 			require.NoError(ct, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
-			output, execErr := fixture.ExecStatus(context.Background())
+			output, execErr := fixture.ExecStatus(ctx)
 			require.NoError(ct, execErr)
 			t.Logf("status output: %v", output)
 			assert.Equal(ct, numEvents, actualHits.Hits)
@@ -1016,7 +1016,7 @@ agent.internal.runtime.filebeat.filestream: otel
 			require.NoError(ct, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
-			output, execErr := fixture.ExecStatus(context.Background())
+			output, execErr := fixture.ExecStatus(ctx)
 			require.NoError(ct, execErr)
 			t.Logf("status output: %v", output)
 			assert.Greater(ct, actualHits.Hits, 0)

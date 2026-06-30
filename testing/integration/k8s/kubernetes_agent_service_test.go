@@ -40,7 +40,7 @@ func TestKubernetesAgentService(t *testing.T) {
 	serviceAgentYAML, err := os.ReadFile(filepath.Join("testdata", "connectors.agent.yml"))
 	require.NoError(t, err, "failed to read service agent config")
 
-	ctx := context.Background()
+	ctx := t.Context()
 	kCtx := k8sGetContext(t, info)
 
 	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)

@@ -155,7 +155,7 @@ func TestFleetUpgradeToPRBuild(t *testing.T) {
 		Local: false,
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// ========================= prepare from fixture ==========================
 	versions, err := upgradetest.GetUpgradableVersions()

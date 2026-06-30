@@ -30,7 +30,7 @@ func TestEnrollReplaceToken(t *testing.T) {
 		Sudo:  true,
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 

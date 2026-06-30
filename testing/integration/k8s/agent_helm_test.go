@@ -118,7 +118,7 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 		),
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	testNamespace := kCtx.getNamespace(t)
 
 	for _, step := range steps {

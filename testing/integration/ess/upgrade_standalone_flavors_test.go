@@ -54,7 +54,7 @@ func TestStandaloneUpgrade_Flavor_Basic(t *testing.T) {
 	require.NoError(t, err)
 
 	checkFn := func(t *testing.T, fixture *atesting.Fixture) {
-		testComponentsPresence(context.Background(), fixture,
+		testComponentsPresence(t.Context(), fixture,
 			[]componentPresenceDefinition{
 				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
@@ -127,7 +127,7 @@ func TestStandaloneUpgrade_Flavor_Servers(t *testing.T) {
 	require.NoError(t, err)
 
 	checkFn := func(t *testing.T, fixture *atesting.Fixture) {
-		testComponentsPresence(context.Background(), fixture,
+		testComponentsPresence(t.Context(), fixture,
 			[]componentPresenceDefinition{
 				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
@@ -198,7 +198,7 @@ func TestStandaloneUpgrade_Flavor_UpgradeFromUnflavored(t *testing.T) {
 	require.NoError(t, err)
 
 	checkFn := func(t *testing.T, fixture *atesting.Fixture) {
-		testComponentsPresence(context.Background(), fixture,
+		testComponentsPresence(t.Context(), fixture,
 			[]componentPresenceDefinition{
 				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
