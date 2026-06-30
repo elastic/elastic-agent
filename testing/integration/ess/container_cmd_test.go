@@ -7,7 +7,6 @@
 package ess
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -348,7 +347,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	reqBody := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "internal": {
@@ -361,7 +360,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
     }
   }
 }
-`, policyName)
+`, policyName, info.Namespace)
 
 	status, result, err := info.KibanaClient.Request(
 		http.MethodPut,
@@ -414,17 +413,21 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		err, agentOutput,
 	)
 
-	assert.Eventually(t, func() bool {
-		agentOutputStr := agentOutput.String()
-		scanner := bufio.NewScanner(strings.NewReader(agentOutputStr))
-		for scanner.Scan() {
-			if strings.Contains(scanner.Text(), "Cannot index event") {
-				return true
-			}
-		}
-
-		return false
+	found := assert.Eventually(t, func() bool {
+		return strings.Contains(agentOutput.String(), "Cannot index event")
 	}, 3*time.Minute, 10*time.Second, "cannot find events on stderr")
+	if !found {
+		statusCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		status, statusErr := agentFixture.ExecStatus(statusCtx, atesting.WithCmdOptions(withEnv(env)))
+		if statusErr != nil {
+			t.Logf("agent status error: %v", statusErr)
+		} else {
+			statusJSON, _ := json.MarshalIndent(status, "", "  ")
+			t.Logf("agent status:\n%s", statusJSON)
+		}
+		t.Logf("agent output:\n%s", agentOutput.String())
+	}
 }
 
 // createMockESOutput creates an output configuration pointing to a mockES
@@ -778,6 +781,7 @@ func createSimpleAgentMonitoringConfig(t *testing.T, workDir string, esAddr stri
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts:
       - %s
 
@@ -819,7 +823,7 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
 	reqBody := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "monitoring": {
@@ -828,7 +832,7 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
     }
   }
 }
-`, policyName, runtime)
+`, policyName, info.Namespace, runtime)
 
 	status, result, err := info.KibanaClient.Request(
 		http.MethodPut,

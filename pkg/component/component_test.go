@@ -4279,7 +4279,7 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	require.NotNil(t, config)
 	assert.Equal(t, string(DefaultRuntimeManager), config.Default)
 	assert.Equal(t, string(ProcessRuntimeManager), config.DynamicInputs)
-	assert.Equal(t, "", config.Auditbeat.Default)
+	assert.Equal(t, "otel", config.Auditbeat.Default)
 	assert.Empty(t, config.Auditbeat.InputType)
 	assert.Equal(t, "otel", config.Filebeat.Default)
 	assert.Empty(t, config.Filebeat.InputType)
@@ -4289,7 +4289,7 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	assert.Equal(t, map[string]string{}, config.Metricbeat.InputType)
 	assert.Equal(t, "", config.Osquerybeat.Default)
 	assert.Empty(t, config.Osquerybeat.InputType)
-	assert.Equal(t, "", config.Packetbeat.Default)
+	assert.Equal(t, string(OtelRuntimeManager), config.Packetbeat.Default)
 	assert.Empty(t, config.Packetbeat.InputType)
 }
 

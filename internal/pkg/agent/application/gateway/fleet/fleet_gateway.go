@@ -6,6 +6,7 @@ package fleet
 
 import (
 	"context"
+	"encoding/json"
 	stderrors "errors"
 	"sync"
 	"time"
@@ -22,13 +23,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	fleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/scheduler"
 )
 
@@ -189,8 +190,11 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 				continue
 			}
 
-			actions := make([]fleetapi.Action, len(resp.Actions))
-			copy(actions, resp.Actions)
+			var actions fleetapi.Actions
+			if err := json.Unmarshal(resp.Actions, &actions); err != nil {
+				f.log.Errorf("failed to unmarshal checkin actions: %v", err)
+				continue
+			}
 			if len(actions) > 0 {
 				f.actionCh <- actions
 			}
@@ -489,7 +493,7 @@ func (f *FleetGateway) shouldUseLongSched() bool {
 }
 
 func isUnauth(err error) bool {
-	return errors.Is(err, client.ErrInvalidAPIKey)
+	return errors.Is(err, fleetapi.ErrInvalidAPIKey)
 }
 
 func (f *FleetGateway) SetClient(c client.Sender) {

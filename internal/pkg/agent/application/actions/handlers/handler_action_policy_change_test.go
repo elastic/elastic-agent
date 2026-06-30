@@ -34,12 +34,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 func TestPolicyChange(t *testing.T) {
@@ -62,7 +62,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, &mockStateStore{}, ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, newStateStoreMock(), ch, defaultLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -87,7 +87,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, &mockStateStore{}, ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, newStateStoreMock(), ch, defaultLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -120,7 +120,6 @@ func TestPolicyAcked(t *testing.T) {
 			},
 		}
 		mockSaver := newStateStoreMock()
-
 		// Test default FF value
 		cfg := configuration.DefaultConfiguration()
 		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
@@ -266,7 +265,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 						"fleet.proxy_url": "http://some.proxy",
 					})
 
-				err := h.handlePolicyChange(context.Background(), cfg)
+				err := h.handlePolicyChange(context.Background(), cfg, nil)
 				assert.ErrorContains(t, err, "fail to create API client with updated config")
 
 				// h.config must be unchanged since the error originated in validation, before any mutation.
@@ -324,7 +323,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 						"fleet.proxy_url": "http://some.proxy",
 					})
 
-				err := h.handlePolicyChange(context.Background(), cfg)
+				err := h.handlePolicyChange(context.Background(), cfg, nil)
 				assert.ErrorContains(t, err, "fail to communicate with Fleet Server API client hosts")
 
 				// h.config must be unchanged since the error originated in validation, before any mutation.
@@ -373,7 +372,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				map[string]interface{}{
 					"fleet.hosts": fleetServer.URL})
 
-			err := h.handlePolicyChange(context.Background(), cfg)
+			err := h.handlePolicyChange(context.Background(), cfg, nil)
 			require.NoError(t, err)
 
 			assert.Equal(t, 1, setterCalledCount)
@@ -422,7 +421,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					"fleet.proxy_url": mockProxy.URL,
 					"fleet.host":      fleetServer.URL})
 
-			err := h.handlePolicyChange(context.Background(), cfg)
+			err := h.handlePolicyChange(context.Background(), cfg, nil)
 			require.NoError(t, err)
 
 			assert.Equal(t, 1, setterCalledCount)
@@ -476,7 +475,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 						"fleet.proxy_url": "",
 						"fleet.host":      fleetServer.URL})
 
-				err = h.handlePolicyChange(context.Background(), cfg)
+				err = h.handlePolicyChange(context.Background(), cfg, nil)
 				require.NoError(t, err)
 
 				assert.Equal(t, 1, setterCalledCount)
@@ -533,7 +532,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 						"fleet.hosts":     []string{alwaysErroringServer.URL},
 					})
 
-				err = h.handlePolicyChange(context.Background(), cfg)
+				err = h.handlePolicyChange(context.Background(), cfg, nil)
 				if assert.Error(t, err, "action policy change handler should return an error if new fleet server sends back a bad status code") {
 					// check that we have the correct error contents
 					assert.ErrorContains(t, err, fmt.Sprintf("fleet server ping returned a bad status code: %d", httpStatusCode))
@@ -939,7 +938,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 
 				cfg := config.MustNewConfigFrom(tc.newCfg)
 
-				err := h.handlePolicyChange(context.Background(), cfg)
+				err := h.handlePolicyChange(context.Background(), cfg, nil)
 				tc.assertErr(t, err)
 
 				assert.Equal(t, tc.setterCalledCount, setterCalledCount,
@@ -1117,7 +1116,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 				runtimeLogLevelSetter: mockLogSetter,
 			}
 
-			tt.wantErr(t, h.handlePolicyChange(context.Background(), config.MustNewConfigFrom(tt.args.c)), fmt.Sprintf("handlePolicyChange(ctx, %v)", tt.args.c))
+			tt.wantErr(t, h.handlePolicyChange(context.Background(), config.MustNewConfigFrom(tt.args.c), nil), fmt.Sprintf("handlePolicyChange(ctx, %v)", tt.args.c))
 		})
 	}
 }
@@ -1179,7 +1178,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *tes
 			cfg := config.MustNewConfigFrom(map[string]interface{}{
 				"agent.logging.level": tt.policyLevel,
 			})
-			err := h.handlePolicyChange(context.Background(), cfg)
+			err := h.handlePolicyChange(context.Background(), cfg, nil)
 			require.NoError(t, err)
 
 			var policyLvl logp.Level
@@ -1218,6 +1217,59 @@ func (c *captureStore) Save(r io.Reader) error {
 	}
 	c.saved = b
 	return nil
+}
+
+func TestFleetToReaderPersistsLoggingOutputFlags(t *testing.T) {
+	agentInfo := &info.AgentInfo{}
+
+	t.Run("to_stderr=true is round-tripped through save/load", func(t *testing.T) {
+		cfg := configuration.DefaultConfiguration()
+		cfg.Settings.LoggingConfig.ToStderr = true
+		cfg.Settings.LoggingConfig.ToFiles = false
+
+		reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), "", cfg)
+		require.NoError(t, err)
+
+		reloaded, err := config.NewConfigFrom(reader)
+		require.NoError(t, err)
+
+		reloadedFull, err := configuration.NewFromConfig(reloaded)
+		require.NoError(t, err)
+
+		assert.Equal(t, cfg.Settings.LoggingConfig.ToStderr, reloadedFull.Settings.LoggingConfig.ToStderr,
+			"LoggingConfig.ToStderr must survive the save/load cycle to prevent a re-exec loop")
+		assert.Equal(t, cfg.Settings.LoggingConfig.ToFiles, reloadedFull.Settings.LoggingConfig.ToFiles,
+			"LoggingConfig.ToFiles must survive the save/load cycle to prevent a re-exec loop")
+	})
+
+	t.Run("hasLoggingConfigChanged returns false after save/load with same policy", func(t *testing.T) {
+		cfg := configuration.DefaultConfiguration()
+		cfg.Settings.LoggingConfig.ToStderr = true
+		cfg.Settings.LoggingConfig.ToFiles = false
+
+		reader, err := fleetToReader(agentInfo.AgentID(), agentInfo.Headers(), "", cfg)
+		require.NoError(t, err)
+
+		reloaded, err := config.NewConfigFrom(reader)
+		require.NoError(t, err)
+
+		reloadedFull, err := configuration.NewFromConfig(reloaded)
+		require.NoError(t, err)
+
+		h := &PolicyChangeHandler{config: reloadedFull}
+
+		policyWithSameLogging, err := configuration.NewFromConfig(config.MustNewConfigFrom(map[string]interface{}{
+			"agent.logging.to_stderr": true,
+			"agent.logging.to_files":  false,
+		}))
+		require.NoError(t, err)
+
+		assert.False(t, h.applyLoggingConfigChange(policyWithSameLogging, &logger.Config{
+			ToStderr: true,
+			ToFiles:  false,
+		}),
+			"after re-exec + reload the same policy must not be detected as a logging change, which would cause an infinite re-exec loop")
+	})
 }
 
 func defaultLogLevelSet(t *testing.T) *mockLogLevelSetter {

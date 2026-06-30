@@ -110,14 +110,6 @@ func DefaultBuildArgs(cfg *Settings) BuildArgs {
 			for varName, value := range fipsConfig.Compile.Env {
 				args.Env[varName] = value
 			}
-			// windows FIPS builds use the upstream FIPS module
-			if platform.GOOS == "windows" {
-				delete(args.Env, "GOEXPERIMENT")
-				// See https://go.dev/doc/security/fips140#go-cryptographic-module-v100
-				// CMVP Certificate #5247: https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/5247
-				// CAVP Certificate A6650: https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/details?product=19371
-				args.Env["GOFIPS140"] = "v1.0.0"
-			}
 		}
 	}
 
@@ -185,9 +177,6 @@ func GolangCrossBuild(ctx context.Context, cfg *Settings, params BuildArgs) erro
 		return errors.New("use the crossBuild target. golangCrossBuild can " +
 			"only be executed within the golang-crossbuild docker environment")
 	}
-
-	defer DockerChown(filepath.Join(params.OutputDir, params.Name+binaryExtension(cfg.Build.GOOS)))
-	defer DockerChown(filepath.Join(params.OutputDir))
 
 	mountPoint := cfg.ElasticBeatsDir
 	if err := sh.Run("git", "config", "--global", "--add", "safe.directory", mountPoint); err != nil {

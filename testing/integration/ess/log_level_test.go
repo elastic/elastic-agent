@@ -142,7 +142,7 @@ func TestSetLogLevelFleetManagedSurvivesRestart(t *testing.T) {
 		}
 		t.Logf("Fleet metadata log level: %q (want %q)", fleetLevel, policyLogLevel)
 		return fleetLevel == policyLogLevel.String()
-	}, 6*time.Minute, 30*time.Second, "agent never reported policy log level %q to Fleet", policyLogLevel)
+	}, 6*time.Minute, time.Second, "agent never reported policy log level %q to Fleet", policyLogLevel)
 
 	// Step 3: restart the agent service.
 	topPath := paths.Top()
@@ -191,7 +191,7 @@ func TestSetLogLevelFleetManagedSurvivesRestart(t *testing.T) {
 		}
 		t.Logf("Fleet metadata log level after restart: %q (want %q)", fleetLevel, policyLogLevel)
 		return fleetLevel == policyLogLevel.String()
-	}, 6*time.Minute, 30*time.Second,
+	}, 6*time.Minute, time.Second,
 		"agent did not report policy log level %q to Fleet after restart", policyLogLevel)
 
 	// Step 6: apply a per-agent log level override after restart and validate it in Fleet metadata.
@@ -211,7 +211,7 @@ func TestSetLogLevelFleetManagedSurvivesRestart(t *testing.T) {
 		}
 		t.Logf("Fleet metadata log level after override: %q (want %q)", fleetLevel, overrideLogLevel)
 		return fleetLevel == overrideLogLevel.String()
-	}, 6*time.Minute, 30*time.Second,
+	}, 6*time.Minute, time.Second,
 		"agent did not apply per-agent log level override %q after restart", overrideLogLevel)
 
 	// Step 7: clear the per-agent override and validate the policy log level is restored.
@@ -227,7 +227,7 @@ func TestSetLogLevelFleetManagedSurvivesRestart(t *testing.T) {
 		}
 		t.Logf("Fleet metadata log level after clearing override: %q (want %q)", fleetLevel, policyLogLevel)
 		return fleetLevel == policyLogLevel.String()
-	}, 6*time.Minute, 30*time.Second,
+	}, 6*time.Minute, time.Second,
 		"agent did not revert to policy log level %q after clearing override", policyLogLevel)
 }
 
@@ -258,7 +258,7 @@ func testLogLevelSetViaFleet(ctx context.Context, f *atesting.Fixture, agentID s
 	//	}
 	//	t.Logf("Agent log level: %q policy log level: %q", agentLogLevel, policyLogLevel)
 	//	return agentLogLevel == policyLogLevel.String()
-	//}, 30*time.Second, time.Second, "agent never received expected log level %q", policyLogLevel)
+	//}, time.Second, time.Second, "agent never received expected log level %q", policyLogLevel)
 
 	// assert Fleet eventually receives the new log level from agent through checkin
 	assert.Eventuallyf(t, func() bool {
@@ -269,7 +269,7 @@ func testLogLevelSetViaFleet(ctx context.Context, f *atesting.Fixture, agentID s
 		}
 		t.Logf("Fleet metadata log level for agent %q: %q policy log level: %q", agentID, fleetMetadataLogLevel, policyLogLevel)
 		return fleetMetadataLogLevel == policyLogLevel.String()
-	}, 6*time.Minute, 30*time.Second, "agent never communicated policy log level %q to Fleet", policyLogLevel)
+	}, 6*time.Minute, time.Second, "agent never communicated policy log level %q to Fleet", policyLogLevel)
 
 	// Step 2: set a different log level for the specific agent using Settings action
 	// set agent log level and verify that it takes precedence over the policy one
@@ -300,7 +300,7 @@ func testLogLevelSetViaFleet(ctx context.Context, f *atesting.Fixture, agentID s
 		}
 		t.Logf("Fleet metadata log level for agent %q: %q agent log level: %q", agentID, fleetMetadataLogLevel, agentLogLevel)
 		return fleetMetadataLogLevel == agentLogLevel
-	}, 6*time.Minute, 30*time.Second, "agent never communicated agent-specific log level %q to Fleet", agentLogLevel)
+	}, 6*time.Minute, time.Second, "agent never communicated agent-specific log level %q to Fleet", agentLogLevel)
 
 	// Step 3: Clear the agent-specific log level override, verify that we revert to policy log level
 	t.Logf("Clearing agent log level, expecting log level to revert back to %q", policyLogLevel)
@@ -317,7 +317,7 @@ func testLogLevelSetViaFleet(ctx context.Context, f *atesting.Fixture, agentID s
 	//	}
 	//	t.Logf("Agent log level: %q policy log level: %q", actualAgentLogLevel, policyLogLevel)
 	//	return actualAgentLogLevel == policyLogLevel.String()
-	//}, 30*time.Second, time.Second, "agent never reverted to policy log level %q", policyLogLevel)
+	//}, time.Second, time.Second, "agent never reverted to policy log level %q", policyLogLevel)
 
 	// assert Fleet eventually receives the new log level from agent through checkin
 	assert.Eventuallyf(t, func() bool {
@@ -328,7 +328,7 @@ func testLogLevelSetViaFleet(ctx context.Context, f *atesting.Fixture, agentID s
 		}
 		t.Logf("Fleet metadata log level for agent %q: %q policy log level: %q", agentID, fleetMetadataLogLevel, policyLogLevel)
 		return fleetMetadataLogLevel == policyLogLevel.String()
-	}, 6*time.Minute, 30*time.Second, "agent never communicated reverting to policy log level %q to Fleet", policyLogLevel)
+	}, 6*time.Minute, time.Second, "agent never communicated reverting to policy log level %q to Fleet", policyLogLevel)
 
 	// Step 4: Clear the log level in policy and verify that agent reverts to the initial log level
 	t.Logf("Clearing policy log level, expecting log level to revert back to %q", initialLogLevel)
@@ -356,7 +356,7 @@ func testLogLevelSetViaFleet(ctx context.Context, f *atesting.Fixture, agentID s
 		}
 		t.Logf("Fleet metadata log level for agent %q: %q initial log level: %q", agentID, fleetMetadataLogLevel, initialLogLevel)
 		return fleetMetadataLogLevel == initialLogLevel
-	}, 6*time.Minute, 30*time.Second, "agent never communicated initial log level %q to Fleet", initialLogLevel)
+	}, 6*time.Minute, time.Second, "agent never communicated initial log level %q to Fleet", initialLogLevel)
 }
 
 func waitForAgentAndFleetHealthy(ctx context.Context, t *testing.T, f *atesting.Fixture) bool {

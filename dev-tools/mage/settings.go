@@ -702,6 +702,7 @@ func (s *Settings) setBuildDefaults() {
 	s.Build.GOARCH = build.Default.GOARCH
 	s.Build.MaxParallel = runtime.NumCPU()
 	s.BuildDate = time.Now().UTC()
+	s.Build.Snapshot = true
 }
 
 // setBeatDefaults sets default values for BeatSettings.
@@ -724,9 +725,6 @@ func (s *Settings) setTestDefaults() {
 
 // setCrossBuildDefaults sets default values for CrossBuildSettings.
 func (s *Settings) setCrossBuildDefaults() {
-	s.CrossBuild.MountModcache = true
-	s.CrossBuild.MountBuildCache = true
-	s.CrossBuild.BuildCacheVolumeName = "elastic-agent-crossbuild-build-cache"
 	s.CrossBuild.DevOS = "linux"
 	s.CrossBuild.DevArch = "amd64"
 }
@@ -739,7 +737,7 @@ func (s *Settings) setPackagingDefaults() {
 
 // setIntegrationTestDefaults sets default values for IntegrationTestSettings.
 func (s *Settings) setIntegrationTestDefaults() {
-	s.IntegrationTest.CleanOnExit = true
+	s.IntegrationTest.CleanOnExit = false
 	s.IntegrationTest.TestEnvironmentEnabled = true
 }
 
@@ -951,14 +949,8 @@ type BuildSettings struct {
 	// GOARM is the ARM version for compilation (from GOARM env var)
 	GOARM string
 
-	// Snapshot indicates whether this is a snapshot build (from SNAPSHOT env var)
+	// Snapshot indicates whether this is a snapshot build (from SNAPSHOT env var, default true)
 	Snapshot bool
-
-	// SnapshotSet indicates whether SNAPSHOT env var was explicitly set.
-	// This is needed to distinguish "not set" from "explicitly set to false"
-	// in contexts where the default varies (e.g., cloud images default to true).
-	// TODO: consider refactoring to use *bool or restructuring context-specific defaults.
-	SnapshotSet bool
 
 	// DevBuild indicates whether this is a development build (from DEV env var)
 	DevBuild bool
@@ -1112,15 +1104,6 @@ type CrossBuildSettings struct {
 
 	// DockerVariants is the comma-separated list of Docker variants (from DOCKER_VARIANTS env var)
 	DockerVariants string
-
-	// MountModcache enables mounting $GOPATH/pkg/mod into crossbuild containers (from CROSSBUILD_MOUNT_MODCACHE env var)
-	MountModcache bool
-
-	// MountBuildCache enables mounting Go build cache into crossbuild containers (from CROSSBUILD_MOUNT_GOCACHE env var)
-	MountBuildCache bool
-
-	// BuildCacheVolumeName is the Docker volume name for the build cache
-	BuildCacheVolumeName string
 
 	// DevOS is the target OS for config generation (from DEV_OS env var, default "linux")
 	DevOS string
@@ -1389,7 +1372,6 @@ func (s *Settings) loadBuildSettingsFromEnv() error {
 
 	var err error
 
-	_, s.Build.SnapshotSet = os.LookupEnv("SNAPSHOT")
 	s.Build.Snapshot, err = parseBoolEnv("SNAPSHOT", s.Build.Snapshot)
 	if err != nil {
 		return fmt.Errorf("failed to parse SNAPSHOT: %w", err)
@@ -1510,12 +1492,6 @@ func (s *Settings) loadCrossBuildSettingsFromEnv() {
 	if v := os.Getenv("DOCKER_VARIANTS"); v != "" {
 		s.CrossBuild.DockerVariants = v
 	}
-	if v, ok := os.LookupEnv("CROSSBUILD_MOUNT_MODCACHE"); ok {
-		s.CrossBuild.MountModcache = v == "true"
-	}
-	if v, ok := os.LookupEnv("CROSSBUILD_MOUNT_GOCACHE"); ok {
-		s.CrossBuild.MountBuildCache = v == "true"
-	}
 	if v := os.Getenv("DEV_OS"); v != "" {
 		s.CrossBuild.DevOS = v
 	}
@@ -1630,7 +1606,9 @@ func (s *Settings) loadIntegrationTestSettingsFromEnv() error {
 	if os.Getenv("TEST_RUN_UNTIL_FAILURE") == "true" {
 		s.IntegrationTest.RunUntilFailure = true
 	}
-	if os.Getenv("TEST_INTEG_CLEAN_ON_EXIT") == "false" {
+	if v := os.Getenv("TEST_INTEG_CLEAN_ON_EXIT"); v == "true" {
+		s.IntegrationTest.CleanOnExit = true
+	} else if v == "false" {
 		s.IntegrationTest.CleanOnExit = false
 	}
 	if v := os.Getenv("TEST_LONG_RUNNING"); v != "" {
@@ -1859,7 +1837,11 @@ func (s *Settings) BuildDateString() string {
 }
 
 // GetPlatforms returns the parsed platform list from PLATFORMS env var.
-// If PLATFORMS is empty, returns the default platform list.
+// If PLATFORMS is empty, returns the host platform (runtime.GOOS/runtime.GOARCH)
+// when that platform is known, or BuildPlatforms.Defaults() as a fallback for
+// exotic hosts. This makes `mage package` produce host-only artifacts by
+// default; callers that want a broader matrix (CI cross-builds) set PLATFORMS
+// explicitly.
 // Platform filters from the settings' PlatformFilters are applied to the result.
 // Note: linux/386 and windows/386 are always filtered out as they are not supported.
 func (s *Settings) GetPlatforms() BuildPlatformList {
@@ -1867,7 +1849,12 @@ func (s *Settings) GetPlatforms() BuildPlatformList {
 	if s.CrossBuild.Platforms != "" {
 		platforms = NewPlatformList(s.CrossBuild.Platforms)
 	} else {
-		platforms = BuildPlatforms.Defaults()
+		hostName := runtime.GOOS + "/" + runtime.GOARCH
+		if bp, ok := BuildPlatforms.Get(hostName); ok {
+			platforms = BuildPlatformList{bp}
+		} else {
+			platforms = BuildPlatforms.Defaults()
+		}
 	}
 
 	// Filter out unsupported platforms
@@ -1886,7 +1873,8 @@ func (s *Settings) GetPlatforms() BuildPlatformList {
 // If SelectedPackageTypes is set in the settings, returns that.
 // Otherwise parses from PACKAGES env var.
 // If PACKAGES is "all", returns all available package types.
-// If PACKAGES is empty, returns nil.
+// If PACKAGES is empty, returns a platform-derived default: tar.gz for non-Windows
+// platforms and zip for Windows platforms.
 func (s *Settings) GetPackageTypes() []PackageType {
 	// Check settings override first
 	if s.SelectedPackageTypes != nil {
@@ -1894,7 +1882,7 @@ func (s *Settings) GetPackageTypes() []PackageType {
 	}
 	// Fall back to env var
 	if s.CrossBuild.Packages == "" {
-		return nil
+		return s.defaultPackageTypesForPlatforms()
 	}
 	if strings.ToLower(s.CrossBuild.Packages) == "all" {
 		return AllPackageTypes
@@ -1905,6 +1893,28 @@ func (s *Settings) GetPackageTypes() []PackageType {
 		if err := p.UnmarshalText([]byte(pkgtype)); err == nil {
 			types = append(types, p)
 		}
+	}
+	return types
+}
+
+// defaultPackageTypesForPlatforms returns the default package types derived from the
+// configured platforms: tar.gz for non-Windows platforms, zip for Windows platforms.
+func (s *Settings) defaultPackageTypesForPlatforms() []PackageType {
+	platforms := s.GetPlatforms()
+	var hasUnix, hasWindows bool
+	for _, p := range platforms {
+		if p.GOOS() == "windows" {
+			hasWindows = true
+		} else {
+			hasUnix = true
+		}
+	}
+	var types []PackageType
+	if hasUnix {
+		types = append(types, TarGz)
+	}
+	if hasWindows {
+		types = append(types, Zip)
 	}
 	return types
 }

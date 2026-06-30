@@ -170,13 +170,14 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		// filebeat input metrics: in OTel mode the elasticmonitoringreceiver emits per-input
 		// metrics with metricset.name "stats" (from its event template), not "json" which is
 		// what the classic http/metrics-monitoring metricbeat uses when scraping /inputs/.
+		// The component.id includes the stream suffix because each stream has its own receiver.
 		{
 			dsType:          "metrics",
 			dsDataset:       "elastic_agent.filebeat_input",
 			onlyCompareKeys: true,
 			query: []map[string]any{
 				{"match_phrase": map[string]any{"metricset.name": "stats"}},
-				{"match_phrase": map[string]any{"component.id": "filestream-monitoring"}},
+				{"match_phrase": map[string]any{"component.id": "filestream-monitoring/filestream-monitoring-agent"}},
 				{"exists": map[string]any{"field": "filebeat_input.bytes_processed_total"}},
 			},
 		},
@@ -531,6 +532,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [{{.ESEndpoint}}]
     api_key: {{.BeatsESApiKey}}
 `
@@ -774,6 +776,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [http://localhost:9200]
     api_key: placeholder
 agent.monitoring.enabled: false
@@ -913,11 +916,13 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [%s]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
   supported:
     type: elasticsearch
+    preset: latency
     hosts: [%s]
     api_key: placeholder
 `, esURL.Host, esURL.Host)
@@ -1032,6 +1037,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [%s]
     api_key: placeholder
 providers:
@@ -1175,6 +1181,7 @@ outputs:
     hosts:
     - %s
     type: elasticsearch
+    preset: latency
 `, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
@@ -1277,6 +1284,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [http://localhost:9200]
     api_key: placeholder
 agent.monitoring.enabled: false
@@ -1314,14 +1322,17 @@ agent.monitoring.enabled: false
 	var componentID, componentWorkDir string
 	var workDirCreated time.Time
 
-	// wait for component to appear in status and be healthy
+	// wait for component to appear in status and be healthy or degraded
+	// (output points at localhost:9200 which is unreachable, so DEGRADED is expected)
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		require.NoError(collect, statusErr)
 		require.Equal(collect, 1, len(status.Components))
 		componentStatus := status.Components[0]
-		assert.Equal(collect, cproto.State_HEALTHY, cproto.State(componentStatus.State))
+		componentState := cproto.State(componentStatus.State)
+		assert.Truef(collect, componentState == cproto.State_HEALTHY || componentState == cproto.State_DEGRADED,
+			"component state should be HEALTHY or DEGRADED, got %s", componentState.String())
 		componentID = componentStatus.ID
 	}, 2*time.Minute, 5*time.Second)
 
@@ -1364,6 +1375,7 @@ inputs: []
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [http://localhost:9200]
     api_key: placeholder
 agent.monitoring.enabled: false
@@ -1468,17 +1480,14 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	tmpDir := t.TempDir()
 	numEvents := 50
 	// Create the data file to ingest
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
-
+	inputFilePath := filepath.Join(tmpDir, "input.txt")
+	var inputContent bytes.Buffer
 	// these messages will fail to index as message is expected to be of integer type
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -1514,6 +1523,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
     otel:
@@ -1649,17 +1659,14 @@ func TestSensitiveIncludeSourceOnError(t *testing.T) {
 	tmpDir := t.TempDir()
 	numEvents := 50
 	// Create the data file to ingest
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
-
+	inputFilePath := filepath.Join(tmpDir, "input.txt")
+	var inputContent bytes.Buffer
 	// these messages will fail to index as message is expected to be of integer type
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -1694,6 +1701,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
 agent:
@@ -1927,8 +1935,8 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 			assert.NoError(collect, statusErr)
 			assertBeatsHealthy(collect, &status, runtime, componentCount)
 		}, 1*time.Minute, 1*time.Second)
-		require.Eventuallyf(t,
-			func() bool {
+		require.EventuallyWithT(t,
+			func(collect *assert.CollectT) {
 				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 				defer findCancel()
 				mustClauses := []map[string]any{
@@ -1949,8 +1957,8 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 					},
 				}
 				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, "logs-*", info.ESClient)
-				require.NoError(t, err)
-				return docs.Hits.Total.Value > 0
+				require.NoError(collect, err)
+				assert.Greater(collect, docs.Hits.Total.Value, 0)
 			},
 			4*time.Minute, 5*time.Second,
 			"health check failed: timestamp: %s", timestamp)
@@ -1984,10 +1992,10 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 
 	// wait until policy is applied
 	policyCheck := func(expectedRevision int) {
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			inspectOutput, err := fut.ExecInspect(ctx)
-			require.NoError(t, err)
-			return expectedRevision == inspectOutput.Revision
+			require.NoError(collect, err)
+			assert.Equal(collect, expectedRevision, inspectOutput.Revision)
 		}, 3*time.Minute, 1*time.Second)
 	}
 	policyCheck(otelMonResp.Revision)

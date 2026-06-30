@@ -13,7 +13,7 @@ kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Fix deprecated component name warnings in EDOT collector Helm values
+summary: fix missing beat receiver trace logs from diagnostic bundle
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
@@ -28,7 +28,7 @@ summary: Fix deprecated component name warnings in EDOT collector Helm values
 
 # REQUIRED for all kinds
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
-component: edot-collector
+component: elastic-agent
 
 # AUTOMATED
 # OPTIONAL to manually add other PR URLs

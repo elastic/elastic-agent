@@ -42,7 +42,7 @@ type mockSender struct {
 	mock.Mock
 }
 
-func (m *mockSender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (*http.Response, error) {
+func (m *mockSender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.ReadSeeker) (*http.Response, error) {
 	args := m.Called(ctx, method, path, params, headers, body)
 	return args.Get(0).(*http.Response), args.Error(1)
 }

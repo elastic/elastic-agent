@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 type ackRequest struct {
@@ -40,7 +40,7 @@ func (s *testSender) Send(
 	path string,
 	params url.Values,
 	headers http.Header,
-	body io.Reader,
+	body io.ReadSeeker,
 ) (*http.Response, error) {
 	d := json.NewDecoder(body)
 	var req ackRequest

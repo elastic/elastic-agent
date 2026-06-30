@@ -35,6 +35,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/go-sysinfo"
@@ -115,6 +116,7 @@ func (runner *ExtendedRunner) SetupSuite() {
 		},
 	}
 
+	require.NoError(runner.T(), fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
 	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
@@ -168,14 +170,17 @@ func (runner *ExtendedRunner) TestHandleLeak() {
 	ticker := time.NewTicker(time.Second * 10)
 	defer ticker.Stop()
 
+	// Use a consecutive health checker so that transient recoverable degraded
+	// states (e.g. system.cpu on Windows) do not immediately fail the test.
+	healthChecker := atesting.NewConsecutiveHealthChecker(runner.agentFixture, 3)
+
 	done := false
 	for !done {
 		select {
 		case <-timer.C:
 			done = true
 		case <-ticker.C:
-			err := runner.agentFixture.IsHealthy(ctx)
-			require.NoError(runner.T(), err)
+			require.NoError(runner.T(), healthChecker.Check(ctx))
 			// iterate through our watchers, update them
 			for _, mon := range runner.resourceWatchers {
 				mon.Update(runner.T(), runner.agentFixture)

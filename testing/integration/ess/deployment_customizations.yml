@@ -1,0 +1,5 @@
+# deployment_customizations.yml maps test groups to ESS deployment settings.
+# Groups not listed here use the provisioner default (1 GB Kibana).
+groups:
+  stress:
+    kibana_memory_mb: 4096

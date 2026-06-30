@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -137,10 +138,10 @@ func TestSettingsWithMethods(t *testing.T) {
 	t.Run("WithSnapshot", func(t *testing.T) {
 		original := DefaultSettings()
 
-		modified := original.WithSnapshot(true)
+		modified := original.WithSnapshot(false)
 
-		assert.True(t, modified.Build.Snapshot)
-		assert.False(t, original.Build.Snapshot)
+		assert.False(t, modified.Build.Snapshot)
+		assert.True(t, original.Build.Snapshot)
 	})
 
 	t.Run("WithPlatformFilter", func(t *testing.T) {
@@ -287,6 +288,45 @@ func TestSettingsPlatform(t *testing.T) {
 	assert.Equal(t, "amd64", platform.Arch)
 }
 
+func TestSettingsGetPlatforms(t *testing.T) {
+	t.Run("returns host platform when PLATFORMS is unset", func(t *testing.T) {
+		s := DefaultSettings()
+		// CrossBuild.Platforms is "" by default — simulates no PLATFORMS env var.
+
+		platforms := s.GetPlatforms()
+
+		hostName := runtime.GOOS + "/" + runtime.GOARCH
+		if _, known := BuildPlatforms.Get(hostName); known {
+			require.Len(t, platforms, 1)
+			assert.Equal(t, hostName, platforms[0].Name)
+		} else {
+			// Exotic host not in BuildPlatforms: falls back to Defaults().
+			assert.Equal(t, BuildPlatforms.Defaults(), platforms)
+		}
+	})
+
+	t.Run("returns specified platforms when PLATFORMS is set", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Platforms = "linux/amd64,darwin/arm64"
+
+		platforms := s.GetPlatforms()
+
+		assert.ElementsMatch(t, []string{"linux/amd64", "darwin/arm64"}, platforms.Names())
+	})
+
+	t.Run("always filters linux/386 and windows/386", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Platforms = "linux/386 windows/386 linux/amd64"
+
+		platforms := s.GetPlatforms()
+
+		names := platforms.Names()
+		assert.NotContains(t, names, "linux/386")
+		assert.NotContains(t, names, "windows/386")
+		assert.Contains(t, names, "linux/amd64")
+	})
+}
+
 func TestSettingsTestTagsWithFIPS(t *testing.T) {
 	t.Run("returns original tags when FIPS disabled", func(t *testing.T) {
 		s := DefaultSettings()
@@ -349,12 +389,33 @@ func TestSettingsGetPackageTypes(t *testing.T) {
 		assert.Equal(t, []PackageType{TarGz, Zip}, types)
 	})
 
-	t.Run("returns nil when both are empty", func(t *testing.T) {
+	t.Run("returns platform-derived default when both are empty", func(t *testing.T) {
 		s := DefaultSettings()
+		// Default platforms include both Unix and Windows entries, so the derived
+		// default should contain both tar.gz and zip.
+		s.CrossBuild.Platforms = "linux/amd64,windows/amd64"
 
 		types := s.GetPackageTypes()
 
-		assert.Nil(t, types)
+		assert.Equal(t, []PackageType{TarGz, Zip}, types)
+	})
+
+	t.Run("returns only tar.gz for unix-only platforms", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Platforms = "linux/amd64,darwin/arm64"
+
+		types := s.GetPackageTypes()
+
+		assert.Equal(t, []PackageType{TarGz}, types)
+	})
+
+	t.Run("returns only zip for windows-only platforms", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Platforms = "windows/amd64"
+
+		types := s.GetPackageTypes()
+
+		assert.Equal(t, []PackageType{Zip}, types)
 	})
 
 	t.Run("returns all package types when PACKAGES is all", func(t *testing.T) {
@@ -408,6 +469,9 @@ func TestSettingsGetDockerVariants(t *testing.T) {
 func TestSettingsIsPackageTypeSelected(t *testing.T) {
 	t.Run("returns true when no types selected", func(t *testing.T) {
 		s := DefaultSettings()
+		// Simulate a cross-platform build so defaultPackageTypesForPlatforms
+		// produces both TarGz (Unix) and Zip (Windows).
+		s.CrossBuild.Platforms = "linux/amd64 windows/amd64"
 
 		assert.True(t, s.IsPackageTypeSelected(TarGz))
 		assert.True(t, s.IsPackageTypeSelected(Zip))
@@ -632,7 +696,7 @@ func TestDefaultSettings(t *testing.T) {
 		assert.Equal(t, "https://www.elastic.co/beats/"+DefaultName, settings.Beat.URL)
 
 		// Build defaults - should not be affected by env vars
-		assert.False(t, settings.Build.Snapshot)
+		assert.True(t, settings.Build.Snapshot)
 		assert.False(t, settings.Build.DevBuild)
 		assert.Greater(t, settings.Build.MaxParallel, 0)
 		assert.NotZero(t, settings.BuildDate)
@@ -644,12 +708,8 @@ func TestDefaultSettings(t *testing.T) {
 		// CrossBuild defaults
 		assert.Equal(t, "linux", settings.CrossBuild.DevOS)
 		assert.Equal(t, "amd64", settings.CrossBuild.DevArch)
-		assert.True(t, settings.CrossBuild.MountModcache)
-		assert.True(t, settings.CrossBuild.MountBuildCache)
-		assert.Equal(t, "elastic-agent-crossbuild-build-cache", settings.CrossBuild.BuildCacheVolumeName)
-
 		// IntegrationTest defaults
-		assert.True(t, settings.IntegrationTest.CleanOnExit)
+		assert.False(t, settings.IntegrationTest.CleanOnExit)
 		assert.True(t, settings.IntegrationTest.TestEnvironmentEnabled)
 	})
 }
@@ -678,11 +738,8 @@ func TestLoadSettings(t *testing.T) {
 		// CrossBuild defaults
 		assert.Equal(t, "linux", settings.CrossBuild.DevOS)
 		assert.Equal(t, "amd64", settings.CrossBuild.DevArch)
-		assert.True(t, settings.CrossBuild.MountModcache)
-		assert.True(t, settings.CrossBuild.MountBuildCache)
-
 		// IntegrationTest defaults
-		assert.True(t, settings.IntegrationTest.CleanOnExit)
+		assert.False(t, settings.IntegrationTest.CleanOnExit)
 		assert.True(t, settings.IntegrationTest.TestEnvironmentEnabled)
 	})
 
@@ -703,7 +760,6 @@ func TestLoadSettings(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.True(t, settings.Build.Snapshot)
-		assert.True(t, settings.Build.SnapshotSet)
 		assert.True(t, settings.Build.DevBuild)
 		assert.True(t, settings.Build.ExternalBuild)
 		assert.True(t, settings.Build.ExternalBuildSet)
@@ -758,8 +814,6 @@ func TestLoadSettings(t *testing.T) {
 		t.Setenv("PLATFORMS", "linux/amd64,darwin/arm64")
 		t.Setenv("PACKAGES", "targz,zip")
 		t.Setenv("DOCKER_VARIANTS", "basic,cloud")
-		t.Setenv("CROSSBUILD_MOUNT_MODCACHE", "false")
-		t.Setenv("CROSSBUILD_MOUNT_GOCACHE", "false")
 		t.Setenv("DEV_OS", "darwin")
 		t.Setenv("DEV_ARCH", "arm64")
 
@@ -769,8 +823,6 @@ func TestLoadSettings(t *testing.T) {
 		assert.Equal(t, "linux/amd64,darwin/arm64", settings.CrossBuild.Platforms)
 		assert.Equal(t, "targz,zip", settings.CrossBuild.Packages)
 		assert.Equal(t, "basic,cloud", settings.CrossBuild.DockerVariants)
-		assert.False(t, settings.CrossBuild.MountModcache)
-		assert.False(t, settings.CrossBuild.MountBuildCache)
 		assert.Equal(t, "darwin", settings.CrossBuild.DevOS)
 		assert.Equal(t, "arm64", settings.CrossBuild.DevArch)
 	})
@@ -842,6 +894,15 @@ func TestLoadSettings(t *testing.T) {
 		assert.True(t, settings.IntegrationTest.BuildAgent)
 		assert.Equal(t, "-v -count=1", settings.IntegrationTest.GoTestFlags)
 		assert.False(t, settings.IntegrationTest.TestEnvironmentEnabled)
+	})
+
+	t.Run("enables clean on exit via env var", func(t *testing.T) {
+		t.Setenv("TEST_INTEG_CLEAN_ON_EXIT", "true")
+
+		settings, err := LoadSettings()
+
+		require.NoError(t, err)
+		assert.True(t, settings.IntegrationTest.CleanOnExit)
 	})
 
 	t.Run("loads docker settings from env vars", func(t *testing.T) {

@@ -57,7 +57,7 @@ func NewFromConfig(cfg *config.Config) (*Configuration, error) {
 func NewPartialFromConfigNoDefaults(cfg *config.Config) (*Configuration, error) {
 	c := new(Configuration)
 	// Validator tag set to "validate_disable" is a hack to avoid validation errors on a partial config
-	if err := cfg.UnpackTo(c, ucfg.ValidatorTag("validate_disable")); err != nil {
+	if err := cfg.UnpackTo(c, ucfg.ValidatorTag("validate_disable"), ucfg.PathSep(".")); err != nil {
 		return nil, errors.New(err, errors.TypeConfig)
 	}
 

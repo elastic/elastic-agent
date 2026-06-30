@@ -73,7 +73,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -85,6 +85,7 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -92,7 +93,7 @@ include_source_on_error: true
 logs_dynamic_id:
   enabled: true
 logs_dynamic_pipeline:
-  enabled: true  
+  enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, _, err := ESToOTelConfig(cfg, "", logger)
@@ -137,7 +138,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -147,6 +148,7 @@ sending_queue:
 suppress_conflict_errors: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -154,7 +156,7 @@ include_source_on_error: true
 logs_dynamic_id:
   enabled: true
 logs_dynamic_pipeline:
-  enabled: true  
+  enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, _, err := ESToOTelConfig(cfg, "", logger)
@@ -200,7 +202,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -210,6 +212,7 @@ sending_queue:
 suppress_conflict_errors: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -217,7 +220,7 @@ include_source_on_error: true
 logs_dynamic_id:
   enabled: true
 logs_dynamic_pipeline:
-  enabled: true  
+  enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, _, err := ESToOTelConfig(cfg, "", logger)
@@ -265,7 +268,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -275,6 +278,7 @@ sending_queue:
 suppress_conflict_errors: true
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -282,7 +286,7 @@ include_source_on_error: true
 logs_dynamic_id:
   enabled: true
 logs_dynamic_pipeline:
-  enabled: true  
+  enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, _, err := ESToOTelConfig(cfg, "", logger)
@@ -306,7 +310,7 @@ preset: %s
 
 		commonOTelCfg := `
 logs_dynamic_pipeline:
-  enabled: true    
+  enabled: true
 endpoints:
   - http://localhost:9200
 retry:
@@ -330,6 +334,7 @@ retry:
 logs_index: some-index
 password: changeme
 user: elastic
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -337,7 +342,7 @@ include_source_on_error: true
 logs_dynamic_id:
   enabled: true
 logs_dynamic_pipeline:
-  enabled: true  
+  enabled: true
 `
 
 		tests := []struct {
@@ -352,7 +357,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -370,7 +375,7 @@ sending_queue:
   batch:
     flush_timeout: 5s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -384,7 +389,7 @@ suppress_conflict_errors: true
 				presetName: "scale",
 				output: `
 logs_dynamic_pipeline:
-  enabled: true        
+  enabled: true
 endpoints:
   - http://localhost:9200
 retry:
@@ -413,7 +418,7 @@ sending_queue:
   batch:
     flush_timeout: 20s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -421,6 +426,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -428,7 +434,7 @@ include_source_on_error: true
 logs_dynamic_id:
   enabled: true
 logs_dynamic_pipeline:
-  enabled: true  
+  enabled: true
  `,
 			},
 			{
@@ -439,7 +445,7 @@ sending_queue:
   batch:
     flush_timeout: 1s
     max_size: 50
-    min_size: 0
+    min_size: 50
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -457,7 +463,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -530,7 +536,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -542,6 +548,7 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -549,7 +556,7 @@ include_source_on_error: true
 logs_dynamic_id:
   enabled: true
 logs_dynamic_pipeline:
-  enabled: true  
+  enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, _, err := ESToOTelConfig(cfg, "", logger)
@@ -592,7 +599,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -604,6 +611,7 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
   level: 1
@@ -611,7 +619,7 @@ include_source_on_error: true
 logs_dynamic_id:
   enabled: true
 logs_dynamic_pipeline:
-  enabled: true  
+  enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, _, err := ESToOTelConfig(cfg, "", logger)
@@ -635,7 +643,7 @@ compression_level: %d`
 
 	otelConfig := `
 logs_dynamic_pipeline:
-  enabled: true 
+  enabled: true
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
@@ -665,7 +673,7 @@ sending_queue:
   batch:
     flush_timeout: 10s
     max_size: 1600
-    min_size: 0
+    min_size: 1600
     sizer: items
   block_on_overflow: true
   enabled: true
@@ -673,6 +681,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 {{ if gt . 0 }}
 compression: gzip
 compression_params:
@@ -684,7 +693,7 @@ include_source_on_error: true
 logs_dynamic_id:
   enabled: true
 logs_dynamic_pipeline:
-  enabled: true   
+  enabled: true
 `
 
 	for level := range 9 {
