@@ -378,63 +378,15 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	// Fix loglevel with the current log level used by coordinator
 	ecsMeta.Elastic.Agent.LogLevel = state.LogLevel.String()
 
-<<<<<<< HEAD
 	// checkin
-	cmd := pkgfleetapi.NewCheckinCmd(f.agentInfo, f.client)
-	req := &pkgfleetapi.CheckinRequest{
+	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
+	req := &fleetapi.CheckinRequest{
 		AckToken:       ackToken,
 		Metadata:       ecsMeta,
 		Status:         agentStateToString(state.State),
 		Message:        state.Message,
 		Components:     components,
 		UpgradeDetails: state.UpgradeDetails,
-=======
-	var (
-		agentPolicyID     string
-		policyRevisionIDX int64
-	)
-	if pc, ok := f.stateStore.Action().(*fleetapi.ActionPolicyChange); ok && pc != nil {
-		agentPolicyID = pc.PolicyID()
-		policyRevisionIDX = pc.PolicyRevisionIDX()
-	}
-
-	// get available rollbacks
-	rollbacks, _, err := f.rollbackSource.GetAll()
-	if err != nil {
-		f.log.Warnf("error getting available rollbacks: %s", err.Error())
-		rollbacks = nil
-	}
-
-	var validRollbacks []fleetapi.CheckinRollback
-	if len(rollbacks) > 0 {
-		now := time.Now()
-		validRollbacks = make([]fleetapi.CheckinRollback, 0, len(rollbacks))
-		for _, rollback := range rollbacks {
-			if rollback.ValidUntil.After(now) {
-				// map the `ttl.Marker` to the `fleetapi.CheckinRollback`
-				validRollbacks = append(validRollbacks, fleetapi.CheckinRollback{
-					Version:    rollback.Version,
-					ValidUntil: rollback.ValidUntil,
-				})
-			}
-		}
-	}
-
-	// checkin
-	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client, f.compression)
-	req := &fleetapi.CheckinRequest{
-		AckToken:          ackToken,
-		Metadata:          ecsMeta,
-		Status:            agentStateToString(state.State),
-		Message:           state.Message,
-		Components:        components,
-		UpgradeDetails:    state.UpgradeDetails,
-		AgentPolicyID:     agentPolicyID,
-		PolicyRevisionIDX: policyRevisionIDX,
-	}
-	if len(validRollbacks) > 0 {
-		req.Upgrade.Rollbacks = validRollbacks
->>>>>>> d0a4ec1dd (Extract action types to pkg/fleetapi for cross-repo sharing (#15084))
 	}
 
 	resp, took, err := cmd.Execute(ctx, req)

@@ -36,7 +36,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	internalfleetapi "github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -2151,81 +2150,3 @@ func logBasedOnState(l *logger.Logger, state client.UnitState, msg string, args 
 		l.With(args...).Info(msg)
 	}
 }
-<<<<<<< HEAD
-=======
-
-func (c *Coordinator) unenroll(ctx context.Context, client fleetapiClient.Sender) error {
-	unenrollCmd := internalfleetapi.NewAuditUnenrollCmd(c.agentInfo, client)
-	unenrollReq := &internalfleetapi.AuditUnenrollRequest{
-		Reason:    internalfleetapi.ReasonMigration,
-		Timestamp: time.Now().UTC(),
-	}
-	unenrollResp, err := unenrollCmd.Execute(ctx, unenrollReq)
-	if err != nil {
-		c.logger.Warnf("failed to unenroll agent from original cluster: %v", err)
-		return err
-	}
-
-	unenrollResp.Body.Close()
-	return nil
-}
-
-func mergeFleetConfig(ctx context.Context, rawConfig *config.Config, store storage.Storage) (*configuration.Configuration, error) {
-	reader, err := store.Load()
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize config store: %w", err)
-	}
-
-	config, err := config.NewConfigFrom(reader)
-	if err != nil {
-		return nil, fmt.Errorf("fail to read configuration for the elastic-agent: %w", err)
-	}
-
-	// merge local configuration and configuration persisted from fleet.
-	err = rawConfig.Merge(config)
-	if err != nil {
-		return nil, fmt.Errorf("fail to merge configuration for the elastic-agent: %w", err)
-	}
-
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return nil, fmt.Errorf("fail to unpack configuration: %w", err)
-	}
-
-	// Fix up fleet.agent.id otherwise the fleet.agent.id is empty string
-	if cfg.Settings != nil && cfg.Fleet != nil && cfg.Fleet.Info != nil && cfg.Fleet.Info.ID == "" {
-		cfg.Fleet.Info.ID = cfg.Settings.ID
-	}
-
-	if err := cfg.Fleet.Valid(); err != nil {
-		return nil, fmt.Errorf("fleet configuration is invalid: %w", err)
-	}
-
-	return cfg, nil
-}
-
-func computeEnrollOptions(ctx context.Context, cfgPath string, cfgFleetPath string) (enroll.EnrollOptions, error) {
-	var options enroll.EnrollOptions
-	rawCfg, err := config.LoadFile(cfgPath)
-	if err != nil {
-		return options, fmt.Errorf("failed to load agent config: %w", err)
-	}
-
-	store, err := storage.NewEncryptedDiskStore(ctx, cfgFleetPath)
-	if err != nil {
-		return options, fmt.Errorf("error instantiating encrypted disk store: %w", err)
-	}
-
-	cfg, err := mergeFleetConfig(ctx, rawCfg, store)
-	if err != nil {
-		return options, fmt.Errorf("failed to merge agent fleet config: %w", err)
-	}
-
-	options = enroll.FromFleetConfig(cfg.Fleet)
-	return options, nil
-}
-
-func (c *Coordinator) isContainerizedEnvironment() bool {
-	return c.specs.Platform().OS == component.Container
-}
->>>>>>> d0a4ec1dd (Extract action types to pkg/fleetapi for cross-repo sharing (#15084))

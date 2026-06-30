@@ -12,12 +12,6 @@ import (
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
-
-<<<<<<< HEAD:internal/pkg/fleetapi/action.go
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-=======
-	api "github.com/elastic/fleet-server/pkg/api"
->>>>>>> d0a4ec1dd (Extract action types to pkg/fleetapi for cross-repo sharing (#15084)):pkg/fleetapi/action.go
 )
 
 const (
