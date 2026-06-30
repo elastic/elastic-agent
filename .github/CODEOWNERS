@@ -23,8 +23,6 @@ changelog/fragments/
 /.github @elastic/elastic-agent-control-plane @elastic/observablt-ci
 /.github/CODEOWNERS @elastic/ingest-tech-leads
 /.github/workflows/release-notes.yml @elastic/ski-docs @elastic/elastic-agent-control-plane 
-/.github/CODEOWNERS @elastic/ingest-tech-leads
-/.github/workflows/release-notes.yml @elastic/ski-docs @elastic/elastic-agent-control-plane 
 /deploy/helm @elastic/elastic-agent-control-plane
 /deploy/helm/edot-collector @elastic/ingest-otel-data
 /deploy/kubernetes @elastic/elastic-agent-control-plane
