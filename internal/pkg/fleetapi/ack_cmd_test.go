@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 func TestAck(t *testing.T) {
@@ -48,12 +49,10 @@ func TestAck(t *testing.T) {
 			return mux
 		}, withAPIKey,
 		func(t *testing.T, client client.Sender) {
-			action := &ActionPolicyChange{
+			action := &pkgfleetapi.ActionPolicyChange{
 				ActionID:   "my-id",
 				ActionType: "POLICY_CHANGE",
-				Data: struct {
-					Policy map[string]interface{} `json:"policy" yaml:"policy,omitempty"`
-				}{Policy: map[string]interface{}{
+				Data: pkgfleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{
 					"id": "config_id",
 				}},
 			}
