@@ -299,7 +299,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	// 2. Assert monitoring logs and metrics are available on ES
 	for _, tc := range tests {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 			defer findCancel()
 			mustClauses := []map[string]any{
 				{"match": map[string]any{"data_stream.type": tc.dsType}},
@@ -368,7 +368,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
 	for _, tc := range otelTests {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 			defer findCancel()
 			mustClauses := []map[string]any{
 				{"match": map[string]any{"data_stream.type": tc.dsType}},
@@ -437,7 +437,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	assert.Equal(t, agentStatus, otelStatus, "expected agent status to be equal to otel status")
 
 	// Make sure we haven't transferred any logs that are supposed to be dropped
-	findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+	findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer findCancel()
 	rawQuery := map[string]any{
 		"query": map[string]any{
