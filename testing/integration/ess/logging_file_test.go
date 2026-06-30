@@ -7,7 +7,6 @@
 package ess
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"

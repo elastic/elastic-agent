@@ -7,7 +7,6 @@
 package ess
 
 import (
-	"context"
 	"crypto/tls"
 	"net/http"
 	"net/url"
