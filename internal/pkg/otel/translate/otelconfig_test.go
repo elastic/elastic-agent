@@ -482,20 +482,21 @@ func TestGetOtelConfig(t *testing.T) {
 		}
 	}
 
+	notSynthetics := map[string]any{"not": map[string]any{"equals": map[string]any{"data_stream.type": "synthetics"}}}
 	defaultGlobalProcessors := []map[string]any{
 		{
 			"add_host_metadata": map[string]any{
 				"when": map[string]any{
 					"and": []any{
 						map[string]any{"not": map[string]any{"contains": map[string]any{"tags": "forwarded"}}},
-						map[string]any{"not": map[string]any{"equals": map[string]any{"data_stream.type": "synthetics"}}},
+						notSynthetics,
 					},
 				},
 			},
 		},
-		{"add_cloud_metadata": nil},
-		{"add_docker_metadata": nil},
-		{"add_kubernetes_metadata": nil},
+		{"add_cloud_metadata": map[string]any{"when": notSynthetics}},
+		{"add_docker_metadata": map[string]any{"when": notSynthetics}},
+		{"add_kubernetes_metadata": map[string]any{"when": notSynthetics}},
 	}
 	defaultExpectedProcessors := map[string]any{
 		"beat/_agent-component": map[string]any{

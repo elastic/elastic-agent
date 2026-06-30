@@ -477,10 +477,18 @@ func beatInputsKey(beatName string) string {
 }
 
 // GetDefaultProcessors returns the default beat processors used across all pipelines.
-// Synthetics (heartbeat) events skip add_host_metadata: heartbeat's internal preProcessors
-// already enriches events with observer.* fields, and adding host.* would diverge from
-// what process-mode heartbeat produces.
+// These mirror the fleetDefaultProcessors that each beat sets for process mode.
+// Synthetics (heartbeat) events skip all four metadata processors: process-mode
+// heartbeat sets fleetDefaultProcessors=nil, so adding any of them in OTel mode
+// would produce fields with no equivalent in process mode.
 func GetDefaultProcessors() []map[string]any {
+	notSynthetics := map[string]any{
+		"not": map[string]any{
+			"equals": map[string]any{
+				"data_stream.type": "synthetics",
+			},
+		},
+	}
 	return []map[string]any{
 		{
 			"add_host_metadata": map[string]any{
@@ -493,20 +501,14 @@ func GetDefaultProcessors() []map[string]any {
 								},
 							},
 						},
-						map[string]any{
-							"not": map[string]any{
-								"equals": map[string]any{
-									"data_stream.type": "synthetics",
-								},
-							},
-						},
+						notSynthetics,
 					},
 				},
 			},
 		},
-		{"add_cloud_metadata": nil},
-		{"add_docker_metadata": nil},
-		{"add_kubernetes_metadata": nil},
+		{"add_cloud_metadata": map[string]any{"when": notSynthetics}},
+		{"add_docker_metadata": map[string]any{"when": notSynthetics}},
+		{"add_kubernetes_metadata": map[string]any{"when": notSynthetics}},
 	}
 }
 
