@@ -23,8 +23,6 @@ import (
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 // it performs diagnostics for all current units. If a given unit does not exist in the manager, then a warning
 // is logged.
-// Note: this function returns unit-level diagnostics only. EDOT groups beat receiver results at the
-// component level, so they are not included here.
 func (m *OTelManager) PerformDiagnostics(ctx context.Context, req ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
 	var diagnostics []runtime.ComponentUnitDiagnostic
 	m.mx.RLock()

@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
@@ -21,7 +20,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
 	componentruntime "github.com/elastic/elastic-agent/pkg/component/runtime"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/ipc"
 
@@ -284,7 +282,7 @@ func TestPerformComponentDiagnosticsUnexpectedError(t *testing.T) {
 	mux.HandleFunc("/diagnostics", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("not json"))
 	})
-	l, err := ipc.CreateListener(logger.NewWithoutConfig(""), paths.DiagnosticsExtensionSocket())
+	l, err := ipc.CreateListener(managerLogger, paths.DiagnosticsExtensionSocket())
 	require.NoError(t, err)
 	server := &http.Server{Handler: mux} //nolint:gosec // This is a test
 	go func() {
@@ -302,13 +300,7 @@ func TestPerformComponentDiagnosticsUnexpectedError(t *testing.T) {
 		assert.Empty(t, d.Results)
 	}
 
-	var loggedWarn bool
-	for _, e := range obs.All() {
-		if e.Level == zapcore.WarnLevel {
-			loggedWarn = true
-		}
-	}
-	assert.True(t, loggedWarn, "unexpected EDOT error should be logged")
+	assert.NotEmpty(t, obs.FilterMessageSnippet("failed to fetch diagnostics from EDOT").All(), "unexpected EDOT error should be logged at warn level")
 }
 
 func setTemporaryAgentPath(t *testing.T) {
