@@ -9,7 +9,10 @@ permissions:
 
 jobs:
   fragments:
-    if: "!contains(github.event.pull_request.labels.*.name, 'skip-changelog') && !contains(github.event.pull_request.labels.*.name, 'backport')"
+    if: >-
+      !contains(github.event.pull_request.labels.*.name, 'skip-changelog') &&
+      !contains(github.event.pull_request.labels.*.name, 'backport') &&
+      github.event.pull_request.user.login != 'mergify[bot]'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
