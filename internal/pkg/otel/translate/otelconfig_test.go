@@ -493,13 +493,6 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			},
 		},
-		{
-			"add_observer_metadata": map[string]any{
-				"when": map[string]any{
-					"equals": map[string]any{"data_stream.type": "synthetics"},
-				},
-			},
-		},
 		{"add_cloud_metadata": nil},
 		{"add_docker_metadata": nil},
 		{"add_kubernetes_metadata": nil},
