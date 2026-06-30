@@ -1876,7 +1876,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	})
 
 	ctx, cancel := testcontext.WithDeadline(t,
-		context.Background(),
+		t.Context(),
 		time.Now().Add(5*time.Minute))
 	t.Cleanup(cancel)
 
