@@ -581,7 +581,7 @@ inputs:
     description: "Osquery"
     platforms: *platforms
     outputs: *outputs
-    # Ensure there is only a single osquerd daemon to manage by using a single receiver.
+    # Ensure there is only a single osqueryd daemon to manage by using a single receiver.
     single_receiver: true
     command:
       restart_monitoring_period: 5s
