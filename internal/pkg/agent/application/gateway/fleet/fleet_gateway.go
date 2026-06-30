@@ -436,13 +436,8 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// checkin
-<<<<<<< HEAD
-	cmd := pkgfleetapi.NewCheckinCmd(f.agentInfo, f.client)
-	req := &pkgfleetapi.CheckinRequest{
-=======
-	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client, f.compression)
+	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
->>>>>>> d0a4ec1dd (Extract action types to pkg/fleetapi for cross-repo sharing (#15084))
 		AckToken:          ackToken,
 		Metadata:          ecsMeta,
 		Status:            agentStateToString(state.State),
