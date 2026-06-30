@@ -90,7 +90,7 @@ func (runner *HeartbeatRunner) SetupSuite() {
 		Privileged:     true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 	defer cancel()
 
 	require.NoError(t, fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
@@ -164,7 +164,7 @@ func (runner *HeartbeatRunner) validateHeartbeatEvents(t *testing.T, ctx context
 func (runner *HeartbeatRunner) TestBeatsMetrics() {
 	t := runner.T()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Minute)
 	defer cancel()
 
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
@@ -175,6 +175,22 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 	// Validate process mode
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			status, statusErr := runner.agentFixture.ExecStatus(ctx)
+			require.NoError(collect, statusErr)
+			var foundProcess bool
+			for _, comp := range status.Components {
+				if strings.HasPrefix(comp.ID, "synthetics/http") &&
+					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.ProcessRuntimeManager) {
+					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
+						"expected synthetics/http component to be healthy, got %s", cproto.State(comp.State))
+					foundProcess = true
+					break
+				}
+			}
+			assert.True(collect, foundProcess, "expected a synthetics/http component to be running as a process")
+		}, 2*time.Minute, 5*time.Second, "heartbeat component should be running as a process")
+
 		processDoc = runner.validateHeartbeatEvents(t, ctx, agentStatus.Info.ID, testStart)
 	})
 
@@ -211,8 +227,9 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 	})
 
 	// Compare that documents produced by process and OTel modes have the same keys.
-	// host.* fields are excluded: the OTel collector's resource detection processor
-	// adds host metadata that heartbeat doesn't emit in process mode.
+	// host.* fields are excluded: hbreceiver uses WithHost in its MakeDefaultSupport
+	// call, which adds host.name to events; the heartbeat command does not include
+	// WithHost, so process mode never emits host.* fields.
 	heartbeatIgnoredFields := append(RuntimeComparisonIgnoredFields, "host")
 	t.Run("compare", func(t *testing.T) {
 		if processDoc == nil || otelDoc == nil {
