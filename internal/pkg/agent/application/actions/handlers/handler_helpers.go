@@ -15,10 +15,16 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+=======
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+>>>>>>> d0a4ec1dd (Extract action types to pkg/fleetapi for cross-repo sharing (#15084))
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 type actionCoordinator interface {

@@ -18,6 +18,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+<<<<<<< HEAD
+=======
+	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
+>>>>>>> d0a4ec1dd (Extract action types to pkg/fleetapi for cross-repo sharing (#15084))
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"

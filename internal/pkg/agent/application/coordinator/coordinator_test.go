@@ -42,13 +42,22 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+=======
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+>>>>>>> d0a4ec1dd (Extract action types to pkg/fleetapi for cross-repo sharing (#15084))
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+<<<<<<< HEAD
+=======
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
+>>>>>>> d0a4ec1dd (Extract action types to pkg/fleetapi for cross-repo sharing (#15084))
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 

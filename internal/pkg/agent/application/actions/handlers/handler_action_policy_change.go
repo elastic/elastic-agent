@@ -26,15 +26,19 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+<<<<<<< HEAD
 )
 
 const (
 	apiStatusTimeout = 15 * time.Second
+=======
+	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
+>>>>>>> d0a4ec1dd (Extract action types to pkg/fleetapi for cross-repo sharing (#15084))
 )
 
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
