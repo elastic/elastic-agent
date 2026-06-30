@@ -1705,17 +1705,17 @@ service:
 
 	require.EventuallyWithT(
 		t,
-		func(t *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 			defer findCancel()
 
 			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]any{
 				"log.file.path": inputFilePath,
 			})
-			require.NoError(t, err)
+			require.NoError(ct, err)
 			got := int(docs.Hits.Total.Value)
 
-			require.GreaterOrEqual(t, got, 10, "")
+			require.GreaterOrEqual(ct, got, 10, "")
 		},
 		time.Minute,
 		time.Second,
@@ -1742,28 +1742,28 @@ service:
 
 	require.EventuallyWithT(
 		t,
-		func(t *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 			defer findCancel()
 
 			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]any{
 				"log.file.path": inputFilePath,
 			})
-			require.NoError(t, err)
+			require.NoError(ct, err)
 
 			uniqueIngestedLogs := make(map[string]struct{})
 			for _, hit := range docs.Hits.Hits {
 				message, found := hit.Source["message"]
-				require.True(t, found, "expected message field in document %q", hit.Source)
+				require.True(ct, found, "expected message field in document %q", hit.Source)
 				msg, ok := message.(string)
-				require.True(t, ok, "expected message field to be a string, got %T", message)
-				require.NotContainsf(t, uniqueIngestedLogs, msg, "found duplicated log message %q", msg)
+				require.True(ct, ok, "expected message field to be a string, got %T", message)
+				require.NotContainsf(ct, uniqueIngestedLogs, msg, "found duplicated log message %q", msg)
 				uniqueIngestedLogs[msg] = struct{}{}
 			}
 
 			want := inputLinesCounter.Load()
 			got := docs.Hits.Total.Value
-			require.EqualValues(t, want, got, "expecting %d hits got %d hits", want, got)
+			require.EqualValues(ct, want, got, "expecting %d hits got %d hits", want, got)
 		},
 		20*time.Second,
 		time.Second,
@@ -3432,7 +3432,7 @@ agent.monitoring:
 				t.Log("Elastic-Agent output:")
 				t.Log(output.String())
 
-				logCtx, logCancel := context.WithTimeout(t.Context(), 30*time.Second)
+				logCtx, logCancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer logCancel()
 
 				lsContainer, err := stack.ServiceContainer(logCtx, "logstash")
