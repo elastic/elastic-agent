@@ -564,7 +564,7 @@ func buildPolicyWithTamperProtection(policy kibana.AgentPolicy, protected bool) 
 
 func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.Info, protected bool) {
 	deadline := time.Now().Add(10 * time.Minute)
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), deadline)
 	defer cancel()
 
 	fixture, policy, agentID := installSecurityAgent(ctx, t, info, protected)
@@ -599,7 +599,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 }
 
 func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info, protected bool) {
-	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cn := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	fixture, policy, agentID := installSecurityAgent(ctx, t, info, protected)
@@ -609,7 +609,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	require.NoError(t, err)
 
 	t.Log("Polling for endpoint-security to become Healthy")
-	ctx, cancel := context.WithTimeout(context.Background(), endpointHealthPollingTimeout)
+	ctx, cancel := context.WithTimeout(ctx, endpointHealthPollingTimeout)
 	defer cancel()
 
 	agentClient := fixture.Client()
@@ -675,7 +675,7 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 }
 
 func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, info *define.Info, protected bool) {
-	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cn := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	fixture, policy, _ := installSecurityAgent(ctx, t, info, protected)
@@ -685,7 +685,7 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 	require.NoErrorf(t, err, "Policy Response was: %#v", pkgPolicyResp)
 
 	t.Log("Polling for endpoint-security to become Healthy")
-	ctx, cancel := context.WithTimeout(context.Background(), endpointHealthPollingTimeout)
+	ctx, cancel := context.WithTimeout(ctx, endpointHealthPollingTimeout)
 	defer cancel()
 
 	agentClient := fixture.Client()
@@ -773,7 +773,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cn := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	// Get path to agent executable.
@@ -804,7 +804,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
 	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	c := fixture.Client()
@@ -851,7 +851,7 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 		},
 	})
 
-	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cn := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	// Get path to agent executable.
@@ -881,7 +881,7 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
 	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	c := fixture.Client()
@@ -931,7 +931,7 @@ func TestEndpointSecurityCannotSwitchToUnprivileged(t *testing.T) {
 		},
 	})
 
-	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cn := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	// Get path to agent executable.
@@ -997,7 +997,7 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 		},
 	})
 
-	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cn := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cn()
 
 	// Get path to agent executable.
@@ -1215,7 +1215,7 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 	})
 
 	deadline := time.Now().Add(10 * time.Minute)
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), deadline)
 	defer cancel()
 
 	fixture, policy, agentID := installSecurityAgent(ctx, t, info, true)
@@ -1279,7 +1279,7 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 		OS: []define.OS{{Type: define.Linux}},
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	testUUID := uuid.Must(uuid.NewV4()).String()
 	policyID := "mTLS-defend-" + testUUID
 
@@ -1818,7 +1818,7 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 		},
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
 	defer cancel()
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
