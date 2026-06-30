@@ -2642,12 +2642,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			expectedBeatName:   "osquerybeat",
 		},
 		{
-			// single_receiver: true collapses all streams into one receiver keyed by component
-			// ID only (no stream suffix). This prevents osquery from launching two competing
-			// osqueryd processes that would fight over the same Unix socket. The input-level
-			// osquery field (schedule, decorators) is injected into the result stream only,
-			// matching osquerybeatCfgFromStreams: "Attach osquery configuration to the
-			// osquery_manager.result stream and set it as a first stream".
 			name:               "osquerybeat component with single_receiver merges streams",
 			component:          osquerybeatSingleReceiverComponent,
 			outputQueueConfig:  nil,

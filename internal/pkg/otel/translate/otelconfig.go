@@ -378,7 +378,7 @@ func getReceiversConfigForComponent(
 	var inputs []receiverInput
 	for _, unit := range comp.Units {
 		if unit.Type == client.UnitTypeInput {
-			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp.InputType)
+			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp)
 			if err != nil {
 				return nil, err
 			}
@@ -686,7 +686,7 @@ func resolveStreamID(streamID string, streamSource map[string]any, unitID string
 	return fmt.Sprintf("%s-%d", unitID, index)
 }
 
-func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, inputType string) ([]receiverInput, error) {
+func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, comp *component.Component) ([]receiverInput, error) {
 	agentInfo := &client.AgentInfo{
 		ID:           info.AgentID(),
 		Version:      info.Version(),
@@ -706,7 +706,7 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 	// Handle input types that are namespaced to their component type by either a prefix or suffix.
 	// CreateInputsFromStreams doesn't do this, each beat does it on its own in a transform
 	// function. For filebeat, see: https://github.com/elastic/beats/blob/main/x-pack/filebeat/cmd/agent.go
-	inputTypePrefix, inputTypeSuffix, inputTypeHasSlash := strings.Cut(inputType, "/")
+	inputTypePrefix, inputTypeSuffix, inputTypeHasSlash := strings.Cut(comp.InputType, "/")
 	result := make([]receiverInput, len(inputs))
 	for i, input := range inputs {
 		switch {
@@ -725,7 +725,7 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 			}
 		default:
 			if _, ok := input["type"]; !ok {
-				input["type"] = inputType
+				input["type"] = comp.InputType
 			}
 		}
 
@@ -737,18 +737,12 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 		result[i] = receiverInput{streamID: streamID, config: input}
 	}
 
-	if inputType == "osquery" {
+	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver && comp.InputType == "osquery" {
 		result = injectOsqueryConfig(result, unit)
 	}
 
 	return result, nil
 }
-
-const (
-	// osqueryResultDataset is the dataset of the stream that carries osquery scheduled
-	// query results and must receive the input-level osquery configuration.
-	osqueryResultDataset = "osquery_manager.result"
-)
 
 // injectOsqueryConfig replicates what osquerybeatCfgFromStreams does in process
 // mode: it attaches the input-level "osquery" field (schedule, packs, decorators,
@@ -757,17 +751,25 @@ const (
 // beat startup.
 func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiverInput {
 	// Mirror the implementation from https://github.com/elastic/beats/blob/7764586737b76758db262a06fb3c594c52185c48/x-pack/osquerybeat/cmd/root.go#L92
-	osqVal := unit.Config.GetSource().AsMap()["osquery"]
-	if osqVal == nil {
+	osqMap, ok := unit.Config.GetSource().AsMap()["osquery"].(map[string]any)
+	if !ok {
 		return result
 	}
 	for i, ri := range result {
-		ds, ok := ri.config["data_stream"].(map[string]any)
-		if !ok || ds["dataset"] != osqueryResultDataset {
+		// "osquery_manager.result" is the dataset of the stream that carries osquery
+		// scheduled query results and must receive the input-level osquery configuration.
+		datastream, ok := ri.config["data_stream"].(map[string]any)
+		if !ok {
+			continue
+		}
+		dataset, _ := datastream["dataset"].(string)
+		if dataset != "osquery_manager.result" {
 			continue
 		}
 		if _, exists := result[i].config["osquery"]; !exists {
-			result[i].config["osquery"] = osqVal
+			// Clone before mutating so we don't modify the map returned by CreateInputsFromStreamsForReceiver.
+			result[i].config = maps.Clone(result[i].config)
+			result[i].config["osquery"] = osqMap
 		}
 		// Place the result stream first so inputs[0].Osquery is set.
 		result[0], result[i] = result[i], result[0]

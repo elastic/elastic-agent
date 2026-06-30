@@ -300,10 +300,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 					continue
 				}
 				for i, stream := range u.Config.Streams {
-					var src map[string]any
-					if s := stream.GetSource(); s != nil {
-						src = s.AsMap()
-					}
+					src := stream.GetSource().AsMap()
 					streamID := resolveStreamID(stream.Id, src, u.ID, i)
 					receiverByInputID[streamID] = rs
 				}
