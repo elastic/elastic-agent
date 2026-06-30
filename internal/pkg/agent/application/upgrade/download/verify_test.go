@@ -347,28 +347,6 @@ var verifierTestArtifact = Artifact{
 	FileName: "elastic-agent-7.5.1-linux-x86.tar.gz",
 }
 
-func prepareVerifierTestCase(t *testing.T, a Artifact, dir string) []byte {
-	t.Helper()
-	filePath := filepath.Join(dir, a.FileName)
-	filePathSHA := filePath + ".sha512"
-	filePathASC := filePath + ".asc"
-
-	content := []byte("sample content")
-	err := os.WriteFile(filePath, content, 0o644)
-	require.NoErrorf(t, err, "could not write %q file", filePath)
-
-	hash := sha512.Sum512(content)
-	hashContent := fmt.Sprintf("%x %s", hash, a.FileName)
-	err = os.WriteFile(filePathSHA, []byte(hashContent), 0o644)
-	require.NoErrorf(t, err, "could not write %q file", filePathSHA)
-
-	pub, sig := pgptest.Sign(t, bytes.NewReader(content))
-	err = os.WriteFile(filePathASC, sig, 0o644)
-	require.NoErrorf(t, err, "could not write %q file", filePathASC)
-
-	return pub
-}
-
 func TestVerify(t *testing.T) {
 	fipsutils.SkipIfFIPSOnly(t, "verifier being tested uses an OpenPGP key which results in a SHA-1 violation.")
 

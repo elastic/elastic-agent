@@ -116,7 +116,8 @@ func TestDownloadArtifact(t *testing.T) {
 		proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, http.MethodConnect, r.Method)
 
-			upstreamConn, err := net.Dial("tcp", upstream.Listener.Addr().String())
+			var dialer net.Dialer
+			upstreamConn, err := dialer.DialContext(r.Context(), "tcp", upstream.Listener.Addr().String())
 			require.NoError(t, err)
 
 			hijacker, ok := w.(http.Hijacker)
@@ -409,8 +410,8 @@ func TestDownloadArtifact(t *testing.T) {
 				proxyURL, requestCounts := setupHTTPSProxy(t, remoteFiles, http.StatusNotFound)
 				enabled := true
 				settings := newSettings()
-				settings.HTTPTransportSettings.Proxy.URL = proxyURL
-				settings.HTTPTransportSettings.TLS = &tlscommon.Config{
+				settings.Proxy.URL = proxyURL
+				settings.TLS = &tlscommon.Config{
 					Enabled:          &enabled,
 					VerificationMode: tlscommon.VerifyNone,
 				}
@@ -657,8 +658,9 @@ func TestLatestSnapshotBuildID(t *testing.T) {
 		client := server.Client()
 		transport := client.Transport.(*http.Transport)
 		transport.TLSClientConfig.InsecureSkipVerify = true
-		transport.DialContext = func(_ context.Context, network, _ string) (net.Conn, error) {
-			return net.Dial(network, server.Listener.Addr().String())
+		transport.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+			var dialer net.Dialer
+			return dialer.DialContext(ctx, network, server.Listener.Addr().String())
 		}
 
 		a, err := download.New("elastic-agent", false, agtversion.NewParsedSemVer(8, 14, 0, "SNAPSHOT", ""), "linux", "amd64")

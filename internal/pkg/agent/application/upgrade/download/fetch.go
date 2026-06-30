@@ -111,7 +111,7 @@ func download(ctx context.Context, log *logger.Logger, config *Config, upgradeDe
 		}
 	}
 
-	req, err := http.NewRequest("GET", sourceURI, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURI, nil)
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("building request %s failed", sourceURI), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
@@ -128,7 +128,7 @@ func download(ctx context.Context, log *logger.Logger, config *Config, upgradeDe
 	}
 	defer destinationFile.Close()
 
-	resp, err := client.Do(req.WithContext(ctx))
+	resp, err := client.Do(req)
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("fetching %s failed", sourceURI), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}

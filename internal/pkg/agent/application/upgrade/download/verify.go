@@ -245,7 +245,7 @@ func FetchPGPKeys(log *logger.Logger, config *Config, defaultPGPKey []byte, skip
 		log.Infof("Default PGP appended")
 	}
 
-	client, err := config.HTTPTransportSettings.Client(
+	client, err := config.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
 			return WithHeaders(rt, Headers)
@@ -353,7 +353,7 @@ func FetchPGPSignature(ctx context.Context, log *logger.Logger, config *Config, 
 		return os.ReadFile(strings.TrimPrefix(src, "file://"))
 	}
 
-	client, err := config.HTTPTransportSettings.Client(
+	client, err := config.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
 			return WithHeaders(rt, Headers)

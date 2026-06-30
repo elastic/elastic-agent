@@ -59,7 +59,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, log *logger.L
 	// do not update source config
 	settings := *a.settings
 
-	client, err := settings.HTTPTransportSettings.Client(
+	client, err := settings.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
 			return download.WithHeaders(rt, download.Headers)
