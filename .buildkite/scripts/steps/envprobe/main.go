@@ -7,9 +7,11 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -17,15 +19,15 @@ import (
 )
 
 var (
-	k32                       = syscall.NewLazyDLL("kernel32.dll")
-	pGetStdHandle             = k32.NewProc("GetStdHandle")
-	pGetFileType              = k32.NewProc("GetFileType")
-	pGetConsoleMode           = k32.NewProc("GetConsoleMode")
-	pIsProcessInJob           = k32.NewProc("IsProcessInJob")
-	pGetCurrentProcess        = k32.NewProc("GetCurrentProcess")
-	pGetProcessAffinityMask   = k32.NewProc("GetProcessAffinityMask")
-	pGetPriorityClass         = k32.NewProc("GetPriorityClass")
-	pCreateToolhelp32Snapshot = k32.NewProc("CreateToolhelp32Snapshot")
+	k32                        = syscall.NewLazyDLL("kernel32.dll")
+	pGetStdHandle              = k32.NewProc("GetStdHandle")
+	pGetFileType               = k32.NewProc("GetFileType")
+	pGetConsoleMode            = k32.NewProc("GetConsoleMode")
+	pIsProcessInJob            = k32.NewProc("IsProcessInJob")
+	pGetCurrentProcess         = k32.NewProc("GetCurrentProcess")
+	pGetProcessAffinityMask    = k32.NewProc("GetProcessAffinityMask")
+	pGetPriorityClass          = k32.NewProc("GetPriorityClass")
+	pCreateToolhelp32Snapshot  = k32.NewProc("CreateToolhelp32Snapshot")
 	pProcess32NextW            = k32.NewProc("Process32NextW")
 	pModule32NextW             = k32.NewProc("Module32NextW")
 	pCloseHandle               = k32.NewProc("CloseHandle")
@@ -240,8 +242,8 @@ func modules() {
 // long gaps mean the OS/hypervisor descheduled us (vCPU steal / host contention).
 func jitter(d time.Duration, threads int) (maxGap time.Duration, over1ms, over10ms int) {
 	type res struct {
-		max              time.Duration
-		o1, o10          int
+		max     time.Duration
+		o1, o10 int
 	}
 	ch := make(chan res, threads)
 	for t := 0; t < threads; t++ {
@@ -292,11 +294,56 @@ func stealLoop() {
 	}
 }
 
-func main() {
-	if len(os.Args) > 1 && os.Args[1] == "-steal" {
-		stealLoop()
-		return
+// burnLoop spins n CPU-bound goroutines forever — a CPU antagonist run as a
+// sibling of the test process. The quiet-VM repro showed pure guest
+// oversubscription doesn't crash; this tests the stacked case: extra in-guest
+// contention ON TOP of the CI host's real vCPU steal. Each goroutine locks its
+// OS thread so the load is genuine OS-thread CPU pressure the host scheduler
+// must arbitrate, not just Go-runtime churn.
+func burnLoop(n int) {
+	for i := 0; i < n; i++ {
+		go func() {
+			runtime.LockOSThread()
+			x := 0.0
+			for {
+				x = math.Sqrt(x*1.0000001 + 1.0)
+				if x > 1e9 {
+					x = 0.0
+				}
+			}
+		}()
 	}
+	select {} // block forever; the launcher kills this process after the tests
+}
+
+func main() {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "-steal":
+			stealLoop()
+			return
+		case "-burn":
+			// -burn [N]: spin N (default NumCPU) CPU antagonist threads.
+			n := runtime.NumCPU()
+			if len(os.Args) > 2 {
+				if v, err := strconv.Atoi(os.Args[2]); err == nil && v > 0 {
+					n = v
+				}
+			}
+			fmt.Printf("burn: spinning %d CPU antagonist threads (NumCPU=%d)\n", n, runtime.NumCPU())
+			burnLoop(n)
+			return
+		case "-hostprobe":
+			// Full environment characterisation WITHOUT the env-var dump, so the
+			// output is safe to upload as a CI artifact (BK env carries secrets).
+			fullProbe(false)
+			return
+		}
+	}
+	fullProbe(true)
+}
+
+func fullProbe(includeEnv bool) {
 	fmt.Println("================ ENV PROBE ================")
 	fmt.Printf("GOOS/GOARCH=%s/%s  NumCPU=%d  GOMAXPROCS=%d  pid=%d\n",
 		runtime.GOOS, runtime.GOARCH, runtime.NumCPU(), runtime.GOMAXPROCS(0), os.Getpid())
@@ -345,11 +392,13 @@ func main() {
 	fmt.Println("\n-- loaded modules (flagging non-Windows = possible injected DLLs) --")
 	modules()
 
-	fmt.Println("\n-- environment (sorted) --")
-	env := os.Environ()
-	sort.Strings(env)
-	for _, e := range env {
-		fmt.Println("  " + e)
+	if includeEnv {
+		fmt.Println("\n-- environment (sorted) --")
+		env := os.Environ()
+		sort.Strings(env)
+		for _, e := range env {
+			fmt.Println("  " + e)
+		}
 	}
 	fmt.Println("================ END PROBE ================")
 }

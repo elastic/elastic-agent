@@ -1,21 +1,30 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 # Diagnostic pipeline for the Windows/amd64 GC-metadata-corruption crash.
-# Cofactor A/B build: cohorts in the SAME build (shared host conditions, so
-# build-to-build variance cancels), each differing from the `control` by exactly
-# one variable, to isolate what the crash needs:
-#   control       -race, GOGC=1, coverage   (known positive control)
-#   no-race       control minus -race       (confirms the -race gate / negative control)
-#   no-cover      control minus -coverpkg    (is the coverage-globals footprint a cofactor?)
-#   gogc-default  control minus GOGC=1       (is GC-pressure amplification required?)
-#   async-preempt control plus async preemption (ASYNC_PREEMPT=1, removes
-#                 asyncpreemptoff): does arbitrary-PC signal preemption AMPLIFY
-#                 the rate? "missing stackmap" is preemption-adjacent.
-#   gogc10        control but GOGC=10 instead of 1: middle GC-pressure amplifier.
-# Prior cofactor builds established -race is required and coverage/GOGC=1 are not.
-# The new open question is what AMPLIFIES the rate; async-preempt + gogc10 target
-# that. Every cohort also runs an environment probe (see unit-tests.ps1): a
-# scheduling-stall + cross-core-TSC sampler plus Azure host identity, captured on
-# crash AND clean runs so the steal hypothesis can be tested by correlation.
+# EXPLORATORY build. Prior cofactor A/Bs established the crash is -race-GATED and
+# that coverage / GOGC=1 are NOT cofactors. The crash rate is dominated by an
+# UNCONTROLLED variable - host CPU contention / hypervisor vCPU steal (a quiet
+# dedicated VM never reproduced; the shared CI fleet does). So this build (1)
+# PERTURBS the environment to try to raise the rate, and (2) MONITORS every run
+# so the relevant host factor can be found by correlation with crash outcome.
+#
+# Cohorts (all -race; control = -race, GOGC=1, coverage, full suite):
+#   control          baseline rate + monitoring reference
+#   no-race          negative control (confirms the -race gate still holds)
+#   async-preempt    ASYNC_PREEMPT=1: SIGURG preemption at arbitrary PCs - the
+#                    in-guest analog of vCPU-steal's arbitrary-boundary descheduling
+#   maxprocs-oversub GOMAXPROCS=32 (4x vCPU): more GC mark workers spread across /
+#                    migrating between more logical CPUs than the host grants
+#   cpu-antagonist   8 busy-spin siblings (envprobe -burn) stacking in-guest
+#                    contention on top of the host's real steal
+#   concentrate-fire upgrade pkg only, MAX_RUNS=15: more crash attempts per job
+#                    (multi-variable, exploratory - not a clean single-var A/B)
+#   kitchen-sink     async-preempt + oversub + antagonist combined (the bet to
+#                    "trigger failures more consistently")
+#
+# Monitoring on EVERY cohort (see unit-tests.ps1), captured on crash AND clean
+# runs: a 1ms scheduling-stall + TSC-skew sampler (sched-probe-*), and a one-shot
+# Go env-probe (host-info-*) capturing job-object CPU-rate control, affinity /
+# priority, and an injected-DLL scan, plus Azure host identity via IMDS.
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -74,34 +83,6 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (no-cover run %n)"
-    key: "unit-tests-win11-nocover"
-    command: .buildkite/scripts/steps/unit-tests.ps1
-    parallelism: 10
-    env:
-      NO_COVER: "1"
-    artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
-    agents: *win11_agent
-    retry:
-      manual:
-        allowed: true
-    plugins:
-      - *google_oidc_plugin
-
-  - label: "Unit tests - Windows 11 (gogc-default run %n)"
-    key: "unit-tests-win11-gogcdefault"
-    command: .buildkite/scripts/steps/unit-tests.ps1
-    parallelism: 10
-    env:
-      GOGC_DEFAULT: "1"
-    artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
-    agents: *win11_agent
-    retry:
-      manual:
-        allowed: true
-    plugins:
-      - *google_oidc_plugin
-
   - label: "Unit tests - Windows 11 (async-preempt run %n)"
     key: "unit-tests-win11-asyncpreempt"
     command: .buildkite/scripts/steps/unit-tests.ps1
@@ -116,12 +97,57 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - label: "Unit tests - Windows 11 (gogc10 run %n)"
-    key: "unit-tests-win11-gogc10"
+  - label: "Unit tests - Windows 11 (maxprocs-oversub run %n)"
+    key: "unit-tests-win11-maxprocs"
     command: .buildkite/scripts/steps/unit-tests.ps1
     parallelism: 10
     env:
-      GOGC_OVERRIDE: "10"
+      GOMAXPROCS_SET: "32"
+    artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
+    agents: *win11_agent
+    retry:
+      manual:
+        allowed: true
+    plugins:
+      - *google_oidc_plugin
+
+  - label: "Unit tests - Windows 11 (cpu-antagonist run %n)"
+    key: "unit-tests-win11-antagonist"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
+    env:
+      CPU_ANTAGONISTS: "8"
+    artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
+    agents: *win11_agent
+    retry:
+      manual:
+        allowed: true
+    plugins:
+      - *google_oidc_plugin
+
+  - label: "Unit tests - Windows 11 (concentrate-fire run %n)"
+    key: "unit-tests-win11-concentrate"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
+    env:
+      TEST_PKG: "./internal/pkg/agent/application/upgrade/..."
+      MAX_RUNS: "15"
+    artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
+    agents: *win11_agent
+    retry:
+      manual:
+        allowed: true
+    plugins:
+      - *google_oidc_plugin
+
+  - label: "Unit tests - Windows 11 (kitchen-sink run %n)"
+    key: "unit-tests-win11-kitchensink"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
+    env:
+      ASYNC_PREEMPT: "1"
+      GOMAXPROCS_SET: "32"
+      CPU_ANTAGONISTS: "8"
     artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
     agents: *win11_agent
     retry:

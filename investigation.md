@@ -135,17 +135,44 @@ steal), the next build does two things at once:
 - The 1ms timer bump is a *constant* perturbation across all cohorts, so it can't
   bias the A/B; probe runs as an isolated background job (can't fail the run).
 
-**Two new amplifier cohorts** (single-variable off control):
-- **async-preempt** (`ASYNC_PREEMPT=1`, removes `asyncpreemptoff`): tests whether
-  arbitrary-PC SIGURG preemption — the closest *in-guest analog to vCPU steal* —
-  raises the rate. NB: mechanism-analogy amplifier test only; `asyncpreemptoff=1`
-  still does not *suppress* the crash, and `missing stackmap` arose *with*
-  preemption off, so the signature link is weak.
-- **gogc10** (`GOGC_OVERRIDE=10`): middle-ground GC-pressure amplifier.
-
 Hypothesis to confirm: crash runs show fatter scheduling-stall tails (and/or
 larger TSC spread) than clean runs on the same cohort → steal is the trigger.
 Upstream report drafted for golang/go (local `golang-issue-draft.md`).
+
+## Exploratory perturbation campaign (current build): 7 cohorts + envprobe
+
+Goal restated by the user: try DIFFERENT ways to perturb the BK environment to
+trigger the crash MORE consistently, and add monitoring to find the relevant
+factor. Since pure guest stress never reproduced on a quiet VM but the contended
+fleet does, the perturbations are designed to *stack on / amplify sensitivity
+to* the host's real vCPU steal, not to synthesize it from scratch.
+
+**Perturbation cohorts** (env knobs in `unit-tests.ps1`; all keep `-race`):
+- **control** — baseline rate + monitoring reference.
+- **no-race** — negative control (confirms the `-race` gate still holds).
+- **async-preempt** (`ASYNC_PREEMPT=1`) — SIGURG preemption at arbitrary PCs, the
+  in-guest analog of steal's arbitrary-boundary descheduling. (Mechanism-analogy
+  amplifier; `asyncpreemptoff=1` is still known not to *suppress* the crash.)
+- **maxprocs-oversub** (`GOMAXPROCS_SET=32`, 4× vCPU) — more GC mark workers
+  spread across / migrating between more logical CPUs than the host grants.
+- **cpu-antagonist** (`CPU_ANTAGONISTS=8`) — 8 busy-spin siblings (`envprobe
+  -burn`) stacking in-guest contention on top of the host's real steal.
+- **concentrate-fire** (`TEST_PKG=upgrade/..., MAX_RUNS=15`) — hammer the known
+  crash-prone package for more attempts/job (multi-variable, exploratory).
+- **kitchen-sink** (`async-preempt` + `oversub` + `antagonist`) — the bet to
+  trigger it most consistently.
+
+**Monitoring added** (every cohort): the 1ms scheduling-stall + TSC probe (as
+above) PLUS a one-shot Go `envprobe -hostprobe` capturing the buildkite-agent
+**job-object CPU-rate control** (is the agent itself throttling/affinity-jailing
+us? — a host-side confound the stall probe can't see), process affinity +
+priority class, and a loaded-module scan flagging injected EDR/AV DLLs. Appended
+to `host-info-<job>.log`. `envprobe -burn N` doubles as the antagonist sidecar.
+
+Readout plan: (1) which perturbation cohort lifts the crash rate above control;
+(2) within each cohort, do crashed jobs' `sched-probe` stall tails / job-object
+throttling differ from clean jobs'; (3) does any cohort show the agent job
+object actually CPU-capping the test (would reframe the whole investigation).
 
 ## Symptom
 

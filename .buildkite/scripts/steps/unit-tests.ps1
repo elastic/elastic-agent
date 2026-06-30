@@ -17,6 +17,23 @@ if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE
 }
 
+# Build the Go env-probe NOW, before the diagnostic GODEBUG/GOGC are set, so the
+# compile is fast (no GOGC=1) and clean (no gctrace spew). It is used twice
+# below: a one-shot host characterisation (envprobe -hostprobe) and the
+# CPU-antagonist sidecar (envprobe -burn, for the cpu-antagonist / kitchen-sink
+# cohorts). Build failure is non-fatal - the run proceeds without it.
+$envProbeExe = Join-Path $env:BUILDKITE_BUILD_CHECKOUT_PATH "build\envprobe.exe"
+New-Item -ItemType Directory -Force -Path (Join-Path $env:BUILDKITE_BUILD_CHECKOUT_PATH "build") | Out-Null
+$prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+try {
+  & go build -o $envProbeExe ./.buildkite/scripts/steps/envprobe 2>&1 | Out-Host
+} catch { Write-Host "envprobe build failed: $_" } finally { $ErrorActionPreference = $prevEAP }
+if (Test-Path $envProbeExe) {
+  Write-Host "envprobe built: $envProbeExe"
+} else {
+  Write-Host "WARNING: envprobe build failed; one-shot host probe + CPU antagonist disabled"
+}
+
 # --- Mitigation handling -----------------------------------------------------
 # The earlier `Set-ProcessMitigation -System` approach was a no-op without a
 # reboot: the system default lives in Session Manager\kernel\MitigationOptions
@@ -244,6 +261,25 @@ try {
   Tee-Object -FilePath $hostInfoLog | Out-Null
 Write-Host "host-info: $((Get-Content $hostInfoLog) -join ' ')"
 
+# One-shot host characterisation via the Go probe: job-object CPU-rate control
+# (is the buildkite-agent job itself CPU-throttling / affinity-jailing us?),
+# process affinity + priority, and a loaded-module scan that flags non-Windows
+# DLLs (injected EDR/AV). Run with a CLEAN GODEBUG/GOGC so envprobe's own output
+# isn't polluted by gctrace; -hostprobe omits the env-var dump so no BK secrets
+# land in the artifact. Output is appended to the host-info artifact.
+if (Test-Path $envProbeExe) {
+  Write-Host "--- One-shot host environment probe (envprobe -hostprobe)"
+  $savedGodebug = $env:GODEBUG; $savedGogc = $env:GOGC
+  $env:GODEBUG = ""; $env:GOGC = ""
+  $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+  try {
+    & $envProbeExe -hostprobe 2>&1 | Tee-Object -FilePath $hostInfoLog -Append | Out-Host
+  } catch { Write-Host "envprobe -hostprobe failed: $_" } finally {
+    $ErrorActionPreference = $prevEAP
+    $env:GODEBUG = $savedGodebug; $env:GOGC = $savedGogc
+  }
+}
+
 $probeLog = Join-Path $env:BUILDKITE_BUILD_CHECKOUT_PATH "sched-probe-$($env:BUILDKITE_JOB_ID).log"
 # C# is single-quoted (literal) so its $ and {} are not touched by PowerShell.
 $probeSource = @'
@@ -359,7 +395,28 @@ $probeJob = Start-Job -ScriptBlock {
   }
 } -ArgumentList $probeSource, $probeLog, 5400
 
-$maxRuns = 5
+# --- Perturbation knobs (exploratory) ---------------------------------------
+# Each is one cohort variable in pipeline.yml, chosen to amplify the suspected
+# mechanism: arbitrary-boundary descheduling of vCPUs during concurrent GC.
+# GOMAXPROCS_SET oversubscribes Ps so more GC mark workers spread across (and
+# migrate between) more logical CPUs than the host actually grants at once.
+if ($env:GOMAXPROCS_SET) {
+  $env:GOMAXPROCS = $env:GOMAXPROCS_SET
+  Write-Host "perturbation: GOMAXPROCS=$($env:GOMAXPROCS)"
+}
+# CPU_ANTAGONISTS launches N busy-spin sibling threads (envprobe -burn) to stack
+# in-guest CPU contention ON TOP of the host's real vCPU steal. (Pure guest
+# oversubscription never reproduced on a quiet VM; this tests the stacked case.)
+$antagonist = $null
+if ($env:CPU_ANTAGONISTS -and (Test-Path $envProbeExe)) {
+  $burnLog = Join-Path $env:BUILDKITE_BUILD_CHECKOUT_PATH "build\burn.log"
+  $antagonist = Start-Process -FilePath $envProbeExe -ArgumentList "-burn", $env:CPU_ANTAGONISTS `
+    -RedirectStandardOutput $burnLog -PassThru -WindowStyle Hidden
+  Write-Host "perturbation: CPU antagonist started (pid=$($antagonist.Id), threads=$($env:CPU_ANTAGONISTS))"
+}
+# MAX_RUNS: more fresh-binary iterations per job = more crash attempts. Used by
+# the concentrate-fire cohort, where each run is a single fast package.
+$maxRuns = if ($env:MAX_RUNS) { [int]$env:MAX_RUNS } else { 5 }
 for ($run = 1; $run -le $maxRuns; $run++) {
   Write-Host "--- Unit test run $run of $maxRuns"
   # Windows PowerShell 5.1 wraps every stderr line from a native command
@@ -384,7 +441,11 @@ for ($run = 1; $run -le $maxRuns; $run++) {
   }
 }
 
-# --- Stop the environment probe and surface its summary ----------------------
+# --- Stop perturbation sidecars and the environment probe --------------------
+if ($antagonist -and -not $antagonist.HasExited) {
+  Stop-Process -Id $antagonist.Id -Force -ErrorAction SilentlyContinue
+  Write-Host "CPU antagonist stopped (pid=$($antagonist.Id))"
+}
 Write-Host "--- Stopping environment probe"
 if ($probeJob) {
   try {
