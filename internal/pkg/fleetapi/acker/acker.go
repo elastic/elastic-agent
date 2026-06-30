@@ -7,7 +7,7 @@ package acker
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 // Acker is an acker of actions to fleet.

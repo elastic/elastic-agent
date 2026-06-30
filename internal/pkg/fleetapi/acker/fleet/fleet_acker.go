@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 const fleetTimeFormat = "2006-01-02T15:04:05.99999-07:00"
@@ -50,7 +51,7 @@ func (f *Acker) SetClient(c client.Sender) {
 }
 
 // Ack acknowledges action.
-func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
+func (f *Acker) Ack(ctx context.Context, action pkgfleetapi.Action) (err error) {
 	span, ctx := apm.StartSpan(ctx, "ack", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -77,7 +78,7 @@ func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
 }
 
 // AckBatch acknowledges multiple actions at once.
-func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *fleetapi.AckResponse, err error) {
+func (f *Acker) AckBatch(ctx context.Context, actions []pkgfleetapi.Action) (res *fleetapi.AckResponse, err error) {
 	f.log.Debugf("fleet acker: ackbatch, actions: %#v", actions)
 	span, ctx := apm.StartSpan(ctx, "ackBatch", "app.internal")
 	defer func() {
