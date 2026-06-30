@@ -18,7 +18,6 @@ changelog/fragments/
 /.ci/scripts/update-integration-testdata.sh @elastic/elastic-agent-control-plane
 /.ci/scripts/update-otel.sh @elastic/elastic-agent-control-plane
 /.github @elastic/elastic-agent-control-plane @elastic/observablt-ci
-<<<<<<< HEAD
 /.github/CODEOWNERS @elastic/ingest-tech-leads
 /.github/workflows/release-notes.yml @elastic/ski-docs @elastic/elastic-agent-control-plane
 /deploy/helm @elastic/elastic-agent-control-plane
