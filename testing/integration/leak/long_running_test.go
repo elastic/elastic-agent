@@ -85,7 +85,7 @@ func TestLongRunningAgentForLeaks(t *testing.T) {
 }
 
 func (runner *ExtendedRunner) SetupSuite() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), 5*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", "install", "-v", "github.com/mingrammer/flog@latest")
 	out, err := cmd.CombinedOutput()
@@ -145,7 +145,7 @@ func (runner *ExtendedRunner) SetupSuite() {
 }
 
 func (runner *ExtendedRunner) TestHandleLeak() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Hour)
 	defer cancel()
 
 	testRuntime := os.Getenv("LONG_TEST_RUNTIME")
