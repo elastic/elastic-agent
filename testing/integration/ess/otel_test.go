@@ -62,6 +62,7 @@ const apmProcessingContent = `2023-06-19 05:20:50 ERROR This is a test error mes
 const apmOtelConfig = `receivers:
   filelog:
     include: [ %s ]
+    start_at: beginning  # read apm logs even if otel starts after they are written
     operators:
       - type: regex_parser
         regex: '^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (?P<sev>[A-Z]*) (?P<msg>.*)$'
@@ -734,7 +735,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	}()
 
 	// wait for apm to start
-	err = logWatcher.WaitForKeys(context.Background(),
+	err = logWatcher.WaitForKeys(ctx,
 		10*time.Minute,
 		500*time.Millisecond,
 		apmReadyLog,
@@ -769,7 +770,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 				return true
 			}
 
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
 			docs, err := estools.GetLogsForIndexWithContext(findCtx, esClient, "logs-apm*", match)
 			if err != nil {
