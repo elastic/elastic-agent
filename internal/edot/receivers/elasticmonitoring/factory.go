@@ -15,35 +15,19 @@ const (
 	Name = "elasticmonitoringreceiver"
 )
 
+// Config holds the configuration for the elasticmonitoringreceiver.
+// Event templates, exporter name mappings, and datastream routing live in the
+// downstream elasticmonitoringconnector; this receiver is only responsible for
+// polling interval.
 type Config struct {
-	// EventTemplate provides the static fields that will be included in every
-	// generated event. If data_stream.* is present, these fields will be set
-	// as attributes on the resulting log record, so the elasticsearch
-	// exporter will route it to the correct datastream.
-	EventTemplate struct {
-		Fields map[string]interface{} `mapstructure:",remain"`
-	} `mapstructure:"event_template"`
-
-	// InputEventTemplate provides the static fields for per-input events.
-	// If unset, per-input events are emitted without base fields (no datastream
-	// routing). When set, data_stream.* should be configured to route input
-	// events to the correct datastream (e.g. elastic_agent.filebeat_input).
-	InputEventTemplate struct {
-		Fields map[string]interface{} `mapstructure:",remain"`
-	} `mapstructure:"input_event_template"`
-
 	Interval time.Duration `mapstructure:"interval"`
-
-	// A map from OTel exporter IDs to the component name that should be used
-	// when reporting their metrics.
-	ExporterNames map[string]string `mapstructure:"exporter_names"`
 }
 
 func NewFactory() receiver.Factory {
 	return receiver.NewFactory(
 		component.MustNewType(Name),
 		createDefaultConfig,
-		receiver.WithLogs(createReceiver, component.StabilityLevelAlpha))
+		receiver.WithMetrics(createReceiver, component.StabilityLevelAlpha))
 }
 
 func createDefaultConfig() component.Config {
