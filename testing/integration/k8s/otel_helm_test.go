@@ -179,7 +179,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := context.Background() //nolint:forbidigo // ctx is captured by t.Cleanup in step functions; must outlive the test
 			testNamespace := kCtx.getNamespace(t)
 
 			for _, step := range tc.steps {

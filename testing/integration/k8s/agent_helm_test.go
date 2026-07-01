@@ -118,7 +118,7 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 		),
 	}
 
-	ctx := context.Background()
+	ctx := context.Background() //nolint:forbidigo // ctx is captured by t.Cleanup in step functions; must outlive the test
 	testNamespace := kCtx.getNamespace(t)
 
 	for _, step := range steps {

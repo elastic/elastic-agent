@@ -45,6 +45,10 @@ linters:
     forbidigo:
       forbid:
         - pattern: fmt.Print.*
+        - pattern: context\.Background\(\)
+          msg: "use t.Context() in tests so the context is cancelled when the test ends"
+          files:
+            - ".*_test\\.go$"
       exclude-godoc-examples: true
     gomoddirectives:
       replace-allow-list:
