@@ -318,4 +318,3 @@ func (v *GCPVerifier) handleGCPError(err error, endpoint string) Result {
 		Endpoint:     endpoint,
 	}
 }
-
