@@ -6,13 +6,12 @@ package fleetapi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
 const (
@@ -740,16 +739,12 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 	}
 
 	if err := json.Unmarshal(data, &typeUnmarshaler); err != nil {
-		return errors.New(err,
-			"fail to decode actions to read their types",
-			errors.TypeConfig)
+		return fmt.Errorf("fail to decode actions to read their types: %w", err)
 	}
 
 	rawActions := make([]json.RawMessage, len(typeUnmarshaler))
 	if err := json.Unmarshal(data, &rawActions); err != nil {
-		return errors.New(err,
-			"fail to decode actions",
-			errors.TypeConfig)
+		return fmt.Errorf("fail to decode actions: %w", err)
 	}
 
 	actions := make([]Action, 0, len(typeUnmarshaler))
@@ -757,9 +752,7 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 		action := NewAction(response.ActionType)
 
 		if err := json.Unmarshal(rawActions[i], action); err != nil {
-			return errors.New(err,
-				fmt.Sprintf("fail to decode %s action", action.Type()),
-				errors.TypeConfig)
+			return fmt.Errorf("fail to decode %s action: %w", action.Type(), err)
 		}
 		actions = append(actions, action)
 	}
