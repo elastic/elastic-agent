@@ -130,6 +130,8 @@ This process can be controlled through the following environment variables:
 - `AGENT_CORE_SOURCE=local|manifest`: Build the aforementioned binaries locally or pull from the manifest. Default is `local`. Manifest is defined either by [.package_version](/.package-version) or the `MANIFEST_URL` environment variable.
 - `USE_PACKAGE_VERSION=true|false`: Use the content of [.package_version](/.package-version) for configuring the package, most importantly the manifest url, but the version is effective as well. Mutually exclusive with `MANIFEST_URL`. Default is `true`.
 - `MANIFEST_URL`: The manifest url from which to pull the dependencies. Mutually exclusive with `USE_PACKAGE_VERSION=true`. Default is empty.
+- `SNAPSHOT=true|false`: Create a snapshot build. This is just versioning metadata indicating that the
+  package doesn't contain a release build. Read from the manifest if present, otherwise defaults to `true`.
 - `EXTERNAL=true|false`: If you want to build with dependencies you've provided locally (you have a custom build of endpoint, for example), then set this to `false` and `USE_PACKAGE_VERSION=false`. Default is `true.
 
 ### Running the tests
