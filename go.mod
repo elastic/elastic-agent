@@ -15,7 +15,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260629203634-ce71b8d3cc71
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260701081146-a130ea1a1b6f
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-autodiscover v0.10.3
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
@@ -77,13 +77,8 @@ require (
 	golang.org/x/term v0.44.0
 	golang.org/x/text v0.38.0
 	golang.org/x/time v0.15.0
-<<<<<<< HEAD
-	golang.org/x/tools v0.46.0
-	google.golang.org/api v0.284.0
-=======
 	golang.org/x/tools v0.47.0
 	google.golang.org/api v0.286.0
->>>>>>> aa11bb720 (build(deps): bump google.golang.org/api from 0.284.0 to 0.286.0 in the misc group (#15196))
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/ini.v1 v1.67.3
