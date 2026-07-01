@@ -1,0 +1,15 @@
+type: quark
+github_project: elastic/elastic-agent
+
+status:
+  class: receiver
+  stability:
+    development: [logs]
+  distributions: []
+  codeowners:
+    active: [biscout42]
+
+tests:
+  config:
+    interval: 1ms
+    message: "quark"

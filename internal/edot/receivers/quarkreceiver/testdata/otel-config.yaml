@@ -1,0 +1,14 @@
+receivers:
+  quark:
+    interval: 1s
+    message: "hello from quark"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    logs:
+      receivers: [quark]
+      exporters: [debug]
