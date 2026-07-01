@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
@@ -300,7 +301,7 @@ func TestPerformComponentDiagnosticsUnexpectedError(t *testing.T) {
 		assert.Empty(t, d.Results)
 	}
 
-	assert.NotEmpty(t, obs.FilterMessageSnippet("failed to fetch diagnostics from EDOT").All(), "unexpected EDOT error should be logged at warn level")
+	assert.NotEmpty(t, obs.FilterLevelExact(zapcore.WarnLevel).FilterMessageSnippet("failed to fetch diagnostics from EDOT").All(), "unexpected EDOT error should be logged at warn level")
 }
 
 func setTemporaryAgentPath(t *testing.T) {
