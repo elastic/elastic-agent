@@ -9,14 +9,15 @@ import (
 	"sync"
 	"time"
 
-	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/consumer"
+	"github.com/elastic/elastic-agent/internal/edot/receivers/quarkreceiver/internal/metadata"
+	"github.com/elastic/elastic-agent/internal/edot/receivers/quarkreceiver/internal/sensor"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
+
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/receiver"
 	"go.uber.org/zap"
-
-	"github.com/elastic/elastic-agent/internal/edot/receivers/quarkreceiver/internal/metadata"
 )
 
 // quarkReceiver implements receiver.Logs. It is a mock receiver that emits
@@ -27,6 +28,7 @@ type quarkReceiver struct {
 	config   *Config
 	consumer consumer.Logs
 	logger   *zap.Logger
+	queue    sensor.Queue
 
 	cancelFn context.CancelFunc
 	wg       sync.WaitGroup
@@ -55,6 +57,13 @@ func (r *quarkReceiver) Start(_ context.Context, _ component.Host) error {
 	r.cancelFn = cancel
 
 	r.wg.Add(1)
+
+	q, err := sensor.NewQueue(r.logger)
+	if err != nil {
+		return err
+	}
+	r.queue = q
+
 	go func() {
 		defer r.wg.Done()
 		r.run(ctx)
@@ -76,6 +85,10 @@ func (r *quarkReceiver) Shutdown(ctx context.Context) error {
 		close(done)
 	}()
 
+	if r.queue != nil {
+		r.queue.Close()
+	}
+
 	select {
 	case <-done:
 	case <-ctx.Done():
@@ -95,16 +108,27 @@ func (r *quarkReceiver) run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
-			if err := r.emitLog(ctx); err != nil {
-				r.logger.Error("Failed to emit quark log", zap.Error(err))
+		default:
+		}
+
+		event, ok := r.queue.GetEvent()
+		if !ok {
+			err := r.queue.Block()
+			if err != nil {
+				r.logger.Error("Failed to block on queue", zap.Error(err))
 			}
+			continue
+		}
+
+		err := r.emitLog(ctx, string(event))
+		if err != nil {
+			r.logger.Error("Failed to emit log", zap.Error(err))
 		}
 	}
 }
 
 // emitLog builds a single-record plog.Logs and forwards it to the consumer.
-func (r *quarkReceiver) emitLog(ctx context.Context) error {
+func (r *quarkReceiver) emitLog(ctx context.Context, msg string) error {
 	now := pcommon.NewTimestampFromTime(time.Now())
 
 	logs := plog.NewLogs()
@@ -119,7 +143,7 @@ func (r *quarkReceiver) emitLog(ctx context.Context) error {
 	lr.SetObservedTimestamp(now)
 	lr.SetSeverityNumber(plog.SeverityNumberInfo)
 	lr.SetSeverityText("INFO")
-	lr.Body().SetStr(r.config.Message)
+	lr.Body().SetStr(msg)
 
 	return r.consumer.ConsumeLogs(ctx, logs)
 }
