@@ -7,6 +7,7 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,7 +38,7 @@ func TestKubernetesJournaldInput(t *testing.T) {
 	agentConfigYAML, err := os.ReadFile(filepath.Join("testdata", "journald-input.yml"))
 	require.NoError(t, err, "failed to read journald input template")
 
-	ctx := t.Context()
+	ctx := context.Background()
 	kCtx := k8sGetContext(t, info)
 
 	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
@@ -198,7 +199,7 @@ func journaldTest(
 	index, field, value string) {
 	t.Helper()
 
-	ctx := t.Context()
+	ctx := context.Background()
 	testNamespace := kCtx.getNamespace(t)
 
 	for _, step := range steps {

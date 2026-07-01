@@ -29,7 +29,7 @@ func TestKubernetesAgentHelmCloudDefend(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
-	ctx := t.Context()
+	ctx := context.Background()
 	kCtx := k8sGetContext(t, info)
 
 	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
@@ -108,7 +108,7 @@ func TestKubernetesAgentHelmCloudDefend(t *testing.T) {
 				t.Skip(tc.skipReason)
 			}
 
-			ctx := t.Context()
+			ctx := context.Background()
 			testNamespace := kCtx.getNamespace(t)
 
 			for _, step := range tc.steps {

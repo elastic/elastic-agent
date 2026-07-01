@@ -179,7 +179,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := t.Context()
+			ctx := context.Background()
 			testNamespace := kCtx.getNamespace(t)
 
 			for _, step := range tc.steps {
