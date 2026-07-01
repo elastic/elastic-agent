@@ -296,7 +296,7 @@ inputs:
     failure_threshold: 5
     hosts:
     - placeholder
-    id: metrics-monitoring-filebeat-1
+    id: metrics-monitoring-filebeat-1-input
     index: metrics-elastic_agent.filebeat_input-default
     json.is_array: true
     metricsets:
