@@ -117,6 +117,7 @@ import (
 
 	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
 	kafkapartitionerextension "github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
+	quarkreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/quarkreceiver"
 	verifierreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
@@ -169,6 +170,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
 			elasticmonitoringreceiver.NewFactory(),
+			quarkreceiver.NewFactory(),
 			verifierreceiver.NewFactory(),
 			abreceiver.NewFactoryWithSettings(abreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			fbreceiver.NewFactoryWithSettings(fbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
