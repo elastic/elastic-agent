@@ -106,7 +106,7 @@ func TestRunFleetServer(t *testing.T) {
 
 		switch actionsIdx {
 		case 0:
-			return CheckinAction{
+			return CheckinAction{ //nolint:gosec // it's a test
 					AckToken: "tmpl.AckToken", Actions: []string{action.data}},
 				nil
 		}
