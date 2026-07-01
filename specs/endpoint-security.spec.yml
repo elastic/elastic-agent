@@ -22,9 +22,9 @@ inputs:
         - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == 7
           message: "Elastic Defend doesn't support RHEL7 on arm64"
         - condition: ${user.root} == false
-          message: "Elastic Defend requires Elastic Agent to be running as root"
+          message: "Elastic Defend requires Elastic Agent be running as root"
         - condition: ${install.in_default} == false
-          message: "Elastic Defend requires Elastic Agent to be installed at the default installation path"
+          message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
     service: &service
       cport: 6788
       csocket: ".eaci.sock"
@@ -70,9 +70,9 @@ inputs:
         - condition: ${runtime.arch} != ${runtime.native_arch}
           message: "Elastic Defend cannot run on an emulated architecture"
         - condition: ${user.root} == false
-          message: "Elastic Defend requires Elastic Agent to be running as root"
+          message: "Elastic Defend requires Elastic Agent be running as root"
         - condition: ${install.in_default} == false
-          message: "Elastic Defend requires Elastic Agent to be installed at the default installation path"
+          message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
     service:
       cport: 6788
       csocket: ".eaci.sock"
@@ -89,9 +89,9 @@ inputs:
     runtime:
       preventions:
         - condition: ${user.root} == false
-          message: "Elastic Defend requires Elastic Agent to be running as Administrator or SYSTEM"
+          message: "Elastic Defend requires Elastic Agent be running as Administrator or SYSTEM"
         - condition: ${install.in_default} == false
-          message: "Elastic Defend requires Elastic Agent to be installed at the default installation path"
+          message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
         - condition: ${runtime.native_arch} != '' and ${runtime.arch} != ${runtime.native_arch}
           message: "Elastic Defend cannot be installed on an emulated architecture"
         - condition: ${runtime.major} < 6 or (${runtime.major} == 6 and ${runtime.minor} < 2)

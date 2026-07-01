@@ -48,7 +48,7 @@ inputs:
     command: *command
     isolate_units: true
   - name: cloudbeat/cis_eks
-    description: "CIS EKS monitoring"
+    description: "CIS elastic Kubernetes monitoring"
     platforms: *platforms
     outputs: *outputs
     command: *command
@@ -66,13 +66,13 @@ inputs:
     command: *command
     isolate_units: true
   - name: cloudbeat/cis_azure
-    description: "CIS Azure monitoring"
+    description: "CIS AZURE monitoring"
     platforms: *platforms
     outputs: *outputs
     command: *command
     isolate_units: true
   - name: cloudbeat/vuln_mgmt_aws
-    description: "AWS vulnerability management"
+    description: "AWS Vulnerabilities management"
     platforms: *platforms
     outputs: *outputs
     command: *command
