@@ -141,7 +141,7 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	for _, extDiag := range extDiagnostics.ComponentDiagnostics {
 		parts := strings.SplitN(extDiag.Name, translate.OtelNamePrefix, 2)
 		if len(parts) != 2 {
-			m.managerLogger.Debugf("skipping EDOT diagnostic %q: receiver name does not contain expected prefix %q", extDiag.Name, translate.OtelNamePrefix)
+			m.managerLogger.Debugf("skipping EDOT diagnostic %q: diagnostic name does not contain expected prefix %q", extDiag.Name, translate.OtelNamePrefix)
 			continue
 		}
 		compID, _, _ := strings.Cut(parts[1], "/")
