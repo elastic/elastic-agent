@@ -243,7 +243,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 	checkinActions := mustUnmarshalActions(got.Actions)
 	fmt.Println(checkinActions)
 	if len(checkinActions) > 0 {
-		policy := checkinActions[0].(*fleetapi.ActionPolicyChange).Data.Policy
+		policy := checkinActions[0].(*pkgfleetapi.ActionPolicyChange).Data.Policy
 		b := new(strings.Builder)
 		encoder := json.NewEncoder(b)
 		encoder.SetIndent("", "  ")
@@ -825,13 +825,13 @@ func (a agentInfo) AgentID() string {
 	return string(a)
 }
 
-// mustUnmarshalActions unmarshals raw JSON into fleetapi.Actions, panicking on error.
+// mustUnmarshalActions unmarshals raw JSON into pkgfleetapi.Actions, panicking on error.
 // Returns an empty slice when raw is nil or empty (no actions in response).
-func mustUnmarshalActions(raw json.RawMessage) fleetapi.Actions {
+func mustUnmarshalActions(raw json.RawMessage) pkgfleetapi.Actions {
 	if len(raw) == 0 {
-		return fleetapi.Actions{}
+		return pkgfleetapi.Actions{}
 	}
-	var actions fleetapi.Actions
+	var actions pkgfleetapi.Actions
 	if err := json.Unmarshal(raw, &actions); err != nil {
 		panic(fmt.Sprintf("failed to unmarshal actions: %v", err))
 	}
