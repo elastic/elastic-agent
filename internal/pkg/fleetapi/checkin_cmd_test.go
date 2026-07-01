@@ -110,7 +110,7 @@ func TestCheckin(t *testing.T) {
 			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
-			var actions Actions
+			var actions pkgfleetapi.Actions
 			require.NoError(t, json.Unmarshal(r.Actions, &actions))
 			require.Equal(t, 1, len(actions))
 
@@ -173,7 +173,7 @@ func TestCheckin(t *testing.T) {
 			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
-			var actions Actions
+			var actions pkgfleetapi.Actions
 			require.NoError(t, json.Unmarshal(r.Actions, &actions))
 			require.Equal(t, 2, len(actions))
 
@@ -184,7 +184,7 @@ func TestCheckin(t *testing.T) {
 			// UnknownAction
 			require.Equal(t, "id2", actions[1].ID())
 			require.Equal(t, "UNKNOWN", actions[1].Type())
-			require.Equal(t, "WHAT_TO_DO_WITH_IT", actions[1].(*ActionUnknown).OriginalType)
+			require.Equal(t, "WHAT_TO_DO_WITH_IT", actions[1].(*pkgfleetapi.ActionUnknown).OriginalType)
 		},
 	))
 
@@ -207,7 +207,7 @@ func TestCheckin(t *testing.T) {
 			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
-			var actions Actions
+			var actions pkgfleetapi.Actions
 			require.NoError(t, json.Unmarshal(r.Actions, &actions))
 			require.Equal(t, 0, len(actions))
 		},
@@ -243,7 +243,7 @@ func TestCheckin(t *testing.T) {
 			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
-			var actions Actions
+			var actions pkgfleetapi.Actions
 			require.NoError(t, json.Unmarshal(r.Actions, &actions))
 			require.Equal(t, 0, len(actions))
 		},
@@ -279,7 +279,7 @@ func TestCheckin(t *testing.T) {
 			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
-			var actions Actions
+			var actions pkgfleetapi.Actions
 			require.NoError(t, json.Unmarshal(r.Actions, &actions))
 			require.Equal(t, 0, len(actions))
 		},
@@ -320,7 +320,7 @@ func TestCheckin(t *testing.T) {
 			r, _, err := cmd.Execute(ctx, &request)
 			require.NoError(t, err)
 
-			var actions Actions
+			var actions pkgfleetapi.Actions
 			require.NoError(t, json.Unmarshal(r.Actions, &actions))
 			require.Equal(t, 0, len(actions))
 		},

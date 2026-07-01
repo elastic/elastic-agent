@@ -2348,6 +2348,8 @@ agent.logging.to_stderr: true
 receivers:
   elasticmonitoringreceiver:
     interval: 3s
+connectors:
+  elasticmonitoringconnector: {}
 exporters:
   elasticsearch/1:
     endpoints:
@@ -2378,8 +2380,11 @@ processors:
 
 service:
   pipelines:
-    logs:
+    metrics:
       receivers: [elasticmonitoringreceiver]
+      exporters: [elasticmonitoringconnector]
+    logs:
+      receivers: [elasticmonitoringconnector]
       processors: [beat/1]
       exporters:
         - elasticsearch/1
