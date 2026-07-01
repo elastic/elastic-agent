@@ -20,9 +20,6 @@ import (
 
 const ackPath = "/api/fleet/agents/%s/acks"
 
-// AckEvent is re-exported from pkg/fleetapi for backward compatibility.
-type AckEvent = pkgfleetapi.AckEvent
-
 // AckRequest is re-exported from pkg/fleetapi for backward compatibility.
 type AckRequest = pkgfleetapi.AckRequest
 
@@ -53,10 +50,6 @@ func (e *AckCmd) Execute(ctx context.Context, r *AckRequest) (_ *AckResponse, er
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
-	if err := r.Validate(); err != nil {
-		return nil, err
-	}
-
 	b, err := json.Marshal(r)
 	if err != nil {
 		return nil, errors.New(err,
