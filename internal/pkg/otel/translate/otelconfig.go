@@ -113,21 +113,6 @@ func GetOtelConfig(
 		}
 	}
 
-	// If the default_processors feature flag is enabled, add a single shared
-	// beat processor definition that all pipelines reference.
-	if features.DefaultProcessors() {
-		processorConf := confmap.NewFromStringMap(map[string]any{
-			"processors": map[string]any{
-				GetProcessorID().String(): map[string]any{
-					"processors": GetDefaultProcessors(),
-				},
-			},
-		})
-		if mergeErr := otelConfig.Merge(processorConf); mergeErr != nil {
-			return nil, fmt.Errorf("error merging beat processor config: %w", mergeErr)
-		}
-	}
-
 	return otelConfig, nil
 }
 
@@ -239,9 +224,13 @@ func GetExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 	return otelcomponent.NewIDWithName(exporterType, exporterName)
 }
 
-// GetProcessorID returns the shared beat processor id used across all pipelines.
-func GetProcessorID() otelcomponent.ID {
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("beat"), strings.TrimSuffix(OtelNamePrefix, "/"))
+// GetProcessorID returns the beat processor id for the given name. Each pipeline
+// gets its own processor, since default processors can differ by beat; the
+// beatsprocessor implementation shares state internally between instances that
+// end up with identical configuration.
+func GetProcessorID(name string) otelcomponent.ID {
+	processorName := fmt.Sprintf("%s%s", OtelNamePrefix, name)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("beat"), processorName)
 }
 
 // getBeatsAuthExtensionID returns the id for beatsauth extension
@@ -291,11 +280,17 @@ func getCollectorConfigForComponent(
 		"receivers": receiverKeys,
 	}
 
-	// Build the pipeline processors list: the shared beat processor first (if enabled),
-	// then per-output processors from config. then any other processors from processorConfig (e.g. Kafka transform),
+	// Build the pipeline processors list: this component's own default beat processor
+	// first (if enabled and its beat has any default processors), then per-output
+	// processors from config, then any other processors from processorConfig (e.g. Kafka transform).
+	// Each pipeline gets its own default-processor definition (scoped by comp.ID) rather
+	// than sharing one across all pipelines, since different beats can have different
+	// default processors.
+	beatDefaultProcessors := GetDefaultProcessors(comp.BeatName())
+	beatProcessorID := GetProcessorID(comp.ID).String()
 	var pipelineProcessors []string
-	if features.DefaultProcessors() {
-		pipelineProcessors = append(pipelineProcessors, GetProcessorID().String())
+	if features.DefaultProcessors() && len(beatDefaultProcessors) > 0 {
+		pipelineProcessors = append(pipelineProcessors, beatProcessorID)
 	}
 
 	// per output processor if any
@@ -349,8 +344,17 @@ func getCollectorConfigForComponent(
 		}
 	}
 
-	if len(processorConfig) > 0 {
-		fullConfig["processors"] = processorConfig
+	allProcessorsConfig := map[string]any{}
+	for k, v := range processorConfig {
+		allProcessorsConfig[k] = v
+	}
+	if features.DefaultProcessors() && len(beatDefaultProcessors) > 0 {
+		allProcessorsConfig[beatProcessorID] = map[string]any{
+			"processors": beatDefaultProcessors,
+		}
+	}
+	if len(allProcessorsConfig) > 0 {
+		fullConfig["processors"] = allProcessorsConfig
 	}
 
 	return confmap.NewFromStringMap(fullConfig), nil
@@ -476,39 +480,22 @@ func beatInputsKey(beatName string) string {
 	}
 }
 
-// GetDefaultProcessors returns the default beat processors used across all pipelines.
+// GetDefaultProcessors returns the default processors for the given beat.
 // These mirror the fleetDefaultProcessors that each beat sets for process mode.
-// Synthetics (heartbeat) events skip all four metadata processors: process-mode
-// heartbeat sets fleetDefaultProcessors=nil, so adding any of them in OTel mode
-// would produce fields with no equivalent in process mode.
-func GetDefaultProcessors() []map[string]any {
-	notSynthetics := map[string]any{
-		"not": map[string]any{
-			"equals": map[string]any{
-				"data_stream.type": "synthetics",
-			},
-		},
+// Heartbeat sets fleetDefaultProcessors=nil, so it gets no default processors.
+func GetDefaultProcessors(beatName string) []map[string]any {
+	if beatName == "heartbeat" {
+		return nil
 	}
 	return []map[string]any{
 		{
 			"add_host_metadata": map[string]any{
-				"when": map[string]any{
-					"and": []any{
-						map[string]any{
-							"not": map[string]any{
-								"contains": map[string]any{
-									"tags": "forwarded",
-								},
-							},
-						},
-						notSynthetics,
-					},
-				},
+				"when.not.contains.tags": "forwarded",
 			},
 		},
-		{"add_cloud_metadata": map[string]any{"when": notSynthetics}},
-		{"add_docker_metadata": map[string]any{"when": notSynthetics}},
-		{"add_kubernetes_metadata": map[string]any{"when": notSynthetics}},
+		{"add_cloud_metadata": nil},
+		{"add_docker_metadata": nil},
+		{"add_kubernetes_metadata": nil},
 	}
 }
 
