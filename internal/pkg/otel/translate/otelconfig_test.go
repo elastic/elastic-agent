@@ -271,6 +271,30 @@ func TestGetOtelConfig(t *testing.T) {
 		},
 	}
 
+	// osquerybeat with two streams (action responses + results), as deployed by osquery_manager.
+	osquerybeatMultiStreamInputConfig := map[string]any{
+		"id":         "test",
+		"use_output": "default",
+		"type":       "osquery",
+		"streams": []any{
+			map[string]any{
+				"id": "action-responses",
+				"data_stream": map[string]any{
+					"dataset": "osquery_manager.action.responses",
+				},
+				"query": nil,
+			},
+			map[string]any{
+				"id": "results",
+				"data_stream": map[string]any{
+					"dataset": "osquery_manager.result",
+				},
+				"query":    "SELECT * FROM processes",
+				"interval": "3600",
+			},
+		},
+	}
+
 	packetbeatInputConfig := map[string]any{
 		"id":         "test",
 		"use_output": "default",
@@ -586,6 +610,38 @@ func TestGetOtelConfig(t *testing.T) {
 					"interval":   "3600",
 					"index":      "logs-generic-1-default",
 					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
+					"type":       "osquery",
+				},
+			},
+		}
+		return cfg
+	}
+
+	// expectedOsquerybeatSingleReceiverConfig is the expected config for an osquery component
+	// with single_receiver: true and two streams merged into one receiver.
+	expectedOsquerybeatSingleReceiverConfig := func(id string) map[string]any {
+		cfg := beatReceiverBaseConfig(id, "osquerybeat", "osquery")
+		cfg["osquerybeat"] = map[string]any{
+			"inputs": []map[string]any{
+				{
+					"id": "action-responses",
+					"data_stream": map[string]any{
+						"dataset": "osquery_manager.action.responses",
+					},
+					"query":      nil,
+					"index":      "logs-osquery_manager.action.responses-default",
+					"processors": defaultInputProcessors("action-responses", "osquery_manager.action.responses", "logs"),
+					"type":       "osquery",
+				},
+				{
+					"id": "results",
+					"data_stream": map[string]any{
+						"dataset": "osquery_manager.result",
+					},
+					"query":      "SELECT * FROM processes",
+					"interval":   "3600",
+					"index":      "logs-osquery_manager.result-default",
+					"processors": defaultInputProcessors("results", "osquery_manager.result", "logs"),
 					"type":       "osquery",
 				},
 			},
@@ -2107,6 +2163,67 @@ func TestGetOtelConfig(t *testing.T) {
 			}),
 		},
 		{
+			name: "osquerybeat with single_receiver merges all streams into one receiver",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "osquerybeat-default",
+						InputType:  "osquery",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"osquerybeat"},
+								},
+								SingleReceiver: true,
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "osquerybeat-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(osquerybeatMultiStreamInputConfig),
+							},
+							{
+								ID:     "osquerybeat-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
+				"receivers": map[string]any{
+					// Single receiver keyed by component ID only — no stream suffix.
+					"osquerybeatreceiver/_agent-component/osquerybeat-default": expectedOsquerybeatSingleReceiverConfig("osquerybeat-default"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/osquerybeat-default": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"beat/_agent-component"},
+							"receivers":  {"osquerybeatreceiver/_agent-component/osquerybeat-default"},
+						},
+					},
+				},
+			}),
+		},
+		{
 			name: "packetbeat",
 			model: &component.Model{
 				Components: []component.Component{
@@ -2378,6 +2495,63 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		},
 	}
 
+	// osquerybeat with two streams and single_receiver: true, matching the real osquery_manager setup.
+	osquerybeatSingleReceiverComponent := &component.Component{
+		ID:        "osquerybeat-test-id",
+		InputType: "osquery",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "osquery",
+				Command: &component.CommandSpec{
+					Args: []string{"osquerybeat"},
+				},
+				SingleReceiver: true,
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "osquerybeat-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "osquery",
+					"streams": []any{
+						map[string]any{
+							"id": "action-responses",
+							"data_stream": map[string]any{
+								"dataset": "osquery_manager.action.responses",
+							},
+							"query": nil,
+						},
+						map[string]any{
+							"id": "results",
+							"data_stream": map[string]any{
+								"dataset": "osquery_manager.result",
+							},
+							"query":    "SELECT * FROM processes",
+							"interval": "3600",
+						},
+					},
+					"osquery": map[string]any{
+						"schedule": map[string]any{
+							"system_info": map[string]any{
+								"query":    "SELECT hostname FROM system_info",
+								"interval": 60,
+							},
+						},
+						"decorators": map[string]any{
+							"load": []any{
+								"SELECT uuid AS host_uuid FROM system_info;",
+							},
+						},
+					},
+				}),
+			},
+		},
+	}
+
 	packetbeatComponent := &component.Component{
 		ID:        "packetbeat-test-id",
 		InputType: "packet",
@@ -2466,6 +2640,40 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			outputQueueConfig:  nil,
 			expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id/test-1",
 			expectedBeatName:   "osquerybeat",
+		},
+		{
+			name:               "osquerybeat component with single_receiver merges streams",
+			component:          osquerybeatSingleReceiverComponent,
+			outputQueueConfig:  nil,
+			expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id",
+			expectedBeatName:   "osquerybeat",
+			verifyBeatConfig: func(t *testing.T, beatConfig map[string]any) {
+				inputs, ok := beatConfig["inputs"].([]map[string]any)
+				require.True(t, ok, "osquerybeat inputs should be a slice of maps")
+				require.Len(t, inputs, 2, "both streams must be merged into the single receiver")
+
+				// The result stream must be placed first so inputs[0].Osquery is non-nil
+				// when config_plugin reads it at beat startup.
+				assert.Equal(t, "results", inputs[0]["id"], "osquery_manager.result stream must be first")
+
+				// Only the result stream gets the osquery section injected from the input level.
+				resultInput := inputs[0]
+				osquery, ok := resultInput["osquery"]
+				require.True(t, ok, "inputs[0] (result stream) must have osquery section injected from input level")
+				osqueryMap, ok := osquery.(map[string]any)
+				require.True(t, ok, "inputs[0].osquery must be a map")
+				schedule, ok := osqueryMap["schedule"]
+				assert.True(t, ok, "inputs[0].osquery must have schedule")
+				scheduleMap, ok := schedule.(map[string]any)
+				assert.True(t, ok, "inputs[0].osquery.schedule must be a map (query name → definition)")
+				assert.Contains(t, scheduleMap, "system_info", "inputs[0].osquery.schedule must have system_info query")
+				assert.Contains(t, osqueryMap, "decorators", "inputs[0].osquery must have decorators")
+
+				// The action-responses stream must NOT have osquery injected.
+				actionInput := inputs[1]
+				_, hasOsquery := actionInput["osquery"]
+				assert.False(t, hasOsquery, "action-responses stream must not have osquery injected")
+			},
 		},
 		{
 			name:               "packetbeat component",
