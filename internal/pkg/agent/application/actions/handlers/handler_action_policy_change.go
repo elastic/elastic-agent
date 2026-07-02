@@ -305,8 +305,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	if loggingConfig != nil {
 		h.config.Settings.LoggingConfig.Level = loggingConfig.Level
 	}
-	h.config.Settings.MonitoringConfig.HTTP = cfg.Settings.MonitoringConfig.HTTP
-	h.config.Settings.MonitoringConfig.Pprof = cfg.Settings.MonitoringConfig.Pprof
+	h.applyMonitoringConfigChange(partialCfg)
 
 	if err := saveConfig(h.agentInfo, h.config, h.store, h.log); err != nil {
 		return fmt.Errorf("failed to persist policy config: %w", err)
@@ -341,6 +340,26 @@ func (h *PolicyChangeHandler) applyEventLoggingOutputChange(new *configuration.C
 	current.ToFiles = incoming.ToFiles
 	current.ToStderr = incoming.ToStderr
 	return true
+}
+
+// applyMonitoringConfigChange updates h.config.Settings.MonitoringConfig.HTTP/Pprof only when the
+// incoming policy explicitly sets them (partialCfg is unpacked without defaults, so a nil HTTP/Pprof
+// means the policy didn't carry that section at all). Fleet policies don't have a way to set
+// monitoring.http today, so this preserves whatever was configured locally (e.g.
+// agent.monitoring.http.host in elastic-agent.yml) instead of clobbering it with library defaults
+// on every policy check-in. Mirrors the EnabledIsSet safeguard in monitoring/reload/reload.go,
+// see https://github.com/elastic/elastic-agent/issues/4582.
+func (h *PolicyChangeHandler) applyMonitoringConfigChange(partialCfg *configuration.Configuration) {
+	if partialCfg == nil || partialCfg.Settings == nil || partialCfg.Settings.MonitoringConfig == nil {
+		return
+	}
+
+	if partialCfg.Settings.MonitoringConfig.HTTP != nil {
+		h.config.Settings.MonitoringConfig.HTTP = partialCfg.Settings.MonitoringConfig.HTTP
+	}
+	if partialCfg.Settings.MonitoringConfig.Pprof != nil {
+		h.config.Settings.MonitoringConfig.Pprof = partialCfg.Settings.MonitoringConfig.Pprof
+	}
 }
 
 func (h *PolicyChangeHandler) applyLoggingConfigChange(new *configuration.Configuration, loggingConfig *logger.Config) bool {
