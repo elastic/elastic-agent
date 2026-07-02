@@ -227,52 +227,6 @@ func TestMonitoringLogsAreShipped(
 			c.Name, client.Healthy, client.State(c.State))
 	}
 
-<<<<<<< HEAD
-	// Stage 3: Make sure there are no errors in logs
-	t.Log("Making sure there are no error logs")
-	docs = queryESDocs(t, func() (estools.Documents, error) {
-		return estools.CheckForErrorsInLogs(ctx, info.ESClient, info.Namespace, []string{
-			// acceptable error messages (include reason)
-			"Error dialing dial tcp 127.0.0.1:9200: connect: connection refused", // beat is running default config before its config gets updated
-			"Failed to apply initial policy from on disk configuration",
-			"Failed to connect to backoff(elasticsearch(http://127.0.0.1:9200)): Get \"http://127.0.0.1:9200\": dial tcp 127.0.0.1:9200: connect: connection refused", // Deb test
-			"Failed to download artifact",
-			"Failed to initialize artifact",
-			"Global configuration artifact is not available", // Endpoint: failed to load user artifact due to connectivity issues
-			"add_cloud_metadata: received error for provider aws: failed fetching EC2 Identity Document",      // okay for the cloud metadata to not work
-			"add_cloud_metadata: received error for provider openstack: failed requesting openstack metadata", // okay for the cloud metadata to not work
-			"add_cloud_metadata: received error for provider hetzner: failed with http status code 404",
-			"add_cloud_metadata: received error for provider digitalocean: failed with http status code 404",
-			"add_cloud_metadata: received error for provider azure: failed with http status code 404",
-			"add_cloud_metadata: received error for provider openstack: failed with http status code 404",
-			"add_cloud_metadata: received error for provider gcp: failed with http status code 404",
-			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled",               // can happen on restart
-			"failed to invoke rollback watcher: starting watcher process: failed to start Upgrade Watcher", // on debian/rpm package installs the binary symlink at Top() doesn't exist
-			"falling back to IMDSv1: operation error ec2imds: getToken",                                    // okay for the cloud metadata to not work
-			"context cancelled",                 // can happen on restar
-			"bulk indexer flush error",          // can happen on restart (caused by context canceled)
-			"Exporting failed. Dropping data.",  // can happen on restart (caused by context canceled)
-			"Exporting failed. Rejecting data.", // can happen on restart (caused by context canceled)
-		})
-	})
-	t.Logf("error logs: Got %d documents", len(docs.Hits.Hits))
-	messages := make([]string, 0, len(docs.Hits.Hits))
-	for _, doc := range docs.Hits.Hits {
-		t.Logf("%#v", doc.Source)
-		message, ok := doc.Source["message"]
-		if !ok {
-			continue
-		}
-		messageStr, ok := message.(string)
-		if !ok {
-			continue
-		}
-		messages = append(messages, messageStr)
-	}
-	require.Emptyf(t, docs.Hits.Hits, "list of error messages is expected to be empty, found:\n%s", strings.Join(messages, ", \n"))
-
-=======
->>>>>>> 602facd10 (Drop error check from TestMonitoringLogsAreShipped (#15312))
 	// Stage 3: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
 	docs = FindESDocs(t, func() (estools.Documents, error) {
