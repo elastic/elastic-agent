@@ -651,6 +651,9 @@ func Package(ctx context.Context) error {
 	}
 
 	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
+	if err != nil {
+		return fmt.Errorf("error loading agent package spec: %w", err)
+	}
 
 	if cfg.Packaging.Manifest != nil {
 		var filters []packaging.ComponentFilter
