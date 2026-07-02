@@ -655,19 +655,17 @@ func Package(ctx context.Context) error {
 		return fmt.Errorf("error loading agent package spec: %w", err)
 	}
 
+	if cfg.Packaging.CoreSource == devtools.CoreSourceLocal {
+		mg.CtxDeps(ctx, PackageAgentCore)
+	}
+
 	if cfg.Packaging.Manifest != nil {
 		var filters []packaging.ComponentFilter
-		switch cfg.Packaging.CoreSource {
-		case devtools.CoreSourceLocal, "":
-			mg.CtxDeps(ctx, PackageAgentCore)
+		if cfg.Packaging.CoreSource == devtools.CoreSourceLocal {
 			// Skip the manifest's elastic-agent-core; we compiled it above.
 			filters = append(filters, packaging.WithoutProjectName(devtools.AgentCoreProjectName))
-		case devtools.CoreSourceManifest:
-
-		default:
-			return fmt.Errorf("unknown AGENT_CORE_SOURCE=%q (want %q or %q)",
-				cfg.Packaging.CoreSource, devtools.CoreSourceLocal, devtools.CoreSourceManifest)
 		}
+
 		if err := downloadManifest(ctx, cfg, pkgSpec, filters...); err != nil {
 			return fmt.Errorf("failed downloading manifest components: %w", err)
 		}
