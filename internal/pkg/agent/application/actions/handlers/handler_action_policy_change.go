@@ -281,8 +281,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	}
 
 	// Step 2: Parse the incoming policy configuration.
-	cfg, err := configuration.NewFromConfig(c)
-	if err != nil {
+	if _, err := configuration.NewFromConfig(c); err != nil {
 		return fmt.Errorf("failed to parse policy configuration: %w", err)
 	}
 
@@ -364,8 +363,6 @@ func (h *PolicyChangeHandler) applyEventLoggingOutputChange(new *configuration.C
 	return true
 }
 
-<<<<<<< HEAD
-=======
 // applyMonitoringConfigChange updates h.config.Settings.MonitoringConfig.HTTP/Pprof only when the
 // incoming policy explicitly sets them (partialCfg is unpacked without defaults, so a nil HTTP/Pprof
 // means the policy didn't carry that section at all). Fleet policies don't have a way to set
@@ -386,24 +383,6 @@ func (h *PolicyChangeHandler) applyMonitoringConfigChange(partialCfg *configurat
 	}
 }
 
-func (h *PolicyChangeHandler) applyLoggingConfigChange(new *configuration.Configuration, loggingConfig *logger.Config) bool {
-	if loggingConfig == nil {
-		return false
-	}
-	current := h.config.Settings.LoggingConfig
-	incoming := new.Settings.LoggingConfig
-	if current.ToFiles == incoming.ToFiles && current.ToStderr == incoming.ToStderr && current.Files.Path == incoming.Files.Path {
-		// if there is no change in the logging output settings, we consider that there is no change to the logging config
-		return false
-	}
-
-	current.ToFiles = incoming.ToFiles
-	current.ToStderr = incoming.ToStderr
-	current.Files.Path = incoming.Files.Path
-	return true
-}
-
->>>>>>> d8ca84df2 (fix: don't reset locally-configured monitoring.http/pprof on Fleet policy check-in (#15291))
 func validateLoggingConfig(cfg *configuration.Configuration) (*logger.Config, error) {
 	if cfg == nil || cfg.Settings == nil || cfg.Settings.LoggingConfig == nil {
 		// no logging config, nothing to do
