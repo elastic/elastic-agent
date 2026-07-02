@@ -116,9 +116,15 @@ To install the agent extract the package and run the install command:
 
 ```sh
 cd build/distributions
-tar xvfz elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64.tar.gz
-cd elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64
+tar xvfz elastic-agent-<version>-SNAPSHOT-linux-x86_64.tar.gz
+cd elastic-agent-<version>-SNAPSHOT-linux-x86_64
 sudo ./elastic-agent install
+```
+
+Replace `<version>` with the current version from [version/version.go](version/version.go). You can also discover the generated filename with:
+
+```sh
+ls elastic-agent-*-linux-x86_64.tar.gz
 ```
 
 For basic use the agent binary can be run directly, with the `./elastic-agent run` command.
