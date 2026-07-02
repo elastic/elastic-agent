@@ -248,6 +248,7 @@ func TestMonitoringLogsAreShipped(
 			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled",               // can happen on restart
 			"failed to invoke rollback watcher: starting watcher process: failed to start Upgrade Watcher", // on debian/rpm package installs the binary symlink at Top() doesn't exist
 			"falling back to IMDSv1: operation error ec2imds: getToken",                                    // okay for the cloud metadata to not work
+			"context cancelled",                 // can happen on restar
 			"bulk indexer flush error",          // can happen on restart (caused by context canceled)
 			"Exporting failed. Dropping data.",  // can happen on restart (caused by context canceled)
 			"Exporting failed. Rejecting data.", // can happen on restart (caused by context canceled)
