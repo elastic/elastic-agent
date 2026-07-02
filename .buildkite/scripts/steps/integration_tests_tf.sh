@@ -26,7 +26,7 @@ ESS_REGION=${ESS_REGION:-""}
 # There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
 STACK_VERSION="$(jq -r '.stack_version' .package-version)"
-STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
+STACK_BUILD_ID="$(jq -r '.stack_build_id // ""' .package-version)"
 if [[ "${FIPS:-false}" == "true" ]]; then
   # FRH testing environment does not have same stack build IDs as CFT environment so
   # we just go with the STACK_VERSION.
@@ -75,4 +75,3 @@ else
     .buildkite/scripts/buildkite-integration-tests.sh $@
   fi
 fi
-
