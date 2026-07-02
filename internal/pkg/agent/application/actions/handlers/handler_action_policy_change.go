@@ -327,8 +327,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	if loggingConfig != nil {
 		h.config.Settings.LoggingConfig.Level = loggingConfig.Level
 	}
-	h.config.Settings.MonitoringConfig.HTTP = cfg.Settings.MonitoringConfig.HTTP
-	h.config.Settings.MonitoringConfig.Pprof = cfg.Settings.MonitoringConfig.Pprof
+	h.applyMonitoringConfigChange(partialCfg)
 
 	if err := saveConfig(h.agentInfo, h.config, h.store, h.log); err != nil {
 		return fmt.Errorf("failed to persist policy config: %w", err)
@@ -365,6 +364,46 @@ func (h *PolicyChangeHandler) applyEventLoggingOutputChange(new *configuration.C
 	return true
 }
 
+<<<<<<< HEAD
+=======
+// applyMonitoringConfigChange updates h.config.Settings.MonitoringConfig.HTTP/Pprof only when the
+// incoming policy explicitly sets them (partialCfg is unpacked without defaults, so a nil HTTP/Pprof
+// means the policy didn't carry that section at all). Fleet policies don't have a way to set
+// monitoring.http today, so this preserves whatever was configured locally (e.g.
+// agent.monitoring.http.host in elastic-agent.yml) instead of clobbering it with library defaults
+// on every policy check-in. Mirrors the EnabledIsSet safeguard in monitoring/reload/reload.go,
+// see https://github.com/elastic/elastic-agent/issues/4582.
+func (h *PolicyChangeHandler) applyMonitoringConfigChange(partialCfg *configuration.Configuration) {
+	if partialCfg == nil || partialCfg.Settings == nil || partialCfg.Settings.MonitoringConfig == nil {
+		return
+	}
+
+	if partialCfg.Settings.MonitoringConfig.HTTP != nil {
+		h.config.Settings.MonitoringConfig.HTTP = partialCfg.Settings.MonitoringConfig.HTTP
+	}
+	if partialCfg.Settings.MonitoringConfig.Pprof != nil {
+		h.config.Settings.MonitoringConfig.Pprof = partialCfg.Settings.MonitoringConfig.Pprof
+	}
+}
+
+func (h *PolicyChangeHandler) applyLoggingConfigChange(new *configuration.Configuration, loggingConfig *logger.Config) bool {
+	if loggingConfig == nil {
+		return false
+	}
+	current := h.config.Settings.LoggingConfig
+	incoming := new.Settings.LoggingConfig
+	if current.ToFiles == incoming.ToFiles && current.ToStderr == incoming.ToStderr && current.Files.Path == incoming.Files.Path {
+		// if there is no change in the logging output settings, we consider that there is no change to the logging config
+		return false
+	}
+
+	current.ToFiles = incoming.ToFiles
+	current.ToStderr = incoming.ToStderr
+	current.Files.Path = incoming.Files.Path
+	return true
+}
+
+>>>>>>> d8ca84df2 (fix: don't reset locally-configured monitoring.http/pprof on Fleet policy check-in (#15291))
 func validateLoggingConfig(cfg *configuration.Configuration) (*logger.Config, error) {
 	if cfg == nil || cfg.Settings == nil || cfg.Settings.LoggingConfig == nil {
 		// no logging config, nothing to do
