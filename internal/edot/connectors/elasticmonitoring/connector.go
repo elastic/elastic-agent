@@ -48,7 +48,17 @@ func (c *monitoringConnector) Capabilities() consumer.Capabilities {
 	return consumer.Capabilities{MutatesData: false}
 }
 
+// ConsumeMetrics converts all monitoring metrics to Beats-format log records and
+// forwards them as a single ConsumeLogs call. Batching all records into one call
+// avoids per-document blocking in the downstream pipeline (e.g. ES exporter retries).
 func (c *monitoringConnector) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) error {
+	pLogs := plog.NewLogs()
+	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
+	scopeLogs := resourceLogs.ScopeLogs().AppendEmpty()
+	scopeLogs.Scope().Attributes().PutStr("elastic.mapping.mode", "bodymap")
+
+	now := time.Now()
+
 	exporterMetricsMap := convertScopeMetrics(md)
 	for exporter, metrics := range exporterMetricsMap {
 		componentID, ok := c.config.ExporterNames[exporter]
@@ -56,7 +66,10 @@ func (c *monitoringConnector) ConsumeMetrics(ctx context.Context, md pmetric.Met
 			c.logger.Warn("Reporting metrics for exporter with no specified component name", zap.String("exporter_id", exporter))
 			componentID = exporter
 		}
-		c.sendExporterMetricsEvent(ctx, componentID, metrics)
+		beatEvent := mapstr.M(c.config.EventTemplate.Fields).Clone()
+		addMetricsToEventFields(c.logger, metrics, &beatEvent)
+		_, _ = beatEvent.Put("component.id", componentID)
+		c.appendLogRecord(scopeLogs, beatEvent, now)
 	}
 
 	componentMetrics := collectComponentInputMetrics(md)
@@ -65,54 +78,39 @@ func (c *monitoringConnector) ConsumeMetrics(ctx context.Context, md pmetric.Met
 			continue
 		}
 		for _, inputMetrics := range compData.inputs {
-			c.sendInputMetricsEvent(ctx, compID, compData.beatType, inputMetrics)
+			beatEvent := mapstr.M(c.config.InputEventTemplate.Fields).Clone()
+			_, _ = beatEvent.Put("component.id", compID)
+			namespace := compData.beatType + "_input"
+			for k, v := range inputMetrics {
+				_, _ = beatEvent.Put(namespace+"."+k, v)
+			}
+			c.appendLogRecord(scopeLogs, beatEvent, now)
 		}
 	}
 
 	receiverPipelineMetrics := collectReceiverMetrics(md)
 	for compID, fields := range receiverPipelineMetrics {
-		c.sendReceiverPipelineMetricsEvent(ctx, compID, fields)
+		beatEvent := mapstr.M(c.config.EventTemplate.Fields).Clone()
+		_, _ = beatEvent.Put("component.id", compID)
+		for k, v := range fields {
+			_, _ = beatEvent.Put(k, v)
+		}
+		c.appendLogRecord(scopeLogs, beatEvent, now)
 	}
 
+	if pLogs.LogRecordCount() == 0 {
+		return nil
+	}
+
+	if err := c.consumer.ConsumeLogs(ctx, pLogs); err != nil {
+		c.logger.Error("error sending internal telemetry log records", zap.Error(err))
+	}
 	return nil
 }
 
-func (c *monitoringConnector) sendExporterMetricsEvent(ctx context.Context, componentID string, metrics exporterMetrics) {
-	beatEvent := mapstr.M(c.config.EventTemplate.Fields).Clone()
-	addMetricsToEventFields(c.logger, metrics, &beatEvent)
-	_, _ = beatEvent.Put("component.id", componentID)
-	c.sendLogRecord(ctx, beatEvent, componentID)
-}
+func (c *monitoringConnector) appendLogRecord(scopeLogs plog.ScopeLogs, beatEvent mapstr.M, now time.Time) {
+	logRecord := scopeLogs.LogRecords().AppendEmpty()
 
-func (c *monitoringConnector) sendReceiverPipelineMetricsEvent(ctx context.Context, componentID string, fields map[string]any) {
-	beatEvent := mapstr.M(c.config.EventTemplate.Fields).Clone()
-	_, _ = beatEvent.Put("component.id", componentID)
-	for k, v := range fields {
-		_, _ = beatEvent.Put(k, v)
-	}
-	c.sendLogRecord(ctx, beatEvent, componentID)
-}
-
-func (c *monitoringConnector) sendInputMetricsEvent(ctx context.Context, componentID string, beatType string, inputMetrics map[string]any) {
-	beatEvent := mapstr.M(c.config.InputEventTemplate.Fields).Clone()
-	_, _ = beatEvent.Put("component.id", componentID)
-	namespace := beatType + "_input"
-	for k, v := range inputMetrics {
-		_, _ = beatEvent.Put(namespace+"."+k, v)
-	}
-	c.sendLogRecord(ctx, beatEvent, componentID)
-}
-
-func (c *monitoringConnector) sendLogRecord(ctx context.Context, beatEvent mapstr.M, componentID string) {
-	pLogs := plog.NewLogs()
-	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
-	sourceLogs := resourceLogs.ScopeLogs().AppendEmpty()
-	logRecords := sourceLogs.LogRecords()
-	logRecord := logRecords.AppendEmpty()
-
-	sourceLogs.Scope().Attributes().PutStr("elastic.mapping.mode", "bodymap")
-
-	now := time.Now()
 	beatEvent["@timestamp"] = now
 	timestamp := pcommon.NewTimestampFromTime(now)
 	logRecord.SetTimestamp(timestamp)
@@ -129,9 +127,5 @@ func (c *monitoringConnector) sendLogRecord(ctx context.Context, beatEvent mapst
 
 	if err := otelmap.FromMapstr(logRecord.Body().SetEmptyMap(), beatEvent); err != nil {
 		c.logger.Error("couldn't convert map to plog.Log, some fields might be missing", zap.Error(err))
-	}
-
-	if err := c.consumer.ConsumeLogs(ctx, pLogs); err != nil {
-		c.logger.Error("error sending internal telemetry log record", zap.String("component.id", componentID), zap.Error(err))
 	}
 }
