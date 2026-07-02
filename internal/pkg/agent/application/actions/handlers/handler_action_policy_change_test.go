@@ -1204,6 +1204,96 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *tes
 	}
 }
 
+func TestPolicyChangeHandler_handlePolicyChange_MonitoringHTTPHostPreserved(t *testing.T) {
+	// Regression test for https://github.com/elastic/elastic-agent/issues/4582-style breakage:
+	// a locally-configured agent.monitoring.http.host (e.g. 0.0.0.0 for Kubernetes probes) must
+	// survive a Fleet policy check-in, since Fleet policies never carry a monitoring.http section.
+	t.Run("policy without a monitoring.http section leaves the local host binding untouched", func(t *testing.T) {
+		log, _ := loggertest.New(t.Name())
+
+		cfg := configuration.DefaultConfiguration()
+		cfg.Settings.MonitoringConfig.HTTP.Host = "0.0.0.0"
+		cfg.Settings.MonitoringConfig.HTTP.Port = 6791
+
+		h := &PolicyChangeHandler{
+			log:                   log,
+			agentInfo:             &info.AgentInfo{},
+			config:                cfg,
+			store:                 &storage.NullStore{},
+			runtimeLogLevelSetter: defaultLogLevelSet(t),
+		}
+
+		// A typical Fleet policy: no "agent.monitoring.http" key at all.
+		policy := config.MustNewConfigFrom(map[string]interface{}{
+			"agent.monitoring.enabled": true,
+			"agent.monitoring.logs":    true,
+			"agent.monitoring.metrics": true,
+		})
+
+		err := h.handlePolicyChange(context.Background(), policy, nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, "0.0.0.0", h.config.Settings.MonitoringConfig.HTTP.Host,
+			"local monitoring.http.host must not be reset to the library default on policy check-in")
+		assert.Equal(t, 6791, h.config.Settings.MonitoringConfig.HTTP.Port)
+	})
+
+	t.Run("policy that explicitly sets monitoring.http.host overrides the local value", func(t *testing.T) {
+		log, _ := loggertest.New(t.Name())
+
+		cfg := configuration.DefaultConfiguration()
+		cfg.Settings.MonitoringConfig.HTTP.Host = "0.0.0.0"
+
+		h := &PolicyChangeHandler{
+			log:                   log,
+			agentInfo:             &info.AgentInfo{},
+			config:                cfg,
+			store:                 &storage.NullStore{},
+			runtimeLogLevelSetter: defaultLogLevelSet(t),
+		}
+
+		policy := config.MustNewConfigFrom(map[string]interface{}{
+			"agent.monitoring.http.host": "192.168.1.1",
+		})
+
+		err := h.handlePolicyChange(context.Background(), policy, nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, "192.168.1.1", h.config.Settings.MonitoringConfig.HTTP.Host,
+			"an explicit policy value should still take precedence over the local config")
+	})
+
+	t.Run("host set via elastic-agent.yml survives repeated policy check-ins", func(t *testing.T) {
+		log, _ := loggertest.New(t.Name())
+
+		cfg := configuration.DefaultConfiguration()
+		cfg.Settings.MonitoringConfig.HTTP.Host = "0.0.0.0"
+
+		defaultLogLevel := logger.DefaultLogLevel
+		logLevelSetter := newMockLogLevelSetter(t)
+		logLevelSetter.EXPECT().SetLogLevel(mock.Anything, &defaultLogLevel).Return(nil)
+
+		h := &PolicyChangeHandler{
+			log:                   log,
+			agentInfo:             &info.AgentInfo{},
+			config:                cfg,
+			store:                 &storage.NullStore{},
+			runtimeLogLevelSetter: logLevelSetter,
+		}
+
+		policy := config.MustNewConfigFrom(map[string]interface{}{
+			"agent.monitoring.enabled": true,
+		})
+
+		for i := 0; i < 3; i++ {
+			err := h.handlePolicyChange(context.Background(), policy, nil)
+			require.NoError(t, err)
+			require.Equal(t, "0.0.0.0", h.config.Settings.MonitoringConfig.HTTP.Host,
+				"host binding must survive every subsequent policy check-in, not just the first")
+		}
+	})
+}
+
 // captureStore is a storage.Store that records the bytes passed to Save so a
 // test can assert on the yaml that fleetToReader produced.
 type captureStore struct {
