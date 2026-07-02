@@ -201,11 +201,11 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 7. Compare both documents are equivalent
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	t.Cleanup(cancel)
 
 	// prepare the policy and marshalled configuration
-	policyCtx, policyCancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	policyCtx, policyCancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	t.Cleanup(policyCancel)
 
 	// 1. Create and install policy with just monitoring
@@ -284,6 +284,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	err = classicFixture.Configure(ctx, updatedPolicyBytes)
 	require.NoError(t, err, "error configuring fixture")
 
+	// must be captured before install — the agent logs this during startup
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	output, err := classicFixture.InstallWithoutEnroll(ctx, &installOpts)
 	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
@@ -352,10 +353,10 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	require.NoError(t, err)
 	err = beatReceiverFixture.Configure(ctx, updatedPolicyBytes)
 	require.NoError(t, err)
+	// must be captured before install — the agent logs this during startup
+	timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	combinedOutput, err = beatReceiverFixture.InstallWithoutEnroll(ctx, &installOpts)
 	require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
-	// store timestamp to filter otel docs with timestamp greater than this value
-	timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error

@@ -2522,7 +2522,9 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 func TestMonitoringReceiverProcessors(t *testing.T) {
 	exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
 	procName := translate.GetProcessorID().String()
-	pipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
+	// Processors are injected on the logs pipeline (connector → ES), which is only
+	// created when an OTel-based monitoring exporter is present.
+	logsPipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
 	baseConfig := map[string]any{
 		"exporters": map[string]any{
 			exporterName: nil,
@@ -2544,19 +2546,24 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	}
 
 	expectedPipelineProcessors := []string{procName}
-	actualPipelineProcessors := result["service.pipelines."+pipelineName+".processors"]
-	assert.NotNil(t, actualPipelineProcessors, "processors for monitoring receiver pipeline should not be nil")
-	assert.ElementsMatch(t, expectedPipelineProcessors, actualPipelineProcessors, "monitoring receiver pipeline processors should match default")
+	actualPipelineProcessors := result["service.pipelines."+logsPipelineName+".processors"]
+	assert.NotNil(t, actualPipelineProcessors, "processors for monitoring logs pipeline should not be nil")
+	assert.ElementsMatch(t, expectedPipelineProcessors, actualPipelineProcessors, "monitoring logs pipeline processors should match default")
 }
 
 func TestMonitoringReceiverFileExporter(t *testing.T) {
-	pipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
 	receiverName := "internal-telemetry-monitoring"
+	// The file exporter is on the metrics pipeline, which always exists.
+	metricsPipelineName := "metrics/" + translate.OtelNamePrefix + receiverName
+	// The logs pipeline (connector → ES) only exists when ES monitoring is configured.
+	logsPipelineName := "logs/" + translate.OtelNamePrefix + receiverName
 	fileExporterName := "file/" + translate.OtelNamePrefix + receiverName
+	connectorName := elasticMonitoringConnectorName + "/" + translate.OtelNamePrefix + receiverName
 
 	t.Run("with OTel monitoring exporter", func(t *testing.T) {
-		// When an OTel-based monitoring exporter is present, the pipeline should
-		// export to both the file and the ES monitoring exporter.
+		// When an OTel-based monitoring exporter is present:
+		// - metrics pipeline: receiver → [file exporter, connector]
+		// - logs pipeline:    connector → ES monitoring exporter
 		exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
 		baseConfig := map[string]any{
 			"exporters": map[string]any{
@@ -2568,31 +2575,48 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 		require.NoError(t, err, "injectMonitoringReceiver should succeed")
 		result := mapstr.M(cfg.ToStringMap()).Flatten()
 
-		pipelineExporters := result["service.pipelines."+pipelineName+".exporters"]
-		require.NotNil(t, pipelineExporters, "pipeline exporters should not be nil")
+		// Metrics pipeline exports to file and to the connector.
+		metricsExporters := result["service.pipelines."+metricsPipelineName+".exporters"]
+		require.NotNil(t, metricsExporters, "metrics pipeline exporters should not be nil")
 		assert.ElementsMatch(t,
-			[]string{exporterName, fileExporterName},
-			pipelineExporters,
-			"pipeline should export to both elasticsearch and the diagnostics file exporter",
+			[]string{fileExporterName, connectorName},
+			metricsExporters,
+			"metrics pipeline should export to the file exporter and the connector",
+		)
+
+		// Logs pipeline (connector output) exports to ES.
+		logsExporters := result["service.pipelines."+logsPipelineName+".exporters"]
+		require.NotNil(t, logsExporters, "logs pipeline exporters should not be nil")
+		assert.ElementsMatch(t,
+			[]string{exporterName},
+			logsExporters,
+			"logs pipeline should export to the elasticsearch monitoring exporter",
 		)
 	})
 
 	t.Run("without OTel monitoring exporter", func(t *testing.T) {
 		// When no OTel-based monitoring exporter exists (e.g. classic HTTP-based
-		// monitoring is in use), the pipeline should still be injected so that
-		// internal telemetry is captured in the diagnostics file.
+		// monitoring is in use), the metrics pipeline is still injected so that
+		// internal telemetry is captured in the diagnostics file. No connector or
+		// logs pipeline is added since there is no ES output to send logs to.
 		cfg := confmap.NewFromStringMap(map[string]any{})
 		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
 		require.NoError(t, err, "injectMonitoringReceiver should succeed without monitoring exporter")
 		result := mapstr.M(cfg.ToStringMap()).Flatten()
 
-		pipelineExporters := result["service.pipelines."+pipelineName+".exporters"]
-		require.NotNil(t, pipelineExporters, "pipeline should still be created with file-only exporters")
+		metricsExporters := result["service.pipelines."+metricsPipelineName+".exporters"]
+		require.NotNil(t, metricsExporters, "metrics pipeline should still be created with file-only exporters")
 		assert.ElementsMatch(t,
 			[]string{fileExporterName},
-			pipelineExporters,
-			"pipeline should export only to the diagnostics file exporter when no OTel monitoring exporter is present",
+			metricsExporters,
+			"metrics pipeline should export only to the diagnostics file exporter when no OTel monitoring exporter is present",
 		)
+
+		// No connector, no logs pipeline.
+		assert.Nil(t, result["connectors."+connectorName],
+			"connector should not be injected when no OTel monitoring exporter is present")
+		assert.Nil(t, result["service.pipelines."+logsPipelineName],
+			"logs pipeline should not be created when no OTel monitoring exporter is present")
 	})
 
 	t.Run("file exporter config", func(t *testing.T) {
@@ -2607,8 +2631,8 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 		assert.Equal(t, expectedPath, result["exporters."+fileExporterName+".path"],
 			"file exporter path should be in paths.Home()/logs/")
 
-		// Records are written as OTLP JSON — format: json uses the same plog.JSONMarshaler
-		// as the otlp_encoding extension, without needing a separate extension component.
+		// Records are written as OTLP JSON metrics — format: json uses the same metrics
+		// marshaler as the otlp_encoding extension, without needing a separate extension component.
 		assert.Equal(t, "json", result["exporters."+fileExporterName+".format"])
 
 		// Rotation settings: 10 MB cap with one backup.
