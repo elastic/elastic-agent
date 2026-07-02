@@ -132,7 +132,7 @@ This process can be controlled through the following environment variables:
 - `MANIFEST_URL`: The manifest url from which to pull the dependencies. Mutually exclusive with `USE_PACKAGE_VERSION=true`. Default is empty.
 - `SNAPSHOT=true|false`: Create a snapshot build. This is just versioning metadata indicating that the
   package doesn't contain a release build. Read from the manifest if present, otherwise defaults to `true`.
-- `EXTERNAL=true|false`: If you want to build with dependencies you've provided locally (you have a custom build of endpoint, for example), then set this to `false` and `USE_PACKAGE_VERSION=false`. Default is `true.
+- `EXTERNAL=true|false`: If you want to build with dependencies you've provided locally (you have a custom build of endpoint, for example), then set this to `false` and `USE_PACKAGE_VERSION=false`. Default is `true`.
 
 ### Running the tests
 
