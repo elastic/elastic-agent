@@ -129,7 +129,7 @@ func (runner *OsqueryManagerRunner) validateOsqueryEvents(t *testing.T, ctx cont
 		require.NoError(collect, err)
 		require.NotEmpty(collect, res.Hits.Hits)
 		doc = res.Hits.Hits[0].Source
-	}, time.Minute*15, time.Second*10, "could not fetch events for osquery_manager")
+	}, time.Minute*5, time.Second*10, "could not fetch events for osquery_manager")
 	return doc
 }
 
@@ -179,7 +179,6 @@ func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
 			assert.True(collect, foundReceiver, "expected an osquery component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
-		t.Skip("osqreceiver does not yet produce events, skipping OTel data validation")
 		otelDoc = runner.validateOsqueryEvents(t, ctx, agentStatus.Info.ID, otelSince)
 	})
 
