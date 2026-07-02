@@ -49,8 +49,7 @@ func (c *monitoringConnector) Capabilities() consumer.Capabilities {
 }
 
 // ConsumeMetrics converts all monitoring metrics to Beats-format log records and
-// forwards them as a single ConsumeLogs call. Batching all records into one call
-// avoids per-document blocking in the downstream pipeline (e.g. ES exporter retries).
+// forwards them as a single ConsumeLogs call.
 func (c *monitoringConnector) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) error {
 	pLogs := plog.NewLogs()
 	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
@@ -59,42 +58,12 @@ func (c *monitoringConnector) ConsumeMetrics(ctx context.Context, md pmetric.Met
 
 	now := time.Now()
 
-	exporterMetricsMap := convertScopeMetrics(md)
-	for exporter, metrics := range exporterMetricsMap {
-		componentID, ok := c.config.ExporterNames[exporter]
-		if !ok {
-			c.logger.Warn("Reporting metrics for exporter with no specified component name", zap.String("exporter_id", exporter))
-			componentID = exporter
-		}
-		beatEvent := mapstr.M(c.config.EventTemplate.Fields).Clone()
-		addMetricsToEventFields(c.logger, metrics, &beatEvent)
-		_, _ = beatEvent.Put("component.id", componentID)
-		c.appendLogRecord(scopeLogs, beatEvent, now)
-	}
+	var beatEvents []mapstr.M
+	beatEvents = append(beatEvents, buildExporterEvents(c.logger, c.config, md)...)
+	beatEvents = append(beatEvents, buildInputEvents(c.config, md)...)
+	beatEvents = append(beatEvents, buildReceiverPipelineEvents(c.config, md)...)
 
-	componentMetrics := collectComponentInputMetrics(md)
-	for compID, compData := range componentMetrics {
-		if compData.beatType != "filebeat" {
-			continue
-		}
-		for _, inputMetrics := range compData.inputs {
-			beatEvent := mapstr.M(c.config.InputEventTemplate.Fields).Clone()
-			_, _ = beatEvent.Put("component.id", compID)
-			namespace := compData.beatType + "_input"
-			for k, v := range inputMetrics {
-				_, _ = beatEvent.Put(namespace+"."+k, v)
-			}
-			c.appendLogRecord(scopeLogs, beatEvent, now)
-		}
-	}
-
-	receiverPipelineMetrics := collectReceiverMetrics(md)
-	for compID, fields := range receiverPipelineMetrics {
-		beatEvent := mapstr.M(c.config.EventTemplate.Fields).Clone()
-		_, _ = beatEvent.Put("component.id", compID)
-		for k, v := range fields {
-			_, _ = beatEvent.Put(k, v)
-		}
+	for _, beatEvent := range beatEvents {
 		c.appendLogRecord(scopeLogs, beatEvent, now)
 	}
 
@@ -106,6 +75,64 @@ func (c *monitoringConnector) ConsumeMetrics(ctx context.Context, md pmetric.Met
 		c.logger.Error("error sending internal telemetry log records", zap.Error(err))
 	}
 	return nil
+}
+
+// buildExporterEvents builds one Beats-format monitoring event per exporter
+// reporting metrics in md, using cfg.EventTemplate for static fields and
+// cfg.ExporterNames to resolve the agent component name.
+func buildExporterEvents(logger *zap.Logger, cfg *Config, md pmetric.Metrics) []mapstr.M {
+	exporterMetricsMap := convertScopeMetrics(md)
+	events := make([]mapstr.M, 0, len(exporterMetricsMap))
+	for exporter, metrics := range exporterMetricsMap {
+		componentID, ok := cfg.ExporterNames[exporter]
+		if !ok {
+			logger.Warn("Reporting metrics for exporter with no specified component name", zap.String("exporter_id", exporter))
+			componentID = exporter
+		}
+		beatEvent := mapstr.M(cfg.EventTemplate.Fields).Clone()
+		addMetricsToEventFields(logger, metrics, &beatEvent)
+		_, _ = beatEvent.Put("component.id", componentID)
+		events = append(events, beatEvent)
+	}
+	return events
+}
+
+// buildInputEvents builds one Beats-format monitoring event per filebeat input
+// reporting metrics in md, using cfg.InputEventTemplate for static fields.
+func buildInputEvents(cfg *Config, md pmetric.Metrics) []mapstr.M {
+	var events []mapstr.M
+	for compID, compData := range collectComponentInputMetrics(md) {
+		if compData.beatType != "filebeat" {
+			continue
+		}
+		for _, inputMetrics := range compData.inputs {
+			beatEvent := mapstr.M(cfg.InputEventTemplate.Fields).Clone()
+			_, _ = beatEvent.Put("component.id", compID)
+			namespace := compData.beatType + "_input"
+			for k, v := range inputMetrics {
+				_, _ = beatEvent.Put(namespace+"."+k, v)
+			}
+			events = append(events, beatEvent)
+		}
+	}
+	return events
+}
+
+// buildReceiverPipelineEvents builds one Beats-format monitoring event per
+// component reporting RegistryBridge pipeline metrics in md, using
+// cfg.EventTemplate for static fields.
+func buildReceiverPipelineEvents(cfg *Config, md pmetric.Metrics) []mapstr.M {
+	receiverPipelineMetrics := collectReceiverMetrics(md)
+	events := make([]mapstr.M, 0, len(receiverPipelineMetrics))
+	for compID, fields := range receiverPipelineMetrics {
+		beatEvent := mapstr.M(cfg.EventTemplate.Fields).Clone()
+		_, _ = beatEvent.Put("component.id", compID)
+		for k, v := range fields {
+			_, _ = beatEvent.Put(k, v)
+		}
+		events = append(events, beatEvent)
+	}
+	return events
 }
 
 func (c *monitoringConnector) appendLogRecord(scopeLogs plog.ScopeLogs, beatEvent mapstr.M, now time.Time) {
