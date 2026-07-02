@@ -227,6 +227,7 @@ func TestMonitoringLogsAreShipped(
 			c.Name, client.Healthy, client.State(c.State))
 	}
 
+<<<<<<< HEAD
 	// Stage 3: Make sure there are no errors in logs
 	t.Log("Making sure there are no error logs")
 	docs = queryESDocs(t, func() (estools.Documents, error) {
@@ -270,6 +271,8 @@ func TestMonitoringLogsAreShipped(
 	}
 	require.Emptyf(t, docs.Hits.Hits, "list of error messages is expected to be empty, found:\n%s", strings.Join(messages, ", \n"))
 
+=======
+>>>>>>> 602facd10 (Drop error check from TestMonitoringLogsAreShipped (#15312))
 	// Stage 3: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
 	docs = FindESDocs(t, func() (estools.Documents, error) {
@@ -310,27 +313,6 @@ func TestMonitoringLogsAreShipped(
 				i, d.Index, doc.Component.ID, doc.ElasticAgent.ID)
 		}
 	}
-}
-
-// queryESDocs runs `findFn` until it returns no error. Zero documents returned
-// is considered a success.
-func queryESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.Documents {
-	var docs estools.Documents
-	require.Eventually(
-		t,
-		func() bool {
-			var err error
-			docs, err = findFn()
-			if err != nil {
-				t.Logf("got an error querying ES, retrying. Error: %s", err)
-			}
-			return err == nil
-		},
-		3*time.Minute,
-		15*time.Second,
-	)
-
-	return docs
 }
 
 func TestFlattenedDatastreamFleetPolicy(
