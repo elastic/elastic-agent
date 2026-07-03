@@ -7,8 +7,8 @@ package upgrade
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 // Option is a functional option for Upgrader.Upgrade.
