@@ -64,6 +64,19 @@ func golangciLintInstalledVersion() (string, error) {
 	return "", fmt.Errorf("could not parse version from: %s", out)
 }
 
+// buildTagSets enumerates the build-tag combinations golangci-lint must run
+// with to reach every //go:build-gated file in the repo: a plain run with no
+// extra tags, plus one run per custom tag combination. "local" and "define"
+// are mutually exclusive (see pkg/testing/define), so they need separate
+// runs; every other custom tag (integration, requirefips, kubernetes_inner,
+// mage) is additive and safe to combine with both. This must be kept in sync
+// with the tagset matrix in .github/workflows/golangci-lint.yml.
+var buildTagSets = []string{
+	"",
+	"integration,requirefips,kubernetes_inner,mage,local",
+	"integration,requirefips,kubernetes_inner,mage,define",
+}
+
 // Lint runs golangci-lint on new issues only, comparing against the closest
 // release branch (main or N.M). This matches the CI behavior where
 // only-new-issues is set on pull requests.
@@ -73,13 +86,32 @@ func Lint(ctx context.Context) error {
 		return err
 	}
 	fmt.Printf(">> lint: using base branch %s\n", base)
-	return sh.RunV("./bin/golangci-lint", "run", "-v", "--timeout=30m",
-		"--whole-files", "--new-from-merge-base="+base)
+	for _, tags := range buildTagSets {
+		args := []string{"run", "-v", "--timeout=30m", "--whole-files", "--new-from-merge-base=" + base}
+		if tags != "" {
+			args = append(args, "--build-tags="+tags)
+		}
+		fmt.Printf(">> lint: build-tags=%q\n", tags)
+		if err := sh.RunV("./bin/golangci-lint", args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // LintAll runs golangci-lint on the whole codebase.
 func LintAll() error {
-	return sh.RunV("./bin/golangci-lint", "run", "-v", "--timeout=30m")
+	for _, tags := range buildTagSets {
+		args := []string{"run", "-v", "--timeout=30m"}
+		if tags != "" {
+			args = append(args, "--build-tags="+tags)
+		}
+		fmt.Printf(">> lint-all: build-tags=%q\n", tags)
+		if err := sh.RunV("./bin/golangci-lint", args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // detectBaseBranch finds the closest release branch by choosing the one whose

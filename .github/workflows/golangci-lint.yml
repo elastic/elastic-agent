@@ -28,9 +28,28 @@ permissions:
 jobs:
   golangci:
     strategy:
+      fail-fast: false
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
-    name: lint
+        # golangci-lint only type-checks files whose build constraints are
+        # satisfied by the active tag set, so a single run with no tags skips
+        # every file gated behind a custom //go:build tag (integration tests,
+        # requirefips, mage, kubernetes_inner, ...). We run it multiple times
+        # with different tag sets to cover them all.
+        #
+        # "local" and "define" are mutually exclusive (pkg/testing/define
+        # picks one file based on which of the two tags is set), so they need
+        # separate runs; every other custom tag is additive and safe to
+        # combine with both. The untagged run stays to cover files that
+        # require *neither* "local" nor "define" to be set.
+        tagset:
+          - name: default
+            tags: ''
+          - name: local
+            tags: 'integration,requirefips,kubernetes_inner,mage,local'
+          - name: define
+            tags: 'integration,requirefips,kubernetes_inner,mage,define'
+    name: lint (${{ matrix.os }}, ${{ matrix.tagset.name }})
     runs-on: ${{  matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -56,7 +75,7 @@ jobs:
           # which can lead to some frustration from developers who would like to
           # fix a single line in an existing codebase and the linter would force them
           # into fixing all linting issues in the whole file instead.
-          args: --timeout=60m --whole-files
+          args: --timeout=60m --whole-files --build-tags=${{ matrix.tagset.tags }}
 
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           only-new-issues: true
