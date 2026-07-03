@@ -81,7 +81,11 @@ Agent version you want to test. For that you'll need to run `mage package`, for 
 DEV=true mage -v package
 ```
 
-The packaging process has many levers that you may need to set depending on what kind of test you're running.
+The packaging process has many levers that you may need to set depending on what kind of test you're running. A more advanced invocation might look like:
+
+```bash
+SNAPSHOT=false PLATFORMS=linux/arm64 PACKAGES=docker DOCKER_VARIANTS=complete mage package
+```
 
  - `DEV=true|false`: Build with debug symbols
  - `PLATFORMS`: Comma separated list of platforms you want to build. If
@@ -133,6 +137,12 @@ This process can be controlled through the following environment variables:
 - `SNAPSHOT=true|false`: Create a snapshot build. This is just versioning metadata indicating that the
   package doesn't contain a release build. Read from the manifest if present, otherwise defaults to `true`.
 - `EXTERNAL=true|false`: If you want to build with dependencies you've provided locally (you have a custom build of endpoint, for example), then set this to `false` and `USE_PACKAGE_VERSION=false`. Default is `true`.
+
+For example, if you want to create a package the same way as the unified release job, you'd run:
+
+```bash
+USE_PACKAGE_VERSION=false MANIFEST_URL=... AGENT_CORE_SOURCE=manifest mage package
+```
 
 ### Running the tests
 
