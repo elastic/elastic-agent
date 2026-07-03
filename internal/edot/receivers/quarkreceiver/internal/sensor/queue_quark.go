@@ -24,7 +24,7 @@ func NewQueue(logger *zap.Logger) (Queue, error) {
 	attr := quark.DefaultQueueAttr()
 	attr.Flags |= quark.QQ_EBPF
 
-	q, err := quark.OpenQueue(attr)
+	q, err := quark.OpenQueue(attr, 1)
 	if err != nil {
 		return nil, fmt.Errorf("open quark queue: %w", err)
 	}

@@ -318,7 +318,7 @@ func DefaultQueueAttr() QueueAttr {
 }
 
 // OpenQueue opens a Quark Queue with the given attributes.
-func OpenQueue(attr QueueAttr) (*Queue, error) {
+func OpenQueue(attr QueueAttr, _ int) (*Queue, error) {
 	var queue Queue
 	var cattr C.struct_quark_queue_attr
 
