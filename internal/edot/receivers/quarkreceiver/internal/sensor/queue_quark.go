@@ -11,8 +11,7 @@ package sensor
 import (
 	"fmt"
 
-	"github.com/elastic/elastic-agent/internal/edot/receivers/quarkreceiver/internal/sensor/quark"
-
+	"github.com/elastic/go-quark"
 	"go.uber.org/zap"
 )
 
