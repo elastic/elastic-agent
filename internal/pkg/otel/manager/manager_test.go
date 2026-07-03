@@ -2521,7 +2521,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 
 func TestMonitoringReceiverProcessors(t *testing.T) {
 	exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
-	procName := translate.GetProcessorID().String()
+	procName := translate.GetProcessorID("internal-telemetry-monitoring").String()
 	// Processors are injected on the logs pipeline (connector → ES), which is only
 	// created when an OTel-based monitoring exporter is present.
 	logsPipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
@@ -2538,7 +2538,7 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	require.NoError(t, err, "injectMonitoringReceiver should succeed")
 	result := mapstr.M(cfg.ToStringMap()).Flatten()
 
-	expectedBeatsProcessors := translate.GetDefaultProcessors()
+	expectedBeatsProcessors := translate.GetDefaultProcessors("")
 	actualBeatsProcessors := result["processors."+procName+".processors"]
 	assert.NotNil(t, actualBeatsProcessors, "monitoring receiver processors should not be nil")
 	if actualBeatsProcessors != nil {
