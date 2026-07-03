@@ -199,12 +199,11 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 		processDoc = runner.validateHeartbeatEvents(t, ctx, agentStatus.Info.ID, testStart)
 	})
 
-	// Remove the process-mode override, falling back to the (OTel) default, and
-	// validate the same data.
+	// Switch to an explicit OTel override and validate the same data.
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
 		otelSince := time.Now()
-		policyRevision := removeHeartbeatRuntimeOverride(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
+		policyRevision := switchHeartbeatToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
 
 		// Wait for the agent to apply the new policy revision
 		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
@@ -257,13 +256,30 @@ func heartbeatProcessRuntimeOverride() map[string]interface{} {
 	}
 }
 
-// removeHeartbeatRuntimeOverride clears the policy's runtime overrides, so
-// heartbeat falls back to its (OTel) default, and returns the new policy revision.
-func removeHeartbeatRuntimeOverride(ctx context.Context, t testing.TB, kibanaClient *kibana.Client, policyID, policyName, namespace string) int {
+// switchHeartbeatToOtelRuntime updates the given policy to override the
+// heartbeat runtime to otel and returns the new policy revision.
+//
+// This uses an explicit override rather than clearing the process-mode
+// override set in SetupSuite: kibana.AgentPolicyUpdateRequest.Overrides has an
+// `omitempty` JSON tag, so an empty/nil map is dropped from the request body
+// entirely, and Fleet's update API treats a missing "overrides" field as
+// "leave unchanged" rather than "clear it".
+func switchHeartbeatToOtelRuntime(ctx context.Context, t testing.TB, kibanaClient *kibana.Client, policyID, policyName, namespace string) int {
 	t.Helper()
 	updateReq := kibana.AgentPolicyUpdateRequest{
 		Name:      policyName,
 		Namespace: namespace,
+		Overrides: map[string]interface{}{
+			"agent": map[string]interface{}{
+				"internal": map[string]interface{}{
+					"runtime": map[string]interface{}{
+						"heartbeat": map[string]interface{}{
+							"default": "otel",
+						},
+					},
+				},
+			},
+		},
 	}
 	policyResp, err := kibanaClient.UpdatePolicy(ctx, policyID, updateReq)
 	require.NoError(t, err)
