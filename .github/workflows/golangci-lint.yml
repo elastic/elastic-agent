@@ -26,29 +26,87 @@ permissions:
   # Optional: allow read access to pull request. Use with `only-new-issues` option.
   pull-requests: read
 jobs:
+  # golangci-lint only type-checks files whose build constraints are satisfied
+  # by the active tag set, so a plain run skips every file gated behind a
+  # custom //go:build tag (integration tests, requirefips, mage,
+  # kubernetes_inner, ...). We cover them by running golangci-lint again with
+  # extra tag combinations - see the "tagset" matrix on the lint job below.
+  #
+  # Those extra runs are only useful when they can see a *changed* line
+  # inside a tag-gated file: CI runs in only-new-issues mode, so an extra run
+  # can never report anything on a line the PR didn't touch, regardless of
+  # which tags made that line visible. This job computes, for pull requests,
+  # which extra tag sets are actually worth running, so most PRs (which don't
+  # touch integration/fips/mage/etc. code) only pay for the one lint run they
+  # already pay for today. Pushes to main/8.19/9.* always run everything,
+  # since that run exists purely to warm the cache for every combination.
+  plan:
+    name: plan tag sets
+    runs-on: ubuntu-latest
+    outputs:
+      tagsets: ${{ steps.compute.outputs.tagsets }}
+    steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+
+      - id: compute
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          default_set='{"name":"default","tags":""}'
+          local_set='{"name":"local","tags":"integration,requirefips,kubernetes_inner,mage,local"}'
+          define_set='{"name":"define","tags":"integration,requirefips,kubernetes_inner,mage,define"}'
+
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "tagsets=[$default_set,$local_set,$define_set]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          changed_files="$(git diff --name-only "$base_sha"...HEAD)"
+
+          need_local=false
+          need_define=false
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              go.mod|go.sum|.golangci.yml|.golangci-lint-version|.github/workflows/golangci-lint.yml)
+                need_local=true
+                need_define=true
+                continue
+                ;;
+            esac
+            case "$f" in
+              *.go) ;;
+              *) continue ;;
+            esac
+            [ -f "$f" ] || continue # deleted file: nothing new to lint there
+            tag_line="$(grep -m1 '^//go:build' -- "$f" || true)"
+            [ -z "$tag_line" ] && continue
+            if echo "$tag_line" | grep -qE '\b(integration|requirefips|kubernetes_inner|mage)\b'; then
+              need_local=true
+              need_define=true
+            fi
+            echo "$tag_line" | grep -qE '\blocal\b' && need_local=true
+            echo "$tag_line" | grep -qE '\bdefine\b' && need_define=true
+          done <<< "$changed_files"
+
+          sets="$default_set"
+          [ "$need_local" = true ] && sets="$sets,$local_set"
+          [ "$need_define" = true ] && sets="$sets,$define_set"
+          echo "tagsets=[$sets]" >> "$GITHUB_OUTPUT"
+          echo "Selected tag sets: [$sets]"
+
   golangci:
+    needs: plan
     strategy:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
-        # golangci-lint only type-checks files whose build constraints are
-        # satisfied by the active tag set, so a single run with no tags skips
-        # every file gated behind a custom //go:build tag (integration tests,
-        # requirefips, mage, kubernetes_inner, ...). We run it multiple times
-        # with different tag sets to cover them all.
-        #
-        # "local" and "define" are mutually exclusive (pkg/testing/define
-        # picks one file based on which of the two tags is set), so they need
-        # separate runs; every other custom tag is additive and safe to
-        # combine with both. The untagged run stays to cover files that
-        # require *neither* "local" nor "define" to be set.
-        tagset:
-          - name: default
-            tags: ''
-          - name: local
-            tags: 'integration,requirefips,kubernetes_inner,mage,local'
-          - name: define
-            tags: 'integration,requirefips,kubernetes_inner,mage,define'
+        tagset: ${{ fromJson(needs.plan.outputs.tagsets) }}
     name: lint (${{ matrix.os }}, ${{ matrix.tagset.name }})
     runs-on: ${{  matrix.os }}
     steps:

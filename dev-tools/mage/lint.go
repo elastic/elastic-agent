@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/magefile/mage/sh"
@@ -86,7 +87,15 @@ func Lint(ctx context.Context) error {
 		return err
 	}
 	fmt.Printf(">> lint: using base branch %s\n", base)
-	for _, tags := range buildTagSets {
+
+	changed, err := changedFiles(base)
+	if err != nil {
+		return err
+	}
+	sets := tagSetsNeeded(changed)
+	fmt.Printf(">> lint: build-tag sets to run: %q\n", sets)
+
+	for _, tags := range sets {
 		args := []string{"run", "-v", "--timeout=30m", "--whole-files", "--new-from-merge-base=" + base}
 		if tags != "" {
 			args = append(args, "--build-tags="+tags)
@@ -97,6 +106,95 @@ func Lint(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// changedFiles lists the files changed between the merge-base of base and
+// HEAD, and HEAD itself.
+func changedFiles(base string) ([]string, error) {
+	out, err := sh.Output("git", "diff", "--name-only", base+"...HEAD")
+	if err != nil {
+		return nil, fmt.Errorf("listing changed files against %s: %w", base, err)
+	}
+	out = strings.TrimSpace(out)
+	if out == "" {
+		return nil, nil
+	}
+	return strings.Split(out, "\n"), nil
+}
+
+// riskFiles are files that, when changed, affect every build-tag set (lint
+// config, module graph) so all extra tag sets must run.
+var riskFiles = map[string]bool{
+	"go.mod":                 true,
+	"go.sum":                 true,
+	".golangci.yml":          true,
+	".golangci-lint-version": true,
+}
+
+var (
+	sharedTagWords = regexp.MustCompile(`\b(integration|requirefips|kubernetes_inner|mage)\b`)
+	localTagWord   = regexp.MustCompile(`\blocal\b`)
+	defineTagWord  = regexp.MustCompile(`\bdefine\b`)
+)
+
+// tagSetsNeeded returns the subset of buildTagSets required to lint the given
+// changed files. The untagged set always runs; the "local"/"define" combined
+// sets are added only when a changed file is gated behind one of their
+// shared tags, or a risk file changed. Since Lint runs with
+// --new-from-merge-base, an extra tag set can only ever report something new
+// on a line inside a file that set makes visible - if no such file changed,
+// running it would be a no-op, so it's safe to skip. This may over-trigger
+// (e.g. a file tagged "local && !define" also triggers the "define" set) but
+// must never under-trigger.
+func tagSetsNeeded(changed []string) []string {
+	needLocal, needDefine := false, false
+	for _, f := range changed {
+		if riskFiles[f] {
+			needLocal, needDefine = true, true
+			continue
+		}
+		if !strings.HasSuffix(f, ".go") {
+			continue
+		}
+		tagLine, ok := buildTagLine(f)
+		if !ok {
+			continue
+		}
+		if sharedTagWords.MatchString(tagLine) {
+			needLocal, needDefine = true, true
+		}
+		if localTagWord.MatchString(tagLine) {
+			needLocal = true
+		}
+		if defineTagWord.MatchString(tagLine) {
+			needDefine = true
+		}
+	}
+
+	sets := []string{buildTagSets[0]}
+	if needLocal {
+		sets = append(sets, buildTagSets[1])
+	}
+	if needDefine {
+		sets = append(sets, buildTagSets[2])
+	}
+	return sets
+}
+
+// buildTagLine returns the file's "//go:build" constraint line, if any. It
+// returns false if the file has no such line or can no longer be read (for
+// example, it was deleted - nothing new to lint there).
+func buildTagLine(path string) (string, bool) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "//go:build") {
+			return line, true
+		}
+	}
+	return "", false
 }
 
 // LintAll runs golangci-lint on the whole codebase.
