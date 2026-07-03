@@ -65,13 +65,10 @@ func golangciLintInstalledVersion() (string, error) {
 	return "", fmt.Errorf("could not parse version from: %s", out)
 }
 
-// buildTagSets enumerates the build-tag combinations golangci-lint must run
-// with to reach every //go:build-gated file in the repo: a plain run with no
-// extra tags, plus one run per custom tag combination. "local" and "define"
-// are mutually exclusive (see pkg/testing/define), so they need separate
-// runs; every other custom tag (integration, requirefips, kubernetes_inner,
-// mage) is additive and safe to combine with both. This must be kept in sync
-// with the tagset matrix in .github/workflows/golangci-lint.yml.
+// buildTagSets are the build-tag combinations we lint with so that files
+// behind a //go:build tag are actually checked. "local" and "define" are
+// mutually exclusive, hence two sets. Keep in sync with the tagset matrix in
+// .github/workflows/golangci-lint.yml.
 var buildTagSets = []string{
 	"",
 	"integration,requirefips,kubernetes_inner,mage,local",
@@ -122,8 +119,7 @@ func changedFiles(base string) ([]string, error) {
 	return strings.Split(out, "\n"), nil
 }
 
-// riskFiles are files that, when changed, affect every build-tag set (lint
-// config, module graph) so all extra tag sets must run.
+// riskFiles affect every tag set when changed, so all of them must run.
 var riskFiles = map[string]bool{
 	"go.mod":                 true,
 	"go.sum":                 true,
@@ -137,15 +133,10 @@ var (
 	defineTagWord  = regexp.MustCompile(`\bdefine\b`)
 )
 
-// tagSetsNeeded returns the subset of buildTagSets required to lint the given
-// changed files. The untagged set always runs; the "local"/"define" combined
-// sets are added only when a changed file is gated behind one of their
-// shared tags, or a risk file changed. Since Lint runs with
-// --new-from-merge-base, an extra tag set can only ever report something new
-// on a line inside a file that set makes visible - if no such file changed,
-// running it would be a no-op, so it's safe to skip. This may over-trigger
-// (e.g. a file tagged "local && !define" also triggers the "define" set) but
-// must never under-trigger.
+// tagSetsNeeded picks which tag sets to lint for the given changed files, so
+// we skip runs that couldn't report anything new. The untagged set always
+// runs; a tagged set is added only when a changed file could belong to it.
+// It may over-select but never under-selects.
 func tagSetsNeeded(changed []string) []string {
 	needLocal, needDefine := false, false
 	for _, f := range changed {
@@ -181,9 +172,8 @@ func tagSetsNeeded(changed []string) []string {
 	return sets
 }
 
-// buildTagLine returns the file's "//go:build" constraint line, if any. It
-// returns false if the file has no such line or can no longer be read (for
-// example, it was deleted - nothing new to lint there).
+// buildTagLine returns the file's "//go:build" line, or false if it has none
+// or can't be read (e.g. deleted).
 func buildTagLine(path string) (string, bool) {
 	data, err := os.ReadFile(path)
 	if err != nil {

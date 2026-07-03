@@ -26,20 +26,9 @@ permissions:
   # Optional: allow read access to pull request. Use with `only-new-issues` option.
   pull-requests: read
 jobs:
-  # golangci-lint only type-checks files whose build constraints are satisfied
-  # by the active tag set, so a plain run skips every file gated behind a
-  # custom //go:build tag (integration tests, requirefips, mage,
-  # kubernetes_inner, ...). We cover them by running golangci-lint again with
-  # extra tag combinations - see the "tagset" matrix on the lint job below.
-  #
-  # Those extra runs are only useful when they can see a *changed* line
-  # inside a tag-gated file: CI runs in only-new-issues mode, so an extra run
-  # can never report anything on a line the PR didn't touch, regardless of
-  # which tags made that line visible. This job computes, for pull requests,
-  # which extra tag sets are actually worth running, so most PRs (which don't
-  # touch integration/fips/mage/etc. code) only pay for the one lint run they
-  # already pay for today. Pushes to main/8.19/9.* always run everything,
-  # since that run exists purely to warm the cache for every combination.
+  # Picks which build-tag sets to lint. A PR only runs the tagged sets when it
+  # changes files those tags cover; pushes always run all of them. Keep the
+  # tag sets in sync with buildTagSets in dev-tools/mage/lint.go.
   plan:
     name: plan tag sets
     runs-on: ubuntu-latest
