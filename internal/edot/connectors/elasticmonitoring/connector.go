@@ -58,12 +58,18 @@ func (c *monitoringConnector) ConsumeMetrics(ctx context.Context, md pmetric.Met
 
 	now := time.Now()
 
-	var beatEvents []mapstr.M
-	beatEvents = append(beatEvents, buildExporterEvents(c.logger, c.config, md)...)
-	beatEvents = append(beatEvents, buildInputEvents(c.config, md)...)
-	beatEvents = append(beatEvents, buildReceiverPipelineEvents(c.config, md)...)
+	// exporter events
+	for _, beatEvent := range buildInputEvents(c.config, md) {
+		c.appendLogRecord(scopeLogs, beatEvent, now)
+	}
 
-	for _, beatEvent := range beatEvents {
+	// input events
+	for _, beatEvent := range buildExporterEvents(c.logger, c.config, md) {
+		c.appendLogRecord(scopeLogs, beatEvent, now)
+	}
+
+	// receiver pipeline events
+	for _, beatEvent := range buildReceiverPipelineEvents(c.config, md) {
 		c.appendLogRecord(scopeLogs, beatEvent, now)
 	}
 
