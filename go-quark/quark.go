@@ -6,7 +6,7 @@
 
 //TODO: arm64
 
-package quark
+package go_quark
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/include

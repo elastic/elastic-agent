@@ -11,7 +11,7 @@ package sensor
 import (
 	"fmt"
 
-	"github.com/elastic/go-quark"
+	quark "github.com/elastic/go-quark"
 	"go.uber.org/zap"
 )
 
