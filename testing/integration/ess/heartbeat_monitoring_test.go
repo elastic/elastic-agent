@@ -82,6 +82,10 @@ func (runner *HeartbeatRunner) SetupSuite() {
 			kibana.MonitoringEnabledLogs,
 			kibana.MonitoringEnabledMetrics,
 		},
+		// Heartbeat defaults to the OTel runtime; start with an override forcing
+		// process mode so process mode can be validated first, then remove the
+		// override to fall back to the (OTel) default.
+		Overrides: heartbeatProcessRuntimeOverride(),
 	}
 
 	installOpts := atesting.InstallOpts{
@@ -172,7 +176,8 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 
 	testStart := time.Now()
 
-	// Validate process mode
+	// The policy was created with an override forcing heartbeat to process mode,
+	// so validate that first.
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -194,11 +199,12 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 		processDoc = runner.validateHeartbeatEvents(t, ctx, agentStatus.Info.ID, testStart)
 	})
 
-	// Switch to OTel runtime and validate the same data
+	// Remove the process-mode override, falling back to the (OTel) default, and
+	// validate the same data.
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
 		otelSince := time.Now()
-		policyRevision := switchPolicyToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
+		policyRevision := removeHeartbeatRuntimeOverride(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
 
 		// Wait for the agent to apply the new policy revision
 		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
@@ -233,4 +239,33 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields,
 			"expected heartbeat document keys to be equal between process and otel modes")
 	})
+}
+
+// heartbeatProcessRuntimeOverride returns a policy override that forces
+// heartbeat to run in process mode, overriding its OTel default.
+func heartbeatProcessRuntimeOverride() map[string]interface{} {
+	return map[string]interface{}{
+		"agent": map[string]interface{}{
+			"internal": map[string]interface{}{
+				"runtime": map[string]interface{}{
+					"heartbeat": map[string]interface{}{
+						"default": "process",
+					},
+				},
+			},
+		},
+	}
+}
+
+// removeHeartbeatRuntimeOverride clears the policy's runtime overrides, so
+// heartbeat falls back to its (OTel) default, and returns the new policy revision.
+func removeHeartbeatRuntimeOverride(ctx context.Context, t testing.TB, kibanaClient *kibana.Client, policyID, policyName, namespace string) int {
+	t.Helper()
+	updateReq := kibana.AgentPolicyUpdateRequest{
+		Name:      policyName,
+		Namespace: namespace,
+	}
+	policyResp, err := kibanaClient.UpdatePolicy(ctx, policyID, updateReq)
+	require.NoError(t, err)
+	return policyResp.Revision
 }
