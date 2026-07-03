@@ -2169,11 +2169,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": map[string]any{
-					"beat/_agent-component": map[string]any{
-						"processors": defaultGlobalProcessors,
-					},
-				},
+				"processors": defaultExpectedProcessors("osquerybeat-default"),
 				"receivers": map[string]any{
 					// Single receiver keyed by component ID only — no stream suffix.
 					"osquerybeatreceiver/_agent-component/osquerybeat-default": expectedOsquerybeatSingleReceiverConfig("osquerybeat-default"),
@@ -2183,7 +2179,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"pipelines": map[string]any{
 						"logs/_agent-component/osquerybeat-default": map[string][]string{
 							"exporters":  {"elasticsearch/_agent-component/default"},
-							"processors": {"beat/_agent-component"},
+							"processors": {beatProcessorID("osquerybeat-default")},
 							"receivers":  {"osquerybeatreceiver/_agent-component/osquerybeat-default"},
 						},
 					},
