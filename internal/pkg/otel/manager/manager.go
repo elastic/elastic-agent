@@ -661,7 +661,7 @@ func injectMonitoringReceiver(
 	connectorType := otelcomponent.MustNewType(elasticMonitoringConnectorName)
 	receiverName := "internal-telemetry-monitoring"
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
-	processorID := translate.GetProcessorID().String()
+	processorID := translate.GetProcessorID(receiverName).String()
 
 	diagName := translate.OtelNamePrefix + receiverName
 	connectorID := otelcomponent.NewIDWithName(connectorType, diagName).String()
@@ -720,12 +720,12 @@ func injectMonitoringReceiver(
 			"exporters": []string{exporterID},
 		}
 		if features.DefaultProcessors() {
-			// If default processors are enabled, reference the shared beat processor.
-			// The processor definition is the same as the one added in GetOtelConfig,
-			// so upon merge one replaces the other with identical content.
+			// This pipeline forwards Agent's own internal telemetry in beats format,
+			// not a specific beat's data, so it always gets the standard default
+			// processors.
 			collectorCfg["processors"] = map[string]any{
 				processorID: map[string]any{
-					"processors": translate.GetDefaultProcessors(),
+					"processors": translate.GetDefaultProcessors(""),
 				},
 			}
 			logsPipelineCfg["processors"] = []string{processorID}
