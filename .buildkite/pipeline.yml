@@ -1,4 +1,30 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+# Diagnostic pipeline for the Windows/amd64 GC-metadata-corruption crash.
+# EXPLORATORY build. Prior cofactor A/Bs established the crash is -race-GATED and
+# that coverage / GOGC=1 are NOT cofactors. The crash rate is dominated by an
+# UNCONTROLLED variable - host CPU contention / hypervisor vCPU steal (a quiet
+# dedicated VM never reproduced; the shared CI fleet does). So this build (1)
+# PERTURBS the environment to try to raise the rate, and (2) MONITORS every run
+# so the relevant host factor can be found by correlation with crash outcome.
+#
+# Cohorts (all -race; control = -race, GOGC=1, coverage, full suite):
+#   control          baseline rate + monitoring reference
+#   no-race          negative control (confirms the -race gate still holds)
+#   async-preempt    ASYNC_PREEMPT=1: SIGURG preemption at arbitrary PCs - the
+#                    in-guest analog of vCPU-steal's arbitrary-boundary descheduling
+#   maxprocs-oversub GOMAXPROCS=32 (4x vCPU): more GC mark workers spread across /
+#                    migrating between more logical CPUs than the host grants
+#   cpu-antagonist   8 busy-spin siblings (envprobe -burn) stacking in-guest
+#                    contention on top of the host's real steal
+#   concentrate-fire upgrade pkg only, MAX_RUNS=15: more crash attempts per job
+#                    (multi-variable, exploratory - not a clean single-var A/B)
+#   kitchen-sink     async-preempt + oversub + antagonist combined (the bet to
+#                    "trigger failures more consistently")
+#
+# Monitoring on EVERY cohort (see unit-tests.ps1), captured on crash AND clean
+# runs: a 1ms scheduling-stall + TSC-skew sampler (sched-probe-*), and a one-shot
+# Go env-probe (host-info-*) capturing job-object CPU-rate control, affinity /
+# priority, and an injected-DLL scan, plus Azure host identity via IMDS.
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -6,6 +32,8 @@ common:
   - google_oidc_plugin: &google_oidc_plugin
       # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
       # This plugin authenticates to Google Cloud using the OIDC token.
+      # Required for buildkite-agent artifact upload to GCS, including the
+      # WER crash dumps the instrumented job depends on.
       elastic/oblt-google-auth#v1.3.1:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
@@ -17,512 +45,115 @@ common:
         - .go-version
         - .package-version
         - version/version.go
+  - win11_agent: &win11_agent
+      provider: "azure"
+      image: "${IMAGE_WIN_11}"
+      imageVersion: "${IMAGE_WIN_11_VERSION}"
+      vmSize: "Standard_D8s_v5"
+      diskSizeGb: "256"
 
 env:
-  # The following images are defined here and their values will be updated by updatecli
-  # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1781485336"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1781485336"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1781485336"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1781485336"
-  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
-  IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
-  IMAGE_WIN_10_VERSION: "1.0.1781485336"
-  IMAGE_WIN_11_VERSION: "1.0.1781485336"
-  IMAGE_WIN_11_ARM64_VERSION: "1.0.1781485336"
+  IMAGE_WIN_11_VERSION: "1.0.1779464011"
 
 steps:
-
-  - label: "check-ci"
-    key: "check-ci"
-    command: ".buildkite/scripts/steps/check-ci.sh"
-    agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_2204_X86_64}"
+  - label: "Unit tests - Windows 11 (control run %n)"
+    key: "unit-tests-win11-control"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
+    artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
+    agents: *win11_agent
     retry:
       manual:
         allowed: true
-
-  - group: "Unit tests"
-    key: "unit-tests"
-    steps:
-      - label: "Unit tests - Ubuntu 22.04"
-        key: "unit-tests-2204"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-          machineType: "n2-standard-8"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-      - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
-        key: "unit-tests-2204-fips-tag"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-          machineType: "n2-standard-8"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-      - label: "Unit tests - fips140=only Ubuntu 22.04"
-        key: "unit-tests-2204-fips140-only"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-          machineType: "n2-standard-8"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-      - label: "Unit tests - Ubuntu 22.04 ARM64"
-        key: "unit-tests-2204-arm64"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "aws"
-          image: "${IMAGE_UBUNTU_2204_ARM_64}"
-          diskSizeGb: 200
-          instanceType: "m6g.xlarge"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-      - label: "Unit tests - Windows 2022"
-        key: "unit-tests-win2022"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_WIN_2022}"
-          machineType: "n2-standard-8"
-          disk_size: 200
-          disk_type: "pd-ssd"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-      - label: "Unit tests - Windows 2016"
-        key: "unit-tests-win2016"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        env:
-          # NOTE: We need to skip token redaction to avoid OIDC token issues. Only for version <= Windows build 17063
-          BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_WIN_2016}"
-          machineType: "n2-standard-8"
-          disk_size: 200
-          disk_type: "pd-ssd"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-      - label: "Unit tests - fips140=only Windows 2022"
-        key: "unit-tests-win2022-fips140-only"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_WIN_2022}"
-          machineType: "n2-standard-8"
-          disk_size: 200
-          disk_type: "pd-ssd"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-  - group: "macOS tests"
-    key: "macos-unit-tests"
-    steps:
-      - label: "Unit tests - macOS 15 ARM"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: orka
-          imagePrefix: generic-base-15-arm-002
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-      # Runs only on main and release branches
-      - label: "Unit tests - macOS 13"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        skip: "Ongoing issues with MacOS 13 CI runners. Unskip after resolved."
-        branches: "main 8.* 9.*"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: orka
-          imagePrefix: generic-13-ventura-x64
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-  - group: "Desktop Windows tests"
-    key: "extended-windows"
-    steps:
-      - label: "Unit tests - Windows 10"
-        key: "unit-tests-win10"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_10}"
-          imageVersion: "${IMAGE_WIN_10_VERSION}"
-          vmSize: "Standard_D8s_v5"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-      - label: "Unit tests - Windows 11"
-        key: "unit-tests-win11"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        # The race detector is disabled here because it triggers a Go runtime
-        # GC-metadata corruption crash specific to Windows 11 amd64.
-        # See https://github.com/elastic/elastic-agent/issues/14248
-        env:
-          DISABLE_RACE_DETECTOR: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11}"
-          imageVersion: "${IMAGE_WIN_11_VERSION}"
-          vmSize: "Standard_D8s_v5"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-      - label: "Unit tests - Windows 11 arm64"
-        key: "unit-tests-win11-arm64"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11_ARM64}"
-          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
-          vmSize: "Standard_D8ps_v6"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-      - label: "Unit tests - fips140=only Windows 11 arm64"
-        key: "unit-tests-win11-arm64-fips140-only"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11_ARM64}"
-          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
-          vmSize: "Standard_D8ps_v6"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
-  - label: ":junit: Junit annotate"
-    agents:
-      # requires at least "bash", "curl" and "git"
-      image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
     plugins:
-      - junit-annotate#v2.7.0:
-          artifacts: "**TEST-*.xml"
-          always-annotate: true
-          run-in-docker: false
       - *google_oidc_plugin
-    depends_on:
-      - step: "unit-tests-2204"
-        allow_failure: true
-      - step: "unit-tests-2204-fips-tag"
-        allow_failure: true
-      - step: "unit-tests-2204-fips140-only"
-        allow_failure: true
-      - step: "unit-tests-2204-arm64"
-        allow_failure: true
-      - step: "unit-tests-win2022"
-        allow_failure: true
-      - step: "unit-tests-win2016"
-        allow_failure: true
-      - step: "macos-unit-tests"
-        allow_failure: true
-      - step: "unit-tests-win10"
-        allow_failure: true
-      - step: "unit-tests-win11"
-        allow_failure: true
-      - step: "unit-tests-win11-arm64"
-        allow_failure: true
-      - step: "unit-tests-win2022-fips140-only"
-        allow_failure: true
-      - step: "unit-tests-win11-arm64-fips140-only"
-        allow_failure: true
 
-  - group: "K8s tests"
-    key: "k8s-tests"
-    steps:
-      - label: "K8s tests: {{matrix.k8s_version}}"
-        env:
-          K8S_VERSION: "v{{matrix.k8s_version}}"
-          KIND_VERSION: "v0.27.0"
-        command: ".buildkite/scripts/steps/k8s-tests.sh"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-        matrix:
-          setup:
-            k8s_version:
-              - "1.33.0"
-              - "1.32.0"
-              - "1.31.0"
-              - "1.30.0"
-              - "1.29.4"
-              - "1.28.9"
-        retry:
-          manual:
-            allowed: true
-
-  # Triggers a dynamic step: Sync K8s
-  # Runs only on main and if k8s files are changed
-  - label: "Trigger k8s sync"
-    branches: main
-    command: ".buildkite/scripts/steps/sync-k8s.sh"
-    agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_2204_X86_64}"
+  - label: "Unit tests - Windows 11 (no-race run %n)"
+    key: "unit-tests-win11-norace"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
     env:
-      GH_VERSION: "2.4.0"
-    if_changed:
-      include:
-        - deploy/kubernetes/*
-        - version/docs/version.asciidoc
-
-  # Trigger for pull requests
-  - label: "Trigger Extended tests for Pull request"
-    if: |
-      (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
-      build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
-    command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
+      NO_RACE: "1"
+    artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
+    agents: *win11_agent
+    retry:
+      manual:
+        allowed: true
     plugins:
-    - *sparse_checkout_plugin
+      - *google_oidc_plugin
+
+  - label: "Unit tests - Windows 11 (async-preempt run %n)"
+    key: "unit-tests-win11-asyncpreempt"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
     env:
-      BUILDKITE_PULL_REQUEST: ${BUILDKITE_PULL_REQUEST}
-      BUILDKITE_PULL_REQUEST_BASE_BRANCH: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
-      GITHUB_PR_LABELS: ${GITHUB_PR_LABELS}
-    if_changed:
-      include:
-        - internal/**
-        - dev-tools/**
-        - pkg/**
-        - deploy/**
-        - test_infra/**
-        - testing/**
-        - version/**
-        - specs/**
-        - .agent-versions.json
-        - .go-version
-        - .package-version
-        - go.mod
-        - go.sum
-        - magefile.go
-        - main.go
-        - .buildkite/integration.pipeline.yml
-        - .buildkite/bk.integration.pipeline.yml
-        - .buildkite/bk.integration-fips.pipeline.yml
-        - .buildkite/pipeline.yml
-        - .buildkite/scripts/**
-        - .buildkite/hooks/**
-
-  # Trigger for branches
-  - label: "Triggering Extended tests for branches"
-    if: build.pull_request.id == null && build.source != "schedule"
-    command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
+      ASYNC_PREEMPT: "1"
+    artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
+    agents: *win11_agent
+    retry:
+      manual:
+        allowed: true
     plugins:
-    - *sparse_checkout_plugin
+      - *google_oidc_plugin
 
-  # Trigger for pull requests - Serverless Beats Tests
-  # this should help detecting issues earlier in the development cycle
-  - label: "Trigger Serverless Beats Tests"
-    if: build.pull_request.id != null
-    trigger: "beats-agent-serverless-tests"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
-      branch: "${BUILDKITE_BRANCH}"
-    if_changed:
-      include:
-        - .buildkite/serverless.beats.tests.yml
-        - .buildkite/scripts/steps/beats_tests.sh
-        - .buildkite/hooks/pre-command
-
-  # NOTE: This should help detecting issues earlier in the development cycle
-  # See https://github.com/elastic/elastic-agent/issues/11604
-  - label: "Trigger Elastic Agent Package"
-    if: build.pull_request.id != null
-    commands:
-      - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
-      - .buildkite/scripts/steps/trigger-elastic-agent-package.sh | buildkite-agent pipeline upload
+  - label: "Unit tests - Windows 11 (maxprocs-oversub run %n)"
+    key: "unit-tests-win11-maxprocs"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
+    env:
+      GOMAXPROCS_SET: "32"
+    artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
+    agents: *win11_agent
+    retry:
+      manual:
+        allowed: true
     plugins:
-    - sparse-checkout#v1.6.0:
-        paths:
-        - .buildkite
-        - .go-version
-        - version/version.go
-        - .package-version
-        - magefile.go
-        - dev-tools
-    if_changed:
-      include:
-        - .buildkite/pipeline.elastic-agent-package.yml
-        - .buildkite/scripts/steps/package.sh
-        - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
-        - magefile.go
-        - dev-tools/**/*
+      - *google_oidc_plugin
 
-  # NOTE: This should help detecting issues earlier in the development cycle
-  # See https://github.com/elastic/elastic-agent/pull/11725
-  - label: "DRY RUN publish to serverless"
-    if: build.pull_request.id != null && build.env("BUILDKITE_PULL_REQUEST_BASE_BRANCH") == "main"
-    if_changed:
-      include:
-        - .buildkite/pipeline.yml
-        - .buildkite/pipeline.agentless-app-release.yaml
-        - .buildkite/scripts/steps/ecp-internal-release.sh
-        - .buildkite/scripts/steps/integration-package.sh
-        - .buildkite/scripts/steps/validate-agentless-docker-image.sh
-    trigger: "agentless-serverless-release"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
-      branch: "${BUILDKITE_BRANCH}"
-      message: "publish to serverless (dry-run) #${BUILDKITE_PULL_REQUEST}"
-      env:
-        DRY_RUN: "true"
+  - label: "Unit tests - Windows 11 (cpu-antagonist run %n)"
+    key: "unit-tests-win11-antagonist"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
+    env:
+      CPU_ANTAGONISTS: "8"
+    artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
+    agents: *win11_agent
+    retry:
+      manual:
+        allowed: true
+    plugins:
+      - *google_oidc_plugin
 
-  # wait for CI to be done
+  - label: "Unit tests - Windows 11 (concentrate-fire run %n)"
+    key: "unit-tests-win11-concentrate"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
+    env:
+      TEST_PKG: "./internal/pkg/agent/application/upgrade/..."
+      MAX_RUNS: "15"
+    artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
+    agents: *win11_agent
+    retry:
+      manual:
+        allowed: true
+    plugins:
+      - *google_oidc_plugin
+
+  - label: "Unit tests - Windows 11 (kitchen-sink run %n)"
+    key: "unit-tests-win11-kitchensink"
+    command: .buildkite/scripts/steps/unit-tests.ps1
+    parallelism: 10
+    env:
+      ASYNC_PREEMPT: "1"
+      GOMAXPROCS_SET: "32"
+      CPU_ANTAGONISTS: "8"
+    artifact_paths: ["coverage-*.out", "sched-probe-*.log", "host-info-*.log"]
+    agents: *win11_agent
+    retry:
+      manual:
+        allowed: true
+    plugins:
+      - *google_oidc_plugin
+
   - wait: ~
-
-  - label: "Publish to serverless"
-    branches: main
-    trigger: "agentless-serverless-release"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
