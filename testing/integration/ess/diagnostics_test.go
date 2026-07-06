@@ -491,17 +491,11 @@ agent.internal.runtime.filebeat.httpjson: process
 			configTemplate: fileStreamConfigTemplate,
 		},
 		{
-<<<<<<< HEAD
-			name:    "filebeat receiver",
-			runtime: "otel",
-=======
 			// Beat receivers register diagnostic hooks per input stream via the OTel receiver
 			// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
 			// at the component level and land under the component directory, same as for process-runtime beats.
-			name:              "filebeat receiver",
-			runtime:           "otel",
-			monitoringEnabled: true,
->>>>>>> 264f0d8bc (Fix duplicate entries and empty unit dirs in OTel diagnostics ZIP (#15108))
+			name:    "filebeat receiver",
+			runtime: "otel",
 			expectedCompDiagnosticsFiles: []string{
 				"registry.tar.gz",
 				"beat_metrics.json",
