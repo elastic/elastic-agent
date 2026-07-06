@@ -7,12 +7,7 @@ replace github.com/elastic/elastic-agent => ../../
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260701182300-13cfae67dc2b
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.44.0
-=======
 	github.com/elastic/elastic-agent-libs v0.46.0
-	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
->>>>>>> 73d2b6e1f (Use option for header-value expansion on specific ENV vars for diagnostics redaction (#15284))
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.59.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.59.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.59.0
