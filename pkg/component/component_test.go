@@ -4283,7 +4283,7 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	assert.Empty(t, config.Auditbeat.InputType)
 	assert.Equal(t, "otel", config.Filebeat.Default)
 	assert.Empty(t, config.Filebeat.InputType)
-	assert.Equal(t, "", config.Heartbeat.Default)
+	assert.Equal(t, "otel", config.Heartbeat.Default)
 	assert.Empty(t, config.Heartbeat.InputType)
 	assert.Equal(t, string(OtelRuntimeManager), config.Metricbeat.Default)
 	assert.Equal(t, map[string]string{}, config.Metricbeat.InputType)
