@@ -679,7 +679,7 @@ func TestProxyURL(t *testing.T) {
 	for _, tt := range testcases {
 
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 			defer cancel()
 
 			// create API Key and basic Fleet Policy

@@ -45,6 +45,8 @@ linters:
     forbidigo:
       forbid:
         - pattern: fmt.Print.*
+        - pattern: ^context\.Background$
+          msg: "use t.Context() in tests so the context is cancelled when the test ends"
       exclude-godoc-examples: true
     gomoddirectives:
       replace-allow-list:
@@ -102,6 +104,10 @@ linters:
       - linters:
           - forbidigo
         path: (.*magefile.go|.*dev-tools/mage/.*)
+      - linters:
+          - forbidigo
+        path-except: "testing/integration/.*_test\\.go$"
+        text: "use t\\.Context\\(\\) in tests"
     paths:
       - third_party$
       - builtin$

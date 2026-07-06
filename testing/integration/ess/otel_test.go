@@ -264,7 +264,7 @@ service:
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", otelConfigPath}))
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
@@ -380,7 +380,7 @@ service:
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
@@ -593,7 +593,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
@@ -681,7 +681,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
@@ -953,7 +953,7 @@ agent.internal.runtime.filebeat.filestream: otel
 				ESApiKey:   decodedApiKey,
 			}))
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -986,7 +986,7 @@ agent.internal.runtime.filebeat.filestream: otel
 	actualHits := &struct{ Hits int }{}
 	assert.EventuallyWithT(t,
 		func(ct *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
 
 			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, index, map[string]interface{}{
@@ -995,7 +995,7 @@ agent.internal.runtime.filebeat.filestream: otel
 			require.NoError(ct, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
-			output, execErr := fixture.ExecStatus(context.Background())
+			output, execErr := fixture.ExecStatus(ctx)
 			require.NoError(ct, execErr)
 			t.Logf("status output: %v", output)
 			assert.Equal(ct, numEvents, actualHits.Hits)
@@ -1007,7 +1007,7 @@ agent.internal.runtime.filebeat.filestream: otel
 	// Check metrics from self-monitoring
 	assert.EventuallyWithT(t,
 		func(ct *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
 
 			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, metricsIndex, map[string]interface{}{
@@ -1016,7 +1016,7 @@ agent.internal.runtime.filebeat.filestream: otel
 			require.NoError(ct, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
-			output, execErr := fixture.ExecStatus(context.Background())
+			output, execErr := fixture.ExecStatus(ctx)
 			require.NoError(ct, execErr)
 			t.Logf("status output: %v", output)
 			assert.Greater(ct, actualHits.Hits, 0)
@@ -1090,7 +1090,7 @@ agent.monitoring:
 			ESApiKey:   decodedApiKey,
 		})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -1127,7 +1127,7 @@ agent.monitoring:
 	actualHits := &struct{ Hits int }{}
 	assert.Eventually(t,
 		func() bool {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
 
 			query := map[string]interface{}{
@@ -1306,7 +1306,7 @@ service:
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
 	err = fixture.Prepare(ctx)
@@ -1347,7 +1347,7 @@ service:
 	}{}
 	require.EventuallyWithT(t,
 		func(collect *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
 
 			docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbIndex+"*", map[string]interface{}{
@@ -1484,7 +1484,7 @@ processors:
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
 	err = fixture.Prepare(ctx)
@@ -1525,7 +1525,7 @@ processors:
 	}{}
 	require.EventuallyWithT(t,
 		func(collect *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
 
 			docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbIndex+"*", map[string]interface{}{
@@ -1666,7 +1666,7 @@ service:
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", otelConfigPath}))
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -1705,17 +1705,17 @@ service:
 
 	require.EventuallyWithT(
 		t,
-		func(t *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 			defer findCancel()
 
 			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]any{
 				"log.file.path": inputFilePath,
 			})
-			require.NoError(t, err)
+			require.NoError(ct, err)
 			got := int(docs.Hits.Total.Value)
 
-			require.GreaterOrEqual(t, got, 10, "")
+			require.GreaterOrEqual(ct, got, 10, "")
 		},
 		time.Minute,
 		time.Second,
@@ -1742,28 +1742,28 @@ service:
 
 	require.EventuallyWithT(
 		t,
-		func(t *assert.CollectT) {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 			defer findCancel()
 
 			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]any{
 				"log.file.path": inputFilePath,
 			})
-			require.NoError(t, err)
+			require.NoError(ct, err)
 
 			uniqueIngestedLogs := make(map[string]struct{})
 			for _, hit := range docs.Hits.Hits {
 				message, found := hit.Source["message"]
-				require.True(t, found, "expected message field in document %q", hit.Source)
+				require.True(ct, found, "expected message field in document %q", hit.Source)
 				msg, ok := message.(string)
-				require.True(t, ok, "expected message field to be a string, got %T", message)
-				require.NotContainsf(t, uniqueIngestedLogs, msg, "found duplicated log message %q", msg)
+				require.True(ct, ok, "expected message field to be a string, got %T", message)
+				require.NotContainsf(ct, uniqueIngestedLogs, msg, "found duplicated log message %q", msg)
 				uniqueIngestedLogs[msg] = struct{}{}
 			}
 
 			want := inputLinesCounter.Load()
 			got := docs.Hits.Total.Value
-			require.EqualValues(t, want, got, "expecting %d hits got %d hits", want, got)
+			require.EqualValues(ct, want, got, "expecting %d hits got %d hits", want, got)
 		},
 		20*time.Second,
 		time.Second,
@@ -2113,7 +2113,7 @@ outputs:
 		otelConfigOptions{
 			StatusReportingEnabled: true,
 		})
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
 	installOpts := aTesting.InstallOpts{
@@ -2909,7 +2909,7 @@ agent.monitoring:
 				CaCert:              filepath.Join(kafkaPath, "certs", "ca-cert"),
 			})
 
-		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 		defer cancel()
 		err = fixture.Prepare(ctx)
 		require.NoError(t, err)
@@ -3191,7 +3191,7 @@ agent.monitoring:
 			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 			require.NoError(t, err)
 
-			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 			defer cancel()
 
 			err = fixture.Prepare(ctx)
@@ -3409,7 +3409,7 @@ agent.monitoring:
 				Host:                tt.host,
 			})
 
-		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 		defer cancel()
 		err = fixture.Prepare(ctx)
 		require.NoError(t, err)

@@ -57,7 +57,7 @@ func TestNoZombieOnAgentShutdown(t *testing.T) {
 	f, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithAllowErrors())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = f.Prepare(ctx, fakeSIGTERMComponent)
 	require.NoError(t, err)

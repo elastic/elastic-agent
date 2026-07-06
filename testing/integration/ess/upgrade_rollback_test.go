@@ -76,7 +76,7 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 	})
 	esUrl := integration.StartMockES(t, 0, 0, 0, 0)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Upgrade from an old build because the new watcher from the new build will

@@ -56,7 +56,7 @@ func TestSwitchUnprivilegedWithoutBasePath(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -88,7 +88,7 @@ func TestSwitchUnprivilegedWithoutBasePathCustomUser(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -158,7 +158,7 @@ func TestSwitchUnprivilegedWithBasePath(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.

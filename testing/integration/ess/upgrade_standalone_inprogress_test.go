@@ -7,7 +7,6 @@
 package ess
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -33,7 +32,7 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// For this test we start with a version of Agent that's two minors older

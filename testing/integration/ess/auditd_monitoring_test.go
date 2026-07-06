@@ -80,7 +80,7 @@ func (runner *AuditDRunner) SetupSuite() {
 		Privileged:     true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), 3*time.Minute)
 	defer cancel()
 
 	require.NoError(runner.T(), fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
@@ -146,7 +146,7 @@ func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Conte
 func (runner *AuditDRunner) TestBeatsMetrics() {
 	t := runner.T()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute*20)
 	defer cancel()
 
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)

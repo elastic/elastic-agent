@@ -89,7 +89,7 @@ func (runner *NetworkTrafficRunner) SetupSuite() {
 
 	// 5 minutes: agent install can take 2+ minutes on slow machines, leaving
 	// insufficient time for the subsequent package install with a 3-minute budget.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), 5*time.Minute)
 	defer cancel()
 
 	require.NoError(runner.T(), fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
@@ -179,7 +179,7 @@ func dialTLS(t *testing.T, host string) {
 func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	t := runner.T()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute*20)
 	defer cancel()
 
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
