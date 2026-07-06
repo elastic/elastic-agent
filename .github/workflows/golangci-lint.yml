@@ -35,20 +35,16 @@ jobs:
       tagsets: ${{ steps.compute.outputs.tagsets }}
     steps:
       - uses: actions/checkout@v7
-        if: github.event_name == 'pull_request'
         with:
-          fetch-depth: 0
-
-      - uses: actions/checkout@v7
-        if: github.event_name != 'pull_request'
+          # Full history on PRs so the plan can diff against the base; pushes
+          # plan all sets and need none.
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
 
       - uses: actions/setup-go@v6
         with:
           go-version-file: .go-version
 
       - id: compute
-        # Empty LINT_PLAN_BASE (pushes) plans all tag sets. The lightweight
-        # lintplan entrypoint keeps this gatekeeper job cheap (no submodule).
         shell: bash
         env:
           LINT_PLAN_BASE: ${{ github.event.pull_request.base.sha }}
