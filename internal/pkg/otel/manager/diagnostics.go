@@ -8,10 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"strings"
 	"syscall"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -68,7 +70,6 @@ func (m *OTelManager) PerformDiagnostics(ctx context.Context, req ...runtime.Com
 			}
 		}
 	}
-
 	return diagnostics
 }
 
@@ -93,7 +94,6 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		compByID[comp.ID] = comp
 	}
 
-	// create empty diagnostics for components that exist in the manager
 	for _, existingComp := range currentComponents {
 		if inputComp, ok := compByID[existingComp.ID]; ok {
 			diagnostics = append(diagnostics, runtime.ComponentDiagnostic{
@@ -105,28 +105,48 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	}
 
 	extDiagnostics, err := otel.PerformDiagnosticsExt(ctx, false)
-
-	// We're not running the EDOT if:
-	//  1. Either the socket doesn't exist
-	//	2. It is refusing the connections.
-	// Return error for any other scenario.
 	if err != nil {
-		m.logger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
-		if !errors.Is(err, syscall.ENOENT) && !errors.Is(err, syscall.ECONNREFUSED) {
-			return nil, fmt.Errorf("error fetching otel diagnostics: %w", err)
-		}
-	}
-
-	for idx, diag := range diagnostics {
-		found := false
-		for _, extDiag := range extDiagnostics.ComponentDiagnostics {
-			if strings.Contains(extDiag.Name, diag.Component.ID) {
-				found = true
-				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
+		// These three errors mean EDOT is not running, which is expected.
+		// fs.ErrNotExist: the socket file is missing (POSIX ENOENT / Windows ERROR_FILE_NOT_FOUND).
+		// syscall.ECONNREFUSED: the socket file exists but nothing is listening (EDOT crashed or mid-restart).
+		// context.DeadlineExceeded: a Windows pipe-busy dial timed out. This is defensive: production does not
+		// set a dial deadline, so this only fires if the caller passes a deadline.
+		// Any other error is unexpected, so surface it on each component so it ends up in the diagnostics archive.
+		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, context.DeadlineExceeded) {
+			m.logger.Debugf("EDOT not reachable, no diagnostics available: %v", err)
+		} else {
+			m.logger.Warnf("failed to fetch diagnostics from EDOT: %v", err)
+			for idx := range diagnostics {
+				diagnostics[idx].Err = fmt.Errorf("error fetching otel diagnostics: %w", err)
 			}
 		}
-		if !found {
-			diagnostics[idx].Err = fmt.Errorf("failed to get diagnostics for %s", diag.Component.ID)
+		return diagnostics, nil
+	}
+
+	// Receiver names have the form "<receiverType>/_agent-component/<comp.ID>/<streamID>".
+	// All "/" characters are literal string delimiters, not filesystem path separators,
+	// so this is consistent across platforms including Windows.
+	// We extract comp.ID as the segment between OtelNamePrefix and the next "/". This is
+	// exact and unambiguous for normal IDs. Both comp.ID and streamID are user-supplied
+	// (from the policy input "id" field), so either could contain "/" — making the format
+	// ambiguous in that case. The warning below flags such IDs. A proper fix requires
+	// escaping "/" in IDs at the source in the beat receiver.
+	diagIdxByCompID := make(map[string]int)
+	for idx, diag := range diagnostics {
+		if strings.Contains(diag.Component.ID, "/") {
+			m.logger.Warnf("component ID %q contains '/', its EDOT diagnostics will be missing from the archive", diag.Component.ID)
+		}
+		diagIdxByCompID[diag.Component.ID] = idx
+	}
+	for _, extDiag := range extDiagnostics.ComponentDiagnostics {
+		parts := strings.SplitN(extDiag.Name, translate.OtelNamePrefix, 2)
+		if len(parts) != 2 {
+			m.logger.Debugf("skipping EDOT diagnostic %q: diagnostic name does not contain expected prefix %q", extDiag.Name, translate.OtelNamePrefix)
+			continue
+		}
+		compID, _, _ := strings.Cut(parts[1], "/")
+		if idx, ok := diagIdxByCompID[compID]; ok {
+			diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
 		}
 	}
 
