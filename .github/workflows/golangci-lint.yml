@@ -26,9 +26,8 @@ permissions:
   # Optional: allow read access to pull request. Use with `only-new-issues` option.
   pull-requests: read
 jobs:
-  # Picks which build-tag sets to lint. A PR only runs the tagged sets when it
-  # changes files those tags cover; pushes always run all of them. Keep the
-  # tag sets in sync with buildTagSets in dev-tools/mage/lint.go.
+  # Picks which build-tag sets to lint: a PR runs a tagged set only when it
+  # changes files that set covers; pushes run them all.
   plan:
     name: plan tag sets
     runs-on: ubuntu-latest
@@ -40,54 +39,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/checkout@v7
+        if: github.event_name != 'pull_request'
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: .go-version
+
       - id: compute
+        # Empty LINT_PLAN_BASE (pushes) plans all tag sets. The lightweight
+        # lintplan entrypoint keeps this gatekeeper job cheap (no submodule).
         shell: bash
+        env:
+          LINT_PLAN_BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-
-          default_set='{"name":"default","tags":""}'
-          local_set='{"name":"local","tags":"integration,requirefips,kubernetes_inner,mage,local"}'
-          define_set='{"name":"define","tags":"integration,requirefips,kubernetes_inner,mage,define"}'
-
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "tagsets=[$default_set,$local_set,$define_set]" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          base_sha="${{ github.event.pull_request.base.sha }}"
-          changed_files="$(git diff --name-only "$base_sha"...HEAD)"
-
-          need_local=false
-          need_define=false
-          while IFS= read -r f; do
-            [ -z "$f" ] && continue
-            case "$f" in
-              go.mod|go.sum|.golangci.yml|.golangci-lint-version|.github/workflows/golangci-lint.yml)
-                need_local=true
-                need_define=true
-                continue
-                ;;
-            esac
-            case "$f" in
-              *.go) ;;
-              *) continue ;;
-            esac
-            [ -f "$f" ] || continue # deleted file: nothing new to lint there
-            tag_line="$(grep -m1 '^//go:build' -- "$f" || true)"
-            [ -z "$tag_line" ] && continue
-            if echo "$tag_line" | grep -qE '\b(integration|requirefips|kubernetes_inner|mage)\b'; then
-              need_local=true
-              need_define=true
-            fi
-            echo "$tag_line" | grep -qE '\blocal\b' && need_local=true
-            echo "$tag_line" | grep -qE '\bdefine\b' && need_define=true
-          done <<< "$changed_files"
-
-          sets="$default_set"
-          [ "$need_local" = true ] && sets="$sets,$local_set"
-          [ "$need_define" = true ] && sets="$sets,$define_set"
-          echo "tagsets=[$sets]" >> "$GITHUB_OUTPUT"
-          echo "Selected tag sets: [$sets]"
+          tagsets="$(go run ./dev-tools/lintplan)"
+          echo "tagsets=$tagsets" >> "$GITHUB_OUTPUT"
+          echo "Selected tag sets: $tagsets"
 
   golangci:
     needs: plan

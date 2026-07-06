@@ -6,6 +6,7 @@ package mage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -65,14 +66,20 @@ func golangciLintInstalledVersion() (string, error) {
 	return "", fmt.Errorf("could not parse version from: %s", out)
 }
 
+// buildTagSet is one build-tag combination we lint with, plus the name the CI
+// matrix uses for it.
+type buildTagSet struct {
+	Name string `json:"name"`
+	Tags string `json:"tags"`
+}
+
 // buildTagSets are the build-tag combinations we lint with so that files
 // behind a //go:build tag are actually checked. "local" and "define" are
-// mutually exclusive, hence two sets. Keep in sync with the tagset matrix in
-// .github/workflows/golangci-lint.yml.
-var buildTagSets = []string{
-	"",
-	"integration,requirefips,kubernetes_inner,mage,local",
-	"integration,requirefips,kubernetes_inner,mage,define",
+// mutually exclusive, hence two sets.
+var buildTagSets = []buildTagSet{
+	{Name: "default", Tags: ""},
+	{Name: "local", Tags: "integration,requirefips,kubernetes_inner,mage,local"},
+	{Name: "define", Tags: "integration,requirefips,kubernetes_inner,mage,define"},
 }
 
 // Lint runs golangci-lint on new issues only, comparing against the closest
@@ -90,18 +97,37 @@ func Lint(ctx context.Context) error {
 		return err
 	}
 	sets := tagSetsNeeded(changed)
-	fmt.Printf(">> lint: build-tag sets to run: %q\n", sets)
+	fmt.Printf(">> lint: build-tag sets to run: %+v\n", sets)
 
-	for _, tags := range sets {
+	for _, set := range sets {
 		args := []string{"run", "-v", "--timeout=30m", "--whole-files", "--new-from-merge-base=" + base}
-		if tags != "" {
-			args = append(args, "--build-tags="+tags)
+		if set.Tags != "" {
+			args = append(args, "--build-tags="+set.Tags)
 		}
-		fmt.Printf(">> lint: build-tags=%q\n", tags)
+		fmt.Printf(">> lint: build-tags=%q\n", set.Tags)
 		if err := sh.RunV("./bin/golangci-lint", args...); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+// LintPlan prints the lint tag-set plan as JSON for CI and runs golangci-lint
+// zero times. LINT_PLAN_BASE selects the diff base; unset (pushes) plans all sets.
+func LintPlan() error {
+	sets := buildTagSets
+	if base := os.Getenv("LINT_PLAN_BASE"); base != "" {
+		changed, err := changedFiles(base)
+		if err != nil {
+			return err
+		}
+		sets = tagSetsNeeded(changed)
+	}
+	out, err := json.Marshal(sets)
+	if err != nil {
+		return fmt.Errorf("marshaling tag sets: %w", err)
+	}
+	fmt.Println(string(out))
 	return nil
 }
 
@@ -121,10 +147,11 @@ func changedFiles(base string) ([]string, error) {
 
 // riskFiles affect every tag set when changed, so all of them must run.
 var riskFiles = map[string]bool{
-	"go.mod":                 true,
-	"go.sum":                 true,
-	".golangci.yml":          true,
-	".golangci-lint-version": true,
+	"go.mod":                              true,
+	"go.sum":                              true,
+	".golangci.yml":                       true,
+	".golangci-lint-version":              true,
+	".github/workflows/golangci-lint.yml": true,
 }
 
 var (
@@ -137,7 +164,7 @@ var (
 // we skip runs that couldn't report anything new. The untagged set always
 // runs; a tagged set is added only when a changed file could belong to it.
 // It may over-select but never under-selects.
-func tagSetsNeeded(changed []string) []string {
+func tagSetsNeeded(changed []string) []buildTagSet {
 	needLocal, needDefine := false, false
 	for _, f := range changed {
 		if riskFiles[f] {
@@ -162,7 +189,7 @@ func tagSetsNeeded(changed []string) []string {
 		}
 	}
 
-	sets := []string{buildTagSets[0]}
+	sets := []buildTagSet{buildTagSets[0]}
 	if needLocal {
 		sets = append(sets, buildTagSets[1])
 	}
@@ -189,12 +216,12 @@ func buildTagLine(path string) (string, bool) {
 
 // LintAll runs golangci-lint on the whole codebase.
 func LintAll() error {
-	for _, tags := range buildTagSets {
+	for _, set := range buildTagSets {
 		args := []string{"run", "-v", "--timeout=30m"}
-		if tags != "" {
-			args = append(args, "--build-tags="+tags)
+		if set.Tags != "" {
+			args = append(args, "--build-tags="+set.Tags)
 		}
-		fmt.Printf(">> lint-all: build-tags=%q\n", tags)
+		fmt.Printf(">> lint-all: build-tags=%q\n", set.Tags)
 		if err := sh.RunV("./bin/golangci-lint", args...); err != nil {
 			return err
 		}
