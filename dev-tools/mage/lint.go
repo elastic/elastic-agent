@@ -131,8 +131,7 @@ func LintPlan() error {
 	return nil
 }
 
-// changedFiles lists the files changed between the merge-base of base and
-// HEAD, and HEAD itself.
+// changedFiles returns the files changed on HEAD since it diverged from base.
 func changedFiles(base string) ([]string, error) {
 	out, err := sh.Output("git", "diff", "--name-only", base+"...HEAD")
 	if err != nil {
