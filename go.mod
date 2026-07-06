@@ -78,14 +78,9 @@ require (
 	golang.org/x/term v0.44.0
 	golang.org/x/text v0.38.0
 	golang.org/x/time v0.15.0
-<<<<<<< HEAD
-	golang.org/x/tools v0.46.0
-	google.golang.org/grpc v1.81.1
-=======
 	golang.org/x/tools v0.47.0
 	google.golang.org/api v0.287.0
 	google.golang.org/grpc v1.82.0
->>>>>>> 42cf6a9ff (build(deps): bump the misc group with 4 updates (#15356))
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/ini.v1 v1.67.3
 	gopkg.in/yaml.v2 v2.4.0
@@ -468,12 +463,7 @@ require (
 	github.com/lufia/plan9stats v0.0.0-20251013123823-9fd1530e3ec3 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
-<<<<<<< HEAD
-	github.com/mattn/go-ieproxy v0.0.1 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
-=======
 	github.com/mattn/go-isatty v0.0.22 // indirect
->>>>>>> 42cf6a9ff (build(deps): bump the misc group with 4 updates (#15356))
 	github.com/mattn/go-runewidth v0.0.19 // indirect
 	github.com/mdlayher/kobject v0.0.0-20200520190114-19ca17470d7d // indirect
 	github.com/mdlayher/netlink v1.7.2 // indirect
@@ -771,7 +761,6 @@ require (
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
-	google.golang.org/api v0.286.0 // indirect
 	google.golang.org/genproto v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260622175928-b703f567277d // indirect
