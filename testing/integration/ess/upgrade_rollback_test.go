@@ -83,6 +83,9 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 	// be ran. Otherwise the test will run the old watcher from the old build.
 	upgradeFromVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
+	if !upgradetest.SupportsUpgradeSourceOnPlatform(upgradeFromVersion, runtime.GOOS, runtime.GOARCH) {
+		t.Skipf("upgrade from %s is not supported on %s/%s", upgradeFromVersion, runtime.GOOS, runtime.GOARCH)
+	}
 	startFixture, err := atesting.NewFixture(
 		t,
 		upgradeFromVersion.String(),
@@ -214,6 +217,9 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 				// be ran. Otherwise the test will run the old watcher from the old build.
 				upgradeFromVersion, err := upgradetest.PreviousMinor()
 				require.NoError(t, err)
+				if !upgradetest.SupportsUpgradeSourceOnPlatform(upgradeFromVersion, runtime.GOOS, runtime.GOARCH) {
+					t.Skipf("upgrade from %s is not supported on %s/%s", upgradeFromVersion, runtime.GOOS, runtime.GOARCH)
+				}
 				startFixture, err := atesting.NewFixture(
 					t,
 					upgradeFromVersion.String(),
