@@ -36,8 +36,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # Full history on PRs so the plan can diff against the base; pushes
-          # plan all sets and need none.
+          # PRs need full history to diff against the base; pushes lint every
+          # set without diffing, so a shallow clone is enough.
           fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
 
       - uses: actions/setup-go@v6
