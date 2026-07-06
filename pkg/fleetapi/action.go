@@ -683,6 +683,10 @@ func (a *ActionApp) AckEvent(agentID string, ts time.Time) api.AckRequest_Events
 		Message:         fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
 		ActionInputType: a.InputType,
 		ActionData:      a.Data,
+		// StartedAt/CompletedAt fall back to ts if a.StartedAt/a.CompletedAt are
+		// empty or fail to parse, so the event never carries a zero time.Time.
+		StartedAt:   ts,
+		CompletedAt: ts,
 	}
 	if a.Response != nil {
 		if b, err := json.Marshal(a.Response); err == nil {
