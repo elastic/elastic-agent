@@ -40,6 +40,14 @@ const (
 	OtelFeatureGatesFlagName                  = "feature-gates"
 	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
 	OtelProfilingSupportFeature               = "service.profilesSupport"
+	// OtelReceiverPartialReloadFeatures enables partial reload of receivers on a
+	// config change: a receiver-only change restarts just the affected receivers
+	// instead of tearing down and rebuilding the whole collector service. This
+	// requires both the master partial-reload gate (service.partialReload, Alpha,
+	// off by default) and the receiver-phase gate (service.partialReloadReceivers,
+	// Beta). Both are listed explicitly so the intent holds regardless of the
+	// gates' default stages.
+	OtelReceiverPartialReloadFeatures = "service.partialReload,service.partialReloadReceivers"
 
 	// stdinGobProviderScheme must match agentprovider.StdinGobProviderSchemeName.
 	// Duplicated here to avoid a cross-module import from the main module into
@@ -60,6 +68,9 @@ func newSubprocessExecution(collectorPath string, healthCheckExtensionID string,
 			// by the exporter instance (e.g. separating the monitoring exporter from general inputs),
 			// matching the behavior of other Collector telemetry metrics like queue state.
 			fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelElasticsearchExporterTelemetryFeature),
+			// Enable partial receiver reload so a receiver-only config change restarts
+			// only the affected receivers instead of the whole collector service.
+			fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelReceiverPartialReloadFeatures),
 		},
 		healthCheckExtensionID:   healthCheckExtensionID,
 		collectorHealthCheckPort: healthCheckPort,

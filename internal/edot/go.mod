@@ -806,6 +806,15 @@ replace (
 	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
 )
 
+// Use a fork of the OTel Collector otelcol and service modules that adds partial
+// receiver reload on config change (feature gates service.partialReload and
+// service.partialReloadReceivers). Fork: https://github.com/swiatekm/opentelemetry-collector
+// commit 9242922d607f3f5a55f1d826badcbd893545cbb0 on top of v0.155.0.
+replace (
+	go.opentelemetry.io/collector/otelcol => github.com/swiatekm/opentelemetry-collector/otelcol v0.0.0-20260706150950-9242922d607f
+	go.opentelemetry.io/collector/service => github.com/swiatekm/opentelemetry-collector/service v0.0.0-20260706150950-9242922d607f
+)
+
 // Replace statements carried forward from Beats https://github.com/elastic/beats/blob/0678f4d96212ac968fc90596e60475ed2f3979e1/go.mod#L503
 replace (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption => github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic
