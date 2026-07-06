@@ -254,13 +254,8 @@ require (
 	github.com/lufia/plan9stats v0.0.0-20251013123823-9fd1530e3ec3 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
-<<<<<<< HEAD
-	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.16 // indirect
-=======
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
->>>>>>> 42cf6a9ff (build(deps): bump the misc group with 4 updates (#15356))
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/mileusna/useragent v1.3.5 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
