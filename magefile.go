@@ -510,12 +510,6 @@ func (Check) LintAll() error {
 	return devtools.LintAll()
 }
 
-// LintPlan prints the build-tag sets to lint as JSON for the CI matrix.
-// LINT_PLAN_BASE selects the diff base; unset plans all sets.
-func (Check) LintPlan() error {
-	return devtools.LintPlan()
-}
-
 // License makes sure that all the Golang files have the appropriate license header.
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
