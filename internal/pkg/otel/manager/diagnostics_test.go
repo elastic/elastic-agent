@@ -130,7 +130,7 @@ func TestBeatMetrics(t *testing.T) {
 
 	// The receiver name format must match what EDOT registers, otherwise the comp.ID extraction
 	// in production would not find this result.
-	receiverName := translate.GetReceiverID(otelcomponent.MustNewType("filebeatreceiver"), filebeatComp.ID+"/stream-1").String()
+	receiverName := otelcomponent.NewIDWithName(otelcomponent.MustNewType("filebeatreceiver"), translate.OtelNamePrefix+filebeatComp.ID+"/stream-1").String()
 
 	m := &OTelManager{
 		logger:     logger,
@@ -213,8 +213,8 @@ func TestBeatMetricsPrefixOverlap(t *testing.T) {
 	longComp := testComponent("filebeat-2")
 	longComp.InputSpec.Spec.Command.Args = []string{"filebeat"}
 
-	shortReceiver := translate.GetReceiverID(otelcomponent.MustNewType("filebeatreceiver"), shortComp.ID+"/stream-1").String()
-	longReceiver := translate.GetReceiverID(otelcomponent.MustNewType("filebeatreceiver"), longComp.ID+"/stream-1").String()
+	shortReceiver := otelcomponent.NewIDWithName(otelcomponent.MustNewType("filebeatreceiver"), translate.OtelNamePrefix+shortComp.ID+"/stream-1").String()
+	longReceiver := otelcomponent.NewIDWithName(otelcomponent.MustNewType("filebeatreceiver"), translate.OtelNamePrefix+longComp.ID+"/stream-1").String()
 
 	metricData, err := json.MarshalIndent(map[string]any{"test": "test"}, "", "  ")
 	require.NoError(t, err)
@@ -227,8 +227,8 @@ func TestBeatMetricsPrefixOverlap(t *testing.T) {
 	}
 
 	m := &OTelManager{
-		managerLogger: logger,
-		components:    []component.Component{shortComp, longComp},
+		logger:     logger,
+		components: []component.Component{shortComp, longComp},
 	}
 
 	called := false
@@ -273,8 +273,8 @@ func TestPerformComponentDiagnosticsUnexpectedError(t *testing.T) {
 	otherComp.InputSpec.Spec.Command.Args = []string{"metricbeat"}
 
 	m := &OTelManager{
-		managerLogger: managerLogger,
-		components:    []component.Component{filebeatComp, otherComp},
+		logger:     managerLogger,
+		components: []component.Component{filebeatComp, otherComp},
 	}
 
 	// A reachable socket that returns a non-JSON body makes PerformDiagnosticsExt fail while

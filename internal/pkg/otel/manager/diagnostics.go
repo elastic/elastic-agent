@@ -106,20 +106,6 @@ func (m *OTelManager) PerformComponentDiagnostics(
 
 	extDiagnostics, err := otel.PerformDiagnosticsExt(ctx, false)
 	if err != nil {
-<<<<<<< HEAD
-		m.logger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
-		if !errors.Is(err, syscall.ENOENT) && !errors.Is(err, syscall.ECONNREFUSED) {
-			return nil, fmt.Errorf("error fetching otel diagnostics: %w", err)
-		}
-	}
-
-	for idx, diag := range diagnostics {
-		found := false
-		for _, extDiag := range extDiagnostics.ComponentDiagnostics {
-			if strings.Contains(extDiag.Name, diag.Component.ID) {
-				found = true
-				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
-=======
 		// These three errors mean EDOT is not running, which is expected.
 		// fs.ErrNotExist: the socket file is missing (POSIX ENOENT / Windows ERROR_FILE_NOT_FOUND).
 		// syscall.ECONNREFUSED: the socket file exists but nothing is listening (EDOT crashed or mid-restart).
@@ -127,12 +113,11 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		// set a dial deadline, so this only fires if the caller passes a deadline.
 		// Any other error is unexpected, so surface it on each component so it ends up in the diagnostics archive.
 		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, context.DeadlineExceeded) {
-			m.managerLogger.Debugf("EDOT not reachable, no diagnostics available: %v", err)
+			m.logger.Debugf("EDOT not reachable, no diagnostics available: %v", err)
 		} else {
-			m.managerLogger.Warnf("failed to fetch diagnostics from EDOT: %v", err)
+			m.logger.Warnf("failed to fetch diagnostics from EDOT: %v", err)
 			for idx := range diagnostics {
 				diagnostics[idx].Err = fmt.Errorf("error fetching otel diagnostics: %w", err)
->>>>>>> 264f0d8bc (Fix duplicate entries and empty unit dirs in OTel diagnostics ZIP (#15108))
 			}
 		}
 		return diagnostics, nil
@@ -149,14 +134,14 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	diagIdxByCompID := make(map[string]int)
 	for idx, diag := range diagnostics {
 		if strings.Contains(diag.Component.ID, "/") {
-			m.managerLogger.Warnf("component ID %q contains '/', its EDOT diagnostics will be missing from the archive", diag.Component.ID)
+			m.logger.Warnf("component ID %q contains '/', its EDOT diagnostics will be missing from the archive", diag.Component.ID)
 		}
 		diagIdxByCompID[diag.Component.ID] = idx
 	}
 	for _, extDiag := range extDiagnostics.ComponentDiagnostics {
 		parts := strings.SplitN(extDiag.Name, translate.OtelNamePrefix, 2)
 		if len(parts) != 2 {
-			m.managerLogger.Debugf("skipping EDOT diagnostic %q: diagnostic name does not contain expected prefix %q", extDiag.Name, translate.OtelNamePrefix)
+			m.logger.Debugf("skipping EDOT diagnostic %q: diagnostic name does not contain expected prefix %q", extDiag.Name, translate.OtelNamePrefix)
 			continue
 		}
 		compID, _, _ := strings.Cut(parts[1], "/")
