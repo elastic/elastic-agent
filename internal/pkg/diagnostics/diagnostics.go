@@ -289,6 +289,9 @@ func ZipArchive(
 			// check for component-level errors
 			// create unit diags
 			for _, ud := range units {
+				if ud.Err == nil && len(ud.Results) == 0 {
+					continue
+				}
 				unitDir := strings.ReplaceAll(strings.TrimPrefix(ud.UnitID, ud.ComponentID+"-"), "/", "-")
 				_, err := zw.CreateHeader(&zip.FileHeader{
 					Name:     fmt.Sprintf("components/%s/%s/", dirName, unitDir),
