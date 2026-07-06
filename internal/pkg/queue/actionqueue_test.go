@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	api "github.com/elastic/fleet-server/pkg/api"
+
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
@@ -36,9 +38,9 @@ func (m *mockAction) ID() string {
 	return args.String(0)
 }
 
-func (m *mockAction) AckEvent() fleetapi.AckEvent {
-	args := m.Called()
-	return args.Get(0).(fleetapi.AckEvent)
+func (m *mockAction) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	args := m.Called(agentID, ts)
+	return args.Get(0).(api.AckRequest_Events_Item)
 }
 
 func (m *mockAction) StartTime() (time.Time, error) {
