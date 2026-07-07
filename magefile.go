@@ -299,7 +299,6 @@ func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch strin
 			// there is no actual FIPS relevance for this particular binary
 			// but better safe than sorry
 			args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
-			args.Env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
 			args.CGO = true
 		}
 	}

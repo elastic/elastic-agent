@@ -197,7 +197,6 @@ func (p Platform) Platform() string {
 
 type FIPSConfig struct {
 	Compile struct {
-		CGO       bool              `yaml:"cgo"`
 		Env       map[string]string `yaml:"env"`
 		Tags      []string          `yaml:"tags"`
 		Platforms []Platform        `yaml:"platforms"`

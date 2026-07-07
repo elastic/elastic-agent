@@ -357,3 +357,45 @@ var wantTestWithWrongPanic = `(?sm:
 .*
 panic: Fail in goroutine after TestGoTest_Helper_WithWrongPanic/setup_failing_go-routine has completed.*
 )`
+
+func TestMakeGoTestArgsFIPS(t *testing.T) {
+	t.Run("FIPS disabled: no FIPS env vars injected", func(t *testing.T) {
+		s := DefaultSettings()
+		s.Build.FIPSBuild = false
+
+		args := makeGoTestArgs(s, "Unit")
+
+		assert.NotContains(t, args.Tags, "requirefips")
+		assert.NotContains(t, args.Env, "GOFIPS140")
+		assert.NotContains(t, args.Env, "GODEBUG")
+	})
+
+	t.Run("FIPS enabled: requirefips tag added", func(t *testing.T) {
+		s := DefaultSettings()
+		s.Build.FIPSBuild = true
+
+		args := makeGoTestArgs(s, "Unit")
+
+		assert.Contains(t, args.Tags, "requirefips")
+	})
+
+	t.Run("FIPS enabled: compile env from packages.yml propagated", func(t *testing.T) {
+		s := DefaultSettings()
+		s.Build.FIPSBuild = true
+
+		args := makeGoTestArgs(s, "Unit")
+
+		// packages.yml sets GOFIPS140=v1.0.0 under fips.compile.env;
+		// makeGoTestArgs must forward every key from that map.
+		assert.Equal(t, "v1.0.0", args.Env["GOFIPS140"])
+	})
+
+	t.Run("FIPS enabled: GODEBUG enforces FIPS-only runtime", func(t *testing.T) {
+		s := DefaultSettings()
+		s.Build.FIPSBuild = true
+
+		args := makeGoTestArgs(s, "Unit")
+
+		assert.Equal(t, "fips140=only,tlsmlkem=0", args.Env["GODEBUG"])
+	})
+}
