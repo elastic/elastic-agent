@@ -1,0 +1,405 @@
+---
+navigation_title: Known issues
+products:
+  - id: elastic-agent
+applies_to:
+  stack: ga
+sub:
+  product: Elastic Agent
+---
+
+# {{product}} known issues
+
+Known issues are significant defects or limitations that may impact your implementation. These issues are actively being worked on and will be addressed in a future release. Review the {{product}} known issues to help you make informed decisions, such as upgrading to a new version.
+
+% Use the following template to add entries to this page.
+
+% :::{dropdown} Title of known issue
+% **Applicable versions for the known issue and the version for when the known issue was fixed**
+% On [Month Day, Year], a known issue was discovered that [description of known issue].
+% For more information, check [Issue #](Issue link).
+
+% **Workaround**
+% Workaround description.
+% :::
+
+:::{dropdown} {{agent}} logs a "failed to unmarshal checkin actions" error on almost every {{fleet}} check-in
+
+**Applies to: {{agent}} 9.4.0, 9.4.1, 9.4.2, 9.4.3**
+
+On July 7, 2026, a known issue was discovered where {{fleet}}-managed {{agents}} log an error on nearly every check-in when there is nothing new for {{fleet}} to tell them to do:
+
+```
+failed to unmarshal checkin actions: unexpected end of JSON input
+```
+
+This is a cosmetic logging issue only. Actions are still delivered and processed normally whenever {{fleet}} does send any. Nothing about how the agent actually operates is affected, and no action is required — the error can be safely ignored.
+
+For more information, check [Issue #15397](https://github.com/elastic/elastic-agent/issues/15397).
+:::
+
+:::{dropdown} [Windows] {{agent}} fails to upgrade when the host has 100 or more installed programs
+
+**Applies to: {{agent}} 9.4.0, 9.4.1, 9.4.2 (Windows only)**
+
+On June 4, 2026, a known issue was discovered where upgrading {{agent}} from a pre-9.4.0 version on a Windows host with 100 or more entries in Add/Remove Programs causes the new agent to hang indefinitely during startup. The Upgrade Watcher detects the hang and rolls back the upgrade.
+
+To check the number of entries on a host, run the following command in PowerShell:
+
+```powershell
+(Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall').Count
+```
+
+If the count is more than 100, upgrade directly to a version that is not affected by this issue.
+
+For more information, check [Issue #14764](https://github.com/elastic/elastic-agent/issues/14764).
+:::
+
+:::{dropdown} Missing APM service_destination metrics and empty service map in the APM UI
+
+**Applies to: {{agent}} 9.2.6, 9.2.7, 9.3.1, 9.3.2**
+
+On June 17, 2026, a known issue was discovered where the aggregated `service_destination` metric that the APM UI uses can be missing from the `metrics/aggregated-otel-metrics` EDOT Collector pipeline, even when trace traffic is present and other telemetry paths appear healthy. As a result, the APM service map appears empty.
+
+The issue occurs when two EDOT components, `elasticapmprocessor` and `elasticapmconnector`, are both at v0.29.0, which is the version bundled with the affected {{agent}} releases.
+
+**Resolution**
+
+This issue is fixed in {{agent}} 9.2.8 and 9.3.3, which include updated versions of these components.
+
+For more information, check [Issue #14964](https://github.com/elastic/elastic-agent/issues/14964).
+:::
+
+:::{dropdown} Elastic Agent reports policy is outdated when agent.features.disable_policy_change_acks is enabled.
+**Applies to: {{agent}} 9.4.0, 9.3.4, 9.3.3, 9.3.2, 9.3.1, 9.3.0, 9.2.7, 9.2.6, 9.2.5, 9.2.4, 9.2.3, 9.2.2, 9.2.1, 9.2.0**
+
+On April 22, 2026 a known issue was discovered that prevents {{fleet}}-managed {{agents}} from correctly reporting their policy information when policy change acknowledgements are disabled.
+
+Users see an outdated policy warning on the {{fleet}} UI when policy change acknowledgments are disabled and a policy update is sent.
+
+**Workaround:**
+
+Affected users can uncheck the **Disable policy change acknowledgments** option within the agent policy settings in the Fleet UI.
+
+For more information check [Issue #264983](https://github.com/elastic/kibana/issues/264983).
+:::
+
+::::{dropdown} Events from Beats-based inputs and integrations in Elastic Agent 9.3.4 incorrectly convert timestamps to an empty {} JSON object.
+:name: events-beats-9-3-4-timestamp-empty-object
+**Applies to: {{agent}} 9.3.4**
+
+:::{warning}
+Due to the broad impact of this issue, {{agent}} 9.3.4 has been removed from the downloads page. We recommend upgrading directly to {{agent}} 9.3.5 or later.
+:::
+
+A performance optimization in {{agent}} 9.3.4 causes timestamp fields produced by Beats-based inputs to be incorrectly serialized as an empty `{}` JSON object. This affects time fields in the event body (for example, `event.created`) but does not affect the primary `@timestamp` field.
+
+**Impact**
+
+Because most {{agent}} integrations and inputs rely on Beats-based collectors, the impact is wide-ranging. Examples of affected functionality include:
+
+* **Synthetics monitoring** — Synthetics monitors rely on Heartbeat and might stop reporting expected data, resulting in a loss of monitoring visibility.
+* **SentinelOne integration** — Response actions stop functioning when `event.created` is missing. For details, refer to [Issue #266355](https://github.com/elastic/kibana/issues/266355).
+* **Other data-collection integrations** — Any integration that sends events through Beats-based inputs may emit affected documents.
+
+**Symptoms**
+
+Documents from Beats-based inputs contain one or more time fields serialized as an empty object, for example:
+
+```json
+"event": {
+  "dataset": "sentinel_one.agent",
+  "created": {}
+}
+```
+
+**Resolution**
+
+The performance optimization has been removed. The fix is included in {{agent}} 9.3.5. This issue does not affect {{agent}} 9.4.0.
+::::
+
+:::{dropdown} Elastic Agent 9.3.x fails to start on MacOS when OSQuery Manager integration is used
+**Applies to: {{agent}} 9.3.0, 9.3.1**
+
+On March 5, 2026, a known issue was discovered that prevents {{agent}} 9.3.0 and above from starting when:
+- {{agent}} is installed on MacOS.
+- The OSQuery Manager integration is installed.
+- The host or agent service is restarted.
+
+Users will see error failing with an error containing `lchown /Library/Elastic/Agent/data/elastic-agent-9.3.1-2ec825/components/osquery.app: operation not permitted` in `/Library/Elastic/Agent/co.elastic.elastic-agent.err.log` or other agent logs files:
+
+```json
+{"log.level":"error","@timestamp":"2026-02-25T07:19:14.101Z","log.origin":{"function":"github.com/elastic/elastic-agent/internal/pkg/agent/cmd.logReturn","file.name":"cmd/run.go","file.line":152}, "message":"failed to perform permission changes on path /Library/Elastic/Agent: cannot update ownership of \"/Library/Elastic/Agent\": lchown /Library/Elastic/Agent/data/elastic-agent-9.2.5-df1a8d/components/osquery.app: operation not permitted","log.source":"elastic-agent","ecs.version":"1.6.0"}
+```
+
+Upgrades from a previous version will succeed and Elastic Agent will operate normally until the host reboots or the Elastic Agent service is restarted for another reason.
+
+It will not be possible to collect agent diagnostics. If Elastic Defend is installed, Elastic Agent will show as orphaned.
+
+For more information, check [Issue #13059](https://github.com/elastic/elastic-agent/issues/13059).
+:::
+
+:::{dropdown} Elastic Agent becomes unhealthy when using the warning log level
+**Applies to: {{agent}} 9.3.0**
+
+On January 30th 2026, a known issue was discovered that causes Elastic Agent to become unhealthy with the message
+`Fatal: failed to unpack the log level 'WARN': invalid level 'warn'` when using the warning log level. Self-monitoring data
+and metrics data will fail to be collected.
+
+**Workaround**
+
+Affected users can use any other log level. A fix will be included in 9.3.1. See [Issue #12513](https://github.com/elastic/elastic-agent/issues/12513).
+:::
+
+:::{dropdown} Elastic Agent becomes unhealthy when an Elasticsearch output used for monitoring specifies any list parameter as a string
+**Applies to: {{agent}} 9.2.1, 9.2.2**
+
+On November 21st 2025, a known issue was discovered that causes Elastic Agent to become unhealthy when a list parameter is specified as a string. Examples for the `hosts` and `ssl.certificate_authorities` parameters follow:
+
+`Otel manager failed: failed to generate otel config: error translating config for output: monitoring, unit: http/metrics-monitoring, error: failed decoding config. decoding failed due to the following error(s): 'hosts' source data must be an array or slice, got string`
+
+`OTel manager failed: failed to generate otel config: error translating config for output: monitoring, unit: filestream-monitoring, error: failed decoding config. decoding failed due to the following error(s): 'ssl.certificate_authorities' source data must be an array or slice, got string`
+
+This occurs when the parameter of an Elasticsearch output that is set as the monitoring output is defined as a string instead of a list:
+
+```yaml callouts=false
+output.elasticsearch:
+  hosts: "https://myEShost:9200" # string instead of list
+  ssl.certificate_authorities: "/tmp/ca.pem" # string instead of list
+```
+
+
+**Workaround**
+
+Affected users can change the affected parameter from a string to a list:
+
+```yaml callouts=false
+output.elasticsearch:
+  hosts: ["https://myEShost:9200"] # list/array instead of string
+  ssl.certificate_authorities: ["/tmp/ca.pem"] # list/array instead of string
+```
+
+The fix for the `hosts` parameter was included in version 9.2.2, which restores support for both the string and list formats of the `hosts` parameter.
+
+A general fix for the remaining parameters will be included in an upcoming patch release. See [Issue #11352](https://github.com/elastic/elastic-agent/issues/11352).
+:::
+
+:::{dropdown} Elastic Agent becomes unhealthy with a host URL parsing error related to the Prometheus collector metricset
+**Applies to: {{agent}} 9.2.1**
+
+On November 13th 2025, a known issue was discovered that causes Elastic Agent to become unhealthy with the error `host parsing failed for prometheus-collector: error parsing URL: parse "http://localhost:EDOT_COLLECTOR_METRICS_PORT": invalid port ":EDOT_COLLECTOR_METRICS_PORT" after host`.
+
+This problem has no effect on the operation of Elastic Agent besides incorrectly marking it as unhealthy. The `prometheus/metrics` input that is
+affected is incorrectly created when certain output types (Logstash, Kafka) or output parameters (for example, `loadbalance`) are used.
+
+For more information, check [#11169](https://github.com/elastic/elastic-agent/issues/11169).
+
+**Workaround**
+
+Affected users must set the **Monitoring runtime** advanced policy setting in {{fleet}} to the **Process** runtime to work around this issue. This is the runtime
+mode that is already being used when this problem occurs. The same can be done in a standalone agent by setting `agent.monitoring._runtime_experimental: process` in its `elastic-agent.yaml` file:
+
+```yaml
+agent.monitoring:
+    _runtime_experimental: process
+```
+
+For more details, check [the comments](https://github.com/elastic/elastic-agent/issues/11169#issuecomment-3553232394) in the related issue.
+
+The fix will be included in version 9.2.2.
+:::
+
+:::{dropdown} Failed upgrades leave {{agent}} stuck until restart
+
+**Applies to: {{agent}} 8.18.7, 9.0.7**
+
+On September 17, 2025, a known issue was discovered that can cause {{agent}} upgrades to get stuck if an upgrade attempt fails under specific conditions. This happens because the coordinator’s `overrideState` remains set, leaving the agent in a state that appears to be upgrading.
+
+**Conditions**
+
+This issue is triggered if the upgrade fails during one of the early checks inside `Coordinator.Upgrade`, for example:
+
+- The agent is not upgradeable
+- Capabilities check denies the upgrade
+- When {{agent}} is tamper-protected, Endpoint must validate that the upgrade action was correctly signed by Kibana to allow the upgrade. If the signature is missing, invalid, or the connection between {{agent}} and Endpoint was interrupted, the validation fails. This causes the agent coordinator's override state to become stuck until the agent is restarted.
+
+**Symptoms**
+
+- {{fleet}} shows the upgrade action in progress, even though the upgrade remains stuck
+- No further upgrade attempts succeed
+- Elastic Agent status shows an override state indicating upgrade
+
+**Workaround**
+
+Restart the {{agent}} to clear the coordinator’s `overrideState` and allow new upgrade attempts to proceed.
+
+**Resolution**
+
+This issue was fixed in [#9992](https://github.com/elastic/elastic-agent/pull/9992), which ensures that the coordinator clears its override state whenever an early failure occurs.
+
+The fix is included in versions 9.1.4, 9.0.8, 8.19.4, and 8.18.8.
+:::
+
+:::{dropdown} [Windows] {{agent}} does not process Windows security events
+
+**Applies to: {{agent}} 8.19.0, 9.1.0 (Windows only)**
+
+On August 1, 2025, a known issue was discovered where {{agent}} does not process Windows security events on hosts running Windows 10, Windows 11, and Windows Server 2022.
+
+For more information, check [Issue #45693](https://github.com/elastic/beats/issues/45693).
+
+**Resolution**
+
+This issue was fixed in [#45730](https://github.com/elastic/beats/pull/45730). The fix is included in {{agent}} 9.1.1 and 8.19.1.
+:::
+
+:::{dropdown} {{agents}} remain in an "Upgrade scheduled" state
+
+**Applies to: {{agent}} 8.18.0, 8.18.1, 8.18.2, 8.18.3, 8.18.4, 8.19.0, 9.0.0, 9.0.1, 9.0.2, 9.0.3, 9.1.0**
+
+On July 2, 2025, a known issue was discovered where {{agent}} remains in an `Upgrade scheduled` state when a scheduled {{agent}} upgrade is cancelled. Attempting to restart the upgrade on the UI returns an error: `The selected agent is not upgradeable: agent is already being upgraded.`.
+
+For more information, check [Issue #8778](https://github.com/elastic/elastic-agent/issues/8778).
+
+**Workaround**
+
+Call the [Upgrade an agent](https://www.elastic.co/docs/api/doc/kibana/operation/operation-post-fleet-agents-agentid-upgrade) endpoint of the Kibana Fleet API with the `force` parameter set to `true` to force-upgrade the {{agent}}:
+
+```powershell
+curl --request POST \
+  --url https://<KIBANA_HOST>/api/fleet/agents/<AGENT_ID>/upgrade \
+  --user "<SUPERUSER_NAME>:<SUPERUSER_PASSWORD>" \
+  --header 'Content-Type: application/json' \
+  --header 'kbn-xsrf: true' \
+  --data '{"version": "<VERSION>","force": true}'
+```
+
+To force-upgrade multiple {{agents}}, call the [Bulk upgrade agents](https://www.elastic.co/docs/api/doc/kibana/operation/operation-post-fleet-agents-bulk-upgrade) endpoint of the Kibana Fleet API with the `force` parameter set to `true`:
+
+```powershell
+curl --request POST \
+  --url https://<KIBANA_HOST>/api/fleet/agents/bulk_upgrade \
+  --user "<SUPERUSER_NAME>:<SUPERUSER_PASSWORD>" \
+  --header 'Content-Type: application/json' \
+  --header 'kbn-xsrf: true' \
+  --data '{"version": "<VERSION>","force": true,"agents":["<AGENT_IDS>"]}'
+```
+:::
+
+:::{dropdown} [Windows] {{agent}} is unable to re-enroll into {{fleet}}
+
+**Applies to: {{agent}} 9.0.0, 9.0.1, 9.0.2 (Windows only)**
+
+On April 9, 2025, a known issue was discovered where an {{agent}} installed on Windows and previously enrolled into {{fleet}} is unable to re-enroll. Attempting to enroll the {{agent}} fails with the following error:
+
+```shell
+Error: the command is executed as root but the program files are not owned by the root user.
+```
+
+For more information, check [Issue #7794](https://github.com/elastic/elastic-agent/issues/7794).
+
+**Workaround**
+
+Until a bug fix is available in a later release, you can resolve the issue temporarily using the following workaround:
+
+1. Change the ownership of the {{agent}} directory:
+
+  ```shell
+  icacls "C:\Program Files\Elastic\Agent" /setowner "NT AUTHORITY\SYSTEM" /t /l
+  ```
+
+2. After the output confirms all files were successfully processed, run the `enroll` command again.
+
+:::
+
+:::{dropdown} [macOS] Osquery integration fails to start on fresh agent installs
+
+**Applies to: {{agent}} 9.0.0 and 9.0.1 (macOS only)**
+
+On May 26th, 2025, a known issue was discovered that causes the `osquery` integration to fail on new {{agent}} installations on macOS. During the installation process, the required `osquery.app/` directory is removed, which prevents the integration from starting.
+
+For more information, check [Issue #8245](https://github.com/elastic/elastic-agent/issues/8245).
+
+**Workaround**
+
+As a workaround, you can manually restore the `osquery.app/` directory as follows:
+
+1. Extract the {{agent}} package, but do not install it yet.
+
+2. Open the following file in the extracted directory:
+
+   ```
+   data/elastic-agent-68f3ed/components/agentbeat.spec.yml
+   ```
+
+3. Locate the `component_files` section at the top of the file. It should look similar to this:
+
+   ```yaml
+   version: 2
+   component_files:
+     - certs/*
+     - lenses/*
+     - module/*
+     - "osquery-extension.ext"
+     - "osquery-extension.exe"
+     - osqueryd
+     - "osqueryd.exe"
+   ```
+
+4. Add the following entry to the end of the list:
+
+   ```yaml
+     - "osquery.app/*"
+   ```
+
+   The updated section should now look like this:
+
+   ```yaml
+   version: 2
+   component_files:
+     - certs/*
+     - lenses/*
+     - module/*
+     - "osquery-extension.ext"
+     - "osquery-extension.exe"
+     - osqueryd
+     - "osqueryd.exe"
+     - "osquery.app/*"
+   ```
+
+5. Proceed to install {{agent}} from the extracted directory as usual.
+
+:::
+
+:::{dropdown} Failed to start {{agent}} in OTel mode for Hosts onboarding
+
+**Applies to: {{agent}} 9.1.6 to 9.2.0**
+
+On October 24, 2025, a known issue was discovered where {{agent}} fails to start
+in OTel mode when deployed through the guided Observability onboarding flow in Kibana. The issue occurs because the sample configuration used by the {{agent}} was using incorrect configuration key.
+
+The Error looks like this in the logs:
+
+```shell
+Starting in otel mode
+failed to get config: cannot unmarshal the configuration: decoding failed due to the following error(s):
+
+'exporters' error reading configuration for "otlp/ingest": decoding failed due to the following error(s):
+
+'sending_queue' decoding failed due to the following error(s):
+
+'batch' decoding failed due to the following error(s):
+
+'' has invalid keys: flush_interval
+```
+
+**Workaround**
+
+To work around this issue, manually update the configuration of the generated `otel.yaml` file to replace the incorrect key `flush_interval` with the correct key `flush_timeout`.
+
+```yaml
+batch:
+  flush_timeout: 1s
+```
+
+:::
