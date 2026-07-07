@@ -22,3 +22,4 @@
 {"name": "github.com/elastic/cloud-on-k8s/v3", "licenceType": "Elastic"}
 {"name": "github.com/elastic/elastic-agent/internal/edot", "licenceType": "Elastic"}
 {"name": "github.com/chengxilo/virtualterm", "licenceType": "MIT", "url": "https://raw.githubusercontent.com/chengxilo/virtualterm/master/LICENSE"}
+{"name": "github.com/elastic/fleet-server/pkg/api", "licenceFile": "LICENSE.txt", "licenceType": "Elastic"}
