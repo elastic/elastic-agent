@@ -1317,6 +1317,36 @@ func TestRedactEnv(t *testing.T) {
 			"SERVICE_TOKEN": redact.REDACTED,
 			"HTTPS_PROXY":   "https://" + REDACTED_URL_USERNAME_PASSWORD + "@my-proxy",
 		},
+	}, {
+		name: "Redacts sensitive header embedded in FLEET_HEADER value",
+		env: map[string]string{
+			"FLEET_HEADER": "X-Elastic-App-Auth=eyJhbGciOiJSUzI1NiJ9.eyJraW5kIjoia2liYW5hIn0.sig",
+			"FLEET_URL":    "https://fleet.example.com:443",
+		},
+		expect: map[string]any{
+			"FLEET_HEADER":                     redact.REDACTED,
+			"FLEET_HEADER::X-Elastic-App-Auth": redact.REDACTED,
+			"FLEET_URL":                        "https://fleet.example.com:443",
+		},
+	}, {
+		name: "Redacts sensitive header embedded in FLEET_HEADERS value, preserves innocuous headers",
+		env: map[string]string{
+			"FLEET_HEADERS": "X-Elastic-App-Auth=eyJhbGciOiJSUzI1NiJ9.eyJraW5kIjoia2liYW5hIn0.sig,Accept=application/json",
+		},
+		expect: map[string]any{
+			"FLEET_HEADERS":                     redact.REDACTED,
+			"FLEET_HEADERS::X-Elastic-App-Auth": redact.REDACTED,
+			"FLEET_HEADERS::Accept":             "application/json",
+		},
+	}, {
+		name: "Redacts sensitive header embedded in FLEET_KIBANA_HEADER value",
+		env: map[string]string{
+			"FLEET_KIBANA_HEADER": "X-Elastic-App-Auth=eyJhbGciOiJSUzI1NiJ9.eyJraW5kIjoia2liYW5hIn0.sig",
+		},
+		expect: map[string]any{
+			"FLEET_KIBANA_HEADER":                     redact.REDACTED,
+			"FLEET_KIBANA_HEADER::X-Elastic-App-Auth": redact.REDACTED,
+		},
 	}}
 
 	for _, tt := range tests {
