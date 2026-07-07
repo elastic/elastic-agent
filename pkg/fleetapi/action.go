@@ -40,7 +40,10 @@ type Action interface {
 	fmt.Stringer
 	Type() string
 	ID() string
-	AckEvent() AckEvent
+	// AckEvent builds the ack event for this action, to be sent to fleet-server as part of an
+	// AckRequest. agentID and ts are injected here (rather than set on the returned value) because
+	// api.AckRequest_Events_Item is an opaque union type with no settable fields after construction.
+	AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item
 }
 
 // Actions is a slice of Actions to executes and allow to unmarshal
@@ -115,13 +118,28 @@ func NewAction(actionType string) Action {
 	return action
 }
 
-func newAckEvent(id, aType string) AckEvent {
-	return AckEvent{
-		EventType: "ACTION_RESULT",
-		SubType:   "ACKNOWLEDGED",
-		ActionID:  id,
+// newGenericEvent builds the common fields shared by every ack event.
+func newGenericEvent(id, aType, agentID string, ts time.Time) api.GenericEvent {
+	return api.GenericEvent{
+		Type:      api.ACTIONRESULT,
+		Subtype:   api.EventSubtypeACKNOWLEDGED,
+		ActionId:  id,
+		AgentId:   agentID,
+		Timestamp: ts,
 		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", id, aType),
 	}
+}
+
+// toGenericAckEvent wraps a GenericEvent in the AckRequest_Events_Item union.
+func toGenericAckEvent(ev api.GenericEvent) api.AckRequest_Events_Item {
+	var item api.AckRequest_Events_Item
+	_ = item.FromGenericEvent(ev)
+	return item
+}
+
+// newAckEvent builds the default (no-error) ack event for actions with no additional fields to report.
+func newAckEvent(id, aType, agentID string, ts time.Time) api.AckRequest_Events_Item {
+	return toGenericAckEvent(newGenericEvent(id, aType, agentID, ts))
 }
 
 // ActionUnknown is an action that is not know by the current version of the Agent and we don't want
@@ -158,14 +176,11 @@ func (a *ActionUnknown) String() string {
 	return s.String()
 }
 
-func (a *ActionUnknown) AckEvent() AckEvent {
-	return AckEvent{
-		EventType: "ACTION_RESULT", // TODO Discuss EventType/SubType needed - by default only ACTION_RESULT was used - what is (or was) the intended purpose of these attributes? Are they documented? Can we change them to better support acking an error or a retry?
-		SubType:   "ACKNOWLEDGED",
-		ActionID:  a.ActionID,
-		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
-		Error:     fmt.Sprintf("Action %q of type %q is unknown to the elastic-agent", a.ActionID, a.OriginalType),
-	}
+func (a *ActionUnknown) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	event := newGenericEvent(a.ActionID, a.ActionType, agentID, ts)
+	errStr := fmt.Sprintf("Action %q of type %q is unknown to the elastic-agent", a.ActionID, a.OriginalType)
+	event.Error = &errStr
+	return toGenericAckEvent(event)
 }
 
 // ActionPolicyReassign is a request to apply a new policy
@@ -198,8 +213,8 @@ func (a *ActionPolicyReassign) ID() string {
 	return a.ActionID
 }
 
-func (a *ActionPolicyReassign) AckEvent() AckEvent {
-	return newAckEvent(a.ActionID, a.ActionType)
+func (a *ActionPolicyReassign) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	return newAckEvent(a.ActionID, a.ActionType, agentID, ts)
 }
 
 // ActionPolicyChange is a request to apply a new
@@ -232,8 +247,8 @@ func (a *ActionPolicyChange) ID() string {
 	return a.ActionID
 }
 
-func (a *ActionPolicyChange) AckEvent() AckEvent {
-	return newAckEvent(a.ActionID, a.ActionType)
+func (a *ActionPolicyChange) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	return newAckEvent(a.ActionID, a.ActionType, agentID, ts)
 }
 
 // ActionUpgrade is a request for agent to upgrade.
@@ -264,24 +279,31 @@ func (a *ActionUpgrade) String() string {
 	return s.String()
 }
 
-func (a *ActionUpgrade) AckEvent() AckEvent {
-	event := newAckEvent(a.ActionID, a.ActionType)
+func (a *ActionUpgrade) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	event := api.UpgradeEvent{
+		Type:      api.ACTIONRESULT,
+		Subtype:   api.EventSubtypeACKNOWLEDGED,
+		ActionId:  a.ActionID,
+		AgentId:   agentID,
+		Timestamp: ts,
+		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
+	}
 	if a.Err != nil {
 		// FIXME Do we want to change EventType/SubType here?
-		event.Error = a.Err.Error()
-		var payload struct {
-			Retry   bool `json:"retry"`
-			Attempt int  `json:"retry_attempt,omitempty"`
+		errStr := a.Err.Error()
+		event.Error = &errStr
+		// retry is set to -1 if it will not re attempt
+		event.Payload = &struct {
+			Retry        bool `json:"retry"`
+			RetryAttempt int  `json:"retry_attempt"`
+		}{
+			Retry:        a.Data.Retry >= 1,
+			RetryAttempt: a.Data.Retry,
 		}
-		payload.Retry = true
-		payload.Attempt = a.Data.Retry
-		if a.Data.Retry < 1 { // retry is set to -1 if it will not re attempt
-			payload.Retry = false
-		}
-		p, _ := json.Marshal(payload)
-		event.Payload = p
 	}
-	return event
+	var item api.AckRequest_Events_Item
+	_ = item.FromUpgradeEvent(event)
+	return item
 }
 
 // Type returns the type of the Action.
@@ -377,8 +399,8 @@ func (a *ActionUnenroll) ID() string {
 	return a.ActionID
 }
 
-func (a *ActionUnenroll) AckEvent() AckEvent {
-	return newAckEvent(a.ActionID, a.ActionType)
+func (a *ActionUnenroll) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	return newAckEvent(a.ActionID, a.ActionType, agentID, ts)
 }
 
 // MarshalMap marshals ActionUnenroll into a corresponding map
@@ -422,8 +444,8 @@ func (a *ActionSettings) String() string {
 	return s.String()
 }
 
-func (a *ActionSettings) AckEvent() AckEvent {
-	return newAckEvent(a.ActionID, a.ActionType)
+func (a *ActionSettings) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	return newAckEvent(a.ActionID, a.ActionType, agentID, ts)
 }
 
 // ActionCancel is a request to cancel an action.
@@ -458,8 +480,8 @@ func (a *ActionCancel) String() string {
 	return s.String()
 }
 
-func (a *ActionCancel) AckEvent() AckEvent {
-	return newAckEvent(a.ActionID, a.ActionType)
+func (a *ActionCancel) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	return newAckEvent(a.ActionID, a.ActionType, agentID, ts)
 }
 
 // ActionDiagnostics is a request to gather and upload a diagnostics bundle.
@@ -495,21 +517,28 @@ func (a *ActionDiagnostics) String() string {
 	return s.String()
 }
 
-func (a *ActionDiagnostics) AckEvent() AckEvent {
-	event := newAckEvent(a.ActionID, a.ActionType)
+func (a *ActionDiagnostics) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	event := api.DiagnosticsEvent{
+		Type:      api.ACTIONRESULT,
+		Subtype:   api.EventSubtypeACKNOWLEDGED,
+		ActionId:  a.ActionID,
+		AgentId:   agentID,
+		Timestamp: ts,
+		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
+	}
 	if a.Err != nil {
-		event.Error = a.Err.Error()
+		errStr := a.Err.Error()
+		event.Error = &errStr
 	}
 	if a.UploadID != "" {
-		var data struct {
-			UploadID string `json:"upload_id"`
-		}
-		data.UploadID = a.UploadID
-		p, _ := json.Marshal(data)
-		event.Data = p
+		event.Data = &struct {
+			UploadId string `json:"upload_id"`
+		}{UploadId: a.UploadID}
 	}
 
-	return event
+	var item api.AckRequest_Events_Item
+	_ = item.FromDiagnosticsEvent(event)
+	return item
 }
 
 // ActionApp is the application action request.
@@ -547,19 +576,40 @@ func (a *ActionApp) Type() string {
 	return a.ActionType
 }
 
-func (a *ActionApp) AckEvent() AckEvent {
-	return AckEvent{
-		EventType:       "ACTION_RESULT",
-		SubType:         "ACKNOWLEDGED",
-		ActionID:        a.ActionID,
+func (a *ActionApp) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	event := api.InputEvent{
+		Type:            api.ACTIONRESULT,
+		Subtype:         api.EventSubtypeACKNOWLEDGED,
+		ActionId:        a.ActionID,
+		AgentId:         agentID,
+		Timestamp:       ts,
 		Message:         fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
 		ActionInputType: a.InputType,
 		ActionData:      a.Data,
-		ActionResponse:  a.Response,
-		StartedAt:       a.StartedAt,
-		CompletedAt:     a.CompletedAt,
-		Error:           a.Error,
+		// StartedAt/CompletedAt fall back to ts if a.StartedAt/a.CompletedAt are
+		// empty or fail to parse, so the event never carries a zero time.Time.
+		StartedAt:   ts,
+		CompletedAt: ts,
 	}
+	if a.Response != nil {
+		if b, err := json.Marshal(a.Response); err == nil {
+			event.ActionResponse = b
+		}
+	}
+	if t, err := time.Parse(time.RFC3339Nano, a.StartedAt); err == nil {
+		event.StartedAt = t
+	}
+	if t, err := time.Parse(time.RFC3339Nano, a.CompletedAt); err == nil {
+		event.CompletedAt = t
+	}
+	if a.Error != "" {
+		errStr := a.Error
+		event.Error = &errStr
+	}
+
+	var item api.AckRequest_Events_Item
+	_ = item.FromInputEvent(event)
+	return item
 }
 
 // MarshalMap marshals ActionApp into a corresponding map
