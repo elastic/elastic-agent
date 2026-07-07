@@ -514,8 +514,8 @@ func TestFleetGatewayCheckinResponseMissingActionsField(t *testing.T) {
 
 	stateStore := newStateStore(t, log)
 
-	mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
-	mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
+	mockRollbacksSrc := newMockRollbacksSource(t)
+	mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
 
 	gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
 	require.NoError(t, err)
