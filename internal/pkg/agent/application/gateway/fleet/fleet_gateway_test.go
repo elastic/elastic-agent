@@ -497,6 +497,63 @@ func TestFleetGateway(t *testing.T) {
 	})
 }
 
+// TestFleetGatewayCheckinResponseMissingActionsField reproduces
+// https://github.com/elastic/elastic-agent/issues/15397: fleet-server omits
+// the "actions" field from its checkin response when it has nothing new to
+// report, and the agent was logging an error every time that happened.
+func TestFleetGatewayCheckinResponseMissingActionsField(t *testing.T) {
+	agentInfo := &testAgentInfo{}
+	settings := &fleetGatewaySettings{
+		Duration: 5 * time.Second,
+		Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 5 * time.Second},
+	}
+
+	scheduler := scheduler.NewStepper()
+	client := newTestingClient()
+
+	log, obs := loggertest.New("fleet_gateway")
+
+	stateStore := newStateStore(t, log)
+
+	mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
+	mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
+
+	gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	waitFn := ackSeq(
+		client.Answer(func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
+			// Real-world fleet-server response when there is nothing new to
+			// report: no "actions" key at all, not even an empty array.
+			resp := wrapStrToResp(http.StatusOK, `{ "ack_token": "token1" }`)
+			return resp, nil
+		}),
+	)
+
+	errCh := runFleetGateway(ctx, gateway)
+
+	scheduler.Next()
+	waitFn()
+
+	cancel()
+	err = <-errCh
+	require.NoError(t, err)
+
+	select {
+	case actions := <-gateway.Actions():
+		t.Errorf("Expected no actions, got %v", actions)
+	default:
+	}
+
+	unmarshalErrors := obs.FilterMessageSnippet("failed to unmarshal checkin actions").All()
+	require.Empty(t, unmarshalErrors,
+		"a checkin response without an \"actions\" field should not produce an unmarshal "+
+			"error (see https://github.com/elastic/elastic-agent/issues/15397): %+v", unmarshalErrors)
+}
+
 func TestRetriesOnFailures(t *testing.T) {
 	agentInfo := &testAgentInfo{}
 	settings := &fleetGatewaySettings{
