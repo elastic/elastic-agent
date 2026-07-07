@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -136,6 +137,11 @@ func getFlushTimeout(logger *logp.Logger, output *config.C) string {
 	if err != nil {
 		logger.Debugf("Failed to get flush timeout: %v", err)
 		return "10s" // return default queue.mem.flush.timeout for sending_queue in case of an errr
+	}
+	// Append seconds unit if Agent config does not specify a unit
+	// to prevent the OTel exporterhelper from failing to start.
+	if _, parseErr := strconv.ParseFloat(timeout, 64); parseErr == nil {
+		return timeout + "s"
 	}
 	return timeout
 }
