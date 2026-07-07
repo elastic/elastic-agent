@@ -33,40 +33,54 @@ func NewTTLMarkerRegistry(log *logger.Logger, baseDir string) *TTLMarkerRegistry
 	}
 }
 
+// Set reconciles the on-disk .ttl markers with the desired state m: existing
+// markers whose versionedHome is not in m are removed, and entries in m are
+// written (creating or overwriting). Existing markers with unparseable payloads
+// are tolerated via GetAll's partial-success contract: malformed entries are
+// logged and either swept (when absent from m) or overwritten by addOrReplace
+// (when present in m), so a single corrupt marker cannot wedge upgrades or
+// rollbacks.
 func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
-	// identify the marker files to be deleted first
-	existingMarkers, err := T.Get()
+	existingMarkers, malformed, err := T.GetAll()
 	if err != nil {
 		return fmt.Errorf("accessing existing markers: %w", err)
 	}
 
 	for versionedHome := range existingMarkers {
-		_, ok := m[versionedHome]
-		if !ok {
-			// the existing marker should not be in the final state
-			T.log.Debugf("Removing marker for versionedHome: %s", versionedHome)
-			err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
-			if err != nil {
-				return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
-			}
+		if _, ok := m[versionedHome]; ok {
+			continue
+		}
+		T.log.Infof("Removing TTL marker for %s: not in new desired state", versionedHome)
+		err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
 		}
 	}
 
-	// create all the remaining markers
+	for versionedHome, parseErr := range malformed {
+		if _, ok := m[versionedHome]; ok {
+			T.log.Infow("Overwriting malformed TTL marker with valid entry",
+				"versionedHome", versionedHome, "error.message", parseErr.Error())
+			continue
+		}
+		T.log.Infow("Sweeping malformed TTL marker: not in new desired state",
+			"versionedHome", versionedHome, "error.message", parseErr.Error())
+		err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
+		}
+	}
+
 	return T.addOrReplace(m)
 }
 
 func (T TTLMarkerRegistry) Remove(versionedHome string) error {
-	markerFilePath := filepath.Join(T.baseDir, versionedHome, ttlMarkerName)
-	if _, err := os.Stat(markerFilePath); errors.Is(err, os.ErrNotExist) {
-		// marker file does not exist, nothing to do
-		return nil
-	}
-
-	T.log.Debugf("Removing marker for versionedHome: %s", versionedHome)
-	err := os.Remove(markerFilePath)
-	if err != nil {
+	err := os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
+	}
+	if err == nil {
+		T.log.Debugf("Removing marker for versionedHome: %s", versionedHome)
 	}
 	return nil
 }
@@ -78,7 +92,7 @@ func (T TTLMarkerRegistry) Remove(versionedHome string) error {
 //   - malformed: per-entry errors keyed by versioned home for entries whose
 //     .ttl file could not be read or parsed (e.g. corrupt YAML, permissions,
 //     ENOENT during read). Entries whose path cannot be made relative to
-//     baseDir are keyed by the original glob match instead.
+//     baseDir are silently skipped (unreachable in practice — see inline comment).
 //
 // The returned error is non-nil only on structural failures (e.g. a glob
 // failure) where no scan could be performed. Callers that need to be
@@ -95,10 +109,12 @@ func (T TTLMarkerRegistry) GetAll() (map[string]TTLMarker, map[string]error, err
 	malformed := map[string]error{}
 	for _, match := range matches {
 		T.log.Debugf("Reading marker from versionedHome: %s", match)
+		// relErr is unreachable in practice: every match is produced by a glob
+		// rooted at T.baseDir, so filepath.Dir(match) is always under T.baseDir
+		// and filepath.Rel cannot fail. The branch is kept as a defensive guard.
 		relPath, relErr := filepath.Rel(T.baseDir, filepath.Dir(match))
 		if relErr != nil {
 			T.log.Infof("skipping marker %q: failed to compute path relative to %q: %s", match, T.baseDir, relErr)
-			malformed[match] = fmt.Errorf("computing path relative to %q: %w", T.baseDir, relErr)
 			continue
 		}
 		marker, readErr := readTTLMarker(match)
@@ -111,26 +127,6 @@ func (T TTLMarkerRegistry) GetAll() (map[string]TTLMarker, map[string]error, err
 	}
 
 	return ttlMarkers, malformed, nil
-}
-
-// Get reads all .ttl markers and returns only successfully parsed entries.
-// It preserves the all-or-nothing contract: if any per-entry parse fails,
-// Get returns (nil, joined error) so existing callers continue to see the
-// same behavior. Callers that want partial results plus a list of malformed
-// entries should use GetAll directly.
-func (T TTLMarkerRegistry) Get() (map[string]TTLMarker, error) {
-	markers, malformed, err := T.GetAll()
-	if err != nil {
-		return nil, err
-	}
-	if len(malformed) > 0 {
-		errs := make([]error, 0, len(malformed))
-		for _, e := range malformed {
-			errs = append(errs, e)
-		}
-		return nil, errors.Join(errs...)
-	}
-	return markers, nil
 }
 
 func (T TTLMarkerRegistry) addOrReplace(m map[string]TTLMarker) error {

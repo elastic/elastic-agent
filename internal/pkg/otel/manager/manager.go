@@ -23,7 +23,6 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap"
 
-	"github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -48,6 +47,9 @@ const (
 
 	// elasticMonitoringReceiverName is the component type name for the elastic monitoring receiver.
 	elasticMonitoringReceiverName = "elasticmonitoringreceiver"
+	// elasticMonitoringConnectorName is the component type name for the elastic monitoring connector.
+	// The connector receives pdata.Metrics from the receiver and converts them to Beats-format pdata.Logs.
+	elasticMonitoringConnectorName = "elasticmonitoringconnector"
 )
 
 type collectorRecoveryTimer interface {
@@ -65,7 +67,7 @@ type collectorRecoveryTimer interface {
 
 type configUpdate struct {
 	collectorCfg  *confmap.Conf
-	settingsCfg   *configuration.SettingsConfig
+	monitoringCfg *monitoringCfg.MonitoringConfig
 	components    []component.Component
 	agentLogLevel logp.Level
 }
@@ -512,17 +514,12 @@ func (m *OTelManager) buildMergedConfig(
 ) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
 
-	var runtimeCfg *component.RuntimeConfig
-	if cfgUpdate.settingsCfg != nil && cfgUpdate.settingsCfg.Internal != nil {
-		runtimeCfg = cfgUpdate.settingsCfg.Internal.Runtime
-	}
-
 	// Generate component otel config if there are components
 	var componentOtelCfg *confmap.Conf
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, runtimeCfg, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
@@ -539,14 +536,12 @@ func (m *OTelManager) buildMergedConfig(
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 		}
 
-		if cfgUpdate.settingsCfg != nil {
-			if mCfg := cfgUpdate.settingsCfg.MonitoringConfig; mCfg != nil {
-				if mCfg.Enabled && mCfg.MonitorMetrics {
-					// Metrics monitoring is enabled, inject a receiver for the
-					// collector's internal telemetry.
-					if err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components); err != nil {
-						return nil, fmt.Errorf("merging internal telemetry config: %w", err)
-					}
+		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil {
+			if mCfg.Enabled && mCfg.MonitorMetrics {
+				// Metrics monitoring is enabled, inject a receiver for the
+				// collector's internal telemetry.
+				if err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components, logger); err != nil {
+					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
 				}
 			}
 		}
@@ -618,19 +613,10 @@ func injectDiagnosticsExtension(config *confmap.Conf) error {
 	}))
 }
 
-func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent) map[string]any {
+func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent, logger *logp.Logger) map[string]any {
 	namespace := "default"
 	if monitoring.Namespace != "" {
 		namespace = monitoring.Namespace
-	}
-	agentFields := map[string]any{
-		"id":      agentInfo.AgentID(),
-		"version": agentInfo.Version(),
-	}
-	// Add hostname as agent.name if available
-	agentName, err := os.Hostname()
-	if err == nil {
-		agentFields["name"] = agentName
 	}
 
 	result := map[string]any{
@@ -648,7 +634,10 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 			"snapshot": agentInfo.Snapshot(),
 			"version":  agentInfo.Version(),
 		},
-		"agent": agentFields,
+		"agent": map[string]any{
+			"id":      agentInfo.AgentID(),
+			"version": agentInfo.Version(),
+		},
 		"component": map[string]any{
 			"binary": "elastic-otel-collector",
 			"id":     "elastic-otel-collector",
@@ -658,11 +647,26 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 		},
 	}
 
+	var hostname string
+	ecsMetadata, err := agentInfo.ECSMetadata(logger)
+	if err == nil {
+		hostname = ecsMetadata.Host.Hostname
+	} else if name, err := os.Hostname(); err == nil {
+		hostname = name
+	}
+
+	if hostname != "" {
+		result["agent"].(map[string]any)["name"] = hostname
+		result["host"] = map[string]any{
+			"hostname": hostname,
+		}
+	}
+
 	return result
 }
 
-func monitoringInputEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent) map[string]any {
-	tmpl := monitoringEventTemplate(monitoring, agentInfo)
+func monitoringInputEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent, logger *logp.Logger) map[string]any {
+	tmpl := monitoringEventTemplate(monitoring, agentInfo, logger)
 	tmpl["data_stream"] = map[string]any{
 		"dataset":   "elastic_agent.filebeat_input",
 		"namespace": tmpl["data_stream"].(map[string]any)["namespace"],
@@ -693,67 +697,126 @@ func exporterIDToOutputNameLookup(components []component.Component) (map[string]
 	return lookup, nil
 }
 
+// internalTelemetryDiagnosticsFileName is the filename for the diagnostics file.
+// It is written to filepath.Join(paths.Home(), "logs") so that it sits alongside the
+// other elastic-agent log files and is automatically included in diagnostics bundles.
+// The file contains uncompressed OTLP JSON records (one per line). Plain NDJSON is
+// used here deliberately: the diagnostics collector packages files into a zip archive
+// using deflate, and repetitive JSON compresses to roughly 4% of its original size —
+// far better than the ~94% stored size of a pre-zstd file. Keeping the file
+// uncompressed also makes individual records immediately readable with standard tools.
+const internalTelemetryDiagnosticsFileName = "elastic-agent-metrics.ndjson"
+
+// defaultDiagnosticsFileSizeMB is the max size in megabytes for the internal telemetry
+// diagnostics file.
+const defaultDiagnosticsFileSizeMB = 10
+
 func injectMonitoringReceiver(
 	config *confmap.Conf,
 	monitoring *monitoringCfg.MonitoringConfig,
 	agentInfo info.Agent,
 	components []component.Component,
+	logger *logp.Logger,
 ) error {
-	// Find the monitoring exporter that this pipeline will be writing to
+	// Check whether OTel-based monitoring is configured — it produces an ES exporter
+	// named "monitoring" that the internal telemetry pipeline can share.
 	exporterType := otelcomponent.MustNewType("elasticsearch")
 	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
 	monitoringExporterFound := false
 	if config.IsSet("exporters") {
-		// Search the defined exporters for one with the expected id for monitoring
 		for exporter := range config.Get("exporters").(map[string]any) {
 			if exporter == exporterID {
 				monitoringExporterFound = true
 			}
 		}
 	}
-	if !monitoringExporterFound {
-		// We can't monitor OTel metrics without OTel-based monitoring
-		return nil
-	}
+
 	outputNameLookup, err := exporterIDToOutputNameLookup(components)
 	if err != nil {
 		return fmt.Errorf("couldn't map exporter IDs to output names: %w", err)
 	}
 
 	receiverType := otelcomponent.MustNewType(elasticMonitoringReceiverName)
+	connectorType := otelcomponent.MustNewType(elasticMonitoringConnectorName)
 	receiverName := "internal-telemetry-monitoring"
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
-	processorID := translate.GetProcessorID().String()
-	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
-	pipelineCfg := map[string]any{
-		"receivers": []string{receiverID},
-		"exporters": []string{exporterID},
+	processorID := translate.GetProcessorID(receiverName).String()
+
+	diagName := translate.OtelNamePrefix + receiverName
+	connectorID := otelcomponent.NewIDWithName(connectorType, diagName).String()
+	metricsPipelineID := "metrics/" + translate.OtelNamePrefix + receiverName
+	logsPipelineID := "logs/" + translate.OtelNamePrefix + receiverName
+
+	// Build a file exporter for writing internal telemetry to disk as a diagnostics
+	// artifact. The file is written to the default logs directory.
+	// Records are written as plain OTLP JSON (one record per line). No compression.
+	// This data format compresses very well, so impact on diagnostics is minimal.
+	fileExporterID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("file"), diagName).String()
+	diagFilePath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
+
+	// The metrics pipeline always writes to the file exporter (for diagnostics in
+	// proper OTel metrics format). When OTel-based monitoring is also configured,
+	// the connector is included as an additional exporter so that metrics are
+	// converted to Beats-format logs and forwarded to Elasticsearch.
+	metricsPipelineExporters := []string{fileExporterID}
+	if monitoringExporterFound {
+		metricsPipelineExporters = append(metricsPipelineExporters, connectorID)
 	}
+	metricsPipelineCfg := map[string]any{
+		"receivers": []string{receiverID},
+		"exporters": metricsPipelineExporters,
+	}
+
 	collectorCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
-				"event_template":       monitoringEventTemplate(monitoring, agentInfo),
-				"input_event_template": monitoringInputEventTemplate(monitoring, agentInfo),
-				"interval":             monitoring.MetricsPeriod,
-				"exporter_names":       outputNameLookup,
+				"interval": monitoring.MetricsPeriod,
+			},
+		},
+		"exporters": map[string]any{
+			fileExporterID: map[string]any{
+				"path":   diagFilePath,
+				"format": "json",
+				"rotation": map[string]any{
+					"max_megabytes": defaultDiagnosticsFileSizeMB,
+					"max_backups":   1,
+				},
 			},
 		},
 		"service": map[string]any{
 			"pipelines": map[string]any{
-				pipelineID: pipelineCfg,
+				metricsPipelineID: metricsPipelineCfg,
 			},
 		},
 	}
-	if features.DefaultProcessors() {
-		// If default processors are enabled, reference the shared beat processor.
-		// The processor definition is the same as the one added in GetOtelConfig,
-		// so upon merge one replaces the other with identical content.
-		collectorCfg["processors"] = map[string]any{
-			processorID: map[string]any{
-				"processors": translate.GetDefaultProcessors(),
+
+	// When OTel-based monitoring is configured, add the connector and a logs
+	// pipeline so that metrics are converted to Beats-format monitoring events
+	// and forwarded to Elasticsearch.
+	if monitoringExporterFound {
+		logsPipelineCfg := map[string]any{
+			"receivers": []string{connectorID},
+			"exporters": []string{exporterID},
+		}
+		if features.DefaultProcessors() {
+			// This pipeline forwards Agent's own internal telemetry in beats format,
+			// not a specific beat's data, so it always gets the standard default
+			// processors.
+			collectorCfg["processors"] = map[string]any{
+				processorID: map[string]any{
+					"processors": translate.GetDefaultProcessors(""),
+				},
+			}
+			logsPipelineCfg["processors"] = []string{processorID}
+		}
+		collectorCfg["connectors"] = map[string]any{
+			connectorID: map[string]any{
+				"event_template":       monitoringEventTemplate(monitoring, agentInfo, logger),
+				"input_event_template": monitoringInputEventTemplate(monitoring, agentInfo, logger),
+				"exporter_names":       outputNameLookup,
 			},
 		}
-		pipelineCfg["processors"] = []string{processorID}
+		collectorCfg["service"].(map[string]any)["pipelines"].(map[string]any)[logsPipelineID] = logsPipelineCfg
 	}
 
 	return mergeWithExtensions(config, confmap.NewFromStringMap(collectorCfg))
@@ -814,10 +877,10 @@ func (m *OTelManager) applyMergedConfig(
 }
 
 // Update sends collector configuration and component updates to the manager's run loop.
-func (m *OTelManager) Update(cfg *confmap.Conf, settings *configuration.SettingsConfig, ll logp.Level, components []component.Component) {
+func (m *OTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component) {
 	cfgUpdate := configUpdate{
 		collectorCfg:  cfg,
-		settingsCfg:   settings,
+		monitoringCfg: monitoring,
 		components:    components,
 		agentLogLevel: ll,
 	}
@@ -869,7 +932,7 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case extensionKey == "extension:"+m.opampExtComponentID:
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
-				case strings.HasPrefix(extensionKey, "extension:"+kafkapartitionerextension.Type.String()):
+				case strings.HasPrefix(extensionKey, "extension:kafkapartitioner"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}

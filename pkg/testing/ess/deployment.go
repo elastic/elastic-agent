@@ -27,10 +27,11 @@ type Tag struct {
 }
 
 type CreateDeploymentRequest struct {
-	Name    string `json:"name"`
-	Region  string `json:"region"`
-	Version string `json:"version"`
-	Tags    []Tag  `json:"tags"`
+	Name           string `json:"name"`
+	Region         string `json:"region"`
+	Version        string `json:"version"`
+	Tags           []Tag  `json:"tags"`
+	KibanaMemoryMB int    `json:"kibana_memory_mb,omitempty"`
 }
 
 type CreateDeploymentResponse struct {

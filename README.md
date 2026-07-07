@@ -103,10 +103,11 @@ To build a local version of the agent for development, run the command below. Th
 
 ```sh
 # EXTERNAL=true downloads the matching version of the binaries that are packaged with agent, not necessary if only using Beats.
-# SNAPSHOT=true indicates that this is a snapshot version and not a release version.
+# SNAPSHOT is true by default (snapshot build); set SNAPSHOT=false to build a release package.
 # PLATFORMS=linux/amd64 builds an agent that will run on 64 bit X86 Linux systems.
-# PACKAGES is required. Use PACKAGES=all to build all package types, or specify types (e.g. tar.gz,rpm,deb,zip,docker).
-EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz mage -v package
+# PACKAGES selects package types; if unset, defaults to tar.gz for non-Windows platforms and zip for Windows.
+# Use PACKAGES=all to build all package types, or specify types (e.g. tar.gz,rpm,deb,zip,docker).
+EXTERNAL=true PLATFORMS=linux/amd64 mage -v package
 ```
 
 The resulting package will be produced in the build/distributions directory. The version is controlled by the value in [version.go](version/version.go).
@@ -114,12 +115,18 @@ To install the agent extract the package and run the install command:
 
 ```sh
 cd build/distributions
-tar xvfz elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64.tar.gz
-cd elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64
-sudo elastic-agent install
+tar xvfz elastic-agent-<version>-SNAPSHOT-linux-x86_64.tar.gz
+cd elastic-agent-<version>-SNAPSHOT-linux-x86_64
+sudo ./elastic-agent install
 ```
 
-For basic use the agent binary can be run directly, with the `sudo elastic-agent run` command.
+Replace `<version>` with the current version from [version/version.go](version/version.go). You can also discover the generated filename with:
+
+```sh
+ls elastic-agent-*-linux-x86_64.tar.gz
+```
+
+For basic use the agent binary can be run directly, with the `./elastic-agent run` command.
 
 #### Packaging for other architectures
 When packaging for an architecture different than the host machine,
@@ -143,7 +150,7 @@ Running Elastic Agent in a docker container is a common use case. To build the E
 
 ```
 # Use PLATFORMS=linux/arm64 if you are using an ARM based Mac.
-DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=docker mage package
+DEV=true EXTERNAL=true PLATFORMS=linux/amd64 PACKAGES=docker mage package
 ```
 
 If you are in the 7.13 branch, this will create the `docker.elastic.co/beats/elastic-agent:7.13.0-SNAPSHOT` image in your local environment. Now you can use this to for example test this container with the stack in elastic-package:

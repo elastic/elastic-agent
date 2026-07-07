@@ -7,6 +7,7 @@ on:
 permissions:
   actions: read
   contents: read
+  copilot-requests: write
   issues: write
   pull-requests: read
 
@@ -14,6 +15,7 @@ jobs:
   run:
     uses: elastic/ai-github-actions/.github/workflows/gh-aw-code-quality-audit.lock.yml@v0
     with:
+      report-failure-as-issue: false
       title-prefix: "[coordinator-status-accuracy]"
       severity-threshold: "high"
       setup-commands: |
@@ -129,5 +131,3 @@ jobs:
         - A priority ranking: permanent incorrect states first, then transient inaccuracies,
           then cosmetic issues
         - State transitions and aggregation paths you audited and found correct
-    secrets:
-      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

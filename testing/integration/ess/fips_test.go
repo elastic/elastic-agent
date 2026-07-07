@@ -177,9 +177,10 @@ func enrollLocalFIPSAgentInFleetServer(t *testing.T, info *define.Info) (*atesti
 		Privileged:     true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Minute)
 	defer cancel()
 
+	require.NoError(t, fleettools.UpdateESOutputPreset(ctx, info.KibanaClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
 	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, basePolicy)
 	require.NoError(t, err)
 
@@ -190,7 +191,7 @@ func addIntegrationAndCheckData(t *testing.T, info *define.Info, fixture *atesti
 	t.Helper()
 
 	// Install system integration
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Minute)
 	defer cancel()
 	_, err := tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "system", integration.PreinstalledPackages["system"], "testdata/system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyID)
 	require.NoError(t, err)

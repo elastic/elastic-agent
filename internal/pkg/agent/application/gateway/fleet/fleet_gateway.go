@@ -6,6 +6,7 @@ package fleet
 
 import (
 	"context"
+	"encoding/json"
 	stderrors "errors"
 	"sync"
 	"time"
@@ -22,14 +23,14 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
-	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	fleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/scheduler"
 )
 
 // Max number of times an invalid API Key is checked
@@ -80,10 +81,6 @@ type stateStore interface {
 	Action() fleetapi.Action
 }
 
-type rollbacksSource interface {
-	Get() (map[string]ttl.TTLMarker, error)
-}
-
 type FleetGateway struct {
 	log                *logger.Logger
 	client             client.Sender
@@ -97,7 +94,7 @@ type FleetGateway struct {
 	stateFetcher       StateFetcher
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
-	rollbackSource     rollbacksSource
+	rollbackSource     ttl.ReadOnlySource
 	compression        string
 }
 
@@ -110,7 +107,7 @@ func New(
 	stateStore stateStore,
 	stateFetcher StateFetcher,
 	cfg *configuration.FleetCheckin,
-	source rollbacksSource,
+	source ttl.ReadOnlySource,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
@@ -142,7 +139,7 @@ func newFleetGatewayWithScheduler(
 	acker acker.Acker,
 	stateStore stateStore,
 	stateFetcher StateFetcher,
-	source rollbacksSource,
+	source ttl.ReadOnlySource,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
 		log:            log,
@@ -193,8 +190,16 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 				continue
 			}
 
-			actions := make([]fleetapi.Action, len(resp.Actions))
-			copy(actions, resp.Actions)
+			// Fleet Server omits the "actions" field entirely when there is nothing
+			// new to report, leaving resp.Actions nil; only unmarshal when it
+			// actually sent a payload.
+			var actions fleetapi.Actions
+			if len(resp.Actions) > 0 {
+				if err := json.Unmarshal(resp.Actions, &actions); err != nil {
+					f.log.Errorf("failed to unmarshal checkin actions: %v", err)
+					continue
+				}
+			}
 			if len(actions) > 0 {
 				f.actionCh <- actions
 			}
@@ -415,10 +420,9 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get available rollbacks
-	rollbacks, err := f.rollbackSource.Get()
+	rollbacks, _, err := f.rollbackSource.GetAll()
 	if err != nil {
 		f.log.Warnf("error getting available rollbacks: %s", err.Error())
-		// this should already be nil but let's make sure that we don't include rollbacks in checkin body when encountering errors
 		rollbacks = nil
 	}
 
@@ -494,7 +498,7 @@ func (f *FleetGateway) shouldUseLongSched() bool {
 }
 
 func isUnauth(err error) bool {
-	return errors.Is(err, client.ErrInvalidAPIKey)
+	return errors.Is(err, fleetapi.ErrInvalidAPIKey)
 }
 
 func (f *FleetGateway) SetClient(c client.Sender) {

@@ -35,6 +35,7 @@ const (
 	OtelSupervisedMonitoringURLFlagName       = "supervised.monitoring.url"
 	OtelFeatureGatesFlagName                  = "feature-gates"
 	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
+	OtelProfilingSupportFeature               = "service.profilesSupport"
 
 	// stdinGobProviderScheme must match agentprovider.StdinGobProviderSchemeName.
 	// Duplicated here to avoid a cross-module import from the main module into
@@ -109,6 +110,9 @@ func (r *subprocessExecution) startCollector(
 
 	// set collector args and add --config flag with the stdingob:stdin URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+	if hasProfilesPipeline(cfg) {
+		collectorArgs = append(collectorArgs, fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelProfilingSupportFeature))
+	}
 	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:", stdinGobProviderScheme))
 
 	processInfo, err := process.Start(r.collectorPath,

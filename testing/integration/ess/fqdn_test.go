@@ -54,7 +54,7 @@ func TestFQDN(t *testing.T) {
 	origEtcHosts, err := getEtcHosts()
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Save original hostname so we can restore it at the end of each test
@@ -89,6 +89,7 @@ func TestFQDN(t *testing.T) {
 		NonInteractive: true,
 		Force:          true,
 	}
+	require.NoError(t, fleettools.UpdateESOutputPreset(ctx, kibClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
 	policy, agentID, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
 
@@ -128,14 +129,13 @@ func TestFQDN(t *testing.T) {
 		Namespace:     info.Namespace,
 		AgentFeatures: policy.AgentFeatures,
 	}
-	_, err = kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
+	updatedPolicy, err := kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Wait until policy has been applied by Agent")
-	expectedAgentPolicyRevision := agent.PolicyRevision + 1
 	require.Eventually(
 		t,
-		tools.IsPolicyRevision(ctx, t, kibClient, agent.ID, expectedAgentPolicyRevision),
+		tools.IsMinPolicyRevision(ctx, t, kibClient, agent.ID, updatedPolicy.Revision),
 		2*time.Minute,
 		1*time.Second,
 	)
@@ -159,14 +159,13 @@ func TestFQDN(t *testing.T) {
 		Namespace:     info.Namespace,
 		AgentFeatures: policy.AgentFeatures,
 	}
-	_, err = kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
+	updatedPolicy, err = kibClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Wait until policy has been applied by Agent")
-	expectedAgentPolicyRevision++
 	require.Eventually(
 		t,
-		tools.IsPolicyRevision(ctx, t, kibClient, agent.ID, expectedAgentPolicyRevision),
+		tools.IsMinPolicyRevision(ctx, t, kibClient, agent.ID, updatedPolicy.Revision),
 		2*time.Minute,
 		1*time.Second,
 	)
@@ -230,9 +229,9 @@ func verifyHostNameInIndices(t *testing.T, indices, hostname, namespace string, 
 
 	search := esClient.Search
 
-	require.Eventually(
+	require.EventuallyWithT(
 		t,
-		func() bool {
+		func(collect *assert.CollectT) {
 			resp, err := search(
 				search.WithIndex(indices),
 				search.WithSort("@timestamp:desc"),
@@ -240,8 +239,8 @@ func verifyHostNameInIndices(t *testing.T, indices, hostname, namespace string, 
 				search.WithSize(1),
 				search.WithBody(&buf),
 			)
-			require.NoError(t, err)
-			require.False(t, resp.IsError())
+			require.NoError(collect, err)
+			require.False(collect, resp.IsError())
 			defer resp.Body.Close()
 
 			var body struct {
@@ -257,9 +256,9 @@ func verifyHostNameInIndices(t *testing.T, indices, hostname, namespace string, 
 			}
 			decoder := json.NewDecoder(resp.Body)
 			err = decoder.Decode(&body)
-			require.NoError(t, err)
+			require.NoError(collect, err)
 
-			return len(body.Hits.Hits) == 1
+			assert.Len(collect, body.Hits.Hits, 1)
 		},
 		2*time.Minute,
 		5*time.Second,

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -137,7 +138,21 @@ func getFlushTimeout(logger *logp.Logger, output *config.C) string {
 		logger.Debugf("Failed to get flush timeout: %v", err)
 		return "10s" // return default queue.mem.flush.timeout for sending_queue in case of an errr
 	}
+	// Append seconds unit if Agent config does not specify a unit
+	// to prevent the OTel exporterhelper from failing to start.
+	if _, parseErr := strconv.ParseFloat(timeout, 64); parseErr == nil {
+		return timeout + "s"
+	}
 	return timeout
+}
+
+func getFlushMinEvents(logger *logp.Logger, output *config.C) int {
+	minEvents, err := output.Int("queue.mem.flush.min_events", -1)
+	if err != nil {
+		logger.Debugf("Failed to get flush min events: %v", err)
+		return 1600 // return default queue.mem.flush.min_events for sending_queue in case of an error
+	}
+	return int(minEvents)
 }
 
 // TLSCommonToOTel converts a tlscommon.Config into the OTel configtls.ClientConfig

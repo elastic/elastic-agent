@@ -15,6 +15,7 @@ $PSVersionTable.PSVersion
 $packageVersionContent = Get-Content .package-version -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
 if ($packageVersionContent -and $packageVersionContent.stack_version ) {
     $STACK_VERSION = $packageVersionContent.stack_version
+    $STACK_BUILD_ID = $packageVersionContent.stack_build_id
 }
 
 Write-Output "~~~ Building test binaries"
@@ -29,7 +30,8 @@ $TestsExitCode = 0
 try {
     Write-Output "~~~ Running integration tests"
     # Get-Ess-Stack will start the ESS stack if it is a BK retry
-    Get-Ess-Stack -StackVersion $STACK_VERSION
+    Get-Ess-Stack -StackVersion $STACK_VERSION -StackBuildId $STACK_BUILD_ID
+
     # Load secrets from GCP Secret Manager via oblt-cli
     $result = ess_load_secrets
     if ($result -ne 0) {

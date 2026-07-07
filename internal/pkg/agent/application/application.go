@@ -24,7 +24,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -46,17 +45,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/version"
 )
-
-type rollbacksSource interface {
-	Set(map[string]ttl.TTLMarker) error
-	Get() (map[string]ttl.TTLMarker, error)
-	Remove(string) error
-}
-
-// CfgOverrider allows for application driven overrides of configuration read from disk.
-type CfgOverrider func(cfg *configuration.Configuration)
 
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
@@ -70,9 +61,9 @@ func New(
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
-	override CfgOverrider,
+	cfg *configuration.Configuration,
 	initialUpdateMarker *upgrade.UpdateMarker,
-	availableRollbacksSource rollbacksSource,
+	availableRollbacksSource ttl.Source,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -102,34 +93,11 @@ func New(
 
 	pathConfigFile := paths.ConfigFile()
 
-	var rawConfig *config.Config
 	if testingMode {
-		// testing mode doesn't read any configuration from the disk
-		rawConfig, err = config.NewConfigFrom("")
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-		}
-
+		cfg = configuration.DefaultConfiguration()
+		cfg.UCfg = config.MustNewConfigFrom(cfg)
 		// monitoring is always disabled in testing mode
 		disableMonitoring = true
-	} else {
-		log.Infof("Loading baseline config from %v", pathConfigFile)
-		rawConfig, err = config.LoadFile(pathConfigFile)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-		}
-	}
-	if err := info.InjectAgentConfig(rawConfig); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	if override != nil {
-		override(cfg)
 	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
@@ -182,7 +150,7 @@ func New(
 		configMgr = newTestingModeConfigManager(log)
 	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
-		flags, err := features.Parse(rawConfig)
+		flags, err := features.Parse(cfg.GetUCfg())
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 		}
@@ -198,7 +166,7 @@ func New(
 			configMgr = newEncryptedOnce(log, paths.AgentConfigFile())
 		} else {
 			loader := config.NewLoader(log, paths.ExternalInputs())
-			rawCfgMap, err := rawConfig.ToMapStr()
+			rawCfgMap, err := cfg.GetUCfg().ToMapStr()
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
 			}
@@ -214,16 +182,14 @@ func New(
 		}
 	} else {
 		isManaged = true
-		var store storage.Store
-		store, cfg, err = mergeFleetConfig(ctx, rawConfig)
-		if err != nil {
-			return nil, nil, nil, err
+		if err := cfg.Fleet.Valid(); err != nil {
+			return nil, nil, nil, fmt.Errorf("fleet configuration is invalid: %w", err)
 		}
 		if configuration.IsFleetServerBootstrap(cfg.Fleet) {
 			log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
 
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
-			configMgr = coordinator.NewConfigPatchManager(newFleetServerBootstrapManager(log), PatchAPMConfig(log, rawConfig))
+			configMgr = coordinator.NewConfigPatchManager(newFleetServerBootstrapManager(log), PatchAPMConfig(log, cfg.GetUCfg()))
 		} else {
 			log.Info("Parsed configuration and determined agent is managed by Fleet")
 
@@ -267,16 +233,20 @@ func New(
 				initialUpgradeDetails = dispatcher.GetScheduledUpgradeDetails(log, actionQueue.Actions(), time.Now())
 			}
 
+			store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to create encrypted disk store: %w", err)
+			}
 			// TODO: stop using global state
 			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, availableRollbacksSource, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			configMgr = coordinator.NewConfigPatchManager(managed, injectOutputOverrides(log, rawConfig), PatchAPMConfig(log, rawConfig))
+			configMgr = coordinator.NewConfigPatchManager(managed, injectOutputOverrides(log, cfg.GetUCfg()), PatchAPMConfig(log, cfg.GetUCfg()))
 		}
 	}
 
-	varsManager, err := composable.New(log, rawConfig, composableManaged)
+	varsManager, err := composable.New(log, cfg.GetUCfg(), composableManaged)
 	if err != nil {
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
@@ -305,31 +275,30 @@ func New(
 		log.Debugf("agent limits have changed: %+v -> %+v", old, new)
 	}, "application.go")
 	// applying the initial limits for the agent process
-	if err := limits.Apply(rawConfig); err != nil {
+	if err := limits.Apply(cfg.GetUCfg()); err != nil {
 		return nil, nil, nil, fmt.Errorf("could not parse and apply limits config: %w", err)
 	}
 
 	// It is important that feature flags from configuration are applied as late as possible.  This will ensure that
 	// any feature flag change callbacks are registered before they get called by `features.Apply`.
-	if err := features.Apply(rawConfig); err != nil {
+	if err := features.Apply(cfg.GetUCfg()); err != nil {
 		return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 	}
 
 	return coord, configMgr, varsManager, nil
 }
 
-// normalizeAgentInstalls will attempt to normalize the agent installs and related TTL markers:
-// - if we just rolled back: the update marker is checked and in case of rollback we clean up the TTL marker of the rolled back version
-// - check all the entries:
-//   - verify that the home directory for that install still exists (remove TTL markers for what does not exist anymore)
-//   - check if the agent install: if it is no longer valid collect the versioned home and the TTL marker for deletion
+// normalizeAgentInstalls normalizes agent installs and TTL markers on startup.
+// It does two things:
+//   - if we just rolled back, removes the TTL marker for the version we rolled back from
+//   - calls CleanAvailableRollbacks to remove expired and orphan installs and sync the TTL registry
 //
 // This function will NOT error out, it will log any errors it encounters as warnings but any error must be treated as non-fatal
-func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource rollbacksSource) {
+func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource ttl.Source) {
 	// Check if we rolled back and update the TTL markers
 	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil && initialUpdateMarker.Details.State == details.StateRollback {
 		// Reset the TTL for the current version if we are coming off a rollback
-		rollbacks, err := rollbackSource.Get()
+		rollbacks, _, err := rollbackSource.GetAll()
 		if err != nil {
 			log.Warnf("Error getting available rollbacks from rollbackSource during startup check: %s", err)
 			return
@@ -354,59 +323,6 @@ func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, in
 	if err != nil {
 		log.Warnf("Error cleaning available rollbacks: %s", err)
 	}
-}
-
-func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
-	path := paths.AgentConfigFile()
-	store, err := storage.NewEncryptedDiskStore(ctx, path)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
-	}
-
-	reader, err := store.Load()
-	if err != nil {
-		return store, nil, errors.New(err, "could not initialize config store",
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, path))
-	}
-	config, err := config.NewConfigFrom(reader)
-	if err != nil {
-		return store, nil, errors.New(err,
-			fmt.Sprintf("fail to read configuration %s for the elastic-agent", path),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	// merge local configuration and configuration persisted from fleet.
-	err = rawConfig.Merge(config)
-	if err != nil {
-		return store, nil, errors.New(err,
-			fmt.Sprintf("fail to merge configuration with %s for the elastic-agent", path),
-			errors.TypeConfig,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return store, nil, errors.New(err,
-			fmt.Sprintf("fail to unpack configuration from %s", path),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	// Fix up fleet.agent.id otherwise the fleet.agent.id is empty string
-	if cfg.Settings != nil && cfg.Fleet != nil && cfg.Fleet.Info != nil && cfg.Fleet.Info.ID == "" {
-		cfg.Fleet.Info.ID = cfg.Settings.ID
-	}
-
-	if err := cfg.Fleet.Valid(); err != nil {
-		return store, nil, errors.New(err,
-			"fleet configuration is invalid",
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	return store, cfg, nil
 }
 
 // injectOutputOverrides takes local configuration for specific outputs and applies them to the configuration.

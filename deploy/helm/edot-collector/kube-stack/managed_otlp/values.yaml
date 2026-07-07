@@ -41,7 +41,7 @@ collectors:
     fullnameOverride: "opentelemetry-kube-stack-cluster-stats"
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: '"true"'
+        value: "true"
     config:
       exporters:
         # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
@@ -150,16 +150,18 @@ collectors:
               enabled: true
       extensions:
         cgroup_runtime: {}
+        health_check:
+          endpoint: "0.0.0.0:13133"
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-        extensions: [cgroup_runtime]
+        extensions: [cgroup_runtime, health_check]
         pipelines:
           metrics:
             exporters:
               - debug
               - otlp_grpc/gateway
             processors:
-              - k8sattributes
+              - k8s_attributes
               - resourcedetection/env
               - resourcedetection/eks
               - resourcedetection/gcp
@@ -186,7 +188,7 @@ collectors:
     fullnameOverride: "opentelemetry-kube-stack-daemon"
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: '"true"'
+        value: "true"
     presets:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
@@ -465,9 +467,11 @@ collectors:
             - container.id
       extensions:
         cgroup_runtime: {}
+        health_check:
+          endpoint: "0.0.0.0:13133"
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
-        extensions: [cgroup_runtime]
+        extensions: [cgroup_runtime, health_check]
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -478,7 +482,7 @@ collectors:
               - file_log
             processors:
               - batch
-              - k8sattributes
+              - k8s_attributes
               - resourcedetection/env
               - resourcedetection/system
               - resourcedetection/eks
@@ -494,7 +498,7 @@ collectors:
               - hostmetrics
             processors:
               - batch/metrics
-              - k8sattributes
+              - k8s_attributes
               - resourcedetection/env
               - resourcedetection/system
               - resourcedetection/eks
@@ -553,7 +557,7 @@ collectors:
     enabled: true
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: '"true"'
+        value: "true"
       - name: ELASTIC_OTLP_ENDPOINT
         valueFrom:
           secretKeyRef:
@@ -606,8 +610,10 @@ collectors:
           timeout: 15s
       extensions:
         cgroup_runtime: {}
+        health_check:
+          endpoint: "0.0.0.0:13133"
       service:
-        extensions: [cgroup_runtime]
+        extensions: [cgroup_runtime, health_check]
         pipelines:
           metrics:
             receivers: [otlp]

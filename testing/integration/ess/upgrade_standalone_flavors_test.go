@@ -7,7 +7,6 @@
 package ess
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"testing"
@@ -54,7 +53,7 @@ func TestStandaloneUpgrade_Flavor_Basic(t *testing.T) {
 	require.NoError(t, err)
 
 	checkFn := func(t *testing.T, fixture *atesting.Fixture) {
-		testComponentsPresence(context.Background(), fixture,
+		testComponentsPresence(t.Context(), fixture,
 			[]componentPresenceDefinition{
 				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
@@ -127,7 +126,7 @@ func TestStandaloneUpgrade_Flavor_Servers(t *testing.T) {
 	require.NoError(t, err)
 
 	checkFn := func(t *testing.T, fixture *atesting.Fixture) {
-		testComponentsPresence(context.Background(), fixture,
+		testComponentsPresence(t.Context(), fixture,
 			[]componentPresenceDefinition{
 				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
@@ -198,7 +197,7 @@ func TestStandaloneUpgrade_Flavor_UpgradeFromUnflavored(t *testing.T) {
 	require.NoError(t, err)
 
 	checkFn := func(t *testing.T, fixture *atesting.Fixture) {
-		testComponentsPresence(context.Background(), fixture,
+		testComponentsPresence(t.Context(), fixture,
 			[]componentPresenceDefinition{
 				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
@@ -240,7 +239,7 @@ func TestStandaloneUpgrade_Flavor_UpgradeFromUnflavored(t *testing.T) {
 }
 
 func testStandaloneUpgradeFlavorCheck(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, unprivileged bool, hasServers bool, flavorCheck func(t *testing.T, f *atesting.Fixture)) {
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	startFixture, err := atesting.NewFixture(

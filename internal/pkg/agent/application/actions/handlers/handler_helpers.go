@@ -16,11 +16,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 type actionCoordinator interface {
@@ -46,7 +46,7 @@ type unitWithComponent struct {
 }
 
 func stopComponents(ctx context.Context, ch chan coordinator.ConfigChange, a fleetapi.Action, acker acker.Acker, backupCallback func()) {
-	unenrollPolicy := newPolicyChange(ctx, nil, config.New(), a, acker, true, nil, false)
+	unenrollPolicy := newPolicyChange(ctx, nil, config.New(), a, acker, true, false)
 	ch <- unenrollPolicy
 
 	if backupCallback != nil {

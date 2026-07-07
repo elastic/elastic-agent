@@ -22,6 +22,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
@@ -59,7 +60,7 @@ func TestEndpointAgentServiceMonitoring(t *testing.T) {
 
 func (runner *EndpointMetricsMonRunner) SetupSuite() {
 	deadline := time.Now().Add(10 * time.Minute)
-	ctx, cancel := testcontext.WithDeadline(runner.T(), context.Background(), deadline)
+	ctx, cancel := testcontext.WithDeadline(runner.T(), runner.T().Context(), deadline)
 	defer cancel()
 
 	runner.T().Log("Enrolling the agent in Fleet")
@@ -81,6 +82,7 @@ func (runner *EndpointMetricsMonRunner) SetupSuite() {
 		Privileged:     true,
 	}
 
+	require.NoError(runner.T(), fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
 	policy, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(),
 		installOpts, runner.fixture, runner.info.KibanaClient, createPolicyReq)
 	require.NoError(runner.T(), err, "failed to install agent with policy")
@@ -107,7 +109,7 @@ func (runner *EndpointMetricsMonRunner) SetupSuite() {
 }
 
 func (runner *EndpointMetricsMonRunner) TestEndpointMetrics() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*15)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute*15)
 	defer cancel()
 
 	agentStatus, err := runner.fixture.ExecStatus(ctx)
@@ -125,7 +127,7 @@ func (runner *EndpointMetricsMonRunner) TestEndpointMetrics() {
 }
 
 func (runner *EndpointMetricsMonRunner) TestEndpointMetricsAfterRestart() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*15)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute*15)
 	defer cancel()
 	// once we've gotten the first round of metrics,forcably restart endpoint, see if we still get metrics
 	// This makes sure that the backend coordinator can deal with properly updating the metrics handlers if there's unexpected state changes

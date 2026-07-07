@@ -2,11 +2,13 @@ notify:
   - slack:
       channels:
         - "#ingest-notifications"
+      message: "<!subteam^S030QSX59PH|agent-control-plane-team> Version bump to ${NEW_VERSION} — ${BUILDKITE_BUILD_URL}"
     if: (build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+\$/) && (build.state == 'passed' || build.state == 'failed')
   - slack:
       channels:
         - "#ingest-notifications"
       message: |
+        <!subteam^S030QSX59PH|agent-control-plane-team>
         🚦 Pipeline waiting to be unblocked 🚦
         Repo: `${REPO}`
 

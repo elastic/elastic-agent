@@ -46,6 +46,11 @@ type TestModeConfigSetter interface {
 	SetConfig(ctx context.Context, cfg string) error
 }
 
+// stateSubscriber is the subset of coordinator.Coordinator required by StateWatch.
+type stateSubscriber interface {
+	StateSubscribe(ctx context.Context, bufferLen int) chan coordinator.State
+}
+
 type RollbacksSource interface {
 	Get() (map[string]ttl.TTLMarker, error)
 }
@@ -57,6 +62,7 @@ type Server struct {
 	logger     *logger.Logger
 	agentInfo  info.Agent
 	coord      *coordinator.Coordinator
+	stateSub   stateSubscriber
 	listener   net.Listener
 	server     *grpc.Server
 	tracer     *apm.Tracer
@@ -64,15 +70,16 @@ type Server struct {
 	grpcConfig *configuration.GRPCConfig
 
 	tmSetter       TestModeConfigSetter
-	rollbackSource RollbacksSource
+	rollbackSource ttl.ReadOnlySource
 }
 
 // New creates a new control protocol server.
-func New(log *logger.Logger, agentInfo info.Agent, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks, grpcConfig *configuration.GRPCConfig, rollbackSource RollbacksSource) *Server {
+func New(log *logger.Logger, agentInfo info.Agent, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks, grpcConfig *configuration.GRPCConfig, rollbackSource ttl.ReadOnlySource) *Server {
 	return &Server{
 		logger:         log,
 		agentInfo:      agentInfo,
 		coord:          coord,
+		stateSub:       coord,
 		tracer:         tracer,
 		diagHooks:      diagHooks,
 		grpcConfig:     grpcConfig,
@@ -149,13 +156,13 @@ func (s *Server) State(_ context.Context, _ *cproto.Empty) (*cproto.StateRespons
 }
 
 // StateWatch streams the current state of the Elastic Agent to the client.
-func (s *Server) StateWatch(_ *cproto.Empty, srv cproto.ElasticAgentControl_StateWatchServer) error {
+func (s *Server) StateWatch(req *cproto.StateWatchRequest, srv cproto.ElasticAgentControl_StateWatchServer) error {
 	ctx := srv.Context()
-	// TODO: Should we expose the subscription buffer size in the RPC? This
-	// would e.g. let subscribers who only care about the latest state set a
-	// buffer size of 0 so they will always receive the most recent value
-	// instead of the full sequence.
-	subChan := s.coord.StateSubscribe(ctx, 32)
+	bufferLen := int(cproto.StateWatchBufferSizeAllAvailable)
+	if req.BufferSize != nil {
+		bufferLen = int(req.GetBufferSize())
+	}
+	subChan := s.stateSub.StateSubscribe(ctx, bufferLen)
 	for {
 		select {
 		case <-ctx.Done():
@@ -370,7 +377,7 @@ func (s *Server) Configure(ctx context.Context, req *cproto.ConfigureRequest) (*
 }
 
 func (s *Server) AvailableRollbacks(context.Context, *cproto.Empty) (*cproto.AvailableRollbacksResponse, error) {
-	rollbacks, err := s.rollbackSource.Get()
+	rollbacks, _, err := s.rollbackSource.GetAll()
 	if err != nil {
 		return &cproto.AvailableRollbacksResponse{
 			Error: fmt.Sprintf("error fetching rollbacks: %s", err.Error()),

@@ -30,13 +30,13 @@ import (
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	"github.com/elastic/elastic-agent-libs/testing/proxytest"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/fleetservertest"
 	"github.com/elastic/elastic-agent/testing/integration"
@@ -679,7 +679,7 @@ func TestProxyURL(t *testing.T) {
 	for _, tt := range testcases {
 
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 			defer cancel()
 
 			// create API Key and basic Fleet Policy
@@ -996,17 +996,16 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	err = fleettools.UpgradeAgent(ctx, kibClient, agentID, endVersionInfo.Binary.String(), true)
 	require.NoError(t, err)
 
-	t.Log("Ensure upgrade starts")
-	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		status, err := startFixture.ExecStatus(ctx)
-		require.NoError(c, err)
-		require.NotNil(c, status.UpgradeDetails, "Agent status does not contain upgrade_details.")
-	}, time.Minute*5, time.Second, "Unable to verify that upgrade details appear.")
-
-	t.Log("Waiting for upgrade watcher to start...")
-	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
+	// The prior failed upgrade left a stale UPG_FAILED in status. Wait until
+	// the new upgrade clears it before handing off to WaitForWatchingState,
+	// which treats any UPG_FAILED as a fatal failure.
+	t.Log("Waiting for second upgrade to start...")
+	err = upgradetest.WaitForUpgradeInProgress(ctx, startFixture, 2*time.Minute, 10*time.Second)
 	require.NoError(t, err)
-	t.Log("Upgrade watcher started")
+
+	t.Log("Waiting for upgrade to reach watching state...")
+	err = upgradetest.WaitForWatchingState(ctx, startFixture, 15*time.Minute, 10*time.Second, 2*time.Minute)
+	require.NoError(t, err)
 
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
 	require.NoError(t, err)
@@ -1173,17 +1172,13 @@ func TestFleetDownloadAuthUpgrade(t *testing.T) {
 	err = fleettools.UpgradeAgent(t.Context(), kibClient, agentID, endVersionInfo.Binary.String(), true)
 	require.NoError(t, err)
 
-	t.Log("Ensure upgrade starts")
-	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		status, err := startFixture.ExecStatus(t.Context())
-		require.NoError(c, err)
-		require.NotNil(c, status.UpgradeDetails, "Agent status does not contain upgrade_details.")
-	}, time.Minute*5, time.Second, "Unable to verify that upgrade details appear.")
-
-	t.Log("Waiting for upgrade watcher to start...")
-	err = upgradetest.WaitForWatcher(t.Context(), 5*time.Minute, 10*time.Second)
+	t.Log("Waiting for upgrade to start...")
+	err = upgradetest.WaitForUpgradeInProgress(t.Context(), startFixture, 2*time.Minute, 10*time.Second)
 	require.NoError(t, err)
-	t.Log("Upgrade watcher started")
+
+	t.Log("Waiting for upgrade to reach watching state...")
+	err = upgradetest.WaitForWatchingState(t.Context(), startFixture, 15*time.Minute, 10*time.Second, 2*time.Minute)
+	require.NoError(t, err)
 
 	err = upgradetest.WaitHealthyAndVersion(t.Context(), startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
 	require.NoError(t, err)

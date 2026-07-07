@@ -6,12 +6,85 @@ package translate
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
+
+func TestGetFlushTimeout(t *testing.T) {
+	logger := logptest.NewTestingLogger(t, "")
+
+	testCases := []struct {
+		name     string
+		input    map[string]any
+		expected string
+	}{
+		{
+			name:     "unitless integer is interpreted as seconds",
+			input:    map[string]any{"queue.mem.flush.timeout": 5},
+			expected: "5s",
+		},
+		{
+			name:     "unitless zero is interpreted as seconds",
+			input:    map[string]any{"queue.mem.flush.timeout": 0},
+			expected: "0s",
+		},
+		{
+			name:     "unitless fractional value preserves original text",
+			input:    map[string]any{"queue.mem.flush.timeout": 0.1},
+			expected: "0.1s",
+		},
+		{
+			name:     "unitless value with leading dot preserves original text",
+			input:    map[string]any{"queue.mem.flush.timeout": ".9"},
+			expected: ".9s",
+		},
+		{
+			name:     "unitless value with trailing dot preserves original text",
+			input:    map[string]any{"queue.mem.flush.timeout": "2."},
+			expected: "2.s",
+		},
+		{
+			name:     "value with seconds unit is passed through",
+			input:    map[string]any{"queue.mem.flush.timeout": "5s"},
+			expected: "5s",
+		},
+		{
+			name:     "value with minutes unit is passed through",
+			input:    map[string]any{"queue.mem.flush.timeout": "2m"},
+			expected: "2m",
+		},
+		{
+			name:     "value with milliseconds unit is passed through",
+			input:    map[string]any{"queue.mem.flush.timeout": "100ms"},
+			expected: "100ms",
+		},
+		{
+			name:     "missing value falls back to default",
+			input:    map[string]any{},
+			expected: "10s",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			cfg, err := config.NewConfigFrom(test.input)
+			require.NoError(t, err)
+
+			got := getFlushTimeout(logger, cfg)
+			require.Equal(t, test.expected, got)
+
+			// The OTel exporterhelper flush_timeout is a time.Duration, so the
+			// returned value must always parse with a unit.
+			_, err = time.ParseDuration(got)
+			require.NoError(t, err, "flush_timeout %q must be a valid duration", got)
+		})
+	}
+}
 
 func TestTLSCommonToOTel(t *testing.T) {
 
