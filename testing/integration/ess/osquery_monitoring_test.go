@@ -144,12 +144,25 @@ func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
 
 	testStart := time.Now()
 
-	// Validate OTel mode (the default for osquerybeat).
+	// Validate process mode
+	var processDoc mapstr.M
+	t.Run("process", func(t *testing.T) {
+		processDoc = runner.validateOsqueryEvents(t, ctx, agentStatus.Info.ID, testStart)
+	})
+
+	// Switch to OTel runtime and validate the same data
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
+		otelSince := time.Now()
+		policyRevision := switchPolicyToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
+
+		// Wait for the agent to apply the new policy revision
+		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
+			5*time.Minute, time.Second)
+
 		// Verify that an osquery component is running as a beats receiver.
-		// The component may not appear immediately after startup, so we look
-		// for it inside the loop rather than capturing its ID up front.
+		// The component may not appear immediately after the policy switch, so we
+		// look for it inside the loop rather than capturing its ID up front.
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			status, statusErr := runner.agentFixture.ExecStatus(ctx)
 			require.NoError(collect, statusErr)
@@ -166,68 +179,14 @@ func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
 			assert.True(collect, foundReceiver, "expected an osquery component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
-		otelDoc = runner.validateOsqueryEvents(t, ctx, agentStatus.Info.ID, testStart)
+		otelDoc = runner.validateOsqueryEvents(t, ctx, agentStatus.Info.ID, otelSince)
 	})
 
-	// Switch to process runtime and validate the same data.
-	var processDoc mapstr.M
-	t.Run("process", func(t *testing.T) {
-		processSince := time.Now()
-		policyRevision := switchOsquerybeatToProcessRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
-
-		// Wait for the agent to apply the new policy revision.
-		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
-			5*time.Minute, time.Second)
-
-		// Verify that the osquery component has switched to process mode.
-		require.EventuallyWithT(t, func(collect *assert.CollectT) {
-			status, statusErr := runner.agentFixture.ExecStatus(ctx)
-			require.NoError(collect, statusErr)
-			var foundProcess bool
-			for _, comp := range status.Components {
-				if strings.HasPrefix(comp.ID, "osquery") &&
-					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.ProcessRuntimeManager) {
-					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected osquery component to be healthy, got %s", cproto.State(comp.State))
-					foundProcess = true
-					break
-				}
-			}
-			assert.True(collect, foundProcess, "expected an osquery component to be running as a process")
-		}, 2*time.Minute, 5*time.Second, "beat component should be running as a process")
-
-		processDoc = runner.validateOsqueryEvents(t, ctx, agentStatus.Info.ID, processSince)
-	})
-
-	// Compare documents from otel and process modes have the same keys.
+	// Compare documents from process and otel modes have the same keys
 	t.Run("compare", func(t *testing.T) {
-		if otelDoc == nil || processDoc == nil {
+		if processDoc == nil || otelDoc == nil {
 			t.Skip("skipping comparison because a previous subtest failed")
 		}
-		AssertMapstrKeysEqual(t, otelDoc, processDoc, RuntimeComparisonIgnoredFields, "expected osquery document keys to be equal between otel and process modes")
+		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields, "expected osquery document keys to be equal between process and otel modes")
 	})
-}
-
-// switchOsquerybeatToProcessRuntime updates the given policy to override the
-// osquerybeat runtime to process and returns the new policy revision.
-func switchOsquerybeatToProcessRuntime(ctx context.Context, t testing.TB, kibanaClient *kibana.Client, policyID, policyName, namespace string) int {
-	t.Helper()
-	updateReq := kibana.AgentPolicyUpdateRequest{
-		Name:      policyName,
-		Namespace: namespace,
-		Overrides: map[string]interface{}{
-			"agent": map[string]interface{}{
-				"internal": map[string]interface{}{
-					"runtime": map[string]interface{}{
-						"osquerybeat": map[string]interface{}{
-							"default": "process",
-						},
-					},
-				},
-			},
-		},
-	}
-	policyResp, err := kibanaClient.UpdatePolicy(ctx, policyID, updateReq)
-	require.NoError(t, err)
-	return policyResp.Revision
 }
