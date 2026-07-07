@@ -8,6 +8,7 @@ package ess
 
 import (
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -41,6 +42,9 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 	// this second upgrade.
 	upgradeFromVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
+	if !upgradetest.SupportsUpgradeSourceOnPlatform(upgradeFromVersion, runtime.GOOS, runtime.GOARCH) {
+		t.Skipf("upgrade from %s is not supported on %s/%s", upgradeFromVersion, runtime.GOOS, runtime.GOARCH)
+	}
 	startFixture, err := atesting.NewFixture(
 		t,
 		upgradeFromVersion.String(),
