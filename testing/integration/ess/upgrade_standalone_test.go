@@ -7,7 +7,6 @@
 package ess
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -58,7 +57,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 }
 
 func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, fetcher atesting.Fetcher, upgradeOpts ...upgradetest.UpgradeOpt) {
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	startFixture, err := atesting.NewFixture(

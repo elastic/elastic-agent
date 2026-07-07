@@ -51,6 +51,9 @@ var (
 	// Version_9_2_0_SNAPSHOT is the minimum version for manual rollback and rollback reason
 	Version_9_2_0_SNAPSHOT = version.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")
 
+	// Version_9_3_0 is the first release that supports upgrading on Windows/arm64 (#11673).
+	Version_9_3_0 = version.NewParsedSemVer(9, 3, 0, "", "")
+
 	// ErrNoSnapshot is returned when a requested snapshot is not on the version list.
 	ErrNoSnapshot = errors.New("failed to find a snapshot on the version list")
 	// ErrNoPreviousMinor is returned when a requested previous minor is not on the version list.
@@ -260,6 +263,16 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 	}
 
 	return previousMinor(currentVersion, upgradeableVersions)
+}
+
+// SupportsUpgradeSourceOnPlatform reports whether an agent of version v can be
+// upgraded when installed on the given platform. Windows/arm64 upgrades require
+// 9.3.0 or newer (#11673).
+func SupportsUpgradeSourceOnPlatform(v *version.ParsedSemVer, goos, goarch string) bool {
+	if goos == "windows" && goarch == "arm64" {
+		return !v.Less(*Version_9_3_0)
+	}
+	return true
 }
 
 // previousMinor returns the previous minor version available for upgrade from the given list of upgradeable versions.

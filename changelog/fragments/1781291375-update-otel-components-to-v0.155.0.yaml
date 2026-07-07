@@ -1,0 +1,3 @@
+kind: enhancement
+summary: Update OTel Collector components to v0.155.0
+component: elastic-agent

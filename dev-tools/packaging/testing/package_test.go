@@ -877,7 +877,8 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 					continue
 				case "GOFIPS140":
 					foundFIPS = true
-					require.NotEmpty(t, setting.Value, "GOFIPS140 must be set in binary build info")
+					// Go embeds a commit hash suffix (e.g. v1.0.0-c2097c7c), so check by prefix.
+					require.True(t, strings.HasPrefix(setting.Value, "v1.0.0"), "GOFIPS140 must reference the certified module version v1.0.0, got: %s", setting.Value)
 					continue
 				case "DefaultGODEBUG":
 					if strings.Contains(setting.Value, "fips140=on") {

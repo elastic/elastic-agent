@@ -59,6 +59,7 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 		Default:       string(DefaultRuntimeManager),
 		DynamicInputs: string(ProcessRuntimeManager),
 		Auditbeat: BeatRuntimeConfig{
+			Default: string(OtelRuntimeManager),
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier
 			InputType: make(map[string]string),
 		},
@@ -68,6 +69,7 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 			InputType: make(map[string]string),
 		},
 		Heartbeat: BeatRuntimeConfig{
+			Default: string(OtelRuntimeManager),
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier
 			InputType: make(map[string]string),
 		},
@@ -76,6 +78,7 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 			InputType: map[string]string{},
 		},
 		Osquerybeat: BeatRuntimeConfig{
+			Default: string(OtelRuntimeManager),
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier
 			InputType: make(map[string]string),
 		},

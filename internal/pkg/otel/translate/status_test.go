@@ -519,6 +519,72 @@ func TestGetComponentStatus(t *testing.T) {
 	}
 }
 
+func TestGetComponentStateSingleReceiver(t *testing.T) {
+	// A component with single_receiver: true has exactly one receiver whose name is
+	// OtelNamePrefix+comp.ID (no stream suffix). getComponentState must map all input
+	// streams to that receiver so the input unit is included in the component state.
+	comp := component.Component{
+		ID:             "osquery-default",
+		RuntimeManager: component.OtelRuntimeManager,
+		InputSpec: &component.InputRuntimeSpec{
+			Spec: component.InputSpec{
+				SingleReceiver: true,
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "input-osquery-default",
+				Type: client.UnitTypeInput,
+				Config: &proto.UnitExpectedConfig{
+					Streams: []*proto.Stream{
+						{Id: "action-responses"},
+						{Id: "results"},
+					},
+				},
+			},
+			{
+				ID:   "output-osquery-default",
+				Type: client.UnitTypeOutput,
+			},
+		},
+	}
+
+	// Receiver name is exactly OtelNamePrefix+comp.ID with no stream suffix.
+	receiverKey := fmt.Sprintf("receiver:osquerybeatreceiver/%sosquery-default", OtelNamePrefix)
+	exporterKey := fmt.Sprintf("exporter:elasticsearch/%soutput-osquery-default", OtelNamePrefix)
+
+	pipelineStatus := &status.AggregateStatus{
+		Event: componentstatus.NewEvent(componentstatus.StatusOK),
+		ComponentStatusMap: map[string]*status.AggregateStatus{
+			receiverKey: {Event: componentstatus.NewEvent(componentstatus.StatusOK)},
+			exporterKey: {Event: componentstatus.NewEvent(componentstatus.StatusOK)},
+		},
+	}
+
+	result, err := getComponentState(pipelineStatus, comp)
+	require.NoError(t, err)
+	assert.Equal(t, client.UnitStateHealthy, result.State.State)
+
+	// Both the input unit and the output unit must appear in component state.
+	require.Len(t, result.State.Units, 2)
+	inputKey := runtime.ComponentUnitKey{UnitID: "input-osquery-default", UnitType: client.UnitTypeInput}
+	outputKey := runtime.ComponentUnitKey{UnitID: "output-osquery-default", UnitType: client.UnitTypeOutput}
+	assert.Contains(t, result.State.Units, inputKey, "input unit must be present in component state")
+	assert.Contains(t, result.State.Units, outputKey, "output unit must be present in component state")
+
+	// Both streams must be individually reported in the input unit payload, even
+	// though they share a single receiver. This confirms getComponentState correctly
+	// maps each stream to the single receiver under single_receiver: true.
+	inputUnitState := result.State.Units[inputKey]
+	assert.Equal(t, client.UnitStateHealthy, inputUnitState.State)
+	require.NotNil(t, inputUnitState.Payload, "input unit payload must not be nil")
+	streams, ok := inputUnitState.Payload["streams"].(map[string]map[string]string)
+	require.True(t, ok, "payload streams must be map[string]map[string]string")
+	healthyStream := map[string]string{"error": "", "status": client.UnitStateHealthy.String()}
+	assert.Equal(t, healthyStream, streams["action-responses"], "action-responses stream must be healthy")
+	assert.Equal(t, healthyStream, streams["results"], "results stream must be healthy")
+}
+
 func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
 	t.Run("single stream with attributes", func(t *testing.T) {
 		unit := component.Unit{

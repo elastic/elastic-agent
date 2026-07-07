@@ -13,7 +13,7 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 // NewMockAcker creates a new instance of MockAcker. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

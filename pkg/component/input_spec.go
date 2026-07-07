@@ -23,6 +23,11 @@ type InputSpec struct {
 	Command      *CommandSpec `config:"command,omitempty" yaml:"command,omitempty"`
 	Service      *ServiceSpec `config:"service,omitempty" yaml:"service,omitempty"`
 	IsolateUnits bool         `config:"isolate_units,omitempty" yaml:"isolate_units,omitempty"`
+	// SingleReceiver causes all streams for this input to be merged into a single OTel receiver
+	// instance rather than one receiver per stream. Required for inputs whose underlying process
+	// (e.g. osqueryd) cannot tolerate multiple independently-launched receiver instances sharing
+	// the same working directory.
+	SingleReceiver bool `config:"single_receiver,omitempty" yaml:"single_receiver,omitempty"`
 }
 
 // Validate ensures correctness of input specification.

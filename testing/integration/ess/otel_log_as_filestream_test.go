@@ -9,6 +9,7 @@ package ess
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -120,9 +121,12 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	t.Cleanup(wg.Wait)
 	go func() {
 		defer wg.Done()
-		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(3*time.Minute))
+		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(3*time.Minute))
 		defer cancel()
-		require.NoError(t, fixture.RunOtelWithClient(ctx))
+		err := fixture.RunOtelWithClient(ctx)
+		assert.Conditionf(t, func() bool {
+			return err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+		}, "unexpected error running OtelWithClient: %v", err)
 	}()
 
 	agentLogFile := fs.LogFile{}
@@ -160,9 +164,12 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	t.Cleanup(wg.Wait)
 	go func() {
 		defer wg.Done()
-		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 		defer cancel()
-		require.NoError(t, fixture.RunOtelWithClient(ctx))
+		err := fixture.RunOtelWithClient(ctx)
+		assert.Conditionf(t, func() bool {
+			return err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+		}, "unexpected error running OtelWithClient: %v", err)
 	}()
 
 	// Ensure the Filestream input starts
@@ -206,10 +213,13 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	t.Cleanup(wg.Wait)
 	go func() {
 		defer wg.Done()
-		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(3*
+		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(3*
 			time.Minute))
 		defer cancel()
-		require.NoError(t, fixture.RunOtelWithClient(ctx))
+		err := fixture.RunOtelWithClient(ctx)
+		assert.Conditionf(t, func() bool {
+			return err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+		}, "unexpected error running OtelWithClient: %v", err)
 	}()
 
 	// Start Elastic Agent again to ensure it is correctly tracking the state

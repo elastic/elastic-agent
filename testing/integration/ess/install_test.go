@@ -58,7 +58,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -85,7 +85,7 @@ func TestInstallWithoutBasePathWithCustomUser(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -112,7 +112,7 @@ func TestInstallWithBasePath(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -219,7 +219,7 @@ func TestInstallServersWithBasePath(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -319,7 +319,7 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -369,7 +369,7 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -428,7 +428,7 @@ func TestInstallFailureCleanup(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -480,7 +480,7 @@ func TestInstallSecondAgentInDevelopmentNamespace(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -679,7 +679,7 @@ func TestInstallUninstallAudit(t *testing.T) {
 		},
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	policyResp, enrollmentTokenResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, createBasicPolicy())
@@ -800,7 +800,7 @@ func TestRepeatedInstallUninstallFleet(t *testing.T) {
 		Local: false,
 	})
 
-	prepareCtx, prepareCancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	prepareCtx, prepareCancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer prepareCancel()
 
 	policyResp, enrollmentTokenResp := createPolicyAndEnrollmentToken(prepareCtx, t, info.KibanaClient, createBasicPolicy())
@@ -821,7 +821,7 @@ func TestRepeatedInstallUninstallFleet(t *testing.T) {
 	maxRunTime := 2 * time.Minute
 	for i := 0; i < iterations(); i++ {
 		successful := t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
-			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(maxRunTime))
+			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(maxRunTime))
 			defer cancel()
 
 			// Run `elastic-agent install`.  We use `--force` to prevent interactive

@@ -126,7 +126,7 @@ func TestDiagnosticsOptionalValues(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
@@ -152,7 +152,7 @@ func TestIsolatedUnitsDiagnosticsOptionalValues(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
@@ -178,7 +178,7 @@ func TestDiagnosticsCommand(t *testing.T) {
 	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = f.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
@@ -201,7 +201,7 @@ func TestIsolatedUnitsDiagnosticsCommand(t *testing.T) {
 	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = f.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
@@ -222,7 +222,7 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 		Sudo:  true,
 	})
 
-	ctx, cancel := testcontext.WithTimeout(t, context.Background(), time.Minute*10)
+	ctx, cancel := testcontext.WithTimeout(t, t.Context(), time.Minute*10)
 	defer cancel()
 
 	t.Log("Setup fake fleet-server")
@@ -459,7 +459,7 @@ agent.internal.runtime.filebeat.httpjson: process
 		},
 	}
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	expectedAgentState := integrationtest.NewClientState(client.Healthy)
 
@@ -494,6 +494,9 @@ agent.internal.runtime.filebeat.httpjson: process
 			configTemplate: fileStreamConfigTemplate,
 		},
 		{
+			// Beat receivers register diagnostic hooks per input stream via the OTel receiver
+			// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
+			// at the component level and land under the component directory, same as for process-runtime beats.
 			name:              "filebeat receiver",
 			runtime:           "otel",
 			monitoringEnabled: true,
@@ -614,7 +617,7 @@ agent.monitoring.enabled: false
 agent.internal.runtime.filebeat.filestream: otel
 `
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Create the fixture
@@ -661,6 +664,9 @@ agent.internal.runtime.filebeat.filestream: otel
 
 	extractZipArchive(t, diagZip, extractionDir)
 
+	// Beat receivers register diagnostic hooks per input stream via the OTel receiver
+	// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
+	// at the component level and land under the component directory, same as for process-runtime beats.
 	expectedFiles := []string{
 		"edot/otel-merged-actual.yaml",
 		"edot/allocs.profile.gz",

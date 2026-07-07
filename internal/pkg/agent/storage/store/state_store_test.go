@@ -15,19 +15,23 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	api "github.com/elastic/fleet-server/pkg/api"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 type wrongAction struct{}
 
-func (wrongAction) ID() string                  { return "" }
-func (wrongAction) Type() string                { return "" }
-func (wrongAction) String() string              { return "" }
-func (wrongAction) AckEvent() fleetapi.AckEvent { return fleetapi.AckEvent{} }
+func (wrongAction) ID() string     { return "" }
+func (wrongAction) Type() string   { return "" }
+func (wrongAction) String() string { return "" }
+func (wrongAction) AckEvent(string, time.Time) api.AckRequest_Events_Item {
+	return api.AckRequest_Events_Item{}
+}
 
 func TestStateStore(t *testing.T) {
 	t.Run("ack token", func(t *testing.T) {

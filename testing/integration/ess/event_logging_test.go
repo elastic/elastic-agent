@@ -52,17 +52,15 @@ inputs:
         paths:
           - %s
 
-# Disable monitoring so there are less Beats running and less logs being generated.
+# Disable metrics monitoring so there are less beats running and less logs being generated.
 agent.monitoring:
-  enabled: false
-  logs: false
+  enabled: true
+  logs: true
   metrics: false
   pprof.enabled: false
   use_output: default
-
-# Needed if you already have an Elastic-Agent running on your machine
-# That's very helpful for running the tests locally
-agent.monitoring:
+  # Needed if you already have an Elastic-Agent running on your machine
+  # That's very helpful for running the tests locally
   http:
     enabled: false
     port: 7002
@@ -81,7 +79,7 @@ func TestEventLogFile(t *testing.T) {
 	})
 	ctx, cancel := testcontext.WithDeadline(
 		t,
-		context.Background(),
+		t.Context(),
 		time.Now().Add(10*time.Minute))
 	defer cancel()
 
@@ -167,7 +165,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		},
 		Group: "container",
 	})
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())

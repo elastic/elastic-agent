@@ -30,6 +30,8 @@ func TestMonitoringReceiver(t *testing.T) {
 	cfg := `receivers:
   elasticmonitoringreceiver:
     interval: 1s
+connectors:
+  elasticmonitoringconnector: {}
 exporters:
   elasticsearch/1:
     endpoints:
@@ -54,8 +56,11 @@ exporters:
 
 service:
   pipelines:
-    logs:
+    metrics:
       receivers: [elasticmonitoringreceiver]
+      exporters: [elasticmonitoringconnector]
+    logs:
+      receivers: [elasticmonitoringconnector]
       exporters:
         - elasticsearch/1
 `
@@ -150,6 +155,8 @@ func TestMonitoringReceiverRequestLevelErrors(t *testing.T) {
 	cfg := `receivers:
   elasticmonitoringreceiver:
     interval: 1s
+connectors:
+  elasticmonitoringconnector: {}
 exporters:
   elasticsearch/1:
     endpoints:
@@ -175,8 +182,11 @@ exporters:
 
 service:
   pipelines:
-    logs:
+    metrics:
       receivers: [elasticmonitoringreceiver]
+      exporters: [elasticmonitoringconnector]
+    logs:
+      receivers: [elasticmonitoringconnector]
       exporters:
         - elasticsearch/1
 `

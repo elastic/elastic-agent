@@ -7,7 +7,6 @@
 package ess
 
 import (
-	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -34,7 +33,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	})
 	t.Skip("Skip this test because it is not compatible with .package-version pinning")
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Start at the build version as we want to test the retry

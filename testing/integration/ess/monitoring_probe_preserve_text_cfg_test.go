@@ -116,7 +116,7 @@ func (runner *MonitoringTextRunner) SetupSuite() {
 		Privileged:     true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), 3*time.Minute)
 	defer cancel()
 
 	// write a default config file that enables monitoring
@@ -136,7 +136,7 @@ func (runner *MonitoringTextRunner) SetupSuite() {
 }
 
 func (runner *MonitoringTextRunner) TestMonitoringLiveness() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute*10)
 	defer cancel()
 
 	runner.AllComponentsHealthy(ctx)

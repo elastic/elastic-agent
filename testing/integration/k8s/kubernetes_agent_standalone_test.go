@@ -61,7 +61,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
-	ctx := context.Background()
+	ctx := context.Background() //nolint:forbidigo // ctx is captured by t.Cleanup in step functions; must outlive the test
 	kCtx := k8sGetContext(t, info)
 
 	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
@@ -165,7 +165,7 @@ func TestKubernetesAgentOtel(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
-	ctx := context.Background()
+	ctx := context.Background() //nolint:forbidigo // ctx is captured by t.Cleanup in step functions; must outlive the test
 	kCtx := k8sGetContext(t, info)
 
 	nodeList := corev1.NodeList{}
@@ -224,7 +224,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
-	ctx := context.Background()
+	ctx := context.Background() //nolint:forbidigo // ctx is captured by t.Cleanup in step functions; must outlive the test
 	kCtx := k8sGetContext(t, info)
 
 	nodeList := corev1.NodeList{}
@@ -850,7 +850,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				t.Skip(tc.skipReason)
 			}
 
-			ctx := context.Background()
+			ctx := context.Background() //nolint:forbidigo // ctx is captured by t.Cleanup in step functions; must outlive the test
 			testNamespace := kCtx.getNamespace(t)
 
 			for _, step := range tc.steps {

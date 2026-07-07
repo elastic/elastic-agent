@@ -47,6 +47,9 @@ const (
 
 	// elasticMonitoringReceiverName is the component type name for the elastic monitoring receiver.
 	elasticMonitoringReceiverName = "elasticmonitoringreceiver"
+	// elasticMonitoringConnectorName is the component type name for the elastic monitoring connector.
+	// The connector receives pdata.Metrics from the receiver and converts them to Beats-format pdata.Logs.
+	elasticMonitoringConnectorName = "elasticmonitoringconnector"
 )
 
 type collectorRecoveryTimer interface {
@@ -655,37 +658,40 @@ func injectMonitoringReceiver(
 	}
 
 	receiverType := otelcomponent.MustNewType(elasticMonitoringReceiverName)
+	connectorType := otelcomponent.MustNewType(elasticMonitoringConnectorName)
 	receiverName := "internal-telemetry-monitoring"
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
-	processorID := translate.GetProcessorID().String()
-	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
+	processorID := translate.GetProcessorID(receiverName).String()
+
+	diagName := translate.OtelNamePrefix + receiverName
+	connectorID := otelcomponent.NewIDWithName(connectorType, diagName).String()
+	metricsPipelineID := "metrics/" + translate.OtelNamePrefix + receiverName
+	logsPipelineID := "logs/" + translate.OtelNamePrefix + receiverName
 
 	// Build a file exporter for writing internal telemetry to disk as a diagnostics
 	// artifact. The file is written to the default logs directory.
 	// Records are written as plain OTLP JSON (one record per line). No compression.
 	// This data format compresses very well, so impact on diagnostics is minimal.
-	diagName := translate.OtelNamePrefix + receiverName
 	fileExporterID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("file"), diagName).String()
 	diagFilePath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
 
-	// The pipeline always writes to the file exporter (for diagnostics). When
-	// OTel-based monitoring is also configured, the ES monitoring exporter is
-	// included too so that the data flows to Elasticsearch as well.
-	pipelineExporters := []string{fileExporterID}
+	// The metrics pipeline always writes to the file exporter (for diagnostics in
+	// proper OTel metrics format). When OTel-based monitoring is also configured,
+	// the connector is included as an additional exporter so that metrics are
+	// converted to Beats-format logs and forwarded to Elasticsearch.
+	metricsPipelineExporters := []string{fileExporterID}
 	if monitoringExporterFound {
-		pipelineExporters = append(pipelineExporters, exporterID)
+		metricsPipelineExporters = append(metricsPipelineExporters, connectorID)
 	}
-	pipelineCfg := map[string]any{
+	metricsPipelineCfg := map[string]any{
 		"receivers": []string{receiverID},
-		"exporters": pipelineExporters,
+		"exporters": metricsPipelineExporters,
 	}
+
 	collectorCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
-				"event_template":       monitoringEventTemplate(monitoring, agentInfo, logger),
-				"input_event_template": monitoringInputEventTemplate(monitoring, agentInfo, logger),
-				"interval":             monitoring.MetricsPeriod,
-				"exporter_names":       outputNameLookup,
+				"interval": monitoring.MetricsPeriod,
 			},
 		},
 		"exporters": map[string]any{
@@ -700,20 +706,38 @@ func injectMonitoringReceiver(
 		},
 		"service": map[string]any{
 			"pipelines": map[string]any{
-				pipelineID: pipelineCfg,
+				metricsPipelineID: metricsPipelineCfg,
 			},
 		},
 	}
-	if features.DefaultProcessors() {
-		// If default processors are enabled, reference the shared beat processor.
-		// The processor definition is the same as the one added in GetOtelConfig,
-		// so upon merge one replaces the other with identical content.
-		collectorCfg["processors"] = map[string]any{
-			processorID: map[string]any{
-				"processors": translate.GetDefaultProcessors(),
+
+	// When OTel-based monitoring is configured, add the connector and a logs
+	// pipeline so that metrics are converted to Beats-format monitoring events
+	// and forwarded to Elasticsearch.
+	if monitoringExporterFound {
+		logsPipelineCfg := map[string]any{
+			"receivers": []string{connectorID},
+			"exporters": []string{exporterID},
+		}
+		if features.DefaultProcessors() {
+			// This pipeline forwards Agent's own internal telemetry in beats format,
+			// not a specific beat's data, so it always gets the standard default
+			// processors.
+			collectorCfg["processors"] = map[string]any{
+				processorID: map[string]any{
+					"processors": translate.GetDefaultProcessors(""),
+				},
+			}
+			logsPipelineCfg["processors"] = []string{processorID}
+		}
+		collectorCfg["connectors"] = map[string]any{
+			connectorID: map[string]any{
+				"event_template":       monitoringEventTemplate(monitoring, agentInfo, logger),
+				"input_event_template": monitoringInputEventTemplate(monitoring, agentInfo, logger),
+				"exporter_names":       outputNameLookup,
 			},
 		}
-		pipelineCfg["processors"] = []string{processorID}
+		collectorCfg["service"].(map[string]any)["pipelines"].(map[string]any)[logsPipelineID] = logsPipelineCfg
 	}
 
 	return mergeWithExtensions(config, confmap.NewFromStringMap(collectorCfg))

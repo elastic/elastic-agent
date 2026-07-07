@@ -738,6 +738,68 @@ func TestEnrichArgs(t *testing.T) {
 	}
 }
 
+// TestFilebeatStreamIDsAreUniquePerComponent verifies that the /stats and /inputs/ streams for a
+// filebeat component are assigned distinct IDs. Previously both used the same ID pattern
+// ("metrics-monitoring-filebeat-1"), causing duplicate IDs in the generated monitoring config.
+func TestFilebeatStreamIDsAreUniquePerComponent(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err)
+
+	defaultConfigWithoutLogs := monitoringcfg.DefaultConfig()
+	defaultConfigWithoutLogs.MonitorLogs = false
+
+	b := &BeatsMonitor{
+		enabled:         true,
+		config:          &monitoringConfig{C: defaultConfigWithoutLogs},
+		operatingSystem: runtime.GOOS,
+		agentInfo:       agentInfo,
+		logger:          logp.NewNopLogger(),
+	}
+
+	components := []component.Component{
+		{
+			ID:             "filebeat-default",
+			InputSpec:      &component.InputRuntimeSpec{BinaryName: "filebeat"},
+			RuntimeManager: component.DefaultRuntimeManager,
+		},
+	}
+
+	policy := map[string]any{"outputs": map[string]any{"default": map[string]any{}}}
+
+	outCfg, err := b.MonitoringConfig(policy, components, map[string]uint64{})
+	require.NoError(t, err)
+
+	// Collect id → path for every stream across all inputs.
+	streamPaths := map[string]string{}
+	for _, rawInput := range outCfg["inputs"].([]any) {
+		input := rawInput.(map[string]any)
+		rawStreams, ok := input["streams"]
+		if !ok {
+			continue
+		}
+		for _, rawStream := range rawStreams.([]any) {
+			stream := rawStream.(map[string]any)
+			id, _ := stream["id"].(string)
+			path, _ := stream["path"].(string)
+			if id != "" {
+				streamPaths[id] = path
+			}
+		}
+	}
+
+	expectedStatsID := fmt.Sprintf("%s-filebeat-1", monitoringMetricsUnitID)
+	expectedInputsID := fmt.Sprintf("%s-filebeat-1-input", monitoringMetricsUnitID)
+
+	statsPath, hasStats := streamPaths[expectedStatsID]
+	inputsPath, hasInputs := streamPaths[expectedInputsID]
+
+	assert.True(t, hasStats, "expected stats stream with ID %q", expectedStatsID)
+	assert.True(t, hasInputs, "expected inputs stream with ID %q", expectedInputsID)
+	assert.Equal(t, "/stats", statsPath, "stats stream should scrape /stats")
+	assert.Equal(t, "/inputs/", inputsPath, "inputs stream should scrape /inputs/")
+	assert.NotEqual(t, expectedStatsID, expectedInputsID, "/stats and /inputs/ stream IDs must differ")
+}
+
 type Processor struct {
 	AddFields AddFields `json:"add_fields"`
 }

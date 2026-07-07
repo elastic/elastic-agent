@@ -11,11 +11,17 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Ignore late component check-ins after a command runtime has stopped
+summary: Preserve locally-configured monitoring.http.host across Fleet policy check-ins
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-# description:
+# NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
+description: |
+  A regression introduced in 9.4.2 caused the agent's monitoring HTTP listener to rebind to the
+  default host (localhost) on every Fleet policy check-in, discarding any host configured locally
+  via agent.monitoring.http.host (e.g. 0.0.0.0). The policy-change handler now only applies
+  monitoring.http/pprof settings from the policy when they are explicitly present, leaving the
+  locally-configured values untouched otherwise.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
@@ -28,4 +34,4 @@ component: elastic-agent
 
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
-issue: https://github.com/elastic/elastic-agent/issues/14298
+#issue: https://github.com/owner/repo/1234

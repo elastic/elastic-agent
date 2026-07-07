@@ -11,6 +11,7 @@ import (
 	"time"
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -31,6 +32,98 @@ agent.upgrade.watcher:
 // watcher stops or is killed before continuing.
 func ConfigureFastWatcher(ctx context.Context, f *atesting.Fixture) error {
 	return f.Configure(ctx, []byte(FastWatcherCfg))
+}
+
+// WaitForWatchingState polls UpgradeDetails until the upgrade reaches
+// StateWatching or the coordinator clears the details (upgrade completed).
+// Returns immediately on StateFailed or StateRollback. During StateDownloading,
+// returns an error if DownloadPercent does not advance for stallTimeout.
+//
+// Callers must ensure an upgrade is already in progress before calling this
+// (e.g. via WaitForUpgradeInProgress) — nil details are treated as completion.
+func WaitForWatchingState(ctx context.Context, f *atesting.Fixture, timeout time.Duration, interval time.Duration, stallTimeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	var lastState details.State
+	var lastPercent float64
+	var lastProgressAt time.Time
+
+	for {
+		select {
+		case <-ctx.Done():
+			if lastState != "" {
+				return fmt.Errorf("upgrade did not reach %s, last state: %s: %w", details.StateWatching, lastState, ctx.Err())
+			}
+			return fmt.Errorf("upgrade did not reach %s: %w", details.StateWatching, ctx.Err())
+		case <-ticker.C:
+			status, err := f.ExecStatus(ctx)
+			if err != nil || status.IsZero() {
+				continue
+			}
+			if status.UpgradeDetails == nil {
+				return nil // coordinator cleared details: upgrade completed
+			}
+
+			state := status.UpgradeDetails.State
+			lastState = state
+
+			switch state {
+			case details.StateWatching:
+				return nil
+			case details.StateFailed:
+				errMsg := status.UpgradeDetails.Metadata.ErrorMsg
+				if errMsg == "" {
+					errMsg = fmt.Sprintf("failed from state %s", status.UpgradeDetails.Metadata.FailedState)
+				}
+				return fmt.Errorf("upgrade failed: %s", errMsg)
+			case details.StateRollback:
+				errMsg := status.UpgradeDetails.Metadata.ErrorMsg
+				if errMsg == "" {
+					errMsg = fmt.Sprintf("rollback from state %s", status.UpgradeDetails.Metadata.FailedState)
+				}
+				return fmt.Errorf("upgrade rolled back: %s", errMsg)
+			case details.StateDownloading:
+				pct := status.UpgradeDetails.Metadata.DownloadPercent
+				if lastProgressAt.IsZero() || pct != lastPercent {
+					lastPercent = pct
+					lastProgressAt = time.Now()
+				} else if time.Since(lastProgressAt) > stallTimeout {
+					return fmt.Errorf("download stalled at %.1f%% for %s", lastPercent*100, time.Since(lastProgressAt).Round(time.Second))
+				}
+			}
+		}
+	}
+}
+
+// WaitForUpgradeInProgress polls until UpgradeDetails is non-nil and not
+// StateFailed. Use before WaitForWatchingState when a prior upgrade may have
+// left a stale UPG_FAILED that would otherwise cause an immediate failure.
+func WaitForUpgradeInProgress(ctx context.Context, f *atesting.Fixture, timeout time.Duration, interval time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("upgrade did not start: %w", ctx.Err())
+		case <-ticker.C:
+			status, err := f.ExecStatus(ctx)
+			if err != nil || status.IsZero() {
+				continue
+			}
+			if status.UpgradeDetails == nil || status.UpgradeDetails.State == details.StateFailed {
+				continue
+			}
+			return nil
+		}
+	}
 }
 
 // WaitForWatcher loops until a watcher is found running or times out.

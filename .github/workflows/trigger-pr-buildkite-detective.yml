@@ -16,6 +16,7 @@ jobs:
       contains(github.event.context, 'buildkite')
     uses: elastic/ai-github-actions/.github/workflows/gh-aw-estc-pr-buildkite-detective.lock.yml@v0
     with:
+      report-failure-as-issue: false
       additional-instructions: |
         If a step fails, check if the failure is reported as a GitHub issue labeled `flaky-test`. Reference the GitHub issue if so. 
     secrets:

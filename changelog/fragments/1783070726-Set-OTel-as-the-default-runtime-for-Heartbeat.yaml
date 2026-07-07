@@ -11,12 +11,12 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: Don't forcibly inject the elasticdiagnostic extension when running in plain otel mode
+summary: Set OTel as the default runtime for Heartbeat
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: |
-  When running in hybrid mode, supervised by the Elastic Agent, the extension continues to be injected.
+# NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
+#description:
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
@@ -25,8 +25,8 @@ component: elastic-agent
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-# pr: https://github.com/owner/repo/1234
+#pr: https://github.com/owner/repo/1234
 
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
-issue: https://github.com/elastic/elastic-agent/issues/14606
+#issue: https://github.com/owner/repo/1234

@@ -113,21 +113,6 @@ func GetOtelConfig(
 		}
 	}
 
-	// If the default_processors feature flag is enabled, add a single shared
-	// beat processor definition that all pipelines reference.
-	if features.DefaultProcessors() {
-		processorConf := confmap.NewFromStringMap(map[string]any{
-			"processors": map[string]any{
-				GetProcessorID().String(): map[string]any{
-					"processors": GetDefaultProcessors(),
-				},
-			},
-		})
-		if mergeErr := otelConfig.Merge(processorConf); mergeErr != nil {
-			return nil, fmt.Errorf("error merging beat processor config: %w", mergeErr)
-		}
-	}
-
 	return otelConfig, nil
 }
 
@@ -239,9 +224,13 @@ func GetExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 	return otelcomponent.NewIDWithName(exporterType, exporterName)
 }
 
-// GetProcessorID returns the shared beat processor id used across all pipelines.
-func GetProcessorID() otelcomponent.ID {
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("beat"), strings.TrimSuffix(OtelNamePrefix, "/"))
+// GetProcessorID returns the beat processor id for the given name. Each pipeline
+// gets its own processor, since default processors can differ by beat; the
+// beatsprocessor implementation shares state internally between instances that
+// end up with identical configuration.
+func GetProcessorID(name string) otelcomponent.ID {
+	processorName := fmt.Sprintf("%s%s", OtelNamePrefix, name)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("beat"), processorName)
 }
 
 // getBeatsAuthExtensionID returns the id for beatsauth extension
@@ -291,11 +280,17 @@ func getCollectorConfigForComponent(
 		"receivers": receiverKeys,
 	}
 
-	// Build the pipeline processors list: the shared beat processor first (if enabled),
-	// then per-output processors from config. then any other processors from processorConfig (e.g. Kafka transform),
+	// Build the pipeline processors list: this component's own default beat processor
+	// first (if enabled and its beat has any default processors), then per-output
+	// processors from config, then any other processors from processorConfig (e.g. Kafka transform).
+	// Each pipeline gets its own default-processor definition (scoped by comp.ID) rather
+	// than sharing one across all pipelines, since different beats can have different
+	// default processors.
+	beatDefaultProcessors := GetDefaultProcessors(comp.BeatName())
+	beatProcessorID := GetProcessorID(comp.ID).String()
 	var pipelineProcessors []string
-	if features.DefaultProcessors() {
-		pipelineProcessors = append(pipelineProcessors, GetProcessorID().String())
+	if features.DefaultProcessors() && len(beatDefaultProcessors) > 0 {
+		pipelineProcessors = append(pipelineProcessors, beatProcessorID)
 	}
 
 	// per output processor if any
@@ -349,15 +344,25 @@ func getCollectorConfigForComponent(
 		}
 	}
 
-	if len(processorConfig) > 0 {
-		fullConfig["processors"] = processorConfig
+	allProcessorsConfig := map[string]any{}
+	for k, v := range processorConfig {
+		allProcessorsConfig[k] = v
+	}
+	if features.DefaultProcessors() && len(beatDefaultProcessors) > 0 {
+		allProcessorsConfig[beatProcessorID] = map[string]any{
+			"processors": beatDefaultProcessors,
+		}
+	}
+	if len(allProcessorsConfig) > 0 {
+		fullConfig["processors"] = allProcessorsConfig
 	}
 
 	return confmap.NewFromStringMap(fullConfig), nil
 }
 
 // getReceiversConfigForComponent returns the receivers configuration for a component.
-// Each input produces its own receiver, so a component with N inputs will have N receivers.
+// By default each input stream produces its own receiver. When the component's InputSpec has
+// SingleReceiver set, all streams are merged into one receiver keyed by component ID alone.
 func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
@@ -377,7 +382,7 @@ func getReceiversConfigForComponent(
 	var inputs []receiverInput
 	for _, unit := range comp.Units {
 		if unit.Type == client.UnitTypeInput {
-			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp.InputType)
+			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp)
 			if err != nil {
 				return nil, err
 			}
@@ -442,7 +447,23 @@ func getReceiversConfigForComponent(
 		},
 	}
 
-	// Create one receiver per input
+	// When SingleReceiver is set, merge all stream inputs into one receiver keyed by
+	// component ID instead of creating one receiver per stream. Some components have
+	// shared state that cannot easily be split across receivers.
+	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
+		allInputConfigs := make([]map[string]any, 0, len(inputs))
+		for _, ri := range inputs {
+			allInputConfigs = append(allInputConfigs, ri.config)
+		}
+		receiverID := GetReceiverID(receiverType, comp.ID)
+		receiverConfig := maps.Clone(sharedConfig)
+		receiverConfig[beatName] = map[string]any{
+			beatInputsKey(beatName): allInputConfigs,
+		}
+		return map[string]any{receiverID.String(): receiverConfig}, nil
+	}
+
+	// Create one receiver per input stream.
 	receiversConfig := make(map[string]any, len(inputs))
 	for _, ri := range inputs {
 		if ri.streamID == "" {
@@ -453,10 +474,7 @@ func getReceiversConfigForComponent(
 		// Create a new config map for this receiver, copying shared config entries.
 		// This is a shallow copy — nested map values (path, logging, http) are shared
 		// across receivers. This is safe because nothing mutates them after construction.
-		receiverConfig := make(map[string]any, len(sharedConfig)+1)
-		for k, v := range sharedConfig {
-			receiverConfig[k] = v
-		}
+		receiverConfig := maps.Clone(sharedConfig)
 		receiverConfig[beatName] = map[string]any{
 			beatInputsKey(beatName): []map[string]any{ri.config},
 		}
@@ -483,8 +501,13 @@ func beatInputsKey(beatName string) string {
 	}
 }
 
-// GetDefaultProcessors returns the default beat processors used across all pipelines.
-func GetDefaultProcessors() []map[string]any {
+// GetDefaultProcessors returns the default processors for the given beat.
+// These mirror the fleetDefaultProcessors that each beat sets for process mode.
+// Heartbeat sets fleetDefaultProcessors=nil, so it gets no default processors.
+func GetDefaultProcessors(beatName string) []map[string]any {
+	if beatName == "heartbeat" {
+		return nil
+	}
 	return []map[string]any{
 		{
 			"add_host_metadata": map[string]any{
@@ -679,7 +702,7 @@ func resolveStreamID(streamID string, streamSource map[string]any, unitID string
 	return fmt.Sprintf("%s-%d", unitID, index)
 }
 
-func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, inputType string) ([]receiverInput, error) {
+func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, comp *component.Component) ([]receiverInput, error) {
 	agentInfo := &client.AgentInfo{
 		ID:           info.AgentID(),
 		Version:      info.Version(),
@@ -699,7 +722,7 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 	// Handle input types that are namespaced to their component type by either a prefix or suffix.
 	// CreateInputsFromStreams doesn't do this, each beat does it on its own in a transform
 	// function. For filebeat, see: https://github.com/elastic/beats/blob/main/x-pack/filebeat/cmd/agent.go
-	inputTypePrefix, inputTypeSuffix, inputTypeHasSlash := strings.Cut(inputType, "/")
+	inputTypePrefix, inputTypeSuffix, inputTypeHasSlash := strings.Cut(comp.InputType, "/")
 	result := make([]receiverInput, len(inputs))
 	for i, input := range inputs {
 		switch {
@@ -718,7 +741,7 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 			}
 		default:
 			if _, ok := input["type"]; !ok {
-				input["type"] = inputType
+				input["type"] = comp.InputType
 			}
 		}
 
@@ -730,7 +753,45 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 		result[i] = receiverInput{streamID: streamID, config: input}
 	}
 
+	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver && comp.InputType == "osquery" {
+		result = injectOsqueryConfig(result, unit)
+	}
+
 	return result, nil
+}
+
+// injectOsqueryConfig replicates what osquerybeatCfgFromStreams does in process
+// mode: it attaches the input-level "osquery" field (schedule, packs, decorators,
+// etc.) to the osquery_manager.result stream and moves that stream to position 0
+// so that inputs[0].Osquery is non-nil when config_plugin.Set() reads it at
+// beat startup.
+func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiverInput {
+	// Mirror the implementation from https://github.com/elastic/beats/blob/7764586737b76758db262a06fb3c594c52185c48/x-pack/osquerybeat/cmd/root.go#L92
+	osqMap, ok := unit.Config.GetSource().AsMap()["osquery"].(map[string]any)
+	if !ok {
+		return result
+	}
+	for i, ri := range result {
+		// "osquery_manager.result" is the dataset of the stream that carries osquery
+		// scheduled query results and must receive the input-level osquery configuration.
+		datastream, ok := ri.config["data_stream"].(map[string]any)
+		if !ok {
+			continue
+		}
+		dataset, _ := datastream["dataset"].(string)
+		if dataset != "osquery_manager.result" {
+			continue
+		}
+		if _, exists := result[i].config["osquery"]; !exists {
+			// Clone before mutating so we don't modify the map returned by CreateInputsFromStreamsForReceiver.
+			result[i].config = maps.Clone(result[i].config)
+			result[i].config["osquery"] = osqMap
+		}
+		// Place the result stream first so inputs[0].Osquery is set.
+		result[0], result[i] = result[i], result[0]
+		break
+	}
+	return result
 }
 
 // extractOtelProcessors extracts the processor IDs from the output configuration.

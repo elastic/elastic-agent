@@ -106,7 +106,6 @@ func DefaultBuildArgs(cfg *Settings) BuildArgs {
 			for _, tag := range fipsConfig.Compile.Tags {
 				args.ExtraFlags = append(args.ExtraFlags, "-tags="+tag)
 			}
-			args.CGO = args.CGO || fipsConfig.Compile.CGO
 			for varName, value := range fipsConfig.Compile.Env {
 				args.Env[varName] = value
 			}
