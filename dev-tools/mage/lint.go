@@ -6,10 +6,8 @@ package mage
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/magefile/mage/sh"
@@ -66,25 +64,25 @@ func golangciLintInstalledVersion() (string, error) {
 	return "", fmt.Errorf("could not parse version from: %s", out)
 }
 
-// buildTagSet is one build-tag combination we lint with, plus the name the CI
-// matrix uses for it.
+// buildTagSet is one build-tag combination golangci-lint runs with.
 type buildTagSet struct {
-	Name string `json:"name"`
-	Tags string `json:"tags"`
+	Name string
+	Tags string
 }
 
 // buildTagSets are the build-tag combinations we lint with so that files
-// behind a //go:build tag are actually checked. "local" and "define" are
-// mutually exclusive, hence two sets.
+// behind a //go:build tag are actually checked. pkg/testing/define also has a
+// third, mutually exclusive "local" variant (define_local.go); it's
+// deliberately left unlinted rather than pay for a third run over one
+// trivial file.
 var buildTagSets = []buildTagSet{
 	{Name: "default", Tags: ""},
-	{Name: "local", Tags: "integration,requirefips,kubernetes_inner,mage,local"},
 	{Name: "define", Tags: "integration,requirefips,kubernetes_inner,mage,define"},
 }
 
-// Lint runs golangci-lint on new issues only, comparing against the closest
-// release branch (main or N.M). This matches the CI behavior where
-// only-new-issues is set on pull requests.
+// Lint runs golangci-lint, once per build-tag set, on new issues only,
+// comparing against the closest release branch (main or N.M). This matches
+// the CI behavior where only-new-issues is set on pull requests.
 func Lint(ctx context.Context) error {
 	base, err := detectBaseBranch(ctx)
 	if err != nil {
@@ -92,14 +90,7 @@ func Lint(ctx context.Context) error {
 	}
 	fmt.Printf(">> lint: using base branch %s\n", base)
 
-	changed, err := changedFiles(base)
-	if err != nil {
-		return err
-	}
-	sets := tagSetsNeeded(changed)
-	fmt.Printf(">> lint: build-tag sets to run: %+v\n", sets)
-
-	for _, set := range sets {
+	for _, set := range buildTagSets {
 		args := []string{"run", "-v", "--timeout=30m", "--whole-files", "--new-from-merge-base=" + base}
 		if set.Tags != "" {
 			args = append(args, "--build-tags="+set.Tags)
@@ -112,108 +103,7 @@ func Lint(ctx context.Context) error {
 	return nil
 }
 
-// LintPlan prints the lint tag-set plan as JSON for CI and runs golangci-lint
-// zero times. LINT_PLAN_BASE selects the diff base; unset (pushes) plans all sets.
-func LintPlan() error {
-	sets := buildTagSets
-	if base := os.Getenv("LINT_PLAN_BASE"); base != "" {
-		changed, err := changedFiles(base)
-		if err != nil {
-			return err
-		}
-		sets = tagSetsNeeded(changed)
-	}
-	out, err := json.Marshal(sets)
-	if err != nil {
-		return fmt.Errorf("marshaling tag sets: %w", err)
-	}
-	fmt.Println(string(out))
-	return nil
-}
-
-// changedFiles returns the files changed on HEAD since it diverged from base.
-func changedFiles(base string) ([]string, error) {
-	out, err := sh.Output("git", "diff", "--name-only", base+"...HEAD")
-	if err != nil {
-		return nil, fmt.Errorf("listing changed files against %s: %w", base, err)
-	}
-	out = strings.TrimSpace(out)
-	if out == "" {
-		return nil, nil
-	}
-	return strings.Split(out, "\n"), nil
-}
-
-// riskFiles affect every tag set when changed, so all of them must run.
-var riskFiles = map[string]bool{
-	"go.mod":                              true,
-	"go.sum":                              true,
-	".golangci.yml":                       true,
-	".golangci-lint-version":              true,
-	".github/workflows/golangci-lint.yml": true,
-}
-
-var (
-	sharedTagWords = regexp.MustCompile(`\b(integration|requirefips|kubernetes_inner|mage)\b`)
-	localTagWord   = regexp.MustCompile(`\blocal\b`)
-	defineTagWord  = regexp.MustCompile(`\bdefine\b`)
-)
-
-// tagSetsNeeded picks which tag sets to lint for the given changed files, so
-// we skip runs that couldn't report anything new. The untagged set always
-// runs; a tagged set is added only when a changed file could belong to it.
-// It may over-select but never under-selects.
-func tagSetsNeeded(changed []string) []buildTagSet {
-	needLocal, needDefine := false, false
-	for _, f := range changed {
-		if riskFiles[f] {
-			needLocal, needDefine = true, true
-			continue
-		}
-		if !strings.HasSuffix(f, ".go") {
-			continue
-		}
-		tagLine, ok := buildTagLine(f)
-		if !ok {
-			continue
-		}
-		if sharedTagWords.MatchString(tagLine) {
-			needLocal, needDefine = true, true
-		}
-		if localTagWord.MatchString(tagLine) {
-			needLocal = true
-		}
-		if defineTagWord.MatchString(tagLine) {
-			needDefine = true
-		}
-	}
-
-	sets := []buildTagSet{buildTagSets[0]}
-	if needLocal {
-		sets = append(sets, buildTagSets[1])
-	}
-	if needDefine {
-		sets = append(sets, buildTagSets[2])
-	}
-	return sets
-}
-
-// buildTagLine returns the file's "//go:build" line, or false if it has none
-// or can't be read (e.g. deleted).
-func buildTagLine(path string) (string, bool) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", false
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.HasPrefix(line, "//go:build") {
-			return line, true
-		}
-	}
-	return "", false
-}
-
-// LintAll runs golangci-lint on the whole codebase.
+// LintAll runs golangci-lint on the whole codebase, once per build-tag set.
 func LintAll() error {
 	for _, set := range buildTagSets {
 		args := []string{"run", "-v", "--timeout=30m"}

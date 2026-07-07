@@ -26,41 +26,22 @@ permissions:
   # Optional: allow read access to pull request. Use with `only-new-issues` option.
   pull-requests: read
 jobs:
-  # Picks which build-tag sets to lint: a PR runs a tagged set only when it
-  # changes files that set covers; pushes run them all.
-  plan:
-    name: plan tag sets
-    runs-on: ubuntu-latest
-    outputs:
-      tagsets: ${{ steps.compute.outputs.tagsets }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          # PRs need full history to diff against the base; pushes lint every
-          # set without diffing, so a shallow clone is enough.
-          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: .go-version
-
-      - id: compute
-        shell: bash
-        env:
-          LINT_PLAN_BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          set -euo pipefail
-          tagsets="$(go run ./dev-tools/lintplan)"
-          echo "tagsets=$tagsets" >> "$GITHUB_OUTPUT"
-          echo "Selected tag sets: $tagsets"
-
   golangci:
-    needs: plan
     strategy:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
-        tagset: ${{ fromJson(needs.plan.outputs.tagsets) }}
+        # golangci-lint only checks files whose build constraints are
+        # satisfied by the active tags, so every custom //go:build tag needs
+        # its own run to actually get linted. pkg/testing/define also has a
+        # third, mutually exclusive "local" variant (define_local.go);
+        # deliberately left unlinted rather than pay for a third run over one
+        # trivial file.
+        tagset:
+          - name: default
+            tags: ''
+          - name: define
+            tags: 'integration,requirefips,kubernetes_inner,mage,define'
     name: lint (${{ matrix.os }}, ${{ matrix.tagset.name }})
     runs-on: ${{  matrix.os }}
     steps:
