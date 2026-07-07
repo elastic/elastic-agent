@@ -25,7 +25,7 @@ Known issues are significant defects or limitations that may impact your impleme
 
 :::{dropdown} {{agent}} logs a "failed to unmarshal checkin actions" error on almost every {{fleet}} check-in
 
-**Applies to: {{agent}} 9.4.0, 9.4.1, 9.4.2, 9.4.3**
+**Applies to: {{agent}} 8.19.17, 8.19.18, 9.3.6, 9.3.7, 9.4.3**
 
 On July 7, 2026, a known issue was discovered where {{fleet}}-managed {{agents}} log an error on nearly every check-in when there is nothing new for {{fleet}} to tell them to do:
 
