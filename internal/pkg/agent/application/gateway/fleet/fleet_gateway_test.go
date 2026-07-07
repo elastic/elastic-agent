@@ -40,7 +40,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
-	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
@@ -337,7 +336,7 @@ func TestFleetGateway(t *testing.T) {
 				data, err := io.ReadAll(body)
 				require.NoError(t, err)
 
-				var checkinRequest pkgfleetapi.CheckinRequest
+				var checkinRequest fleetapi.CheckinRequest
 				err = json.Unmarshal(data, &checkinRequest)
 				require.NoError(t, err)
 
@@ -399,7 +398,7 @@ func TestFleetGateway(t *testing.T) {
 				data, err := io.ReadAll(body)
 				require.NoError(t, err)
 
-				var checkinRequest pkgfleetapi.CheckinRequest
+				var checkinRequest fleetapi.CheckinRequest
 				err = json.Unmarshal(data, &checkinRequest)
 				require.NoError(t, err)
 
@@ -782,7 +781,7 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		defer cancel()
 
 		unauth := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
-			return nil, pkgfleetapi.ErrInvalidAPIKey
+			return nil, fleetapi.ErrInvalidAPIKey
 		}
 
 		clientWaitFn := c.Answer(unauth)
@@ -912,7 +911,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 		name       string
 		components []runtime.ComponentComponentState
 		collector  *status.AggregateStatus
-		expected   []pkgfleetapi.CheckinComponent
+		expected   []fleetapi.CheckinComponent
 	}{
 		{
 			name:       "Nil inputs",
@@ -924,7 +923,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 			name:       "Empty inputs",
 			components: []runtime.ComponentComponentState{},
 			collector:  &status.AggregateStatus{},
-			expected:   []pkgfleetapi.CheckinComponent{},
+			expected:   []fleetapi.CheckinComponent{},
 		},
 		{
 			name: "Only agent components",
@@ -952,7 +951,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 				},
 			},
 			collector: nil,
-			expected: []pkgfleetapi.CheckinComponent{
+			expected: []fleetapi.CheckinComponent{
 				{
 					ID:      "comp-1",
 					Type:    "log",
@@ -964,7 +963,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					Type:    "log",
 					Status:  "DEGRADED",
 					Message: "Component is degraded",
-					Units: []pkgfleetapi.CheckinUnit{
+					Units: []fleetapi.CheckinUnit{
 						{
 							ID:      "unit-1",
 							Type:    "input",
@@ -1005,13 +1004,13 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					},
 				},
 			},
-			expected: []pkgfleetapi.CheckinComponent{
+			expected: []fleetapi.CheckinComponent{
 				{
 					ID:      "extensions",
 					Type:    "otel",
 					Status:  "HEALTHY",
 					Message: "Healthy",
-					Units: []pkgfleetapi.CheckinUnit{
+					Units: []fleetapi.CheckinUnit{
 						{
 							ID:      "extensions:healthcheck",
 							Type:    "",
@@ -1025,7 +1024,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					Type:    "otel",
 					Status:  "DEGRADED",
 					Message: "Recoverable: pipeline error",
-					Units: []pkgfleetapi.CheckinUnit{
+					Units: []fleetapi.CheckinUnit{
 						{
 							ID:      "exporter:elasticsearch",
 							Type:    "output",
@@ -1066,7 +1065,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					},
 				},
 			},
-			expected: []pkgfleetapi.CheckinComponent{
+			expected: []fleetapi.CheckinComponent{
 				{
 					ID:      "comp-1",
 					Type:    "log",
@@ -1099,13 +1098,13 @@ func TestConvertToCheckingComponents(t *testing.T) {
 				},
 			},
 			collector: nil,
-			expected: []pkgfleetapi.CheckinComponent{
+			expected: []fleetapi.CheckinComponent{
 				{
 					ID:      "comp-1",
 					Type:    "log",
 					Status:  "",
 					Message: "Unknown state",
-					Units: []pkgfleetapi.CheckinUnit{
+					Units: []fleetapi.CheckinUnit{
 						{
 							ID:      "unit-1",
 							Type:    "",
@@ -1131,13 +1130,13 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					},
 				},
 			},
-			expected: []pkgfleetapi.CheckinComponent{
+			expected: []fleetapi.CheckinComponent{
 				{
 					ID:      "invalid-id",
 					Type:    "otel",
 					Status:  "HEALTHY",
 					Message: "Healthy",
-					Units: []pkgfleetapi.CheckinUnit{
+					Units: []fleetapi.CheckinUnit{
 						{
 							ID:      "invalid-unit-id",
 							Type:    "",
@@ -1154,11 +1153,11 @@ func TestConvertToCheckingComponents(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := convertToCheckinComponents(logp.NewNopLogger(), tt.components, tt.collector)
 			// Testify diffs are nicer if we sort and compare directly vs using ElementsMathc
-			slices.SortFunc(result, func(a, b pkgfleetapi.CheckinComponent) int {
+			slices.SortFunc(result, func(a, b fleetapi.CheckinComponent) int {
 				return strings.Compare(a.ID, b.ID)
 			})
 			for _, c := range result {
-				slices.SortFunc(c.Units, func(a, b pkgfleetapi.CheckinUnit) int {
+				slices.SortFunc(c.Units, func(a, b fleetapi.CheckinUnit) int {
 					return strings.Compare(a.ID, b.ID)
 				})
 			}
@@ -1172,7 +1171,7 @@ func TestAvailableRollbacks(t *testing.T) {
 		name                  string
 		setup                 func(t *testing.T, rbSource *ttl.MockReadOnlySource, client *testingClient)
 		wantErr               assert.ErrorAssertionFunc
-		assertCheckinResponse func(t *testing.T, resp *pkgfleetapi.CheckinResponse)
+		assertCheckinResponse func(t *testing.T, resp *fleetapi.CheckinResponse)
 	}{
 		{
 			name: "no available rollbacks - normal checkin",
@@ -1214,11 +1213,11 @@ func TestAvailableRollbacks(t *testing.T) {
 					assert.NoError(t, err, "error decoding checkin body")
 					if assert.Contains(t, unmarshaled, "upgrade") {
 						// verify that we got the correct data
-						var actualUpgrade pkgfleetapi.CheckinUpgrade
+						var actualUpgrade fleetapi.CheckinUpgrade
 						err = json.Unmarshal(unmarshaled["upgrade"], &actualUpgrade)
 						require.NoError(t, err, "error decoding upgrade info from checkin body")
 
-						expected := []pkgfleetapi.CheckinRollback{{
+						expected := []fleetapi.CheckinRollback{{
 							Version:    "1.2.3",
 							ValidUntil: validUntil,
 						}}
