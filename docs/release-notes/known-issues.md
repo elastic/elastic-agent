@@ -33,7 +33,7 @@ On July 7, 2026, a known issue was discovered where {{fleet}}-managed {{agents}}
 failed to unmarshal checkin actions: unexpected end of JSON input
 ```
 
-This is a cosmetic logging issue only. Actions are still delivered and processed normally whenever {{fleet}} does send any; nothing about how the agent actually operates is affected. No action is required — the error can be safely ignored.
+This is a cosmetic logging issue only. Actions are still delivered and processed normally whenever {{fleet}} does send any. Nothing about how the agent actually operates is affected, and no action is required — the error can be safely ignored.
 
 For more information, check [Issue #15397](https://github.com/elastic/elastic-agent/issues/15397).
 :::
