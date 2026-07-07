@@ -2719,6 +2719,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			result, err := getReceiversConfigForComponent(
 				tt.component,
 				testAgentInfo,
+				false,
 				tt.outputQueueConfig,
 			)
 
@@ -2812,18 +2813,8 @@ func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
 
 	fqdnConfig := func(t *testing.T, enabled bool) map[string]any {
 		t.Helper()
-		cfg := internalConfig.MustNewConfigFrom(map[string]any{
-			"agent": map[string]any{
-				"features": map[string]any{
-					"fqdn": map[string]any{
-						"enabled": enabled,
-					},
-				},
-			},
-		})
-		require.NoError(t, features.Apply(cfg))
 
-		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, enabled, nil)
 		require.NoError(t, err)
 		require.Len(t, result, 1)
 
@@ -2835,11 +2826,6 @@ func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
 		require.True(t, ok, "features config should be present and a map")
 		return featuresConfig
 	}
-
-	// reset the global feature flags after the test so we don't leak state
-	t.Cleanup(func() {
-		require.NoError(t, features.Apply(internalConfig.MustNewConfigFrom(map[string]any{})))
-	})
 
 	t.Run("enabled", func(t *testing.T) {
 		featuresConfig := fqdnConfig(t, true)

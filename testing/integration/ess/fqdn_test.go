@@ -120,18 +120,15 @@ func TestFQDN(t *testing.T) {
 	verifyHostNameInIndices(t, "logs-*", shortName, startedAt, info.Namespace, info.ESClient)
 	verifyHostNameInIndices(t, "metrics-*", shortName, startedAt, info.Namespace, info.ESClient)
 
-	runtimes := []struct {
-		name    string
-		runtime component.RuntimeManager
-	}{
-		{"process", component.ProcessRuntimeManager},
-		{"beatreceiver", component.OtelRuntimeManager},
+	// Use a map so iteration order is not guaranteed; each subtest is self-contained and must
+	// pass regardless of the order the runtimes run in.
+	runtimes := map[string]component.RuntimeManager{
+		"process":      component.ProcessRuntimeManager,
+		"beatreceiver": component.OtelRuntimeManager,
 	}
-	for _, rt := range runtimes {
-		t.Run(rt.name, func(t *testing.T) {
-			since := time.Now().UTC().Format(time.RFC3339)
-
-			t.Logf("Update Agent policy to enable FQDN with monitoring runtime %q", rt.runtime)
+	for name, runtime := range runtimes {
+		t.Run(name, func(t *testing.T) {
+			t.Logf("Update Agent policy to enable FQDN with monitoring runtime %q", runtime)
 			updatePolicyReq := kibana.AgentPolicyUpdateRequest{
 				Name:      policy.Name,
 				Namespace: info.Namespace,
@@ -144,7 +141,7 @@ func TestFQDN(t *testing.T) {
 				Overrides: map[string]interface{}{
 					"agent": map[string]interface{}{
 						"monitoring": map[string]interface{}{
-							"_runtime_experimental": string(rt.runtime),
+							"_runtime_experimental": string(runtime),
 						},
 					},
 				},
@@ -160,8 +157,13 @@ func TestFQDN(t *testing.T) {
 				1*time.Second,
 			)
 
-			t.Logf("Verify that the monitoring beats are running as %q", rt.runtime)
-			assertMonitoringRuntime(ctx, t, agentFixture, rt.runtime)
+			t.Logf("Verify that the monitoring beats are running as %q", runtime)
+			assertMonitoringRuntime(ctx, t, agentFixture, runtime)
+
+			// Capture the timestamp only after the runtime switch has been applied, so the
+			// document check below can't be satisfied by documents produced under the previous
+			// runtime.
+			since := time.Now().UTC().Format(time.RFC3339)
 
 			t.Log("Verify that agent name is FQDN")
 			verifyAgentName(ctx, t, agentID, fqdn, info.KibanaClient)
