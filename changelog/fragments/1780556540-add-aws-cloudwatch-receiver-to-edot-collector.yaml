@@ -1,0 +1,5 @@
+kind: feature
+
+summary: Add AWS CloudWatch receiver to EDOT Collector.
+
+component: elastic-agent

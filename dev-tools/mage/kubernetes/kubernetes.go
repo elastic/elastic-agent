@@ -159,7 +159,7 @@ func waitKubeStateMetricsReadiness(env map[string]string, stdOut, stdErr io.Writ
 // kubernetesClusterName generates a name for the Kubernetes cluster.
 func kubernetesClusterName(cfg *mage.Settings) string {
 	commit := cfg.Build.CommitHash()
-	version := strings.NewReplacer(".", "-").Replace(cfg.BeatQualifiedVersion())
+	version := strings.NewReplacer(".", "-").Replace(cfg.AgentQualifiedCoreVersion())
 
 	clusterName := "{{.BeatName}}-{{.Version}}-{{.ShortCommit}}-{{.StackEnvironment}}"
 	clusterName = mage.MustExpand(cfg, clusterName, map[string]interface{}{

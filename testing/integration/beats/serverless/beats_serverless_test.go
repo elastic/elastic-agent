@@ -89,7 +89,7 @@ func (runner *BeatRunner) SetupSuite() {
 	runner.pass = os.Getenv("ELASTICSEARCH_PASSWORD")
 	runner.kibHost = os.Getenv("KIBANA_HOST")
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute)
 	defer cancel()
 
 	beatOutConfig := `
@@ -188,7 +188,7 @@ auditbeat.modules:
 
 // run the beat with default metricsets, ensure no errors in logs + data is ingested
 func (runner *BeatRunner) TestRunAndCheckData() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*4)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute*4)
 	defer cancel()
 
 	// in case there's already a running template, delete it, forcing the beat to re-install
@@ -208,7 +208,7 @@ func (runner *BeatRunner) TestRunAndCheckData() {
 
 // tests the [beat] setup --dashboards command
 func (runner *BeatRunner) TestSetupDashboards() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3) //dashboards seem to take a while
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute*3) //dashboards seem to take a while
 	defer cancel()
 
 	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home", runner.agentFixture.WorkDir(), "setup", "--dashboards"})
@@ -245,7 +245,7 @@ func (runner *BeatRunner) TestSetupDashboards() {
 
 // tests the [beat] export dashboard command
 func (runner *BeatRunner) SubtestExportDashboards() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute*2)
 	defer cancel()
 	outDir := runner.T().TempDir()
 
@@ -278,7 +278,7 @@ func (runner *BeatRunner) TestSetupPipelines() {
 	if runner.testbeatName != "filebeat" {
 		runner.T().Skip("pipelines only available on filebeat")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute)
 	defer cancel()
 
 	defer func() {
@@ -307,7 +307,7 @@ func (runner *BeatRunner) TestSetupPipelines() {
 
 // test beat setup --index-management with ILM disabled
 func (runner *BeatRunner) TestIndexManagementNoILM() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute)
 	defer cancel()
 	defer func() {
 		runner.CleanupTemplates(ctx)
@@ -337,7 +337,7 @@ func (runner *BeatRunner) TestIndexManagementNoILM() {
 
 // tests setup with all default settings
 func (runner *BeatRunner) TestWithAllDefaults() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute)
 	defer cancel()
 	defer func() {
 		runner.CleanupTemplates(ctx)
@@ -362,7 +362,7 @@ func (runner *BeatRunner) TestWithAllDefaults() {
 
 // test the setup process with mismatching template and DSL names
 func (runner *BeatRunner) TestCustomBadNames() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute)
 	defer cancel()
 
 	defer func() {
@@ -386,7 +386,7 @@ func (runner *BeatRunner) TestOverwriteWithCustomName() {
 	updatedPolicy := mapstr.M{
 		"data_retention": "1d",
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute)
 	defer cancel()
 	defer func() {
 		runner.CleanupTemplates(ctx)
@@ -433,7 +433,7 @@ func (runner *BeatRunner) TestWithCustomLifecyclePolicy() {
 		"data_retention": "1d",
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute)
 	defer cancel()
 	defer func() {
 		runner.CleanupTemplates(ctx)
@@ -465,7 +465,7 @@ func (runner *BeatRunner) TestWithCustomLifecyclePolicy() {
 // tests beat setup --index-management with ILM explicitly set
 // On serverless, this should fail.
 func (runner *BeatRunner) TestIndexManagementILMEnabledFailure() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute)
 	defer cancel()
 	info, err := estools.GetPing(ctx, runner.requirementsInfo.ESClient)
 	require.NoError(runner.T(), err)
@@ -486,7 +486,7 @@ func (runner *BeatRunner) TestIndexManagementILMEnabledFailure() {
 
 // tests setup with both ILM and DSL enabled, should fail
 func (runner *BeatRunner) TestBothLifecyclesEnabled() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute)
 	defer cancel()
 
 	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
@@ -500,7 +500,7 @@ func (runner *BeatRunner) TestBothLifecyclesEnabled() {
 
 // disable all lifecycle management, ensure it's actually disabled
 func (runner *BeatRunner) TestAllLifecyclesDisabled() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute)
 	defer cancel()
 	defer func() {
 		runner.CleanupTemplates(ctx)
@@ -534,7 +534,7 @@ func (runner *BeatRunner) TestAllLifecyclesDisabled() {
 // the export command doesn't actually make a network connection,
 // so this won't fail
 func (runner *BeatRunner) TestExport() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute)
 	defer cancel()
 	info, err := estools.GetPing(ctx, runner.requirementsInfo.ESClient)
 	require.NoError(runner.T(), err)
@@ -558,7 +558,7 @@ func (runner *BeatRunner) TestExport() {
 
 // tests beat export with DSL
 func (runner *BeatRunner) TestExportDSL() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute)
 	defer cancel()
 	resp, err := runner.agentFixture.Exec(ctx, []string{"--path.home",
 		runner.agentFixture.WorkDir(),
@@ -574,7 +574,7 @@ func (runner *BeatRunner) TestExportDSL() {
 }
 
 func (runner *BeatRunner) SubtestExportTemplates() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute*2)
 	defer cancel()
 	outDir := runner.T().TempDir()
 
@@ -591,7 +591,7 @@ func (runner *BeatRunner) SubtestExportTemplates() {
 }
 
 func (runner *BeatRunner) SubtestExportIndexPatterns() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute*2)
 	defer cancel()
 
 	rawPattern, err := runner.agentFixture.Exec(ctx, []string{"--path.home",

@@ -68,7 +68,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 		t.Run(fmt.Sprintf("%s_to_%s", startVersion.String(), endVersion), func(t *testing.T) {
 			// Create ECH deployment with start version
 			t.Logf("Creating ECH deployment with version [%s] in region [%s]", startVersion.String(), echRegion)
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
 			deployment, err := statefulProv.Create(ctx, common.StackRequest{
 				ID:      "it-upgrade-integrations-server",
@@ -95,18 +95,18 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 
 			// Check that deployment is ready and healthy after creation
 			t.Logf("Waiting for ECH deployment [%s] in region [%s] to be ready and healthy after creation", deployment.ID, echRegion)
-			deployment, err = prov.WaitForReady(context.Background(), deployment)
+			deployment, err = prov.WaitForReady(t.Context(), deployment)
 			require.NoError(t, err)
 
 			// Upgrade deployment to end version
 			t.Logf("Upgrading ECH deployment [%s] in region [%s] from version [%s] to [%s]", deployment.ID, echRegion, startVersion.String(), endVersion)
-			err = prov.Upgrade(context.Background(), deployment, endVersion)
+			err = prov.Upgrade(t.Context(), deployment, endVersion)
 			require.NoError(t, err)
 			deployment.Version = endVersion
 
 			// Check that deployment is ready and healthy after upgrade
 			t.Logf("Waiting for ECH deployment [%s] in region [%s] to be ready and healthy after upgrade", deployment.ID, echRegion)
-			deployment, err = prov.WaitForReady(context.Background(), deployment)
+			deployment, err = prov.WaitForReady(t.Context(), deployment)
 			require.NoError(t, err)
 		})
 	}

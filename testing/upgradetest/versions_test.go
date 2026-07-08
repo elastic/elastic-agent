@@ -757,3 +757,27 @@ func (f fetcherMock) FetchAgentVersions(ctx context.Context) (version.SortablePa
 func (f fetcherMock) FindLatestSnapshots(ctx context.Context, branches []string) (version.SortableParsedVersions, error) {
 	return f.list, nil
 }
+
+func TestSupportsUpgradeSourceOnPlatform(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+		goos    string
+		goarch  string
+		want    bool
+	}{
+		{"windows/arm64 before 9.3.0 not supported", "9.2.8", "windows", "arm64", false},
+		{"windows/arm64 9.3.0 supported", "9.3.0", "windows", "arm64", true},
+		{"windows/arm64 after 9.3.0 supported", "9.4.1", "windows", "arm64", true},
+		{"windows/amd64 before 9.3.0 supported", "9.2.8", "windows", "amd64", true},
+		{"linux/arm64 before 9.3.0 supported", "9.2.8", "linux", "arm64", true},
+		{"darwin/arm64 before 9.3.0 supported", "9.2.8", "darwin", "arm64", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			v, err := version.ParseVersion(tc.version)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, SupportsUpgradeSourceOnPlatform(v, tc.goos, tc.goarch))
+		})
+	}
+}

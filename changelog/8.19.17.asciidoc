@@ -1,0 +1,59 @@
+// begin 8.19.17 relnotes
+
+[[release-notes-8.19.17]]
+==  8.19.17
+
+Review important information about the  8.19.17 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-8.19.17]]
+=== New features
+
+The 8.19.17 release adds the following new and notable features.
+
+
+
+
+* Add Azure Monitor receiver to EDOT Collector. https://github.com/elastic/elastic-agent/pull/14443[#14443]
+* Change `bulk_response_filter_path` in elasticsearch exporter configurations to match beats. https://github.com/elastic/elastic-agent/pull/14452[#14452] https://github.com/elastic/elastic-agent/issues/12688[#12688]
+* Add Azure auth extension to EDOT Collector. https://github.com/elastic/elastic-agent/pull/14665[#14665]
+
+
+[discrete]
+[[enhancements-8.19.17]]
+=== Enhancements
+
+
+
+
+* Disable TLS certificate hot-reload by default. https://github.com/elastic/elastic-agent/pull/14599[#14599]
+* Update OTel Collector components to v0.153.0. https://github.com/elastic/elastic-agent/pull/14902[#14902]
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.17]]
+=== Bug fixes
+
+
+
+
+* Preserve live install during upgrade cleanup and report aborted upgrades to Fleet. https://github.com/elastic/elastic-agent/pull/14714[#14714]
+* Apply policy log level changes after an agent restart. https://github.com/elastic/elastic-agent/pull/14430[#14430] https://github.com/elastic/elastic-agent/issues/13196[#13196]
+* Notify endpoint-security just before symlink swap, not before upgrade attempt. https://github.com/elastic/elastic-agent/pull/14481[#14481]
+* Honour `--path.logs` when running `elastic-agent run`. https://github.com/elastic/elastic-agent/pull/14476[#14476] https://github.com/elastic/elastic-agent/issues/13320[#13320]
+* Notify Fleet of agent uninstall before marking the installation directory for removal. https://github.com/elastic/elastic-agent/pull/14581[#14581] https://github.com/elastic/elastic-agent/issues/14142[#14142]
+* Read TLS config from environment variables in container mode. https://github.com/elastic/elastic-agent/pull/14758[#14758]
+* Fix container config override inconsistencies. https://github.com/elastic/elastic-agent/pull/14758[#14758]
+* Fix a bug where an empty request body could be sent after failing over to an alternate Fleet host. https://github.com/elastic/elastic-agent/pull/14844[#14844] https://github.com/elastic/elastic-agent/issues/14773[#14773]
+
+// end 8.19.17 relnotes

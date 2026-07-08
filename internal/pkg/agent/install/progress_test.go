@@ -17,6 +17,10 @@ func TestProgressSpinner(t *testing.T) {
 	spinner := CreateAndStartNewSpinner(stringWriter, "example")
 
 	spinner.Describe("test input")
+	// Finish stops the internal render goroutine (added in progressbar v3.14+). After
+	// Finish returns, state.finished=true and any pending render call exits early without
+	// writing, so reading the buffer is race-free.
+	require.NoError(t, spinner.Finish())
 
 	res := stringWriter.String()
 	require.Contains(t, res, "test input")

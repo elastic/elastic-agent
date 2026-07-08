@@ -8,7 +8,7 @@ import (
 	"container/heap"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 // saver is the minimal interface needed for state storage.

@@ -207,7 +207,10 @@ type Client interface {
 	// State returns the current state of the running agent.
 	State(ctx context.Context) (*AgentState, error)
 	// StateWatch watches the current state of the running agent.
-	StateWatch(ctx context.Context) (ClientStateWatch, error)
+	// Pass WithLatestOnly() to skip intermediate states and always receive
+	// the most recent state at the time of each read. Pass WithAllAvailable()
+	// (or no option) to receive all buffered transitions in order.
+	StateWatch(ctx context.Context, opts ...StateWatchOption) (ClientStateWatch, error)
 	// Restart triggers restarting the current running daemon.
 	Restart(ctx context.Context) error
 	// Upgrade triggers upgrade of the current running daemon.
@@ -230,6 +233,44 @@ type Client interface {
 type ClientStateWatch interface {
 	// Recv receives the next agent state.
 	Recv() (*AgentState, error)
+}
+
+// StateWatchBufferSizeLatestOnly and StateWatchBufferSizeAllAvailable are
+// convenience re-exports of the same constants from the cproto package, so
+// callers do not need to import cproto directly.
+const (
+	StateWatchBufferSizeLatestOnly   = cproto.StateWatchBufferSizeLatestOnly
+	StateWatchBufferSizeAllAvailable = cproto.StateWatchBufferSizeAllAvailable
+)
+
+// StateWatchOption configures a StateWatch call.
+type StateWatchOption func(*stateWatchConfig)
+
+type stateWatchConfig struct {
+	bufferSize *int32
+}
+
+// WithLatestOnly configures StateWatch to always return the most recent agent
+// state at the time of each read, skipping any intermediate states that
+// accumulated since the previous read. Use this when only the current state
+// matters and replaying every transition would be wasteful.
+func WithLatestOnly() StateWatchOption {
+	return WithBufferSize(StateWatchBufferSizeLatestOnly)
+}
+
+// WithAllAvailable configures StateWatch to receive all buffered state
+// transitions in order, up to the server's internal maximum. This is the
+// default behaviour when no buffer size is specified.
+func WithAllAvailable() StateWatchOption {
+	return WithBufferSize(StateWatchBufferSizeAllAvailable)
+}
+
+// WithBufferSize configures the number of recent state transitions buffered per
+// read. Use StateWatchBufferSizeLatestOnly (0) for latest-only delivery, or
+// StateWatchBufferSizeAllAvailable (32) to receive all buffered transitions in
+// order. Values above the server's internal maximum are capped silently.
+func WithBufferSize(n int32) StateWatchOption {
+	return func(c *stateWatchConfig) { c.bufferSize = &n }
 }
 
 // Option is an option to adjust how the client operates.
@@ -319,8 +360,12 @@ func (c *client) State(ctx context.Context) (*AgentState, error) {
 }
 
 // StateWatch watches the current state of the running agent.
-func (c *client) StateWatch(ctx context.Context) (ClientStateWatch, error) {
-	cli, err := c.client.StateWatch(ctx, &cproto.Empty{})
+func (c *client) StateWatch(ctx context.Context, opts ...StateWatchOption) (ClientStateWatch, error) {
+	cfg := &stateWatchConfig{}
+	for _, o := range opts {
+		o(cfg)
+	}
+	cli, err := c.client.StateWatch(ctx, &cproto.StateWatchRequest{BufferSize: cfg.bufferSize})
 	if err != nil {
 		return nil, err
 	}

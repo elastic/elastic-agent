@@ -30,6 +30,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
@@ -71,6 +72,12 @@ func (runner *MetricsRunner) SetupSuite() {
 			kibana.MonitoringEnabledLogs,
 			kibana.MonitoringEnabledMetrics,
 		},
+		AgentFeatures: []map[string]interface{}{
+			{
+				"name":    "default_processors",
+				"enabled": false,
+			},
+		},
 	}
 
 	installOpts := atesting.InstallOpts{
@@ -79,9 +86,10 @@ func (runner *MetricsRunner) SetupSuite() {
 		Privileged:     true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), 3*time.Minute)
 	defer cancel()
 
+	require.NoError(runner.T(), fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
 	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
@@ -98,7 +106,7 @@ func (runner *MetricsRunner) addMonitoringToOtelRuntimeOverwrite() {
 	addMonitoringOverwriteBody := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "monitoring": {
@@ -107,7 +115,7 @@ func (runner *MetricsRunner) addMonitoringToOtelRuntimeOverwrite() {
     }
   }
 }
-`, runner.policyName)
+`, runner.policyName, runner.info.Namespace)
 	resp, err := runner.info.KibanaClient.Send(
 		http.MethodPut,
 		fmt.Sprintf("/api/fleet/agent_policies/%s", runner.policyID),
@@ -138,7 +146,7 @@ func (runner *MetricsRunner) addMonitoringToOtelRuntimeOverwrite() {
 func (runner *MetricsRunner) TestBeatsMetrics() {
 	t := runner.T()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute*20)
 	defer cancel()
 
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
@@ -170,11 +178,12 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 				{"exists", "field", "beat.stats.libbeat.output.events.acked"},
 			},
 		},
-		// per-input metrics for filestream-monitoring from elasticmonitoringreceiver
+		// per-input metrics for filestream-monitoring from elasticmonitoringreceiver.
+		// The component.id includes the stream suffix because each stream has its own receiver.
 		{
 			name: "filestream-monitoring",
 			fields: [][]string{
-				{"match", "component.id", "filestream-monitoring"},
+				{"match", "component.id", "filestream-monitoring/filestream-monitoring-agent"},
 				{"match", "metricset.name", "stats"},
 			},
 		},
@@ -196,19 +205,42 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 	}()
 
 	t.Logf("starting to query ES for metrics at %s", now.Format(time.RFC3339Nano))
-	require.Eventually(t, func() bool {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		for _, check := range componentChecks {
 			query = genESQuery(agentStatus.Info.ID, check.fields)
 			now = time.Now()
 			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
-			require.NoError(t, err)
+			require.NoError(collect, err)
 			t.Logf("Fetched metrics for %s, got %d hits", check.name, res.Hits.Total.Value)
-			if res.Hits.Total.Value < 1 {
-				return false
-			}
+			assert.GreaterOrEqual(collect, res.Hits.Total.Value, 1)
 		}
-		return true
 	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install")
+
+	query = genESQuery(agentStatus.Info.ID,
+		[][]string{
+			{"match", "component.binary", "elastic-otel-collector"},
+			{"exists", "field", "data_stream.dataset"},
+			{"exists", "field", "data_stream.namespace"},
+			{"exists", "field", "data_stream.type"},
+			{"exists", "field", "event.dataset"},
+			{"exists", "field", "elastic_agent.id"},
+			{"exists", "field", "elastic_agent.process"},
+			{"exists", "field", "elastic_agent.snapshot"},
+			{"exists", "field", "elastic_agent.version"},
+			{"exists", "field", "agent.id"},
+			{"exists", "field", "agent.version"},
+			{"exists", "field", "agent.name"},
+			{"exists", "field", "component.id"},
+			{"exists", "field", "metricset.name"},
+			{"exists", "field", "host.hostname"},
+		})
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		now = time.Now()
+		res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
+		require.NoError(collect, err)
+		t.Logf("Fetched monitoring metrics with event template fields, got %d hits", res.Hits.Total.Value)
+		assert.GreaterOrEqual(collect, res.Hits.Total.Value, 1)
+	}, time.Minute*10, time.Second*10, "monitoring metrics missing expected event template fields")
 
 	// Add a policy overwrite to change the agent monitoring to use Otel runtime
 	runner.addMonitoringToOtelRuntimeOverwrite()
@@ -223,15 +255,12 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 			{"exists", "field", "system.process.memory.size"},
 		})
 
-	require.Eventually(t, func() bool {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		now = time.Now()
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
-		require.NoError(t, err)
+		require.NoError(collect, err)
 		t.Logf("Fetched metrics for %s, got %d hits", edotCollectorComponentID, res.Hits.Total.Value)
-		if res.Hits.Total.Value < 1 {
-			return false
-		}
-		return true
+		assert.GreaterOrEqual(collect, res.Hits.Total.Value, 1)
 	}, time.Minute*10, time.Second*10, "could not fetch metrics for edot collector")
 
 	if runtime.GOOS == "windows" {

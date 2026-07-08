@@ -1,0 +1,207 @@
+version: 8.19.17
+entries:
+    - kind: feature
+      summary: Add Azure Monitor receiver to EDOT Collector.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14443
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1771884267
+      file:
+        name: 1771884267-add-azure-monitor-receiver-to-edot-collector.yaml
+        checksum: 094233164734be7485b683e033a6ea25b3b92bda
+    - kind: bug-fix
+      summary: Preserve live install during upgrade cleanup and report aborted upgrades to Fleet
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14714
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1777551882
+      file:
+        name: 1777551882-drosiek-marker-stale.yaml
+        checksum: 7007cf607ed0cddef1891599315f7e55847fb6a8
+    - kind: bug-fix
+      summary: Policy log level changes are applied after an agent restart
+      description: |
+        After an agent had been restarted, changing the log level in the Fleet
+        policy had no effect, the agent kept reporting and using the previous log
+        level. Policy log level changes now take effect on agents that have already
+        been restarted.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14430
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/13196
+      impact: ""
+      action: ""
+      timestamp: 1778149614
+      file:
+        name: 1778149614-fix-policy-log-level-after-restart.yaml
+        checksum: c68013c1d45bdba2c12706d0b90d36a7b6e897da
+    - kind: bug-fix
+      summary: Notify endpoint-security just before symlink swap, not before upgrade attempt
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14481
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1779219800
+      file:
+        name: 1779219800-fix-notify-endpoint-security-just-before-symlink-swap,-not-before-upgrade-attempt.yaml
+        checksum: f50d6e73b1e272a00be49db675c34143ec304108
+    - kind: bug-fix
+      summary: Honour --path.logs when running elastic-agent run
+      description: |
+        When --path.logs is explicitly set on the CLI, the agent now writes logs to the specified path even if the configuration file has agent.logging.to_stderr: true (the shipped default).
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14476
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/13320
+      impact: ""
+      action: ""
+      timestamp: 1779269825
+      file:
+        name: 1779269825-fix-run-path-logs.yaml
+        checksum: 01027703efba99afcb91879f7f5d6a40202dddab
+    - kind: feature
+      summary: Change bulk_response_filter_path in elasticsearch exporter configurations to match beats.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14452
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12688
+      impact: ""
+      action: ""
+      timestamp: 1779393592
+      file:
+        name: 1779393592-change-bulk_response_filter_path-in-elasticsearch-exporter-configurations.yaml
+        checksum: 2a9fc6198aa397564fdfbe7866a195215c954215
+    - kind: other
+      summary: upgrade NPM to 11.14.1 on wolfi images
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14473
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1779396962
+      file:
+        name: 1779396962-heartbeat-bump-npm-11.14.1.yaml
+        checksum: 521b42499f203d4abf531b8b404d2779fabfa4d2
+    - kind: feature
+      summary: Add Azure auth extension to EDOT Collector
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14665
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1779748227
+      file:
+        name: 1779748227-Add-Azure-auth-extension-to-EDOT-Collector.yaml
+        checksum: 315fbe489a68dd799808b438889dc2b8eadf0959
+    - kind: enhancement
+      summary: Disable TLS certificate hot-reload by default
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14599
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1779933797
+      file:
+        name: 1779933797-disable-tls-certificate-hot-reload-by-default.yaml
+        checksum: 67d7d7daf6bc9068b004f7bf1da08281b9fae3a2
+    - kind: bug-fix
+      summary: Move fleet uninstall notification before installation directory removal as likely fix for runtime panic during uninstall on Windows.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14581
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14142
+      impact: ""
+      action: ""
+      timestamp: 1779979535
+      file:
+        name: 1779979535-move-fleet-uninstall-notification-before-installation-directory-removal.yaml
+        checksum: 37511da15155992574844203e56a71d6cf5656e2
+    - kind: bug-fix
+      summary: Read TLS config from environment variables in container mode
+      description: TLS certificate paths will now always be read from ELASTIC_AGENT_CERT and ELASTIC_AGENT_CERT_KEY in container mode rather than reading from potentially stale fleet.enc values.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14758
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1779995943
+      file:
+        name: 1779995943-read-container-tls-from-env.yaml
+        checksum: 811169545b21d2614cf29e08920e2180f4063567
+    - kind: bug-fix
+      summary: Fix container config override inconsistencies
+      description: Fixes a bug where container-mode overrides were correctly applied to the running agent but were overwritten by fleet.enc before being passed to the coordinator. This could result in incorrect config diagnostics and unnecessary restarts on policy updates.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14758
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1779996772
+      file:
+        name: 1779996772-fix-container-override-inconsistencies.yaml
+        checksum: f67af5ec0a67ea14b617b18cb7f6872bc56f6a75
+    - kind: bug-fix
+      summary: Fix bug where an empty request body could be sent after failing over to an alternate fleet host.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14844
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14773
+      impact: ""
+      action: ""
+      timestamp: 1780926122
+      file:
+        name: 1780926122-fix-bug-where-an-empty-request-body-could-be-sent-after-failing-over-to-an-alternate-fleet-host..yaml
+        checksum: 617d9eb2d47fa7ff90c7df3e82031c02a97b3746
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.153.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14902
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1781512468
+      file:
+        name: 1781512468-update-otel-components-to-v0.153.0.yaml
+        checksum: f9f924c97b15b6f86e968672802e7632ed53261e
+    - kind: other
+      summary: Bump NPM to 11.17.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14963
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1781639318
+      file:
+        name: 1781639318-heartbeat-bump-npm-11.17.0.yaml
+        checksum: 5721066e381b7a8a848ba90ed049716c14032860

@@ -64,22 +64,58 @@ func golangciLintInstalledVersion() (string, error) {
 	return "", fmt.Errorf("could not parse version from: %s", out)
 }
 
-// Lint runs golangci-lint on new issues only, comparing against the closest
-// release branch (main or N.M). This matches the CI behavior where
-// only-new-issues is set on pull requests.
+// buildTagSet is one build-tag combination golangci-lint runs with.
+type buildTagSet struct {
+	Name string
+	Tags string
+}
+
+// buildTagSets are the build-tag combinations we lint with so that files
+// behind a //go:build tag are actually checked. pkg/testing/define also has a
+// third, mutually exclusive "local" variant (define_local.go); it's
+// deliberately left unlinted rather than pay for a third run over one
+// trivial file.
+var buildTagSets = []buildTagSet{
+	{Name: "default", Tags: ""},
+	{Name: "define", Tags: "integration,requirefips,kubernetes_inner,mage,define"},
+}
+
+// Lint runs golangci-lint, once per build-tag set, on new issues only,
+// comparing against the closest release branch (main or N.M). This matches
+// the CI behavior where only-new-issues is set on pull requests.
 func Lint(ctx context.Context) error {
 	base, err := detectBaseBranch(ctx)
 	if err != nil {
 		return err
 	}
 	fmt.Printf(">> lint: using base branch %s\n", base)
-	return sh.RunV("./bin/golangci-lint", "run", "-v", "--timeout=30m",
-		"--whole-files", "--new-from-merge-base="+base)
+
+	for _, set := range buildTagSets {
+		args := []string{"run", "-v", "--timeout=30m", "--whole-files", "--new-from-merge-base=" + base}
+		if set.Tags != "" {
+			args = append(args, "--build-tags="+set.Tags)
+		}
+		fmt.Printf(">> lint: build-tags=%q\n", set.Tags)
+		if err := sh.RunV("./bin/golangci-lint", args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// LintAll runs golangci-lint on the whole codebase.
+// LintAll runs golangci-lint on the whole codebase, once per build-tag set.
 func LintAll() error {
-	return sh.RunV("./bin/golangci-lint", "run", "-v", "--timeout=30m")
+	for _, set := range buildTagSets {
+		args := []string{"run", "-v", "--timeout=30m"}
+		if set.Tags != "" {
+			args = append(args, "--build-tags="+set.Tags)
+		}
+		fmt.Printf(">> lint-all: build-tags=%q\n", set.Tags)
+		if err := sh.RunV("./bin/golangci-lint", args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // detectBaseBranch finds the closest release branch by choosing the one whose

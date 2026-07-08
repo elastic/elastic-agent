@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Exclude for the packaging to avoid issues with the IAR.
+if [[ "$BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG" == *"independent-agent-release"* ]]; then
+  echo "+++ Skipping artifact upload configuration for packaging pipeline"
+  return 0
+fi
+
 # Required: Upload destination
 export BUILDKITE_ARTIFACT_UPLOAD_DESTINATION="gs://buildkite-elastic-agent/$BUILDKITE_PIPELINE_ID/$BUILDKITE_BUILD_ID/$BUILDKITE_JOB_ID"
 

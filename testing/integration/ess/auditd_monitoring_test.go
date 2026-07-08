@@ -7,26 +7,27 @@
 package ess
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/http/httputil"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
@@ -36,6 +37,7 @@ type AuditDRunner struct {
 	agentFixture *atesting.Fixture
 
 	ESHost     string
+	agentID    string
 	policyID   string
 	policyName string
 }
@@ -78,12 +80,14 @@ func (runner *AuditDRunner) SetupSuite() {
 		Privileged:     true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), 3*time.Minute)
 	defer cancel()
 
-	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
+	require.NoError(runner.T(), fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
+	policyResp, agentID, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
+	runner.agentID = agentID
 	runner.policyID = policyResp.ID
 	runner.policyName = policyResp.Name
 
@@ -94,49 +98,11 @@ func (runner *AuditDRunner) SetupSuite() {
 
 }
 
-func (runner *AuditDRunner) switchToOtelRuntime() {
-	body := fmt.Sprintf(`
-{
-  "name": "%s",
-  "namespace": "%s",
-  "overrides": {
-    "agent": {
-      "internal": {
-        "runtime": {
-          "default": "otel"
-        }
-      }
-    }
-  }
-}
-`, runner.policyName, runner.info.Namespace)
-	resp, err := runner.info.KibanaClient.Send(
-		http.MethodPut,
-		fmt.Sprintf("/api/fleet/agent_policies/%s", runner.policyID),
-		nil,
-		nil,
-		bytes.NewBufferString(body),
-	)
-	if err != nil {
-		runner.T().Fatalf("could not execute request to Kibana/Fleet: %s", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		runner.T().Errorf("received a non 200-OK when adding overwrite to policy. "+
-			"Status code: %d", resp.StatusCode)
-		respDump, err := httputil.DumpResponse(resp, true)
-		if err != nil {
-			runner.T().Fatalf("could not dump error response from Kibana: %s", err)
-		}
-		runner.T().Log("================================================================================")
-		runner.T().Log("Kibana error response:")
-		runner.T().Log(string(respDump))
-		runner.T().FailNow()
-	}
-}
-
-func (runner *AuditDRunner) validateAuditdEvents(ctx context.Context, agentID string) mapstr.M {
-	t := runner.T()
-
+// validateAuditdEvents waits for an ambient auditd event to appear in ES from
+// the given agent since the given time. If eventAction is non-empty, only
+// events with that event.action value are returned so that the caller can
+// compare documents of the same audit event type across runtime modes.
+func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Context, agentID string, since time.Time, eventAction string) mapstr.M {
 	now := time.Now()
 	var query map[string]any
 	var doc mapstr.M
@@ -153,20 +119,26 @@ func (runner *AuditDRunner) validateAuditdEvents(ctx context.Context, agentID st
 		}
 	}()
 
+	requiredFields := [][]string{
+		{"exists", "field", "auditd.summary.actor.primary"},
+	}
+	if eventAction != "" {
+		requiredFields = append(requiredFields, []string{"match", "event.action", eventAction})
+	}
+
 	t.Logf("starting to query ES for auditd events at %s", now.Format(time.RFC3339Nano))
-	require.Eventually(t, func() bool {
-		query = genESQuery(agentID,
-			[][]string{
-				{"exists", "field", "auditd.summary.actor.primary"},
-			})
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		query = genESQuery(agentID, requiredFields)
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
+			"range": map[string]any{
+				"@timestamp": map[string]any{"gte": since.UTC().Format("2006-01-02T15:04:05.000Z")},
+			},
+		}
 		now = time.Now()
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-auditd_manager.auditd*", runner.info.ESClient)
-		require.NoError(t, err)
-		if res.Hits.Total.Value < 1 {
-			return false
-		}
+		require.NoError(collect, err)
+		require.NotEmpty(collect, res.Hits.Hits)
 		doc = res.Hits.Hits[0].Source
-		return true
 	}, time.Minute*10, time.Second*10, "could not fetch events for auditd_manager")
 	return doc
 }
@@ -174,41 +146,112 @@ func (runner *AuditDRunner) validateAuditdEvents(ctx context.Context, agentID st
 func (runner *AuditDRunner) TestBeatsMetrics() {
 	t := runner.T()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute*20)
 	defer cancel()
 
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(t, err, "could not get agent status")
 
-	// Validate process mode
-	var processDoc mapstr.M
-	t.Run("process", func(t *testing.T) {
-		processDoc = runner.validateAuditdEvents(ctx, agentStatus.Info.ID)
-	})
+	testStart := time.Now()
 
-	// Switch to OTel runtime and validate the same data
+	// Validate OTel mode (the default for auditbeat).
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
-		runner.switchToOtelRuntime()
-
-		// Wait for the agent to pick up the new policy and become healthy
-		require.Eventually(t, func() bool {
-			err := runner.agentFixture.IsHealthy(ctx)
-			if err != nil {
-				t.Logf("waiting for agent healthy after otel switch: %s", err.Error())
-				return false
+		// Verify that an audit/auditd component is running as a beats receiver.
+		// The component may not appear immediately after startup, so we look for
+		// it inside the loop rather than capturing its ID up front.
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			status, statusErr := runner.agentFixture.ExecStatus(ctx)
+			require.NoError(collect, statusErr)
+			var foundReceiver bool
+			for _, comp := range status.Components {
+				if strings.HasPrefix(comp.ID, "audit/auditd") &&
+					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
+					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
+						"expected audit/auditd component to be healthy, got %s", cproto.State(comp.State))
+					foundReceiver = true
+					break
+				}
 			}
-			return true
-		}, 2*time.Minute, 5*time.Second)
+			assert.True(collect, foundReceiver, "expected an audit/auditd component to be running as beats receiver")
+		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
-		otelDoc = runner.validateAuditdEvents(ctx, agentStatus.Info.ID)
+		otelDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, testStart, "")
 	})
 
-	// Compare documents from process and otel modes have the same keys
+	// Switch to process runtime and validate the same data.
+	var processDoc mapstr.M
+	t.Run("process", func(t *testing.T) {
+		processSince := time.Now()
+		policyRevision := switchAuditbeatToProcessRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
+
+		// Wait for the agent to apply the new policy revision.
+		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
+			5*time.Minute, time.Second)
+
+		// Verify that the audit/auditd component has switched to process mode.
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			status, statusErr := runner.agentFixture.ExecStatus(ctx)
+			require.NoError(collect, statusErr)
+			var foundProcess bool
+			for _, comp := range status.Components {
+				if strings.HasPrefix(comp.ID, "audit/auditd") &&
+					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.ProcessRuntimeManager) {
+					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
+						"expected audit/auditd component to be healthy, got %s", cproto.State(comp.State))
+					foundProcess = true
+					break
+				}
+			}
+			assert.True(collect, foundProcess, "expected an audit/auditd component to be running as a process")
+		}, 2*time.Minute, 5*time.Second, "beat component should be running as a process")
+
+		// Use the same event.action as the OTel document to ensure we compare
+		// semantically equivalent events across runtime modes. auditd.data fields
+		// are excluded from the key comparison because they are audit event type-
+		// specific and vary even within the same event.action depending on kernel
+		// version and PAM configuration (e.g. grantors may or may not be present).
+		var processEventAction string
+		if otelDoc != nil {
+			if v, err := otelDoc.GetValue("event.action"); err == nil {
+				processEventAction, _ = v.(string)
+			}
+		}
+		processDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, processSince, processEventAction)
+	})
+
+	// Compare documents from otel and process modes have the same keys.
+	// auditd.data fields are excluded because they are audit event type-specific
+	// and can legitimately differ even for the same event.action.
 	t.Run("compare", func(t *testing.T) {
-		if processDoc == nil || otelDoc == nil {
+		if otelDoc == nil || processDoc == nil {
 			t.Skip("skipping comparison because a previous subtest failed")
 		}
-		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields, "expected auditd document keys to be equal between process and otel modes")
+		ignoredFields := append(RuntimeComparisonIgnoredFields, "auditd.data")
+		AssertMapstrKeysEqual(t, otelDoc, processDoc, ignoredFields, "expected auditd document keys to be equal between otel and process modes")
 	})
+}
+
+// switchAuditbeatToProcessRuntime updates the given policy to override the
+// auditbeat runtime to process and returns the new policy revision.
+func switchAuditbeatToProcessRuntime(ctx context.Context, t testing.TB, kibanaClient *kibana.Client, policyID, policyName, namespace string) int {
+	t.Helper()
+	updateReq := kibana.AgentPolicyUpdateRequest{
+		Name:      policyName,
+		Namespace: namespace,
+		Overrides: map[string]interface{}{
+			"agent": map[string]interface{}{
+				"internal": map[string]interface{}{
+					"runtime": map[string]interface{}{
+						"auditbeat": map[string]interface{}{
+							"default": "process",
+						},
+					},
+				},
+			},
+		},
+	}
+	policyResp, err := kibanaClient.UpdatePolicy(ctx, policyID, updateReq)
+	require.NoError(t, err)
+	return policyResp.Revision
 }

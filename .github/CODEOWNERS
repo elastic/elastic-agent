@@ -21,19 +21,19 @@ changelog/fragments/
 /.ci/scripts/update-integration-testdata.sh @elastic/elastic-agent-control-plane
 /.ci/scripts/update-otel.sh @elastic/elastic-agent-control-plane
 /.github @elastic/elastic-agent-control-plane @elastic/observablt-ci
-/.github/CODEOWNERS @elastic/ingest-tech-lead
-/.github/workflows/release-notes.yml @elastic/ingest-docs @elastic/elastic-agent-control-plane 
+/.github/CODEOWNERS @elastic/ingest-tech-leads
+/.github/workflows/release-notes.yml @elastic/ski-docs @elastic/elastic-agent-control-plane 
 /deploy/helm @elastic/elastic-agent-control-plane
 /deploy/helm/edot-collector @elastic/ingest-otel-data
 /deploy/kubernetes @elastic/elastic-agent-control-plane
 /dev-tools/kubernetes @elastic/elastic-agent-control-plane
-/docs/release-notes @elastic/ingest-docs
-/docs/docset.yml @elastic/ingest-docs
-/.github/workflows/update-docs.yml @elastic/ingest-docs
-/.github/workflows/validate-docs-structure.yml @elastic/ingest-docs
-/docs/reference/edot-collector @elastic/ingest-docs
-/docs/scripts/update-docs @elastic/ingest-docs
-/internal/edot/samples @elastic/ingest-otel-data @elastic/ingest-docs
+/docs/release-notes @elastic/ski-docs
+/docs/docset.yml @elastic/ski-docs
+/.github/workflows/update-docs.yml @elastic/ski-docs @elastic/docs-engineering
+/.github/workflows/validate-docs-structure.yml @elastic/ski-docs @elastic/docs-engineering
+/docs/reference/edot-collector @elastic/ski-docs
+/docs/scripts/update-docs @elastic/ski-docs
+/internal/edot/samples @elastic/ingest-otel-data @elastic/ski-docs
 /internal/edot/components.yml @elastic/ingest-otel-leads
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
 /internal/edot/samples/darwin/autoops_es*.yml @elastic/opex

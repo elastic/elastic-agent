@@ -10,6 +10,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -52,7 +53,7 @@ type Agent interface {
 	IsStandalone() bool
 
 	// ECSMetadata returns the ECS metadata that is attached as part of every Fleet checkin.
-	ECSMetadata(*logger.Logger) (*ECSMeta, error)
+	ECSMetadata(*logger.Logger) (*ecsmeta.ECSMeta, error)
 }
 
 // AgentInfo is a collection of information about agent.

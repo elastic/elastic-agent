@@ -12,13 +12,14 @@ import (
 
 	"go.elastic.co/apm/v2"
 
+	api "github.com/elastic/fleet-server/pkg/api"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
-
-const fleetTimeFormat = "2006-01-02T15:04:05.99999-07:00"
 
 type agentInfo interface {
 	AgentID() string
@@ -50,7 +51,7 @@ func (f *Acker) SetClient(c client.Sender) {
 }
 
 // Ack acknowledges action.
-func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
+func (f *Acker) Ack(ctx context.Context, action pkgfleetapi.Action) (err error) {
 	span, ctx := apm.StartSpan(ctx, "ack", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -59,11 +60,9 @@ func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
 	// checkin
 	agentID := f.agentInfo.AgentID()
 	cmd := fleetapi.NewAckCmd(f.agentInfo, f.client)
-	event := action.AckEvent()
-	event.AgentID = agentID
-	event.Timestamp = time.Now().Format(fleetTimeFormat)
+	event := action.AckEvent(agentID, time.Now())
 	req := &fleetapi.AckRequest{
-		Events: []fleetapi.AckEvent{event},
+		Events: []api.AckRequest_Events_Item{event},
 	}
 
 	_, err = cmd.Execute(ctx, req)
@@ -77,7 +76,7 @@ func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
 }
 
 // AckBatch acknowledges multiple actions at once.
-func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *fleetapi.AckResponse, err error) {
+func (f *Acker) AckBatch(ctx context.Context, actions []pkgfleetapi.Action) (res *fleetapi.AckResponse, err error) {
 	f.log.Debugf("fleet acker: ackbatch, actions: %#v", actions)
 	span, ctx := apm.StartSpan(ctx, "ackBatch", "app.internal")
 	defer func() {
@@ -86,13 +85,11 @@ func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *f
 	}()
 	// checkin
 	agentID := f.agentInfo.AgentID()
-	events := make([]fleetapi.AckEvent, 0, len(actions))
+	events := make([]api.AckRequest_Events_Item, 0, len(actions))
 	ids := make([]string, 0, len(actions))
+	now := time.Now()
 	for _, action := range actions {
-		event := action.AckEvent()
-		event.AgentID = agentID
-		event.Timestamp = time.Now().Format(fleetTimeFormat)
-		events = append(events, event)
+		events = append(events, action.AckEvent(agentID, now))
 		ids = append(ids, action.ID())
 	}
 
