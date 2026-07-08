@@ -21,11 +21,9 @@ import (
 type fetchFunc func(ctx context.Context, url, target string) error
 
 // DownloadArtifactWithChecksum downloads a DRA artifact together with its
-// sha512 checksum file and verifies they match, retrying on a mismatch.
-//
-// The checksum file is fetched first, before the much larger artifact, to
-// minimize the chance that the artifact is republished mid-download and no
-// longer matches the checksum already on hand.
+// sha512 checksum file, verifying that they match. On a checksum mismatch,
+// both files are re-downloaded and re-verified, up to len(backoffSchedule)
+// attempts.
 func DownloadArtifactWithChecksum(ctx context.Context, artifactURL, artifactPath, shaURL, shaPath string) error {
 	return downloadArtifactWithChecksum(ctx, DownloadPackage, artifactURL, artifactPath, shaURL, shaPath)
 }

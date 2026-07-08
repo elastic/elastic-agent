@@ -69,15 +69,13 @@ func TestDownloadArtifactWithChecksum_RetriesOnMismatchThenSucceeds(t *testing.T
 	artifactPath := filepath.Join(dir, "artifact.tar.gz")
 	shaPath := artifactPath + ".sha512"
 
-	staleContent := []byte("stale-bytes-from-before-republish")
-	freshContent := []byte("fresh-bytes-after-republish")
+	staleContent := []byte("mismatched-bytes")
+	freshContent := []byte("matching-bytes")
 	checksumLine := checksumLineFor(freshContent, filepath.Base(artifactPath))
 
 	var artifactFetches int
 	fetch := func(_ context.Context, url, target string) error {
 		if strings.HasSuffix(url, ".sha512") {
-			// the manifest always advertises the checksum for the latest
-			// (fresh) artifact generation
 			return os.WriteFile(target, []byte(checksumLine), 0o644)
 		}
 		artifactFetches++
@@ -136,8 +134,8 @@ func TestDownloadArtifactWithChecksum_FailsAfterExhaustingRetries(t *testing.T) 
 	artifactPath := filepath.Join(dir, "artifact.tar.gz")
 	shaPath := artifactPath + ".sha512"
 
-	staleContent := []byte("stale-bytes-from-before-republish")
-	freshContent := []byte("fresh-bytes-after-republish")
+	staleContent := []byte("mismatched-bytes")
+	freshContent := []byte("matching-bytes")
 	checksumLine := checksumLineFor(freshContent, filepath.Base(artifactPath))
 
 	var artifactFetches int
