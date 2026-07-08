@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build kubernetes_inner
+//go:build kubernetes_inner && linux
 
 package kubernetes_inside
 
@@ -43,7 +43,7 @@ func TestAgentPathsPermissions(t *testing.T) {
 			return nil
 		}
 
-		if sysInfo.Gid != uint32(gid) && sysInfo.Uid != uint32(uid) {
+		if sysInfo.Gid != uint32(gid) && sysInfo.Uid != uint32(uid) { //nolint:gosec // uid/gid from os.Getuid/os.Getgid are always valid uint32 values
 			// already owned
 			return fmt.Errorf("%s doesn't have correct permissions: has %d:%d (expected %d:%d)", walkPath, sysInfo.Uid, sysInfo.Gid, uid, gid)
 		}
