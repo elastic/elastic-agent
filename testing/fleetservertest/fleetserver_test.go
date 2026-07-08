@@ -16,11 +16,35 @@ import (
 	"testing"
 	"time"
 
+	api "github.com/elastic/fleet-server/pkg/api"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
+
+// newGenericAckEvent builds a generic ack event for tests that ack sample actions
+// not tied to a concrete pkgfleetapi.Action (the timestamp layout matches the
+// literal fixture strings used throughout this file).
+func newGenericAckEvent(actionID, agentID, timestamp, message string) api.AckRequest_Events_Item {
+	ts, err := time.Parse("2006-01-02T15:04:05.99999-07:00", timestamp)
+	if err != nil {
+		panic(fmt.Sprintf("could not parse timestamp %q: %v", timestamp, err))
+	}
+	var item api.AckRequest_Events_Item
+	if err := item.FromGenericEvent(api.GenericEvent{
+		Type:      api.ACTIONRESULT,
+		Subtype:   api.EventSubtypeACKNOWLEDGED,
+		ActionId:  actionID,
+		AgentId:   agentID,
+		Timestamp: ts,
+		Message:   message,
+	}); err != nil {
+		panic(fmt.Sprintf("could not build generic ack event: %v", err))
+	}
+	return item
+}
 
 // TestRunFleetServer shows how to configure and run a fleet-server capable of
 // enrolling and send actions to a single agent.
@@ -82,7 +106,7 @@ func TestRunFleetServer(t *testing.T) {
 
 		switch actionsIdx {
 		case 0:
-			return CheckinAction{
+			return CheckinAction{ //nolint:gosec // it's a test
 					AckToken: "tmpl.AckToken", Actions: []string{action.data}},
 				nil
 		}
@@ -347,32 +371,23 @@ func ExampleNewServer_ack() {
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathAgentAcks(agentID)})
 
 	respAck, err := cmdAck.Execute(context.Background(),
-		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{
-			{
-				EventType: "ACTION_RESULT",
-				SubType:   "ACKNOWLEDGED",
-				Timestamp: "2022-12-01T01:02:03.00004-07:00",
-				ActionID:  actionID,
-				AgentID:   agentID,
-				Message: fmt.Sprintf("Action '%s' of type 'ACTION_TYPE' acknowledged.",
-					actionID),
-			},
-			{
-				EventType: "ACTION_RESULT",
-				SubType:   "ACKNOWLEDGED",
-				Timestamp: "2022-12-01T01:02:03.00004-07:00",
-				ActionID:  "not-received-on-checkin",
-				AgentID:   agentID,
-				Message: fmt.Sprintf("Action '%s' of type 'unknwon_action' acknowledged.",
-					"not-received-on-checkin"),
-			}}})
+		&fleetapi.AckRequest{Events: []api.AckRequest_Events_Item{
+			newGenericAckEvent(actionID, agentID, "2022-12-01T01:02:03.00004-07:00",
+				fmt.Sprintf("Action '%s' of type 'ACTION_TYPE' acknowledged.", actionID)),
+			newGenericAckEvent("not-received-on-checkin", agentID, "2022-12-01T01:02:03.00004-07:00",
+				fmt.Sprintf("Action '%s' of type 'unknwon_action' acknowledged.", "not-received-on-checkin")),
+		}})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing checkin: %v", err))
 	}
-	fmt.Printf("%#v\n", respAck)
+	bs, err := json.Marshal(respAck)
+	if err != nil {
+		panic(fmt.Sprintf("could not marshal ack response: %v", err))
+	}
+	fmt.Println(string(bs))
 
 	// Output:
-	// &fleetapi.AckResponse{Action:"acks", Errors:false, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}, fleetapi.AckResponseItem{Status:200, Message:"OK"}}}
+	// {"action":"acks","items":[{"message":"OK","status":200},{"message":"OK","status":200}]}
 }
 
 func ExampleNewServer_enroll() {
@@ -625,32 +640,23 @@ func ExampleNewServer_ackWithAcker() {
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathAgentAcks(agentID)})
 
 	respAck, err := cmdAck.Execute(context.Background(),
-		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{
-			{
-				EventType: "ACTION_RESULT",
-				SubType:   "ACKNOWLEDGED",
-				Timestamp: "2022-12-01T01:02:03.00004-07:00",
-				ActionID:  actionID,
-				AgentID:   agentID,
-				Message: fmt.Sprintf("Action '%s' of type 'ACTION_TYPE' acknowledged.",
-					actionID),
-			},
-			{
-				EventType: "ACTION_RESULT",
-				SubType:   "ACKNOWLEDGED",
-				Timestamp: "2022-12-01T01:02:03.00004-07:00",
-				ActionID:  "not-received-on-checkin",
-				AgentID:   "invalid-action-id",
-				Message: fmt.Sprintf("Action '%s' of type 'unknwon_action' acknowledged.",
-					"not-received-on-checkin"),
-			}}})
+		&fleetapi.AckRequest{Events: []api.AckRequest_Events_Item{
+			newGenericAckEvent(actionID, agentID, "2022-12-01T01:02:03.00004-07:00",
+				fmt.Sprintf("Action '%s' of type 'ACTION_TYPE' acknowledged.", actionID)),
+			newGenericAckEvent("not-received-on-checkin", "invalid-action-id", "2022-12-01T01:02:03.00004-07:00",
+				fmt.Sprintf("Action '%s' of type 'unknwon_action' acknowledged.", "not-received-on-checkin")),
+		}})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing checkin: %v", err))
 	}
-	fmt.Printf("%#v\n", respAck)
+	bs, err := json.Marshal(respAck)
+	if err != nil {
+		panic(fmt.Sprintf("could not marshal ack response: %v", err))
+	}
+	fmt.Println(string(bs))
 
 	// Output:
-	// &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}, fleetapi.AckResponseItem{Status:404, Message:"action not-received-on-checkin not found"}}}
+	// {"action":"acks","errors":true,"items":[{"message":"OK","status":200},{"message":"action not-received-on-checkin not found","status":404}]}
 }
 
 // ExampleNewServer_checkin_and_ackWithAcker demonstrates how to assemble a
@@ -753,23 +759,24 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	// 5th - Simulate the checkin -> ack flow by calling the checkin and ack
 	// commands in order
 
-	ackEventPolicyChange := fleetapi.AckEvent{
-		EventType: "ACTION_RESULT",
-		SubType:   "ACKNOWLEDGED",
-		Timestamp: "2022-12-01T01:02:03.00004-07:00",
-		ActionID:  actionID,
-		AgentID:   agentID,
-		Message: fmt.Sprintf("Action '%s' of type 'ACTION_TYPE' acknowledged.",
-			actionID),
+	ackEventPolicyChange := newGenericAckEvent(actionID, agentID, "2022-12-01T01:02:03.00004-07:00",
+		fmt.Sprintf("Action '%s' of type 'ACTION_TYPE' acknowledged.", actionID))
+
+	printAckResponse := func(prefix string, resp *fleetapi.AckResponse) {
+		bs, err := json.Marshal(resp)
+		if err != nil {
+			panic(fmt.Sprintf("could not marshal ack response: %v", err))
+		}
+		fmt.Printf("%s %s\n", prefix, string(bs))
 	}
 
 	// 1st ack: acking an action that haven't been sent
 	respAck, err := cmdAck.Execute(context.Background(),
-		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{ackEventPolicyChange}})
+		&fleetapi.AckRequest{Events: []api.AckRequest_Events_Item{ackEventPolicyChange}})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing checkin: %v", err))
 	}
-	fmt.Printf("[1st ack] %#v\n", respAck)
+	printAckResponse("[1st ack]", respAck)
 
 	// 1st checkin: it will return a POLICY_CHANGE.
 	// TODO: make the acker only ack if the checkin was called
@@ -781,11 +788,11 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 	// 2dn ack: acking the POLICY_CHANGE
 	respAck, err = cmdAck.Execute(context.Background(),
-		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{ackEventPolicyChange}})
+		&fleetapi.AckRequest{Events: []api.AckRequest_Events_Item{ackEventPolicyChange}})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing checkin: %v", err))
 	}
-	fmt.Printf("[2nd ack] %#v\n", respAck)
+	printAckResponse("[2nd ack]", respAck)
 
 	// 2nd checkin: it will fail.
 	_, _, err = cmdCheckin.Execute(context.Background(), &pkgfleetapi.CheckinRequest{})
@@ -796,27 +803,21 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 	// 3rd ack: acking an action not received during checkin
 	respAck, err = cmdAck.Execute(context.Background(),
-		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{
-			{
-				EventType: "ACTION_RESULT",
-				SubType:   "ACKNOWLEDGED",
-				Timestamp: "2022-12-01T01:02:03.00004-07:00",
-				ActionID:  "not-received-on-checkin",
-				AgentID:   agentID,
-				Message: fmt.Sprintf("Action '%s' of type 'unknwon_action' acknowledged.",
-					"not-received-on-checkin"),
-			}}})
+		&fleetapi.AckRequest{Events: []api.AckRequest_Events_Item{
+			newGenericAckEvent("not-received-on-checkin", agentID, "2022-12-01T01:02:03.00004-07:00",
+				fmt.Sprintf("Action '%s' of type 'unknwon_action' acknowledged.", "not-received-on-checkin")),
+		}})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing checkin: %v", err))
 	}
-	fmt.Printf("[3rd ack] %#v\n", respAck)
+	printAckResponse("[3rd ack]", respAck)
 
 	// Output:
-	// [1st ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action anActionID not found"}}}
+	// [1st ack] {"action":"acks","errors":true,"items":[{"message":"action anActionID not found","status":404}]}
 	// [1st checkin] [id: anActionID, type: POLICY_CHANGE]
-	// [2nd ack] &fleetapi.AckResponse{Action:"acks", Errors:false, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}}}
+	// [2nd ack] {"action":"acks","items":[{"message":"OK","status":200}]}
 	// [2nd checkin] Error: status code: 418, fleet-server returned an error: I'm a teapot
-	// [3rd ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action not-received-on-checkin not found"}}}
+	// [3rd ack] {"action":"acks","errors":true,"items":[{"message":"action not-received-on-checkin not found","status":404}]}
 }
 
 type agentInfo string
