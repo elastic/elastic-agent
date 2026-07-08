@@ -2802,7 +2802,6 @@ func TestSystemMetricsWithKafkaOutput(t *testing.T) {
 			{Type: define.Linux},
 			{Type: define.Darwin},
 		},
-		Stack: &define.Stack{},
 	})
 
 	_, currentFile, _, ok := runtime.Caller(0)
