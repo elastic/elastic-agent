@@ -413,10 +413,190 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			},
 			"http": map[string]any{
+<<<<<<< HEAD
 				"enabled": true,
 				"host":    "localhost",
+=======
+				"enabled": false,
 			},
 			"management.otel.enabled": true,
+			"features": map[string]any{
+				"fqdn": map[string]any{
+					"enabled": false,
+				},
+			},
+		}
+	}
+
+	// expects component id
+	expectedAuditbeatReceiverConfig := func(id string) map[string]any {
+		cfg := beatReceiverBaseConfig(id, "auditbeat", "audit/auditd")
+		cfg["auditbeat"] = map[string]any{
+			"modules": []map[string]any{
+				{
+					"id": "test-1",
+					"data_stream": map[string]any{
+						"dataset": "generic-1",
+					},
+					"audit_rules": "-a exit,always -F arch=b64 -S open",
+					"index":       "logs-generic-1-default",
+					"module":      "auditd",
+					"processors":  defaultInputProcessors("test-1", "generic-1", "logs"),
+				},
+			},
+		}
+		return cfg
+	}
+
+	// expects component id
+	expectedHeartbeatReceiverConfig := func(id string) map[string]any {
+		cfg := beatReceiverBaseConfig(id, "heartbeat", "synthetics/http")
+		cfg["heartbeat"] = map[string]any{
+			"monitors": []map[string]any{
+				{
+					"id": "test-1",
+					"data_stream": map[string]any{
+						"dataset": "generic-1",
+					},
+					"urls":       []any{"https://example.com"},
+					"schedule":   "@every 5s",
+					"index":      "logs-generic-1-default",
+					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
+					"type":       "http",
+				},
+			},
+		}
+		return cfg
+	}
+
+	// expects component id
+	expectedOsquerybeatReceiverConfig := func(id string) map[string]any {
+		cfg := beatReceiverBaseConfig(id, "osquerybeat", "osquery")
+		cfg["osquerybeat"] = map[string]any{
+			"inputs": []map[string]any{
+				{
+					"id": "test-1",
+					"data_stream": map[string]any{
+						"dataset": "generic-1",
+					},
+					"query":      "SELECT * FROM processes",
+					"interval":   "3600",
+					"index":      "logs-generic-1-default",
+					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
+					"type":       "osquery",
+				},
+			},
+		}
+		return cfg
+	}
+
+	// expectedOsquerybeatSingleReceiverConfig is the expected config for an osquery component
+	// with single_receiver: true and two streams merged into one receiver.
+	expectedOsquerybeatSingleReceiverConfig := func(id string) map[string]any {
+		cfg := beatReceiverBaseConfig(id, "osquerybeat", "osquery")
+		cfg["osquerybeat"] = map[string]any{
+			"inputs": []map[string]any{
+				{
+					"id": "action-responses",
+					"data_stream": map[string]any{
+						"dataset": "osquery_manager.action.responses",
+					},
+					"query":      nil,
+					"index":      "logs-osquery_manager.action.responses-default",
+					"processors": defaultInputProcessors("action-responses", "osquery_manager.action.responses", "logs"),
+					"type":       "osquery",
+				},
+				{
+					"id": "results",
+					"data_stream": map[string]any{
+						"dataset": "osquery_manager.result",
+					},
+					"query":      "SELECT * FROM processes",
+					"interval":   "3600",
+					"index":      "logs-osquery_manager.result-default",
+					"processors": defaultInputProcessors("results", "osquery_manager.result", "logs"),
+					"type":       "osquery",
+				},
+			},
+		}
+		return cfg
+	}
+
+	// expects component id
+	expectedPacketbeatReceiverConfig := func(id string) map[string]any {
+		cfg := beatReceiverBaseConfig(id, "packetbeat", "packet")
+		cfg["packetbeat"] = map[string]any{
+			"protocols": []map[string]any{
+				{
+					"id": "test-1",
+					"data_stream": map[string]any{
+						"dataset": "generic-1",
+					},
+					"ports":      []any{float64(443), float64(8443)},
+					"index":      "logs-generic-1-default",
+					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
+					"type":       "packet",
+				},
+			},
+		}
+		return cfg
+	}
+
+	// expects component id, input id, and dataset
+	expectedFilestreamConfig := func(compID string, inputID string, dataset string) map[string]any {
+		return map[string]any{
+			"filebeat": map[string]any{
+				"inputs": []map[string]any{
+					{
+						"id":   inputID,
+						"type": "filestream",
+						"data_stream": map[string]any{
+							"dataset": dataset,
+						},
+						"paths": []any{
+							"/var/log/*.log",
+						},
+						"index":      fmt.Sprintf("logs-%s-default", dataset),
+						"processors": defaultInputProcessors(inputID, dataset, "logs"),
+					},
+				},
+			},
+			"path": map[string]any{
+				"home": paths.Components(),
+				"data": filepath.Join(paths.Run(), compID),
+			},
+			"queue": map[string]any{
+				"mem": map[string]any{
+					"events": uint64(3200),
+					"flush": map[string]any{
+						"min_events": uint64(1600),
+						"timeout":    "10s",
+					},
+				},
+			},
+			"logging": map[string]any{
+				"with_fields": map[string]any{
+					"component": map[string]any{
+						"binary":  "filebeat",
+						"dataset": "elastic_agent.filebeat",
+						"type":    "filestream",
+						"id":      compID,
+					},
+					"log": map[string]any{
+						"source": compID,
+					},
+				},
+			},
+			"http": map[string]any{
+				"enabled": false,
+>>>>>>> afd83c518 (Fix agent.features.fqdn.enabled in otel/translate. (#15191))
+			},
+			"management.otel.enabled": true,
+			"features": map[string]any{
+				"fqdn": map[string]any{
+					"enabled": false,
+				},
+			},
 		}
 		return config
 	}
@@ -468,6 +648,11 @@ func TestGetOtelConfig(t *testing.T) {
 			"host":    "localhost",
 		},
 		"management.otel.enabled": true,
+		"features": map[string]any{
+			"fqdn": map[string]any{
+				"enabled": false,
+			},
+		},
 	}
 
 	getBeatMonitoringConfig := func(_, _ string) map[string]any {
@@ -789,6 +974,11 @@ func TestGetOtelConfig(t *testing.T) {
 							"host":    "localhost",
 						},
 						"management.otel.enabled": true,
+						"features": map[string]any{
+							"fqdn": map[string]any{
+								"enabled": false,
+							},
+						},
 					},
 				},
 				"service": map[string]any{
@@ -1363,6 +1553,11 @@ func TestGetOtelConfig(t *testing.T) {
 							"host":    "localhost",
 						},
 						"management.otel.enabled": true,
+						"features": map[string]any{
+							"fqdn": map[string]any{
+								"enabled": false,
+							},
+						},
 					},
 				},
 				"service": map[string]any{
@@ -1564,6 +1759,11 @@ func TestGetOtelConfig(t *testing.T) {
 							"host":    "localhost",
 						},
 						"management.otel.enabled": true,
+						"features": map[string]any{
+							"fqdn": map[string]any{
+								"enabled": false,
+							},
+						},
 					},
 				},
 				"service": map[string]any{
@@ -1680,6 +1880,11 @@ func TestGetOtelConfig(t *testing.T) {
 							"host":    "localhost",
 						},
 						"management.otel.enabled": true,
+						"features": map[string]any{
+							"fqdn": map[string]any{
+								"enabled": false,
+							},
+						},
 					},
 				},
 				"service": map[string]any{
@@ -1891,6 +2096,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			result, err := getReceiversConfigForComponent(
 				tt.component,
 				testAgentInfo,
+				false,
 				tt.outputQueueConfig,
 				tt.beatMonitoringConfigGetter,
 			)
@@ -1933,6 +2139,71 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGetReceiversConfigForComponentFQDN verifies that the agent's FQDN feature flag is
+// propagated into the generated beat receiver config.
+func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-fqdn",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"streams": []any{
+						map[string]any{
+							"id": "test-1",
+							"data_stream": map[string]any{
+								"dataset": "generic-1",
+							},
+							"paths": []any{
+								"/var/log/*.log",
+							},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	fqdnConfig := func(t *testing.T, enabled bool) map[string]any {
+		t.Helper()
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, enabled, nil)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+
+		var receiverConfig map[string]any
+		for _, v := range result {
+			receiverConfig = v.(map[string]any)
+		}
+		featuresConfig, ok := receiverConfig["features"].(map[string]any)
+		require.True(t, ok, "features config should be present and a map")
+		return featuresConfig
+	}
+
+	t.Run("enabled", func(t *testing.T) {
+		featuresConfig := fqdnConfig(t, true)
+		assert.Equal(t, map[string]any{"fqdn": map[string]any{"enabled": true}}, featuresConfig)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		featuresConfig := fqdnConfig(t, false)
+		assert.Equal(t, map[string]any{"fqdn": map[string]any{"enabled": false}}, featuresConfig)
+	})
 }
 
 func TestVerifyComponentIsOtelSupported(t *testing.T) {

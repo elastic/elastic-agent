@@ -79,8 +79,16 @@ func GetOtelConfig(
 	otelConfig := confmap.New()     // base config, nothing here for now
 	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
+	// Evaluate the FQDN feature flag once, so every component in this render sees a consistent
+	// value even if the global flag changes (via a concurrent policy update) while we iterate.
+	fqdnEnabled := features.FQDN()
+
 	for _, comp := range components {
+<<<<<<< HEAD
 		componentConfig, compErr := getCollectorConfigForComponent(comp, info, beatMonitoringConfigGetter, logger)
+=======
+		componentConfig, compErr := getCollectorConfigForComponent(comp, info, fqdnEnabled, logger)
+>>>>>>> afd83c518 (Fix agent.features.fqdn.enabled in otel/translate. (#15191))
 		if compErr != nil {
 			return nil, compErr
 		}
@@ -174,9 +182,13 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 
 	// check if the actual configuration is supported. We need to actually generate the config and look for
 	// the right kind of error
+<<<<<<< HEAD
 	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, func(unitID, binary string) map[string]any {
 		return nil
 	}, logp.NewNopLogger())
+=======
+	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, features.FQDN(), logp.NewNopLogger())
+>>>>>>> afd83c518 (Fix agent.features.fqdn.enabled in otel/translate. (#15191))
 	if errors.Is(compErr, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
 	}
@@ -270,7 +282,11 @@ func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
 func getCollectorConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
+<<<<<<< HEAD
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
+=======
+	fqdnEnabled bool,
+>>>>>>> afd83c518 (Fix agent.features.fqdn.enabled in otel/translate. (#15191))
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	exporterType, err := OutputTypeToExporterType(comp.OutputType)
@@ -282,7 +298,11 @@ func getCollectorConfigForComponent(
 	if err != nil {
 		return nil, err
 	}
+<<<<<<< HEAD
 	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig, beatMonitoringConfigGetter)
+=======
+	receiversConfig, err := getReceiversConfigForComponent(comp, info, fqdnEnabled, outputQueueConfig)
+>>>>>>> afd83c518 (Fix agent.features.fqdn.enabled in otel/translate. (#15191))
 	if err != nil {
 		return nil, err
 	}
@@ -366,6 +386,7 @@ func getCollectorConfigForComponent(
 func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
+	fqdnEnabled bool,
 	outputQueueConfig map[string]any,
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 ) (map[string]any, error) {
@@ -464,9 +485,54 @@ func getReceiversConfigForComponent(
 	receiverConfig["management.otel.enabled"] = true
 	koanfmaps.Merge(monitoringConfig, receiverConfig)
 
+<<<<<<< HEAD
 	return map[string]any{
 		receiverId.String(): receiverConfig,
 	}, nil
+=======
+	// propagate the FQDN feature flag into the receiver config
+	sharedConfig["features"] = map[string]any{
+		"fqdn": map[string]any{
+			"enabled": fqdnEnabled,
+		},
+	}
+
+	// When SingleReceiver is set, merge all stream inputs into one receiver keyed by
+	// component ID instead of creating one receiver per stream. Some components have
+	// shared state that cannot easily be split across receivers.
+	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
+		allInputConfigs := make([]map[string]any, 0, len(inputs))
+		for _, ri := range inputs {
+			allInputConfigs = append(allInputConfigs, ri.config)
+		}
+		receiverID := GetReceiverID(receiverType, comp.ID)
+		receiverConfig := maps.Clone(sharedConfig)
+		receiverConfig[beatName] = map[string]any{
+			beatInputsKey(beatName): allInputConfigs,
+		}
+		return map[string]any{receiverID.String(): receiverConfig}, nil
+	}
+
+	// Create one receiver per input stream.
+	receiversConfig := make(map[string]any, len(inputs))
+	for _, ri := range inputs {
+		if ri.streamID == "" {
+			return nil, fmt.Errorf("input missing stream ID in component %s", comp.ID)
+		}
+		receiverID := GetReceiverID(receiverType, comp.ID+"/"+ri.streamID)
+
+		// Create a new config map for this receiver, copying shared config entries.
+		// This is a shallow copy — nested map values (path, logging, http) are shared
+		// across receivers. This is safe because nothing mutates them after construction.
+		receiverConfig := maps.Clone(sharedConfig)
+		receiverConfig[beatName] = map[string]any{
+			beatInputsKey(beatName): []map[string]any{ri.config},
+		}
+		receiversConfig[receiverID.String()] = receiverConfig
+	}
+
+	return receiversConfig, nil
+>>>>>>> afd83c518 (Fix agent.features.fqdn.enabled in otel/translate. (#15191))
 }
 
 // GetDefaultProcessors returns the default beat processors used across all pipelines.
