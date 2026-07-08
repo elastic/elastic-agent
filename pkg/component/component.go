@@ -78,6 +78,7 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 			InputType: map[string]string{},
 		},
 		Osquerybeat: BeatRuntimeConfig{
+			Default: string(OtelRuntimeManager),
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier
 			InputType: make(map[string]string),
 		},
