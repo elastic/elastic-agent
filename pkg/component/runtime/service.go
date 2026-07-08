@@ -563,16 +563,43 @@ func (s *serviceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *t
 		} else if now.Sub(*lastCheckin) <= checkinPeriod {
 			*missedCheckins = 0
 		}
+		maxMisses := s.maxCheckinMisses(checkinPeriod)
 		if *missedCheckins == 0 {
 			s.compState(client.UnitStateHealthy, *missedCheckins)
-		} else if *missedCheckins > 0 && *missedCheckins < maxCheckinMisses {
+		} else if *missedCheckins > 0 && *missedCheckins < maxMisses {
 			s.compState(client.UnitStateDegraded, *missedCheckins)
-		} else if *missedCheckins >= maxCheckinMisses {
+		} else if *missedCheckins >= maxMisses {
 			// something is wrong; the service should be checking in
-			msg := fmt.Sprintf("Failed: %s service missed %d check-ins", s.name(), maxCheckinMisses)
+			msg := fmt.Sprintf("Failed: %s service missed %d check-ins", s.name(), maxMisses)
 			s.forceCompState(client.UnitStateFailed, msg)
 		}
 	}
+}
+
+// checkinFailureTimeout returns how long this service is allowed to take to
+// start up before a lack of check-ins is treated as a real failure.
+func (s *serviceRuntime) checkinFailureTimeout() time.Duration {
+	ops := s.comp.InputSpec.Spec.Service.Operations
+	var longest time.Duration
+	for _, op := range []*component.ServiceOperationsCommandSpec{ops.Check, ops.Install, ops.Uninstall} {
+		if op != nil && op.Timeout > longest {
+			longest = op.Timeout
+		}
+	}
+	return longest
+}
+
+// maxCheckinMisses returns how many consecutive check-ins this component can
+// miss before it's marked FAILED.
+func (s *serviceRuntime) maxCheckinMisses(checkinPeriod time.Duration) int {
+	timeout := s.checkinFailureTimeout()
+	if timeout <= 0 || checkinPeriod <= 0 {
+		return maxCheckinMisses
+	}
+	if misses := int(timeout / checkinPeriod); misses > maxCheckinMisses {
+		return misses
+	}
+	return maxCheckinMisses
 }
 
 func (s *serviceRuntime) checkinPeriod() time.Duration {

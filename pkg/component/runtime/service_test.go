@@ -454,6 +454,105 @@ func TestServiceStartRetry(t *testing.T) {
 	}, service.serviceRestartDelay+1*time.Second, 500*time.Millisecond)
 }
 
+func makeServiceForCheckStatus(t *testing.T, installTimeout, uninstallTimeout, checkTimeout time.Duration) *serviceRuntime {
+	log, _ := loggertest.New("test")
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9999,
+		CSocket: ".test.sock",
+		Operations: component.ServiceOperationsSpec{
+			Check:     &component.ServiceOperationsCommandSpec{Timeout: checkTimeout},
+			Install:   &component.ServiceOperationsCommandSpec{Timeout: installTimeout},
+			Uninstall: &component.ServiceOperationsCommandSpec{Timeout: uninstallTimeout},
+		},
+	}
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+	// simulate the service already being up and running
+	service.state.State = client.UnitStateHealthy
+
+	// drain state updates so compState/forceCompState never block on service.ch
+	done := make(chan struct{})
+	t.Cleanup(func() { close(done) })
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-service.ch:
+			}
+		}
+	}()
+
+	return service
+}
+
+func TestServiceCheckinFailureTimeout(t *testing.T) {
+	service := makeServiceForCheckStatus(t, 600*time.Second, 600*time.Second, 60*time.Second)
+	require.Equal(t, 600*time.Second, service.checkinFailureTimeout())
+	require.Equal(t, 20, service.maxCheckinMisses(30*time.Second))
+
+	// falls back to the generic count when nothing is configured
+	noTimeouts := makeServiceForCheckStatus(t, 0, 0, 0)
+	require.Equal(t, time.Duration(0), noTimeouts.checkinFailureTimeout())
+	require.Equal(t, maxCheckinMisses, noTimeouts.maxCheckinMisses(30*time.Second))
+}
+
+func TestServiceCheckStatus(t *testing.T) {
+	const checkinPeriod = 30 * time.Second
+
+	t.Run("normal check-in stays healthy", func(t *testing.T) {
+		service := makeServiceForCheckStatus(t, 600*time.Second, 600*time.Second, 60*time.Second)
+		lastCheckin := time.Now()
+		missedCheckins := 0
+
+		service.checkStatus(checkinPeriod, &lastCheckin, &missedCheckins)
+
+		require.Equal(t, client.UnitStateHealthy, service.state.State)
+		require.Equal(t, 0, missedCheckins)
+	})
+
+	t.Run("slow but within configured operation timeout stays degraded", func(t *testing.T) {
+		service := makeServiceForCheckStatus(t, 600*time.Second, 600*time.Second, 60*time.Second)
+		lastCheckin := time.Now().Add(-150 * time.Second)
+		missedCheckins := 0
+
+		// past the old 90s window, but well under the 600s timeout
+		for i := 0; i < 5; i++ {
+			service.checkStatus(checkinPeriod, &lastCheckin, &missedCheckins)
+		}
+
+		require.Equal(t, client.UnitStateDegraded, service.state.State)
+	})
+
+	t.Run("stuck past the configured operation timeout is marked failed", func(t *testing.T) {
+		service := makeServiceForCheckStatus(t, 600*time.Second, 600*time.Second, 60*time.Second)
+		lastCheckin := time.Now().Add(-660 * time.Second)
+		missedCheckins := 0
+
+		// past the 600s timeout
+		for i := 0; i < 22; i++ {
+			service.checkStatus(checkinPeriod, &lastCheckin, &missedCheckins)
+		}
+
+		require.Equal(t, client.UnitStateFailed, service.state.State)
+	})
+
+	t.Run("component with no configured operation timeouts keeps the generic 90s failure window", func(t *testing.T) {
+		service := makeServiceForCheckStatus(t, 0, 0, 0)
+		lastCheckin := time.Now().Add(-120 * time.Second)
+		missedCheckins := 0
+
+		// past the generic 90s window
+		for i := 0; i < 4; i++ {
+			service.checkStatus(checkinPeriod, &lastCheckin, &missedCheckins)
+		}
+
+		require.Equal(t, client.UnitStateFailed, service.state.State)
+	})
+}
+
 func mockEndpointBinary(t *testing.T, exitCode int) string {
 	// Build a mock Endpoint binary that can return a specific exit code.
 	outPath := filepath.Join(t.TempDir(), "mock_endpoint")
