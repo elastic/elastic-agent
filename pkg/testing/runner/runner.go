@@ -76,8 +76,17 @@ type Runner struct {
 	state   State
 }
 
+// NewLogger returns a logger suitable for the runner and provisioners. The
+// timestamp argument controls whether each line is prefixed with a timestamp.
+func NewLogger(timestamp bool) common.Logger {
+	return &runnerLogger{
+		writer:    os.Stdout,
+		timestamp: timestamp,
+	}
+}
+
 // NewRunner creates a new runner based on the provided batches.
-func NewRunner(cfg common.Config, ip common.InstanceProvisioner, sp common.StackProvisioner, batches ...define.Batch) (*Runner, error) {
+func NewRunner(cfg common.Config, log common.Logger, ip common.InstanceProvisioner, sp common.StackProvisioner, batches ...define.Batch) (*Runner, error) {
 	err := cfg.Validate()
 	if err != nil {
 		return nil, err
@@ -93,16 +102,9 @@ func NewRunner(cfg common.Config, ip common.InstanceProvisioner, sp common.Stack
 	}
 	osBatches = filterSupportedOS(osBatches, ip)
 
-	logger := &runnerLogger{
-		writer:    os.Stdout,
-		timestamp: cfg.Timestamp,
-	}
-	ip.SetLogger(logger)
-	sp.SetLogger(logger)
-
 	r := &Runner{
 		cfg:            cfg,
-		logger:         logger,
+		logger:         log,
 		ip:             ip,
 		sp:             sp,
 		batches:        osBatches,

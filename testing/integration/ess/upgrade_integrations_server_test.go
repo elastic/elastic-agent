@@ -49,13 +49,12 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	startVersions := getUpgradeableFIPSVersions(t, runtime.GOOS, runtime.GOARCH)
 	endVersion := define.Version()
 
-	prov, err := ess.NewProvisioner(ess.ProvisionerConfig{
+	prov, err := ess.NewProvisioner(t, ess.ProvisionerConfig{
 		Identifier: "it-upgrade-integrations-server",
 		APIKey:     echApiKey,
 		Region:     echRegion,
 	})
 	require.NoError(t, err)
-	prov.SetLogger(t)
 	statefulProv, ok := prov.(*ess.StatefulProvisioner)
 	require.True(t, ok)
 

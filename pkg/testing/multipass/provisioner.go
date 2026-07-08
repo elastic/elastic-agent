@@ -34,16 +34,12 @@ type provisioner struct {
 }
 
 // NewProvisioner creates the multipass provisioner
-func NewProvisioner() common.InstanceProvisioner {
-	return &provisioner{}
+func NewProvisioner(log common.Logger) common.InstanceProvisioner {
+	return &provisioner{logger: log}
 }
 
 func (p *provisioner) Name() string {
 	return Name
-}
-
-func (p *provisioner) SetLogger(l common.Logger) {
-	p.logger = l
 }
 
 func (p *provisioner) Type() common.ProvisionerType {
