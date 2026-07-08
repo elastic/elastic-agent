@@ -55,11 +55,7 @@ func TestFQDN(t *testing.T) {
 	origEtcHosts, err := getEtcHosts()
 	require.NoError(t, err)
 
-<<<<<<< HEAD
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
-=======
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(20*time.Minute))
->>>>>>> afd83c518 (Fix agent.features.fqdn.enabled in otel/translate. (#15191))
 	defer cancel()
 
 	// Save original hostname so we can restore it at the end of each test
