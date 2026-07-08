@@ -123,3 +123,100 @@ func verifyPprof(t *testing.T, content []byte) {
 	require.NoError(t, err)
 	require.NotNil(t, prof)
 }
+
+func TestExtension_Actions(t *testing.T) {
+	temp := t.TempDir()
+	config := createDefaultConfig().(*Config)
+	config.Endpoint = utils.SocketURLWithFallback("edot-actions.sock", temp)
+
+	ext, err := NewFactory().Create(context.Background(), extension.Settings{
+		TelemetrySettings: component.TelemetrySettings{
+			Logger: zap.NewNop(),
+		},
+		ID: component.NewID(metadata.Type),
+	}, config)
+	require.NoError(t, err)
+	require.NotNil(t, ext)
+
+	require.NoError(t, ext.Start(context.Background(), componenttest.NewNopHost()))
+	defer func() {
+		require.NoError(t, ext.Shutdown(context.Background()))
+	}()
+
+	diagExt := ext.(*diagnosticsExtension)
+
+	tr := &http.Transport{
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return client.Dialer(ctx, config.Endpoint)
+		},
+	}
+	httpClient := &http.Client{Transport: tr}
+
+	postAction := func(t *testing.T, actionReq ActionRequest) (int, ActionResponse) {
+		t.Helper()
+		body, err := json.Marshal(actionReq)
+		require.NoError(t, err)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "http://localhost/actions", strings.NewReader(string(body)))
+		require.NoError(t, err)
+		resp, err := httpClient.Do(req)
+		require.NoError(t, err)
+		defer func() { require.NoError(t, resp.Body.Close()) }()
+		b, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		var actionResp ActionResponse
+		if len(b) > 0 {
+			require.NoError(t, json.Unmarshal(b, &actionResp))
+		}
+		return resp.StatusCode, actionResp
+	}
+
+	t.Run("no handler registered", func(t *testing.T) {
+		status, _ := postAction(t, ActionRequest{ComponentID: "osquery-default", Name: "osquery", Params: map[string]any{}})
+		assert.Equal(t, http.StatusNotFound, status)
+	})
+
+	t.Run("handler invoked and result round-trips", func(t *testing.T) {
+		var receivedParams map[string]any
+		diagExt.RegisterActionHandler("osquerybeatreceiver/_agent-component/osquery-default/osquery-default",
+			func(ctx context.Context, params map[string]any) (map[string]any, error) {
+				receivedParams = params
+				return map[string]any{"count": float64(3)}, nil
+			})
+
+		status, resp := postAction(t, ActionRequest{
+			ComponentID: "osquery-default",
+			Name:        "osquery",
+			Params:      map[string]any{"id": "abc"},
+		})
+		assert.Equal(t, http.StatusOK, status)
+		assert.Empty(t, resp.Error)
+		assert.Equal(t, map[string]any{"count": float64(3)}, resp.Result)
+		assert.Equal(t, map[string]any{"id": "abc"}, receivedParams)
+	})
+
+	t.Run("handler error is surfaced but request still succeeds", func(t *testing.T) {
+		diagExt.RegisterActionHandler("osquerybeatreceiver/_agent-component/osquery-error/osquery-error",
+			func(ctx context.Context, params map[string]any) (map[string]any, error) {
+				return nil, assert.AnError
+			})
+
+		status, resp := postAction(t, ActionRequest{ComponentID: "osquery-error", Name: "osquery"})
+		assert.Equal(t, http.StatusOK, status)
+		assert.Equal(t, assert.AnError.Error(), resp.Error)
+	})
+
+	t.Run("unregistered handler is no longer reachable", func(t *testing.T) {
+		diagExt.UnregisterActionHandler("osquerybeatreceiver/_agent-component/osquery-default/osquery-default")
+		status, _ := postAction(t, ActionRequest{ComponentID: "osquery-default", Name: "osquery"})
+		assert.Equal(t, http.StatusNotFound, status)
+	})
+
+	t.Run("GET is not allowed", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://localhost/actions", nil)
+		require.NoError(t, err)
+		resp, err := httpClient.Do(req)
+		require.NoError(t, err)
+		defer func() { require.NoError(t, resp.Body.Close()) }()
+		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+	})
+}

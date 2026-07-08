@@ -206,3 +206,102 @@ func UpdateESOutputPreset(ctx context.Context, client *kibana.Client, outputID s
 
 	return nil
 }
+
+// osqueryAPIVersion is the versioned-route header required by the osquery
+// plugin's public API. See
+// x-pack/platform/plugins/shared/osquery/common/constants.ts (API_VERSIONS.public.v1)
+// in the Kibana repository.
+const osqueryAPIVersion = "2023-10-31"
+
+func osqueryAPIHeaders() http.Header {
+	h := http.Header{}
+	h.Set("elastic-api-version", osqueryAPIVersion)
+	return h
+}
+
+// OsqueryLiveQuery identifies a submitted live query: ActionID is the parent
+// action ID (used to poll status), QueryActionID is the per-query action ID
+// (used to fetch results).
+type OsqueryLiveQuery struct {
+	ActionID      string
+	QueryActionID string
+}
+
+type osqueryLiveQueryCreateResponse struct {
+	Data struct {
+		ActionID string `json:"action_id"`
+		Queries  []struct {
+			ActionID string `json:"action_id"`
+		} `json:"queries"`
+	} `json:"data"`
+}
+
+// SubmitOsqueryLiveQuery submits a live query for the given agent via Kibana's
+// osquery plugin (POST /api/osquery/live_queries), which creates a Fleet
+// INPUT_ACTION with input_type "osquery" under the hood.
+func SubmitOsqueryLiveQuery(ctx context.Context, client *kibana.Client, agentID, query string) (OsqueryLiveQuery, error) {
+	reqBody, err := json.Marshal(map[string]any{
+		"agent_ids": []string{agentID},
+		"query":     query,
+	})
+	if err != nil {
+		return OsqueryLiveQuery{}, fmt.Errorf("marshaling live query request: %w", err)
+	}
+
+	resp, err := client.SendWithContext(ctx, http.MethodPost, "/api/osquery/live_queries", nil, osqueryAPIHeaders(), bytes.NewReader(reqBody))
+	if err != nil {
+		return OsqueryLiveQuery{}, fmt.Errorf("submitting osquery live query: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return OsqueryLiveQuery{}, fmt.Errorf("reading osquery live query response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return OsqueryLiveQuery{}, fmt.Errorf("submitting osquery live query returned status %d: %s", resp.StatusCode, body)
+	}
+
+	var parsed osqueryLiveQueryCreateResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return OsqueryLiveQuery{}, fmt.Errorf("unmarshaling osquery live query response: %w: %s", err, body)
+	}
+	if parsed.Data.ActionID == "" || len(parsed.Data.Queries) == 0 {
+		return OsqueryLiveQuery{}, fmt.Errorf("osquery live query response missing action id(s): %s", body)
+	}
+
+	return OsqueryLiveQuery{
+		ActionID:      parsed.Data.ActionID,
+		QueryActionID: parsed.Data.Queries[0].ActionID,
+	}, nil
+}
+
+type osqueryLiveQueryDetailsResponse struct {
+	Data struct {
+		Status string `json:"status"`
+	} `json:"data"`
+}
+
+// GetOsqueryLiveQueryStatus fetches the status ("running" or "completed") of a
+// previously submitted live query via GET /api/osquery/live_queries/{actionID}.
+func GetOsqueryLiveQueryStatus(ctx context.Context, client *kibana.Client, actionID string) (string, error) {
+	resp, err := client.SendWithContext(ctx, http.MethodGet, "/api/osquery/live_queries/"+actionID, nil, osqueryAPIHeaders(), nil)
+	if err != nil {
+		return "", fmt.Errorf("fetching osquery live query details: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("reading osquery live query details response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("fetching osquery live query details returned status %d: %s", resp.StatusCode, body)
+	}
+
+	var parsed osqueryLiveQueryDetailsResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return "", fmt.Errorf("unmarshaling osquery live query details response: %w: %s", err, body)
+	}
+	return parsed.Data.Status, nil
+}

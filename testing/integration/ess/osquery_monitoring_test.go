@@ -135,6 +135,29 @@ func (runner *OsqueryManagerRunner) validateOsqueryEvents(t *testing.T, ctx cont
 	return doc
 }
 
+// validateOsqueryLiveQuery submits an osquery live query for agentID via
+// Kibana's osquery plugin, waits for it to complete, and confirms the result
+// document landed in Elasticsearch tagged with this query's action ID.
+func (runner *OsqueryManagerRunner) validateOsqueryLiveQuery(t *testing.T, ctx context.Context, agentID string) {
+	liveQuery, err := fleettools.SubmitOsqueryLiveQuery(ctx, runner.info.KibanaClient, agentID, "SELECT * FROM os_version;")
+	require.NoError(t, err, "failed to submit osquery live query")
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		status, statusErr := fleettools.GetOsqueryLiveQueryStatus(ctx, runner.info.KibanaClient, liveQuery.ActionID)
+		require.NoError(collect, statusErr)
+		assert.Equal(collect, "completed", status)
+	}, 2*time.Minute, 5*time.Second, "osquery live query did not complete")
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		query := genESQuery(agentID, [][]string{
+			{"term", "action_id", liveQuery.QueryActionID},
+		})
+		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-osquery_manager.result*", runner.info.ESClient)
+		require.NoError(collect, err)
+		require.NotEmpty(collect, res.Hits.Hits, "expected a result document for the live query")
+	}, time.Minute*5, time.Second*10, "could not fetch osquery live query result from ES")
+}
+
 func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
 	t := runner.T()
 
@@ -169,6 +192,14 @@ func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
 		otelDoc = runner.validateOsqueryEvents(t, ctx, agentStatus.Info.ID, testStart)
+
+		// Regression test for https://github.com/elastic/elastic-agent/issues/15410:
+		// osquery live queries dispatched by Fleet must reach osquerybeat even
+		// though it is running as a beats receiver inside EDOT rather than as a
+		// standalone process with a gRPC control connection to elastic-agent.
+		t.Run("live query", func(t *testing.T) {
+			runner.validateOsqueryLiveQuery(t, ctx, agentStatus.Info.ID)
+		})
 	})
 
 	// Switch to process runtime and validate the same data.
