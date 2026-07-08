@@ -219,6 +219,26 @@ func osqueryAPIHeaders() http.Header {
 	return h
 }
 
+// doOsqueryRequest sends a request to the osquery plugin's API and returns the
+// raw response body, after checking for a 200 status. action names the call
+// for error messages (e.g. "submitting osquery live query").
+func doOsqueryRequest(ctx context.Context, client *kibana.Client, method, path, action string, reqBody io.Reader) ([]byte, error) {
+	resp, err := client.SendWithContext(ctx, method, path, nil, osqueryAPIHeaders(), reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", action, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s response: %w", action, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s returned status %d: %s", action, resp.StatusCode, body)
+	}
+	return body, nil
+}
+
 // OsqueryLiveQuery identifies a submitted live query: ActionID is the parent
 // action ID (used to poll status), QueryActionID is the per-query action ID
 // (used to fetch results).
@@ -248,18 +268,9 @@ func SubmitOsqueryLiveQuery(ctx context.Context, client *kibana.Client, agentID,
 		return OsqueryLiveQuery{}, fmt.Errorf("marshaling live query request: %w", err)
 	}
 
-	resp, err := client.SendWithContext(ctx, http.MethodPost, "/api/osquery/live_queries", nil, osqueryAPIHeaders(), bytes.NewReader(reqBody))
+	body, err := doOsqueryRequest(ctx, client, http.MethodPost, "/api/osquery/live_queries", "submitting osquery live query", bytes.NewReader(reqBody))
 	if err != nil {
-		return OsqueryLiveQuery{}, fmt.Errorf("submitting osquery live query: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return OsqueryLiveQuery{}, fmt.Errorf("reading osquery live query response: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return OsqueryLiveQuery{}, fmt.Errorf("submitting osquery live query returned status %d: %s", resp.StatusCode, body)
+		return OsqueryLiveQuery{}, err
 	}
 
 	var parsed osqueryLiveQueryCreateResponse
@@ -285,18 +296,9 @@ type osqueryLiveQueryDetailsResponse struct {
 // GetOsqueryLiveQueryStatus fetches the status ("running" or "completed") of a
 // previously submitted live query via GET /api/osquery/live_queries/{actionID}.
 func GetOsqueryLiveQueryStatus(ctx context.Context, client *kibana.Client, actionID string) (string, error) {
-	resp, err := client.SendWithContext(ctx, http.MethodGet, "/api/osquery/live_queries/"+actionID, nil, osqueryAPIHeaders(), nil)
+	body, err := doOsqueryRequest(ctx, client, http.MethodGet, "/api/osquery/live_queries/"+actionID, "fetching osquery live query details", nil)
 	if err != nil {
-		return "", fmt.Errorf("fetching osquery live query details: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("reading osquery live query details response: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("fetching osquery live query details returned status %d: %s", resp.StatusCode, body)
+		return "", err
 	}
 
 	var parsed osqueryLiveQueryDetailsResponse

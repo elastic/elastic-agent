@@ -123,14 +123,9 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		return diagnostics, nil
 	}
 
-	// Receiver names have the form "<receiverType>/_agent-component/<comp.ID>/<streamID>".
-	// All "/" characters are literal string delimiters, not filesystem path separators,
-	// so this is consistent across platforms including Windows.
-	// We extract comp.ID as the segment between OtelNamePrefix and the next "/". This is
-	// exact and unambiguous for normal IDs. Both comp.ID and streamID are user-supplied
-	// (from the policy input "id" field), so either could contain "/" — making the format
-	// ambiguous in that case. The warning below flags such IDs. A proper fix requires
-	// escaping "/" in IDs at the source in the beat receiver.
+	// See translate.ComponentIDFromReceiverName for the receiver-name format and
+	// the "/"-in-ID ambiguity this warning flags. A proper fix requires escaping
+	// "/" in IDs at the source in the beat receiver.
 	diagIdxByCompID := make(map[string]int)
 	for idx, diag := range diagnostics {
 		if strings.Contains(diag.Component.ID, "/") {
@@ -139,12 +134,11 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		diagIdxByCompID[diag.Component.ID] = idx
 	}
 	for _, extDiag := range extDiagnostics.ComponentDiagnostics {
-		parts := strings.SplitN(extDiag.Name, translate.OtelNamePrefix, 2)
-		if len(parts) != 2 {
+		compID, ok := translate.ComponentIDFromReceiverName(extDiag.Name)
+		if !ok {
 			m.managerLogger.Debugf("skipping EDOT diagnostic %q: diagnostic name does not contain expected prefix %q", extDiag.Name, translate.OtelNamePrefix)
 			continue
 		}
-		compID, _, _ := strings.Cut(parts[1], "/")
 		if idx, ok := diagIdxByCompID[compID]; ok {
 			diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
 		}

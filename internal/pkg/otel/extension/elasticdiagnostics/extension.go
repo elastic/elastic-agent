@@ -13,7 +13,6 @@ import (
 	"net"
 	"net/http"
 	"runtime/pprof"
-	"strings"
 	"sync"
 	"time"
 
@@ -63,9 +62,9 @@ type diagnosticsExtension struct {
 	componentHooks    map[string][]*diagHook
 	globalHooks       map[string]*diagHook
 
-	// actionHandlers is keyed by the full OTel receiver name (e.g.
-	// "osquerybeatreceiver/_agent-component/osquery-default/osquery-default"),
-	// the same key RegisterDiagnosticHook uses.
+	// actionHandlers is keyed by elastic-agent component ID (e.g.
+	// "osquery-default"), resolved from the OTel receiver name at
+	// registration time via translate.ComponentIDFromReceiverName.
 	actionHandlers map[string]actionHandler
 
 	mx         sync.Mutex
@@ -191,33 +190,33 @@ func (d *diagnosticsExtension) RegisterDiagnosticHook(componentName string, desc
 }
 
 // RegisterActionHandler API exposes the ability for beat receivers to register a
-// handler for Fleet actions routed to them.
+// handler for Fleet actions routed to them. componentName is the OTel receiver
+// name (e.g. "osquerybeatreceiver/_agent-component/osquery-default/stream");
+// it is resolved to elastic-agent's component ID up front so lookups in
+// serveAction are a plain map read rather than a per-request scan.
 // NOTE: Changing the function signature will require changes to libbeat and beatreceivers. Proceed with caution.
 func (d *diagnosticsExtension) RegisterActionHandler(componentName string, handler func(ctx context.Context, params map[string]any) (map[string]any, error)) {
+	compID, ok := translate.ComponentIDFromReceiverName(componentName)
+	if !ok {
+		d.logger.Warn("action handler registered under a name without the expected component prefix, ignoring",
+			zap.String("receiver_name", componentName))
+		return
+	}
 	d.actionsMtx.Lock()
 	defer d.actionsMtx.Unlock()
-	d.actionHandlers[componentName] = handler
+	d.actionHandlers[compID] = handler
 }
 
 // UnregisterActionHandler removes a previously registered action handler.
 // NOTE: Changing the function signature will require changes to libbeat and beatreceivers. Proceed with caution.
 func (d *diagnosticsExtension) UnregisterActionHandler(componentName string) {
+	compID, ok := translate.ComponentIDFromReceiverName(componentName)
+	if !ok {
+		return
+	}
 	d.actionsMtx.Lock()
 	defer d.actionsMtx.Unlock()
-	delete(d.actionHandlers, componentName)
-}
-
-// componentIDFromReceiverName extracts elastic-agent's component ID from a beat
-// receiver name of the form "<receiverType>/_agent-component/<comp.ID>/<streamID>".
-// This mirrors the correlation used by internal/pkg/otel/manager's diagnostics
-// correlation and must stay in sync with it.
-func componentIDFromReceiverName(receiverName string) (string, bool) {
-	parts := strings.SplitN(receiverName, translate.OtelNamePrefix, 2)
-	if len(parts) != 2 {
-		return "", false
-	}
-	compID, _, _ := strings.Cut(parts[1], "/")
-	return compID, true
+	delete(d.actionHandlers, compID)
 }
 
 // serveAction handles POST /actions. It resolves the action handler registered
@@ -236,7 +235,9 @@ func (d *diagnosticsExtension) serveAction(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	handler, ok := d.findActionHandler(actionReq.ComponentID)
+	d.actionsMtx.Lock()
+	handler, ok := d.actionHandlers[actionReq.ComponentID]
+	d.actionsMtx.Unlock()
 	if !ok {
 		d.writeActionError(w, http.StatusNotFound, fmt.Sprintf("no action handler registered for component %q", actionReq.ComponentID))
 		return
@@ -272,27 +273,6 @@ func (d *diagnosticsExtension) writeActionError(w http.ResponseWriter, status in
 	if _, err := w.Write(b); err != nil {
 		d.logger.Error("Failed writing response to client.", zap.Error(err))
 	}
-}
-
-// findActionHandler resolves the action handler registered for the given
-// elastic-agent component ID by correlating it against the (OTel receiver
-// name)-keyed action handlers. The handler is returned unlocked so the
-// (potentially long-running) action execution doesn't hold actionsMtx.
-func (d *diagnosticsExtension) findActionHandler(componentID string) (actionHandler, bool) {
-	d.actionsMtx.Lock()
-	defer d.actionsMtx.Unlock()
-	for receiverName, handler := range d.actionHandlers {
-		compID, ok := componentIDFromReceiverName(receiverName)
-		if !ok {
-			d.logger.Warn("action handler registered under a name without the expected component prefix, skipping",
-				zap.String("receiver_name", receiverName))
-			continue
-		}
-		if compID == componentID {
-			return handler, true
-		}
-	}
-	return nil, false
 }
 
 func (d *diagnosticsExtension) ServeHTTP(w http.ResponseWriter, req *http.Request) {

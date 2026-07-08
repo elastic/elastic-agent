@@ -11,12 +11,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
 // PerformActionExt routes a Fleet action to the beat receiver instance running
@@ -28,12 +25,7 @@ import (
 // If no receiver is currently registered for componentID, or the extension is
 // unreachable (EDOT not running), a non-nil error is returned.
 func PerformActionExt(ctx context.Context, componentID string, name string, params map[string]interface{}) (map[string]interface{}, error) {
-	tr := &http.Transport{
-		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-			return client.Dialer(ctx, paths.DiagnosticsExtensionSocket())
-		},
-	}
-	httpClient := &http.Client{Transport: tr}
+	httpClient := newExtensionHTTPClient()
 
 	body, err := json.Marshal(elasticdiagnostics.ActionRequest{
 		ComponentID: componentID,
