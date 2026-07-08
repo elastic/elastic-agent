@@ -188,10 +188,15 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 				continue
 			}
 
+			// Fleet Server omits the "actions" field entirely when there is nothing
+			// new to report, leaving resp.Actions nil; only unmarshal when it
+			// actually sent a payload.
 			var actions fleetapi.Actions
-			if err := json.Unmarshal(resp.Actions, &actions); err != nil {
-				f.log.Errorf("failed to unmarshal checkin actions: %v", err)
-				continue
+			if len(resp.Actions) > 0 {
+				if err := json.Unmarshal(resp.Actions, &actions); err != nil {
+					f.log.Errorf("failed to unmarshal checkin actions: %v", err)
+					continue
+				}
 			}
 			if len(actions) > 0 {
 				f.actionCh <- actions
