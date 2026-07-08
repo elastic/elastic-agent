@@ -1358,3 +1358,38 @@ func TestContainerEnvOverridesFleetTLSPaths(t *testing.T) {
 	require.Equal(t, envCertPath, loaded.Fleet.Client.Transport.TLS.Certificate.Certificate)
 	require.Equal(t, envKeyPath, loaded.Fleet.Client.Transport.TLS.Certificate.Key)
 }
+
+// Regression test for #15408: FLEET_CA/KIBANA_CA/ELASTICSEARCH_CA overrides fleet.enc CA
+func TestContainerEnvOverridesFleetCA(t *testing.T) {
+	rootPair, _, err := certutil.NewRSARootAndChildCerts()
+	require.NoError(t, err)
+	certDir := t.TempDir()
+	envFleetCAPath := filepath.Join(certDir, "fleet-ca.crt")
+	require.NoError(t, os.WriteFile(envFleetCAPath, rootPair.Cert, 0o644))
+
+	origCfg := paths.Config()
+	t.Cleanup(func() { paths.SetConfig(origCfg) })
+	paths.SetConfig(t.TempDir())
+
+	ctx := t.Context()
+	require.NoError(t, secret.CreateAgentSecret(ctx, vault.WithUnprivileged(true)))
+	require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte("fleet:\n  enabled: true\n"), 0o644))
+
+	store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+	require.NoError(t, err)
+	require.NoError(t, store.Save(strings.NewReader(`fleet:
+  ssl:
+    certificate_authorities:
+      - "/nonexistent/ca.crt"`)))
+
+	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
+	require.Error(t, err)
+
+	t.Setenv("FLEET_CA", envFleetCAPath)
+	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
+	require.NoError(t, err)
+
+	loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+	require.NoError(t, err)
+	require.Equal(t, []string{envFleetCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+}
