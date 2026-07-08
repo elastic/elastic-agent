@@ -904,6 +904,8 @@ func containerCfgOverrides(cfg *config.Config) error {
 	uCfg["fleet.ssl.certificate"] = envWithDefault("", "ELASTIC_AGENT_CERT")
 	uCfg["fleet.ssl.key"] = envWithDefault("", "ELASTIC_AGENT_CERT_KEY")
 
+	uCfg["fleet.ssl.certificate_authorities"] = cli.StringToSlice(envWithDefault("", "FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"))
+
 	return cfg.Merge(uCfg)
 }
 
@@ -1183,6 +1185,11 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	err = cfg.Agent.SetString("fleet.ssl.key", -1, envWithDefault("", "ELASTIC_AGENT_CERT_KEY"), ucfg.PathSep("."))
 	if err != nil {
 		return false, fmt.Errorf("failed to override cert key: %w", err)
+	}
+
+	err = cfg.Merge(map[string]any{"fleet.ssl.certificate_authorities": cli.StringToSlice(envWithDefault("", "FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"))})
+	if err != nil {
+		return false, fmt.Errorf("failed to override CAs: %w", err)
 	}
 
 	storedConfig, err := configuration.NewFromConfig(cfg)
