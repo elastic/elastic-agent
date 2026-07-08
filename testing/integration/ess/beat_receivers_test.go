@@ -223,7 +223,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 2. Download the policy, add the API key
 	downloadURL := fmt.Sprintf("/api/fleet/agent_policies/%s/download", policyResponse.ID)
-	resp, err := info.KibanaClient.Connection.SendWithContext(policyCtx, http.MethodGet, downloadURL, nil, nil, nil)
+	resp, err := info.KibanaClient.SendWithContext(policyCtx, http.MethodGet, downloadURL, nil, nil, nil)
 	require.NoError(t, err, "error downloading policy")
 	policyBytes, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "error reading policy response")
@@ -823,7 +823,7 @@ agent.monitoring.enabled: false
 				if unit.UnitType == int(cproto.UnitType_INPUT) {
 					assert.Equal(t, int(cproto.State_HEALTHY), unit.State,
 						"expected state of unit %s to be %s, got %s",
-						unit.UnitID, cproto.State_HEALTHY.String(), cproto.State(unit.State).String())
+						unit.UnitID, cproto.State_HEALTHY.String(), cproto.State(unit.State).String()) //nolint:gosec // G115 always under 32-bit
 				}
 			}
 		}
@@ -1337,7 +1337,7 @@ agent.monitoring.enabled: false
 		require.NoError(collect, statusErr)
 		require.Equal(collect, 1, len(status.Components))
 		componentStatus := status.Components[0]
-		componentState := cproto.State(componentStatus.State)
+		componentState := cproto.State(componentStatus.State) //nolint:gosec // G115 always under 32-bit
 		assert.Truef(collect, componentState == cproto.State_HEALTHY || componentState == cproto.State_DEGRADED,
 			"component state should be HEALTHY or DEGRADED, got %s", componentState.String())
 		componentID = componentStatus.ID
@@ -1364,7 +1364,7 @@ agent.monitoring.enabled: false
 		require.Equal(collect, 1, len(status.Components))
 		componentStatus := status.Components[0]
 		require.Equal(collect, "beats-receiver", componentStatus.VersionInfo.Name)
-		componentState := cproto.State(componentStatus.State)
+		componentState := cproto.State(componentStatus.State) //nolint:gosec // G115 always under 32-bit
 		assert.Truef(collect, componentState == cproto.State_HEALTHY || componentState == cproto.State_DEGRADED,
 			"component state should be HEALTHY or DEGRADED, got %s", componentState.String())
 	}, 2*time.Minute, 5*time.Second)
@@ -1399,14 +1399,6 @@ agent.monitoring.enabled: false
 
 	// the component working directory shouldn't exist anymore
 	require.NoDirExists(t, componentWorkDir)
-}
-
-func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {
-	assert.Equal(t, int(cproto.CollectorComponentStatus_StatusOK), status.Status, "component status should be ok")
-	assert.Equal(t, "", status.Error, "component status should not have an error")
-	for _, componentStatus := range status.ComponentStatusMap {
-		assertCollectorComponentsHealthy(t, componentStatus)
-	}
 }
 
 func assertBeatsHealthy(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager, componentCount int) {
@@ -1569,7 +1561,7 @@ agent.logging.stderr: true
 	err = fixture.Configure(ctx, configBuffer.Bytes())
 	require.NoError(t, err)
 
-	err = setStrictMapping(info.ESClient, index)
+	err = setStrictMapping(ctx, info.ESClient, index)
 	require.NoError(t, err, "could not set strict mapping due to %v", err)
 
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
@@ -1744,7 +1736,7 @@ agent.logging.stderr: true
 	err = fixture.Configure(ctx, configBuffer.Bytes())
 	require.NoError(t, err)
 
-	err = setStrictMapping(info.ESClient, index)
+	err = setStrictMapping(ctx, info.ESClient, index)
 	require.NoError(t, err, "could not set strict mapping due to %v", err)
 
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
@@ -1800,7 +1792,7 @@ agent.logging.stderr: true
 // setStrictMapping takes es client and index name
 // and sets strict mapping for that index.
 // Useful to reproduce mapping conflicts required for testing
-func setStrictMapping(client *elasticsearch.Client, index string) error {
+func setStrictMapping(ctx context.Context, client *elasticsearch.Client, index string) error {
 	// Define the body
 	body := map[string]any{
 		"index_patterns": []string{index + "*"},
@@ -1824,18 +1816,17 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 
 	esEndpoint, err := integration.GetESHost()
 	if err != nil {
-		return fmt.Errorf("error getting elasticsearch endpoint: %v", err)
+		return fmt.Errorf("error getting elasticsearch endpoint: %w", err)
 	}
 
-	// Create a context
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	// Build request
 	url := fmt.Sprintf("%s/_index_template/%s", esEndpoint, index)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(jsonData))
 	if err != nil {
-		return fmt.Errorf("could not create http request to ES server: %v", err)
+		return fmt.Errorf("could not create http request to ES server: %w", err)
 	}
 
 	// Set content type header
@@ -1843,7 +1834,7 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 
 	resp, err := client.Perform(req)
 	if err != nil {
-		return fmt.Errorf("error performing request: %v", err)
+		return fmt.Errorf("error performing request: %w", err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -1914,6 +1905,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		kibana.CreateEnrollmentAPIKeyRequest{
 			PolicyID: policyResponse.ID,
 		})
+	require.NoError(t, err, "error creating enrollment API key")
 
 	fut, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -2115,6 +2107,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 
 	aggResults := map[string]any{}
 	err = json.Unmarshal(resultBuf, &aggResults)
+	require.NoError(t, err)
 	aggs, ok := aggResults["aggregations"].(map[string]any)
 	require.Truef(t, ok, "'aggregations' wasn't a map[string]any, result was %s", string(resultBuf))
 	dups, ok := aggs["duplicates"].(map[string]any)
