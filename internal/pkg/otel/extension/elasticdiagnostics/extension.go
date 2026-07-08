@@ -192,8 +192,6 @@ func (d *diagnosticsExtension) RegisterDiagnosticHook(componentName string, desc
 // RegisterActionHandler API exposes the ability for beat receivers to register a
 // handler for Fleet actions routed to them. componentName is the OTel receiver
 // name (e.g. "osquerybeatreceiver/_agent-component/osquery-default/stream");
-// it is resolved to elastic-agent's component ID up front so lookups in
-// serveAction are a plain map read rather than a per-request scan.
 // NOTE: Changing the function signature will require changes to libbeat and beatreceivers. Proceed with caution.
 func (d *diagnosticsExtension) RegisterActionHandler(componentName string, handler func(ctx context.Context, params map[string]any) (map[string]any, error)) {
 	compID, ok := translate.ComponentIDFromReceiverName(componentName)

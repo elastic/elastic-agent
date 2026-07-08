@@ -187,7 +187,7 @@ type OTelManager interface {
 	// then it performs the diagnostics for all current units.
 	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
 
-	// PerformAction executes an action on a unit backed by a beat receiver running inside the otel collector.
+	// PerformAction executes a Fleet action for the specified component and unit.
 	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
 }
 

@@ -16,15 +16,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 )
 
-// PerformActionExt routes a Fleet action to the beat receiver instance running
-// inside EDOT whose elastic-agent component ID is componentID. It connects to
-// the elasticdiagnostics extension over its Unix socket, the same transport
-// used by PerformDiagnosticsExt, and returns the result map produced by the
-// receiver's registered action handler.
-//
-// If no receiver is currently registered for componentID, or the extension is
-// unreachable (EDOT not running), a non-nil error is returned.
-func PerformActionExt(ctx context.Context, componentID string, name string, params map[string]interface{}) (map[string]interface{}, error) {
+// PerformActionExt routes a Fleet action to a receiver mapped to componentID.
+// It connects to the elasticdiagnostics extension over its Unix socket, the
+// same transport used by PerformDiagnosticsExt, and returns the result map
+// produced by the receiver's registered action handler.
+func PerformActionExt(ctx context.Context, componentID string, name string, params map[string]any) (map[string]any, error) {
 	httpClient := newExtensionHTTPClient()
 
 	body, err := json.Marshal(elasticdiagnostics.ActionRequest{

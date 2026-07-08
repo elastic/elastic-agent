@@ -7,8 +7,12 @@
 package ess
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -139,11 +143,11 @@ func (runner *OsqueryManagerRunner) validateOsqueryEvents(t *testing.T, ctx cont
 // Kibana's osquery plugin, waits for it to complete, and confirms the result
 // document landed in Elasticsearch tagged with this query's action ID.
 func (runner *OsqueryManagerRunner) validateOsqueryLiveQuery(t *testing.T, ctx context.Context, agentID string) {
-	liveQuery, err := fleettools.SubmitOsqueryLiveQuery(ctx, runner.info.KibanaClient, agentID, "SELECT * FROM os_version;")
+	liveQuery, err := submitOsqueryLiveQuery(ctx, runner.info.KibanaClient, agentID, "SELECT * FROM os_version;")
 	require.NoError(t, err, "failed to submit osquery live query")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		status, statusErr := fleettools.GetOsqueryLiveQueryStatus(ctx, runner.info.KibanaClient, liveQuery.ActionID)
+		status, statusErr := getOsqueryLiveQueryStatus(ctx, runner.info.KibanaClient, liveQuery.ActionID)
 		require.NoError(collect, statusErr)
 		assert.Equal(collect, "completed", status)
 	}, 2*time.Minute, 5*time.Second, "osquery live query did not complete")
@@ -263,4 +267,104 @@ func switchOsquerybeatToProcessRuntime(ctx context.Context, t testing.TB, kibana
 	policyResp, err := kibanaClient.UpdatePolicy(ctx, policyID, updateReq)
 	require.NoError(t, err)
 	return policyResp.Revision
+}
+
+// osqueryLiveQuery identifies a submitted live query: ActionID is the parent
+// action ID (used to poll status), QueryActionID is the per-query action ID
+// (used to fetch results).
+type osqueryLiveQuery struct {
+	ActionID      string
+	QueryActionID string
+}
+
+type osqueryLiveQueryCreateResponse struct {
+	Data struct {
+		ActionID string `json:"action_id"`
+		Queries  []struct {
+			ActionID string `json:"action_id"`
+		} `json:"queries"`
+	} `json:"data"`
+}
+
+// submitOsqueryLiveQuery submits a live query for the given agent via Kibana's
+// osquery plugin (POST /api/osquery/live_queries), which creates a Fleet
+// INPUT_ACTION with input_type "osquery" under the hood.
+func submitOsqueryLiveQuery(ctx context.Context, client *kibana.Client, agentID, query string) (osqueryLiveQuery, error) {
+	reqBody, err := json.Marshal(map[string]any{
+		"agent_ids": []string{agentID},
+		"query":     query,
+	})
+	if err != nil {
+		return osqueryLiveQuery{}, fmt.Errorf("marshaling live query request: %w", err)
+	}
+
+	body, err := doOsqueryRequest(ctx, client, http.MethodPost, "/api/osquery/live_queries", bytes.NewReader(reqBody))
+	if err != nil {
+		return osqueryLiveQuery{}, fmt.Errorf("submitting osquery live query: %w", err)
+	}
+
+	var parsed osqueryLiveQueryCreateResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return osqueryLiveQuery{}, fmt.Errorf("unmarshaling osquery live query response: %w: %s", err, body)
+	}
+	if parsed.Data.ActionID == "" || len(parsed.Data.Queries) == 0 {
+		return osqueryLiveQuery{}, fmt.Errorf("osquery live query response missing action id(s): %s", body)
+	}
+
+	return osqueryLiveQuery{
+		ActionID:      parsed.Data.ActionID,
+		QueryActionID: parsed.Data.Queries[0].ActionID,
+	}, nil
+}
+
+type osqueryLiveQueryDetailsResponse struct {
+	Data struct {
+		Status string `json:"status"`
+	} `json:"data"`
+}
+
+// getOsqueryLiveQueryStatus fetches the status ("running" or "completed") of a
+// previously submitted live query via GET /api/osquery/live_queries/{actionID}.
+func getOsqueryLiveQueryStatus(ctx context.Context, client *kibana.Client, actionID string) (string, error) {
+	body, err := doOsqueryRequest(ctx, client, http.MethodGet, "/api/osquery/live_queries/"+actionID, nil)
+	if err != nil {
+		return "", fmt.Errorf("fetching osquery live query details: %w", err)
+	}
+
+	var parsed osqueryLiveQueryDetailsResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return "", fmt.Errorf("unmarshaling osquery live query details response: %w: %s", err, body)
+	}
+	return parsed.Data.Status, nil
+}
+
+// osqueryAPIVersion is the versioned-route header required by the osquery
+// plugin's public API. See
+// x-pack/platform/plugins/shared/osquery/common/constants.ts (API_VERSIONS.public.v1)
+// in the Kibana repository.
+const osqueryAPIVersion = "2023-10-31"
+
+func osqueryAPIHeaders() http.Header {
+	h := http.Header{}
+	h.Set("elastic-api-version", osqueryAPIVersion)
+	return h
+}
+
+// doOsqueryRequest sends a request to the osquery plugin's API and returns the
+// raw response body, after checking for a 200 status.
+func doOsqueryRequest(ctx context.Context, client *kibana.Client, method, path string, reqBody io.Reader) ([]byte, error) {
+	resp, err := client.SendWithContext(ctx, method, path, nil, osqueryAPIHeaders(), reqBody)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("returned status %d: %s", resp.StatusCode, body)
+	}
+	return body, nil
 }

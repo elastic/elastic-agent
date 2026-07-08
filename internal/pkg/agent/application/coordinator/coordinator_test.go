@@ -1949,10 +1949,7 @@ func (f *fakeVarsManager) DefaultProvider() string {
 
 // TestCoordinator_PerformAction_RoutesByRuntimeManager verifies that
 // Coordinator.PerformAction routes to the otel manager for components running
-// under the OTel runtime, and to the runtime (process) manager otherwise. This
-// is the fix for elastic/elastic-agent#15410: osquery live queries were
-// silently dropped because actions for OTel-managed components were always
-// sent to the process-runtime manager, which has no knowledge of them.
+// under the OTel runtime, and to the runtime (process) manager otherwise.
 func TestCoordinator_PerformAction_RoutesByRuntimeManager(t *testing.T) {
 	var runtimeCalled, otelCalled bool
 	runtimeMgr := &fakeRuntimeManager{
