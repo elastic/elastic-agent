@@ -185,8 +185,20 @@ func dynamicTopicSetterProcessor(topic string, outputName string) (map[string]an
 
 	return map[string]any{
 		getTransformProcessorID(outputName).String(): map[string]any{
-			"error_mode":     "ignore",
-			"log_statements": logStatements,
+			"error_mode": "ignore",
+			// Statements are wrapped in an explicit context/error_mode group (rather than
+			// relying on the transform processor's bare-string shorthand, which decodes to
+			// an implicit zero-value context/error_mode) because that implicit zero value
+			// does not survive a marshal/unmarshal round trip: confmap.Marshal always
+			// serializes the zero value explicitly, and the resulting "" is not a valid
+			// context or error mode on the next decode.
+			"log_statements": []map[string]any{
+				{
+					"context":    "log",
+					"error_mode": "ignore",
+					"statements": logStatements,
+				},
+			},
 		},
 	}, nil
 }
