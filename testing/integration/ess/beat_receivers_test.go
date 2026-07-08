@@ -838,7 +838,7 @@ agent.monitoring.enabled: false
 	err = fixture.Configure(ctx, processConfig)
 	require.NoError(t, err)
 
-	output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true, Develop: true})
 	require.NoError(t, err, "failed to install agent: %s", output)
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -867,10 +867,16 @@ agent.monitoring.enabled: false
 	require.Len(t, beatStartLogs, 2, "expected to find one log line for each configuration")
 	processLog, receiverLog := beatStartLogs[0], beatStartLogs[1]
 
-	// Check that the process log is a subset of the receiver log
+	// Check that the process log is a subset of the receiver log.
+	// "message" and "log.origin.file.line" are expected to differ: periodic metrics
+	// logging is disabled by default for beats receivers, so the beat process logs
+	// "Starting metrics logging every 30s" while the receiver logs "Skipping metrics
+	// logging" from a different line of the same function.
 	for key, value := range processLog {
 		assert.Contains(t, receiverLog, key)
-		if key == "@timestamp" { // the timestamp value will be different
+		switch key {
+		case "@timestamp", // the timestamp value will be different
+			"message", "log.origin.file.line":
 			continue
 		}
 		assert.Equal(t, value, receiverLog[key])
@@ -1422,8 +1428,11 @@ func assertBeatsHealthy(t *assert.CollectT, status *atesting.AgentStatusOutput, 
 	}
 }
 
-// getBeatStartLogRecords returns the log records for a particular log line emitted when the beat starts
-// This log line is identical between beats processes and receivers, so it's a good point of comparison
+// getBeatStartLogRecords returns the log records for the metrics reporter startup log line emitted
+// when the beat starts. This log line comes from the same code path in both beats processes and
+// receivers, so aside from its message (and the line number it was logged from) it's a good point
+// of comparison. Beats processes log "Starting metrics logging every 30s", while receivers log
+// "Skipping metrics logging" since periodic metrics logging is disabled by default for receivers.
 func getBeatStartLogRecords(logs string) []map[string]any {
 	var logRecords []map[string]any
 	for _, line := range strings.Split(logs, "\n") {
@@ -1436,7 +1445,8 @@ func getBeatStartLogRecords(logs string) []map[string]any {
 			continue
 		}
 
-		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Starting metrics logging") {
+		if message, ok := logRecord["message"].(string); ok &&
+			(strings.HasPrefix(message, "Starting metrics logging") || strings.HasPrefix(message, "Skipping metrics logging")) {
 			logRecords = append(logRecords, mapstr.M(logRecord).Flatten())
 		}
 	}
