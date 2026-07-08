@@ -745,7 +745,7 @@ func addLogIntegration(t *testing.T, info *define.Info, policyID, logFilePath st
 
 	// Call Kibana to create the policy.
 	// Docs: https://www.elastic.co/guide/en/fleet/current/fleet-api-docs.html#create-integration-policy-api
-	resp, err := info.KibanaClient.Connection.Send(
+	resp, err := info.KibanaClient.Send(
 		http.MethodPost,
 		"/api/fleet/package_policies",
 		nil,
@@ -754,6 +754,7 @@ func addLogIntegration(t *testing.T, info *define.Info, policyID, logFilePath st
 	if err != nil {
 		t.Fatalf("could not execute request to Kibana/Fleet: %s", err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		// On error dump the whole request response so we can easily spot
 		// what went wrong.
@@ -894,10 +895,10 @@ func TestContainerCMDEnrollByPolicyName(t *testing.T) {
 	env := []string{
 		"FLEET_ENROLL=1",
 		"FLEET_URL=" + fleetURL,
-		"KIBANA_FLEET_HOST=" + info.KibanaClient.Connection.URL,
+		"KIBANA_FLEET_HOST=" + info.KibanaClient.URL,
 		"FLEET_TOKEN_POLICY_NAME=" + resp.Name,
-		"KIBANA_FLEET_USERNAME=" + info.KibanaClient.Connection.Username,
-		"KIBANA_FLEET_PASSWORD=" + info.KibanaClient.Connection.Password,
+		"KIBANA_FLEET_USERNAME=" + info.KibanaClient.Username,
+		"KIBANA_FLEET_PASSWORD=" + info.KibanaClient.Password,
 		"STATE_PATH=" + agentFixture.WorkDir(),
 	}
 	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
