@@ -18,7 +18,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -78,20 +77,6 @@ func (e *Downloader) Download(ctx context.Context, _ artifact.Artifact, filename
 	hashPath, err := e.download(sourcePath+".sha512", targetPath+".sha512")
 	downloadedFiles = append(downloadedFiles, hashPath)
 	return path, err
-}
-
-// DownloadAsc downloads the package .asc file from configured source.
-// It returns absolute path to the downloaded file and a no-nil error if any occurs.
-func (e *Downloader) DownloadAsc(_ context.Context, a artifact.Artifact, _ agtversion.ParsedSemVer) (string, error) {
-	sourcePath := filepath.Join(e.dropPath, a.FileName()+".asc")
-	targetPath := filepath.Join(e.config.TargetDirectory, a.FileName()+".asc")
-	path, err := e.download(sourcePath, targetPath)
-	if err != nil {
-		os.Remove(path)
-		return "", err
-	}
-
-	return path, nil
 }
 
 func (e *Downloader) download(sourcePath, targetPath string) (string, error) {
