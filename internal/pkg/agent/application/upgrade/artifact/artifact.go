@@ -41,6 +41,10 @@ func New(name string, fips bool, version *agtversion.ParsedSemVer, os, arch stri
 		return Artifact{}, errors.New(fmt.Sprintf("'%s' is not a valid combination for a package", key), errors.TypeConfig)
 	}
 
+	if version == nil {
+		return Artifact{}, errors.New("no version specified for package", errors.TypeConfig)
+	}
+
 	return Artifact{Name: name, FIPS: fips, OS: os, Arch: arch, Version: version}, nil
 }
 
