@@ -39,7 +39,7 @@ func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {
 func TestCreatePRIdempotent(t *testing.T) {
 	createCalls := 0
 	existingPR := &github.PullRequest{
-		Number: github.Ptr(42),
+		Number:  github.Ptr(42),
 		HTMLURL: github.Ptr("https://github.com/elastic/elastic-agent/pull/42"),
 		Head: &github.PullRequestBranch{
 			Ref: github.Ptr("9.5"),
