@@ -13,6 +13,8 @@ import (
 	"net"
 	"net/http"
 	"runtime/pprof"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,8 +66,15 @@ type diagnosticsExtension struct {
 
 	// actionHandlers is keyed by elastic-agent component ID (e.g.
 	// "osquery-default"), resolved from the OTel receiver name at
-	// registration time via translate.ComponentIDFromReceiverName.
-	actionHandlers map[string]actionHandler
+	// registration time via translate.ComponentIDFromReceiverName. The inner
+	// map is keyed by the full OTel receiver name, because a single component
+	// can be split across multiple receivers — one per input stream, unless
+	// the component's spec sets single_receiver: true.
+	// Routing an action requires exactly one receiver registered for the
+	// target component; more than one is treated as ambiguous (see
+	// serveAction) rather than guessing, since there is no per-stream
+	// targeting information in a Fleet action today.
+	actionHandlers map[string]map[string]actionHandler
 
 	mx         sync.Mutex
 	hooksMtx   sync.Mutex
@@ -191,18 +200,30 @@ func (d *diagnosticsExtension) RegisterDiagnosticHook(componentName string, desc
 
 // RegisterActionHandler API exposes the ability for beat receivers to register a
 // handler for Fleet actions routed to them. componentName is the OTel receiver
-// name (e.g. "osquerybeatreceiver/_agent-component/osquery-default/stream");
+// name (e.g. "osquerybeatreceiver/_agent-component/osquery-default/stream"). It
+// returns an error if this registration makes routing for the component
+// ambiguous (see ambiguousActionRoutingError); the handler is still recorded so
+// that action requests keep failing loudly via resolveActionHandler, but the
+// caller should log this error since it is otherwise only surfaced the next
+// time Fleet dispatches an action to this component.
 // NOTE: Changing the function signature will require changes to libbeat and beatreceivers. Proceed with caution.
-func (d *diagnosticsExtension) RegisterActionHandler(componentName string, handler func(ctx context.Context, params map[string]any) (map[string]any, error)) {
+func (d *diagnosticsExtension) RegisterActionHandler(componentName string, handler func(ctx context.Context, params map[string]any) (map[string]any, error)) error {
 	compID, ok := translate.ComponentIDFromReceiverName(componentName)
 	if !ok {
-		d.logger.Warn("action handler registered under a name without the expected component prefix, ignoring",
-			zap.String("receiver_name", componentName))
-		return
+		err := fmt.Errorf("receiver name %q does not contain the expected component prefix, ignoring registration", componentName)
+		d.logger.Warn(err.Error())
+		return err
 	}
 	d.actionsMtx.Lock()
 	defer d.actionsMtx.Unlock()
-	d.actionHandlers[compID] = handler
+	if d.actionHandlers[compID] == nil {
+		d.actionHandlers[compID] = make(map[string]actionHandler)
+	}
+	d.actionHandlers[compID][componentName] = handler
+	if len(d.actionHandlers[compID]) > 1 {
+		return ambiguousActionRoutingError(compID, d.actionHandlers[compID])
+	}
+	return nil
 }
 
 // UnregisterActionHandler removes a previously registered action handler.
@@ -214,8 +235,54 @@ func (d *diagnosticsExtension) UnregisterActionHandler(componentName string) {
 	}
 	d.actionsMtx.Lock()
 	defer d.actionsMtx.Unlock()
-	delete(d.actionHandlers, compID)
+	delete(d.actionHandlers[compID], componentName)
+	if len(d.actionHandlers[compID]) == 0 {
+		delete(d.actionHandlers, compID)
+	}
 }
+
+// resolveActionHandler returns the sole action handler registered for
+// componentID. If more than one receiver has registered a handler for this
+// component (possible when a component's input runs as multiple per-stream
+// receivers, see actionHandlers), routing is ambiguous: there is no
+// per-stream targeting information in a Fleet action to pick the right one,
+// so this returns an error naming the conflicting receivers rather than
+// guessing. Components whose inputs register custom actions must set
+// single_receiver: true in their spec to avoid this.
+func (d *diagnosticsExtension) resolveActionHandler(componentID string) (actionHandler, error) {
+	d.actionsMtx.Lock()
+	defer d.actionsMtx.Unlock()
+	handlers := d.actionHandlers[componentID]
+	switch len(handlers) {
+	case 0:
+		return nil, fmt.Errorf("no action handler registered for component %q", componentID)
+	case 1:
+		for _, handler := range handlers {
+			return handler, nil
+		}
+	}
+	return nil, ambiguousActionRoutingError(componentID, handlers)
+}
+
+// ambiguousActionRoutingError describes the case where more than one receiver
+// has registered an action handler for componentID. Callers must not invoke
+// any of these handlers, since there is no per-stream targeting information
+// in a Fleet action to pick the right one.
+func ambiguousActionRoutingError(componentID string, handlers map[string]actionHandler) error {
+	receiverNames := make([]string, 0, len(handlers))
+	for receiverName := range handlers {
+		receiverNames = append(receiverNames, receiverName)
+	}
+	sort.Strings(receiverNames)
+	return fmt.Errorf("%w for component %q: %d receivers registered actions (%s); "+
+		"this input must set single_receiver: true in its component spec to support actions",
+		errAmbiguousActionRouting, componentID, len(receiverNames), strings.Join(receiverNames, ", "))
+}
+
+// errAmbiguousActionRouting identifies the resolveActionHandler failure mode
+// where multiple receivers registered actions for the same component, so
+// serveAction can map it to a distinct HTTP status from a plain "not found".
+var errAmbiguousActionRouting = errors.New("ambiguous action routing")
 
 // serveAction handles POST /actions. It resolves the action handler registered
 // for the requested component ID and invokes it, returning the result (or
@@ -233,11 +300,13 @@ func (d *diagnosticsExtension) serveAction(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	d.actionsMtx.Lock()
-	handler, ok := d.actionHandlers[actionReq.ComponentID]
-	d.actionsMtx.Unlock()
-	if !ok {
-		d.writeActionError(w, http.StatusNotFound, fmt.Sprintf("no action handler registered for component %q", actionReq.ComponentID))
+	handler, err := d.resolveActionHandler(actionReq.ComponentID)
+	if err != nil {
+		status := http.StatusNotFound
+		if errors.Is(err, errAmbiguousActionRouting) {
+			status = http.StatusConflict
+		}
+		d.writeActionError(w, status, err.Error())
 		return
 	}
 

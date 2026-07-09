@@ -27,6 +27,6 @@ func newExtension(ctx context.Context, set extension.Settings, cfg component.Con
 		logger:            set.Logger.Named("elastic_diagnostics"),
 		componentHooks:    make(map[string][]*diagHook),
 		globalHooks:       make(map[string]*diagHook),
-		actionHandlers:    make(map[string]actionHandler),
+		actionHandlers:    make(map[string]map[string]actionHandler),
 	}, nil
 }

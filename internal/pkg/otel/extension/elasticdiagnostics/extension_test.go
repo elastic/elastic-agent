@@ -177,11 +177,11 @@ func TestExtension_Actions(t *testing.T) {
 
 	t.Run("handler invoked and result round-trips", func(t *testing.T) {
 		var receivedParams map[string]any
-		diagExt.RegisterActionHandler("osquerybeatreceiver/_agent-component/osquery-default/osquery-default",
+		require.NoError(t, diagExt.RegisterActionHandler("osquerybeatreceiver/_agent-component/osquery-default/osquery-default",
 			func(ctx context.Context, params map[string]any) (map[string]any, error) {
 				receivedParams = params
 				return map[string]any{"count": float64(3)}, nil
-			})
+			}))
 
 		status, resp := postAction(t, ActionRequest{
 			ComponentID: "osquery-default",
@@ -195,10 +195,10 @@ func TestExtension_Actions(t *testing.T) {
 	})
 
 	t.Run("handler error is surfaced but request still succeeds", func(t *testing.T) {
-		diagExt.RegisterActionHandler("osquerybeatreceiver/_agent-component/osquery-error/osquery-error",
+		require.NoError(t, diagExt.RegisterActionHandler("osquerybeatreceiver/_agent-component/osquery-error/osquery-error",
 			func(ctx context.Context, params map[string]any) (map[string]any, error) {
 				return nil, assert.AnError
-			})
+			}))
 
 		status, resp := postAction(t, ActionRequest{ComponentID: "osquery-error", Name: "osquery"})
 		assert.Equal(t, http.StatusOK, status)
@@ -209,6 +209,71 @@ func TestExtension_Actions(t *testing.T) {
 		diagExt.UnregisterActionHandler("osquerybeatreceiver/_agent-component/osquery-default/osquery-default")
 		status, _ := postAction(t, ActionRequest{ComponentID: "osquery-default", Name: "osquery"})
 		assert.Equal(t, http.StatusNotFound, status)
+	})
+
+	// A component's input normally runs as one OTel receiver per stream.
+	// If such a multi-receiver component's beat ever registered a custom action, every stream's
+	// receiver would register under the same elastic-agent component ID.
+	// There is no per-stream targeting info in a Fleet action, so this must be
+	// treated as an error rather than silently routing to whichever receiver
+	// registered last.
+	t.Run("multiple receivers for one component is ambiguous", func(t *testing.T) {
+		// The first receiver to register is unaffected: nothing is ambiguous yet.
+		err := diagExt.RegisterActionHandler("filebeatreceiver/_agent-component/filestream-default/stream-1",
+			func(ctx context.Context, params map[string]any) (map[string]any, error) {
+				return map[string]any{"stream": "1"}, nil
+			})
+		require.NoError(t, err)
+
+		// The second, conflicting receiver must be told immediately — via its
+		// own RegisterActionHandler call, i.e. at registration time on the
+		// beat side — not only the next time Fleet dispatches an action.
+		err = diagExt.RegisterActionHandler("filebeatreceiver/_agent-component/filestream-default/stream-2",
+			func(ctx context.Context, params map[string]any) (map[string]any, error) {
+				return map[string]any{"stream": "2"}, nil
+			})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, errAmbiguousActionRouting)
+		assert.Contains(t, err.Error(), "filestream-default")
+		assert.Contains(t, err.Error(), "single_receiver: true")
+
+		// The same ambiguity must independently be caught at action-processing
+		// time too, in case a future caller of RegisterActionHandler ignores
+		// its returned error.
+		status, resp := postAction(t, ActionRequest{ComponentID: "filestream-default", Name: "some-action"})
+		assert.Equal(t, http.StatusConflict, status)
+		assert.Contains(t, resp.Error, "ambiguous action routing")
+		assert.Contains(t, resp.Error, "filestream-default")
+		assert.Contains(t, resp.Error, "single_receiver: true")
+
+		t.Run("unregistering one receiver resolves the ambiguity", func(t *testing.T) {
+			diagExt.UnregisterActionHandler("filebeatreceiver/_agent-component/filestream-default/stream-1")
+
+			status, resp := postAction(t, ActionRequest{ComponentID: "filestream-default", Name: "some-action"})
+			assert.Equal(t, http.StatusOK, status)
+			assert.Equal(t, map[string]any{"stream": "2"}, resp.Result)
+
+			diagExt.UnregisterActionHandler("filebeatreceiver/_agent-component/filestream-default/stream-2")
+		})
+	})
+
+	t.Run("re-registering the same receiver replaces its handler without ambiguity", func(t *testing.T) {
+		const receiverName = "osquerybeatreceiver/_agent-component/osquery-restart/osquery-restart"
+		err := diagExt.RegisterActionHandler(receiverName, func(ctx context.Context, params map[string]any) (map[string]any, error) {
+			return map[string]any{"version": "1"}, nil
+		})
+		require.NoError(t, err)
+		// Simulate the beat process restarting and re-registering under the
+		// same receiver name — this must cleanly replace, not accumulate, and
+		// must not be reported as ambiguous.
+		err = diagExt.RegisterActionHandler(receiverName, func(ctx context.Context, params map[string]any) (map[string]any, error) {
+			return map[string]any{"version": "2"}, nil
+		})
+		require.NoError(t, err)
+
+		status, resp := postAction(t, ActionRequest{ComponentID: "osquery-restart", Name: "osquery"})
+		assert.Equal(t, http.StatusOK, status)
+		assert.Equal(t, map[string]any{"version": "2"}, resp.Result)
 	})
 
 	t.Run("GET is not allowed", func(t *testing.T) {
