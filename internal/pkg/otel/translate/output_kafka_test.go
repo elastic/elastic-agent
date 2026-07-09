@@ -203,14 +203,8 @@ func TestDynamicTopicSetter(t *testing.T) {
 			expectedTransformMap: map[string]any{
 				"transform/_agent-component/default": map[string]any{
 					"error_mode": "ignore",
-					"log_statements": []map[string]any{
-						{
-							"context":    "log",
-							"error_mode": "ignore",
-							"statements": []string{
-								`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
-							},
-						},
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
 					},
 				}},
 			err: nil,
@@ -221,15 +215,9 @@ func TestDynamicTopicSetter(t *testing.T) {
 			expectedTransformMap: map[string]any{
 				"transform/_agent-component/default": map[string]any{
 					"error_mode": "ignore",
-					"log_statements": []map[string]any{
-						{
-							"context":    "log",
-							"error_mode": "ignore",
-							"statements": []string{
-								`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
-								`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["type"]], "-"))`,
-							},
-						},
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["type"]], "-"))`,
 					},
 				}},
 			err: nil,
@@ -240,16 +228,10 @@ func TestDynamicTopicSetter(t *testing.T) {
 			expectedTransformMap: map[string]any{
 				"transform/_agent-component/default": map[string]any{
 					"error_mode": "ignore",
-					"log_statements": []map[string]any{
-						{
-							"context":    "log",
-							"error_mode": "ignore",
-							"statements": []string{
-								`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
-								`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["dataset"]], "-"))`,
-								`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-"))`,
-							},
-						},
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["type"])`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["dataset"]], "-"))`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-"))`,
 					},
 				}},
 			err: nil,
@@ -260,15 +242,9 @@ func TestDynamicTopicSetter(t *testing.T) {
 			expectedTransformMap: map[string]any{
 				"transform/_agent-component/default": map[string]any{
 					"error_mode": "ignore",
-					"log_statements": []map[string]any{
-						{
-							"context":    "log",
-							"error_mode": "ignore",
-							"statements": []string{
-								`set(resource.attributes["topic"], Concat(["test-data-", log.body["data_stream"]["dataset"]], ""))`,
-								`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-"))`,
-							},
-						},
+					"log_statements": []string{
+						`set(resource.attributes["topic"], Concat(["test-data-", log.body["data_stream"]["dataset"]], ""))`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-"))`,
 					},
 				}},
 			err: nil,
@@ -279,15 +255,9 @@ func TestDynamicTopicSetter(t *testing.T) {
 			expectedTransformMap: map[string]any{
 				"transform/_agent-component/default": map[string]any{
 					"error_mode": "ignore",
-					"log_statements": []map[string]any{
-						{
-							"context":    "log",
-							"error_mode": "ignore",
-							"statements": []string{
-								`set(resource.attributes["topic"], log.body["data_stream"]["dataset"])`,
-								`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-test-data-"))`,
-							},
-						},
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["dataset"])`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], log.body["data_stream"]["namespace"]], "-test-data-"))`,
 					},
 				}},
 			err: nil,
@@ -298,15 +268,9 @@ func TestDynamicTopicSetter(t *testing.T) {
 			expectedTransformMap: map[string]any{
 				"transform/_agent-component/default": map[string]any{
 					"error_mode": "ignore",
-					"log_statements": []map[string]any{
-						{
-							"context":    "log",
-							"error_mode": "ignore",
-							"statements": []string{
-								`set(resource.attributes["topic"], log.body["data_stream"]["dataset"])`,
-								`set(resource.attributes["topic"], Concat([resource.attributes["topic"], "-test-data"], ""))`,
-							},
-						},
+					"log_statements": []string{
+						`set(resource.attributes["topic"], log.body["data_stream"]["dataset"])`,
+						`set(resource.attributes["topic"], Concat([resource.attributes["topic"], "-test-data"], ""))`,
 					},
 				}},
 			err: nil,
