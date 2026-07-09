@@ -4223,12 +4223,13 @@ func (h Helm) Package(ctx context.Context) error {
 	mg.SerialDeps(h.BuildDependencies)
 
 	cfg := devtools.SettingsFromContext(ctx)
-	productionPackage := !cfg.Build.Snapshot
 
 	cfg, err := cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
+
+	productionPackage := !cfg.Build.Snapshot
 	agentPackageVersion := cfg.AgentPackageVersion()
 	agentImageTag := agentPackageVersion
 	agentChartVersion := agentPackageVersion
