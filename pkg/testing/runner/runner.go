@@ -137,6 +137,12 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 		return Result{}, err
 	}
 
+	// ensure the cache dir exists before any state gets written to it
+	cacheDir, err := r.ensureCacheDir()
+	if err != nil {
+		return Result{}, err
+	}
+
 	// start the needed stacks
 	err = r.startStacks(ctx)
 	if err != nil {
@@ -174,7 +180,7 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 	case common.ProvisionerTypeVM:
 		// prepare an SSH key and repo archive to reach the instances
 		prepareCtx, prepareCancel := context.WithTimeout(ctx, 10*time.Minute)
-		sshAuth, repoArchive, prepareErr := r.prepare(prepareCtx)
+		sshAuth, repoArchive, prepareErr := r.prepare(prepareCtx, cacheDir)
 		prepareCancel()
 		if prepareErr != nil {
 			return Result{}, prepareErr
@@ -532,23 +538,7 @@ func (r *Runner) getBuilds(b common.OSBatch) []common.Build {
 // prepare prepares for the runner to run.
 //
 // Creates the SSH keys to use and creates the archive of the repo.
-func (r *Runner) prepare(ctx context.Context) (ssh.AuthMethod, string, error) {
-	wd, err := WorkDir()
-	if err != nil {
-		return nil, "", err
-	}
-	cacheDir := filepath.Join(wd, r.cfg.StateDir)
-	_, err = os.Stat(cacheDir)
-	if errors.Is(err, os.ErrNotExist) {
-		err = os.Mkdir(cacheDir, 0755)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to create %q: %w", cacheDir, err)
-		}
-	} else if err != nil {
-		// unknown error
-		return nil, "", err
-	}
-
+func (r *Runner) prepare(ctx context.Context, cacheDir string) (ssh.AuthMethod, string, error) {
 	var auth ssh.AuthMethod
 	var repoArchive string
 	g, gCtx := errgroup.WithContext(ctx)
@@ -568,7 +558,7 @@ func (r *Runner) prepare(ctx context.Context) (ssh.AuthMethod, string, error) {
 		repoArchive = repo
 		return nil
 	})
-	err = g.Wait()
+	err := g.Wait()
 	if err != nil {
 		return nil, "", err
 	}
@@ -849,6 +839,25 @@ func (r *Runner) writeState() error {
 		return fmt.Errorf("failed to write state file %s: %w", r.getStatePath(), err)
 	}
 	return nil
+}
+
+func (r *Runner) ensureCacheDir() (string, error) {
+	wd, err := WorkDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(wd, r.cfg.StateDir)
+	_, err = os.Stat(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		err = os.Mkdir(dir, 0755)
+		if err != nil {
+			return "", fmt.Errorf("failed to create %q: %w", dir, err)
+		}
+	} else if err != nil {
+		// unknown error
+		return "", err
+	}
+	return dir, nil
 }
 
 func (r *Runner) getStatePath() string {
