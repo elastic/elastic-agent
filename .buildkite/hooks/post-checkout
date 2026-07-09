@@ -20,7 +20,7 @@ checkout_merge() {
     # function when beats is not an initialized repository.
     local -a git=( git )
     if [[ ! -e beats/.git ]]; then
-        git+=( -c submodule.recurse=false )
+        git=( git -c submodule.recurse=false )
     fi
 
     "${git[@]}" fetch -v origin "${target_branch}"
