@@ -128,7 +128,7 @@ By default, packaging will build the binaries defined in this repository:
 - `otel-collector` (includes agentbeat)
 - `osquery-extension`
 
-It will pull the remaining dependencies from a manifest specified in [.package_version](/.package-version).
+It will pull the remaining dependencies from a manifest specified in [.package-version](/.package-version).
 This process can be controlled through the following environment variables:
 
 - `AGENT_CORE_SOURCE=local|manifest`: Build the aforementioned binaries locally or pull from the manifest. Default is `local`. Manifest is defined either by [.package-version](/.package-version) or the `MANIFEST_URL` environment variable.
