@@ -51,8 +51,37 @@ type PROptions struct {
 	Maintainers bool // allow maintainers to edit
 }
 
-// CreatePR creates a new pull request
+// FindOpenPR returns an open pull request matching head and base, or nil if none exists.
+func (gh *GitHubClient) FindOpenPR(owner, repo, head, base string) (*github.PullRequest, error) {
+	headRef := fmt.Sprintf("%s:%s", owner, head)
+	prs, _, err := gh.client.PullRequests.List(gh.ctx, owner, repo, &github.PullRequestListOptions{
+		State: "open",
+		Head:  headRef,
+		Base:  base,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pull requests: %w", err)
+	}
+
+	if len(prs) == 0 {
+		return nil, nil
+	}
+
+	return prs[0], nil
+}
+
+// CreatePR creates a new pull request.
+// If an open pull request already exists for the same head and base, it is returned instead (idempotent).
 func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
+	existing, err := gh.FindOpenPR(opts.Owner, opts.Repo, opts.Head, opts.Base)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		fmt.Printf("  Open PR #%d already exists: %s\n", existing.GetNumber(), existing.GetHTMLURL())
+		return existing, nil
+	}
+
 	newPR := &github.NewPullRequest{
 		Title:               github.Ptr(opts.Title),
 		Head:                github.Ptr(opts.Head),
@@ -64,6 +93,14 @@ func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
 
 	pr, _, err := gh.client.PullRequests.Create(gh.ctx, opts.Owner, opts.Repo, newPR)
 	if err != nil {
+		var ghErr *github.ErrorResponse
+		if errors.As(err, &ghErr) && ghErr.Response != nil && ghErr.Response.StatusCode == 422 {
+			existing, findErr := gh.FindOpenPR(opts.Owner, opts.Repo, opts.Head, opts.Base)
+			if findErr == nil && existing != nil {
+				fmt.Printf("  Open PR #%d already exists: %s\n", existing.GetNumber(), existing.GetHTMLURL())
+				return existing, nil
+			}
+		}
 		return nil, fmt.Errorf("failed to create PR: %w", err)
 	}
 

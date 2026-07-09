@@ -66,6 +66,12 @@ func UpdateVersion(newVersion string) error {
 	newContent := re.ReplaceAllString(string(content), `${1}"`+newVersion+`"`)
 
 	if newContent == string(content) {
+		versionRe := regexp.MustCompile(`const\s+defaultBeatVersion\s*=\s*"([^"]+)"`)
+		matches := versionRe.FindStringSubmatch(string(content))
+		if len(matches) >= 2 && matches[1] == newVersion {
+			fmt.Printf("  Version already set to %s in %s\n", newVersion, versionFile)
+			return nil
+		}
 		return fmt.Errorf("version pattern not found in %s", versionFile)
 	}
 

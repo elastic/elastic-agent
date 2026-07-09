@@ -29,11 +29,29 @@ func OpenRepo(path string) (*GitRepo, error) {
 	return &GitRepo{repo: repo}, nil
 }
 
-// CreateBranch creates and checks out a new branch
+// CreateBranch creates and checks out a new branch.
+// If the branch already exists, it is checked out instead (idempotent).
 func (g *GitRepo) CreateBranch(branchName string) error {
 	w, err := g.repo.Worktree()
 	if err != nil {
 		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	refName := plumbing.NewBranchReferenceName(branchName)
+	_, err = g.repo.Reference(refName, true)
+	if err == nil {
+		err = w.Checkout(&git.CheckoutOptions{
+			Branch: refName,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to checkout existing branch: %w", err)
+		}
+
+		fmt.Printf("✓ Checked out existing branch: %s\n", branchName)
+		return nil
+	}
+	if !errors.Is(err, plumbing.ErrReferenceNotFound) {
+		return fmt.Errorf("failed to check branch: %w", err)
 	}
 
 	// Get current HEAD reference
@@ -43,7 +61,6 @@ func (g *GitRepo) CreateBranch(branchName string) error {
 	}
 
 	// Create new branch reference
-	refName := plumbing.NewBranchReferenceName(branchName)
 	ref := plumbing.NewHashReference(refName, headRef.Hash())
 
 	err = g.repo.Storer.SetReference(ref)
@@ -76,6 +93,15 @@ func (g *GitRepo) CommitAll(message, authorName, authorEmail string) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to add changes: %w", err)
+	}
+
+	status, err := w.Status()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree status: %w", err)
+	}
+	if status.IsClean() {
+		fmt.Println("  No changes to commit")
+		return nil
 	}
 
 	// Create commit

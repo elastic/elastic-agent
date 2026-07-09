@@ -413,10 +413,12 @@ pwd  # Should show elastic-agent directory
 
 ### "failed to create branch: reference already exists"
 
-**Solution:** The branch already exists. Either:
-- Delete the existing branch: `git branch -D 9.5`
-- Checkout the existing branch: `git checkout 9.5`
-- Use a different version number
+**Note:** Release automation is idempotent. Re-running `mage release:createBranch` or `mage release:runMajorMinor` checks out the existing branch instead of failing.
+
+If you need a fresh branch, delete it first:
+```bash
+git branch -D 9.5
+```
 
 ### "failed to push: authentication required"
 
@@ -431,9 +433,10 @@ git config credential.helper store
 
 ### PR creation fails with "422 Validation Failed"
 
-**Possible causes:**
+**Note:** Release automation is idempotent. If an open PR already exists for the same head and base branch, `mage release:createPR` returns the existing PR instead of creating a duplicate.
+
+**Other possible causes:**
 - Branch doesn't exist on remote (push first: `git push origin 9.5`)
-- PR already exists for this branch
 - Invalid base branch specified
 
 **Solution:**

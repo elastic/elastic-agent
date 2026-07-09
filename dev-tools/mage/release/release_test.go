@@ -339,6 +339,60 @@ func TestUpdateMergify(t *testing.T) {
 	}
 }
 
+func TestUpdateVersionIdempotent(t *testing.T) {
+	tmpDir := t.TempDir()
+	versionDir := filepath.Join(tmpDir, "version")
+	err := os.Mkdir(versionDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create version dir: %v", err)
+	}
+
+	versionFile := filepath.Join(versionDir, "version.go")
+	initialContent := `package version
+
+const defaultBeatVersion = "9.5.0"
+const Agent = defaultBeatVersion
+`
+	err = os.WriteFile(versionFile, []byte(initialContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	originalWd, _ := os.Getwd()
+	defer func() {
+		if err := os.Chdir(originalWd); err != nil {
+			t.Logf("failed to restore working directory: %v", err)
+		}
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+
+	err = UpdateVersion("9.5.0")
+	if err != nil {
+		t.Errorf("UpdateVersion() first call error = %v", err)
+	}
+
+	content1, err := os.ReadFile(versionFile)
+	if err != nil {
+		t.Fatalf("failed to read version file: %v", err)
+	}
+
+	err = UpdateVersion("9.5.0")
+	if err != nil {
+		t.Errorf("UpdateVersion() second call error = %v", err)
+	}
+
+	content2, err := os.ReadFile(versionFile)
+	if err != nil {
+		t.Fatalf("failed to read version file: %v", err)
+	}
+
+	if string(content1) != string(content2) {
+		t.Error("UpdateVersion() is not idempotent - file changed on second call")
+	}
+}
+
 func TestUpdateMergifyIdempotent(t *testing.T) {
 	tmpDir := t.TempDir()
 

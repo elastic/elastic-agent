@@ -275,7 +275,7 @@ func TestCreateBranchIdempotent(t *testing.T) {
 	// Creating the same branch again should be idempotent (just checkout)
 	err = gitRepo.CreateBranch("test-branch")
 	if err != nil {
-		t.Logf("CreateBranch() with existing branch error = %v", err)
+		t.Errorf("CreateBranch() with existing branch error = %v", err)
 	}
 
 	// Verify we're still on the branch
@@ -285,5 +285,39 @@ func TestCreateBranchIdempotent(t *testing.T) {
 	}
 	if branch != "test-branch" {
 		t.Errorf("GetCurrentBranch() = %s, want test-branch", branch)
+	}
+}
+
+func TestCommitAllIdempotent(t *testing.T) {
+	gitRepo, tmpDir := createTestRepo(t)
+
+	testFile := filepath.Join(tmpDir, "test.txt")
+	err := os.WriteFile(testFile, []byte("test content"), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	err = gitRepo.CommitAll("Test commit", "Test Author", "test@example.com")
+	if err != nil {
+		t.Fatalf("CommitAll() first call error = %v", err)
+	}
+
+	headBefore, err := gitRepo.repo.Head()
+	if err != nil {
+		t.Fatalf("failed to get HEAD before second commit: %v", err)
+	}
+
+	err = gitRepo.CommitAll("Test commit", "Test Author", "test@example.com")
+	if err != nil {
+		t.Errorf("CommitAll() second call error = %v", err)
+	}
+
+	headAfter, err := gitRepo.repo.Head()
+	if err != nil {
+		t.Fatalf("failed to get HEAD after second commit: %v", err)
+	}
+
+	if headBefore.Hash() != headAfter.Hash() {
+		t.Error("CommitAll() is not idempotent - second call created a new commit")
 	}
 }
