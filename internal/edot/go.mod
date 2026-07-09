@@ -811,8 +811,8 @@ replace (
 // service.partialReloadReceivers). Fork: https://github.com/swiatekm/opentelemetry-collector
 // commit 9242922d607f3f5a55f1d826badcbd893545cbb0 on top of v0.155.0.
 replace (
-	go.opentelemetry.io/collector/otelcol => github.com/swiatekm/opentelemetry-collector/otelcol v0.0.0-20260706150950-9242922d607f
-	go.opentelemetry.io/collector/service => github.com/swiatekm/opentelemetry-collector/service v0.0.0-20260706150950-9242922d607f
+	go.opentelemetry.io/collector/otelcol => github.com/swiatekm/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057
+	go.opentelemetry.io/collector/service => github.com/swiatekm/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057
 )
 
 // Replace statements carried forward from Beats https://github.com/elastic/beats/blob/0678f4d96212ac968fc90596e60475ed2f3979e1/go.mod#L503

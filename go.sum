@@ -772,10 +772,10 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/swiatekm/opentelemetry-collector/otelcol v0.0.0-20260706150950-9242922d607f h1:LhtPDni1RPTDitSMPfry+bQQ0VO6Oq99TadKmXoKcsc=
-github.com/swiatekm/opentelemetry-collector/otelcol v0.0.0-20260706150950-9242922d607f/go.mod h1:/R9dgXJABmOizLuUmCXJdBlE/qpAFOiHOPwXJRFuN08=
-github.com/swiatekm/opentelemetry-collector/service v0.0.0-20260706150950-9242922d607f h1:1cHXg6Fz51DOLYTTYDG3lxaD6p+wWn7hMfb+X9eRvh4=
-github.com/swiatekm/opentelemetry-collector/service v0.0.0-20260706150950-9242922d607f/go.mod h1:L9Rs1QOuz5syuz678aZA1D5WchQle+3WVRav5PPGiMs=
+github.com/swiatekm/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057 h1:z3M4g3vq3WsUa8JKfj6EV3GnuOiJz+chvRiVne6rnyk=
+github.com/swiatekm/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057/go.mod h1:/R9dgXJABmOizLuUmCXJdBlE/qpAFOiHOPwXJRFuN08=
+github.com/swiatekm/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057 h1:69+yHsdZqzy3J/0O+GOEDTFIaLiNssWSecB9Ha+fTJE=
+github.com/swiatekm/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057/go.mod h1:L9Rs1QOuz5syuz678aZA1D5WchQle+3WVRav5PPGiMs=
 github.com/testcontainers/testcontainers-go v0.43.0 h1:oEQx5MW2DGd9z3AeEQfB2lPM0eLs7ztyaGRu75bFo5A=
 github.com/testcontainers/testcontainers-go v0.43.0/go.mod h1:+VxkT2NQnKOZPKi6praMuMKYHYyOGXr0XSBSlSMCzFo=
 github.com/testcontainers/testcontainers-go/modules/compose v0.42.0 h1:+t1ZN31TD36cwxmeLqGwe7wIdvblBm0Z+vlj4SX8Mv0=
