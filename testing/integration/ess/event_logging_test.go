@@ -79,7 +79,7 @@ func TestEventLogFile(t *testing.T) {
 	})
 	ctx, cancel := testcontext.WithDeadline(
 		t,
-		context.Background(),
+		t.Context(),
 		time.Now().Add(10*time.Minute))
 	defer cancel()
 
@@ -165,7 +165,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		},
 		Group: "container",
 	})
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())

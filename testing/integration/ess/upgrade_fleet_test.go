@@ -155,7 +155,7 @@ func TestFleetUpgradeToPRBuild(t *testing.T) {
 		Local: false,
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// ========================= prepare from fixture ==========================
 	versions, err := upgradetest.GetUpgradableVersions()
@@ -283,8 +283,9 @@ func TestFleetUpgradeToPRBuild(t *testing.T) {
 }
 
 func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bool) {
-	ctx, _ := testcontext.WithDeadline(
-		t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(
+		t, t.Context(), time.Now().Add(10*time.Minute))
+	defer cancel()
 
 	latest := define.Version()
 

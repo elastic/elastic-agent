@@ -40,7 +40,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
-	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
@@ -337,7 +336,7 @@ func TestFleetGateway(t *testing.T) {
 				data, err := io.ReadAll(body)
 				require.NoError(t, err)
 
-				var checkinRequest pkgfleetapi.CheckinRequest
+				var checkinRequest fleetapi.CheckinRequest
 				err = json.Unmarshal(data, &checkinRequest)
 				require.NoError(t, err)
 
@@ -399,7 +398,7 @@ func TestFleetGateway(t *testing.T) {
 				data, err := io.ReadAll(body)
 				require.NoError(t, err)
 
-				var checkinRequest pkgfleetapi.CheckinRequest
+				var checkinRequest fleetapi.CheckinRequest
 				err = json.Unmarshal(data, &checkinRequest)
 				require.NoError(t, err)
 
@@ -495,6 +494,63 @@ func TestFleetGateway(t *testing.T) {
 		cancel()
 		wg.Wait()
 	})
+}
+
+// TestFleetGatewayCheckinResponseMissingActionsField reproduces
+// https://github.com/elastic/elastic-agent/issues/15397: fleet-server omits
+// the "actions" field from its checkin response when it has nothing new to
+// report, and the agent was logging an error every time that happened.
+func TestFleetGatewayCheckinResponseMissingActionsField(t *testing.T) {
+	agentInfo := &testAgentInfo{}
+	settings := &fleetGatewaySettings{
+		Duration: 5 * time.Second,
+		Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 5 * time.Second},
+	}
+
+	scheduler := scheduler.NewStepper()
+	client := newTestingClient()
+
+	log, obs := loggertest.New("fleet_gateway")
+
+	stateStore := newStateStore(t, log)
+
+	mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
+	mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
+
+	gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	waitFn := ackSeq(
+		client.Answer(func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
+			// Real-world fleet-server response when there is nothing new to
+			// report: no "actions" key at all, not even an empty array.
+			resp := wrapStrToResp(http.StatusOK, `{ "ack_token": "token1" }`)
+			return resp, nil
+		}),
+	)
+
+	errCh := runFleetGateway(ctx, gateway)
+
+	scheduler.Next()
+	waitFn()
+
+	cancel()
+	err = <-errCh
+	require.NoError(t, err)
+
+	select {
+	case actions := <-gateway.Actions():
+		t.Errorf("Expected no actions, got %v", actions)
+	default:
+	}
+
+	unmarshalErrors := obs.FilterMessageSnippet("failed to unmarshal checkin actions").All()
+	require.Empty(t, unmarshalErrors,
+		"a checkin response without an \"actions\" field should not produce an unmarshal "+
+			"error (see https://github.com/elastic/elastic-agent/issues/15397): %+v", unmarshalErrors)
 }
 
 func TestRetriesOnFailures(t *testing.T) {
@@ -725,7 +781,7 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		defer cancel()
 
 		unauth := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
-			return nil, pkgfleetapi.ErrInvalidAPIKey
+			return nil, fleetapi.ErrInvalidAPIKey
 		}
 
 		clientWaitFn := c.Answer(unauth)
@@ -855,7 +911,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 		name       string
 		components []runtime.ComponentComponentState
 		collector  *status.AggregateStatus
-		expected   []pkgfleetapi.CheckinComponent
+		expected   []fleetapi.CheckinComponent
 	}{
 		{
 			name:       "Nil inputs",
@@ -867,7 +923,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 			name:       "Empty inputs",
 			components: []runtime.ComponentComponentState{},
 			collector:  &status.AggregateStatus{},
-			expected:   []pkgfleetapi.CheckinComponent{},
+			expected:   []fleetapi.CheckinComponent{},
 		},
 		{
 			name: "Only agent components",
@@ -895,7 +951,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 				},
 			},
 			collector: nil,
-			expected: []pkgfleetapi.CheckinComponent{
+			expected: []fleetapi.CheckinComponent{
 				{
 					ID:      "comp-1",
 					Type:    "log",
@@ -907,7 +963,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					Type:    "log",
 					Status:  "DEGRADED",
 					Message: "Component is degraded",
-					Units: []pkgfleetapi.CheckinUnit{
+					Units: []fleetapi.CheckinUnit{
 						{
 							ID:      "unit-1",
 							Type:    "input",
@@ -948,13 +1004,13 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					},
 				},
 			},
-			expected: []pkgfleetapi.CheckinComponent{
+			expected: []fleetapi.CheckinComponent{
 				{
 					ID:      "extensions",
 					Type:    "otel",
 					Status:  "HEALTHY",
 					Message: "Healthy",
-					Units: []pkgfleetapi.CheckinUnit{
+					Units: []fleetapi.CheckinUnit{
 						{
 							ID:      "extensions:healthcheck",
 							Type:    "",
@@ -968,7 +1024,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					Type:    "otel",
 					Status:  "DEGRADED",
 					Message: "Recoverable: pipeline error",
-					Units: []pkgfleetapi.CheckinUnit{
+					Units: []fleetapi.CheckinUnit{
 						{
 							ID:      "exporter:elasticsearch",
 							Type:    "output",
@@ -1009,7 +1065,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					},
 				},
 			},
-			expected: []pkgfleetapi.CheckinComponent{
+			expected: []fleetapi.CheckinComponent{
 				{
 					ID:      "comp-1",
 					Type:    "log",
@@ -1042,13 +1098,13 @@ func TestConvertToCheckingComponents(t *testing.T) {
 				},
 			},
 			collector: nil,
-			expected: []pkgfleetapi.CheckinComponent{
+			expected: []fleetapi.CheckinComponent{
 				{
 					ID:      "comp-1",
 					Type:    "log",
 					Status:  "",
 					Message: "Unknown state",
-					Units: []pkgfleetapi.CheckinUnit{
+					Units: []fleetapi.CheckinUnit{
 						{
 							ID:      "unit-1",
 							Type:    "",
@@ -1074,13 +1130,13 @@ func TestConvertToCheckingComponents(t *testing.T) {
 					},
 				},
 			},
-			expected: []pkgfleetapi.CheckinComponent{
+			expected: []fleetapi.CheckinComponent{
 				{
 					ID:      "invalid-id",
 					Type:    "otel",
 					Status:  "HEALTHY",
 					Message: "Healthy",
-					Units: []pkgfleetapi.CheckinUnit{
+					Units: []fleetapi.CheckinUnit{
 						{
 							ID:      "invalid-unit-id",
 							Type:    "",
@@ -1097,11 +1153,11 @@ func TestConvertToCheckingComponents(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := convertToCheckinComponents(logp.NewNopLogger(), tt.components, tt.collector)
 			// Testify diffs are nicer if we sort and compare directly vs using ElementsMathc
-			slices.SortFunc(result, func(a, b pkgfleetapi.CheckinComponent) int {
+			slices.SortFunc(result, func(a, b fleetapi.CheckinComponent) int {
 				return strings.Compare(a.ID, b.ID)
 			})
 			for _, c := range result {
-				slices.SortFunc(c.Units, func(a, b pkgfleetapi.CheckinUnit) int {
+				slices.SortFunc(c.Units, func(a, b fleetapi.CheckinUnit) int {
 					return strings.Compare(a.ID, b.ID)
 				})
 			}
@@ -1115,7 +1171,7 @@ func TestAvailableRollbacks(t *testing.T) {
 		name                  string
 		setup                 func(t *testing.T, rbSource *ttl.MockReadOnlySource, client *testingClient)
 		wantErr               assert.ErrorAssertionFunc
-		assertCheckinResponse func(t *testing.T, resp *pkgfleetapi.CheckinResponse)
+		assertCheckinResponse func(t *testing.T, resp *fleetapi.CheckinResponse)
 	}{
 		{
 			name: "no available rollbacks - normal checkin",
@@ -1157,11 +1213,11 @@ func TestAvailableRollbacks(t *testing.T) {
 					assert.NoError(t, err, "error decoding checkin body")
 					if assert.Contains(t, unmarshaled, "upgrade") {
 						// verify that we got the correct data
-						var actualUpgrade pkgfleetapi.CheckinUpgrade
+						var actualUpgrade fleetapi.CheckinUpgrade
 						err = json.Unmarshal(unmarshaled["upgrade"], &actualUpgrade)
 						require.NoError(t, err, "error decoding upgrade info from checkin body")
 
-						expected := []pkgfleetapi.CheckinRollback{{
+						expected := []fleetapi.CheckinRollback{{
 							Version:    "1.2.3",
 							ValidUntil: validUntil,
 						}}

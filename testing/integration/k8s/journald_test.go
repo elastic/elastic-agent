@@ -38,7 +38,7 @@ func TestKubernetesJournaldInput(t *testing.T) {
 	agentConfigYAML, err := os.ReadFile(filepath.Join("testdata", "journald-input.yml"))
 	require.NoError(t, err, "failed to read journald input template")
 
-	ctx := context.Background()
+	ctx := context.Background() //nolint:forbidigo // ctx is captured by t.Cleanup in step functions; must outlive the test
 	kCtx := k8sGetContext(t, info)
 
 	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
@@ -199,7 +199,7 @@ func journaldTest(
 	index, field, value string) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := context.Background() //nolint:forbidigo // ctx is captured by t.Cleanup in step functions; must outlive the test
 	testNamespace := kCtx.getNamespace(t)
 
 	for _, step := range steps {

@@ -13,9 +13,12 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	api "github.com/elastic/fleet-server/pkg/api"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -23,7 +26,7 @@ import (
 )
 
 type ackRequest struct {
-	Events []fleetapi.AckEvent `json:"events"`
+	Events []api.AckRequest_Events_Item `json:"events"`
 }
 
 type testAgentInfo struct{}
@@ -152,44 +155,64 @@ func TestAcker_Ack(t *testing.T) {
 		}
 		assert.EqualValues(t, len(actions), len(req.Events))
 		for i, ac := range actions {
-			assert.EqualValues(t, "ACTION_RESULT", req.Events[i].EventType)
-			assert.EqualValues(t, "ACKNOWLEDGED", req.Events[i].SubType)
-			assert.EqualValues(t, ac.ID(), req.Events[i].ActionID)
-			assert.EqualValues(t, agentInfo.AgentID(), req.Events[i].AgentID)
-			assert.EqualValues(t, fmt.Sprintf("Action %q of type %q acknowledged.", ac.ID(), ac.Type()), req.Events[i].Message)
-			// Check if the fleet acker handles RetryableActions correctly using the UpgradeAction
-			if a, ok := ac.(*fleetapi.ActionUpgrade); ok {
+			switch a := ac.(type) {
+			case *fleetapi.ActionUpgrade:
+				event, err := req.Events[i].AsUpgradeEvent()
+				require.NoError(t, err)
+				assert.Equal(t, api.ACTIONRESULT, event.Type)
+				assert.Equal(t, api.EventSubtypeACKNOWLEDGED, event.Subtype)
+				assert.Equal(t, a.ID(), event.ActionId)
+				assert.Equal(t, agentInfo.AgentID(), event.AgentId)
+				assert.Equal(t, fmt.Sprintf("Action %q of type %q acknowledged.", a.ID(), a.Type()), event.Message)
 				if a.Err != nil {
-					assert.EqualValues(t, a.Err.Error(), req.Events[i].Error)
+					require.NotNil(t, event.Error)
+					assert.Equal(t, a.Err.Error(), *event.Error)
 					// Check payload
-					require.NotEmpty(t, req.Events[i].Payload)
-					var pl struct {
-						Retry   bool `json:"retry"`
-						Attempt int  `json:"retry_attempt,omitempty"`
-					}
-					err := json.Unmarshal(req.Events[i].Payload, &pl)
-					require.NoError(t, err)
-					assert.Equal(t, a.Data.Retry, pl.Attempt,
+					require.NotNil(t, event.Payload)
+					assert.Equal(t, a.Data.Retry, event.Payload.RetryAttempt,
 						"action ID %s failed", a.ActionID)
 					// Check retry flag
-					if pl.Attempt > 0 {
-						assert.True(t, pl.Retry)
+					if event.Payload.RetryAttempt > 0 {
+						assert.True(t, event.Payload.Retry)
 					} else {
-						assert.False(t, pl.Retry)
+						assert.False(t, event.Payload.Retry)
 					}
 				} else {
-					assert.Empty(t, req.Events[i].Error)
+					assert.Nil(t, event.Error)
 				}
+			case *fleetapi.ActionApp:
+				event, err := req.Events[i].AsInputEvent()
+				require.NoError(t, err)
+				assert.Equal(t, api.ACTIONRESULT, event.Type)
+				assert.Equal(t, api.EventSubtypeACKNOWLEDGED, event.Subtype)
+				assert.Equal(t, a.ID(), event.ActionId)
+				assert.Equal(t, agentInfo.AgentID(), event.AgentId)
+				assert.Equal(t, a.InputType, event.ActionInputType)
+				assert.EqualValues(t, a.Data, event.ActionData)
+				wantResponse, err := json.Marshal(a.Response)
+				require.NoError(t, err)
+				assert.JSONEq(t, string(wantResponse), string(event.ActionResponse))
+				wantStarted, err := time.Parse(time.RFC3339Nano, a.StartedAt)
+				require.NoError(t, err)
+				assert.True(t, wantStarted.Equal(event.StartedAt))
+				wantCompleted, err := time.Parse(time.RFC3339Nano, a.CompletedAt)
+				require.NoError(t, err)
+				assert.True(t, wantCompleted.Equal(event.CompletedAt))
+				if a.Error != "" {
+					require.NotNil(t, event.Error)
+					assert.Equal(t, a.Error, *event.Error)
+				} else {
+					assert.Nil(t, event.Error)
+				}
+			default:
+				event, err := req.Events[i].AsGenericEvent()
+				require.NoError(t, err)
+				assert.Equal(t, api.ACTIONRESULT, event.Type)
+				assert.Equal(t, api.EventSubtypeACKNOWLEDGED, event.Subtype)
+				assert.Equal(t, ac.ID(), event.ActionId)
+				assert.Equal(t, agentInfo.AgentID(), event.AgentId)
+				assert.Equal(t, fmt.Sprintf("Action %q of type %q acknowledged.", ac.ID(), ac.Type()), event.Message)
 			}
-			if a, ok := ac.(*fleetapi.ActionApp); ok {
-				assert.EqualValues(t, a.InputType, req.Events[i].ActionInputType)
-				assert.EqualValues(t, a.Data, req.Events[i].ActionData)
-				assert.EqualValues(t, a.Response, req.Events[i].ActionResponse)
-				assert.EqualValues(t, a.StartedAt, req.Events[i].StartedAt)
-				assert.EqualValues(t, a.CompletedAt, req.Events[i].CompletedAt)
-				assert.EqualValues(t, a.Error, req.Events[i].Error)
-			}
-
 		}
 	}
 

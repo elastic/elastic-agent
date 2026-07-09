@@ -138,7 +138,7 @@ func TestContainerCMD(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Minute)
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -205,7 +205,7 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
 	defer cancel()
 
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
@@ -325,7 +325,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -934,7 +934,7 @@ func TestContainerCMDDiagnosticsSocket(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Minute)
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -1004,7 +1004,7 @@ func TestContainerCMDTLSCertOverride(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())

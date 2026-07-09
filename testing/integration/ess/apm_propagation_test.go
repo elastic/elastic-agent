@@ -62,7 +62,7 @@ func TestAPMConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	deadline := time.Now().Add(10 * time.Minute)
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), deadline)
 	defer cancel()
 
 	err = f.Prepare(ctx, fakeComponent)

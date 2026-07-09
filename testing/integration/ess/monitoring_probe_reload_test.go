@@ -78,7 +78,7 @@ func (runner *MonitoringRunner) SetupSuite() {
 		Privileged:     true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), 3*time.Minute)
 	defer cancel()
 
 	policyResp, agentID, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
@@ -94,7 +94,7 @@ func (runner *MonitoringRunner) SetupSuite() {
 }
 
 func (runner *MonitoringRunner) TestMonitoringLiveness() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+	ctx, cancel := context.WithTimeout(runner.T().Context(), time.Minute*10)
 	defer cancel()
 
 	runner.AllComponentsHealthy(ctx)

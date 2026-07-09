@@ -118,7 +118,7 @@ var (
 		"demo":  Demo.Enroll,
 	}
 
-	errNoManifest         = errors.New(fmt.Sprintf("missing %q environment variable", devtools.ManifestUrlEnvVar))
+	errNoManifest         = fmt.Errorf("missing %q environment variable", devtools.ManifestUrlEnvVar)
 	errNoAgentDropPath    = errors.New("missing AGENT_DROP_PATH environment variable")
 	errAtLeastOnePlatform = errors.New("elastic-agent package is expected to build at least one platform package")
 
@@ -194,10 +194,12 @@ func CheckNoChanges() error {
 }
 
 // Env returns information about the environment.
-func (Prepare) Env() {
+func (Prepare) Env() error {
 	mg.Deps(Mkdir("build"), Build.GenerateConfig)
-	RunGo("version")
-	RunGo("env")
+	if err := RunGo("version"); err != nil {
+		return err
+	}
+	return RunGo("env")
 }
 
 // Build builds the agent binary with DEV flag set.
@@ -299,7 +301,6 @@ func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch strin
 			// there is no actual FIPS relevance for this particular binary
 			// but better safe than sorry
 			args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
-			args.Env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
 			args.CGO = true
 		}
 	}
@@ -868,7 +869,7 @@ func GoInstall(link string) error {
 func Mkdir(dir string) func() error {
 	return func() error {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return fmt.Errorf("failed to create directory: %v, error: %+v", dir, err)
+			return fmt.Errorf("failed to create directory: %v, error: %w", dir, err)
 		}
 		return nil
 	}
@@ -1011,7 +1012,7 @@ func (Demo) NoEnroll(ctx context.Context) error {
 }
 
 // Image builds a cloud image
-func (Cloud) Image(ctx context.Context) {
+func (Cloud) Image(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 
 	// Configure for cloud image build
@@ -1029,7 +1030,7 @@ func (Cloud) Image(ctx context.Context) {
 	}
 
 	ctx = devtools.ContextWithSettings(ctx, cfg)
-	Package(ctx)
+	return Package(ctx)
 }
 
 // Load loads an artifact as a docker image.
@@ -1153,7 +1154,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		if err := dockerBuild(tag); err != nil {
 			fmt.Println(">> Building docker images again (after 10 seconds)")
 			// This sleep is to avoid hitting the docker build issues when resources are not available.
-			time.Sleep(10)
+			time.Sleep(10 * time.Second)
 			if err := dockerBuild(tag); err != nil {
 				return err
 			}
@@ -1239,7 +1240,9 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 	if mg.Verbose() {
 		log.Printf("--- creating flat dir in .elastic-agent_flat")
 	}
-	os.MkdirAll(flatPath, 0o755)
+	if err := os.MkdirAll(flatPath, 0o755); err != nil {
+		return fmt.Errorf("creating flat dir %q: %w", flatPath, err)
+	}
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
@@ -1311,7 +1314,9 @@ func collectPackageDependencies(cfg *devtools.Settings, platforms []string, pack
 					}
 					if supportsAtLeastOnePackageType(platform, spec, cfg.GetPackageTypes()) {
 						targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
-						os.MkdirAll(targetPath, 0o755)
+						if err := os.MkdirAll(targetPath, 0o755); err != nil {
+							panic(fmt.Errorf("creating target dir %q: %w", targetPath, err))
+						}
 						packageName := spec.GetPackageName(packageVersion, platform)
 						if mg.Verbose() {
 							log.Printf(">>> Downloading package %s component %s/%s", packageName, spec.BinaryName, platform)
@@ -1405,9 +1410,15 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 		targetPath := filepath.Join(archivePath, rp)
 		versionedFlatPath := filepath.Join(flatPath, rp)
 		versionedDropPath := filepath.Join(dropPath, rp)
-		os.MkdirAll(targetPath, 0o755)
-		os.MkdirAll(versionedFlatPath, 0o755)
-		os.MkdirAll(versionedDropPath, 0o755)
+		if err := os.MkdirAll(targetPath, 0o755); err != nil {
+			panic(fmt.Errorf("creating target dir %q: %w", targetPath, err))
+		}
+		if err := os.MkdirAll(versionedFlatPath, 0o755); err != nil {
+			panic(fmt.Errorf("creating versioned flat dir %q: %w", versionedFlatPath, err))
+		}
+		if err := os.MkdirAll(versionedDropPath, 0o755); err != nil {
+			panic(fmt.Errorf("creating versioned drop dir %q: %w", versionedDropPath, err))
+		}
 
 		// untar all
 		matches, err := filepath.Glob(filepath.Join(targetPath, "*tar.gz"))
@@ -1453,7 +1464,7 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 			}
 		}
 
-		checksums := make(map[string]string)
+		var checksums map[string]string
 		// Manifest-declared SHAs are only correct when every binary being
 		// checksummed came from the manifest — i.e. CoreSource=manifest. When
 		// the core was compiled locally, its on-disk SHA wouldn't match the
@@ -1723,7 +1734,7 @@ func downloadBinary(ctx context.Context, project string, packageName string, bin
 	return func() error {
 		_, err := downloads.FetchProjectBinary(ctx, project, packageName, binary, version, 3, false, targetPath, true)
 		if err != nil {
-			return fmt.Errorf("FetchProjectBinary failed for %s on %s: %v", binary, platform, err)
+			return fmt.Errorf("FetchProjectBinary failed for %s on %s: %w", binary, platform, err)
 		}
 
 		fmt.Printf("Done downloading %s into %s\n", packageName, targetPath)
@@ -1745,7 +1756,7 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 		hash, err := devtools.GetSHA512Hash(filepath.Join(versionedDropPath, componentFile))
 		if errors.Is(err, os.ErrNotExist) {
 			fmt.Printf(">>> Computing hash for %q failed: %s\n", componentFile, err)
-			return fmt.Errorf("cannot generate SHA512 for %q: %s", componentFile, err)
+			return fmt.Errorf("cannot generate SHA512 for %q: %w", componentFile, err)
 		} else if err != nil {
 			return err
 		}
@@ -1764,7 +1775,9 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 // movePackagesToArchive Create archive folder and move any pre-existing artifacts into it.
 func movePackagesToArchive(dropPath string, platforms []string, packageVersion string, dependencies []packaging.BinarySpec) string {
 	archivePath := filepath.Join(dropPath, "archives")
-	os.MkdirAll(archivePath, 0o755)
+	if err := os.MkdirAll(archivePath, 0o755); err != nil {
+		panic(fmt.Errorf("creating archive dir %q: %w", archivePath, err))
+	}
 
 	// move archives to archive path
 	matches, err := filepath.Glob(filepath.Join(dropPath, "*tar.gz*"))
@@ -1985,30 +1998,38 @@ func saveIronbank(cfg *devtools.Settings) error {
 	ironbank := getIronbankContextName(cfg)
 	buildDir := filepath.Join("build", ironbank)
 	if _, err := os.Stat(buildDir); os.IsNotExist(err) {
-		return fmt.Errorf("cannot find the folder with the ironbank context: %+v", err)
+		return fmt.Errorf("cannot find the folder with the ironbank context: %w", err)
 	}
 
 	if _, err := os.Stat(devtools.DistributionsDir); os.IsNotExist(err) {
 		err := os.MkdirAll(devtools.DistributionsDir, 0o750)
 		if err != nil {
-			return fmt.Errorf("cannot create folder for docker artifacts: %+v", err)
+			return fmt.Errorf("cannot create folder for docker artifacts: %w", err)
 		}
 	}
 
 	// change dir to the buildDir location where the ironbank folder exists
 	// this will generate a tar.gz without some nested folders.
-	wd, _ := os.Getwd()
-	os.Chdir(buildDir)
-	defer os.Chdir(wd)
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting current working directory: %w", err)
+	}
+	if err := os.Chdir(buildDir); err != nil {
+		return fmt.Errorf("changing directory to %q: %w", buildDir, err)
+	}
+	defer func() {
+		if err := os.Chdir(wd); err != nil {
+			fmt.Printf("WARNING: failed to restore working directory to %q: %v\n", wd, err)
+		}
+	}()
 
 	// move the folder to the parent folder, there are two parent folder since
 	// buildDir contains a two folders dir.
 	tarGzFile := filepath.Join("..", "..", devtools.DistributionsDir, ironbank+".tar.gz")
 
 	// Save the build context as tar.gz artifact
-	err := devtools.Tar("./", tarGzFile)
-	if err != nil {
-		return fmt.Errorf("cannot compress the tar.gz file: %+v", err)
+	if err := devtools.Tar("./", tarGzFile); err != nil {
+		return fmt.Errorf("cannot compress the tar.gz file: %w", err)
 	}
 
 	if err := devtools.CreateSHA512File(tarGzFile); err != nil {
@@ -2052,13 +2073,13 @@ func prepareIronbankBuild(cfg *devtools.Settings) error {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("cannot create templates for the IronBank: %+v", err)
+		return fmt.Errorf("cannot create templates for the IronBank: %w", err)
 	}
 
 	// copy files
 	sourcePath := filepath.Join("dev-tools", "packaging", "files", "ironbank")
 	if err := devtools.Copy(sourcePath, buildDir); err != nil {
-		return fmt.Errorf("cannot create files for the IronBank: %+v", err)
+		return fmt.Errorf("cannot create files for the IronBank: %w", err)
 	}
 	return nil
 }
@@ -2101,7 +2122,7 @@ func (Integration) Clean(ctx context.Context) error {
 
 // Check checks that integration tests are using define.Require
 func (Integration) Check() error {
-	fmt.Println(">> check: Checking for define.Require in integration tests") // nolint:forbidigo // it's ok to use fmt.println in mage
+	fmt.Println(">> check: Checking for define.Require in integration tests")
 	return errors.Join(
 		define.ValidateDir("testing/integration/ess"),
 		define.ValidateDir("testing/integration/serverless"),
@@ -2322,7 +2343,9 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 		"# the starting (pre-upgrade) or ending (post-upgrade) versions of Elastic Agent in\n" +
 		"# upgrade integration tests.\n\n"
 
-	io.WriteString(file, header)
+	if _, err := io.WriteString(file, header); err != nil {
+		return fmt.Errorf("failed to write header to %s: %w", upgradetest.AgentVersionsFilename, err)
+	}
 
 	encoder := yaml.NewEncoder(file)
 	encoder.SetIndent(2)
@@ -2463,10 +2486,10 @@ func listStacks() (string, error) {
 			{"Type", stack.Provisioner},
 		})
 
-		switch {
-		case stack.Provisioner == "serverless":
+		switch stack.Provisioner {
+		case "serverless":
 			t.AppendRow(table.Row{"Project ID", stack.Internal["deployment_id"]})
-		case stack.Provisioner == "stateful":
+		case "stateful":
 			t.AppendRow(table.Row{"Deployment ID", stack.Internal["deployment_id"]})
 		}
 		t.AppendRows([]table.Row{
@@ -2498,11 +2521,11 @@ func askForVM() (runner.StateInstance, error) {
 	id := 0
 	fmt.Fprint(os.Stderr, "Instance number: ")
 	if _, err := fmt.Scanf("%d", &id); err != nil {
-		return runner.StateInstance{}, fmt.Errorf("could not read instance number: %w:", err)
+		return runner.StateInstance{}, fmt.Errorf("could not read instance number: %w", err)
 	}
 
 	if id >= len(instances) {
-		return runner.StateInstance{}, fmt.Errorf("Invalid Stack number, it must be between 0 and %d", len(instances)-1)
+		return runner.StateInstance{}, fmt.Errorf("invalid stack number, it must be between 0 and %d", len(instances)-1)
 	}
 
 	return instances[id], nil
@@ -2528,7 +2551,7 @@ func askForStack() (tcommon.Stack, error) {
 	}
 
 	if id >= len(state.Stacks) {
-		return tcommon.Stack{}, fmt.Errorf("Invalid Stack number, it must be between 0 and %d", len(state.Stacks)-1)
+		return tcommon.Stack{}, fmt.Errorf("invalid stack number, it must be between 0 and %d", len(state.Stacks)-1)
 	}
 
 	return state.Stacks[id], nil
@@ -2656,7 +2679,7 @@ func (Integration) SSH() error {
 		return fmt.Errorf("cannot get VM: %w", err)
 	}
 
-	fmt.Println(fmt.Sprintf(`ssh -i %s %s@%s`, filepath.Join(absStateDir, "id_rsa"), vm.Username, vm.IP))
+	fmt.Printf("ssh -i %s %s@%s\n", filepath.Join(absStateDir, "id_rsa"), vm.Username, vm.IP)
 	return nil
 }
 
@@ -2713,7 +2736,7 @@ func (Integration) DeployEnvFile() error {
 		return fmt.Errorf("cannot get VM: %w", err)
 	}
 
-	cmd := exec.Command("scp", "-i", keyFile, fullEnvFilepath, fmt.Sprintf("%s@%s:~/env.sh", vm.Username, vm.IP))
+	cmd := exec.CommandContext(context.Background(), "scp", "-i", keyFile, fullEnvFilepath, fmt.Sprintf("%s@%s:~/env.sh", vm.Username, vm.IP))
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("could not copy env file to VM: %w", err)
 	}
@@ -2771,7 +2794,7 @@ func (Integration) DeployDebugTools() error {
 	}
 
 	for _, c := range commands {
-		cmd := exec.Command("ssh", "-i", keyFile, fmt.Sprintf("%s@%s", vm.Username, vm.IP), c)
+		cmd := exec.CommandContext(context.Background(), "ssh", "-i", keyFile, fmt.Sprintf("%s@%s", vm.Username, vm.IP), c)
 		cmd.Stdin = os.Stdin
 		cmd.Stderr = os.Stderr
 		cmd.Stdout = os.Stdout
@@ -2801,9 +2824,10 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	}
 
 	// a bit of bypass logic; run as serverless by default
-	if cfg.IntegrationTest.StackProvisioner == "" {
+	switch cfg.IntegrationTest.StackProvisioner {
+	case "":
 		cfg = cfg.WithStackProvisioner("serverless")
-	} else if cfg.IntegrationTest.StackProvisioner == "stateful" {
+	case "stateful":
 		fmt.Printf(">>> Warning: running TestBeatServerless as stateful\n")
 	}
 
@@ -3093,8 +3117,10 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	instanceProvisionerMode := cfg.IntegrationTest.InstanceProvisioner
 	switch instanceProvisionerMode {
 	case "", gcloud.Name:
-		instanceProvisionerMode = gcloud.Name
 		instanceProvisioner, err = gcloud.NewProvisioner(gcloudCfg)
+		if err != nil {
+			return nil, err
+		}
 	case multipass.Name:
 		instanceProvisioner = multipass.NewProvisioner()
 	case kind.Name:
@@ -3118,7 +3144,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
 	switch stackProvisionerMode {
 	case "", ess.ProvisionerStateful:
-		stackProvisionerMode = ess.ProvisionerStateful
 		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
 		if err != nil {
 			return nil, err
@@ -3466,7 +3491,7 @@ func authESS(ctx context.Context) error {
 		fmt.Fprintln(os.Stderr, "❌  ESS authentication unsuccessful. Retrying...")
 
 		prompt := fmt.Sprintf("Please provide a ESS API key for %s. To get your API key, "+
-			"visit %s/account/keys:", client.BaseURL(), strings.TrimRight(client.BaseURL(), "/api/v1"))
+			"visit %s/account/keys:", client.BaseURL(), strings.TrimSuffix(client.BaseURL(), "/api/v1"))
 		essAPIKey, err = stringPrompt(prompt)
 		if err != nil {
 			return fmt.Errorf("unable to read ESS API key from prompt: %w", err)
@@ -3474,7 +3499,7 @@ func authESS(ctx context.Context) error {
 	}
 
 	// Write API key to file for future use
-	if err := os.WriteFile(essAPIKeyFile, []byte(essAPIKey), 0o600); err != nil {
+	if err := os.WriteFile(essAPIKeyFile, []byte(essAPIKey), 0o600); err != nil { //nolint:gosec // essAPIKeyFile comes from ess.GetESSAPIKeyFilePath(), not user input
 		return fmt.Errorf("unable to persist ESS API key for future use: %w", err)
 	}
 
@@ -3636,7 +3661,7 @@ func (Otel) Readme() error {
 
 	data, err := otel.GetOtelDependencies(filepath.Join("internal", "edot", "go.mod"))
 	if err != nil {
-		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
+		return fmt.Errorf("failed to get OTel dependencies: %w", err)
 	}
 
 	// resolve template
@@ -3736,7 +3761,7 @@ func (Otel) PrepareBeats() error {
 
 	// verify the source git directory exists
 	gitdirAbsPath := filepath.Join("beats", gitdirRelPath)
-	if _, err := os.Stat(gitdirAbsPath); err != nil {
+	if _, err := os.Stat(gitdirAbsPath); err != nil { //nolint:gosec // gitdirRelPath comes from the local beats/.git submodule metadata, not user input
 		return fmt.Errorf("git modules directory not found at %s: %w", gitdirAbsPath, err)
 	}
 
@@ -3797,8 +3822,15 @@ func restoreBeatsSubmodule() error {
 	beatsGitPath := filepath.Join("beats", ".git")
 
 	info, err := os.Lstat(beatsGitPath)
-	if err != nil || !info.IsDir() {
-		// already a file or doesn't exist, nothing to revert
+	if err != nil {
+		if os.IsNotExist(err) {
+			// already a file or doesn't exist, nothing to revert
+			return nil
+		}
+		return fmt.Errorf("failed to stat %s: %w", beatsGitPath, err)
+	}
+	if !info.IsDir() {
+		// already a file, nothing to revert
 		return nil
 	}
 

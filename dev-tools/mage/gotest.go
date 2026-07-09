@@ -19,6 +19,7 @@ import (
 	"github.com/magefile/mage/sh"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 // GoTestArgs are the arguments used for the "go*Test" targets and they define
@@ -52,6 +53,9 @@ func makeGoTestArgs(cfg *Settings, name string) GoTestArgs {
 		params.CoverageProfileFile = fileName + ".cov"
 	}
 	if cfg.Build.FIPSBuild {
+		for k, v := range packaging.Settings().FIPS.Compile.Env {
+			params.Env[k] = v
+		}
 		// fips140=only causes the Go runtime to reject non-FIPS algorithms.
 		// tlsmlkem=0 disables X25519MLKEM768 (uses X25519, which is not FIPS-compliant).
 		// Both are set here rather than in the shell environment so that they apply

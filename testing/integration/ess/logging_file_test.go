@@ -7,7 +7,6 @@
 package ess
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,7 +39,7 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 	})
 
 	deadline := time.Now().Add(15 * time.Minute)
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), deadline)
 	defer cancel()
 
 	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
