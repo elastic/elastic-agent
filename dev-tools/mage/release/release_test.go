@@ -166,6 +166,17 @@ spec:
 
 func TestUpdateVersionInFile(t *testing.T) {
 	tmpDir := t.TempDir()
+	manifestPath := filepath.Join("deploy", "kubernetes", "elastic-agent-managed-kubernetes.yaml")
+
+	originalWd, _ := os.Getwd()
+	defer func() {
+		if err := os.Chdir(originalWd); err != nil {
+			t.Logf("failed to restore working directory: %v", err)
+		}
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
 	tests := []struct {
 		name        string
@@ -197,19 +208,23 @@ spec:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testFile := filepath.Join(tmpDir, "test.yaml")
-			err := os.WriteFile(testFile, []byte(tt.content), 0644)
+			err := os.MkdirAll(filepath.Dir(manifestPath), 0755)
+			if err != nil {
+				t.Fatalf("failed to create manifest dir: %v", err)
+			}
+
+			err = os.WriteFile(manifestPath, []byte(tt.content), 0644)
 			if err != nil {
 				t.Fatalf("failed to write test file: %v", err)
 			}
 
-			err = updateVersionInFile(testFile, tt.newVersion)
+			err = updateVersionInFile(manifestPath, tt.newVersion)
 			if err != nil {
 				t.Errorf("updateVersionInFile() error = %v", err)
 				return
 			}
 
-			content, err := os.ReadFile(testFile)
+			content, err := os.ReadFile(manifestPath)
 			if err != nil {
 				t.Fatalf("failed to read test file: %v", err)
 			}

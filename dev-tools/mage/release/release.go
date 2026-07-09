@@ -7,15 +7,53 @@ package release
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
+func validateRepoRelativePath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("path must not be empty")
+	}
+	if filepath.IsAbs(path) {
+		return "", fmt.Errorf("absolute path not allowed: %s", path)
+	}
+
+	cleaned := filepath.Clean(path)
+	if cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("path escapes repository root: %s", path)
+	}
+
+	return cleaned, nil
+}
+
+func writeRepoFile(relPath string, content []byte) error {
+	safePath, err := validateRepoRelativePath(relPath)
+	if err != nil {
+		return err
+	}
+
+	switch safePath {
+	case "version/version.go",
+		"deploy/kubernetes/elastic-agent-managed-kubernetes.yaml",
+		"deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml",
+		".mergify.yml":
+	default:
+		return fmt.Errorf("unsupported file path: %s", relPath)
+	}
+
+	return os.WriteFile(safePath, content, 0644) //nolint:gosec // safePath is validated and allowlisted for release automation files
+}
+
 // UpdateVersion updates the version in version/version.go
 func UpdateVersion(newVersion string) error {
-	versionFile := "version/version.go"
+	versionFile, err := validateRepoRelativePath("version/version.go")
+	if err != nil {
+		return err
+	}
 
 	content, err := os.ReadFile(versionFile)
 	if err != nil {
@@ -31,7 +69,7 @@ func UpdateVersion(newVersion string) error {
 		return fmt.Errorf("version pattern not found in %s", versionFile)
 	}
 
-	err = os.WriteFile(versionFile, []byte(newContent), 0644)
+	err = writeRepoFile(versionFile, []byte(newContent))
 	if err != nil {
 		return fmt.Errorf("failed to write %s: %w", versionFile, err)
 	}
@@ -59,9 +97,14 @@ func UpdateDocs(newVersion string) error {
 
 // updateVersionInFile updates version references in a file
 func updateVersionInFile(filePath, newVersion string) error {
-	content, err := os.ReadFile(filePath)
+	safePath, err := validateRepoRelativePath(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read %s: %w", filePath, err)
+		return err
+	}
+
+	content, err := os.ReadFile(safePath)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", safePath, err)
 	}
 
 	// Pattern: docker.elastic.co/elastic-agent/elastic-agent:X.Y.Z
@@ -70,16 +113,16 @@ func updateVersionInFile(filePath, newVersion string) error {
 
 	if newContent == string(content) {
 		// No changes needed
-		fmt.Printf("  No version changes needed in %s\n", filePath)
+		fmt.Printf("  No version changes needed in %s\n", safePath)
 		return nil
 	}
 
-	err = os.WriteFile(filePath, []byte(newContent), 0644)
+	err = writeRepoFile(safePath, []byte(newContent))
 	if err != nil {
-		return fmt.Errorf("failed to write %s: %w", filePath, err)
+		return fmt.Errorf("failed to write %s: %w", safePath, err)
 	}
 
-	fmt.Printf("✓ Updated version to %s in %s\n", newVersion, filePath)
+	fmt.Printf("✓ Updated version to %s in %s\n", newVersion, safePath)
 	return nil
 }
 
@@ -150,7 +193,7 @@ func UpdateMergify(version string) error {
 	}
 
 	// Write back to file
-	err = os.WriteFile(mergifyFile, output, 0644)
+	err = writeRepoFile(mergifyFile, output)
 	if err != nil {
 		return fmt.Errorf("failed to write %s: %w", mergifyFile, err)
 	}
