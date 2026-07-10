@@ -42,6 +42,7 @@ func (g *GitRepo) CreateBranch(branchName string) error {
 	if err == nil {
 		err = w.Checkout(&git.CheckoutOptions{
 			Branch: refName,
+			Keep:   true,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to checkout existing branch: %w", err)
@@ -68,9 +69,11 @@ func (g *GitRepo) CreateBranch(branchName string) error {
 		return fmt.Errorf("failed to create branch: %w", err)
 	}
 
-	// Checkout the new branch
+	// Checkout the new branch, keeping local changes so release file updates
+	// prepared before branch creation can be committed on the release branch.
 	err = w.Checkout(&git.CheckoutOptions{
 		Branch: refName,
+		Keep:   true,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to checkout branch: %w", err)

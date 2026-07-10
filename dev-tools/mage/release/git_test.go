@@ -263,6 +263,28 @@ func TestCommitAllErrorCases(t *testing.T) {
 	}
 }
 
+func TestCreateBranchWithUnstagedChanges(t *testing.T) {
+	gitRepo, tmpDir := createTestRepo(t)
+
+	readmePath := filepath.Join(tmpDir, "README.md")
+	if err := os.WriteFile(readmePath, []byte("# Modified for release"), 0644); err != nil {
+		t.Fatalf("failed to modify tracked file: %v", err)
+	}
+
+	err := gitRepo.CreateBranch("9.7")
+	if err != nil {
+		t.Fatalf("CreateBranch() with unstaged changes error = %v", err)
+	}
+
+	currentBranch, err := gitRepo.GetCurrentBranch()
+	if err != nil {
+		t.Fatalf("GetCurrentBranch() error = %v", err)
+	}
+	if currentBranch != "9.7" {
+		t.Errorf("CreateBranch() branch = %s, want 9.7", currentBranch)
+	}
+}
+
 func TestCreateBranchIdempotent(t *testing.T) {
 	gitRepo, _ := createTestRepo(t)
 
