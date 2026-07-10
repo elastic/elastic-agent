@@ -1081,7 +1081,9 @@ func (Cloud) Push(ctx context.Context) error {
 	fmt.Println(">> Docker image tag updated successfully")
 
 	fmt.Println(">> Pushing a docker image to remote registry")
-	err = sh.RunV("docker", "image", "push", targetCloudImageName)
+	err = devtools.Retry(func() error {
+		return sh.RunV("docker", "image", "push", targetCloudImageName)
+	})
 	if err != nil {
 		return fmt.Errorf("failed pushing docker image: %w", err)
 	}
@@ -1543,6 +1545,24 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string) (*branchInfo, error) {
 	// latest build info for a branch is at "<base url>/latest/<branch>.json"
 	branchLatestBuildUrl := strings.TrimSuffix(baseURL, "/") + fmt.Sprintf("/latest/%s.json", branch)
+	var bi *branchInfo
+	err := devtools.Retry(func() error {
+		var fetchErr error
+		bi, fetchErr = fetchBranchInfo(ctx, branchLatestBuildUrl)
+		return fetchErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if mg.Verbose() {
+		log.Printf("Received branch information for %q: %+v", branch, bi)
+	}
+
+	return bi, nil
+}
+
+func fetchBranchInfo(ctx context.Context, branchLatestBuildUrl string) (*branchInfo, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, branchLatestBuildUrl, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error composing request for finding latest build using %q: %w", branchLatestBuildUrl, err)
@@ -1566,10 +1586,6 @@ func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string
 	err = json.NewDecoder(resp.Body).Decode(bi)
 	if err != nil {
 		return nil, fmt.Errorf("decoding json branch information: %w", err)
-	}
-
-	if mg.Verbose() {
-		log.Printf("Received branch information for %q: %+v", branch, bi)
 	}
 
 	return bi, nil
@@ -4115,7 +4131,10 @@ func (Helm) ensureRepository(repoName, repoURL string, settings *cli.EnvSettings
 		return fmt.Errorf("could not create repo %s: %w", repoURL, err)
 	}
 
-	_, err = chartRepo.DownloadIndexFile()
+	err = devtools.Retry(func() error {
+		_, err := chartRepo.DownloadIndexFile()
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("could not download index file for repo %s: %w", repoURL, err)
 	}
@@ -4198,12 +4217,12 @@ func (h Helm) handleDependencies(update bool) error {
 	}
 
 	if update {
-		if err = man.Update(); err != nil {
-			return fmt.Errorf("failed to build helm dependencies: %w", err)
+		if err = devtools.Retry(man.Update); err != nil {
+			return fmt.Errorf("failed to update helm dependencies: %w", err)
 		}
 	} else {
-		if err = man.Build(); err != nil {
-			return fmt.Errorf("failed to update helm dependencies: %w", err)
+		if err = devtools.Retry(man.Build); err != nil {
+			return fmt.Errorf("failed to build helm dependencies: %w", err)
 		}
 	}
 

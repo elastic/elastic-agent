@@ -239,11 +239,47 @@ func MustFindReplace(file string, re *regexp.Regexp, repl string) {
 	}
 }
 
-// DownloadFile downloads the given URL and writes the file to destinationDir.
-// The path to the file is returned.
+// retryBackoffSchedule is the wait time before each retry of a failed network
+// operation; the number of entries bounds the number of retries.
+var retryBackoffSchedule = []time.Duration{
+	1 * time.Second,
+	3 * time.Second,
+	10 * time.Second,
+}
+
+// Retry runs f up to len(retryBackoffSchedule)+1 times, backing off between
+// attempts, to protect network operations against transient failures.
+func Retry(f func() error) error {
+	err := f()
+	for _, backoff := range retryBackoffSchedule {
+		if err == nil {
+			return nil
+		}
+		log.Printf("Attempt failed: %v, retrying in %v", err, backoff)
+		time.Sleep(backoff)
+		err = f()
+	}
+	return err
+}
+
+// DownloadFile downloads the given URL and writes the file to destinationDir,
+// retrying transient failures. The path to the file is returned.
 func DownloadFile(url, destinationDir string) (string, error) {
 	log.Println("Downloading", url)
 
+	var name string
+	err := Retry(func() error {
+		var err error
+		name, err = downloadFileAttempt(url, destinationDir)
+		return err
+	})
+	if err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+func downloadFileAttempt(url, destinationDir string) (string, error) {
 	//nolint:gosec,noctx // url is not user input
 	resp, err := http.Get(url)
 	if err != nil {
@@ -252,7 +288,7 @@ func DownloadFile(url, destinationDir string) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download failed with http status: %v : %w", resp.StatusCode, err)
+		return "", fmt.Errorf("download failed with http status: %v", resp.StatusCode)
 	}
 
 	name := filepath.Join(destinationDir, filepath.Base(url))
