@@ -339,13 +339,15 @@ git push origin 9.4
 
 ## Local Development & Testing
 
+Release commands expect a valid `X.Y.Z` version (for example `9.6.0`). Suffixes such as `9.5.0-test` are rejected.
+
 ### Test the Functions Locally
 
 You can test individual functions without creating actual branches:
 
 ```bash
 # Test version update
-mage release:updateVersion 9.5.0-test
+mage release:updateVersion 9.6.0
 
 # Check the change
 git diff version/version.go
@@ -377,7 +379,7 @@ Before running on the main repository, test on a fork:
 ```bash
 export PROJECT_OWNER="your-github-username"
 export PROJECT_REPO="elastic-agent"
-export CURRENT_RELEASE="9.5.0-test"
+export CURRENT_RELEASE="9.6.0"
 export GITHUB_TOKEN="ghp_..."
 
 # Run through the workflow
