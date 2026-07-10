@@ -83,7 +83,7 @@ func TestPerformActionExt(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("EDOT not running", func(t *testing.T) {
+	t.Run("collector not running", func(t *testing.T) {
 		paths.SetDiagnosticsExtensionSocket(paths.SocketFromPath(runtime.GOOS, t.TempDir(), "does-not-exist.sock"))
 		_, err := PerformActionExt(context.Background(), "osquery-default", "osquery", nil)
 		require.Error(t, err)
