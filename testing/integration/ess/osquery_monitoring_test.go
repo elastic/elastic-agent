@@ -50,11 +50,10 @@ func TestOsqueryManager(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Fleet,
 		Stack: &define.Stack{},
-		Local: true, // requires Agent installation
-		Sudo:  true, // requires Agent installation
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
-			{Type: define.Darwin},
 		},
 	})
 
@@ -81,7 +80,6 @@ func (runner *OsqueryManagerRunner) SetupSuite() {
 		NonInteractive: true,
 		Force:          true,
 		Privileged:     true,
-		Develop:        true,
 	}
 
 	ctx, cancel := context.WithTimeout(runner.T().Context(), 3*time.Minute)
