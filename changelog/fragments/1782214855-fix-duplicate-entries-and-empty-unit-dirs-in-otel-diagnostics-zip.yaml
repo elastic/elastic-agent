@@ -9,16 +9,20 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: enhancement
+kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Update OTel Collector components to v0.155.0
+summary: Fix duplicate entries, empty unit dirs, and EDOT error handling in OTel diagnostics
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-# description:
+description: >
+  The OTel diagnostics ZIP no longer contains duplicate entries and no longer creates empty unit
+  subdirectories. Components with no EDOT diagnostics no longer produce a spurious error in the archive.
+  Also, an unexpected EDOT error used to abort the whole component-diagnostics request; now it is
+  recorded per component so the diagnostics archive is still produced.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:

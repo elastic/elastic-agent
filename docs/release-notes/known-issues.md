@@ -23,6 +23,21 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} {{agent}} logs a "failed to unmarshal checkin actions" error on almost every {{fleet}} check-in
+
+**Applies to: {{agent}} 8.19.17, 8.19.18, 9.3.6, 9.3.7, 9.4.3**
+
+On July 7, 2026, a known issue was discovered where {{fleet}}-managed {{agents}} log an error on nearly every check-in when there is nothing new for {{fleet}} to tell them to do:
+
+```
+failed to unmarshal checkin actions: unexpected end of JSON input
+```
+
+This is a cosmetic logging issue only. Actions are still delivered and processed normally whenever {{fleet}} does send any. Nothing about how the agent actually operates is affected, and no action is required — the error can be safely ignored.
+
+For more information, check [Issue #15397](https://github.com/elastic/elastic-agent/issues/15397).
+:::
+
 :::{dropdown} [Windows] {{agent}} fails to upgrade when the host has 100 or more installed programs
 
 **Applies to: {{agent}} 9.4.0, 9.4.1, 9.4.2 (Windows only)**

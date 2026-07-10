@@ -423,6 +423,83 @@ type zippedItem struct {
 	IsDir bool
 }
 
+func TestZipArchiveUnitDirSkip(t *testing.T) {
+	compID := "my-component"
+	compDiags := []client.DiagnosticComponentResult{{ComponentID: compID}}
+
+	tests := []struct {
+		name          string
+		unitDiags     []client.DiagnosticUnitResult
+		expectedPaths []string
+	}{
+		{
+			name: "unit with no results and no error is skipped",
+			unitDiags: []client.DiagnosticUnitResult{
+				{ComponentID: compID, UnitID: compID + "-input"},
+			},
+			expectedPaths: []string{
+				"components/",
+				"components/my-component/",
+				"logs/",
+			},
+		},
+		{
+			name: "unit with error creates dir and error.txt",
+			unitDiags: []client.DiagnosticUnitResult{
+				{ComponentID: compID, UnitID: compID + "-input", Err: errors.New("something failed")},
+			},
+			expectedPaths: []string{
+				"components/",
+				"components/my-component/",
+				"components/my-component/input/",
+				"components/my-component/input/error.txt",
+				"logs/",
+			},
+		},
+		{
+			name: "unit with results creates dir and file",
+			unitDiags: []client.DiagnosticUnitResult{
+				{
+					ComponentID: compID,
+					UnitID:      compID + "-input",
+					Results: []client.DiagnosticFileResult{
+						{Filename: "beat_metrics.json", ContentType: "application/json", Content: []byte(`{}`)},
+					},
+				},
+			},
+			expectedPaths: []string{
+				"components/",
+				"components/my-component/",
+				"components/my-component/input/",
+				"components/my-component/input/beat_metrics.json",
+				"logs/",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			topPath := t.TempDir()
+			// zipLogs opens topPath/data; create it so ZipArchive doesn't fail
+			require.NoError(t, os.MkdirAll(filepath.Join(topPath, "data"), 0o700))
+
+			buf := new(bytes.Buffer)
+			err := ZipArchive(io.Discard, buf, topPath, nil, tc.unitDiags, compDiags, true)
+			require.NoError(t, err)
+
+			r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+			require.NoError(t, err)
+
+			// One component per case, so the zip entry order is deterministic and safe to assert.
+			var paths []string
+			for _, f := range r.File {
+				paths = append(paths, f.Name)
+			}
+			assert.Equal(t, tc.expectedPaths, paths)
+		})
+	}
+}
+
 func TestZipLogs(t *testing.T) {
 	topPath := t.TempDir()
 	dir := filepath.Join(paths.HomeFrom(topPath), "logs", "sub-dir")
@@ -1239,6 +1316,36 @@ func TestRedactEnv(t *testing.T) {
 			"SECRET_URL":    redact.REDACTED, // key name wins
 			"SERVICE_TOKEN": redact.REDACTED,
 			"HTTPS_PROXY":   "https://" + REDACTED_URL_USERNAME_PASSWORD + "@my-proxy",
+		},
+	}, {
+		name: "Redacts sensitive header embedded in FLEET_HEADER value",
+		env: map[string]string{
+			"FLEET_HEADER": "X-Elastic-App-Auth=eyJhbGciOiJSUzI1NiJ9.eyJraW5kIjoia2liYW5hIn0.sig",
+			"FLEET_URL":    "https://fleet.example.com:443",
+		},
+		expect: map[string]any{
+			"FLEET_HEADER":                     redact.REDACTED,
+			"FLEET_HEADER::X-Elastic-App-Auth": redact.REDACTED,
+			"FLEET_URL":                        "https://fleet.example.com:443",
+		},
+	}, {
+		name: "Redacts sensitive header embedded in FLEET_HEADERS value, preserves innocuous headers",
+		env: map[string]string{
+			"FLEET_HEADERS": "X-Elastic-App-Auth=eyJhbGciOiJSUzI1NiJ9.eyJraW5kIjoia2liYW5hIn0.sig,Accept=application/json",
+		},
+		expect: map[string]any{
+			"FLEET_HEADERS":                     redact.REDACTED,
+			"FLEET_HEADERS::X-Elastic-App-Auth": redact.REDACTED,
+			"FLEET_HEADERS::Accept":             "application/json",
+		},
+	}, {
+		name: "Redacts sensitive header embedded in FLEET_KIBANA_HEADER value",
+		env: map[string]string{
+			"FLEET_KIBANA_HEADER": "X-Elastic-App-Auth=eyJhbGciOiJSUzI1NiJ9.eyJraW5kIjoia2liYW5hIn0.sig",
+		},
+		expect: map[string]any{
+			"FLEET_KIBANA_HEADER":                     redact.REDACTED,
+			"FLEET_KIBANA_HEADER::X-Elastic-App-Auth": redact.REDACTED,
 		},
 	}}
 

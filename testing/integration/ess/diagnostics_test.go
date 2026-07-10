@@ -491,6 +491,9 @@ agent.internal.runtime.filebeat.httpjson: process
 			configTemplate: fileStreamConfigTemplate,
 		},
 		{
+			// Beat receivers register diagnostic hooks per input stream via the OTel receiver
+			// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
+			// at the component level and land under the component directory, same as for process-runtime beats.
 			name:    "filebeat receiver",
 			runtime: "otel",
 			expectedCompDiagnosticsFiles: []string{
@@ -647,6 +650,9 @@ agent.internal.runtime.filebeat.filestream: otel
 
 	extractZipArchive(t, diagZip, extractionDir)
 
+	// Beat receivers register diagnostic hooks per input stream via the OTel receiver
+	// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
+	// at the component level and land under the component directory, same as for process-runtime beats.
 	expectedFiles := []string{
 		"edot/otel-merged-actual.yaml",
 		"edot/allocs.profile.gz",
