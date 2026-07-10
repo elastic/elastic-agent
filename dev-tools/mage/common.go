@@ -216,30 +216,6 @@ func HaveKubectl() error {
 	return nil
 }
 
-// FindReplace reads a file, performs a find/replace operation, then writes the
-// output to the same file path.
-func FindReplace(file string, re *regexp.Regexp, repl string) error {
-	info, err := os.Stat(file)
-	if err != nil {
-		return err
-	}
-
-	contents, err := os.ReadFile(file)
-	if err != nil {
-		return err
-	}
-
-	out := re.ReplaceAllString(string(contents), repl)
-	return os.WriteFile(file, []byte(out), info.Mode().Perm())
-}
-
-// MustFindReplace invokes FindReplace and panics if an error occurs.
-func MustFindReplace(file string, re *regexp.Regexp, repl string) {
-	if err := FindReplace(file, re, repl); err != nil {
-		panic(fmt.Errorf("failed to find and replace: %w", err))
-	}
-}
-
 // retryMaxRetries bounds the number of retries of a failed network operation,
 // in addition to the initial attempt.
 const retryMaxRetries = 3
@@ -383,6 +359,14 @@ func Tar(src string, targetFile string) error {
 	zr := gzip.NewWriter(f)
 	tw := tar.NewWriter(zr)
 
+	// open files via a root scoped to src so a path component replaced with a
+	// symlink mid-walk cannot redirect reads outside the tree (TOCTOU)
+	root, err := os.OpenRoot(src)
+	if err != nil {
+		return fmt.Errorf("error opening source directory: %w", err)
+	}
+	defer root.Close()
+
 	// walk through every file in the folder
 	err = filepath.WalkDir(src, func(file string, d fs.DirEntry, errFn error) error {
 		if errFn != nil {
@@ -417,7 +401,11 @@ func Tar(src string, targetFile string) error {
 
 		// if not a dir, write file content
 		if !fi.IsDir() {
-			data, err := os.Open(file)
+			rel, err := filepath.Rel(src, file)
+			if err != nil {
+				return fmt.Errorf("error resolving path relative to %q: %w", src, err)
+			}
+			data, err := root.Open(rel)
 			if err != nil {
 				return fmt.Errorf("error opening file: %w", err)
 			}
