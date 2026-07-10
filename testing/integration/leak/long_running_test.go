@@ -87,11 +87,24 @@ func TestLongRunningAgentForLeaks(t *testing.T) {
 func (runner *ExtendedRunner) SetupSuite() {
 	ctx, cancel := context.WithTimeout(runner.T().Context(), 5*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "go", "install", "-v", "github.com/mingrammer/flog@latest")
-	out, err := cmd.CombinedOutput()
+	// Retry the install: a transient module proxy or network failure here
+	// would otherwise abort the whole suite.
+	var out []byte
+	var err error
+	for attempt := 1; attempt <= 3; attempt++ {
+		if attempt > 1 {
+			runner.T().Logf("go install flog failed (attempt %d/3), retrying: %s", attempt-1, err)
+			time.Sleep(10 * time.Second)
+		}
+		cmd := exec.CommandContext(ctx, "go", "install", "-v", "github.com/mingrammer/flog@v0.4.4")
+		out, err = cmd.CombinedOutput()
+		if err == nil {
+			break
+		}
+	}
 	require.NoError(runner.T(), err, "got out: %s", string(out))
 
-	cmd = exec.CommandContext(ctx, "flog", "-t", "log", "-f", "apache_error", "-o", "/var/log/httpd/error_log", "-b", "50485760", "-p", "1048576")
+	cmd := exec.CommandContext(ctx, "flog", "-t", "log", "-f", "apache_error", "-o", "/var/log/httpd/error_log", "-b", "50485760", "-p", "1048576")
 	out, err = cmd.CombinedOutput()
 	require.NoError(runner.T(), err, "got out: %s", string(out))
 
