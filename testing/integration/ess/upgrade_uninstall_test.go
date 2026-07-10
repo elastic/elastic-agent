@@ -9,6 +9,7 @@ package ess
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -50,6 +51,9 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	// We need a version with a non-matching commit hash to perform the upgrade
 	startVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
+	if !upgradetest.SupportsUpgradeSourceOnPlatform(startVersion, runtime.GOOS, runtime.GOARCH) {
+		t.Skipf("upgrade from %s is not supported on %s/%s", startVersion, runtime.GOOS, runtime.GOARCH)
+	}
 	startFixture, err := atesting.NewFixture(
 		t,
 		startVersion.String(),

@@ -10,8 +10,11 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+
+	api "github.com/elastic/fleet-server/pkg/api"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
@@ -29,9 +32,7 @@ func TestAck(t *testing.T) {
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 
-				responses := struct {
-					Events []AckEvent `json:"events"`
-				}{}
+				var responses AckRequest
 
 				decoder := json.NewDecoder(r.Body)
 				defer r.Body.Close()
@@ -41,8 +42,9 @@ func TestAck(t *testing.T) {
 
 				require.Equal(t, 1, len(responses.Events))
 
-				id := responses.Events[0].ActionID
-				require.Equal(t, "my-id", id)
+				event, err := responses.Events[0].AsGenericEvent()
+				require.NoError(t, err)
+				require.Equal(t, "my-id", event.ActionId)
 
 				fmt.Fprint(w, raw)
 			}, withAPIKey))
@@ -60,12 +62,8 @@ func TestAck(t *testing.T) {
 			cmd := NewAckCmd(&agentinfo{}, client)
 
 			request := AckRequest{
-				Events: []AckEvent{
-					{
-						EventType: "ACTION_RESULT",
-						SubType:   "ACKNOWLEDGED",
-						ActionID:  action.ID(),
-					},
+				Events: []api.AckRequest_Events_Item{
+					action.AckEvent(agentInfo.AgentID(), time.Now()),
 				},
 			}
 

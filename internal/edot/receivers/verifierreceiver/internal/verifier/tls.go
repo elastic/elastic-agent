@@ -25,10 +25,9 @@ var fipsCurves = []tls.CurveID{tls.CurveP256, tls.CurveP384}
 // AWS STS, Azure Entra ID (login.microsoftonline.com), and all *.googleapis.com.
 //
 // Full binary-level FIPS compliance also requires building with
-// GOEXPERIMENT=systemcrypto (RHEL) or GOEXPERIMENT=boringcrypto, which
-// replaces the standard Go crypto library with a FIPS 140-validated
-// implementation. The TLS settings here provide defence-in-depth and are
-// effective regardless of build mode.
+// GOFIPS140=v1.0.0, which uses Go's native FIPS 140-3 certified crypto module.
+// The TLS settings here provide defence-in-depth and are effective regardless
+// of build mode.
 func newHTTPClient() *http.Client {
 	var transport *http.Transport
 	if t, ok := http.DefaultTransport.(*http.Transport); ok {
