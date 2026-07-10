@@ -161,7 +161,6 @@ func TestDownloader_Download(t *testing.T) {
 			config.TargetDirectory = targetDirPath
 
 			e := &Downloader{
-				dropPath: dropPath,
 				config:   config,
 				copy:     io.Copy,
 				mkdirAll: os.MkdirAll,

@@ -26,8 +26,7 @@ const (
 
 // Downloader is a downloader able to fetch artifacts from elastic.co web page.
 type Downloader struct {
-	dropPath string
-	config   *artifact.Config
+	config *artifact.Config
 	// The following are abstractions for stdlib functions so that we can mock them in tests.
 	copy     func(dst io.Writer, src io.Reader) (int64, error)
 	mkdirAll func(name string, perm os.FileMode) error
@@ -38,7 +37,6 @@ type Downloader struct {
 func NewDownloader(config *artifact.Config) *Downloader {
 	return &Downloader{
 		config:   config,
-		dropPath: getDropPath(config),
 		copy:     io.Copy,
 		mkdirAll: os.MkdirAll,
 		openFile: os.OpenFile,
