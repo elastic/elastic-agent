@@ -12,7 +12,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/sha512"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,7 +50,6 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -1602,21 +1600,11 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 				downloadFunc := func(pkgName string, pkgDesc manifest.Package) func() error {
 					return func() error {
 						artifactDownloadPath := filepath.Join(draDownloadDir, pkgName)
-						err := manifest.DownloadPackage(errCtx, pkgDesc.URL, artifactDownloadPath)
+						artifactSHADownloadPath := filepath.Join(draDownloadDir, pkgName+sha512FileExt)
+
+						err := manifest.DownloadArtifactWithChecksum(errCtx, pkgDesc.URL, artifactDownloadPath, pkgDesc.ShaURL, artifactSHADownloadPath)
 						if err != nil {
 							return fmt.Errorf("downloading %q: %w", pkgName, err)
-						}
-
-						// download the SHA to check integrity
-						artifactSHADownloadPath := filepath.Join(draDownloadDir, pkgName+sha512FileExt)
-						err = manifest.DownloadPackage(errCtx, pkgDesc.ShaURL, artifactSHADownloadPath)
-						if err != nil {
-							return fmt.Errorf("downloading SHA for %q: %w", pkgName, err)
-						}
-
-						err = download.VerifyChecksum(sha512.New(), artifactDownloadPath, artifactSHADownloadPath)
-						if err != nil {
-							return fmt.Errorf("validating checksum for %q: %w", pkgName, err)
 						}
 
 						// we should probably validate the signature, it can be done later as we return the package metadata
