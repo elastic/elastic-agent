@@ -1377,72 +1377,110 @@ func TestContainerEnvOverridesFleetCA(t *testing.T) {
 	origCfg := paths.Config()
 	t.Cleanup(func() { paths.SetConfig(origCfg) })
 	paths.SetConfig(t.TempDir())
+	for _, key := range []string{"FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"} {
+		if orig, ok := os.LookupEnv(key); ok {
+			t.Cleanup(func() { os.Setenv(key, orig) })
+		} else {
+			t.Cleanup(func() { os.Unsetenv(key) })
+		}
+		os.Unsetenv(key)
+	}
 
 	ctx := t.Context()
 	require.NoError(t, secret.CreateAgentSecret(ctx, vault.WithUnprivileged(true)))
 	require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte("fleet:\n  enabled: true\n"), 0o644))
-
 	store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
 	require.NoError(t, err)
 
-	// no override for unset CA env vars, valid fleet.enc
-	require.NoError(t, store.Save(strings.NewReader(fmt.Sprintf(`fleet:
+	t.Run("valid fleet.enc CAs with no overrides", func(t *testing.T) {
+		require.NoError(t, store.Save(strings.NewReader(fmt.Sprintf(`fleet:
   ssl:
     certificate_authorities:
       - %q`, storedCAPath))))
 
-	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
-	require.NoError(t, err)
+		_, err := shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
+		require.NoError(t, err)
 
-	loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
-	require.NoError(t, err)
-	require.Equal(t, []string{storedCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+		loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+		require.NoError(t, err)
+		require.Equal(t, []string{storedCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+	})
 
-	// no override for unset CA env vars, invalid fleet.enc
-	require.NoError(t, store.Save(strings.NewReader(`fleet:
+	t.Run("invalid fleet.enc CAs with no overrides", func(t *testing.T) {
+		require.NoError(t, store.Save(strings.NewReader(`fleet:
   ssl:
     certificate_authorities:
       - "/nonexistent/ca.crt"`)))
 
-	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
-	require.Error(t, err)
+		_, err := shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
+		require.Error(t, err)
+	})
 
-	// set FLEET_CA should override fleet.enc
-	t.Setenv("FLEET_CA", envFleetCAPath)
-	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
-	require.NoError(t, err)
+	t.Run("set FLEET_CA should override fleet.enc", func(t *testing.T) {
+		require.NoError(t, store.Save(strings.NewReader(`fleet:
+  ssl:
+    certificate_authorities:
+      - "/nonexistent/ca.crt"`)))
+		t.Setenv("FLEET_CA", envFleetCAPath)
 
-	loaded, err = configuration.LoadConfig(ctx, containerCfgOverrides)
-	require.NoError(t, err)
-	require.Equal(t, []string{envFleetCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+		_, err := shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
+		require.NoError(t, err)
 
-	// explicitly empty FLEET_CA should override fleet.enc
-	t.Setenv("FLEET_CA", "")
-	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
-	require.NoError(t, err)
+		loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+		require.NoError(t, err)
+		require.Equal(t, []string{envFleetCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+	})
 
-	loaded, err = configuration.LoadConfig(ctx, containerCfgOverrides)
-	require.NoError(t, err)
-	require.Empty(t, loaded.Fleet.Client.Transport.TLS.CAs)
+	t.Run("explicitly empty FLEET_CA should override fleet.enc", func(t *testing.T) {
+		require.NoError(t, store.Save(strings.NewReader(`fleet:
+  ssl:
+    certificate_authorities:
+      - "/nonexistent/ca.crt"`)))
+		t.Setenv("FLEET_CA", "")
 
-	// KIBANA_CA should override fleet.enc when FLEET_CA is unset
-	os.Unsetenv("FLEET_CA")
-	t.Setenv("KIBANA_CA", kibanaCAPath)
-	loaded, err = configuration.LoadConfig(ctx, containerCfgOverrides)
-	require.NoError(t, err)
-	require.Equal(t, []string{kibanaCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+		_, err := shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
+		require.NoError(t, err)
 
-	// ELASTICSEARCH_CA should override fleet.enc when FLEET_CA and KIBANA_CA are unset
-	os.Unsetenv("KIBANA_CA")
-	t.Setenv("ELASTICSEARCH_CA", esCAPath)
-	loaded, err = configuration.LoadConfig(ctx, containerCfgOverrides)
-	require.NoError(t, err)
-	require.Equal(t, []string{esCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+		loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+		require.NoError(t, err)
+		require.Empty(t, loaded.Fleet.Client.Transport.TLS.CAs)
+	})
 
-	// explicitly empty FLEET_CA should take precedence over set KIBANA_CA
-	t.Setenv("FLEET_CA", "")
-	t.Setenv("KIBANA_CA", kibanaCAPath)
-	loaded, err = configuration.LoadConfig(ctx, containerCfgOverrides)
-	require.NoError(t, err)
-	require.Empty(t, loaded.Fleet.Client.Transport.TLS.CAs)
+	t.Run("KIBANA_CA should override fleet.enc CAs when FLEET_CA is unset", func(t *testing.T) {
+		require.NoError(t, store.Save(strings.NewReader(`fleet:
+  ssl:
+    certificate_authorities:
+      - "/nonexistent/ca.crt"`)))
+		t.Setenv("KIBANA_CA", kibanaCAPath)
+
+		loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+		require.NoError(t, err)
+		require.Equal(t, []string{kibanaCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+	})
+
+	t.Run("ELASTICSEARCH_CA should override fleet.enc CAs when FLEET_CA and KIBANA_CA are unset", func(t *testing.T) {
+		require.NoError(t, store.Save(strings.NewReader(`fleet:
+  ssl:
+    certificate_authorities:
+      - "/nonexistent/ca.crt"`)))
+		t.Setenv("ELASTICSEARCH_CA", esCAPath)
+
+		loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+		require.NoError(t, err)
+		require.Equal(t, []string{esCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+	})
+
+	t.Run("explicitly empty FLEET_CA should take precedence over set KIBANA_CA and ELASTICSEARCH_CA", func(t *testing.T) {
+		require.NoError(t, store.Save(strings.NewReader(`fleet:
+  ssl:
+    certificate_authorities:
+      - "/nonexistent/ca.crt"`)))
+		t.Setenv("FLEET_CA", "")
+		t.Setenv("KIBANA_CA", kibanaCAPath)
+		t.Setenv("ELASTICSEARCH_CA", esCAPath)
+
+		loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+		require.NoError(t, err)
+		require.Empty(t, loaded.Fleet.Client.Transport.TLS.CAs)
+	})
 }
