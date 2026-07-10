@@ -1392,95 +1392,86 @@ func TestContainerEnvOverridesFleetCA(t *testing.T) {
 	store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
 	require.NoError(t, err)
 
-	t.Run("valid fleet.enc CAs with no overrides", func(t *testing.T) {
-		require.NoError(t, store.Save(strings.NewReader(fmt.Sprintf(`fleet:
+	cases := []struct {
+		name       string
+		env        map[string]string
+		fleetEncCA string
+		wantCAs    []string
+		wantErr    bool
+	}{
+		{
+			name:       "valid fleet.enc CAs with no overrides",
+			fleetEncCA: storedCAPath,
+			wantCAs:    []string{storedCAPath},
+		},
+		{
+			name:       "invalid fleet.enc CAs with no overrides",
+			fleetEncCA: "/nonexistent/ca.crt",
+			wantErr:    true,
+		},
+		{
+			name:       "set FLEET_CA should override valid fleet.enc CA",
+			fleetEncCA: storedCAPath,
+			env:        map[string]string{"FLEET_CA": envFleetCAPath},
+			wantCAs:    []string{envFleetCAPath},
+		},
+		{
+			name:       "set FLEET_CA should override invalid fleet.enc CA",
+			fleetEncCA: "/nonexistent/ca.crt",
+			env:        map[string]string{"FLEET_CA": envFleetCAPath},
+			wantCAs:    []string{envFleetCAPath},
+		},
+		{
+			name:       "explicitly empty FLEET_CA should override valid fleet.enc",
+			fleetEncCA: storedCAPath,
+			env:        map[string]string{"FLEET_CA": ""},
+			wantCAs:    []string{},
+		},
+		{
+			name:       "explicitly empty FLEET_CA should override invalid fleet.enc",
+			fleetEncCA: "/nonexistent/ca.crt",
+			env:        map[string]string{"FLEET_CA": ""},
+			wantCAs:    []string{},
+		},
+		{
+			name:       "KIBANA_CA should override fleet.enc CAs when FLEET_CA is unset",
+			fleetEncCA: "/nonexistent/ca.crt",
+			env:        map[string]string{"KIBANA_CA": kibanaCAPath},
+			wantCAs:    []string{kibanaCAPath},
+		},
+		{
+			name:       "ELASTICSEARCH_CA should override fleet.enc CAs when FLEET_CA and KIBANA_CA are unset",
+			fleetEncCA: "/nonexistent/ca.crt",
+			env:        map[string]string{"ELASTICSEARCH_CA": esCAPath},
+			wantCAs:    []string{esCAPath},
+		},
+		{
+			name:       "explicitly empty FLEET_CA should take precedence over set KIBANA_CA and ELASTICSEARCH_CA",
+			fleetEncCA: "/nonexistent/ca.crt",
+			env:        map[string]string{"FLEET_CA": "", "KIBANA_CA": kibanaCAPath, "ELASTICSEARCH_CA": esCAPath},
+			wantCAs:    []string{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, store.Save(strings.NewReader(fmt.Sprintf(`fleet:
   ssl:
     certificate_authorities:
-      - %q`, storedCAPath))))
+      - %q`, tc.fleetEncCA))))
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
 
-		_, err := shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
-		require.NoError(t, err)
-
-		loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
-		require.NoError(t, err)
-		require.Equal(t, []string{storedCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
-	})
-
-	t.Run("invalid fleet.enc CAs with no overrides", func(t *testing.T) {
-		require.NoError(t, store.Save(strings.NewReader(`fleet:
-  ssl:
-    certificate_authorities:
-      - "/nonexistent/ca.crt"`)))
-
-		_, err := shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
-		require.Error(t, err)
-	})
-
-	t.Run("set FLEET_CA should override fleet.enc", func(t *testing.T) {
-		require.NoError(t, store.Save(strings.NewReader(`fleet:
-  ssl:
-    certificate_authorities:
-      - "/nonexistent/ca.crt"`)))
-		t.Setenv("FLEET_CA", envFleetCAPath)
-
-		_, err := shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
-		require.NoError(t, err)
-
-		loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
-		require.NoError(t, err)
-		require.Equal(t, []string{envFleetCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
-	})
-
-	t.Run("explicitly empty FLEET_CA should override fleet.enc", func(t *testing.T) {
-		require.NoError(t, store.Save(strings.NewReader(`fleet:
-  ssl:
-    certificate_authorities:
-      - "/nonexistent/ca.crt"`)))
-		t.Setenv("FLEET_CA", "")
-
-		_, err := shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
-		require.NoError(t, err)
-
-		loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
-		require.NoError(t, err)
-		require.Empty(t, loaded.Fleet.Client.Transport.TLS.CAs)
-	})
-
-	t.Run("KIBANA_CA should override fleet.enc CAs when FLEET_CA is unset", func(t *testing.T) {
-		require.NoError(t, store.Save(strings.NewReader(`fleet:
-  ssl:
-    certificate_authorities:
-      - "/nonexistent/ca.crt"`)))
-		t.Setenv("KIBANA_CA", kibanaCAPath)
-
-		loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
-		require.NoError(t, err)
-		require.Equal(t, []string{kibanaCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
-	})
-
-	t.Run("ELASTICSEARCH_CA should override fleet.enc CAs when FLEET_CA and KIBANA_CA are unset", func(t *testing.T) {
-		require.NoError(t, store.Save(strings.NewReader(`fleet:
-  ssl:
-    certificate_authorities:
-      - "/nonexistent/ca.crt"`)))
-		t.Setenv("ELASTICSEARCH_CA", esCAPath)
-
-		loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
-		require.NoError(t, err)
-		require.Equal(t, []string{esCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
-	})
-
-	t.Run("explicitly empty FLEET_CA should take precedence over set KIBANA_CA and ELASTICSEARCH_CA", func(t *testing.T) {
-		require.NoError(t, store.Save(strings.NewReader(`fleet:
-  ssl:
-    certificate_authorities:
-      - "/nonexistent/ca.crt"`)))
-		t.Setenv("FLEET_CA", "")
-		t.Setenv("KIBANA_CA", kibanaCAPath)
-		t.Setenv("ELASTICSEARCH_CA", esCAPath)
-
-		loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
-		require.NoError(t, err)
-		require.Empty(t, loaded.Fleet.Client.Transport.TLS.CAs)
-	})
+			_, err := shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+				require.NoError(t, err)
+				require.Equal(t, tc.wantCAs, loaded.Fleet.Client.Transport.TLS.CAs)
+			}
+		})
+	}
 }
