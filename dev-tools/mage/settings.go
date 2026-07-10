@@ -917,6 +917,13 @@ func (s *Settings) WithStackProvisioner(provisioner string) *Settings {
 	return clone
 }
 
+// WithInstanceProvisioner returns a copy of the settings with the specified instance provisioner.
+func (s *Settings) WithInstanceProvisioner(provisioner string) *Settings {
+	clone := s.Clone()
+	clone.IntegrationTest.InstanceProvisioner = provisioner
+	return clone
+}
+
 // WithTestGroups returns a copy of the settings with the specified test groups.
 func (s *Settings) WithTestGroups(groups string) *Settings {
 	clone := s.Clone()

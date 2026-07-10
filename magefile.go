@@ -57,6 +57,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/gcloud"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
+	"github.com/elastic/elastic-agent/pkg/testing/local"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/git"
@@ -2111,7 +2112,7 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	if shouldBuildAgent(cfg) {
 		// need only local package for current platform
-		cfg = cfg.WithPlatformFilter(fmt.Sprintf("+all %s/%s", runtime.GOOS, runtime.GOARCH))
+		cfg = cfg.WithPlatformFilter(fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH))
 		ctx = devtools.ContextWithSettings(ctx, cfg)
 		mg.CtxDeps(ctx, Package)
 	}
@@ -2120,25 +2121,21 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	// clean the .agent-testing/local so this run will use the latest build
 	_ = os.RemoveAll(".agent-testing/local")
 
-	// run the integration tests but only run test that can run locally
-	params := devtools.DefaultGoTestIntegrationArgs(cfg)
-	params.Tags = append(params.Tags, "local")
-	params.Packages = []string{
-		"github.com/elastic/elastic-agent/testing/integration/...",
-	}
+	cfg = cfg.WithInstanceProvisioner(local.Name)
+	ctx = devtools.ContextWithSettings(ctx, cfg)
 
-	var goTestFlags []string
-	if cfg.IntegrationTest.GoTestFlags != "" {
-		goTestFlags = strings.Split(cfg.IntegrationTest.GoTestFlags, " ")
+	singleTest := testName
+	if singleTest == "all" {
+		singleTest = ""
 	}
-	params.ExtraFlags = goTestFlags
-
-	if testName == "all" {
-		params.RunExpr = ""
-	} else {
-		params.RunExpr = testName
+	failedCount, err := integRunnerOnce(ctx, false, "./testing/integration/...", singleTest)
+	if err != nil {
+		return err
 	}
-	return devtools.GoTest(ctx, params)
+	if failedCount > 0 {
+		os.Exit(1)
+	}
+	return nil
 }
 
 // Auth authenticates users who run it to various IaaS CSPs and ESS
@@ -3098,6 +3095,8 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		instanceProvisioner = multipass.NewProvisioner()
 	case kind.Name:
 		instanceProvisioner = kind.NewProvisioner()
+	case local.Name:
+		instanceProvisioner = local.NewProvisioner()
 	default:
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud' or 'multipass', not %s", instanceProvisionerMode)
 	}
