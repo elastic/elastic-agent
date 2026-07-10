@@ -571,6 +571,7 @@ agent:
     #    mode: [deployment, statefulset, daemonset]
     #    replicaCount: 1
     #    labels: {}
+    #    podLabels: {}
     #    hostPID: boolean
     #    hostNetwork: boolean
     #    imagePullPolicy: [Always, IfNotPresent, Never]

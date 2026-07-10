@@ -7,6 +7,12 @@
 apiVersion: v1
 kind: PodTemplate
 template:
+  metadata:
+    labels:
+      name: {{ $agentName }}
+      {{- with ($presetVal).podLabels }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
   spec:
     dnsPolicy: ClusterFirstWithHostNet
     {{- with ($presetVal).hostNetwork }}
