@@ -33,6 +33,7 @@ import (
 	"time"
 	"unicode"
 
+	backoff "github.com/cenkalti/backoff/v4"
 	"github.com/magefile/mage/sh"
 )
 
@@ -239,27 +240,21 @@ func MustFindReplace(file string, re *regexp.Regexp, repl string) {
 	}
 }
 
-// retryBackoffSchedule is the wait time before each retry of a failed network
-// operation; the number of entries bounds the number of retries.
-var retryBackoffSchedule = []time.Duration{
-	1 * time.Second,
-	3 * time.Second,
-	10 * time.Second,
-}
+// retryMaxRetries bounds the number of retries of a failed network operation,
+// in addition to the initial attempt.
+const retryMaxRetries = 3
 
-// Retry runs f up to len(retryBackoffSchedule)+1 times, backing off between
+// Retry runs f up to retryMaxRetries+1 times with exponential backoff between
 // attempts, to protect network operations against transient failures.
 func Retry(f func() error) error {
-	err := f()
-	for _, backoff := range retryBackoffSchedule {
-		if err == nil {
-			return nil
-		}
-		log.Printf("Attempt failed: %v, retrying in %v", err, backoff)
-		time.Sleep(backoff)
-		err = f()
-	}
-	return err
+	exp := backoff.NewExponentialBackOff()
+	exp.InitialInterval = 1 * time.Second
+	exp.Multiplier = 3
+	exp.MaxInterval = 10 * time.Second
+	return backoff.RetryNotify(f, backoff.WithMaxRetries(exp, retryMaxRetries),
+		func(err error, wait time.Duration) {
+			log.Printf("Attempt failed: %v, retrying in %v", err, wait)
+		})
 }
 
 // DownloadFile downloads the given URL and writes the file to destinationDir,
