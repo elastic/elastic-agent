@@ -424,14 +424,16 @@ git branch -D 9.5
 
 ### "failed to push: authentication required"
 
-**Solution:** Configure git credentials or use SSH:
-```bash
-# Option 1: Use SSH
-git remote set-url origin git@github.com:elastic/elastic-agent.git
+**Cause:** `GITHUB_TOKEN` is not set or the token lacks push permissions.
 
-# Option 2: Configure credentials
-git config credential.helper store
+**Solution:**
+```bash
+export GITHUB_TOKEN=$(gh auth token)
+# or
+export GITHUB_TOKEN="ghp_your_token_here"
 ```
+
+Push uses `GITHUB_TOKEN` with HTTPS authentication (same as the Beats release automation).
 
 ### PR creation fails with "422 Validation Failed"
 

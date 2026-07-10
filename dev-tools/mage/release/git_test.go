@@ -232,6 +232,26 @@ func TestGetCurrentBranch(t *testing.T) {
 	}
 }
 
+func TestPushRequiresToken(t *testing.T) {
+	gitRepo, _ := createTestRepo(t)
+
+	oldToken := os.Getenv("GITHUB_TOKEN")
+	os.Unsetenv("GITHUB_TOKEN")
+	defer func() {
+		if oldToken != "" {
+			os.Setenv("GITHUB_TOKEN", oldToken)
+		}
+	}()
+
+	err := gitRepo.Push("origin")
+	if err == nil {
+		t.Error("Push() should fail without GITHUB_TOKEN, got nil error")
+	}
+	if err != nil && err.Error() != "GITHUB_TOKEN environment variable is required for pushing" {
+		t.Errorf("Push() error = %v, want 'GITHUB_TOKEN environment variable is required for pushing'", err)
+	}
+}
+
 func TestSetRemoteURL(t *testing.T) {
 	gitRepo, _ := createTestRepo(t)
 

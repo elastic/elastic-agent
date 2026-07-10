@@ -7,12 +7,14 @@ package release
 import (
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
 // GitRepo represents a Git repository with common operations
@@ -126,20 +128,33 @@ func (g *GitRepo) CommitAll(message, authorName, authorEmail string) error {
 	return nil
 }
 
-// Push pushes the current branch to the remote
+// Push pushes the current branch to the remote using GITHUB_TOKEN for authentication.
 func (g *GitRepo) Push(remoteName string) error {
-	err := g.repo.Push(&git.PushOptions{
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		return fmt.Errorf("GITHUB_TOKEN environment variable is required for pushing")
+	}
+
+	currentBranch, err := g.GetCurrentBranch()
+	if err != nil {
+		return err
+	}
+
+	refSpec := config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", currentBranch, currentBranch))
+
+	err = g.repo.Push(&git.PushOptions{
 		RemoteName: remoteName,
+		RefSpecs:   []config.RefSpec{refSpec},
+		Auth: &http.BasicAuth{
+			Username: "git",
+			Password: token,
+		},
 	})
 	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
 		return fmt.Errorf("failed to push: %w", err)
 	}
 
-	if errors.Is(err, git.NoErrAlreadyUpToDate) {
-		fmt.Println("  Branch already up to date on remote")
-	} else {
-		fmt.Printf("✓ Pushed to remote: %s\n", remoteName)
-	}
+	fmt.Printf("Pushed branch %s to remote: %s\n", currentBranch, remoteName)
 	return nil
 }
 
