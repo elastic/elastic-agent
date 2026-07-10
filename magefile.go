@@ -4262,15 +4262,9 @@ func (h Helm) Package(ctx context.Context) error {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 
-	productionPackage := !cfg.Build.Snapshot
 	agentPackageVersion := cfg.AgentPackageVersion()
-	agentImageTag := agentPackageVersion
-	agentChartVersion := agentPackageVersion
-	if !productionPackage {
-		// always use the SNAPSHOT version for image tag if not a production package
-		agentImageTag = agentImageTag + devtools.SnapshotSuffix
-		agentChartVersion = agentChartVersion + devtools.SnapshotSuffix
-	}
+	agentImageTag := agentPackageVersion + devtools.MaybeSnapshotSuffix(cfg)
+	agentChartVersion := agentPackageVersion + devtools.MaybeSnapshotSuffix(cfg)
 
 	for yamlFile, keyVals := range map[string][]struct {
 		key   string
