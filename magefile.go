@@ -4119,7 +4119,7 @@ func (h Helm) Package(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
-	
+
 	agentPackageVersion := cfg.AgentPackageVersion()
 	agentImageTag := agentPackageVersion + devtools.MaybeSnapshotSuffix(cfg)
 	agentChartVersion := agentPackageVersion + devtools.MaybeSnapshotSuffix(cfg)
