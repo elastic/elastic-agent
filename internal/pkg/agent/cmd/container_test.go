@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
@@ -1366,6 +1367,8 @@ func TestContainerEnvOverridesFleetCA(t *testing.T) {
 	certDir := t.TempDir()
 	envFleetCAPath := filepath.Join(certDir, "fleet-ca.crt")
 	require.NoError(t, os.WriteFile(envFleetCAPath, rootPair.Cert, 0o644))
+	storedCAPath := filepath.Join(certDir, "stored-ca.crt")
+	require.NoError(t, os.WriteFile(storedCAPath, rootPair.Cert, 0o644))
 
 	origCfg := paths.Config()
 	t.Cleanup(func() { paths.SetConfig(origCfg) })
@@ -1377,6 +1380,21 @@ func TestContainerEnvOverridesFleetCA(t *testing.T) {
 
 	store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
 	require.NoError(t, err)
+
+	// no override for unset CA env vars, valid fleet.enc
+	require.NoError(t, store.Save(strings.NewReader(fmt.Sprintf(`fleet:
+  ssl:
+    certificate_authorities:
+      - %q`, storedCAPath))))
+
+	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
+	require.NoError(t, err)
+
+	loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+	require.NoError(t, err)
+	require.Equal(t, []string{storedCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+
+	// no override for unset CA env vars, invalid fleet.enc
 	require.NoError(t, store.Save(strings.NewReader(`fleet:
   ssl:
     certificate_authorities:
@@ -1385,11 +1403,21 @@ func TestContainerEnvOverridesFleetCA(t *testing.T) {
 	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
 	require.Error(t, err)
 
+	// set FLEET_CA should override fleet.enc
 	t.Setenv("FLEET_CA", envFleetCAPath)
 	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
 	require.NoError(t, err)
 
-	loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+	loaded, err = configuration.LoadConfig(ctx, containerCfgOverrides)
 	require.NoError(t, err)
 	require.Equal(t, []string{envFleetCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+
+	// explicitly empty FLEET_CA should override fleet.enc
+	t.Setenv("FLEET_CA", "")
+	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
+	require.NoError(t, err)
+
+	loaded, err = configuration.LoadConfig(ctx, containerCfgOverrides)
+	require.NoError(t, err)
+	require.Empty(t, loaded.Fleet.Client.Transport.TLS.CAs)
 }

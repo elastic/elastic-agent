@@ -904,7 +904,19 @@ func containerCfgOverrides(cfg *config.Config) error {
 	uCfg["fleet.ssl.certificate"] = envWithDefault("", "ELASTIC_AGENT_CERT")
 	uCfg["fleet.ssl.key"] = envWithDefault("", "ELASTIC_AGENT_CERT_KEY")
 
-	uCfg["fleet.ssl.certificate_authorities"] = cli.StringToSlice(envWithDefault("", "FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"))
+	for _, key := range []string{"FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"} {
+		// Override with first explicitly defined env var, even if value is empty
+		// ucfg Merge won't allow an empty array to overwrite, so we have to
+		// edit cfg instead of uCfg here
+		if caEnv, ok := os.LookupEnv(key); ok {
+			if caChild, err := ucfg.NewFrom(cli.StringToSlice(caEnv)); err != nil {
+				return fmt.Errorf("failed to create CA config for container override: %w", err)
+			} else if err := cfg.Agent.SetChild("fleet.ssl.certificate_authorities", -1, caChild, ucfg.PathSep(".")); err != nil {
+				return fmt.Errorf("failed to write CA config for container override: %w", err)
+			}
+			break
+		}
+	}
 
 	return cfg.Merge(uCfg)
 }
@@ -1187,9 +1199,16 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 		return false, fmt.Errorf("failed to override cert key: %w", err)
 	}
 
-	err = cfg.Merge(map[string]any{"fleet.ssl.certificate_authorities": cli.StringToSlice(envWithDefault("", "FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"))})
-	if err != nil {
-		return false, fmt.Errorf("failed to override CAs: %w", err)
+	for _, key := range []string{"FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"} {
+		if caEnv, ok := os.LookupEnv(key); ok {
+			// Override with first explicitly defined env var, even if value is empty
+			if caChild, err := ucfg.NewFrom(cli.StringToSlice(caEnv)); err != nil {
+				return false, fmt.Errorf("failed to create CA config for container override: %w", err)
+			} else if err := cfg.Agent.SetChild("fleet.ssl.certificate_authorities", -1, caChild, ucfg.PathSep(".")); err != nil {
+				return false, fmt.Errorf("failed to write CA config for container override: %w", err)
+			}
+			break
+		}
 	}
 
 	storedConfig, err := configuration.NewFromConfig(cfg)

@@ -1096,7 +1096,7 @@ func TestContainerCMDFleetCAOverride(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -1133,21 +1133,15 @@ func TestContainerCMDFleetCAOverride(t *testing.T) {
 		"FLEET_INSECURE=1",
 		"STATE_PATH=" + statePath,
 	}
-	envWithCA1 := append([]string{
-		"FLEET_CA=" + caPath1,
-	}, env...)
-	envWithCA2 := append([]string{
-		"FLEET_CA=" + caPath2,
-	}, env...)
 
-	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, envWithCA1)
+	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, append([]string{"FLEET_CA=" + caPath1}, env...))
 	t.Logf(">> running binary with: %v", cmd.Args)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
 	require.Eventuallyf(t, func() bool {
-		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(envWithCA1)))
+		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv([]string{"STATE_PATH=" + statePath})))
 		return err == nil
 	},
 		2*time.Minute, time.Second,
@@ -1164,18 +1158,48 @@ func TestContainerCMDFleetCAOverride(t *testing.T) {
 
 	require.NoError(t, os.Remove(caPath1))
 
-	cmd, agentOutput = prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, envWithCA2)
+	// Agent should crash on the stale fleet.enc caPath1 when no CA env var is set to override it
+	cmd, agentOutput = prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
+	t.Logf(">> running binary with: %v", cmd.Args)
+	require.Error(t, cmd.Run(), "agent should exit with an error when the stored CA path is stale and no CA env var is set")
+	require.Contains(t, agentOutput.String(), "Error: failed to read from disk store",
+		"agent should fail to load the stale stored CA path when no CA env var is set")
+	cmd.Process = nil
+
+	// Agent should start healthy with FLEET_CA's caPath1 overriding fleet.enc's now stale caPath2
+	cmd, agentOutput = prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, append([]string{"FLEET_CA=" + caPath2}, env...))
 	t.Logf(">> running binary with: %v", cmd.Args)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
 	require.Eventuallyf(t, func() bool {
-		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(envWithCA2)))
+		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv([]string{"STATE_PATH=" + statePath})))
 		return err == nil
 	},
 		2*time.Minute, time.Second,
 		"Elastic-Agent did not report healthy after restart with FLEET_CA overriding the stale stored path. Agent status error: \"%v\", Agent logs\n%s",
+		err, agentOutput,
+	)
+
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
+	cmd.Process = nil
+
+	// Agent should start healthy with FLEET_CA's empty var overriding fleet.enc's now stale caPath2
+	require.NoError(t, os.Remove(caPath2))
+	cmd, agentOutput = prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, append([]string{"FLEET_CA="}, env...))
+	t.Logf(">> running binary with: %v", cmd.Args)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
+	}
+
+	require.Eventuallyf(t, func() bool {
+		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv([]string{"STATE_PATH=" + statePath})))
+		return err == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy after restart with an explicitly empty FLEET_CA overriding the stale stored path. Agent status error: \"%v\", Agent logs\n%s",
 		err, agentOutput,
 	)
 }
