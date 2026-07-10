@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# shellcheck source=.buildkite/scripts/retry.sh
+source "$(dirname "$0")/retry.sh"
 
 GROUP_NAME=$1
 TEST_SUDO=$2
@@ -31,11 +33,11 @@ if [ "$TEST_SUDO" == "true" ]; then
 fi
 
 # Make sure that all tools are installed
-asdf install
+retry 3 asdf install
 
 echo "~~~ Running integration tests as $USER"
 
-make install-gotestsum
+retry 3 make install-gotestsum
 
 if [[ -z "${AGENT_VERSION:-}" ]]; then
   if [[ -f "${WORKSPACE}/.package-version" ]]; then
@@ -84,7 +86,7 @@ if [[ $TESTS_EXIT_STATUS -ne 0 ]]; then
 fi
 
 if [ -f "$outputXML" ]; then
-  go install github.com/kitproj/junit2html@latest
+  retry 3 go install github.com/kitproj/junit2html@latest
   junit2html < "$outputXML" > build/TEST-report.html
 else
     echo "Cannot generate HTML test report: $outputXML not found"
