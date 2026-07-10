@@ -1369,6 +1369,10 @@ func TestContainerEnvOverridesFleetCA(t *testing.T) {
 	require.NoError(t, os.WriteFile(envFleetCAPath, rootPair.Cert, 0o644))
 	storedCAPath := filepath.Join(certDir, "stored-ca.crt")
 	require.NoError(t, os.WriteFile(storedCAPath, rootPair.Cert, 0o644))
+	kibanaCAPath := filepath.Join(certDir, "kibana-ca.crt")
+	require.NoError(t, os.WriteFile(kibanaCAPath, rootPair.Cert, 0o644))
+	esCAPath := filepath.Join(certDir, "es-ca.crt")
+	require.NoError(t, os.WriteFile(esCAPath, rootPair.Cert, 0o644))
 
 	origCfg := paths.Config()
 	t.Cleanup(func() { paths.SetConfig(origCfg) })
@@ -1417,6 +1421,27 @@ func TestContainerEnvOverridesFleetCA(t *testing.T) {
 	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
 	require.NoError(t, err)
 
+	loaded, err = configuration.LoadConfig(ctx, containerCfgOverrides)
+	require.NoError(t, err)
+	require.Empty(t, loaded.Fleet.Client.Transport.TLS.CAs)
+
+	// KIBANA_CA should override fleet.enc when FLEET_CA is unset
+	os.Unsetenv("FLEET_CA")
+	t.Setenv("KIBANA_CA", kibanaCAPath)
+	loaded, err = configuration.LoadConfig(ctx, containerCfgOverrides)
+	require.NoError(t, err)
+	require.Equal(t, []string{kibanaCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+
+	// ELASTICSEARCH_CA should override fleet.enc when FLEET_CA and KIBANA_CA are unset
+	os.Unsetenv("KIBANA_CA")
+	t.Setenv("ELASTICSEARCH_CA", esCAPath)
+	loaded, err = configuration.LoadConfig(ctx, containerCfgOverrides)
+	require.NoError(t, err)
+	require.Equal(t, []string{esCAPath}, loaded.Fleet.Client.Transport.TLS.CAs)
+
+	// explicitly empty FLEET_CA should take precedence over set KIBANA_CA
+	t.Setenv("FLEET_CA", "")
+	t.Setenv("KIBANA_CA", kibanaCAPath)
 	loaded, err = configuration.LoadConfig(ctx, containerCfgOverrides)
 	require.NoError(t, err)
 	require.Empty(t, loaded.Fleet.Client.Transport.TLS.CAs)
