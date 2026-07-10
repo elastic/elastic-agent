@@ -10,10 +10,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"runtime/pprof"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -210,9 +211,7 @@ func (d *diagnosticsExtension) RegisterDiagnosticHook(componentName string, desc
 func (d *diagnosticsExtension) RegisterActionHandler(componentName string, handler func(ctx context.Context, params map[string]any) (map[string]any, error)) error {
 	compID, ok := translate.ComponentIDFromReceiverName(componentName)
 	if !ok {
-		err := fmt.Errorf("receiver name %q does not contain the expected component prefix, ignoring registration", componentName)
-		d.logger.Warn(err.Error())
-		return err
+		return fmt.Errorf("receiver name %q does not contain the expected component prefix, ignoring registration", componentName)
 	}
 	d.actionsMtx.Lock()
 	defer d.actionsMtx.Unlock()
@@ -220,10 +219,7 @@ func (d *diagnosticsExtension) RegisterActionHandler(componentName string, handl
 		d.actionHandlers[compID] = make(map[string]actionHandler)
 	}
 	d.actionHandlers[compID][componentName] = handler
-	if len(d.actionHandlers[compID]) > 1 {
-		return ambiguousActionRoutingError(compID, d.actionHandlers[compID])
-	}
-	return nil
+	return ambiguityError(compID, d.actionHandlers[compID])
 }
 
 // UnregisterActionHandler removes a previously registered action handler.
@@ -253,27 +249,30 @@ func (d *diagnosticsExtension) resolveActionHandler(componentID string) (actionH
 	d.actionsMtx.Lock()
 	defer d.actionsMtx.Unlock()
 	handlers := d.actionHandlers[componentID]
-	switch len(handlers) {
-	case 0:
+	if len(handlers) == 0 {
 		return nil, fmt.Errorf("no action handler registered for component %q", componentID)
-	case 1:
-		for _, handler := range handlers {
-			return handler, nil
-		}
 	}
-	return nil, ambiguousActionRoutingError(componentID, handlers)
+	if err := ambiguityError(componentID, handlers); err != nil {
+		return nil, err
+	}
+	for _, handler := range handlers {
+		return handler, nil
+	}
+	// Unreachable in practice: len(handlers) is checked above (0 handled,
+	// >1 handled by ambiguityError), so exactly one iteration of the loop
+	// above always runs.
+	return nil, fmt.Errorf("no action handler registered for component %q", componentID)
 }
 
-// ambiguousActionRoutingError describes the case where more than one receiver
-// has registered an action handler for componentID. Callers must not invoke
-// any of these handlers, since there is no per-stream targeting information
-// in a Fleet action to pick the right one.
-func ambiguousActionRoutingError(componentID string, handlers map[string]actionHandler) error {
-	receiverNames := make([]string, 0, len(handlers))
-	for receiverName := range handlers {
-		receiverNames = append(receiverNames, receiverName)
+// ambiguityError returns a non-nil error if more than one receiver has
+// registered an action handler for componentID. Callers must not invoke any
+// of these handlers in that case, since there is no per-stream targeting
+// information in a Fleet action to pick the right one.
+func ambiguityError(componentID string, handlers map[string]actionHandler) error {
+	if len(handlers) <= 1 {
+		return nil
 	}
-	sort.Strings(receiverNames)
+	receiverNames := slices.Sorted(maps.Keys(handlers))
 	return fmt.Errorf("%w for component %q: %d receivers registered actions (%s); "+
 		"this input must set single_receiver: true in its component spec to support actions",
 		errAmbiguousActionRouting, componentID, len(receiverNames), strings.Join(receiverNames, ", "))
