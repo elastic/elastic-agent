@@ -83,31 +83,34 @@ func (g *GitRepo) CreateBranch(branchName string) error {
 	return nil
 }
 
-// CommitAll commits all changes with the given message
+// CommitAll commits all changes with the given message.
 func (g *GitRepo) CommitAll(message, authorName, authorEmail string) error {
 	w, err := g.repo.Worktree()
 	if err != nil {
 		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
-	// Add all changes
-	err = w.AddWithOptions(&git.AddOptions{
-		All: true,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to add changes: %w", err)
-	}
-
 	status, err := w.Status()
 	if err != nil {
 		return fmt.Errorf("failed to get worktree status: %w", err)
 	}
-	if status.IsClean() {
+
+	hasChanges := false
+	for path, fileStatus := range status {
+		if fileStatus.Worktree == git.Unmodified && fileStatus.Staging == git.Unmodified {
+			continue
+		}
+
+		hasChanges = true
+		if _, err := w.Add(path); err != nil {
+			return fmt.Errorf("failed to add %s: %w", path, err)
+		}
+	}
+	if !hasChanges {
 		fmt.Println("  No changes to commit")
 		return nil
 	}
 
-	// Create commit
 	commit, err := w.Commit(message, &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  authorName,

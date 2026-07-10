@@ -122,6 +122,47 @@ func TestCreateBranch(t *testing.T) {
 	}
 }
 
+func TestCommitAllWithSubmoduleDirectory(t *testing.T) {
+	gitRepo, tmpDir := createTestRepo(t)
+
+	changeFile := filepath.Join(tmpDir, "change.txt")
+	if err := os.WriteFile(changeFile, []byte("release changes"), 0644); err != nil {
+		t.Fatalf("failed to write change file: %v", err)
+	}
+
+	beatsDir := filepath.Join(tmpDir, "beats")
+	if err := os.Mkdir(beatsDir, 0755); err != nil {
+		t.Fatalf("failed to create beats dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(beatsDir, "README.md"), []byte("beats"), 0644); err != nil {
+		t.Fatalf("failed to write beats file: %v", err)
+	}
+
+	err := gitRepo.CommitAll("Release commit", "Test Author", "test@example.com")
+	if err != nil {
+		t.Fatalf("CommitAll() error = %v", err)
+	}
+
+	ref, err := gitRepo.repo.Head()
+	if err != nil {
+		t.Fatalf("failed to get HEAD: %v", err)
+	}
+
+	commit, err := gitRepo.repo.CommitObject(ref.Hash())
+	if err != nil {
+		t.Fatalf("failed to get commit: %v", err)
+	}
+
+	tree, err := commit.Tree()
+	if err != nil {
+		t.Fatalf("failed to get tree: %v", err)
+	}
+
+	if _, err := tree.File("change.txt"); err != nil {
+		t.Fatalf("CommitAll() did not commit change.txt: %v", err)
+	}
+}
+
 func TestCommitAll(t *testing.T) {
 	gitRepo, tmpDir := createTestRepo(t)
 
