@@ -4114,13 +4114,13 @@ func (h Helm) Package(ctx context.Context) error {
 	mg.SerialDeps(h.BuildDependencies)
 
 	cfg := devtools.SettingsFromContext(ctx)
-	productionPackage := !cfg.Build.Snapshot
 
 	cfg, err := cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 	agentPackageVersion := cfg.AgentPackageVersion()
+<<<<<<< HEAD
 	agentImageTag := agentPackageVersion
 	agentChartVersion := agentPackageVersion
 	if !productionPackage {
@@ -4128,6 +4128,10 @@ func (h Helm) Package(ctx context.Context) error {
 		agentImageTag = agentImageTag + mage.SnapshotSuffix
 		agentChartVersion = agentChartVersion + mage.SnapshotSuffix
 	}
+=======
+	agentImageTag := agentPackageVersion + devtools.MaybeSnapshotSuffix(cfg)
+	agentChartVersion := agentPackageVersion + devtools.MaybeSnapshotSuffix(cfg)
+>>>>>>> 13fc78d4e ([mage] Fix release Helm Chart version (#15447))
 
 	for yamlFile, keyVals := range map[string][]struct {
 		key   string
