@@ -71,11 +71,11 @@ outputs:
     # -- contents to the client certificate for the output
     # @section -- 1.1 - Output Object
     # @key -- outputs.{name}.ssl.certificate.value
-    #  value: ""      
+    #  value: ""
     # -- path to the client private key for the output
     # @section -- 1.1 - Output Object
     # @key -- outputs.{name}.ssl.key
-    #  key: 
+    #  key:
     # -- path to the client private key for the output
     # @section -- 1.1 - Output Object
     # @key -- outputs.{name}.ssl.key.valueFromSecret
