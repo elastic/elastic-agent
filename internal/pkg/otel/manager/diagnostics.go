@@ -8,9 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"strings"
-	"syscall"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
@@ -106,16 +104,17 @@ func (m *OTelManager) PerformComponentDiagnostics(
 
 	extDiagnostics, err := otel.PerformDiagnosticsExt(ctx, false)
 	if err != nil {
-		// These three errors mean EDOT is not running, which is expected.
-		// fs.ErrNotExist: the socket file is missing (POSIX ENOENT / Windows ERROR_FILE_NOT_FOUND).
-		// syscall.ECONNREFUSED: the socket file exists but nothing is listening (EDOT crashed or mid-restart).
-		// context.DeadlineExceeded: a Windows pipe-busy dial timed out. This is defensive: production does not
-		// set a dial deadline, so this only fires if the caller passes a deadline.
+		// otel.IsCollectorUnavailable covers the socket being missing or refusing
+		// connections, both of which mean the collector isn't running, which is
+		// expected. context.DeadlineExceeded is additionally treated the same way
+		// here for a Windows-specific case: a pipe-busy dial timing out. This is
+		// defensive: production does not set a dial deadline, so this only fires
+		// if the caller passes one.
 		// Any other error is unexpected, so surface it on each component so it ends up in the diagnostics archive.
-		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, context.DeadlineExceeded) {
-			m.managerLogger.Debugf("EDOT not reachable, no diagnostics available: %v", err)
+		if otel.IsCollectorUnavailable(err) || errors.Is(err, context.DeadlineExceeded) {
+			m.managerLogger.Debugf("collector not reachable, no diagnostics available: %v", err)
 		} else {
-			m.managerLogger.Warnf("failed to fetch diagnostics from EDOT: %v", err)
+			m.managerLogger.Warnf("failed to fetch diagnostics from collector: %v", err)
 			for idx := range diagnostics {
 				diagnostics[idx].Err = fmt.Errorf("error fetching otel diagnostics: %w", err)
 			}

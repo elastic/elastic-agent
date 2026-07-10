@@ -199,7 +199,7 @@ func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
 
 		// Regression test for https://github.com/elastic/elastic-agent/issues/15410:
 		// osquery live queries dispatched by Fleet must reach osquerybeat even
-		// though it is running as a beats receiver inside EDOT rather than as a
+		// though it is running as a beats receiver inside the collector rather than as a
 		// standalone process with a gRPC control connection to elastic-agent.
 		t.Run("live query", func(t *testing.T) {
 			runner.validateOsqueryLiveQuery(t, ctx, agentStatus.Info.ID)

@@ -9,7 +9,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"runtime"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -21,7 +23,7 @@ import (
 
 // startMockActionsServer stands up an HTTP server on the diagnostics extension
 // socket handling POST /actions, mimicking the elasticdiagnostics extension for
-// testing PerformActionExt without a real EDOT collector.
+// testing PerformActionExt without a real collector.
 func startMockActionsServer(t *testing.T, handle func(elasticdiagnostics.ActionRequest) (int, elasticdiagnostics.ActionResponse)) *http.Server {
 	t.Helper()
 	mux := http.NewServeMux()
@@ -84,8 +86,54 @@ func TestPerformActionExt(t *testing.T) {
 	})
 
 	t.Run("collector not running", func(t *testing.T) {
+		shrinkActionDialRetryMaxTime(t, 100*time.Millisecond)
 		paths.SetDiagnosticsExtensionSocket(paths.SocketFromPath(runtime.GOOS, t.TempDir(), "does-not-exist.sock"))
 		_, err := PerformActionExt(context.Background(), "osquery-default", "osquery", nil)
 		require.Error(t, err)
+	})
+
+	t.Run("collector mid-restart is retried until it comes back", func(t *testing.T) {
+		shrinkActionDialRetryMaxTime(t, 2*time.Second)
+		shrinkActionDialRetryInterval(t, time.Millisecond, 5*time.Millisecond)
+		socketDir := t.TempDir()
+		paths.SetDiagnosticsExtensionSocket(paths.SocketFromPath(runtime.GOOS, socketDir, "test-actions-restart.sock"))
+
+		// Simulate the collector being mid-restart: nothing is listening on the
+		// socket when PerformActionExt is first called.
+		firstAttemptFailed := make(chan struct{})
+		var once sync.Once
+		onDialRetry = func() { once.Do(func() { close(firstAttemptFailed) }) }
+		t.Cleanup(func() { onDialRetry = nil })
+
+		go func() {
+			<-firstAttemptFailed
+			startMockActionsServer(t, func(req elasticdiagnostics.ActionRequest) (int, elasticdiagnostics.ActionResponse) {
+				return http.StatusOK, elasticdiagnostics.ActionResponse{Result: map[string]interface{}{"recovered": true}}
+			})
+		}()
+
+		res, err := PerformActionExt(context.Background(), "osquery-default", "osquery", nil)
+		require.NoError(t, err)
+		require.Equal(t, map[string]interface{}{"recovered": true}, res)
+	})
+}
+
+// shrinkActionDialRetryMaxTime temporarily lowers the package-level dial retry max time.
+func shrinkActionDialRetryMaxTime(t *testing.T, max time.Duration) {
+	t.Helper()
+	orig := actionDialRetryMaxTime
+	actionDialRetryMaxTime = max
+	t.Cleanup(func() { actionDialRetryMaxTime = orig })
+}
+
+// shrinkActionDialRetryInterval temporarily lowers the package-level backoff
+// interval so a test that expects several retries doesn't spend real wall
+// time waiting out the production backoff between attempts.
+func shrinkActionDialRetryInterval(t *testing.T, initInterval, maxInterval time.Duration) {
+	t.Helper()
+	origInit, origMax := actionDialRetryInitialInterval, actionDialRetryMaxInterval
+	actionDialRetryInitialInterval, actionDialRetryMaxInterval = initInterval, maxInterval
+	t.Cleanup(func() {
+		actionDialRetryInitialInterval, actionDialRetryMaxInterval = origInit, origMax
 	})
 }
