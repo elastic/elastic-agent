@@ -1,6 +1,13 @@
 #!/bin/bash
+<<<<<<< HEAD
 set -euo pipefail
 
+=======
+
+# retry runs the given command up to $1 times total, with exponential backoff
+# between attempts, to protect against transient failures.
+# Usage: retry <attempts> <command> [args...]
+>>>>>>> 320e5548c (Add retries to network calls in Buildkite CI scripts (#15451))
 retry() {
     local retries=$1
     shift
@@ -19,4 +26,8 @@ retry() {
         fi
     done
     return 0
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 320e5548c (Add retries to network calls in Buildkite CI scripts (#15451))
