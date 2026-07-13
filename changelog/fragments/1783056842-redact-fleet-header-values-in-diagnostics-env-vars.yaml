@@ -9,16 +9,20 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: enhancement
+kind: security
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Update OTel Collector components to v0.155.0
+summary: Redact sensitive HTTP header values embedded in Fleet env vars in diagnostics archives
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-# description:
+description: |
+  Diagnostics archives could expose authentication tokens when Fleet header environment
+  variables (such as FLEET_HEADER, FLEET_HEADERS, FLEET_KIBANA_HEADER, and
+  FLEET_KIBANA_HEADERS) contained sensitive HTTP header values. The diagnostics redaction
+  logic now expands and redacts individual header values within these variables.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
@@ -36,7 +40,7 @@ component: elastic-agent
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-# pr: https://github.com/owner/repo/1234
+pr: https://github.com/elastic/elastic-agent/pull/15284
 
 # AUTOMATED
 # OPTIONAL to manually add other issue URLs

@@ -40,6 +40,13 @@ const (
 	redactionRouteKey     = "routekey"
 )
 
+var redactionHeaderValueKeys = []string{
+	"FLEET_HEADER",
+	"FLEET_HEADERS",
+	"FLEET_KIBANA_HEADER",
+	"FLEET_KIBANA_HEADERS",
+}
+
 // DiagCPU* are contstants to describe the CPU profile that is collected when the --cpu-profile flag is used with the diagnostics command, or the diagnostics action contains "CPU" in the additional_metrics list.
 const (
 	DiagCPUName        = "cpuprofile"
@@ -282,6 +289,9 @@ func ZipArchive(
 			// check for component-level errors
 			// create unit diags
 			for _, ud := range units {
+				if ud.Err == nil && len(ud.Results) == 0 {
+					continue
+				}
 				unitDir := strings.ReplaceAll(strings.TrimPrefix(ud.UnitID, ud.ComponentID+"-"), "/", "-")
 				_, err := zw.CreateHeader(&zip.FileHeader{
 					Name:     fmt.Sprintf("components/%s/%s/", dirName, unitDir),
@@ -346,6 +356,7 @@ func RedactOpts(w io.Writer) []redact.RedactOption {
 		redact.WithErrorOutput(w),
 		redact.WithMarkerPrefix(redactionMarkerPrefix),
 		redact.WithIgnoreKeys(redactionRouteKey),
+		redact.WithHeaderValueKeys(redactionHeaderValueKeys...),
 	}
 }
 
