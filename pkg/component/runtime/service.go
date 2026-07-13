@@ -61,8 +61,8 @@ type serviceRuntime struct {
 
 	// checkinGracePeriod is the configured upgrade watcher grace period,
 	// used to cap how long this component waits before being marked FAILED.
-	// Shared with Manager so a config reload is reflected here too. A nil
-	// or zero value means no cap is applied.
+	// May change live if the operator updates the config. Nil or zero means
+	// no cap.
 	checkinGracePeriod *gracePeriodValue
 
 	// The most recent mode received on actionCh. The mode will be either

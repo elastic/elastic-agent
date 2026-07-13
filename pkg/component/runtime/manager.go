@@ -110,12 +110,10 @@ type Manager struct {
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
 
-	// serviceCheckinGracePeriod holds the configured upgrade watcher grace
-	// period. Service-runtime components use it to cap how long they wait
-	// before being marked FAILED, so a truly failed component is still
-	// caught before the watcher gives up. It is shared (not copied) with
-	// every service-runtime component so Reload updates already-running
-	// components too, not just ones created afterward. Zero means no cap.
+	// serviceCheckinGracePeriod is the configured upgrade watcher grace
+	// period. Service-runtime components cap their failure window against
+	// it so a truly failed component is still caught before the watcher
+	// gives up. Updated live by Reload; zero means no cap.
 	serviceCheckinGracePeriod *gracePeriodValue
 
 	// Set when the RPC server is ready to receive requests, for use by tests.
@@ -147,10 +145,8 @@ type Manager struct {
 	doneChan chan struct{}
 }
 
-// gracePeriodValue is a concurrency-safe time.Duration holder shared between
-// Manager and every service-runtime component it creates, so calling Set
-// (e.g. from Manager.Reload) is immediately visible to already-running
-// components, not just ones created afterward.
+// gracePeriodValue holds a grace period that can be read and updated safely
+// from multiple goroutines, so a config reload takes effect right away.
 type gracePeriodValue struct {
 	d atomic.Int64
 }
@@ -176,10 +172,7 @@ func (v *gracePeriodValue) Set(d time.Duration) {
 
 // SetServiceCheckinGracePeriod sets the configured upgrade watcher grace
 // period, so service-runtime components can cap their failure window to a
-// safe margin below it. Safe to call at any point in Manager's lifetime
-// (e.g. right after NewManager, or later from a config reload) since the
-// value is shared live with every service-runtime component. Zero disables
-// the cap.
+// safe margin below it. Safe to call at any time. Zero disables the cap.
 func (m *Manager) SetServiceCheckinGracePeriod(d time.Duration) {
 	m.serviceCheckinGracePeriod.Set(d)
 }
@@ -231,15 +224,13 @@ func NewManager(
 	return m, nil
 }
 
-// Reload updates settings that can change via a config/policy reload without
-// restarting the Manager, such as the upgrade watcher grace period used by
-// service-runtime components. Safe to call from a goroutine other than Run.
+// Reload updates settings that can change via a config reload, such as the
+// upgrade watcher grace period. Safe to call from any goroutine.
 func (m *Manager) Reload(rawConfig *config.Config) error {
 	watcherCfg := struct {
 		GracePeriod time.Duration `config:"agent.upgrade.watcher.grace_period"`
 	}{
-		// seeded so a reload that omits this section keeps the default,
-		// matching configuration.NewFromConfig's default-then-unpack pattern
+		// seeded with the default so an incomplete reload doesn't zero it out
 		GracePeriod: configuration.DefaultUpgradeConfig().Watcher.GracePeriod,
 	}
 	if err := rawConfig.UnpackTo(&watcherCfg); err != nil {
