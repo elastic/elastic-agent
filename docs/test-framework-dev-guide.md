@@ -77,18 +77,16 @@ Before you can run any test, you first need to package the Elastic
 Agent version you want to test. For that you'll need to run `mage package`, for example:
 
 ```
-DEV=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
+DEV=true mage -v package
 ```
 
-The packaging process has many leavers that need to be correctly set:
+The packaging process has many levers that you may need to set depending on what kind of test you're running. A more advanced invocation might look like:
+
+```bash
+SNAPSHOT=false PLATFORMS=linux/arm64 PACKAGES=docker DOCKER_VARIANTS=complete mage package
+```
 
  - `DEV=true|false`: Build with debug symbols
- - `EXTERNAL=true|false`: If `false` it will not download any components
-   and only include the `elastic-otel-collector` which has `beats` bundled in
-   the resulting package.
- - `SNAPSHOT=true|false`: Whether to use snapshot versions of dependencies
-   (like Beats). Defaults to `true`, which is required to package from the
-   `main` branch with `EXTERNAL=true`. Set `SNAPSHOT=false` for release builds.
  - `PLATFORMS`: Comma separated list of platforms you want to build. If
   not set, it defaults to the **host platform** only. [Selecting specific
   platform](#selecting-specific-platform) contains a list of common
@@ -121,6 +119,30 @@ The packaging process has many leavers that need to be correctly set:
     - `elastic-otel-collector-wolfi`
     - `slim-wolfi`
 
+#### Choosing dependencies and metadata
+
+By default, packaging will build the binaries defined in this repository:
+
+- `elastic-agent`
+- `otel-collector` (includes agentbeat)
+- `osquery-extension`
+
+It will pull the remaining dependencies from a manifest specified in [.package-version](/.package-version).
+This process can be controlled through the following environment variables:
+
+- `AGENT_CORE_SOURCE=local|manifest`: Build the aforementioned binaries locally or pull from the manifest. Default is `local`. Manifest is defined either by [.package-version](/.package-version) or the `MANIFEST_URL` environment variable.
+- `USE_PACKAGE_VERSION=true|false`: Use the content of [.package-version](/.package-version) for configuring the package, most importantly the manifest url, but the version is effective as well. Mutually exclusive with `MANIFEST_URL`. Default is `true`.
+- `MANIFEST_URL`: The manifest url from which to pull the dependencies. Mutually exclusive with `USE_PACKAGE_VERSION=true`. Default is empty.
+- `SNAPSHOT=true|false`: Create a snapshot build. This is just versioning metadata indicating that the
+  package doesn't contain a release build. Read from the manifest if present, otherwise defaults to `true`.
+- `EXTERNAL=true|false`: If you want to build with dependencies you've provided locally (you have a custom build of endpoint, for example), then set this to `false` and `USE_PACKAGE_VERSION=false`. Default is `true`.
+
+For example, if you want to create a package the same way as the unified release job, you'd run:
+
+```bash
+USE_PACKAGE_VERSION=false MANIFEST_URL=... AGENT_CORE_SOURCE=manifest mage package
+```
+
 ### Running the tests
 
 The test are run with mage using the `integration` namespace, they
@@ -128,7 +150,7 @@ share similar leavers as the packaging process.
 
  - `AGENT_VERSION`: The version to test, in the format
    `9.2.0-SNAPSHOT`. It is **REQUIRED** to be set when packages were
-   built with `SNAPSHOT=true` (the default). Currently there is no way
+   built with `SNAPSHOT=true` (the default on `main`). Currently there is no way
    to tell the integration tests framework to use snapshot versions if
    testing on VMs.
 
@@ -146,18 +168,18 @@ share similar leavers as the packaging process.
 
 An example for running a single test, including packaging the artifacts for it is:
 ```
-EXTERNAL=true DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package # create elastic-agent snapshot package (default) using external sources for components
+DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package # create elastic-agent snapshot package (EXTERNAL=true and snapshot state from .package-version by default)
 INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME # Run TEST_NAME on a multipass VM
 ```
 
 ### TL;DR: Packaging and running tests
 **Package the Elastic Agent**
 ```
-# If testing on VMs. SNAPSHOT=true is the default; omit or pass SNAPSHOT=false for release builds.
-DEV=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
+# SNAPSHOT state comes from .package-version (true on main, false on release branches); pass SNAPSHOT=false to override.
+DEV=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
 
 # If running Kubernetes tests. Adjust the variants according to your tests
-DEV=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" DOCKER_VARIANTS="basic,complete,elastic-otel-collector" PLATFORMS=linux/amd64 mage -v package
+DEV=true PACKAGES="tar.gz,deb,rpm" DOCKER_VARIANTS="basic,complete,elastic-otel-collector" PLATFORMS=linux/amd64 mage -v package
 ```
 
 **Run the tests**
