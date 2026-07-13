@@ -9,28 +9,40 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/google/go-github/v68/github"
 )
 
-// GitHubClient wraps the GitHub API client
+// GitHubClient wraps the GitHub API client.
 type GitHubClient struct {
 	client *github.Client
 	ctx    context.Context
 }
 
-// NewGitHubClient creates a new GitHub client with authentication
+// PROptions holds options for creating a pull request.
+type PROptions struct {
+	Owner     string
+	Repo      string
+	Title     string
+	Head      string
+	Base      string
+	Body      string
+	Draft     bool
+	Reviewers []string
+	Labels    []string
+}
+
+// NewGitHubClient creates a new GitHub API client.
 func NewGitHubClient(token string) *GitHubClient {
 	ctx := context.Background()
-	client := github.NewClient(nil).WithAuthToken(token)
-
 	return &GitHubClient{
-		client: client,
+		client: github.NewClient(nil).WithAuthToken(token),
 		ctx:    ctx,
 	}
 }
 
-// NewGitHubClientFromEnv creates a GitHub client using GITHUB_TOKEN env var
+// NewGitHubClientFromEnv creates a GitHub client using GITHUB_TOKEN env var.
 func NewGitHubClientFromEnv() (*GitHubClient, error) {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
@@ -39,102 +51,93 @@ func NewGitHubClientFromEnv() (*GitHubClient, error) {
 	return NewGitHubClient(token), nil
 }
 
-// PROptions contains options for creating a pull request
-type PROptions struct {
-	Owner       string
-	Repo        string
-	Title       string
-	Head        string // branch name
-	Base        string // target branch (e.g., "main")
-	Body        string
-	Draft       bool
-	Maintainers bool // allow maintainers to edit
-}
-
-// FindOpenPR returns an open pull request matching head and base, or nil if none exists.
-func (gh *GitHubClient) FindOpenPR(owner, repo, head, base string) (*github.PullRequest, error) {
-	headRef := fmt.Sprintf("%s:%s", owner, head)
-	prs, _, err := gh.client.PullRequests.List(gh.ctx, owner, repo, &github.PullRequestListOptions{
-		State: "open",
-		Head:  headRef,
-		Base:  base,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list pull requests: %w", err)
-	}
-
-	if len(prs) == 0 {
-		return nil, nil
-	}
-
-	return prs[0], nil
-}
-
-// CreatePR creates a new pull request.
-// If an open pull request already exists for the same head and base, it is returned instead (idempotent).
+// CreatePR creates a pull request, or returns an existing open PR with the same head and base.
 func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
-	existing, err := gh.FindOpenPR(opts.Owner, opts.Repo, opts.Head, opts.Base)
+	existingPR, found, err := gh.FindOpenPR(opts.Owner, opts.Repo, opts.Head, opts.Base)
 	if err != nil {
 		return nil, err
 	}
-	if existing != nil {
-		fmt.Printf("  Open PR #%d already exists: %s\n", existing.GetNumber(), existing.GetHTMLURL())
-		return existing, nil
+	if found {
+		fmt.Printf("Open PR already exists #%d: %s\n", existingPR.GetNumber(), existingPR.GetHTMLURL())
+		gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels)
+		return existingPR, nil
 	}
 
 	newPR := &github.NewPullRequest{
-		Title:               github.Ptr(opts.Title),
-		Head:                github.Ptr(opts.Head),
-		Base:                github.Ptr(opts.Base),
-		Body:                github.Ptr(opts.Body),
-		MaintainerCanModify: github.Ptr(opts.Maintainers),
-		Draft:               github.Ptr(opts.Draft),
+		Title: github.Ptr(opts.Title),
+		Head:  github.Ptr(opts.Head),
+		Base:  github.Ptr(opts.Base),
+		Body:  github.Ptr(opts.Body),
+		Draft: github.Ptr(opts.Draft),
 	}
 
 	pr, _, err := gh.client.PullRequests.Create(gh.ctx, opts.Owner, opts.Repo, newPR)
 	if err != nil {
-		var ghErr *github.ErrorResponse
-		if errors.As(err, &ghErr) && ghErr.Response != nil && ghErr.Response.StatusCode == 422 {
-			existing, findErr := gh.FindOpenPR(opts.Owner, opts.Repo, opts.Head, opts.Base)
-			if findErr == nil && existing != nil {
-				fmt.Printf("  Open PR #%d already exists: %s\n", existing.GetNumber(), existing.GetHTMLURL())
-				return existing, nil
-			}
-		}
 		return nil, fmt.Errorf("failed to create PR: %w", err)
 	}
 
-	fmt.Printf("✓ Created PR #%d: %s\n", pr.GetNumber(), pr.GetHTMLURL())
+	if len(opts.Reviewers) > 0 {
+		reviewersReq := github.ReviewersRequest{
+			Reviewers: opts.Reviewers,
+		}
+		_, _, err = gh.client.PullRequests.RequestReviewers(gh.ctx, opts.Owner, opts.Repo, pr.GetNumber(), reviewersReq)
+		if err != nil {
+			fmt.Printf("Warning: failed to add reviewers: %v\n", err)
+		}
+	}
+
+	gh.ensurePRLabels(opts.Owner, opts.Repo, pr.GetNumber(), opts.Labels)
+
+	fmt.Printf("Created PR #%d: %s\n", pr.GetNumber(), pr.GetHTMLURL())
 	return pr, nil
 }
 
-// AddLabels adds labels to a pull request
-func (gh *GitHubClient) AddLabels(owner, repo string, prNumber int, labels []string) error {
-	_, _, err := gh.client.Issues.AddLabelsToIssue(gh.ctx, owner, repo, prNumber, labels)
+// FindOpenPR returns an open pull request for the given head and base branches, if one exists.
+func (gh *GitHubClient) FindOpenPR(owner, repo, head, base string) (*github.PullRequest, bool, error) {
+	headQuery := head
+	if !strings.Contains(head, ":") {
+		headQuery = fmt.Sprintf("%s:%s", owner, head)
+	}
+
+	prs, _, err := gh.client.PullRequests.List(gh.ctx, owner, repo, &github.PullRequestListOptions{
+		State: "open",
+		Head:  headQuery,
+		Base:  base,
+		ListOptions: github.ListOptions{
+			PerPage: 1,
+		},
+	})
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to list pull requests: %w", err)
+	}
+	if len(prs) == 0 {
+		return nil, false, nil
+	}
+
+	return prs[0], true, nil
+}
+
+func (gh *GitHubClient) ensurePRLabels(owner, repo string, number int, labels []string) {
+	if len(labels) == 0 {
+		return
+	}
+	if err := gh.AddLabels(owner, repo, number, labels); err != nil {
+		fmt.Printf("Warning: failed to add labels: %v\n", err)
+	}
+}
+
+// AddLabels adds labels to a pull request or issue.
+func (gh *GitHubClient) AddLabels(owner, repo string, number int, labels []string) error {
+	_, _, err := gh.client.Issues.AddLabelsToIssue(gh.ctx, owner, repo, number, labels)
 	if err != nil {
 		return fmt.Errorf("failed to add labels: %w", err)
 	}
 
-	fmt.Printf("✓ Added labels to PR #%d: %v\n", prNumber, labels)
+	fmt.Printf("Added labels to #%d: %v\n", number, labels)
 	return nil
 }
 
-// RequestReviewers requests reviews from users
-func (gh *GitHubClient) RequestReviewers(owner, repo string, prNumber int, reviewers []string) error {
-	reviewReq := github.ReviewersRequest{
-		Reviewers: reviewers,
-	}
-
-	_, _, err := gh.client.PullRequests.RequestReviewers(gh.ctx, owner, repo, prNumber, reviewReq)
-	if err != nil {
-		return fmt.Errorf("failed to request reviewers: %w", err)
-	}
-
-	fmt.Printf("✓ Requested reviews from: %v\n", reviewers)
-	return nil
-}
-
-// GetDefaultBranch gets the default branch for a repository
+// GetDefaultBranch gets the default branch for a repository.
 func (gh *GitHubClient) GetDefaultBranch(owner, repo string) (string, error) {
 	repository, _, err := gh.client.Repositories.Get(gh.ctx, owner, repo)
 	if err != nil {
@@ -144,12 +147,12 @@ func (gh *GitHubClient) GetDefaultBranch(owner, repo string) (string, error) {
 	return repository.GetDefaultBranch(), nil
 }
 
-// BranchExists checks if a branch exists in the repository
+// BranchExists checks if a branch exists in the remote repository.
 func (gh *GitHubClient) BranchExists(owner, repo, branch string) (bool, error) {
 	_, _, err := gh.client.Repositories.GetBranch(gh.ctx, owner, repo, branch, 0)
 	if err != nil {
 		var ghErr *github.ErrorResponse
-		if errors.As(err, &ghErr) && ghErr.Response.StatusCode == 404 {
+		if errors.As(err, &ghErr) && ghErr.Response != nil && ghErr.Response.StatusCode == 404 {
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to check branch: %w", err)

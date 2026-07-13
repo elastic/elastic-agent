@@ -4397,7 +4397,7 @@ func (Release) UpdateMergify(version string) error {
 
 // PrepareMajorMinor prepares files for a major/minor release using env vars
 func (Release) PrepareMajorMinor() error {
-	cfg, err := release.LoadReleaseConfigFromEnv()
+	cfg, err := release.LoadConfigFromEnv()
 	if err != nil {
 		return err
 	}
@@ -4406,7 +4406,7 @@ func (Release) PrepareMajorMinor() error {
 
 // CreateBranch creates a release branch with all changes committed
 func (Release) CreateBranch() error {
-	cfg, err := release.LoadReleaseConfigFromEnv()
+	cfg, err := release.LoadConfigFromEnv()
 	if err != nil {
 		return err
 	}
@@ -4415,7 +4415,7 @@ func (Release) CreateBranch() error {
 
 // CreatePR creates a pull request for the release (requires GITHUB_TOKEN)
 func (Release) CreatePR() error {
-	cfg, err := release.LoadReleaseConfigFromEnv()
+	cfg, err := release.LoadConfigFromEnv()
 	if err != nil {
 		return err
 	}
@@ -4431,23 +4431,19 @@ func (Release) CreatePR() error {
 // RunMajorMinor orchestrates the complete major/minor release workflow
 // Set DRY_RUN=true to preview changes without pushing
 func (Release) RunMajorMinor() error {
-	cfg, err := release.LoadReleaseConfigFromEnv()
+	cfg, err := release.LoadConfigFromEnv()
 	if err != nil {
 		return err
 	}
-
-	dryRun := os.Getenv("DRY_RUN") == "true"
-	return release.RunMajorMinorRelease(cfg, dryRun)
+	return release.RunMajorMinorRelease(cfg)
 }
 
 // RunPatch orchestrates the complete patch release workflow
 // Set DRY_RUN=true to preview changes without pushing
 func (Release) RunPatch() error {
-	cfg, err := release.LoadReleaseConfigFromEnv()
+	cfg, err := release.LoadConfigFromEnv()
 	if err != nil {
 		return err
 	}
-
-	dryRun := os.Getenv("DRY_RUN") == "true"
-	return release.RunPatchRelease(cfg, dryRun)
+	return release.RunPatchRelease(cfg)
 }

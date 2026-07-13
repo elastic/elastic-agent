@@ -26,29 +26,19 @@ mage release:runMajorMinor
 
 # Review changes, then run for real
 export DRY_RUN=false
-git checkout main && git pull origin main
 mage release:runMajorMinor
 ```
 
 ### Manual Steps
 
 ```bash
-# 1. Start clean
-git checkout main && git pull origin main
+# 1. Start from a clean working tree (automation checks out main)
+export CURRENT_RELEASE="9.5.0"
 
-# 2. Prepare release files
-mage release:prepareMajorMinor
-
-# 3. Review changes
-git diff
-
-# 4. Create release branch and commit
+# 2. Create release branch from main, update files, and commit
 mage release:createBranch
 
-# 5. Push branch
-git push origin 9.5
-
-# 6. Create pull request
+# 3. Push branch and create pull request
 mage release:createPR
 ```
 

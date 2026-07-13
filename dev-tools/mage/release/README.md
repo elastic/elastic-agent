@@ -1,6 +1,15 @@
 # Elastic Agent Release Automation
 
-This directory contains the mage-based release automation system for elastic-agent. It replaces the previous Makefile-based scripts with pure Go implementations.
+This directory contains the mage-based release automation system for elastic-agent. It follows the same package layout as [elastic/beats](https://github.com/elastic/beats/pull/51831):
+
+| File | Purpose |
+|------|---------|
+| `config.go` | Environment-based `ReleaseConfig` and version inference |
+| `release.go` | File updates (`UpdateVersion`, `UpdateDocs`) |
+| `mergify.go` | `.mergify.yml` backport rule updates |
+| `workflows.go` | Orchestration (`RunMajorMinorRelease`, `RunPatchRelease`) |
+| `git.go` | Git operations (`EnsureBranchFrom`, `CommitAll`, …) |
+| `github.go` | Pull request creation and idempotent reuse |
 
 ## Quick Start
 
@@ -23,13 +32,11 @@ mage release:runPatch
 ### Manual Step-by-Step
 
 ```bash
-# 1. Prepare release files
-mage release:prepareMajorMinor
-
-# 2. Create release branch and commit
+# createBranch checks out main, creates the release branch, updates files, and commits
+export CURRENT_RELEASE="9.5.0"
 mage release:createBranch
 
-# 3. Create pull request on GitHub
+# Push and open the PR
 mage release:createPR
 ```
 
@@ -170,24 +177,15 @@ git diff
 **2. Run for real:**
 
 ```bash
-# Ensure you're on main
-git checkout main
-git pull origin main
-
-# Disable dry run
 export DRY_RUN=false
-
-# Run the complete workflow
 mage release:runMajorMinor
 ```
 
 This will:
-1. Check requirements (git status, etc.)
-2. Update all release files (version, docs, mergify)
-3. Create release branch (e.g., `9.5`)
-4. Commit all changes
-5. Push branch to remote
-6. Create pull request on GitHub
+1. Validate prerequisites (clean working tree)
+2. Check out `main` and create the release branch (e.g., `9.5`) from it
+3. Update all release files (version, docs, mergify)
+4. Commit, push, and create a pull request on GitHub
 
 **Done!** The PR is created and ready for review.
 

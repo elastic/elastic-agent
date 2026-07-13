@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"gopkg.in/yaml.v3"
 )
@@ -453,111 +454,6 @@ func TestUpdateMergifyIdempotent(t *testing.T) {
 	}
 }
 
-func TestLoadReleaseConfigFromEnv(t *testing.T) {
-	// Save original env vars
-	originalVars := map[string]string{
-		"CURRENT_RELEASE": os.Getenv("CURRENT_RELEASE"),
-		"BASE_BRANCH":     os.Getenv("BASE_BRANCH"),
-		"PROJECT_OWNER":   os.Getenv("PROJECT_OWNER"),
-		"PROJECT_REPO":    os.Getenv("PROJECT_REPO"),
-	}
-	defer func() {
-		for key, val := range originalVars {
-			if val == "" {
-				os.Unsetenv(key)
-			} else {
-				os.Setenv(key, val)
-			}
-		}
-	}()
-
-	tests := []struct {
-		name      string
-		envVars   map[string]string
-		wantError bool
-		validate  func(t *testing.T, cfg *ReleaseConfig)
-	}{
-		{
-			name: "valid config with all env vars",
-			envVars: map[string]string{
-				"CURRENT_RELEASE": "9.5.0",
-				"BASE_BRANCH":     "main",
-				"PROJECT_OWNER":   "elastic",
-				"PROJECT_REPO":    "elastic-agent",
-			},
-			wantError: false,
-			validate: func(t *testing.T, cfg *ReleaseConfig) {
-				if cfg.Version != "9.5.0" {
-					t.Errorf("Version = %s, want 9.5.0", cfg.Version)
-				}
-				if cfg.ReleaseBranch != "9.5" {
-					t.Errorf("ReleaseBranch = %s, want 9.5", cfg.ReleaseBranch)
-				}
-				if cfg.BaseBranch != "main" {
-					t.Errorf("BaseBranch = %s, want main", cfg.BaseBranch)
-				}
-			},
-		},
-		{
-			name: "missing version",
-			envVars: map[string]string{
-				"BASE_BRANCH": "main",
-			},
-			wantError: true,
-		},
-		{
-			name: "invalid version format",
-			envVars: map[string]string{
-				"CURRENT_RELEASE": "invalid",
-			},
-			wantError: true,
-		},
-		{
-			name: "defaults applied",
-			envVars: map[string]string{
-				"CURRENT_RELEASE": "9.5.0",
-			},
-			wantError: false,
-			validate: func(t *testing.T, cfg *ReleaseConfig) {
-				if cfg.BaseBranch != "main" {
-					t.Errorf("BaseBranch = %s, want default 'main'", cfg.BaseBranch)
-				}
-				if cfg.Owner != "elastic" {
-					t.Errorf("Owner = %s, want default 'elastic'", cfg.Owner)
-				}
-				if cfg.Repo != "elastic-agent" {
-					t.Errorf("Repo = %s, want default 'elastic-agent'", cfg.Repo)
-				}
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Clear env vars
-			os.Unsetenv("CURRENT_RELEASE")
-			os.Unsetenv("BASE_BRANCH")
-			os.Unsetenv("PROJECT_OWNER")
-			os.Unsetenv("PROJECT_REPO")
-
-			// Set test env vars
-			for key, val := range tt.envVars {
-				os.Setenv(key, val)
-			}
-
-			cfg, err := LoadReleaseConfigFromEnv()
-			if (err != nil) != tt.wantError {
-				t.Errorf("LoadReleaseConfigFromEnv() error = %v, wantError %v", err, tt.wantError)
-				return
-			}
-
-			if !tt.wantError && tt.validate != nil {
-				tt.validate(t, cfg)
-			}
-		})
-	}
-}
-
 func TestPrepareMajorMinorRelease(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -617,13 +513,13 @@ const Agent = defaultBeatVersion
 
 	// Test PrepareMajorMinorRelease
 	cfg := &ReleaseConfig{
-		Version:       "9.5.0",
-		BaseBranch:    "main",
-		ReleaseBranch: "9.5",
-		Owner:         "elastic",
-		Repo:          "elastic-agent",
-		AuthorName:    "Test User",
-		AuthorEmail:   "test@example.com",
+		CurrentRelease: "9.5.0",
+		BaseBranch:     "main",
+		ReleaseBranch:  "9.5",
+		ProjectOwner:   "elastic",
+		ProjectRepo:    "elastic-agent",
+		GitAuthorName:  "Test User",
+		GitAuthorEmail: "test@example.com",
 	}
 
 	err = PrepareMajorMinorRelease(cfg)
@@ -654,27 +550,46 @@ const Agent = defaultBeatVersion
 func TestCreateReleaseBranch(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Initialize a git repository
 	gitRepo, err := git.PlainInit(tmpDir, false)
 	if err != nil {
 		t.Fatalf("failed to init repo: %v", err)
 	}
 
-	// Create an initial commit
 	w, err := gitRepo.Worktree()
 	if err != nil {
 		t.Fatalf("failed to get worktree: %v", err)
 	}
 
-	testFile := filepath.Join(tmpDir, "README.md")
-	err = os.WriteFile(testFile, []byte("# Test"), 0644)
-	if err != nil {
-		t.Fatalf("failed to write file: %v", err)
+	versionDir := filepath.Join(tmpDir, "version")
+	k8sDir := filepath.Join(tmpDir, "deploy", "kubernetes")
+	if err := os.MkdirAll(versionDir, 0755); err != nil {
+		t.Fatalf("failed to create version dir: %v", err)
+	}
+	if err := os.MkdirAll(k8sDir, 0755); err != nil {
+		t.Fatalf("failed to create k8s dir: %v", err)
 	}
 
-	_, err = w.Add("README.md")
-	if err != nil {
-		t.Fatalf("failed to add file: %v", err)
+	files := map[string]string{
+		"README.md": "# Test",
+		filepath.Join("version", "version.go"): `package version
+
+const defaultBeatVersion = "9.4.0"
+`,
+		filepath.Join("deploy", "kubernetes", "elastic-agent-managed-kubernetes.yaml"):    "image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0",
+		filepath.Join("deploy", "kubernetes", "elastic-agent-standalone-kubernetes.yaml"): "image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0",
+		".mergify.yml": "pull_request_rules: []",
+	}
+	for relPath, content := range files {
+		fullPath := filepath.Join(tmpDir, relPath)
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+			t.Fatalf("failed to create dir for %s: %v", relPath, err)
+		}
+		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+			t.Fatalf("failed to write %s: %v", relPath, err)
+		}
+		if _, err := w.Add(relPath); err != nil {
+			t.Fatalf("failed to add %s: %v", relPath, err)
+		}
 	}
 
 	_, err = w.Commit("Initial commit", &git.CommitOptions{
@@ -687,22 +602,27 @@ func TestCreateReleaseBranch(t *testing.T) {
 		t.Fatalf("failed to commit: %v", err)
 	}
 
-	// Test CreateReleaseBranch
-	cfg := &ReleaseConfig{
-		Version:       "9.5.0",
-		BaseBranch:    "main",
-		ReleaseBranch: "9.5",
-		Owner:         "elastic",
-		Repo:          "elastic-agent",
-		AuthorName:    "Test User",
-		AuthorEmail:   "test@example.com",
-	}
-
-	// Create another file to commit
-	changeFile := filepath.Join(tmpDir, "change.txt")
-	err = os.WriteFile(changeFile, []byte("changes"), 0644)
+	headRef, err := gitRepo.Head()
 	if err != nil {
-		t.Fatalf("failed to write change file: %v", err)
+		t.Fatalf("failed to get HEAD: %v", err)
+	}
+	mainRef := plumbing.NewHashReference(plumbing.NewBranchReferenceName("main"), headRef.Hash())
+	if err := gitRepo.Storer.SetReference(mainRef); err != nil {
+		t.Fatalf("failed to create main branch: %v", err)
+	}
+	if err := w.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("main")}); err != nil {
+		t.Fatalf("failed to checkout main: %v", err)
+	}
+	_ = gitRepo.Storer.RemoveReference(plumbing.NewBranchReferenceName("master"))
+
+	cfg := &ReleaseConfig{
+		CurrentRelease: "9.5.0",
+		BaseBranch:     "main",
+		ReleaseBranch:  "9.5",
+		ProjectOwner:   "elastic",
+		ProjectRepo:    "elastic-agent",
+		GitAuthorName:  "Test User",
+		GitAuthorEmail: "test@example.com",
 	}
 
 	err = CreateReleaseBranch(cfg, tmpDir)
@@ -711,7 +631,6 @@ func TestCreateReleaseBranch(t *testing.T) {
 		return
 	}
 
-	// Verify the branch was created
 	repo, err := OpenRepo(tmpDir)
 	if err != nil {
 		t.Fatalf("failed to open repo: %v", err)
@@ -722,7 +641,6 @@ func TestCreateReleaseBranch(t *testing.T) {
 		t.Errorf("GetCurrentBranch() error = %v", err)
 		return
 	}
-
 	if currentBranch != cfg.ReleaseBranch {
 		t.Errorf("CreateReleaseBranch() branch = %s, want %s", currentBranch, cfg.ReleaseBranch)
 	}
