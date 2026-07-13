@@ -174,16 +174,14 @@ func (v *gracePeriodValue) Set(d time.Duration) {
 	v.d.Store(int64(d))
 }
 
-// ManagerOption is an optional setting applied by NewManager.
-type ManagerOption func(*Manager)
-
-// WithServiceCheckinGracePeriod sets the configured upgrade watcher grace
+// SetServiceCheckinGracePeriod sets the configured upgrade watcher grace
 // period, so service-runtime components can cap their failure window to a
-// safe margin below it. Omit this option (or pass zero) to disable the cap.
-func WithServiceCheckinGracePeriod(d time.Duration) ManagerOption {
-	return func(m *Manager) {
-		m.serviceCheckinGracePeriod.Set(d)
-	}
+// safe margin below it. Safe to call at any point in Manager's lifetime
+// (e.g. right after NewManager, or later from a config reload) since the
+// value is shared live with every service-runtime component. Zero disables
+// the cap.
+func (m *Manager) SetServiceCheckinGracePeriod(d time.Duration) {
+	m.serviceCheckinGracePeriod.Set(d)
 }
 
 // NewManager creates a new manager.
@@ -194,7 +192,6 @@ func NewManager(
 	tracer *apm.Tracer,
 	monitor MonitoringManager,
 	grpcConfig *configuration.GRPCConfig,
-	opts ...ManagerOption,
 ) (*Manager, error) {
 	ca, err := authority.NewCA()
 	if err != nil {
@@ -230,9 +227,6 @@ func NewManager(
 		serviceCheckinGracePeriod: newGracePeriodValue(0),
 		serverReady:               make(chan struct{}),
 		doneChan:                  make(chan struct{}),
-	}
-	for _, opt := range opts {
-		opt(m)
 	}
 	return m, nil
 }

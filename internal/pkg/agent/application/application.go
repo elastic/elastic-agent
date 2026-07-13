@@ -120,10 +120,6 @@ func New(
 		log,
 	)
 
-	var managerOpts []runtime.ManagerOption
-	if cfg.Settings.Upgrade != nil && cfg.Settings.Upgrade.Watcher != nil {
-		managerOpts = append(managerOpts, runtime.WithServiceCheckinGracePeriod(cfg.Settings.Upgrade.Watcher.GracePeriod))
-	}
 	runtime, err := runtime.NewManager(
 		log,
 		baseLogger,
@@ -131,11 +127,11 @@ func New(
 		tracer,
 		monitor,
 		cfg.Settings.GRPC,
-		managerOpts...,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
+	runtime.SetServiceCheckinGracePeriod(cfg.Settings.Upgrade.Watcher.GracePeriod)
 
 	// prepare initialUpgradeDetails for injecting it in coordinator later on
 	var initialUpgradeDetails *details.Details
