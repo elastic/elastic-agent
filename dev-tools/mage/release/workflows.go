@@ -12,7 +12,7 @@ import (
 	"github.com/google/go-github/v68/github"
 )
 
-var releasePRLabels = []string{"release", "Team:Automation", "skip-changelog"}
+var releasePRLabels = []string{"backport-skip", "skip-changelog"}
 
 func checkRequirements(cfg *ReleaseConfig) error {
 	parts := strings.Split(cfg.CurrentRelease, ".")
