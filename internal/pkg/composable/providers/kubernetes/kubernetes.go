@@ -30,10 +30,6 @@ const (
 
 const nodeScope = "node"
 
-func init() {
-	composable.Providers.MustAddDynamicProvider("kubernetes", DynamicProviderBuilder)
-}
-
 type dynamicProvider struct {
 	logger  *logger.Logger
 	config  *Config

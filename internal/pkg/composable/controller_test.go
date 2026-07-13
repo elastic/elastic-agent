@@ -17,17 +17,21 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/env"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/host"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/local"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-
-	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/env"
-	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/host"
-	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/local"
-	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
 )
 
 func TestController(t *testing.T) {
+	composable.Providers.MustAddContextProvider("env", env.ContextProviderBuilder)
+	composable.Providers.MustAddContextProvider("host", host.ContextProviderBuilder)
+	composable.Providers.MustAddContextProvider("local", local.ContextProviderBuilder)
+	composable.Providers.MustAddDynamicProvider("local_dynamic", localdynamic.DynamicProviderBuilder)
+
 	cfg, err := config.NewConfigFrom(map[string]interface{}{
 		"providers": map[string]interface{}{
 			"env": map[string]interface{}{

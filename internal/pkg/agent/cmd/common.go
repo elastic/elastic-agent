@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/basecmd"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/include"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -30,6 +31,9 @@ func NewCommand() *cobra.Command {
 
 // NewCommandWithArgs returns a new agent with the flags and the subcommand.
 func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
+	// register the composable providers
+	include.Providers()
+
 	cmd := &cobra.Command{
 		Use: "elastic-agent [subcommand]",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
