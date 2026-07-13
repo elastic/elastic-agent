@@ -191,14 +191,6 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 	var results map[string]common.OSRunnerResult
 	switch r.ip.Type() {
 	case common.ProvisionerTypeVM:
-		// prepare an SSH key and repo archive to reach the instances
-		prepareCtx, prepareCancel := context.WithTimeout(ctx, 10*time.Minute)
-		sshAuth, repoArchive, prepareErr := r.prepare(prepareCtx, cacheDir)
-		prepareCancel()
-		if prepareErr != nil {
-			return Result{}, prepareErr
-		}
-
 		// use SSH to perform all the required work on the instances
 		results, err = r.runInstances(ctx, sshAuth, repoArchive, instances)
 		if err != nil {
