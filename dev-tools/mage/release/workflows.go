@@ -101,7 +101,7 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	return nil
 }
 
-// RunPatchRelease updates version and docs on the release branch.
+// RunPatchRelease creates a feature branch from the release branch and opens a PR with version/doc updates.
 func RunPatchRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Patch Release Workflow ===")
 
@@ -122,8 +122,12 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 		releaseBranch = inferReleaseBranch(cfg.CurrentRelease)
 	}
 
+	patchBranch := patchDocsBranchName(cfg.CurrentRelease)
+
 	fmt.Printf("Using release branch: %s\n", releaseBranch)
-	if err := repo.EnsureBranch(releaseBranch); err != nil {
+	fmt.Println("--- Creating PR: Version and docs ---")
+	fmt.Printf("Creating branch: %s from %s\n", patchBranch, releaseBranch)
+	if err := repo.EnsureBranchFrom(releaseBranch, patchBranch); err != nil {
 		return err
 	}
 
@@ -141,8 +145,8 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 	}
 
 	if cfg.DryRun {
-		fmt.Println("\nDRY RUN: Skipping push")
-		fmt.Printf("Branch prepared: %s\n", releaseBranch)
+		fmt.Println("\nDRY RUN: Skipping push and PR creation")
+		fmt.Printf("Branch prepared: %s\n", patchBranch)
 		if committed {
 			fmt.Println("Review changes with 'git diff'")
 		}
@@ -150,18 +154,44 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 	}
 
 	if !committed {
-		fmt.Println("No changes to push")
-		return nil
+		fmt.Printf("No new changes on %s; checking for existing PR\n", patchBranch)
 	}
 
-	if err := repo.Push("origin"); err != nil {
+	prOpts := PROptions{
+		Owner:     cfg.ProjectOwner,
+		Repo:      cfg.ProjectRepo,
+		Title:     fmt.Sprintf("docs: update docs versions %s", cfg.CurrentRelease),
+		Head:      patchBranch,
+		Base:      releaseBranch,
+		Body:      patchReleasePRBody(cfg.CurrentRelease),
+		Reviewers: cfg.ProjectReviewers,
+		Labels:    releasePRLabels,
+	}
+
+	pr, err := finalizePR(repo, NewGitHubClient(cfg.GitHubToken), patchBranch, releaseBranch, prOpts)
+	if err != nil {
 		return err
 	}
 
 	fmt.Printf("\n=== Patch Release Workflow Complete ===\n")
-	fmt.Printf("Changes pushed to branch %s\n", releaseBranch)
+	if pr != nil {
+		fmt.Printf("PR: %s\n", pr.GetHTMLURL())
+	} else {
+		fmt.Println("No PR created (release already up to date)")
+	}
 
 	return nil
+}
+
+func patchDocsBranchName(version string) string {
+	return fmt.Sprintf("update-docs-version-%s", version)
+}
+
+func patchReleasePRBody(version string) string {
+	return fmt.Sprintf(`Updates docs versions to %s.
+
+Merge before the final Release build.
+`, version)
 }
 
 // CreateReleaseBranch creates the release branch from main and commits prepared changes.

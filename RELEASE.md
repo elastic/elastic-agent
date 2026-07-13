@@ -49,10 +49,9 @@ mage release:createPR
 ```bash
 # Dry run first
 export CURRENT_RELEASE="9.4.1"
-export BASE_BRANCH="9.4"
+export RELEASE_BRANCH="9.4"
 export GITHUB_TOKEN="ghp_..."
 export DRY_RUN=true
-git checkout 9.4 && git pull origin 9.4
 mage release:runPatch
 
 # Review changes, then run for real
@@ -60,22 +59,27 @@ export DRY_RUN=false
 mage release:runPatch
 ```
 
+Creates branch `update-docs-version-9.4.1` and opens a PR into `9.4`.
+
 ### Manual Steps
 
 ```bash
-# 1. Checkout release branch
+# 1. Create feature branch from release branch
 export CURRENT_RELEASE="9.4.1"
-export BASE_BRANCH="9.4"
-git checkout 9.4 && git pull origin 9.4
+export RELEASE_BRANCH="9.4"
+git fetch origin 9.4
+git checkout -b update-docs-version-9.4.1 origin/9.4
 
 # 2. Update files
 mage release:updateVersion 9.4.1
 mage release:updateDocs 9.4.1
 
-# 3. Commit and push
+# 3. Commit, push, and open PR
 git add -A
 git commit -m "[Release] Prepare patch release 9.4.1"
-git push origin 9.4
+git push -u origin update-docs-version-9.4.1
+gh pr create --base 9.4 --head update-docs-version-9.4.1 \
+  --title "docs: update docs versions 9.4.1"
 ```
 
 ## Individual Commands

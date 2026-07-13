@@ -23,9 +23,9 @@ export GITHUB_TOKEN="ghp_your_token_here"
 # Run the complete major/minor release workflow
 mage release:runMajorMinor
 
-# Or for patch releases (from release branch)
+# Or for patch releases (creates update-docs-version-<version> PR into the release branch)
 export CURRENT_RELEASE="9.4.1"
-export BASE_BRANCH="9.4"
+export RELEASE_BRANCH="9.4"
 mage release:runPatch
 ```
 
@@ -275,15 +275,11 @@ This creates a PR from `9.5` → `main` with:
 
 ```bash
 export CURRENT_RELEASE="9.4.1"
-export BASE_BRANCH="9.4"
+export RELEASE_BRANCH="9.4"
 export GITHUB_TOKEN="ghp_your_token_here"
 export DRY_RUN=true
 
-# Checkout the release branch
-git checkout 9.4
-git pull origin 9.4
-
-# Test the workflow
+# Test the workflow (creates update-docs-version-9.4.1 locally from 9.4)
 mage release:runPatch
 
 # Review changes
@@ -302,37 +298,42 @@ mage release:runPatch
 
 This will:
 1. Check requirements
-2. Verify you're on the release branch
-3. Update version files
+2. Create branch `update-docs-version-9.4.1` from the release branch
+3. Update version and docs files
 4. Commit changes
-5. Push to remote
+5. Push the branch and open a PR targeting the release branch
 
-**Done!** Changes are pushed to the release branch.
+**Done!** Review and merge the PR on release day.
 
 ---
 
 #### Manual Workflow
 
-For patch releases, the manual process targets the existing release branch:
+For patch releases, the manual process creates a feature branch and opens a PR into the release branch:
 
 ```bash
 # Set the patch version
 export CURRENT_RELEASE="9.4.1"
-export BASE_BRANCH="9.4"  # Target the release branch
+export RELEASE_BRANCH="9.4"
 export GITHUB_TOKEN="ghp_..."
 
-# Checkout the release branch
-git checkout 9.4
-git pull origin 9.4
+# Create the feature branch from the release branch
+git fetch origin 9.4
+git checkout -b update-docs-version-9.4.1 origin/9.4
 
 # Prepare files
 mage release:updateVersion 9.4.1
 mage release:updateDocs 9.4.1
 
-# Commit and push
+# Commit, push, and open a PR
 git add -A
 git commit -m "[Release] Prepare patch release 9.4.1"
-git push origin 9.4
+git push -u origin update-docs-version-9.4.1
+gh pr create --base 9.4 --head update-docs-version-9.4.1 \
+  --title "docs: update docs versions 9.4.1" \
+  --body "Updates docs versions to 9.4.1.
+
+Merge before the final Release build."
 ```
 
 ## Local Development & Testing
@@ -677,7 +678,7 @@ A: No, everything runs in pure Go.
 A: Before pushing, you can reset with `git reset --hard origin/main`. After pushing, you can delete the branch and start over.
 
 **Q: Can I use this for patch releases?**
-A: Yes, set `BASE_BRANCH` to the release branch (e.g., `9.4`) and run the same commands.
+A: Yes, set `CURRENT_RELEASE` to the patch version (e.g., `9.4.1`). The workflow infers `RELEASE_BRANCH` as `9.4` and opens a PR from `update-docs-version-9.4.1` into that branch.
 
 **Q: How do I test without affecting production?**
 A: Use a fork by setting `PROJECT_OWNER` to your GitHub username.

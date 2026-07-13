@@ -547,6 +547,34 @@ const Agent = defaultBeatVersion
 	}
 }
 
+func TestPatchDocsBranchName(t *testing.T) {
+	tests := []struct {
+		version string
+		want    string
+	}{
+		{version: "9.7.1", want: "update-docs-version-9.7.1"},
+		{version: "9.4.0", want: "update-docs-version-9.4.0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.version, func(t *testing.T) {
+			if got := patchDocsBranchName(tt.version); got != tt.want {
+				t.Errorf("patchDocsBranchName(%q) = %q, want %q", tt.version, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPatchReleasePRBody(t *testing.T) {
+	body := patchReleasePRBody("9.7.1")
+	if !strings.Contains(body, "9.7.1") {
+		t.Errorf("patchReleasePRBody() = %q, want to contain version", body)
+	}
+	if !strings.Contains(body, "Merge before the final Release build") {
+		t.Errorf("patchReleasePRBody() = %q, want merge guidance", body)
+	}
+}
+
 func TestCreateReleaseBranch(t *testing.T) {
 	tmpDir := t.TempDir()
 
