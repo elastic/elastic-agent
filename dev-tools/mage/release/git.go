@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -126,12 +127,27 @@ func (g *GitRepo) EnsureBranch(branchName string) error {
 	return g.CheckoutBranch(branchName)
 }
 
+// SyncSubmodules aligns submodule working trees with the commits recorded at HEAD.
+func (g *GitRepo) SyncSubmodules() error {
+	cmd := exec.Command("git", "submodule", "update", "--init", "--recursive", "--force")
+	cmd.Dir = g.path
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to sync submodules: %w: %s", err, string(output))
+	}
+	return nil
+}
+
 // CheckoutBranch checks out an existing branch.
 func (g *GitRepo) CheckoutBranch(branchName string) error {
 	currentBranch, err := g.GetCurrentBranch()
 	if err == nil && currentBranch == branchName {
 		fmt.Printf("Already on branch: %s\n", branchName)
-		return nil
+		return g.SyncSubmodules()
+	}
+
+	if err := g.SyncSubmodules(); err != nil {
+		return err
 	}
 
 	w, err := g.repo.Worktree()
@@ -144,6 +160,10 @@ func (g *GitRepo) CheckoutBranch(branchName string) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
+	}
+
+	if err := g.SyncSubmodules(); err != nil {
+		return fmt.Errorf("failed to sync submodules after checking out %s: %w", branchName, err)
 	}
 
 	fmt.Printf("Checked out branch: %s\n", branchName)

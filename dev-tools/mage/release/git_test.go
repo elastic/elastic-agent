@@ -6,7 +6,9 @@ package release
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-git/go-git/v5"
@@ -66,6 +68,106 @@ func createTestRepo(t *testing.T) (*GitRepo, string) {
 
 	gitRepo := &GitRepo{repo: repo, path: tmpDir}
 	return gitRepo, tmpDir
+}
+
+func runGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+
+	gitArgs := append([]string{"-c", "protocol.file.allow=always"}, args...)
+	cmd := exec.Command("git", gitArgs...)
+	cmd.Dir = dir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v in %s failed: %v\n%s", args, dir, err, string(output))
+	}
+	return string(output)
+}
+
+func createRepoWithSubmodule(t *testing.T) (*GitRepo, string, plumbing.Hash, plumbing.Hash) {
+	t.Helper()
+
+	rootDir := t.TempDir()
+	submoduleDir := filepath.Join(rootDir, "submodule")
+	parentDir := filepath.Join(rootDir, "parent")
+
+	if err := os.Mkdir(submoduleDir, 0755); err != nil {
+		t.Fatalf("failed to create submodule dir: %v", err)
+	}
+	if err := os.Mkdir(parentDir, 0755); err != nil {
+		t.Fatalf("failed to create parent dir: %v", err)
+	}
+
+	runGit(t, submoduleDir, "init")
+	runGit(t, submoduleDir, "config", "user.email", "test@example.com")
+	runGit(t, submoduleDir, "config", "user.name", "Test User")
+	if err := os.WriteFile(filepath.Join(submoduleDir, "README.md"), []byte("v1"), 0644); err != nil {
+		t.Fatalf("failed to write submodule file: %v", err)
+	}
+	runGit(t, submoduleDir, "add", "README.md")
+	runGit(t, submoduleDir, "commit", "-m", "submodule v1")
+	firstCommit := strings.TrimSpace(runGit(t, submoduleDir, "rev-parse", "HEAD"))
+
+	if err := os.WriteFile(filepath.Join(submoduleDir, "README.md"), []byte("v2"), 0644); err != nil {
+		t.Fatalf("failed to update submodule file: %v", err)
+	}
+	runGit(t, submoduleDir, "add", "README.md")
+	runGit(t, submoduleDir, "commit", "-m", "submodule v2")
+	secondCommit := strings.TrimSpace(runGit(t, submoduleDir, "rev-parse", "HEAD"))
+
+	runGit(t, parentDir, "init")
+	runGit(t, parentDir, "config", "user.email", "test@example.com")
+	runGit(t, parentDir, "config", "user.name", "Test User")
+	runGit(t, parentDir, "submodule", "add", submoduleDir, "beats")
+	runGit(t, parentDir, "commit", "-m", "pin submodule to v2")
+	runGit(t, parentDir, "branch", "-M", "main")
+
+	gitRepo, err := OpenRepo(parentDir)
+	if err != nil {
+		t.Fatalf("OpenRepo() error = %v", err)
+	}
+
+	firstHash := plumbing.NewHash(firstCommit)
+	secondHash := plumbing.NewHash(secondCommit)
+	return gitRepo, parentDir, secondHash, firstHash
+}
+
+func TestSyncSubmodulesNoSubmodules(t *testing.T) {
+	gitRepo, _ := createTestRepo(t)
+
+	if err := gitRepo.SyncSubmodules(); err != nil {
+		t.Fatalf("SyncSubmodules() error = %v", err)
+	}
+}
+
+func gitStatusPorcelain(t *testing.T, dir string) string {
+	t.Helper()
+	return strings.TrimSpace(runGit(t, dir, "status", "--porcelain"))
+}
+
+func TestCheckoutBranchResetsDirtySubmodule(t *testing.T) {
+	gitRepo, parentDir, pinnedCommit, otherCommit := createRepoWithSubmodule(t)
+
+	runGit(t, filepath.Join(parentDir, "beats"), "checkout", otherCommit.String())
+
+	if gitStatusPorcelain(t, parentDir) == "" {
+		t.Fatal("test setup invalid: submodule should be dirty before checkout")
+	}
+
+	if err := gitRepo.CreateBranch("9.7"); err != nil {
+		t.Fatalf("CreateBranch() error = %v", err)
+	}
+	if err := gitRepo.CheckoutBranch("9.7"); err != nil {
+		t.Fatalf("CheckoutBranch() error = %v", err)
+	}
+
+	if gitStatusPorcelain(t, parentDir) != "" {
+		t.Fatalf("CheckoutBranch() should leave a clean worktree, got status:\n%s", gitStatusPorcelain(t, parentDir))
+	}
+
+	currentSubmoduleCommit := strings.TrimSpace(runGit(t, filepath.Join(parentDir, "beats"), "rev-parse", "HEAD"))
+	if currentSubmoduleCommit != pinnedCommit.String() {
+		t.Fatalf("submodule commit = %s, want %s", currentSubmoduleCommit, pinnedCommit.String())
+	}
 }
 
 func TestOpenRepo(t *testing.T) {
