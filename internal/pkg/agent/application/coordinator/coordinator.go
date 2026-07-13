@@ -147,6 +147,9 @@ type RuntimeManager interface {
 	// Update updates the current components model.
 	Update(model component.Model)
 
+	// Reload reloads the configuration for the runtime manager.
+	Reload(rawConfig *config.Config) error
+
 	// PerformAction executes an action on a unit.
 	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
 
@@ -1864,10 +1867,8 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 		}
 	}
 
-	// RuntimeManager doesn't declare Reload itself: not every RuntimeManager
-	// (e.g. test fakes) needs to react to config changes, only the real one.
-	if rm, ok := c.runtimeMgr.(*runtime.Manager); ok {
-		if err := rm.Reload(cfg); err != nil {
+	if c.runtimeMgr != nil {
+		if err := c.runtimeMgr.Reload(cfg); err != nil {
 			return fmt.Errorf("failed to reload runtime manager configuration: %w", err)
 		}
 	}

@@ -2079,6 +2079,8 @@ func (r *fakeRuntimeManager) Run(ctx context.Context) error {
 
 func (r *fakeRuntimeManager) Errors() <-chan error { return nil }
 
+func (r *fakeRuntimeManager) Reload(rawConfig *config.Config) error { return nil }
+
 func (r *fakeRuntimeManager) Update(model component.Model) {
 	r.result = nil
 	if r.updateCallback != nil {
