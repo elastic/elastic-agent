@@ -85,6 +85,11 @@ jobs:
             - **Source core-components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/internal/pkg/otel/core-components.yaml
             - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ steps.get_version.outputs.version }}
             
+<<<<<<< HEAD
+=======
+            cc @elastic/ski-docs
+            
+>>>>>>> dab417937 (docs: update generated docs owner (#15484))
             This is an automated PR created by the documentation update workflow.
           branch: update-docs-${{ steps.get_version.outputs.version }}
           base: main
