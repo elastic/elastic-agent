@@ -143,8 +143,8 @@ func updateKustomizeManifest(content, newVersion string) string {
 }
 
 func updateChartYAML(content, newVersion, snapshot string) string {
-	content = regexp.MustCompile(`(?m)^appVersion: ` + semverCore).ReplaceAllString(content, "appVersion: "+newVersion)
-	content = regexp.MustCompile(`(?m)^version: ` + semverCore + `(?:-SNAPSHOT)?`).ReplaceAllString(content, "version: "+snapshot)
+	content = regexp.MustCompile(`(?m)^appVersion: `+semverCore).ReplaceAllString(content, "appVersion: "+newVersion)
+	content = regexp.MustCompile(`(?m)^version: `+semverCore+`(?:-SNAPSHOT)?`).ReplaceAllString(content, "version: "+snapshot)
 	return content
 }
 

@@ -107,7 +107,7 @@ func TestUpdateDocsCoversReleaseFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	files := map[string]string{
-		"deploy/kubernetes/elastic-agent-managed-kubernetes.yaml": "image: docker.elastic.co/elastic-agent/elastic-agent:9.5.0",
+		"deploy/kubernetes/elastic-agent-managed-kubernetes.yaml":    "image: docker.elastic.co/elastic-agent/elastic-agent:9.5.0",
 		"deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml": "image: docker.elastic.co/elastic-agent/elastic-agent:9.5.0",
 		"deploy/helm/elastic-agent/Chart.yaml": `appVersion: 9.5.0
 version: 9.5.0-SNAPSHOT
@@ -125,7 +125,7 @@ version: 9.5.0-SNAPSHOT
 helm.sh/chart: elastic-agent-9.5.0-SNAPSHOT
 `,
 		"deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-managed/base/elastic-agent-managed-daemonset.yaml": "image: docker.elastic.co/elastic-agent/elastic-agent:9.5.0",
-		"testing/integration/k8s/testdata/elastic-agent-kustomize.yaml": "image: docker.elastic.co/elastic-agent/elastic-agent:9.5.0",
+		"testing/integration/k8s/testdata/elastic-agent-kustomize.yaml":                                                     "image: docker.elastic.co/elastic-agent/elastic-agent:9.5.0",
 	}
 
 	for relPath, content := range files {
