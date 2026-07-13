@@ -74,7 +74,7 @@ func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 
 	gitArgs := append([]string{"-c", "protocol.file.allow=always"}, args...)
-	cmd := exec.Command("git", gitArgs...)
+	cmd := exec.CommandContext(t.Context(), "git", gitArgs...)
 	cmd.Dir = dir
 	output, err := cmd.CombinedOutput()
 	if err != nil {

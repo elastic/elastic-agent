@@ -5,6 +5,7 @@
 package release
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -129,7 +130,7 @@ func (g *GitRepo) EnsureBranch(branchName string) error {
 
 // SyncSubmodules aligns submodule working trees with the commits recorded at HEAD.
 func (g *GitRepo) SyncSubmodules() error {
-	cmd := exec.Command("git", "submodule", "update", "--init", "--recursive", "--force")
+	cmd := exec.CommandContext(context.Background(), "git", "submodule", "update", "--init", "--recursive", "--force")
 	cmd.Dir = g.path
 	output, err := cmd.CombinedOutput()
 	if err != nil {
