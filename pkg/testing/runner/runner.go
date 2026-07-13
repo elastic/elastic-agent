@@ -149,6 +149,19 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 		return Result{}, err
 	}
 
+	// VM provisioners need an SSH key in place before Provision runs, since
+	// they use it to seed the instances they create.
+	var sshAuth ssh.AuthMethod
+	var repoArchive string
+	if r.ip.Type() == common.ProvisionerTypeVM {
+		prepareCtx, prepareCancel := context.WithTimeout(ctx, 10*time.Minute)
+		sshAuth, repoArchive, err = r.prepare(prepareCtx, cacheDir)
+		prepareCancel()
+		if err != nil {
+			return Result{}, err
+		}
+	}
+
 	// only send to the provisioner the batches that need to be created
 	var instances []StateInstance
 	var batches []common.OSBatch
