@@ -21,6 +21,9 @@ if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
     echo "+++ Running in PR and setting branch main and --dry-run"
 fi
 
+# XXX: Temp for testing IAR Staging workflow end-to-end
+BRANCH="9.4"
+
 if [[ -z "${WORKFLOW}" ]]; then
   echo "+++ Missing DRA workflow";
   exit 1
