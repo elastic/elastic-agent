@@ -93,8 +93,8 @@ jobs:
             - **Source components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/internal/edot/components.yaml
             - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ steps.get_version.outputs.version }}
             
-            cc @elastic/ingest-docs
-            
+            cc @elastic/ski-docs
+
             This is an automated PR created by the documentation update workflow.
           branch: update-docs-${{ steps.get_version.outputs.version }}
           base: main
