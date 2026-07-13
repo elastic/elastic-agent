@@ -113,7 +113,7 @@ type Manager struct {
 	// serviceCheckinGracePeriod is the configured upgrade watcher grace
 	// period. Service-runtime components cap their failure window against
 	// it so a truly failed component is still caught before the watcher
-	// gives up. Updated live by Reload; zero means no cap.
+	// gives up. Zero means no cap.
 	serviceCheckinGracePeriod *gracePeriodValue
 
 	// Set when the RPC server is ready to receive requests, for use by tests.
