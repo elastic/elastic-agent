@@ -305,7 +305,7 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	t.Logf("mock binary path: %s\n", endpoint.InputSpec.BinaryPath)
 
 	// Create new service runtime with component
-	service, err := newServiceRuntime(endpoint, log, true)
+	service, err := newServiceRuntime(endpoint, log, true, nil)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -406,7 +406,7 @@ func TestServiceStartRetry(t *testing.T) {
 	t.Logf("mock binary path: %s\n", endpoint.InputSpec.BinaryPath)
 
 	// Create new service runtime with component
-	service, err := newServiceRuntime(endpoint, log, true)
+	service, err := newServiceRuntime(endpoint, log, true, nil)
 	require.NoError(t, err)
 
 	// Shorten service restart delay for testing
@@ -455,6 +455,10 @@ func TestServiceStartRetry(t *testing.T) {
 }
 
 func makeServiceForCheckStatus(t *testing.T, installTimeout, uninstallTimeout, checkTimeout time.Duration) *serviceRuntime {
+	return makeServiceForCheckStatusWithGracePeriod(t, installTimeout, uninstallTimeout, checkTimeout, 0)
+}
+
+func makeServiceForCheckStatusWithGracePeriod(t *testing.T, installTimeout, uninstallTimeout, checkTimeout, checkinGracePeriod time.Duration) *serviceRuntime {
 	log, _ := loggertest.New("test")
 	endpoint := makeEndpointComponent(t, map[string]interface{}{})
 	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
@@ -467,7 +471,7 @@ func makeServiceForCheckStatus(t *testing.T, installTimeout, uninstallTimeout, c
 		},
 	}
 
-	service, err := newServiceRuntime(endpoint, log, true)
+	service, err := newServiceRuntime(endpoint, log, true, newGracePeriodValue(checkinGracePeriod))
 	require.NoError(t, err)
 	// simulate the service already being up and running
 	service.state.State = client.UnitStateHealthy
@@ -497,6 +501,59 @@ func TestServiceCheckinFailureTimeout(t *testing.T) {
 	noTimeouts := makeServiceForCheckStatus(t, 0, 0, 0)
 	require.Equal(t, time.Duration(0), noTimeouts.checkinFailureTimeout())
 	require.Equal(t, maxCheckinMisses, noTimeouts.maxCheckinMisses(30*time.Second))
+}
+
+func TestServiceMaxCheckinMissesGracePeriodCap(t *testing.T) {
+	const checkinPeriod = 30 * time.Second
+
+	t.Run("grace period well above the spec timeout does not change anything", func(t *testing.T) {
+		service := makeServiceForCheckStatusWithGracePeriod(t, 600*time.Second, 600*time.Second, 60*time.Second, 30*time.Minute)
+		require.Equal(t, 20, service.maxCheckinMisses(checkinPeriod))
+	})
+
+	t.Run("grace period matching the spec timeout caps to 3 ticks of margin", func(t *testing.T) {
+		// matches today's real Defend timeout (600s) vs default upgrade watcher grace period (600s)
+		service := makeServiceForCheckStatusWithGracePeriod(t, 600*time.Second, 600*time.Second, 60*time.Second, 600*time.Second)
+		require.Equal(t, 17, service.maxCheckinMisses(checkinPeriod))
+	})
+
+	t.Run("small grace period falls back to the generic default instead of going negative", func(t *testing.T) {
+		service := makeServiceForCheckStatusWithGracePeriod(t, 600*time.Second, 600*time.Second, 60*time.Second, 60*time.Second)
+		require.Equal(t, maxCheckinMisses, service.maxCheckinMisses(checkinPeriod))
+	})
+
+	t.Run("no grace period configured means no cap", func(t *testing.T) {
+		service := makeServiceForCheckStatusWithGracePeriod(t, 600*time.Second, 600*time.Second, 60*time.Second, 0)
+		require.Equal(t, 20, service.maxCheckinMisses(checkinPeriod))
+	})
+}
+
+// TestServiceMaxCheckinMissesGracePeriodLiveUpdate verifies that changing the
+// shared grace period (e.g. via Manager.Reload on a config change) is
+// reflected immediately by an already-constructed serviceRuntime, instead of
+// staying pinned to the value it was constructed with.
+func TestServiceMaxCheckinMissesGracePeriodLiveUpdate(t *testing.T) {
+	const checkinPeriod = 30 * time.Second
+
+	gracePeriod := newGracePeriodValue(600 * time.Second)
+	log, _ := loggertest.New("test")
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9999,
+		CSocket: ".test.sock",
+		Operations: component.ServiceOperationsSpec{
+			Install:   &component.ServiceOperationsCommandSpec{Timeout: 600 * time.Second},
+			Uninstall: &component.ServiceOperationsCommandSpec{Timeout: 600 * time.Second},
+		},
+	}
+	service, err := newServiceRuntime(endpoint, log, true, gracePeriod)
+	require.NoError(t, err)
+	require.Equal(t, 17, service.maxCheckinMisses(checkinPeriod))
+
+	// simulate a config reload lowering the grace period, without recreating
+	// the serviceRuntime
+	gracePeriod.Set(60 * time.Second)
+	require.Equal(t, maxCheckinMisses, service.maxCheckinMisses(checkinPeriod))
 }
 
 func TestServiceCheckStatus(t *testing.T) {

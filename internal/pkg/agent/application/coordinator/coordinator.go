@@ -1864,6 +1864,14 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 		}
 	}
 
+	// RuntimeManager doesn't declare Reload itself: not every RuntimeManager
+	// (e.g. test fakes) needs to react to config changes, only the real one.
+	if rm, ok := c.runtimeMgr.(*runtime.Manager); ok {
+		if err := rm.Reload(cfg); err != nil {
+			return fmt.Errorf("failed to reload runtime manager configuration: %w", err)
+		}
+	}
+
 	c.ast = rawAst
 	return nil
 }

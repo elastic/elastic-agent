@@ -22,7 +22,8 @@ description: |
   Elastic Defend restarting slowly after an upgrade could be mistaken for a
   broken Agent build and trigger an unnecessary rollback. Agent now gives
   service-managed components more time to check in before treating them as
-  failed.
+  failed, while keeping a safe margin below the upgrade watcher's grace
+  period so a truly failed component is still caught.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:

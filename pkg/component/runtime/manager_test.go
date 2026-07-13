@@ -17,9 +17,39 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
+
+func TestManagerReload(t *testing.T) {
+	m, err := NewManager(
+		newDebugLogger(t),
+		newDebugLogger(t),
+		&info.AgentInfo{},
+		apmtest.DiscardTracer,
+		newTestMonitoringMgr(),
+		testGrpcConfig())
+	require.NoError(t, err)
+	require.Equal(t, time.Duration(0), m.serviceCheckinGracePeriod.Get())
+
+	cfg := config.MustNewConfigFrom(map[string]interface{}{
+		"agent": map[string]interface{}{
+			"upgrade": map[string]interface{}{
+				"watcher": map[string]interface{}{
+					"grace_period": "15m",
+				},
+			},
+		},
+	})
+	require.NoError(t, m.Reload(cfg))
+	require.Equal(t, 15*time.Minute, m.serviceCheckinGracePeriod.Get())
+
+	// a reload that omits the section keeps the default, matching
+	// configuration.NewFromConfig's default-then-unpack behavior
+	require.NoError(t, m.Reload(config.MustNewConfigFrom(map[string]interface{}{})))
+	require.Equal(t, 10*time.Minute, m.serviceCheckinGracePeriod.Get())
+}
 
 func TestManager_SimpleComponentErr(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())

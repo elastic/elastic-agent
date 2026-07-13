@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -32,6 +33,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
@@ -108,6 +110,14 @@ type Manager struct {
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
 
+	// serviceCheckinGracePeriod holds the configured upgrade watcher grace
+	// period. Service-runtime components use it to cap how long they wait
+	// before being marked FAILED, so a truly failed component is still
+	// caught before the watcher gives up. It is shared (not copied) with
+	// every service-runtime component so Reload updates already-running
+	// components too, not just ones created afterward. Zero means no cap.
+	serviceCheckinGracePeriod *gracePeriodValue
+
 	// Set when the RPC server is ready to receive requests, for use by tests.
 	serverReady chan struct{}
 
@@ -137,6 +147,45 @@ type Manager struct {
 	doneChan chan struct{}
 }
 
+// gracePeriodValue is a concurrency-safe time.Duration holder shared between
+// Manager and every service-runtime component it creates, so calling Set
+// (e.g. from Manager.Reload) is immediately visible to already-running
+// components, not just ones created afterward.
+type gracePeriodValue struct {
+	d atomic.Int64
+}
+
+func newGracePeriodValue(d time.Duration) *gracePeriodValue {
+	v := &gracePeriodValue{}
+	v.Set(d)
+	return v
+}
+
+// Get returns the current value. A nil receiver returns zero, so callers
+// that never configured a grace period (e.g. existing tests) can pass nil.
+func (v *gracePeriodValue) Get() time.Duration {
+	if v == nil {
+		return 0
+	}
+	return time.Duration(v.d.Load())
+}
+
+func (v *gracePeriodValue) Set(d time.Duration) {
+	v.d.Store(int64(d))
+}
+
+// ManagerOption is an optional setting applied by NewManager.
+type ManagerOption func(*Manager)
+
+// WithServiceCheckinGracePeriod sets the configured upgrade watcher grace
+// period, so service-runtime components can cap their failure window to a
+// safe margin below it. Omit this option (or pass zero) to disable the cap.
+func WithServiceCheckinGracePeriod(d time.Duration) ManagerOption {
+	return func(m *Manager) {
+		m.serviceCheckinGracePeriod.Set(d)
+	}
+}
+
 // NewManager creates a new manager.
 func NewManager(
 	logger,
@@ -145,6 +194,7 @@ func NewManager(
 	tracer *apm.Tracer,
 	monitor MonitoringManager,
 	grpcConfig *configuration.GRPCConfig,
+	opts ...ManagerOption,
 ) (*Manager, error) {
 	ca, err := authority.NewCA()
 	if err != nil {
@@ -164,23 +214,45 @@ func NewManager(
 	logger.With("address", listenAddr).Infof("GRPC comms socket listening at %s", listenAddr)
 
 	m := &Manager{
-		logger:        logger,
-		baseLogger:    baseLogger,
-		ca:            ca,
-		listenAddr:    listenAddr,
-		isLocal:       ipc.IsLocal(listenAddr),
-		agentInfo:     agentInfo,
-		tracer:        tracer,
-		current:       make(map[string]*componentRuntimeState),
-		subscriptions: make(map[string][]*Subscription),
-		updateChan:    make(chan component.Model),
-		errCh:         make(chan error),
-		monitor:       monitor,
-		grpcConfig:    grpcConfig,
-		serverReady:   make(chan struct{}),
-		doneChan:      make(chan struct{}),
+		logger:                    logger,
+		baseLogger:                baseLogger,
+		ca:                        ca,
+		listenAddr:                listenAddr,
+		isLocal:                   ipc.IsLocal(listenAddr),
+		agentInfo:                 agentInfo,
+		tracer:                    tracer,
+		current:                   make(map[string]*componentRuntimeState),
+		subscriptions:             make(map[string][]*Subscription),
+		updateChan:                make(chan component.Model),
+		errCh:                     make(chan error),
+		monitor:                   monitor,
+		grpcConfig:                grpcConfig,
+		serviceCheckinGracePeriod: newGracePeriodValue(0),
+		serverReady:               make(chan struct{}),
+		doneChan:                  make(chan struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
 	}
 	return m, nil
+}
+
+// Reload updates settings that can change via a config/policy reload without
+// restarting the Manager, such as the upgrade watcher grace period used by
+// service-runtime components. Safe to call from a goroutine other than Run.
+func (m *Manager) Reload(rawConfig *config.Config) error {
+	watcherCfg := struct {
+		GracePeriod time.Duration `config:"agent.upgrade.watcher.grace_period"`
+	}{
+		// seeded so a reload that omits this section keeps the default,
+		// matching configuration.NewFromConfig's default-then-unpack pattern
+		GracePeriod: configuration.DefaultUpgradeConfig().Watcher.GracePeriod,
+	}
+	if err := rawConfig.UnpackTo(&watcherCfg); err != nil {
+		return fmt.Errorf("failed to unpack config during reload: %w", err)
+	}
+	m.serviceCheckinGracePeriod.Set(watcherCfg.GracePeriod)
+	return nil
 }
 
 // Run runs the manager's grpc server, implementing the
@@ -802,7 +874,7 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 	for _, comp := range newComponents {
 		// new component; create its runtime
 		logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
-		state, err := newComponentRuntimeState(m, logger, m.monitor, comp, m.isLocal)
+		state, err := newComponentRuntimeState(m, logger, m.monitor, comp, m.isLocal, m.serviceCheckinGracePeriod)
 		if err != nil {
 			return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
 		}
