@@ -239,12 +239,12 @@ func majorMinorPRBody(version string) string {
 
 ### Changes
 - Updated version to %s
-- Updated documentation and K8s manifests
+- Updated K8s manifests, Helm charts, kustomize overlays, and integration testdata
 - Added backport rule to .mergify.yml
 
 ### Checklist
 - [ ] Verify version is correct in version/version.go
-- [ ] Check K8s manifests have correct image tags
+- [ ] Check K8s manifests and Helm examples have correct image tags
 - [ ] Confirm mergify config is updated
 - [ ] Run integration tests
 `, version, version)

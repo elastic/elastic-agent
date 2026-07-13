@@ -34,12 +34,7 @@ func writeRepoFile(relPath string, content []byte) error {
 		return err
 	}
 
-	switch safePath {
-	case "version/version.go",
-		"deploy/kubernetes/elastic-agent-managed-kubernetes.yaml",
-		"deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml",
-		".mergify.yml":
-	default:
+	if !isReleaseWritablePath(safePath) {
 		return fmt.Errorf("unsupported file path: %s", relPath)
 	}
 
@@ -80,14 +75,14 @@ func UpdateVersion(newVersion string) error {
 	return nil
 }
 
-// UpdateDocs updates version references in K8s manifests.
+// UpdateDocs updates version references in K8s manifests, Helm charts, and kustomize files.
 func UpdateDocs(newVersion string) error {
-	k8sFiles := []string{
-		"deploy/kubernetes/elastic-agent-managed-kubernetes.yaml",
-		"deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml",
+	files, err := collectDocFiles()
+	if err != nil {
+		return err
 	}
 
-	for _, file := range k8sFiles {
+	for _, file := range files {
 		if err := updateVersionInFile(file, newVersion); err != nil {
 			return err
 		}
@@ -104,12 +99,14 @@ func updateVersionInFile(filePath, newVersion string) error {
 
 	content, err := os.ReadFile(safePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Printf("Skipping missing file %s\n", safePath)
+			return nil
+		}
 		return fmt.Errorf("failed to read %s: %w", safePath, err)
 	}
 
-	re := regexp.MustCompile(`(docker\.elastic\.co/elastic-agent/elastic-agent:)[0-9]+\.[0-9]+\.[0-9]+`)
-	newContent := re.ReplaceAllString(string(content), `${1}`+newVersion)
-
+	newContent := applyVersionReplacements(safePath, string(content), newVersion)
 	if newContent == string(content) {
 		fmt.Printf("No version changes needed in %s\n", safePath)
 		return nil
