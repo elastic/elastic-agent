@@ -50,7 +50,7 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 	}
 
 	t.Run(fmt.Sprintf("Upgrade on the same version %s to %s (%s)", currentVersion, currentVersion, unPrivilegedString), func(t *testing.T) {
-		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 		defer cancel()
 
 		// ensure we use the same package version

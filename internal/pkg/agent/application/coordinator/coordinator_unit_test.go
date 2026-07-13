@@ -50,7 +50,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -59,13 +58,14 @@ import (
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	pkgcomponent "github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -1255,8 +1255,6 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 		paths.SetTop(top)
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
 	logger := logp.NewLogger("testing")
 
 	configChan := make(chan ConfigChange, 1)
@@ -1314,6 +1312,8 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 	var workDirCreated time.Time
 
 	t.Run("run in process manager", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		t.Cleanup(cancel)
 		// Create a policy with one input and one output (no otel configuration)
 		cfg := config.MustNewConfigFrom(`
 agent.internal.runtime.filebeat.filestream: process
@@ -1343,6 +1343,8 @@ inputs:
 	})
 
 	t.Run("run in otel manager", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		t.Cleanup(cancel)
 		// Create a policy with one input and one output (no otel configuration)
 		cfg := config.MustNewConfigFrom(`
 agent.internal.runtime.filebeat.filestream: otel
@@ -1380,6 +1382,8 @@ inputs:
 		assert.Equal(t, workDirCreated, stat.ModTime(), "component working directory shouldn't have been modified")
 	})
 	t.Run("remove component", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		t.Cleanup(cancel)
 		// Create a policy with one input and one output (no otel configuration)
 		cfg := config.MustNewConfigFrom(`
 outputs:
@@ -2586,7 +2590,7 @@ func (m *mockUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	return nil, m.upgradeErr
 }
 

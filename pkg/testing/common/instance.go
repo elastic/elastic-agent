@@ -15,6 +15,7 @@ type ProvisionerType uint32
 const (
 	ProvisionerTypeVM ProvisionerType = iota
 	ProvisionerTypeK8SCluster
+	ProvisionerTypeLocal
 )
 
 // Instance represents a provisioned instance.

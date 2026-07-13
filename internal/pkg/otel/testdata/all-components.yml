@@ -26,7 +26,14 @@ extensions:
         default_value: Org-ID
   awslogs_encoding/elbaccess:
     format: elbaccess
+  azure_auth:
+    managed_identity:
   azure_encoding:
+  awscredentialsprovider:
+    credentials:
+      access_key_id: tom 
+      secret_access_key: tom
+      session_token: dG9tCg==
 
 processors:
   attributes:
@@ -81,6 +88,13 @@ receivers:
           static_configs:
             - targets: ['0.0.0.0:8888']
   elasticapmintake:
+  akamai_siem:
+    endpoint: https://akab-placeholder.luna.akamaiapis.net
+    config_ids: "12345"
+    authentication:
+      client_token: placeholder-client-token
+      client_secret: placeholder-client-secret
+      access_token: placeholder-access-token
   apache:
   mysql:
   postgresql:
@@ -97,6 +111,21 @@ receivers:
       s3_prefix: 'test'
     encodings:
       - extension: awslogs_encoding/elbaccess
+  awscloudwatch:
+    credentials_provider: awscredentialsprovider
+    region: us-east-1
+    logs:
+      poll_interval: 1m
+      groups:
+        autodiscover:
+          limit: 1
+    metrics:
+      collection_interval: 5m
+      period: 5m
+      queries:
+        - namespace: AWS/Lambda
+          metric_name: Invocations
+          account_id: 123456789012
   prometheusremotewrite:
     endpoint: 0.0.0.0:9090
   statsd:
@@ -189,6 +218,7 @@ service:
     - health_check
     - headers_setter
     - awslogs_encoding/elbaccess
+    - azure_auth
     - azure_encoding
   pipelines:
     logs:
@@ -214,6 +244,7 @@ service:
         - elasticapmintake
         - elasticmonitoringreceiver
         - azure_event_hub
+        - awscloudwatch
         - verifier
 
     logs/forward_receive:
@@ -266,6 +297,7 @@ service:
         - vcenter
         - zookeeper
         - azure_event_hub
+        - awscloudwatch
 
     metrics/aggregated:
       receivers:

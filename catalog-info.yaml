@@ -271,7 +271,7 @@ spec:
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
-        release-eng:
+        artifact-management:
           access_level: BUILD_AND_READ
         observablt-robots:
           access_level: BUILD_AND_READ
@@ -405,7 +405,7 @@ spec:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots-automation:
           access_level: BUILD_AND_READ
-        release-eng:
+        artifact-management:
           access_level: BUILD_AND_READ
         # See https://buildkite.com/docs/pipelines/configure/step-types/trigger-step#permissions
         # Otherwise even if merge commits in main or any branch will fail
@@ -492,7 +492,7 @@ spec:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
-        release-eng:
+        artifact-management:
           access_level: BUILD_AND_READ
         everyone:
           access_level: READ_ONLY

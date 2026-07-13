@@ -24,6 +24,7 @@ fi
 # There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
 STACK_VERSION="$(jq -r '.stack_version' .package-version)"
+STACK_BUILD_ID="$(jq -r '.stack_build_id // ""' .package-version)"
 
 METADATA_PREFIX=""
 if [[ "${FIPS:-false}" == "true" ]]; then
@@ -38,7 +39,7 @@ export METADATA_PREFIX
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 || "${FORCE_ESS_CREATE:-false}" == "true" ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   trap 'ess_down' EXIT
-  ess_up "$STACK_VERSION"
+  ess_up "$STACK_VERSION" "$STACK_BUILD_ID"
 fi
 
 ess_load_secrets

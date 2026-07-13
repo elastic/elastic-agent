@@ -247,6 +247,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -291,6 +293,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -339,6 +343,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -387,6 +393,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -404,7 +412,7 @@ inputs:
     failure_threshold: 5
     hosts:
     - placeholder
-    id: metrics-monitoring-filebeat-1
+    id: metrics-monitoring-filebeat-1-input
     index: metrics-elastic_agent.filebeat_input-default
     json.is_array: true
     metricsets:
@@ -436,6 +444,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -484,6 +494,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -501,7 +513,7 @@ inputs:
     failure_threshold: 5
     hosts:
     - placeholder
-    id: metrics-monitoring-filebeat-1
+    id: metrics-monitoring-filebeat-1-input
     index: metrics-elastic_agent.filebeat_input-default
     json.is_array: true
     metricsets:
@@ -533,6 +545,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:
@@ -581,6 +595,8 @@ inputs:
           to: apm-server
         - from: http.filebeat_input
           to: filebeat_input
+        - from: http.agent.system.cpu.cores
+          to: system.cpu.cores
         ignore_missing: true
     - drop_fields:
         fields:

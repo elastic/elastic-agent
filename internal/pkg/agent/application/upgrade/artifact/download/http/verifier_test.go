@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/http"
-
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,9 +21,9 @@ import (
 	"github.com/elastic/elastic-agent-libs/testing/proxytest"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
 func TestVerify(t *testing.T) {
@@ -98,9 +98,13 @@ func runTests(t *testing.T, testCases []testCase, td *testDials, config *artifac
 			downloader, err := NewDownloader(log, config, upgradeDetails)
 			require.NoError(t, err, "could not create new downloader")
 
-			pkgPath, err := downloader.Download(cancelCtx, beatSpec, version)
+			spec, err := artifact.New(beatSpec.Name, false, version, tc.system, tc.arch)
+			require.NoError(t, err)
+			filename := spec.FileName()
+			sourceDir := fmt.Sprintf("%s/beats/%s", strings.TrimRight(config.SourceURI, "/"), spec.Name)
+			pkgPath, err := downloader.Download(cancelCtx, spec, filename, sourceDir, config.TargetDirectory)
 			require.NoErrorf(t, err, "failed downloading %s v%s",
-				beatSpec.Artifact, version)
+				spec.Name, version)
 
 			_, err = os.Stat(pkgPath)
 			if err != nil {
@@ -112,7 +116,7 @@ func runTests(t *testing.T, testCases []testCase, td *testDials, config *artifac
 				t.Fatal(err)
 			}
 
-			err = testVerifier.Verify(cancelCtx, beatSpec, *version, false)
+			err = testVerifier.Verify(cancelCtx, spec, filename, sourceDir, config.TargetDirectory, false)
 			require.NoError(t, err)
 		})
 	}

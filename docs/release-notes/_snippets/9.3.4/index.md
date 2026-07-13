@@ -1,6 +1,12 @@
 ## 9.3.4 [elastic-agent-release-notes-9.3.4]
 
+:::{warning}
+We recommend that you skip {{agent}} 9.3.4 and upgrade directly to 9.3.5 or later.
 
+A time serialization optimization introduced in {{agent}} 9.3.4 causes timestamp fields sent from Beats-based inputs and {{agent}} integrations to be incorrectly serialized as an empty `{}` JSON object.
+
+As a result, affected documents might be rejected by {{es}} or routed to the Failure Store when it's enabled on the target data stream. For more information, refer to the [known issue](/release-notes/known-issues.md#events-beats-9-3-4-timestamp-empty-object). The optimization has been reverted, and the fix is included in {{agent}} 9.3.5.
+:::
 
 ### Features and enhancements [elastic-agent-9.3.4-features-enhancements]
 

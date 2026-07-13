@@ -14,11 +14,11 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -49,6 +49,8 @@ type UpdateMarker struct {
 
 	Details *details.Details `json:"details,omitempty" yaml:"details,omitempty"`
 
+	// Agents older than 9.5.0 read rollback targets from this field on Windows.
+	// TODO: remove once the minimum supported upgrade-from version is 9.5.0.
 	RollbacksAvailable map[string]ttl.TTLMarker `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
 }
 
@@ -134,10 +136,10 @@ type agentInstall struct {
 
 type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, writeFile writeFileFunc) error
 
-// markUpgrade marks update happened so we can handle grace period
-func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
+// writeUpgradeMarkerProvider returns a function that writes the upgrade marker file.
+// It does not update active.commit; use it to protect the target directory before unpacking starts.
+func writeUpgradeMarkerProvider() writeUpgradeMarkerFunc {
 	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
-
 		if len(previousAgent.hash) > HashLen {
 			previousAgent.hash = previousAgent.hash[:HashLen]
 		}
@@ -166,11 +168,19 @@ func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile wr
 			return goerrors.Join(err, errors.New(errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath)))
 		}
 
-		if err := updateActiveCommit(log, paths.Top(), agent.hash, writeFile); err != nil {
+		return nil
+	}
+}
+
+// markUpgradeProvider returns a function that writes the upgrade marker file and updates active.commit.
+// Use it after the symlink has been flipped to the new binary.
+func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
+	writeMarker := writeUpgradeMarkerProvider()
+	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
+		if err := writeMarker(log, dataDirPath, updatedOn, agent, previousAgent, action, upgradeDetails, availableRollbacks); err != nil {
 			return err
 		}
-
-		return nil
+		return updateActiveCommit(log, paths.Top(), agent.hash, writeFile)
 	}
 }
 
@@ -182,6 +192,38 @@ func UpdateActiveCommit(log *logger.Logger, topDirPath, hash string, writeFile w
 		return goerrors.Join(err, errors.New(errors.TypeFilesystem, "failed to update active commit", errors.M(errors.MetaKeyPath, activeCommitPath)))
 	}
 
+	return nil
+}
+
+// MarkUpgradeFailed records an upgrade failure both in the in-memory
+// upgrade-details (det.Fail(cause)) and, if a marker is on disk, by saving
+// the marker with state=Failed so the failure is surfaced to Fleet via the
+// next upgrade-details ack.
+//
+// Designed as the single entry point for marking an upgrade as failed across
+// every error path that can run after the upgrade flow has begun, regardless
+// of whether the marker file was ever written. det is always mutated; the
+// marker step is best-effort and a no-op when no marker exists (e.g.
+// markUpgrade failed before writing it, or the failure happened before the
+// marker was created), so callers can invoke it uniformly without first
+// checking marker presence.
+//
+// The on-disk part is what prevents the next agent run from starting a
+// watcher against an upgrade that has already been undone
+// (https://github.com/elastic/elastic-agent/issues/13505).
+func MarkUpgradeFailed(dataDirPath string, det *details.Details, cause error) error {
+	det.Fail(cause)
+	marker, err := LoadMarker(dataDirPath)
+	if err != nil {
+		return errors.New(err, errors.TypeFilesystem, "loading marker after upgrade failure")
+	}
+	if marker == nil {
+		return nil
+	}
+	marker.Details = det
+	if err := SaveMarker(dataDirPath, marker, true); err != nil {
+		return errors.New(err, errors.TypeFilesystem, "saving failed-state marker")
+	}
 	return nil
 }
 

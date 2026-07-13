@@ -7,7 +7,6 @@
 package ess
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -32,7 +31,7 @@ func TestInspect(t *testing.T) {
 		Sudo:  true,
 	})
 
-	ctx, cancel := testcontext.WithTimeout(t, context.Background(), time.Minute*10)
+	ctx, cancel := testcontext.WithTimeout(t, t.Context(), time.Minute*10)
 	defer cancel()
 
 	apiKey, policy := createBasicFleetPolicyData(t, "http://fleet-server:8220")

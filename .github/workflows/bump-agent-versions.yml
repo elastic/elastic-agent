@@ -6,6 +6,9 @@ on:
   schedule:
     - cron: "0 0 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   filter:
     runs-on: ubuntu-slim
@@ -30,7 +33,7 @@ jobs:
       matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: true
           ref: "${{ matrix.branch }}"

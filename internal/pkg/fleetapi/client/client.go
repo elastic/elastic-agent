@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	api "github.com/elastic/fleet-server/pkg/api"
 )
 
 const (
@@ -33,14 +34,13 @@ type Sender interface {
 		path string,
 		params url.Values,
 		headers http.Header,
-		body io.Reader,
+		body io.ReadSeeker,
 	) (*http.Response, error)
 
 	URI() string
 }
 
-// Default value for Elastic-Api-Version header when sending requests to Fleet (that's the only version we have at the time of writing)
-const defaultFleetApiVersion = "2023-06-01"
+const defaultFleetApiVersion = api.DefaultFleetAPIVersion
 
 var baseRoundTrippers = func(rt http.RoundTripper) (http.RoundTripper, error) {
 	rt = NewFleetUserAgentRoundTripper(rt, release.Version())

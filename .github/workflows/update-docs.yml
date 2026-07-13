@@ -1,11 +1,16 @@
 name: Update documentation
 
 on:
+  release:
+    types: [published]
   schedule:
     # Run weekly on Monday at 8:00 AM UTC
     - cron: '0 8 * * 1'
   workflow_dispatch:
     # Allow manual triggering
+
+permissions:
+  contents: read
 
 jobs:
   update-docs:
@@ -16,7 +21,7 @@ jobs:
       issues: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: true
           fetch-depth: 0  # Fetch all history including tags
@@ -30,8 +35,12 @@ jobs:
       - name: Find latest semantic version
         id: get_version
         run: |
-          # Get the latest semantic version tag (excluding pre-release versions)
-          LATEST_VERSION=$(git tag --list | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -1)
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            LATEST_VERSION="${{ github.event.release.tag_name }}"
+          else
+            # Get the latest semantic version tag (excluding pre-release versions)
+            LATEST_VERSION=$(git tag --list | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -1)
+          fi
           echo "Latest version: $LATEST_VERSION"
           echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
       
@@ -86,6 +95,8 @@ jobs:
             - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/go.mod
             - **Source components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/internal/edot/components.yaml
             - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ steps.get_version.outputs.version }}
+            
+            cc @elastic/ingest-docs
             
             This is an automated PR created by the documentation update workflow.
           branch: update-docs-${{ steps.get_version.outputs.version }}

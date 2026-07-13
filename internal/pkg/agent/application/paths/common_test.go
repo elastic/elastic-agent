@@ -5,12 +5,15 @@
 package paths
 
 import (
+	"flag"
 	"fmt"
 	"path/filepath"
 	"runtime"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/version"
@@ -25,6 +28,22 @@ func validTestPath(useVersionInPath bool) string {
 		validPath = filepath.Join(validPath, "elastic-agent.app", "Contents", "MacOS")
 	}
 	return validPath
+}
+
+func TestIsCustomLogsPath(t *testing.T) {
+	SetupFlags()
+
+	origLogsPath := logsPath
+	t.Cleanup(func() {
+		logsPath = origLogsPath
+		isCustomLogsPath = false
+	})
+
+	assert.False(t, IsCustomLogsPath(), "should be false before --path.logs is set")
+
+	require.NoError(t, flag.CommandLine.Set("path.logs", "/tmp/test-logs"))
+	assert.True(t, IsCustomLogsPath(), "should be true after --path.logs is set")
+	assert.Equal(t, "/tmp/test-logs", logsPath)
 }
 
 func TestIsInsideData(t *testing.T) {

@@ -170,7 +170,7 @@ func InjectFleetConfigComponentModifier(fleetCfg *configuration.FleetAgentConfig
 }
 
 type logLevelProvider interface {
-	LogLevel() string
+	GetLogLevelRuntime() string
 }
 
 func injectAgentLoggingLevel(cfg map[string]interface{}, llp logLevelProvider) {
@@ -196,7 +196,7 @@ func injectAgentLoggingLevel(cfg map[string]interface{}, llp logLevelProvider) {
 	}
 
 	if loggingMap != nil {
-		loggingMap["level"] = llp.LogLevel()
+		loggingMap["level"] = llp.GetLogLevelRuntime()
 	}
 }
 

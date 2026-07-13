@@ -7,6 +7,7 @@ package cmd
 import (
 	"context"
 	_ "embed"
+	"flag"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -156,9 +157,84 @@ func TestRunLoadConfig(t *testing.T) {
 			err := os.WriteFile(filepath.Join(dir, paths.DefaultConfigName), tt.file, 0o644)
 			require.NoError(t, err)
 
-			cfg, err := loadConfig(t.Context(), nil)
+			cfg, err := configuration.LoadConfig(t.Context(), nil)
 			require.NoError(t, err)
-			require.Equal(t, tt.expect(), cfg)
+			require.Equal(t, tt.expect().Fleet, cfg.Fleet)
+			require.Equal(t, tt.expect().Settings, cfg.Settings)
+		})
+	}
+}
+
+// TestApplyCustomLogsPath exercises applyCustomLogsPath against a yaml config
+// that has agent.logging.to_stderr: true (the shipped default). The "set" case
+// simulates the user passing --path.logs on the CLI via the real flag mechanism.
+func TestApplyCustomLogsPath(t *testing.T) {
+	const customPath = "/tmp/custom-logs"
+
+	// Mirrors the shipped default: to_stderr wins over to_files.
+	toStderrYAML := []byte(`agent:
+  logging:
+    to_stderr: true
+`)
+
+	tests := map[string]struct {
+		flagValue     string // non-empty: set --path.logs to this value via flag.CommandLine
+		wantToStderr  bool
+		wantToFiles   bool
+		wantFilesPath string
+	}{
+		"--path.logs not set: config unchanged": {
+			// Without --path.logs, applyCustomLogsPath is a no-op.
+			// The raw loaded config has both ToStderr=true (from yaml) and
+			// ToFiles=true (default); applyFlags in logp resolves the conflict
+			// later when the logger is actually constructed.
+			wantToStderr: true,
+			wantToFiles:  true,
+		},
+		"--path.logs set: overrides yaml to_stderr, forces file output": {
+			flagValue:     customPath,
+			wantToStderr:  false,
+			wantToFiles:   true,
+			wantFilesPath: customPath,
+		},
+	}
+
+	// Ensure the path.logs flag is registered before we try to Set it.
+	paths.SetupFlags()
+
+	origCfgDir := paths.Config()
+	origLogsPath := paths.Logs()
+	t.Cleanup(func() {
+		paths.SetConfig(origCfgDir)
+		paths.SetLogs(origLogsPath)
+	})
+
+	for name, tt := range tests {
+		require.NoError(t, flag.CommandLine.Set("path.logs", "")) // reset flag before each test
+		t.Run(name, func(t *testing.T) {
+			if tt.flagValue != "" {
+				require.NoError(t, flag.CommandLine.Set("path.logs", tt.flagValue))
+			}
+
+			dir := t.TempDir()
+			paths.SetConfig(dir)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, paths.DefaultConfigName), toStderrYAML, 0o644))
+
+			cfg, err := configuration.LoadConfig(t.Context(), nil)
+			require.NoError(t, err)
+
+			applyCustomLogsPath(cfg)
+
+			assert.Equal(t, tt.wantToStderr, cfg.Settings.LoggingConfig.ToStderr)
+			assert.Equal(t, tt.wantToFiles, cfg.Settings.LoggingConfig.ToFiles)
+			assert.Equal(t, filepath.Join(paths.Home(), logger.DefaultLogDirectory, "events"), cfg.Settings.EventLoggingConfig.Files.Path)
+			if tt.wantFilesPath != "" {
+				assert.Equal(t, tt.wantFilesPath, cfg.Settings.LoggingConfig.Files.Path)
+				assert.False(t, cfg.Settings.EventLoggingConfig.ToStderr)
+				assert.True(t, cfg.Settings.EventLoggingConfig.ToFiles)
+			} else {
+				assert.Equal(t, paths.Top(), cfg.Settings.LoggingConfig.Files.Path)
+			}
 		})
 	}
 }

@@ -170,13 +170,14 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		// filebeat input metrics: in OTel mode the elasticmonitoringreceiver emits per-input
 		// metrics with metricset.name "stats" (from its event template), not "json" which is
 		// what the classic http/metrics-monitoring metricbeat uses when scraping /inputs/.
+		// The component.id includes the stream suffix because each stream has its own receiver.
 		{
 			dsType:          "metrics",
 			dsDataset:       "elastic_agent.filebeat_input",
 			onlyCompareKeys: true,
 			query: []map[string]any{
 				{"match_phrase": map[string]any{"metricset.name": "stats"}},
-				{"match_phrase": map[string]any{"component.id": "filestream-monitoring"}},
+				{"match_phrase": map[string]any{"component.id": "filestream-monitoring/filestream-monitoring-agent"}},
 				{"exists": map[string]any{"field": "filebeat_input.bytes_processed_total"}},
 			},
 		},
@@ -200,11 +201,11 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 7. Compare both documents are equivalent
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	t.Cleanup(cancel)
 
 	// prepare the policy and marshalled configuration
-	policyCtx, policyCancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	policyCtx, policyCancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	t.Cleanup(policyCancel)
 
 	// 1. Create and install policy with just monitoring
@@ -222,7 +223,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 2. Download the policy, add the API key
 	downloadURL := fmt.Sprintf("/api/fleet/agent_policies/%s/download", policyResponse.ID)
-	resp, err := info.KibanaClient.Connection.SendWithContext(policyCtx, http.MethodGet, downloadURL, nil, nil, nil)
+	resp, err := info.KibanaClient.SendWithContext(policyCtx, http.MethodGet, downloadURL, nil, nil, nil)
 	require.NoError(t, err, "error downloading policy")
 	policyBytes, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "error reading policy response")
@@ -283,6 +284,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	err = classicFixture.Configure(ctx, updatedPolicyBytes)
 	require.NoError(t, err, "error configuring fixture")
 
+	// must be captured before install — the agent logs this during startup
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	output, err := classicFixture.InstallWithoutEnroll(ctx, &installOpts)
 	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
@@ -351,10 +353,10 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	require.NoError(t, err)
 	err = beatReceiverFixture.Configure(ctx, updatedPolicyBytes)
 	require.NoError(t, err)
+	// must be captured before install — the agent logs this during startup
+	timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	combinedOutput, err = beatReceiverFixture.InstallWithoutEnroll(ctx, &installOpts)
 	require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
-	// store timestamp to filter otel docs with timestamp greater than this value
-	timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
@@ -531,6 +533,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [{{.ESEndpoint}}]
     api_key: {{.BeatsESApiKey}}
 `
@@ -774,6 +777,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [http://localhost:9200]
     api_key: placeholder
 agent.monitoring.enabled: false
@@ -819,7 +823,7 @@ agent.monitoring.enabled: false
 				if unit.UnitType == int(cproto.UnitType_INPUT) {
 					assert.Equal(t, int(cproto.State_HEALTHY), unit.State,
 						"expected state of unit %s to be %s, got %s",
-						unit.UnitID, cproto.State_HEALTHY.String(), cproto.State(unit.State).String())
+						unit.UnitID, cproto.State_HEALTHY.String(), cproto.State(unit.State).String()) //nolint:gosec // G115 always under 32-bit
 				}
 			}
 		}
@@ -834,7 +838,7 @@ agent.monitoring.enabled: false
 	err = fixture.Configure(ctx, processConfig)
 	require.NoError(t, err)
 
-	output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true, Develop: true})
 	require.NoError(t, err, "failed to install agent: %s", output)
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -863,10 +867,16 @@ agent.monitoring.enabled: false
 	require.Len(t, beatStartLogs, 2, "expected to find one log line for each configuration")
 	processLog, receiverLog := beatStartLogs[0], beatStartLogs[1]
 
-	// Check that the process log is a subset of the receiver log
+	// Check that the process log is a subset of the receiver log.
+	// "message" and "log.origin.file.line" are expected to differ: periodic metrics
+	// logging is disabled by default for beats receivers, so the beat process logs
+	// "Starting metrics logging every 30s" while the receiver logs "Skipping metrics
+	// logging" from a different line of the same function.
 	for key, value := range processLog {
 		assert.Contains(t, receiverLog, key)
-		if key == "@timestamp" { // the timestamp value will be different
+		switch key {
+		case "@timestamp", // the timestamp value will be different
+			"message", "log.origin.file.line":
 			continue
 		}
 		assert.Equal(t, value, receiverLog[key])
@@ -913,11 +923,13 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [%s]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
   supported:
     type: elasticsearch
+    preset: latency
     hosts: [%s]
     api_key: placeholder
 `, esURL.Host, esURL.Host)
@@ -1032,6 +1044,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [%s]
     api_key: placeholder
 providers:
@@ -1175,6 +1188,7 @@ outputs:
     hosts:
     - %s
     type: elasticsearch
+    preset: latency
 `, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
@@ -1277,6 +1291,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [http://localhost:9200]
     api_key: placeholder
 agent.monitoring.enabled: false
@@ -1314,14 +1329,17 @@ agent.monitoring.enabled: false
 	var componentID, componentWorkDir string
 	var workDirCreated time.Time
 
-	// wait for component to appear in status and be healthy
+	// wait for component to appear in status and be healthy or degraded
+	// (output points at localhost:9200 which is unreachable, so DEGRADED is expected)
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		require.NoError(collect, statusErr)
 		require.Equal(collect, 1, len(status.Components))
 		componentStatus := status.Components[0]
-		assert.Equal(collect, cproto.State_HEALTHY, cproto.State(componentStatus.State))
+		componentState := cproto.State(componentStatus.State) //nolint:gosec // G115 always under 32-bit
+		assert.Truef(collect, componentState == cproto.State_HEALTHY || componentState == cproto.State_DEGRADED,
+			"component state should be HEALTHY or DEGRADED, got %s", componentState.String())
 		componentID = componentStatus.ID
 	}, 2*time.Minute, 5*time.Second)
 
@@ -1346,7 +1364,7 @@ agent.monitoring.enabled: false
 		require.Equal(collect, 1, len(status.Components))
 		componentStatus := status.Components[0]
 		require.Equal(collect, "beats-receiver", componentStatus.VersionInfo.Name)
-		componentState := cproto.State(componentStatus.State)
+		componentState := cproto.State(componentStatus.State) //nolint:gosec // G115 always under 32-bit
 		assert.Truef(collect, componentState == cproto.State_HEALTHY || componentState == cproto.State_DEGRADED,
 			"component state should be HEALTHY or DEGRADED, got %s", componentState.String())
 	}, 2*time.Minute, 5*time.Second)
@@ -1364,6 +1382,7 @@ inputs: []
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [http://localhost:9200]
     api_key: placeholder
 agent.monitoring.enabled: false
@@ -1380,14 +1399,6 @@ agent.monitoring.enabled: false
 
 	// the component working directory shouldn't exist anymore
 	require.NoDirExists(t, componentWorkDir)
-}
-
-func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {
-	assert.Equal(t, int(cproto.CollectorComponentStatus_StatusOK), status.Status, "component status should be ok")
-	assert.Equal(t, "", status.Error, "component status should not have an error")
-	for _, componentStatus := range status.ComponentStatusMap {
-		assertCollectorComponentsHealthy(t, componentStatus)
-	}
 }
 
 func assertBeatsHealthy(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager, componentCount int) {
@@ -1409,8 +1420,11 @@ func assertBeatsHealthy(t *assert.CollectT, status *atesting.AgentStatusOutput, 
 	}
 }
 
-// getBeatStartLogRecords returns the log records for a particular log line emitted when the beat starts
-// This log line is identical between beats processes and receivers, so it's a good point of comparison
+// getBeatStartLogRecords returns the log records for the metrics reporter startup log line emitted
+// when the beat starts. This log line comes from the same code path in both beats processes and
+// receivers, so aside from its message (and the line number it was logged from) it's a good point
+// of comparison. Beats processes log "Starting metrics logging every 30s", while receivers log
+// "Skipping metrics logging" since periodic metrics logging is disabled by default for receivers.
 func getBeatStartLogRecords(logs string) []map[string]any {
 	var logRecords []map[string]any
 	for _, line := range strings.Split(logs, "\n") {
@@ -1423,7 +1437,8 @@ func getBeatStartLogRecords(logs string) []map[string]any {
 			continue
 		}
 
-		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Starting metrics logging") {
+		if message, ok := logRecord["message"].(string); ok &&
+			(strings.HasPrefix(message, "Starting metrics logging") || strings.HasPrefix(message, "Skipping metrics logging")) {
 			logRecords = append(logRecords, mapstr.M(logRecord).Flatten())
 		}
 	}
@@ -1468,17 +1483,14 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	tmpDir := t.TempDir()
 	numEvents := 50
 	// Create the data file to ingest
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
-
+	inputFilePath := filepath.Join(tmpDir, "input.txt")
+	var inputContent bytes.Buffer
 	// these messages will fail to index as message is expected to be of integer type
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -1514,6 +1526,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
     otel:
@@ -1548,7 +1561,7 @@ agent.logging.stderr: true
 	err = fixture.Configure(ctx, configBuffer.Bytes())
 	require.NoError(t, err)
 
-	err = setStrictMapping(info.ESClient, index)
+	err = setStrictMapping(ctx, info.ESClient, index)
 	require.NoError(t, err, "could not set strict mapping due to %v", err)
 
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
@@ -1649,17 +1662,14 @@ func TestSensitiveIncludeSourceOnError(t *testing.T) {
 	tmpDir := t.TempDir()
 	numEvents := 50
 	// Create the data file to ingest
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
-
+	inputFilePath := filepath.Join(tmpDir, "input.txt")
+	var inputContent bytes.Buffer
 	// these messages will fail to index as message is expected to be of integer type
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		fmt.Fprintf(&inputContent, "Line %d\n", i)
 	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	err := os.WriteFile(inputFilePath, inputContent.Bytes(), 0o600)
+	require.NoError(t, err, "failed to write data to temp file")
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -1694,6 +1704,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
 agent:
@@ -1725,7 +1736,7 @@ agent.logging.stderr: true
 	err = fixture.Configure(ctx, configBuffer.Bytes())
 	require.NoError(t, err)
 
-	err = setStrictMapping(info.ESClient, index)
+	err = setStrictMapping(ctx, info.ESClient, index)
 	require.NoError(t, err, "could not set strict mapping due to %v", err)
 
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
@@ -1781,7 +1792,7 @@ agent.logging.stderr: true
 // setStrictMapping takes es client and index name
 // and sets strict mapping for that index.
 // Useful to reproduce mapping conflicts required for testing
-func setStrictMapping(client *elasticsearch.Client, index string) error {
+func setStrictMapping(ctx context.Context, client *elasticsearch.Client, index string) error {
 	// Define the body
 	body := map[string]any{
 		"index_patterns": []string{index + "*"},
@@ -1805,18 +1816,17 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 
 	esEndpoint, err := integration.GetESHost()
 	if err != nil {
-		return fmt.Errorf("error getting elasticsearch endpoint: %v", err)
+		return fmt.Errorf("error getting elasticsearch endpoint: %w", err)
 	}
 
-	// Create a context
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	// Build request
 	url := fmt.Sprintf("%s/_index_template/%s", esEndpoint, index)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(jsonData))
 	if err != nil {
-		return fmt.Errorf("could not create http request to ES server: %v", err)
+		return fmt.Errorf("could not create http request to ES server: %w", err)
 	}
 
 	// Set content type header
@@ -1824,7 +1834,7 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 
 	resp, err := client.Perform(req)
 	if err != nil {
-		return fmt.Errorf("error performing request: %v", err)
+		return fmt.Errorf("error performing request: %w", err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -1867,7 +1877,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	})
 
 	ctx, cancel := testcontext.WithDeadline(t,
-		context.Background(),
+		t.Context(),
 		time.Now().Add(5*time.Minute))
 	t.Cleanup(cancel)
 
@@ -1895,6 +1905,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		kibana.CreateEnrollmentAPIKeyRequest{
 			PolicyID: policyResponse.ID,
 		})
+	require.NoError(t, err, "error creating enrollment API key")
 
 	fut, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -1927,8 +1938,8 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 			assert.NoError(collect, statusErr)
 			assertBeatsHealthy(collect, &status, runtime, componentCount)
 		}, 1*time.Minute, 1*time.Second)
-		require.Eventuallyf(t,
-			func() bool {
+		require.EventuallyWithT(t,
+			func(collect *assert.CollectT) {
 				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 				defer findCancel()
 				mustClauses := []map[string]any{
@@ -1949,8 +1960,8 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 					},
 				}
 				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, "logs-*", info.ESClient)
-				require.NoError(t, err)
-				return docs.Hits.Total.Value > 0
+				require.NoError(collect, err)
+				assert.Greater(collect, docs.Hits.Total.Value, 0)
 			},
 			4*time.Minute, 5*time.Second,
 			"health check failed: timestamp: %s", timestamp)
@@ -1984,10 +1995,10 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 
 	// wait until policy is applied
 	policyCheck := func(expectedRevision int) {
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			inspectOutput, err := fut.ExecInspect(ctx)
-			require.NoError(t, err)
-			return expectedRevision == inspectOutput.Revision
+			require.NoError(collect, err)
+			assert.Equal(collect, expectedRevision, inspectOutput.Revision)
 		}, 3*time.Minute, 1*time.Second)
 	}
 	policyCheck(otelMonResp.Revision)
@@ -2096,6 +2107,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 
 	aggResults := map[string]any{}
 	err = json.Unmarshal(resultBuf, &aggResults)
+	require.NoError(t, err)
 	aggs, ok := aggResults["aggregations"].(map[string]any)
 	require.Truef(t, ok, "'aggregations' wasn't a map[string]any, result was %s", string(resultBuf))
 	dups, ok := aggs["duplicates"].(map[string]any)

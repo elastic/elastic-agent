@@ -7,7 +7,6 @@
 package ess
 
 import (
-	"context"
 	"crypto/tls"
 	"net/http"
 	"net/url"
@@ -46,13 +45,9 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 		Stack: &define.Stack{},
 		Sudo:  true,
 		Local: false,
-		// fleet-server has no windows/arm64 build
-		// (see dev-tools/packaging/packages.yml: comp-fleet-server),
-		// so the bundled fleet-server binary is missing on this platform.
-		SkipOS: []define.OS{{Type: define.Windows, Arch: define.ARM64}},
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	t.Log("Ensure base path is clean")

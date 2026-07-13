@@ -9,6 +9,7 @@ package ess
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -36,7 +37,7 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 		t.Skipf("Version %s is lower than min version %s; test cannot be performed", define.Version(), upgradetest.Version_8_11_0_SNAPSHOT)
 	}
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Upgrades to build under test.
@@ -50,6 +51,9 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	// We need a version with a non-matching commit hash to perform the upgrade
 	startVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
+	if !upgradetest.SupportsUpgradeSourceOnPlatform(startVersion, runtime.GOOS, runtime.GOARCH) {
+		t.Skipf("upgrade from %s is not supported on %s/%s", startVersion, runtime.GOOS, runtime.GOARCH)
+	}
 	startFixture, err := atesting.NewFixture(
 		t,
 		startVersion.String(),
@@ -93,7 +97,7 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 
 	// call uninstall now, do not wait for the watcher to finish running
 	// 8.11+ should always kill the running watcher (if it doesn't uninstall will fail)
-	uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	uninstallCtx, uninstallCancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer uninstallCancel()
 	output, err := startFixture.Uninstall(uninstallCtx, &atesting.UninstallOpts{Force: true})
 	assert.NoError(t, err, "uninstall failed with output:\n%s", string(output))

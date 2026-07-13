@@ -7,7 +7,6 @@
 package ess
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -27,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -138,7 +138,7 @@ func TestContainerCMD(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Minute)
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -205,7 +205,7 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
 	defer cancel()
 
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
@@ -325,7 +325,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -347,7 +347,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	reqBody := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "internal": {
@@ -360,7 +360,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
     }
   }
 }
-`, policyName)
+`, policyName, info.Namespace)
 
 	status, result, err := info.KibanaClient.Request(
 		http.MethodPut,
@@ -413,17 +413,21 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		err, agentOutput,
 	)
 
-	assert.Eventually(t, func() bool {
-		agentOutputStr := agentOutput.String()
-		scanner := bufio.NewScanner(strings.NewReader(agentOutputStr))
-		for scanner.Scan() {
-			if strings.Contains(scanner.Text(), "Cannot index event") {
-				return true
-			}
-		}
-
-		return false
+	found := assert.Eventually(t, func() bool {
+		return strings.Contains(agentOutput.String(), "Cannot index event")
 	}, 3*time.Minute, 10*time.Second, "cannot find events on stderr")
+	if !found {
+		statusCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		status, statusErr := agentFixture.ExecStatus(statusCtx, atesting.WithCmdOptions(withEnv(env)))
+		if statusErr != nil {
+			t.Logf("agent status error: %v", statusErr)
+		} else {
+			statusJSON, _ := json.MarshalIndent(status, "", "  ")
+			t.Logf("agent status:\n%s", statusJSON)
+		}
+		t.Logf("agent output:\n%s", agentOutput.String())
+	}
 }
 
 // createMockESOutput creates an output configuration pointing to a mockES
@@ -741,7 +745,7 @@ func addLogIntegration(t *testing.T, info *define.Info, policyID, logFilePath st
 
 	// Call Kibana to create the policy.
 	// Docs: https://www.elastic.co/guide/en/fleet/current/fleet-api-docs.html#create-integration-policy-api
-	resp, err := info.KibanaClient.Connection.Send(
+	resp, err := info.KibanaClient.Send(
 		http.MethodPost,
 		"/api/fleet/package_policies",
 		nil,
@@ -750,6 +754,7 @@ func addLogIntegration(t *testing.T, info *define.Info, policyID, logFilePath st
 	if err != nil {
 		t.Fatalf("could not execute request to Kibana/Fleet: %s", err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		// On error dump the whole request response so we can easily spot
 		// what went wrong.
@@ -777,6 +782,7 @@ func createSimpleAgentMonitoringConfig(t *testing.T, workDir string, esAddr stri
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts:
       - %s
 
@@ -818,7 +824,7 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
 	reqBody := fmt.Sprintf(`
 {
   "name": "%s",
-  "namespace": "default",
+  "namespace": "%s",
   "overrides": {
     "agent": {
       "monitoring": {
@@ -827,7 +833,7 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
     }
   }
 }
-`, policyName, runtime)
+`, policyName, info.Namespace, runtime)
 
 	status, result, err := info.KibanaClient.Request(
 		http.MethodPut,
@@ -889,10 +895,10 @@ func TestContainerCMDEnrollByPolicyName(t *testing.T) {
 	env := []string{
 		"FLEET_ENROLL=1",
 		"FLEET_URL=" + fleetURL,
-		"KIBANA_FLEET_HOST=" + info.KibanaClient.Connection.URL,
+		"KIBANA_FLEET_HOST=" + info.KibanaClient.URL,
 		"FLEET_TOKEN_POLICY_NAME=" + resp.Name,
-		"KIBANA_FLEET_USERNAME=" + info.KibanaClient.Connection.Username,
-		"KIBANA_FLEET_PASSWORD=" + info.KibanaClient.Connection.Password,
+		"KIBANA_FLEET_USERNAME=" + info.KibanaClient.Username,
+		"KIBANA_FLEET_PASSWORD=" + info.KibanaClient.Password,
 		"STATE_PATH=" + agentFixture.WorkDir(),
 	}
 	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
@@ -929,7 +935,7 @@ func TestContainerCMDDiagnosticsSocket(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Minute)
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -983,6 +989,217 @@ func TestContainerCMDDiagnosticsSocket(t *testing.T) {
 	},
 		5*time.Minute, time.Second,
 		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
+		err, agentOutput,
+	)
+}
+
+// Regression test for #13810: ensure env vars override fleet.enc for certs
+func TestContainerCMDTLSCertOverride(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+		Group: "container",
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	require.NoError(t, agentFixture.Prepare(ctx))
+	require.NoError(t, err)
+
+	_, childPair, err := certutil.NewRSARootAndChildCerts()
+	require.NoError(t, err)
+
+	certDir := t.TempDir()
+	certPath := filepath.Join(certDir, "tls.crt")
+	keyPath := filepath.Join(certDir, "tls.key")
+	require.NoError(t, os.WriteFile(certPath, childPair.Cert, 0o644))
+	require.NoError(t, os.WriteFile(keyPath, childPair.Key, 0o600))
+
+	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	require.NoErrorf(t, err, "could not get Fleet URL")
+
+	_, enrollmentToken := createPolicy(
+		t, ctx, agentFixture, info,
+		fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
+		"")
+
+	statePath := agentFixture.WorkDir()
+	env := []string{
+		"FLEET_ENROLL=1",
+		"FLEET_URL=" + fleetURL,
+		"FLEET_ENROLLMENT_TOKEN=" + enrollmentToken,
+		"STATE_PATH=" + statePath,
+	}
+	envWithCerts := append([]string{
+		"ELASTIC_AGENT_CERT=" + certPath,
+		"ELASTIC_AGENT_CERT_KEY=" + keyPath,
+	}, env...)
+
+	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, envWithCerts)
+	t.Logf(">> running binary with: %v", cmd.Args)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
+	}
+
+	require.Eventuallyf(t, func() bool {
+		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(envWithCerts)))
+		return err == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy after first enrollment. Agent status error: \"%v\", Agent logs\n%s",
+		err, agentOutput,
+	)
+
+	require.FileExists(t, filepath.Join(statePath, "fleet.enc"),
+		"fleet.enc must exist for regression test")
+
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
+	cmd.Process = nil
+
+	require.NoError(t, os.Remove(certPath))
+	require.NoError(t, os.Remove(keyPath))
+
+	cmd, agentOutput = prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
+	t.Logf(">> running binary with: %v", cmd.Args)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
+	}
+
+	require.Eventuallyf(t, func() bool {
+		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env)))
+		return err == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy after restart without certs. Agent status error: \"%v\", Agent logs\n%s",
+		err, agentOutput,
+	)
+}
+
+// Regression test for #15408: FLEET_CA/KIBANA_CA/ELASTICSEARCH_CA overrides fleet.enc CA
+func TestContainerCMDFleetCAOverride(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+		Group: "container",
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	require.NoError(t, agentFixture.Prepare(ctx))
+	require.NoError(t, err)
+
+	certDir := t.TempDir()
+
+	caPath1 := filepath.Join(certDir, "fleet-ca-1.crt")
+	rootPair1, _, err := certutil.NewRSARootAndChildCerts()
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(caPath1, rootPair1.Cert, 0o644))
+
+	caPath2 := filepath.Join(certDir, "fleet-ca-2.crt")
+	rootPair2, _, err := certutil.NewRSARootAndChildCerts()
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(caPath2, rootPair2.Cert, 0o644))
+
+	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	require.NoErrorf(t, err, "could not get Fleet URL")
+
+	_, enrollmentToken := createPolicy(
+		t, ctx, agentFixture, info,
+		fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
+		"")
+
+	statePath := agentFixture.WorkDir()
+	env := []string{
+		"FLEET_ENROLL=1",
+		"FLEET_URL=" + fleetURL,
+		"FLEET_ENROLLMENT_TOKEN=" + enrollmentToken,
+		"FLEET_INSECURE=1",
+		"STATE_PATH=" + statePath,
+	}
+
+	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, append([]string{"FLEET_CA=" + caPath1}, env...))
+	t.Logf(">> running binary with: %v", cmd.Args)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
+	}
+
+	require.Eventuallyf(t, func() bool {
+		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv([]string{"STATE_PATH=" + statePath})))
+		return err == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy after first enrollment. Agent status error: \"%v\", Agent logs\n%s",
+		err, agentOutput,
+	)
+
+	require.FileExists(t, filepath.Join(statePath, "fleet.enc"),
+		"fleet.enc must exist for regression test")
+
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
+	cmd.Process = nil
+
+	require.NoError(t, os.Remove(caPath1))
+
+	// Agent should crash on the stale fleet.enc caPath1 when no CA env var is set to override it
+	cmd, agentOutput = prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
+	t.Logf(">> running binary with: %v", cmd.Args)
+	require.Error(t, cmd.Run(), "agent should exit with an error when the stored CA path is stale and no CA env var is set")
+	require.Contains(t, agentOutput.String(), "Error: failed to read from disk store",
+		"agent should fail to load the stale stored CA path when no CA env var is set")
+	cmd.Process = nil
+
+	// Agent should start healthy with FLEET_CA's caPath1 overriding fleet.enc's now stale caPath2
+	cmd, agentOutput = prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, append([]string{"FLEET_CA=" + caPath2}, env...))
+	t.Logf(">> running binary with: %v", cmd.Args)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
+	}
+
+	require.Eventuallyf(t, func() bool {
+		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv([]string{"STATE_PATH=" + statePath})))
+		return err == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy after restart with FLEET_CA overriding the stale stored path. Agent status error: \"%v\", Agent logs\n%s",
+		err, agentOutput,
+	)
+
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
+	cmd.Process = nil
+
+	// Agent should start healthy with FLEET_CA's empty var overriding fleet.enc's now stale caPath2
+	require.NoError(t, os.Remove(caPath2))
+	cmd, agentOutput = prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, append([]string{"FLEET_CA="}, env...))
+	t.Logf(">> running binary with: %v", cmd.Args)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
+	}
+
+	require.Eventuallyf(t, func() bool {
+		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv([]string{"STATE_PATH=" + statePath})))
+		return err == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy after restart with an explicitly empty FLEET_CA overriding the stale stored path. Agent status error: \"%v\", Agent logs\n%s",
 		err, agentOutput,
 	)
 }

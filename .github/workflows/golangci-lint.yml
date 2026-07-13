@@ -1,10 +1,18 @@
 name: golangci-lint
 on:
-  #push:
-  #  branches:
-  #    - main
-  #    - 8.*
-  #    - 7.17
+  push:
+    # This is only here to establish a base cache and make the PR executions faster
+    branches:
+      - 'main'
+      - '8.19'
+      - '9.*'
+    paths:
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '.golangci.yml'
+      - '.golangci-lint-version'
+      - '.github/workflows/golangci-lint.yml'
   pull_request:
     paths:
       - '**/*.go'
@@ -20,12 +28,24 @@ permissions:
 jobs:
   golangci:
     strategy:
+      fail-fast: false
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
-    name: lint
+        # golangci-lint only checks files whose build constraints are
+        # satisfied by the active tags, so every custom //go:build tag needs
+        # its own run to actually get linted. pkg/testing/define also has a
+        # third, mutually exclusive "local" variant (define_local.go);
+        # deliberately left unlinted rather than pay for a third run over one
+        # trivial file.
+        tagset:
+          - name: default
+            tags: ''
+          - name: define
+            tags: 'integration,requirefips,kubernetes_inner,mage,define'
+    name: lint (${{ matrix.os }}, ${{ matrix.tagset.name }})
     runs-on: ${{  matrix.os }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -36,7 +56,7 @@ jobs:
       - name: golangci-lint
         # Pin the full commit hash
         # https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#using-third-party-actions
-        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           # Read the version from .golangci-lint-version to keep local and CI in sync.
           version-file: .golangci-lint-version
@@ -48,7 +68,7 @@ jobs:
           # which can lead to some frustration from developers who would like to
           # fix a single line in an existing codebase and the linter would force them
           # into fixing all linting issues in the whole file instead.
-          args: --timeout=30m --whole-files
+          args: --timeout=60m --whole-files --build-tags=${{ matrix.tagset.tags }}
 
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           only-new-issues: true

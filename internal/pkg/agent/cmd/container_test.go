@@ -8,10 +8,13 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -22,8 +25,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
@@ -1314,4 +1321,157 @@ func TestKibanaFetchToken(t *testing.T) {
 		require.Error(t, err)
 		require.Empty(t, token)
 	})
+}
+
+// Regression test for #13810: ensure env vars override fleet.enc for certs
+func TestContainerEnvOverridesFleetTLSPaths(t *testing.T) {
+	_, childPair, err := certutil.NewRSARootAndChildCerts()
+	require.NoError(t, err)
+	certDir := t.TempDir()
+	envCertPath := filepath.Join(certDir, "tls.crt")
+	envKeyPath := filepath.Join(certDir, "tls.key")
+	require.NoError(t, os.WriteFile(envCertPath, childPair.Cert, 0o644))
+	require.NoError(t, os.WriteFile(envKeyPath, childPair.Key, 0o600))
+
+	t.Setenv("ELASTIC_AGENT_CERT", envCertPath)
+	t.Setenv("ELASTIC_AGENT_CERT_KEY", envKeyPath)
+
+	origCfg := paths.Config()
+	t.Cleanup(func() { paths.SetConfig(origCfg) })
+	paths.SetConfig(t.TempDir())
+
+	ctx := t.Context()
+	require.NoError(t, secret.CreateAgentSecret(ctx, vault.WithUnprivileged(true)))
+	require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte("fleet:\n  enabled: true\n"), 0o644))
+
+	store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+	require.NoError(t, err)
+	require.NoError(t, store.Save(strings.NewReader(`fleet:
+  ssl:
+    certificate: "/nonexistent/tls.crt"
+    key: "/nonexistent/tls.key"`)))
+
+	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
+	require.NotErrorIs(t, err, fs.ErrNotExist, "unpack must not try to open stale stored TLS path")
+
+	loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+	require.NoError(t, err)
+	require.Equal(t, envCertPath, loaded.Fleet.Client.Transport.TLS.Certificate.Certificate)
+	require.Equal(t, envKeyPath, loaded.Fleet.Client.Transport.TLS.Certificate.Key)
+}
+
+// Regression test for #15408: FLEET_CA/KIBANA_CA/ELASTICSEARCH_CA overrides fleet.enc CA
+func TestContainerEnvOverridesFleetCA(t *testing.T) {
+	rootPair, _, err := certutil.NewRSARootAndChildCerts()
+	require.NoError(t, err)
+	certDir := t.TempDir()
+	envFleetCAPath := filepath.Join(certDir, "fleet-ca.crt")
+	require.NoError(t, os.WriteFile(envFleetCAPath, rootPair.Cert, 0o644))
+	storedCAPath := filepath.Join(certDir, "stored-ca.crt")
+	require.NoError(t, os.WriteFile(storedCAPath, rootPair.Cert, 0o644))
+	kibanaCAPath := filepath.Join(certDir, "kibana-ca.crt")
+	require.NoError(t, os.WriteFile(kibanaCAPath, rootPair.Cert, 0o644))
+	esCAPath := filepath.Join(certDir, "es-ca.crt")
+	require.NoError(t, os.WriteFile(esCAPath, rootPair.Cert, 0o644))
+
+	origCfg := paths.Config()
+	t.Cleanup(func() { paths.SetConfig(origCfg) })
+	paths.SetConfig(t.TempDir())
+	for _, key := range []string{"FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"} {
+		if orig, ok := os.LookupEnv(key); ok {
+			t.Cleanup(func() { os.Setenv(key, orig) })
+		} else {
+			t.Cleanup(func() { os.Unsetenv(key) })
+		}
+		os.Unsetenv(key)
+	}
+
+	ctx := t.Context()
+	require.NoError(t, secret.CreateAgentSecret(ctx, vault.WithUnprivileged(true)))
+	require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte("fleet:\n  enabled: true\n"), 0o644))
+	store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+	require.NoError(t, err)
+
+	cases := []struct {
+		name       string
+		env        map[string]string
+		fleetEncCA string
+		wantCAs    []string
+		wantErr    bool
+	}{
+		{
+			name:       "valid fleet.enc CAs with no overrides",
+			fleetEncCA: storedCAPath,
+			wantCAs:    []string{storedCAPath},
+		},
+		{
+			name:       "invalid fleet.enc CAs with no overrides",
+			fleetEncCA: "/nonexistent/ca.crt",
+			wantErr:    true,
+		},
+		{
+			name:       "set FLEET_CA should override valid fleet.enc CA",
+			fleetEncCA: storedCAPath,
+			env:        map[string]string{"FLEET_CA": envFleetCAPath},
+			wantCAs:    []string{envFleetCAPath},
+		},
+		{
+			name:       "set FLEET_CA should override invalid fleet.enc CA",
+			fleetEncCA: "/nonexistent/ca.crt",
+			env:        map[string]string{"FLEET_CA": envFleetCAPath},
+			wantCAs:    []string{envFleetCAPath},
+		},
+		{
+			name:       "explicitly empty FLEET_CA should override valid fleet.enc",
+			fleetEncCA: storedCAPath,
+			env:        map[string]string{"FLEET_CA": ""},
+			wantCAs:    []string{},
+		},
+		{
+			name:       "explicitly empty FLEET_CA should override invalid fleet.enc",
+			fleetEncCA: "/nonexistent/ca.crt",
+			env:        map[string]string{"FLEET_CA": ""},
+			wantCAs:    []string{},
+		},
+		{
+			name:       "KIBANA_CA should override fleet.enc CAs when FLEET_CA is unset",
+			fleetEncCA: "/nonexistent/ca.crt",
+			env:        map[string]string{"KIBANA_CA": kibanaCAPath},
+			wantCAs:    []string{kibanaCAPath},
+		},
+		{
+			name:       "ELASTICSEARCH_CA should override fleet.enc CAs when FLEET_CA and KIBANA_CA are unset",
+			fleetEncCA: "/nonexistent/ca.crt",
+			env:        map[string]string{"ELASTICSEARCH_CA": esCAPath},
+			wantCAs:    []string{esCAPath},
+		},
+		{
+			name:       "explicitly empty FLEET_CA should take precedence over set KIBANA_CA and ELASTICSEARCH_CA",
+			fleetEncCA: "/nonexistent/ca.crt",
+			env:        map[string]string{"FLEET_CA": "", "KIBANA_CA": kibanaCAPath, "ELASTICSEARCH_CA": esCAPath},
+			wantCAs:    []string{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, store.Save(strings.NewReader(fmt.Sprintf(`fleet:
+  ssl:
+    certificate_authorities:
+      - %q`, tc.fleetEncCA))))
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+
+			_, err := shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+				require.NoError(t, err)
+				require.Equal(t, tc.wantCAs, loaded.Fleet.Client.Transport.TLS.CAs)
+			}
+		})
+	}
 }

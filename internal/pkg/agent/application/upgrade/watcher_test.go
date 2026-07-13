@@ -23,10 +23,10 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -249,6 +249,69 @@ func TestWatcher_PIDChangeSuccess(t *testing.T) {
 		case <-time.After(1 * time.Second):
 			return
 		}
+	}
+}
+
+// TestWatcher_GracefulShutdownWithPreloadedLostCounter is a regression test
+// for the race where watch()'s deferred close(errChan) fires before
+// AgentWatcher.Run() exits, causing a panic (send on closed channel) when the
+// context.Canceled error from gRPC pushes lostCounter past statusLossesAllowed.
+//
+// The test preloads lostCounter to statusLossesAllowed via PID changes, then
+// cancels the context (simulating grace-period expiry) and asserts that no
+// error is written to errChan — i.e. the watcher exits cleanly rather than
+// treating the expected shutdown as a connection failure.
+func TestWatcher_GracefulShutdownWithPreloadedLostCounter(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Buffered so that a bug (send of ErrLostConnection) lands here instead of
+	// panicking, allowing the test to fail with a descriptive assertion.
+	errCh := make(chan error, 10)
+	logger, _ := loggertest.New("watcher")
+	// Long checkInterval to prevent reconnect races during the test.
+	w := NewAgentWatcher(errCh, logger, 500*time.Millisecond)
+
+	mockHandler := func(srv cproto.ElasticAgentControl_StateWatchServer) error {
+		// Three PIDs: first sets lastPid, next two each increment lostCounter.
+		for _, pid := range []int32{1, 2, 3} {
+			if err := srv.Send(&cproto.StateResponse{
+				Info:    &cproto.StateAgentInfo{Pid: pid},
+				State:   cproto.State_HEALTHY,
+				Message: "healthy",
+			}); err != nil {
+				return err
+			}
+		}
+		<-ctx.Done()
+		return nil
+	}
+	md := &mockDaemon{watch: mockHandler}
+	require.NoError(t, md.Start())
+	defer md.Stop()
+
+	w.agentClient = md.Client()
+	go w.Run(ctx)
+
+	// Wait until the watcher has processed both PID changes and lostCounter
+	// reaches the threshold. The test file is in the same package so it can
+	// read the private field directly.
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.Equal(c, int32(statusLossesAllowed), w.lostCounter.Load())
+	}, 3*time.Second, 5*time.Millisecond)
+
+	// Cancel the context, simulating grace-period expiry triggering watch()'s
+	// deferred cleanup. Before the fix, Run() would increment lostCounter to 3
+	// (> statusLossesAllowed=2) and send ErrLostConnection on errCh (and panic
+	// if errCh had been closed). After the fix, Run() detects ctx.Err() != nil
+	// and returns cleanly.
+	cancel()
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err, "watcher must not report an error when context is canceled")
+	case <-time.After(500 * time.Millisecond):
+		// clean exit — expected
 	}
 }
 
@@ -605,7 +668,7 @@ type mockDaemon struct {
 }
 
 func (s *mockDaemon) Start(opt ...grpc.ServerOption) error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.port))
+	lis, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", s.port))
 	if err != nil {
 		return err
 	}
@@ -630,7 +693,7 @@ func (s *mockDaemon) Client() client.Client {
 	return client.New(client.WithAddress(fmt.Sprintf("http://localhost:%d", s.port)))
 }
 
-func (s *mockDaemon) StateWatch(_ *cproto.Empty, srv cproto.ElasticAgentControl_StateWatchServer) error {
+func (s *mockDaemon) StateWatch(_ *cproto.StateWatchRequest, srv cproto.ElasticAgentControl_StateWatchServer) error {
 	return s.watch(srv)
 }
 

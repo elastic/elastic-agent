@@ -1500,7 +1500,10 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 					"pipeline:logs/_agent-component/test-component": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							"receiver:filebeat/_agent-component/test-component": {
+							"receiver:filebeat/_agent-component/test-component/test-1": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							"receiver:filebeat/_agent-component/test-component/test-2": {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							"exporter:elasticsearch/_agent-component/test-component": {
@@ -1836,7 +1839,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receivers)
 		assert.True(t, receivers.IsSet("nop"))
-		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test/test-1"))
 	})
 
 	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
@@ -1852,7 +1855,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receivers)
 		assert.False(t, receivers.IsSet("nop"))
-		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test/test-1"))
 	})
 
 	t.Run("collector status with components is passed up to the component manager", func(t *testing.T) {
@@ -1863,7 +1866,10 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 				"pipeline:logs/_agent-component/test": {
 					Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					ComponentStatusMap: map[string]*status.AggregateStatus{
-						"receiver:filebeatreceiver/_agent-component/test": {
+						"receiver:filebeatreceiver/_agent-component/test/test-1": {
+							Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						},
+						"receiver:filebeatreceiver/_agent-component/test/test-2": {
 							Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						},
 						"exporter:elasticsearch/_agent-component/test": {
@@ -2098,7 +2104,10 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 			"pipeline:logs/_agent-component/test": {
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					"receiver:filebeatreceiver/_agent-component/test": {
+					"receiver:filebeatreceiver/_agent-component/test/test-1": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+					"receiver:filebeatreceiver/_agent-component/test/test-2": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
 					"exporter:elasticsearch/_agent-component/test": {
@@ -2436,10 +2445,9 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 		"pull": map[string]any{
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
-					"host":                "localhost",
-					"port":                0,
-					"without_units":       true,
-					"without_type_suffix": true,
+					"host":               "localhost",
+					"port":               0,
+					"without_scope_info": false,
 				},
 			},
 		},
@@ -2513,8 +2521,10 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 
 func TestMonitoringReceiverProcessors(t *testing.T) {
 	exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
-	procName := translate.GetProcessorID().String()
-	pipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
+	procName := translate.GetProcessorID("internal-telemetry-monitoring").String()
+	// Processors are injected on the logs pipeline (connector → ES), which is only
+	// created when an OTel-based monitoring exporter is present.
+	logsPipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
 	baseConfig := map[string]any{
 		"exporters": map[string]any{
 			exporterName: nil,
@@ -2524,11 +2534,11 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	monitoringConfig := &config.MonitoringConfig{}
 	agentInfo := &info.AgentInfo{}
 	components := []component.Component{}
-	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components)
+	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components, logp.NewNopLogger())
 	require.NoError(t, err, "injectMonitoringReceiver should succeed")
 	result := mapstr.M(cfg.ToStringMap()).Flatten()
 
-	expectedBeatsProcessors := translate.GetDefaultProcessors()
+	expectedBeatsProcessors := translate.GetDefaultProcessors("")
 	actualBeatsProcessors := result["processors."+procName+".processors"]
 	assert.NotNil(t, actualBeatsProcessors, "monitoring receiver processors should not be nil")
 	if actualBeatsProcessors != nil {
@@ -2536,9 +2546,105 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	}
 
 	expectedPipelineProcessors := []string{procName}
-	actualPipelineProcessors := result["service.pipelines."+pipelineName+".processors"]
-	assert.NotNil(t, actualPipelineProcessors, "processors for monitoring receiver pipeline should not be nil")
-	assert.ElementsMatch(t, expectedPipelineProcessors, actualPipelineProcessors, "monitoring receiver pipeline processors should match default")
+	actualPipelineProcessors := result["service.pipelines."+logsPipelineName+".processors"]
+	assert.NotNil(t, actualPipelineProcessors, "processors for monitoring logs pipeline should not be nil")
+	assert.ElementsMatch(t, expectedPipelineProcessors, actualPipelineProcessors, "monitoring logs pipeline processors should match default")
+}
+
+func TestMonitoringReceiverFileExporter(t *testing.T) {
+	receiverName := "internal-telemetry-monitoring"
+	// The file exporter is on the metrics pipeline, which always exists.
+	metricsPipelineName := "metrics/" + translate.OtelNamePrefix + receiverName
+	// The logs pipeline (connector → ES) only exists when ES monitoring is configured.
+	logsPipelineName := "logs/" + translate.OtelNamePrefix + receiverName
+	fileExporterName := "file/" + translate.OtelNamePrefix + receiverName
+	connectorName := elasticMonitoringConnectorName + "/" + translate.OtelNamePrefix + receiverName
+
+	t.Run("with OTel monitoring exporter", func(t *testing.T) {
+		// When an OTel-based monitoring exporter is present:
+		// - metrics pipeline: receiver → [file exporter, connector]
+		// - logs pipeline:    connector → ES monitoring exporter
+		exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
+		baseConfig := map[string]any{
+			"exporters": map[string]any{
+				exporterName: nil,
+			},
+		}
+		cfg := confmap.NewFromStringMap(baseConfig)
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err, "injectMonitoringReceiver should succeed")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+		// Metrics pipeline exports to file and to the connector.
+		metricsExporters := result["service.pipelines."+metricsPipelineName+".exporters"]
+		require.NotNil(t, metricsExporters, "metrics pipeline exporters should not be nil")
+		assert.ElementsMatch(t,
+			[]string{fileExporterName, connectorName},
+			metricsExporters,
+			"metrics pipeline should export to the file exporter and the connector",
+		)
+
+		// Logs pipeline (connector output) exports to ES.
+		logsExporters := result["service.pipelines."+logsPipelineName+".exporters"]
+		require.NotNil(t, logsExporters, "logs pipeline exporters should not be nil")
+		assert.ElementsMatch(t,
+			[]string{exporterName},
+			logsExporters,
+			"logs pipeline should export to the elasticsearch monitoring exporter",
+		)
+	})
+
+	t.Run("without OTel monitoring exporter", func(t *testing.T) {
+		// When no OTel-based monitoring exporter exists (e.g. classic HTTP-based
+		// monitoring is in use), the metrics pipeline is still injected so that
+		// internal telemetry is captured in the diagnostics file. No connector or
+		// logs pipeline is added since there is no ES output to send logs to.
+		cfg := confmap.NewFromStringMap(map[string]any{})
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err, "injectMonitoringReceiver should succeed without monitoring exporter")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+		metricsExporters := result["service.pipelines."+metricsPipelineName+".exporters"]
+		require.NotNil(t, metricsExporters, "metrics pipeline should still be created with file-only exporters")
+		assert.ElementsMatch(t,
+			[]string{fileExporterName},
+			metricsExporters,
+			"metrics pipeline should export only to the diagnostics file exporter when no OTel monitoring exporter is present",
+		)
+
+		// No connector, no logs pipeline.
+		assert.Nil(t, result["connectors."+connectorName],
+			"connector should not be injected when no OTel monitoring exporter is present")
+		assert.Nil(t, result["service.pipelines."+logsPipelineName],
+			"logs pipeline should not be created when no OTel monitoring exporter is present")
+	})
+
+	t.Run("file exporter config", func(t *testing.T) {
+		cfg := confmap.NewFromStringMap(map[string]any{})
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err, "injectMonitoringReceiver should succeed")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+		// The file exporter path must be in paths.Home()/logs/ — the same directory
+		// that MakeInternalFileOutput writes to and that the diagnostics collector walks.
+		expectedPath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
+		assert.Equal(t, expectedPath, result["exporters."+fileExporterName+".path"],
+			"file exporter path should be in paths.Home()/logs/")
+
+		// Records are written as OTLP JSON metrics — format: json uses the same metrics
+		// marshaler as the otlp_encoding extension, without needing a separate extension component.
+		assert.Equal(t, "json", result["exporters."+fileExporterName+".format"])
+
+		// Rotation settings: 10 MB cap with one backup.
+		assert.Equal(t, defaultDiagnosticsFileSizeMB, result["exporters."+fileExporterName+".rotation.max_megabytes"])
+		assert.Equal(t, 1, result["exporters."+fileExporterName+".rotation.max_backups"])
+
+		// No on-disk compression: the diagnostics collector packages files into a zip using
+		// deflate, and repetitive JSON compresses to ~4% of its original size in that
+		// context — far better than the ~94% stored ratio of a pre-compressed zstd file.
+		assert.Nil(t, result["exporters."+fileExporterName+".compression"],
+			"compression should not be set; plain NDJSON deflates better inside the diagnostics zip")
+	})
 }
 
 // fakeCloseListener is a wrapper around a net.Listener that ignores the Close() method. This is used in a very particular

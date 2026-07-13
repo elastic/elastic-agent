@@ -24,7 +24,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -32,6 +31,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
@@ -76,13 +76,16 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 	})
 	esUrl := integration.StartMockES(t, 0, 0, 0, 0)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// Upgrade from an old build because the new watcher from the new build will
 	// be ran. Otherwise the test will run the old watcher from the old build.
 	upgradeFromVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
+	if !upgradetest.SupportsUpgradeSourceOnPlatform(upgradeFromVersion, runtime.GOOS, runtime.GOARCH) {
+		t.Skipf("upgrade from %s is not supported on %s/%s", upgradeFromVersion, runtime.GOOS, runtime.GOARCH)
+	}
 	startFixture, err := atesting.NewFixture(
 		t,
 		upgradeFromVersion.String(),
@@ -112,6 +115,7 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 outputs:
   default:
     type: elasticsearch
+    preset: latency
     hosts: [%s]
 
 inputs:
@@ -213,6 +217,9 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 				// be ran. Otherwise the test will run the old watcher from the old build.
 				upgradeFromVersion, err := upgradetest.PreviousMinor()
 				require.NoError(t, err)
+				if !upgradetest.SupportsUpgradeSourceOnPlatform(upgradeFromVersion, runtime.GOOS, runtime.GOARCH) {
+					t.Skipf("upgrade from %s is not supported on %s/%s", upgradeFromVersion, runtime.GOOS, runtime.GOARCH)
+				}
 				startFixture, err := atesting.NewFixture(
 					t,
 					upgradeFromVersion.String(),

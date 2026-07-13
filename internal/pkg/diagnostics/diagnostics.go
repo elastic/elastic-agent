@@ -40,6 +40,13 @@ const (
 	redactionRouteKey     = "routekey"
 )
 
+var redactionHeaderValueKeys = []string{
+	"FLEET_HEADER",
+	"FLEET_HEADERS",
+	"FLEET_KIBANA_HEADER",
+	"FLEET_KIBANA_HEADERS",
+}
+
 // DiagCPU* are contstants to describe the CPU profile that is collected when the --cpu-profile flag is used with the diagnostics command, or the diagnostics action contains "CPU" in the additional_metrics list.
 const (
 	DiagCPUName        = "cpuprofile"
@@ -282,6 +289,9 @@ func ZipArchive(
 			// check for component-level errors
 			// create unit diags
 			for _, ud := range units {
+				if ud.Err == nil && len(ud.Results) == 0 {
+					continue
+				}
 				unitDir := strings.ReplaceAll(strings.TrimPrefix(ud.UnitID, ud.ComponentID+"-"), "/", "-")
 				_, err := zw.CreateHeader(&zip.FileHeader{
 					Name:     fmt.Sprintf("components/%s/%s/", dirName, unitDir),
@@ -319,7 +329,7 @@ func ZipArchive(
 	}
 
 	// Gather Logs:
-	return zipLogs(zw, ts, topPath, excludeEvents)
+	return zipLogs(zw, ts, topPath, excludeEvents, errOut)
 }
 
 func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
@@ -346,6 +356,7 @@ func RedactOpts(w io.Writer) []redact.RedactOption {
 		redact.WithErrorOutput(w),
 		redact.WithMarkerPrefix(redactionMarkerPrefix),
 		redact.WithIgnoreKeys(redactionRouteKey),
+		redact.WithHeaderValueKeys(redactionHeaderValueKeys...),
 	}
 }
 
@@ -379,14 +390,28 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 	return err
 }
 
-func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) error {
+func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool, errOut io.Writer) error {
 	homePath := paths.HomeFrom(topPath)
 	dataPath := paths.DataFrom(topPath)
 	currentDir := filepath.Base(homePath)
+
+	_, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "logs/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := collectServiceComponentsLogs(zw, errOut); err != nil {
+		fmt.Fprintf(errOut, "[WARNING] failed to collect endpoint-security logs: %s\n", err)
+	}
+
 	if !paths.IsVersionHome() {
 		// running in a container with custom top path set
 		// logs are directly under top path
-		return zipLogsWithPath(homePath, currentDir, true, excludeEvents, zw, ts)
+		return zipLogsWithPath(homePath, currentDir, excludeEvents, zw, ts, errOut)
 	}
 
 	dataDir, err := os.Open(dataPath)
@@ -405,9 +430,8 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) e
 		if !strings.HasPrefix(dir, dirPrefix) {
 			continue
 		}
-		collectServices := dir == currentDir
 		path := filepath.Join(dataPath, dir)
-		if err := zipLogsWithPath(path, dir, collectServices, excludeEvents, zw, ts); err != nil {
+		if err := zipLogsWithPath(path, dir, excludeEvents, zw, ts, errOut); err != nil {
 			return err
 		}
 	}
@@ -415,40 +439,53 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) e
 	return nil
 }
 
-// zipLogs walks paths.Logs() and copies the file structure into zw in "logs/"
-func zipLogsWithPath(pathsHome, commitName string, collectServices, excludeEvents bool, zw *zip.Writer, ts time.Time) error {
-	_, err := zw.CreateHeader(&zip.FileHeader{
-		Name:     "logs/",
-		Method:   zip.Deflate,
-		Modified: ts,
-	})
-	if err != nil {
-		return err
-	}
-
-	if collectServices {
-		if err := collectServiceComponentsLogs(zw); err != nil {
-			return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
-		}
-	}
-
-	_, err = zw.CreateHeader(&zip.FileHeader{
+// zipLogsWithPath walks {pathsHome}/logs and {pathsHome}/components/logs and copies them into zw
+// under "logs/<commitName>/" and "logs/<commitName>/components/" respectively.
+func zipLogsWithPath(pathsHome, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer) error {
+	if _, err := zw.CreateHeader(&zip.FileHeader{
 		Name:     "logs/" + commitName + "/",
 		Method:   zip.Deflate,
 		Modified: ts,
-	})
-	if err != nil {
-		return err
+	}); err != nil {
+		return fmt.Errorf("failed to create logs dir entry for %s: %w", commitName, err)
 	}
 
-	// using Data() + "/logs", for some reason default paths/Logs() is the home dir...
-	logPath := filepath.Join(pathsHome, "logs") + string(filepath.Separator)
-	return filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
+	if err := walkLogPath(filepath.Join(pathsHome, "logs"), commitName, excludeEvents, zw, ts, errOut); err != nil {
+		return fmt.Errorf("failed to collect logs from %s: %w", pathsHome, err)
+	}
+
+	if _, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "logs/" + commitName + "/components/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	}); err != nil {
+		return fmt.Errorf("failed to create components logs dir entry for %s: %w", commitName, err)
+	}
+
+	// Components may write logs under {pathsHome}/components/logs.
+	// Mirror that structure under logs/<commitName>/components/ to reflect the source layout.
+	if err := walkLogPath(filepath.Join(pathsHome, "components", "logs"), filepath.Join(commitName, "components"), excludeEvents, zw, ts, errOut); err != nil {
+		return fmt.Errorf("failed to collect component logs from %s: %w", pathsHome, err)
+	}
+
+	return nil
+}
+
+func walkLogPath(logRoot, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer) error {
+	// Trailing separator is required: zipLogWalkFunc uses logPath as a TrimPrefix argument,
+	// so it must end with a separator to avoid a leading slash on relative names.
+	logPath := logRoot + string(filepath.Separator)
+	return filepath.WalkDir(logPath, zipLogWalkFunc(logPath, commitName, excludeEvents, zw, ts, errOut))
+}
+
+func zipLogWalkFunc(logPath, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer) func(path string, d fs.DirEntry, fErr error) error {
+	return func(path string, d fs.DirEntry, fErr error) error {
 		if errors.Is(fErr, fs.ErrNotExist) {
 			return nil
 		}
 		if fErr != nil {
-			return fmt.Errorf("unable to walk log dir: %w", fErr)
+			fmt.Fprintf(errOut, "[WARNING] unable to walk log dir %s: %s\n", path, fErr)
+			return nil
 		}
 
 		// name is the relative dir/file name replacing any filepath seperators with /
@@ -469,27 +506,21 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices, excludeEvent
 		name = filepath.Join(commitName, name)
 
 		if d.IsDir() {
-			_, err := zw.CreateHeader(&zip.FileHeader{
+			if _, err := zw.CreateHeader(&zip.FileHeader{
 				Name:     "logs/" + filepath.ToSlash(name) + "/",
 				Method:   zip.Deflate,
 				Modified: ts,
-			})
-			if err != nil {
-				return fmt.Errorf("unable to create log directory in archive: %w", err)
+			}); err != nil {
+				return fmt.Errorf("unable to create log directory in archive %s: %w", name, err)
 			}
 			return nil
 		}
 
-		// Add the file to the zip.
-		// Ignore files that don't exist to account for races with log rotation.
-		if err := saveLogs(name, path, zw); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return err
-		}
-		return nil
-	})
+		return saveLogs(name, path, zw, errOut)
+	}
 }
 
-func collectServiceComponentsLogs(zw *zip.Writer) error {
+func collectServiceComponentsLogs(zw *zip.Writer, errOut io.Writer) error {
 	platform, err := component.LoadPlatformDetail()
 	if err != nil {
 		return fmt.Errorf("failed to gather system information: %w", err)
@@ -523,7 +554,7 @@ func collectServiceComponentsLogs(zw *zip.Writer) error {
 				return nil
 			}
 
-			return saveLogs("services/"+name, path, zw)
+			return saveLogs("services/"+name, path, zw, errOut)
 		})
 		if err != nil {
 			return err
@@ -532,11 +563,19 @@ func collectServiceComponentsLogs(zw *zip.Writer) error {
 	return nil
 }
 
-func saveLogs(name string, logPath string, zw *zip.Writer) error {
+// saveLogs copies the log file at logPath into the zip under "logs/<name>".
+// Source-file errors (file not found, permission denied) are logged as warnings and the
+// function returns nil so the caller can continue collecting other logs.
+// Only zip-writer errors (CreateHeader, io.Copy to the zip) are returned so the caller
+// knows to stop writing to the archive.
+func saveLogs(name string, logPath string, zw *zip.Writer, errOut io.Writer) error {
 	ts := time.Now().UTC()
 	lf, err := os.Open(logPath)
 	if err != nil {
-		return fmt.Errorf("unable to open log file: %w", err)
+		if !errors.Is(err, fs.ErrNotExist) {
+			fmt.Fprintf(errOut, "[WARNING] unable to open log file %s: %s\n", logPath, err)
+		}
+		return nil
 	}
 	defer lf.Close()
 	if li, err := lf.Stat(); err == nil {
@@ -551,11 +590,7 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 		return err
 	}
 	_, err = io.Copy(zf, lf)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // AddSecretMarkers adds secret redaction markers to the config by looking at the secret_paths field.

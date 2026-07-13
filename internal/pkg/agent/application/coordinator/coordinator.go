@@ -20,6 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/backoff"
@@ -39,7 +40,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -47,7 +47,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	internalfleetapi "github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	fleetapiClient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -55,8 +55,11 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -95,7 +98,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -164,7 +167,7 @@ type OTelManager interface {
 	Runner
 
 	// Update updates the current plain configuration for the otel collector and components.
-	Update(*confmap.Conf, *configuration.SettingsConfig, logp.Level, []component.Component)
+	Update(*confmap.Conf, *monitoringCfg.MonitoringConfig, logp.Level, []component.Component)
 
 	// WatchCollector returns a channel to watch for collector status updates.
 	WatchCollector() <-chan *status.AggregateStatus
@@ -835,7 +838,7 @@ type upgradeOpts struct {
 	skipVerifyOverride bool
 	skipDefaultPgp     bool
 	pgpBytes           []string
-	preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error
+	upgradeOpts        []upgrade.Option
 	rollback           bool
 }
 
@@ -861,7 +864,7 @@ func WithPgpBytes(pgpBytes []string) UpgradeOpt {
 
 func WithPreUpgradeCallback(preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
-		opts.preUpgradeCallback = preUpgradeCallback
+		opts.upgradeOpts = append(opts.upgradeOpts, upgrade.WithPreSymlinkCallback(preUpgradeCallback))
 	}
 }
 
@@ -945,16 +948,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		}
 	}
 
-	// run any pre upgrade callback
-	if uOpts.preUpgradeCallback != nil {
-		if err := uOpts.preUpgradeCallback(ctx, c.logger, action); err != nil {
-			c.ClearOverrideState()
-			det.Fail(err)
-			return err
-		}
-	}
-
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes...)
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes, uOpts.upgradeOpts...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
@@ -971,7 +965,17 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 			err = upgradeErrors.ErrInsufficientDiskSpace
 		}
 
-		det.Fail(err)
+		// MarkUpgradeFailed updates det in-memory and, when an upgrade marker
+		// is present on disk (i.e. the failure happened after markUpgrade ran),
+		// persists state=Failed so the watcher started on next boot recognizes
+		// the upgrade as terminal and skips the grace-period watch instead of
+		// treating it as an in-progress upgrade. Returns an error only when a
+		// marker is present but cannot be loaded or written; absent markers are
+		// a no-op.
+		if mErr := upgrade.MarkUpgradeFailed(paths.Data(), det, err); mErr != nil {
+			c.logger.Warnw("failed to persist failed-state marker; reconcile deferred to next boot",
+				"error.message", mErr.Error())
+		}
 		return err
 	}
 
@@ -1247,15 +1251,17 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				}
 
 				output := struct {
-					Headers     map[string]string `yaml:"headers"`
-					LogLevel    string            `yaml:"log_level"`
-					RawLogLevel string            `yaml:"log_level_raw"`
-					Metadata    *info.ECSMeta     `yaml:"metadata"`
+					Headers          map[string]string `yaml:"headers"`
+					LogLevelRuntime  string            `yaml:"log_level"`
+					LogLevelPolicy   string            `yaml:"log_level_policy"`
+					LogLevelOverride string            `yaml:"log_level_override"`
+					Metadata         *ecsmeta.ECSMeta  `yaml:"metadata"`
 				}{
-					Headers:     c.agentInfo.Headers(),
-					LogLevel:    c.agentInfo.LogLevel(),
-					RawLogLevel: c.agentInfo.RawLogLevel(),
-					Metadata:    meta,
+					Headers:          c.agentInfo.Headers(),
+					LogLevelRuntime:  c.agentInfo.GetLogLevelRuntime(),
+					LogLevelPolicy:   c.agentInfo.GetLogLevelPolicy(),
+					LogLevelOverride: c.agentInfo.GetLogLevelOverride(),
+					Metadata:         meta,
 				}
 				o, err := yaml.Marshal(output)
 				if err != nil {
@@ -2131,7 +2137,7 @@ func (c *Coordinator) applyOTelUpdate(components []component.Component) {
 	if len(ids) > 0 {
 		c.logger.With("component_ids", ids).Info("Using OpenTelemetry collector runtime.")
 	}
-	c.otelMgr.Update(c.otelCfg, c.currentCfg.Settings, c.state.LogLevel, components)
+	c.otelMgr.Update(c.otelCfg, c.currentCfg.Settings.MonitoringConfig, c.state.LogLevel, components)
 }
 
 // forceApplyPendingTransitions applies all deferred updates regardless of
@@ -2682,9 +2688,9 @@ func logBasedOnState(l *logger.Logger, state client.UnitState, msg string, args 
 }
 
 func (c *Coordinator) unenroll(ctx context.Context, client fleetapiClient.Sender) error {
-	unenrollCmd := fleetapi.NewAuditUnenrollCmd(c.agentInfo, client)
-	unenrollReq := &fleetapi.AuditUnenrollRequest{
-		Reason:    fleetapi.ReasonMigration,
+	unenrollCmd := internalfleetapi.NewAuditUnenrollCmd(c.agentInfo, client)
+	unenrollReq := &internalfleetapi.AuditUnenrollRequest{
+		Reason:    internalfleetapi.ReasonMigration,
 		Timestamp: time.Now().UTC(),
 	}
 	unenrollResp, err := unenrollCmd.Execute(ctx, unenrollReq)

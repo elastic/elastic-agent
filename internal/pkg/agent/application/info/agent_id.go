@@ -31,10 +31,11 @@ const (
 )
 
 type persistentAgentInfo struct {
-	ID             string                                 `json:"id" yaml:"id" config:"id"`
-	Headers        map[string]string                      `json:"headers" yaml:"headers" config:"headers"`
-	LogLevel       string                                 `json:"logging.level,omitempty" yaml:"logging.level,omitempty" config:"logging.level,omitempty"`
-	MonitoringHTTP *monitoringConfig.MonitoringHTTPConfig `json:"monitoring.http,omitempty" yaml:"monitoring.http,omitempty" config:"monitoring.http,omitempty"`
+	ID               string                                 `json:"id" yaml:"id" config:"id"`
+	Headers          map[string]string                      `json:"headers" yaml:"headers" config:"headers"`
+	LogLevel         string                                 `json:"logging.level,omitempty" yaml:"logging.level,omitempty" config:"logging.level,omitempty"`
+	LogLevelOverride string                                 `json:"logging.level_override,omitempty" yaml:"logging.level_override,omitempty" config:"logging.level_override,omitempty"`
+	MonitoringHTTP   *monitoringConfig.MonitoringHTTPConfig `json:"monitoring.http,omitempty" yaml:"monitoring.http,omitempty" config:"monitoring.http,omitempty"`
 }
 
 type ioStore interface {
@@ -42,14 +43,15 @@ type ioStore interface {
 	Load() (io.ReadCloser, error)
 }
 
-// updateLogLevel updates log level and persists it to disk.
-func updateLogLevel(ctx context.Context, level string) error {
+// updateLogLevelOverride updates the per-agent log level override
+// (agent.logging.level_override) and persists it to disk.
+func updateLogLevelOverride(ctx context.Context, level string) error {
 	ai, _, err := loadAgentInfoWithBackoff(ctx, false, defaultLogLevel, false)
 	if err != nil {
 		return err
 	}
 
-	if ai.LogLevel == level {
+	if ai.LogLevelOverride == level {
 		// no action needed
 		return nil
 	}
@@ -60,7 +62,7 @@ func updateLogLevel(ctx context.Context, level string) error {
 		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
 	}
 
-	ai.LogLevel = level
+	ai.LogLevelOverride = level
 	return updateAgentInfo(diskStore, ai)
 }
 

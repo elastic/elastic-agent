@@ -698,7 +698,7 @@ func (b *BeatsMonitor) getHttpStreams(
 			fbDataset := fmt.Sprintf("elastic_agent.%s", fbDataStreamName)
 			fbIndexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", fbDataStreamName, monitoringNamespace)
 			fbStream := map[string]any{
-				idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
+				idKey: fmt.Sprintf("%s-%s-1-input", monitoringMetricsUnitID, name),
 				"data_stream": map[string]any{
 					"type":      "metrics",
 					"dataset":   fbDataset,
@@ -1284,6 +1284,12 @@ func httpCopyRules() []any {
 		map[string]any{
 			"from": "http.filebeat_input",
 			"to":   "filebeat_input",
+		},
+
+		// System CPU core count
+		map[string]any{
+			"from": "http.agent.system.cpu.cores",
+			"to":   "system.cpu.cores",
 		},
 	}
 

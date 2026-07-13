@@ -263,7 +263,7 @@ type testLogLevelProvider struct {
 	logLevel string
 }
 
-func (l *testLogLevelProvider) LogLevel() string {
+func (l *testLogLevelProvider) GetLogLevelRuntime() string {
 	return l.logLevel
 }
 

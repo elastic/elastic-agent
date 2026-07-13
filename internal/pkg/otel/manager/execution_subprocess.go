@@ -39,6 +39,7 @@ const (
 	OtelSupervisedMonitoringURLFlagName       = "supervised.monitoring.url"
 	OtelFeatureGatesFlagName                  = "feature-gates"
 	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
+	OtelProfilingSupportFeature               = "service.profilesSupport"
 
 	// stdinGobProviderScheme must match agentprovider.StdinGobProviderSchemeName.
 	// Duplicated here to avoid a cross-module import from the main module into
@@ -123,6 +124,9 @@ func (r *subprocessExecution) startCollector(
 
 	// set collector args and add --config flag with the stdingob:stdin URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+	if hasProfilesPipeline(cfg) {
+		collectorArgs = append(collectorArgs, fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelProfilingSupportFeature))
+	}
 	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:", stdinGobProviderScheme))
 	// Override the health check endpoint placeholder (port 0) with the actual resolved port.
 	// Uses the OTel collector --set flag to override a specific config value after all config sources are merged.
@@ -194,10 +198,12 @@ func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
 		"pull": map[string]any{
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
-					"host":                "localhost",
-					"port":                port,
-					"without_units":       true,
-					"without_type_suffix": true,
+					"host": "localhost",
+					"port": port,
+					// without_scope_info=false keeps pipeline-identifying scope attributes (injected by
+					// telemetry.newPipelineTelemetry) as Prometheus labels, preventing label collisions
+					// when the same component type appears in multiple pipelines.
+					"without_scope_info": false,
 				},
 			},
 		},

@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/v2/apmtest"
 	"go.opentelemetry.io/collector/confmap"
+	"go.opentelemetry.io/collector/featuregate"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -39,12 +40,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -53,6 +53,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -639,13 +641,17 @@ func TestReplayedRollbackActionAcked(t *testing.T) {
 }
 
 func TestPreUpgradeCallback(t *testing.T) {
+	// Verify that WithPreUpgradeCallback is forwarded to upgradeMgr.Upgrade as an
+	// upgrade.WithPreSymlinkCallback option. The callback is invoked by the
+	// upgrader (not by the coordinator directly); if it returns an error the
+	// whole upgrade fails and the error is propagated back to the caller.
 	coordCh := make(chan error)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	upgradeManager := &fakeUpgradeManager{
 		upgradeable: true,
-		upgradeErr:  upgrade.ErrUpgradeSameVersion,
+		// No upgradeErr — the error comes from the pre-symlink callback itself.
 	}
 
 	acker := acker.NewMockAcker(t)
@@ -675,9 +681,8 @@ func TestPreUpgradeCallback(t *testing.T) {
 			return preUpgradeCallbackErr
 		}))
 
-	assert.ErrorIs(t, preUpgradeCallbackErr, upgradeErr)
+	assert.ErrorIs(t, upgradeErr, preUpgradeCallbackErr)
 	assert.Nil(t, coord.overrideState)
-	assert.Equal(t, preUpgradeCallbackErr, upgradeErr, "expected pre upgrade callback error")
 	assert.Eventually(t, func() bool {
 		ud := coord.State().UpgradeDetails
 		return ud != nil && ud.State == details.StateFailed
@@ -1164,6 +1169,160 @@ func Test_ApplyPersistedConfig(t *testing.T) {
 	}
 }
 
+func TestExtensionsAreMergedInOrder(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		fleetFile               string
+		persistedFile           string
+		expectedExtensionsOrder []string
+	}{
+		{
+			name:          "extensions are merged in the order of the source file",
+			fleetFile:     filepath.Join(".", "testdata", "config_fleet.yaml"),
+			persistedFile: filepath.Join(".", "testdata", "service_populated.yaml"),
+			expectedExtensionsOrder: []string{
+				"headers_setter/fleet",
+				"headers_setter/api_key",
+				"headers_setter/persisted",
+			},
+		},
+		{
+			name:          "extensions are merged in the order of the source file",
+			fleetFile:     filepath.Join(".", "testdata", "config_fleet.yaml"),
+			persistedFile: filepath.Join(".", "testdata", "service_populated_with_dup.yaml"),
+			expectedExtensionsOrder: []string{
+				"headers_setter/fleet",
+				"headers_setter/api_key",
+				"headers_setter/persisted",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fleetCfg, err := config.LoadFile(tc.fleetFile)
+			require.NoError(t, err)
+
+			testLogger, _ := loggertest.New("")
+
+			registry := featuregate.GlobalRegistry()
+			require.NoError(t, registry.Set("confmap.enableMergeAppendOption", true))
+			t.Cleanup(func() {
+				_ = registry.Set("confmap.enableMergeAppendOption", false)
+			})
+
+			err = applyPersistedConfig(testLogger, fleetCfg, tc.persistedFile)
+			require.NoError(t, err)
+
+			// verify extensions contain both values
+			extensions, ok := fleetCfg.OTel.Get("extensions").(map[string]interface{})
+			require.True(t, ok)
+			require.Equal(t, len(tc.expectedExtensionsOrder), len(extensions))
+			for _, ext := range tc.expectedExtensionsOrder {
+				_, ok = extensions[ext]
+				require.True(t, ok)
+			}
+
+			// verify service contains both values in service.extensions array
+
+			serviceExtensions, ok := fleetCfg.OTel.Get("service::extensions").([]any)
+			require.True(t, ok)
+			require.Equal(t, len(tc.expectedExtensionsOrder), len(serviceExtensions))
+			for i := range len(tc.expectedExtensionsOrder) {
+				require.Equal(t, tc.expectedExtensionsOrder[i], serviceExtensions[i].(string))
+			}
+		})
+	}
+}
+
+func TestOtelConfigIsMerged(t *testing.T) {
+	// this test loads config from service_populated.yaml and verifies that the extensions are merged
+	// with already prepopulated extensions in agent configuration
+	// we are testing extensions, processors, pipelines, exporters
+	// those coming from file are named type/persisted those from config type/fleet
+	// test passes when all extensions, processors, pipelines, exporters are present in the merged config
+	// single test for all of those
+	// we're testing these keys:
+	// - extensions
+	// - service.extensions
+	// - service.pipelines
+	// - processors
+	// - pipelines
+	// - exporters
+	// - receivers
+
+	fleetCfg, err := config.LoadFile(filepath.Join(".", "testdata", "config_fleet.yaml"))
+	require.NoError(t, err)
+
+	testLogger, _ := loggertest.New("")
+
+	registry := featuregate.GlobalRegistry()
+	require.NoError(t, registry.Set("confmap.enableMergeAppendOption", true))
+	t.Cleanup(func() {
+		_ = registry.Set("confmap.enableMergeAppendOption", false)
+	})
+
+	err = applyPersistedConfig(testLogger, fleetCfg, filepath.Join(".", "testdata", "service_populated.yaml"))
+	require.NoError(t, err)
+
+	// verify extensions contain both values
+	extensions, ok := fleetCfg.OTel.Get("extensions").(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, 3, len(extensions))
+	_, ok = extensions["headers_setter/persisted"]
+	require.True(t, ok)
+	_, ok = extensions["headers_setter/api_key"]
+	require.True(t, ok)
+	_, ok = extensions["headers_setter/fleet"]
+	require.True(t, ok)
+
+	// verify service contains both values in service.extensions array
+
+	serviceExtensions, ok := fleetCfg.OTel.Get("service::extensions").([]any)
+	require.True(t, ok)
+	require.Equal(t, 3, len(serviceExtensions))
+	require.Equal(t, "headers_setter/fleet", serviceExtensions[0].(string))
+	require.Equal(t, "headers_setter/api_key", serviceExtensions[1].(string))
+	require.Equal(t, "headers_setter/persisted", serviceExtensions[2].(string))
+
+	// verify processors contain both values
+	processors, ok := fleetCfg.OTel.Get("processors").(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, 2, len(processors))
+	_, ok = processors["batch/persisted"]
+	require.True(t, ok)
+	_, ok = processors["batch/fleet"]
+	require.True(t, ok)
+
+	// verify service contains both values in service.pipelines map
+	pipelines, ok := fleetCfg.OTel.Get("service::pipelines").(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, 2, len(pipelines))
+	_, ok = pipelines["logs/persisted"]
+	require.True(t, ok)
+	_, ok = pipelines["logs/fleet"]
+	require.True(t, ok)
+
+	// verify exporters contain both values
+	exporters, ok := fleetCfg.OTel.Get("exporters").(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, 2, len(exporters))
+	_, ok = exporters["nop/persisted"]
+	require.True(t, ok)
+	_, ok = exporters["nop/fleet"]
+	require.True(t, ok)
+
+	// verify receivers contain both values
+	receivers, ok := fleetCfg.OTel.Get("receivers").(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, 2, len(receivers))
+	_, ok = receivers["nop/persisted"]
+	require.True(t, ok)
+	_, ok = receivers["nop/fleet"]
+	require.True(t, ok)
+
+}
+
 // Test_Coordinator_OTelManagerReceivesPersistedConfig verifies that the OTel manager
 // receives the correct configuration when both persisted config and Fleet config contain
 // OTel configuration. This test specifically checks the timing fix where c.otelCfg must
@@ -1603,8 +1762,11 @@ func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	f.upgradeCalled = true
+	if cbErr := upgrade.InvokePreSymlinkCallback(opts, ctx, nil, action); cbErr != nil {
+		return nil, cbErr
+	}
 	if f.upgradeErr != nil {
 		return nil, f.upgradeErr
 	}
@@ -1806,7 +1968,7 @@ func (f *fakeOTelManager) Errors() <-chan error {
 	return f.errChan
 }
 
-func (f *fakeOTelManager) Update(cfg *confmap.Conf, settings *configuration.SettingsConfig, ll logp.Level, components []component.Component) {
+func (f *fakeOTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component) {
 	var collectorResult, componentResult error
 	if f.updateCollectorCallback != nil {
 		collectorResult = f.updateCollectorCallback(cfg)

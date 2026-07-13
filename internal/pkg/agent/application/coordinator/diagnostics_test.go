@@ -19,8 +19,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -31,6 +29,8 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
+	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -153,10 +153,11 @@ func TestDiagnosticAgentInfo(t *testing.T) {
 			"header1": "value1",
 			"header2": "value2",
 		},
-		logLevel: "trace",
-		meta: &info.ECSMeta{
-			Elastic: &info.ElasticECSMeta{
-				Agent: &info.AgentECSMeta{
+		LogLevelPolicy:   "info",
+		LogLevelOverride: "trace",
+		meta: &ecsmeta.ECSMeta{
+			Elastic: &ecsmeta.ElasticECSMeta{
+				Agent: &ecsmeta.AgentECSMeta{
 					BuildOriginal: "8.14.0-SNAPSHOT",
 					ID:            "agent-id",
 					LogLevel:      "trace",
@@ -166,11 +167,11 @@ func TestDiagnosticAgentInfo(t *testing.T) {
 					Upgradeable:   true,
 				},
 			},
-			Host: &info.HostECSMeta{
+			Host: &ecsmeta.HostECSMeta{
 				Arch:     "arm64",
 				Hostname: "Test-Macbook-Pro.local",
 			},
-			OS: &info.SystemECSMeta{
+			OS: &ecsmeta.SystemECSMeta{
 				Name:     "macos",
 				Platform: "darwin",
 			},
@@ -182,7 +183,8 @@ headers:
   header1: value1
   header2: value2
 log_level: trace
-log_level_raw: trace
+log_level_policy: info
+log_level_override: trace
 metadata:
   elastic:
     agent:
@@ -744,14 +746,15 @@ func mapFromRawYAML(t *testing.T, str string) map[string]interface{} {
 }
 
 type fakeAgentInfo struct {
-	agentID      string
-	headers      map[string]string
-	logLevel     string
-	snapshot     bool
-	version      string
-	unprivileged bool
-	isStandalone bool
-	meta         *info.ECSMeta
+	agentID          string
+	headers          map[string]string
+	LogLevelPolicy   string
+	LogLevelOverride string
+	snapshot         bool
+	version          string
+	unprivileged     bool
+	isStandalone     bool
+	meta             *ecsmeta.ECSMeta
 }
 
 func (a fakeAgentInfo) AgentID() string {
@@ -762,12 +765,19 @@ func (a fakeAgentInfo) Headers() map[string]string {
 	return a.headers
 }
 
-func (a fakeAgentInfo) LogLevel() string {
-	return a.logLevel
+func (a fakeAgentInfo) GetLogLevelRuntime() string {
+	if a.LogLevelOverride != "" {
+		return a.LogLevelOverride
+	}
+	return a.LogLevelPolicy
 }
 
-func (a fakeAgentInfo) RawLogLevel() string {
-	return a.logLevel
+func (a fakeAgentInfo) GetLogLevelPolicy() string {
+	return a.LogLevelPolicy
+}
+
+func (a fakeAgentInfo) GetLogLevelOverride() string {
+	return a.LogLevelOverride
 }
 
 func (a fakeAgentInfo) Snapshot() bool {
@@ -786,12 +796,15 @@ func (a fakeAgentInfo) IsStandalone() bool {
 	return a.isStandalone
 }
 
-func (a fakeAgentInfo) ECSMetadata(l *logger.Logger) (*info.ECSMeta, error) {
+func (a fakeAgentInfo) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
 	return a.meta, nil
 }
 
-func (a fakeAgentInfo) ReloadID(ctx context.Context) error                  { panic("implement me") }
-func (a fakeAgentInfo) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }
+func (a fakeAgentInfo) ReloadID(ctx context.Context) error { panic("implement me") }
+func (a fakeAgentInfo) SetLogLevelOverride(ctx context.Context, level string) error {
+	panic("implement me")
+}
+func (a fakeAgentInfo) SetLogLevelPolicy(level string) { panic("implement me") }
 
 func TestCoordinatorPerformDiagnostics(t *testing.T) {
 	tests := []struct {

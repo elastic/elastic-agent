@@ -7,6 +7,7 @@ on:
 permissions:
   actions: read
   contents: read
+  copilot-requests: write
   issues: write
   pull-requests: read
 
@@ -14,6 +15,7 @@ jobs:
   run:
     uses: elastic/ai-github-actions/.github/workflows/gh-aw-code-quality-audit.lock.yml@v0
     with:
+      report-failure-as-issue: false
       title-prefix: "[fleet-enrollment-resilience]"
       severity-threshold: "high"
       setup-commands: |
@@ -122,5 +124,3 @@ jobs:
         - A priority ranking: unrecoverable states first, then data plane impact, then
           cosmetic status issues
         - Communication paths you audited and found resilient
-    secrets:
-      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

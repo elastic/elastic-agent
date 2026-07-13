@@ -1,0 +1,422 @@
+version: 9.3.5
+entries:
+    - kind: feature
+      summary: Add Azure Monitor receiver to EDOT Collector.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12919
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1771884267
+      file:
+        name: 1771884267-add-azure-monitor-receiver-to-edot-collector.yaml
+        checksum: 094233164734be7485b683e033a6ea25b3b92bda
+    - kind: bug-fix
+      summary: fix rpm --prefix installation service file not found after reboot
+      description: |
+        When installing with `rpm --prefix`, RPM relocates all package files under the
+        prefix, including the systemd service file. The postinstall script previously
+        created a symlink at /lib/systemd/system/ pointing back into the prefix mount.
+        If the prefix is on a separate mount (e.g. /opt), the symlink is unresolvable
+        at boot before that mount is available, causing the service to not be found.
+        The fix copies the service file directly to /lib/systemd/system/ so it is
+        always on the root filesystem.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13284
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1774358740
+      file:
+        name: 1774358740-fix-rpm---prefix-installation-to-copy-service-file.yaml
+        checksum: dbd42022f354a728715adc3a1f0f53be916a0067
+    - kind: feature
+      summary: Add Azure encoding extension to EDOT Collector.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13583
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1775846688
+      file:
+        name: 1775846688-add-azure-encoding-extension-to-edot-collector.yaml
+        checksum: 167a439379bd61e3e6db7c46c7a9732fd7cd23e9
+    - kind: enhancement
+      summary: Update go to v1.26.2
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13683
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1776464382
+      file:
+        name: 1776464382-Update-go-to-v1.26.2.yaml
+        checksum: c54246048c6ad6000a72c457a5eeb604776dd0f1
+    - kind: bug-fix
+      summary: Make enrollment retry backoff respect context cancellation
+      description: |
+        The enrollment retry loop's backoff wait was not context-aware, so a
+        canceled context could not interrupt the current sleep. This caused
+        `elastic-agent uninstall` and graceful shutdown to block for up to
+        EnrollBackoffMax (10 minutes) while the agent was retrying enrollment
+        against an unreachable Fleet Server. The retry loop now exits
+        immediately when the caller's context is canceled.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13698
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1776702953
+      file:
+        name: 1776702953-fix-enroll-retry-blocks-uninstall.yaml
+        checksum: fc1473a8e1ffd8a2f7d349e8ca80a68557fe1c0e
+    - kind: bug-fix
+      summary: Clean up leftover artifacts when `elastic-agent install` fails
+      description: |
+        When `elastic-agent install` failed, some artifacts could be left on the
+        system. These leftovers are now removed when the install fails.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13705
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1776765594
+      file:
+        name: 1776765594-clean-up-after-failed-install.yaml
+        checksum: e71f3b8ba55caf3cb01a561ce026de59413f7ac3
+    - kind: bug-fix
+      summary: Stop MIGRATE action from inheriting source cluster configuration
+      description: |
+        The MIGRATE action previously merged the source cluster's fleet
+        configuration (TLS CAs, proxy settings, etc.) with the migration
+        action's settings. This caused agents enrolled with a custom CA to
+        fail when migrating to a cluster with a different trust chain (e.g.,
+        from self-managed with a custom CA to Elastic Cloud with a public CA)
+        with "certificate signed by unknown authority". The migrate action now
+        builds enrollment options solely from what the action provides,
+        falling back to system defaults (e.g., OS trust store) for any fields
+        not specified.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13756
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1776878791
+      file:
+        name: 1776878791-fix-migrate-action-inherits-source-config.yaml
+        checksum: 4f58b53b752df48144890038a20c6a3a2f0cb49d
+    - kind: bug-fix
+      summary: Report policy id and revision in checkin when acks are disabled
+      description: |
+        Persist the applied POLICY_CHANGE action in the state store regardless of
+        the disable_policy_change_acks flag, and read agent_policy_id and
+        policy_revision_idx from the action's policy data fields ("id" and
+        "revision") that fleet-server actually emits. Without this, Fleet's view
+        of the agent's policy revision never advanced when acks were disabled.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13938
+      issue:
+        - https://github.com/elastic/kibana/issues/264983
+      impact: ""
+      action: ""
+      timestamp: 1777000000
+      file:
+        name: 1777000000-persist-policy-change-without-ack.yaml
+        checksum: 91196801ad40fef51f2d0a8e1eadda8dbc2c520f
+    - kind: bug-fix
+      summary: Fix handling of console events on Windows
+      description: |
+        When Elastic Agent runs in a console on Windows and receives an event like CTRL+C/CTRL+BREAK, it now
+        exits gracefully.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13862
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/13586
+      impact: ""
+      action: ""
+      timestamp: 1777295027
+      file:
+        name: 1777295027-fix-windows-otel-signal-handling.yaml
+        checksum: 1cc210b269fe2e4425eeb3562401cbf3f923131c
+    - kind: bug-fix
+      summary: Retry delayed enrollment on invalid token instead of failing fast
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13861
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1777354971
+      file:
+        name: 1777354971-drosiek-fix-delay-enrollment.yaml
+        checksum: 56d6efa48de3e16e79b56c2557b6c31403c7572e
+    - kind: bug-fix
+      summary: Stop Windows service promptly while the agent is retrying enrollment
+      description: |
+        Stopping the Elastic Agent Windows service while it was retrying
+        enrollment could hang for several minutes and cause MSI uninstall to
+        fail. The service now stops promptly.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13878
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1777366905
+      file:
+        name: 1777366905-fix-windows-service-stop-hang-during-enroll-retry.yaml
+        checksum: b1959433114749afd44ebbb366d4e56ba3be374f
+    - kind: bug-fix
+      summary: fix profiling agent daemonset for K8s versions v1.33+
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13894
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1777410560
+      file:
+        name: 1777410560-k8s-daemonset-fix.yaml
+        checksum: 51f693bc505261146d8312960b8ddc70c4860efa
+    - kind: bug-fix
+      summary: Clamp non-positive agent.download.retry_sleep_init_duration to default 30s
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/13974
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1777882926
+      file:
+        name: 1777882926-drosiek-validate-download-retrysleepinit-time.yaml
+        checksum: 27ec3d47a59a67c704792da81f6b9c7b2c90f628
+    - kind: bug-fix
+      summary: redact sensitive values in slice maps
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14007
+      issue:
+        - https://github.com/elastic/elastic-agent-libs/issues/415
+      impact: ""
+      action: ""
+      timestamp: 1777923810
+      file:
+        name: 1777923810-redact-sensitive-values-in-slice-maps.yaml
+        checksum: c647723935b574c40f3c41b44b426884b46109ba
+    - kind: bug-fix
+      summary: Preserve unexpired available rollback agent versions during rollback
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14024
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1777976666
+      file:
+        name: 1777976666-drosiek-rollback-prune-issue.yaml
+        checksum: 6d8149f63c6d3d44ce82f9705e2dc2faabc9acd4
+    - kind: bug-fix
+      summary: Ship config samples, OTel collector spec, and endpoint resources zip without executable bits
+      description: |
+        Several non-executable files were being installed with mode 0755 in
+        Elastic Agent packages: the OTel sample configs under `otel_samples/`,
+        the `elastic-otel-collector.spec.yml` file, and the
+        `endpoint-security-resources.zip` resource bundle. These files now
+        ship with mode 0644 across deb, rpm, tar.gz, and zip packages.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14117
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/13960
+      impact: ""
+      action: ""
+      timestamp: 1778020336
+      file:
+        name: 1778020336-fix-non-executable-package-file-permissions.yaml
+        checksum: c9ac7e213785e555b1eeabe84065a0be80432b17
+    - kind: bug-fix
+      summary: Policy log level changes are applied after an agent restart
+      description: |
+        After an agent had been restarted, changing the log level in the Fleet
+        policy had no effect, the agent kept reporting and using the previous log
+        level. Policy log level changes now take effect on agents that have already
+        been restarted.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14078
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/13196
+      impact: ""
+      action: ""
+      timestamp: 1778149614
+      file:
+        name: 1778149614-fix-policy-log-level-after-restart.yaml
+        checksum: c68013c1d45bdba2c12706d0b90d36a7b6e897da
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.150.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14104
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1778233524
+      file:
+        name: 1778233524-update-otel-components-to-v0.150.0.yaml
+        checksum: 45290897b0744e30cd43e961e0b88559b77cb27d
+    - kind: security
+      summary: Upgrade npm to v11 in non-wolfi elastic-agent-complete Docker images
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14167
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1778526445
+      file:
+        name: 1778526445-upgrade-npm-elastic-agent-docker.yaml
+        checksum: 439e8fb965398a2d224805ca3b2be5dcd27284a2
+    - kind: bug-fix
+      summary: Correctly deduplicate privilege change actions on Linux
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14114
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1778580284
+      file:
+        name: 1778580284-fix-unprivilege-action-deduplication.yaml
+        checksum: 4409abbab9e1fa11fbc96818546a276190af8820
+    - kind: bug-fix
+      summary: Agent no longer fails to start when the upgrade marker file is corrupt
+      description: |
+        If the machine lost power while the agent was in the middle of an upgrade,
+        the upgrade marker file could be left in a broken state. This caused the
+        agent to refuse to start on the next boot. The agent now moves the broken
+        file out of the way (keeping it for support diagnostics) and starts up
+        normally as if no upgrade was in progress. The upgrade marker file is also
+        now written more safely, making this situation less likely to occur.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14194
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1778590690
+      file:
+        name: 1778590690-upgrade-marker-startup-resilience.yaml
+        checksum: bc502263d8e0da82306fd961e5c6a5c73a42dc19
+    - kind: bug-fix
+      summary: Fix silent early-return when removing stale enrollment and upgrade artifacts
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14234
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1778661566
+      file:
+        name: 1778661566-drosiek-fix-is-not-exist.yaml
+        checksum: 0384a4b0d1a8c3567b3476446dc3c0991528fdb7
+    - kind: bug-fix
+      summary: fix dangling symlink when rotating to a non-existent target
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14238
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1778666423
+      file:
+        name: 1778666423-fix-dangling-symlink-when-rotating-to-a-non-existent-target.yaml
+        checksum: 4de0bfe5e2c3eacf888b604132d950b8ae3c21a1
+    - kind: bug-fix
+      summary: prevent upgrade watcher panic when grace period expires
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14253
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1778716751
+      file:
+        name: 1778716751-prevent-upgrade-watcher-panic-when-grace-period-expires.yaml
+        checksum: 7ace5a901b437622a21a96b6f5f352722daaec83
+    - kind: enhancement
+      summary: Update OTel Collector components to v1.58.0/v0.152.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14326
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1778958546
+      file:
+        name: 1778958546-update-otel-components-to-v0.151.0.yaml
+        checksum: 8c08e93f0fe4e1a2087183e27ed6a1c8943f7db0
+    - kind: bug-fix
+      summary: Notify endpoint-security just before symlink swap, not before upgrade attempt
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14397
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1779219800
+      file:
+        name: 1779219800-fix-notify-endpoint-security-just-before-symlink-swap,-not-before-upgrade-attempt.yaml
+        checksum: f50d6e73b1e272a00be49db675c34143ec304108
+    - kind: bug-fix
+      summary: Honour --path.logs when running elastic-agent run
+      description: |
+        When --path.logs is explicitly set on the CLI, the agent now writes logs to the specified path even if the configuration file has agent.logging.to_stderr: true (the shipped default).
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14410
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/13320
+      impact: ""
+      action: ""
+      timestamp: 1779269825
+      file:
+        name: 1779269825-fix-run-path-logs.yaml
+        checksum: 01027703efba99afcb91879f7f5d6a40202dddab
+    - kind: other
+      summary: upgrade NPM to 11.14.1 on wolfi images
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/14453
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1779396962
+      file:
+        name: 1779396962-heartbeat-bump-npm-11.14.1.yaml
+        checksum: 521b42499f203d4abf531b8b404d2779fabfa4d2

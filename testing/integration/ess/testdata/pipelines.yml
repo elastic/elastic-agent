@@ -8,6 +8,7 @@
       beats {
         port => "5044"
         enrich => "none"
+        ssl_enabled => false
       }
     }
     filter {
@@ -28,6 +29,7 @@
       beats {
         port => "5055"
         enrich => "none"
+        ssl_enabled => false
       }
     }
     filter {

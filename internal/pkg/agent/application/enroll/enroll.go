@@ -34,11 +34,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 const (
-	EnrollBackoffInit      = time.Second * 5
-	EnrollBackoffMax       = time.Minute * 10
 	EnrollInfiniteAttempts = -1
 
 	maxRetriesstoreAgentInfo       = 5
@@ -64,7 +63,7 @@ func EnrollWithBackoff(
 ) error {
 	if backoffFactory == nil {
 		backoffFactory = func(done <-chan struct{}) backoff.Backoff {
-			return backoff.NewEqualJitterBackoff(done, EnrollBackoffInit, EnrollBackoffMax)
+			return backoff.NewEqualJitterBackoff(done, pkgfleetapi.EnrollBackoffInit, pkgfleetapi.EnrollBackoffMax)
 		}
 	}
 	delay(ctx, enrollDelay)
@@ -91,7 +90,7 @@ func EnrollWithBackoff(
 		return nil
 	}
 
-	log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff (init %s, max %s)", client.URI(), EnrollBackoffInit, EnrollBackoffMax)
+	log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff (init %s, max %s)", client.URI(), pkgfleetapi.EnrollBackoffInit, pkgfleetapi.EnrollBackoffMax)
 
 	signal := make(chan struct{})
 	defer close(signal)
@@ -188,7 +187,7 @@ func enroll(
 			errors.TypeNetwork)
 	}
 
-	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, options.EnrollAPIKey, options.ReplaceToken, remoteConfig)
+	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, options.EnrollAPIKey, options.ReplaceToken, remoteConfig, options.CheckinOnStateChange)
 	if err != nil {
 		return err
 	}
@@ -506,12 +505,15 @@ func storeAgentInfo(s saver, reader io.Reader) error {
 	return nil
 }
 
-func createFleetConfigFromEnroll(accessAPIKey string, enrollmentToken string, replaceToken string, cli remote.Config) (*configuration.FleetAgentConfig, error) {
+func createFleetConfigFromEnroll(accessAPIKey string, enrollmentToken string, replaceToken string, cli remote.Config, checkinOnStateChange bool) (*configuration.FleetAgentConfig, error) {
 	var err error
 	cfg := configuration.DefaultFleetAgentConfig()
 	cfg.Enabled = true
 	cfg.AccessAPIKey = accessAPIKey
 	cfg.Client = cli
+	if checkinOnStateChange {
+		cfg.Checkin.Mode = configuration.FleetCheckinModeOnStateChange
+	}
 	cfg.EnrollmentTokenHash, err = fleetHashToken(enrollmentToken)
 	if err != nil {
 		return nil, errors.New(err, "failed to generate enrollment hash", errors.TypeConfig)

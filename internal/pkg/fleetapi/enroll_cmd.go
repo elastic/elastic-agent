@@ -16,9 +16,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
 // EnrollType is the type of enrollment to do with the elastic-agent.
@@ -111,7 +111,7 @@ type EnrollRequest struct {
 
 // Metadata is a all the metadata send or received from the elastic-agent.
 type Metadata struct {
-	Local        *info.ECSMeta          `json:"local"`
+	Local        *ecsmeta.ECSMeta       `json:"local"`
 	UserProvided map[string]interface{} `json:"user_provided"`
 	Tags         []string               `json:"tags"`
 }
@@ -211,7 +211,7 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 		return nil, errors.New(err, "fail to encode the enrollment request")
 	}
 
-	resp, err := e.client.Send(ctx, "POST", p, nil, headers, bytes.NewBuffer(b))
+	resp, err := e.client.Send(ctx, "POST", p, nil, headers, bytes.NewReader(b))
 	if err != nil {
 		if errors.Is(err, syscall.ECONNREFUSED) {
 			return nil, ErrConnRefused

@@ -91,14 +91,14 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 	agentRootCertPool := x509.NewCertPool()
 	agentRootCertPool.AppendCertsFromPEM(agentRootPair.Cert)
 
-	fleetmTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+	fleetmTLSServer.TLS = &tls.Config{
 		RootCAs:      fleetRootCertPool,
 		Certificates: []tls.Certificate{cert},
 		ClientCAs:    agentRootCertPool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 	}
 
-	fleetNomTLSServer.TLS = &tls.Config{ //nolint:gosec // it's just a test
+	fleetNomTLSServer.TLS = &tls.Config{
 		RootCAs:      fleetRootCertPool,
 		Certificates: []tls.Certificate{cert},
 	}
@@ -206,20 +206,20 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 			if tc.customLogLevelSetterMock != nil {
 				logLevelSetterMock = tc.customLogLevelSetterMock(t)
 			} else {
-				logLevelSetterMock = nilLogLevelSet(t)
+				logLevelSetterMock = defaultLogLevelSet(t)
 			}
 			h := PolicyChangeHandler{
-				agentInfo:            &info.AgentInfo{},
-				config:               tc.originalCfg,
-				store:                &storage.NullStore{},
-				setters:              []actions.ClientSetter{&setter},
-				log:                  log,
-				policyLogLevelSetter: logLevelSetterMock,
+				agentInfo:             &info.AgentInfo{},
+				config:                tc.originalCfg,
+				store:                 &storage.NullStore{},
+				setters:               []actions.ClientSetter{&setter},
+				log:                   log,
+				runtimeLogLevelSetter: logLevelSetterMock,
 			}
 
 			cfg := config.MustNewConfigFrom(tc.newCfg)
 
-			err := h.handlePolicyChange(context.Background(), cfg)
+			err := h.handlePolicyChange(context.Background(), cfg, nil)
 			tc.assertErr(t, err)
 
 			assert.Equal(t, tc.setterCalledCount, setterCalledCount,
