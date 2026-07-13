@@ -116,7 +116,9 @@ common:
       - v1.31.0
       - v1.32.0
       - v1.33.0
-      - &k8s_max_test_version v1.36.0
+      - v1.34.0
+      - v1.35.0
+      - &k8s_max_test_version v1.36.1 # kind doesn't have a v1.36.0 image
     versions_without_min_max: &k8s_test_versions_without_min_max
       - v1.28.15
       - v1.29.14
@@ -124,6 +126,8 @@ common:
       - v1.31.0
       - v1.32.0
       - v1.33.0
+      - v1.34.0
+      - v1.35.0
     variants: &k8s_test_variants
       - basic
       - complete
