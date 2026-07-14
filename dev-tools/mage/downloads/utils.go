@@ -42,7 +42,6 @@ func downloadFile(downloadRequest *downloadRequest) error {
 
 	exp := downloadFileBackoff()
 
-	retryCount := 1
 	download := func() error {
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, downloadRequest.URL, nil)
 		if err != nil {
@@ -55,7 +54,6 @@ func downloadFile(downloadRequest *downloadRequest) error {
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			retryCount++
 			return fmt.Errorf("downloading file %s: %w", downloadRequest.URL, err)
 		}
 		defer func() {
@@ -71,7 +69,6 @@ func downloadFile(downloadRequest *downloadRequest) error {
 		// file. Drain the body so the connection can be reused.
 		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 			_, _ = io.Copy(io.Discard, resp.Body)
-			retryCount++
 			return fmt.Errorf("downloading file %s: bad HTTP status: %d - %q", downloadRequest.URL, resp.StatusCode, resp.Status)
 		}
 
