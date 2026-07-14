@@ -185,7 +185,7 @@ func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
 				if strings.HasPrefix(comp.ID, "osquery") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
 					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected osquery component to be healthy, got %s", cproto.State(comp.State))
+						"expected osquery component to be healthy, got state %d", comp.State)
 					foundReceiver = true
 					break
 				}
@@ -223,7 +223,7 @@ func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
 				if strings.HasPrefix(comp.ID, "osquery") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.ProcessRuntimeManager) {
 					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected osquery component to be healthy, got %s", cproto.State(comp.State))
+						"expected osquery component to be healthy, got state %d", comp.State)
 					foundProcess = true
 					break
 				}
