@@ -13,6 +13,11 @@ receivers:
       logs: Beta
       metrics: Undefined
       traces: Undefined
+  - name: heartbeatreceiver
+    stability:
+      logs: Alpha
+      metrics: Undefined
+      traces: Undefined
   - name: hostmetrics
     stability:
       logs: Development
@@ -38,6 +43,11 @@ receivers:
       logs: Beta
       metrics: Undefined
       traces: Undefined
+  - name: kafka
+    stability:
+      logs: Beta
+      metrics: Beta
+      traces: Beta
   - name: kubeletstats
     stability:
       logs: Undefined
@@ -53,6 +63,11 @@ receivers:
       logs: Beta
       metrics: Stable
       traces: Stable
+  - name: prometheus
+    stability:
+      logs: Undefined
+      metrics: Beta
+      traces: Undefined
   - name: zipkin
     stability:
       logs: Undefined
@@ -130,6 +145,11 @@ exporters:
       logs: Alpha
       metrics: Alpha
       traces: Alpha
+  - name: kafka
+    stability:
+      logs: Beta
+      metrics: Beta
+      traces: Beta
   - name: loadbalancing
     stability:
       logs: Beta
