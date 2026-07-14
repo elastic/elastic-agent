@@ -120,6 +120,10 @@ The `elasticinframetrics` processor is deprecated in EDOT Collector 9.2 but is r
 
 When ingesting OTel data through the [{{motlp}}](opentelemetry://reference/motlp.md), all the enrichment that is required for an optimal experience in the Elastic solutions happens at the endpoint level and is transparent to users.
 
+:::{note}
+The {{motlp}} is available only on {{ecloud}} ({{serverless-full}} and {{ech}}) and doesn't apply to self-managed deployments. For self-managed environments, use a Gateway Collector as described in [Forwarding to a self-managed Gateway Collector](#forwarding-to-a-self-managed-gateway-collector).
+:::
+
 The Collector configuration for all use cases that involve the {{motlp}} is only concerned with local data collection and context enrichment.
 
 Platform logs are scraped with the [`filelog`] receiver, host metrics are collected through the [`hostmetrics`] receiver and both signals are enriched with meta information through the [`resourcedetection`] processor.
@@ -127,6 +131,51 @@ Platform logs are scraped with the [`filelog`] receiver, host metrics are collec
 Data from OTel SDKs is piped through the [`OTLP`] receiver directly to the OTLP exporter that sends data for all signals to the {{motlp}}.
 
 With the {{motlp}}, there is no need to configure any Elastic-specific components, such as the [`elasticinframetrics`] and [`elasticapm`] processors, the [`elasticapm`] connector, or the [`elasticsearch`] exporter. Edge setup and configuration can be fully vendor agnostic.
+
+### Forwarding to a self-managed Gateway Collector
+
+When the {{motlp}} isn't an option (for example in self-managed Elastic deployments), the Collector can forward all signals to a self-managed Gateway Collector over OTLP instead.
+
+Like the {{motlp}} path, this approach keeps the edge configuration vendor-agnostic, meaning that no Elastic-specific components are required in the Agent Collector. Data enrichment and the authenticated export to {{es}} happen centrally at the Gateway Collector. For guidance on when to use a Gateway Collector and the required Gateway components for self-managed environments, refer to [Deployment modes](/reference/edot-collector/modes.md).
+
+The local-collection pipelines (receivers and processors) are the same as the {{motlp}} configuration. Only the exporter destination changes to targeting your own Gateway Collector's OTLP endpoint:
+
+```yaml
+exporters:
+  # Forward all signals to a self-managed Gateway Collector over OTLP/gRPC.
+  otlp/gateway:
+    endpoint: "gateway-host:4317"
+    tls:
+      insecure: false
+      ca_file: /path/to/gateway-ca.crt
+    # The exporter batches automatically using sending_queue (already tuned in the EDOT Collector).
+    # Refer to the "Batching configuration" section to customize.
+
+service:
+  pipelines:
+    logs:
+      receivers: [file_log/platformlogs, otlp/fromsdk]
+      processors: [resourcedetection]
+      exporters: [otlp/gateway]
+    metrics:
+      receivers: [hostmetrics/system, otlp/fromsdk]
+      processors: [resourcedetection]
+      exporters: [otlp/gateway]
+    traces:
+      receivers: [otlp/fromsdk]
+      processors: []
+      exporters: [otlp/gateway]
+```
+
+No `elasticsearch` exporter and no `elasticapm`/`elasticinframetrics` components are needed in the Agent Collector configuration, because the enrichment and the authenticated export to Elastic are the Gateway's responsibility. For configuring the receiving Gateway Collector, refer to the [Gateway Collector configuration](#gateway-mode) section.
+
+:::{note}
+With a self-managed Gateway, you own authentication (TLS/mTLS, or optionally the `apikeyauth` extension), scaling, and availability. Authentication to {{es}} is configured on the Gateway Collector, not on the Agent Collector, meaning that no Elastic API key is needed on the `otlp/gateway` exporter.
+
+The `sending_queue` batching tuning described in the [Batching configuration for contrib OpenTelemetry Collector](#batching-configuration-for-contrib-opentelemetry-collector) section applies to this OTLP output as well and is already included in the EDOT Collector.
+:::
+
+For information on sending data from a non-EDOT upstream OpenTelemetry Collector to an EDOT Gateway, refer to [Send data from an upstream OpenTelemetry Collector](docs-content://solutions/observability/get-started/opentelemetry/use-cases/upstream-collector.md).
 
 ### Batching configuration for contrib OpenTelemetry Collector
 
