@@ -578,6 +578,10 @@ github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintaker
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.65.0/go.mod h1:9nH1kJLlAzMcgzTPpHqwe8uPiP3m2DuqssXG0zd0AJM=
 github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260623161606-914313578a72 h1:DS/wAeQb9D+qAS2q4tAJycu9MbkKXkleTonSIN2d38o=
 github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260623161606-914313578a72/go.mod h1:p2j6xOQqCCXa5mRN6Kepb2EeYFbQFVsb/OBsqTHC6lk=
+github.com/elastic/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057 h1:jBz4E5yQcQw7xaKax8EMd+HKSuBa4rILlK8xdIz1FoA=
+github.com/elastic/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057/go.mod h1:/R9dgXJABmOizLuUmCXJdBlE/qpAFOiHOPwXJRFuN08=
+github.com/elastic/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057 h1:5TIY+buJraOXaDiMxGXBFLn1MoZ+E7cV6+DHEK5M4lE=
+github.com/elastic/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057/go.mod h1:L9Rs1QOuz5syuz678aZA1D5WchQle+3WVRav5PPGiMs=
 github.com/elastic/opentelemetry-lib v0.42.0 h1:qxLzHONqWCcF/BW6Pb17Z5i3nOJD3OkXHklbJXavbfs=
 github.com/elastic/opentelemetry-lib v0.42.0/go.mod h1:tvufZL2pYRcVk25cC24jRfm/+rmPafNWnwa/fTFE6z8=
 github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 h1:QFDM5JuLch52FxjHizLP2tiuzfhulUdyOsUe/JuPhrQ=
@@ -1618,10 +1622,6 @@ github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXl
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/swiatekm/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057 h1:z3M4g3vq3WsUa8JKfj6EV3GnuOiJz+chvRiVne6rnyk=
-github.com/swiatekm/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057/go.mod h1:/R9dgXJABmOizLuUmCXJdBlE/qpAFOiHOPwXJRFuN08=
-github.com/swiatekm/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057 h1:69+yHsdZqzy3J/0O+GOEDTFIaLiNssWSecB9Ha+fTJE=
-github.com/swiatekm/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057/go.mod h1:L9Rs1QOuz5syuz678aZA1D5WchQle+3WVRav5PPGiMs=
 github.com/teambition/rrule-go v1.8.2 h1:lIjpjvWTj9fFUZCmuoVDrKVOtdiyzbzc93qTmRVe/J8=
 github.com/teambition/rrule-go v1.8.2/go.mod h1:Ieq5AbrKGciP1V//Wq8ktsTXwSwJHDD5mD/wLBGl3p4=
 github.com/testcontainers/testcontainers-go v0.43.0 h1:oEQx5MW2DGd9z3AeEQfB2lPM0eLs7ztyaGRu75bFo5A=

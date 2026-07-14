@@ -452,11 +452,11 @@ replace (
 
 // Use a fork of the OTel Collector otelcol and service modules that adds partial
 // receiver reload on config change (feature gates service.partialReload and
-// service.partialReloadReceivers). Fork: https://github.com/swiatekm/opentelemetry-collector
-// commit 9242922d607f3f5a55f1d826badcbd893545cbb0 on top of v0.155.0.
+// service.partialReloadReceivers). Fork: https://github.com/elastic/opentelemetry-collector
+// commit 86a6a75a9057 on branch v01550/partial-reload on top of v0.155.0.
 replace (
-	go.opentelemetry.io/collector/otelcol => github.com/swiatekm/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057
-	go.opentelemetry.io/collector/service => github.com/swiatekm/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057
+	go.opentelemetry.io/collector/otelcol => github.com/elastic/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057
+	go.opentelemetry.io/collector/service => github.com/elastic/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057
 )
 
 // Replace statements carried forward from Beats https://github.com/elastic/beats/blob/0678f4d96212ac968fc90596e60475ed2f3979e1/go.mod#L503
