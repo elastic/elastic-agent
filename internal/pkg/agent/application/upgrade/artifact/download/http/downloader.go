@@ -12,10 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -25,7 +23,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
-	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -106,8 +103,7 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
-	remoteArtifact := a.Artifact
+func (e *Downloader) Download(ctx context.Context, _ artifact.Artifact, filename, sourceDir, targetDir string) (_ string, err error) {
 	downloadedFiles := make([]string, 0, 2)
 	defer func() {
 		if err != nil {
@@ -119,99 +115,52 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 		}
 	}()
 
+	sourceURI, err := url.JoinPath(sourceDir, filename)
+	if err != nil {
+		return "", errors.New(err, "invalid upstream source URI")
+	}
+	targetPath := filepath.Join(targetDir, filename)
+
 	// download from source to dest
-	path, err := e.download(ctx, remoteArtifact, e.config.OS(), a, *version)
+	path, err := e.downloadFile(ctx, sourceURI, targetPath)
 	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
 
-	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
+	hashPath, err := e.downloadFile(ctx, sourceURI+".sha512", targetPath+".sha512")
 	downloadedFiles = append(downloadedFiles, hashPath)
 	return path, err
 }
 
-func (e *Downloader) composeURI(artifactName, packageName string) (string, error) {
-	upstream := e.config.SourceURI
-	if !strings.HasPrefix(upstream, "http") && !strings.HasPrefix(upstream, "file") && !strings.HasPrefix(upstream, "/") {
-		// always default to https
-		upstream = fmt.Sprintf("https://%s", upstream)
-	}
-
-	// example: https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.1.1-x86_64.rpm
-	uri, err := url.Parse(upstream)
-	if err != nil {
-		return "", errors.New(err, "invalid upstream URI", errors.TypeConfig)
-	}
-
-	uri.Path = path.Join(uri.Path, artifactName, packageName)
-	return uri.String(), nil
-}
-
-func (e *Downloader) download(ctx context.Context, remoteArtifact string, operatingSystem string, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
-	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
-	if err != nil {
-		return "", errors.New(err, "generating package name failed")
-	}
-
-	fullPath, err := artifact.GetArtifactPath(a, version, operatingSystem, e.config.Arch(), e.config.TargetDirectory)
-	if err != nil {
-		return "", errors.New(err, "generating package path failed")
-	}
-
-	return e.downloadFile(ctx, remoteArtifact, filename, fullPath)
-}
-
-func (e *Downloader) downloadHash(ctx context.Context, remoteArtifact string, operatingSystem string, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
-	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
-	if err != nil {
-		return "", errors.New(err, "generating package name failed")
-	}
-
-	fullPath, err := artifact.GetArtifactPath(a, version, operatingSystem, e.config.Arch(), e.config.TargetDirectory)
-	if err != nil {
-		return "", errors.New(err, "generating package path failed")
-	}
-
-	filename = filename + ".sha512"
-	fullPath = fullPath + ".sha512"
-
-	return e.downloadFile(ctx, remoteArtifact, filename, fullPath)
-}
-
-func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, fullPath string) (string, error) {
-	sourceURI, err := e.composeURI(artifactName, filename)
-	if err != nil {
-		return "", err
-	}
-
-	req, err := http.NewRequest("GET", sourceURI, nil)
+func (e *Downloader) downloadFile(ctx context.Context, sourceURI, targetPath string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURI, nil)
 	if err != nil {
 		return "", errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
-	if destinationDir := filepath.Dir(fullPath); destinationDir != "" && destinationDir != "." {
+	if destinationDir := filepath.Dir(targetPath); destinationDir != "" && destinationDir != "." {
 		if err := e.mkdirAll(destinationDir, 0o755); err != nil {
 			return "", err
 		}
 	}
 
-	destinationFile, err := e.openFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
+	destinationFile, err := e.openFile(targetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
-		return "", goerrors.Join(errors.New("creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath)), err)
+		return "", goerrors.Join(errors.New("creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, targetPath)), err)
 	}
 	defer destinationFile.Close()
 
-	resp, err := e.client.Do(req.WithContext(ctx))
+	resp, err := e.client.Do(req)
 	if err != nil {
 		// return path, file already exists and needs to be cleaned up
-		return fullPath, errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		return targetPath, errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		// return path, file already exists and needs to be cleaned up
-		return fullPath, errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", sourceURI, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		return targetPath, errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", sourceURI, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
 	fileSize := -1
@@ -236,9 +185,9 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 		}
 		dp.ReportFailed(reportedErr)
 		// return path, file already exists and needs to be cleaned up
-		return fullPath, goerrors.Join(errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)), err)
+		return targetPath, goerrors.Join(errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)), err)
 	}
 	dp.ReportComplete()
 
-	return fullPath, nil
+	return targetPath, nil
 }

@@ -96,12 +96,8 @@ func GetOtelConfig(
 	otelConfig := confmap.New()     // base config, nothing here for now
 	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
-	// Evaluate the FQDN feature flag once, so every component in this render sees a consistent
-	// value even if the global flag changes (via a concurrent policy update) while we iterate.
-	fqdnEnabled := features.FQDN()
-
 	for _, comp := range components {
-		componentConfig, compErr := getCollectorConfigForComponent(comp, info, fqdnEnabled, logger)
+		componentConfig, compErr := getCollectorConfigForComponent(comp, info, logger)
 		if compErr != nil {
 			return nil, compErr
 		}
@@ -180,7 +176,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 
 	// check if the actual configuration is supported. We need to actually generate the config and look for
 	// the right kind of error
-	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, features.FQDN(), logp.NewNopLogger())
+	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, logp.NewNopLogger())
 	if errors.Is(compErr, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
 	}
@@ -278,7 +274,6 @@ func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
 func getCollectorConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
-	fqdnEnabled bool,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	exporterType, err := OutputTypeToExporterType(comp.OutputType)
@@ -290,7 +285,7 @@ func getCollectorConfigForComponent(
 	if err != nil {
 		return nil, err
 	}
-	receiversConfig, err := getReceiversConfigForComponent(comp, info, fqdnEnabled, outputQueueConfig)
+	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +387,6 @@ func getCollectorConfigForComponent(
 func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
-	fqdnEnabled bool,
 	outputQueueConfig map[string]any,
 ) (map[string]any, error) {
 	receiverType, err := getReceiverTypeForComponent(comp)
@@ -467,11 +461,8 @@ func getReceiversConfigForComponent(
 	// indicate that beat receivers are managed by the elastic-agent
 	sharedConfig["management.otel.enabled"] = true
 
-	// propagate the FQDN feature flag into the receiver config
-	sharedConfig["features"] = map[string]any{
-		"fqdn": map[string]any{
-			"enabled": fqdnEnabled,
-		},
+	if receiverFeatures := beatReceiverFeatures(comp); len(receiverFeatures) > 0 {
+		sharedConfig["features"] = receiverFeatures
 	}
 
 	// When SingleReceiver is set, merge all stream inputs into one receiver keyed by
@@ -509,6 +500,21 @@ func getReceiversConfigForComponent(
 	}
 
 	return receiversConfig, nil
+}
+
+// beatReceiverFeatures unwraps agent.features from the component's feature
+// source into the top-level features block expected by Beats.
+func beatReceiverFeatures(comp *component.Component) map[string]any {
+	if comp.Features == nil || comp.Features.Source == nil {
+		return nil
+	}
+
+	agentConfig, ok := comp.Features.Source.AsMap()["agent"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	receiverFeatures, _ := agentConfig["features"].(map[string]any)
+	return receiverFeatures
 }
 
 // beatInputsKey returns the config key used to pass inputs/modules/monitors/protocols

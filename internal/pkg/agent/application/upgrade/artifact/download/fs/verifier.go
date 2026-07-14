@@ -10,13 +10,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -66,24 +66,26 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Veri
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
-	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
-	if err != nil {
-		return fmt.Errorf("could not get artifact name: %w", err)
+func (v *Verifier) Verify(ctx context.Context, _ artifact.Artifact, filename, sourceDir, targetDir string, skipDefaultPgp bool, pgpBytes ...string) error {
+
+	var sourcePath string
+	if strings.HasPrefix(sourceDir, "http://") || strings.HasPrefix(sourceDir, "https://") {
+		sourcePath = filepath.Join(getDropPath(v.config), filename)
+	} else {
+		sourcePath = filepath.Join(strings.TrimPrefix(sourceDir, "file://"), filename)
 	}
+	targetPath := filepath.Join(targetDir, filename)
 
-	artifactPath := filepath.Join(v.config.TargetDirectory, filename)
-
-	if err = download.VerifySHA512HashWithCleanup(v.log, artifactPath); err != nil {
+	if err := download.VerifySHA512HashWithCleanup(v.log, targetPath); err != nil {
 		return fmt.Errorf("failed to verify SHA512 hash: %w", err)
 	}
 
-	if err = v.verifyAsc(filename, artifactPath, skipDefaultPgp, pgpBytes...); err != nil {
+	if err := v.verifyAsc(sourcePath, targetPath, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
-			if err := os.Remove(artifactPath + ".asc"); err != nil {
+			if err := os.Remove(targetPath + ".asc"); err != nil {
 				v.log.Warnf("failed clean up after signature verification: failed to remove %q: %v",
-					artifactPath+".asc", err)
+					targetPath+".asc", err)
 			}
 		}
 		return err
@@ -110,7 +112,7 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 	return nil
 }
 
-func (v *Verifier) verifyAsc(filename, fullPath string, skipDefaultKey bool, pgpSources ...string) error {
+func (v *Verifier) verifyAsc(sourcePath, targetPath string, skipDefaultKey bool, pgpSources ...string) error {
 	var pgpBytes [][]byte
 	pgpBytes, err := download.FetchPGPKeys(
 		v.log, v.client, v.defaultKey, skipDefaultKey, pgpSources)
@@ -118,16 +120,16 @@ func (v *Verifier) verifyAsc(filename, fullPath string, skipDefaultKey bool, pgp
 		return fmt.Errorf("could not fetch pgp keys: %w", err)
 	}
 
-	ascBytes, err := v.getPublicAsc(filename)
+	ascBytes, err := v.getPublicAsc(sourcePath)
 	if err != nil {
 		return fmt.Errorf("could not get .asc file: %w", err)
 	}
 
-	return download.VerifyPGPSignatureWithKeys(v.log, fullPath, ascBytes, pgpBytes)
+	return download.VerifyPGPSignatureWithKeys(v.log, targetPath, ascBytes, pgpBytes)
 }
 
-func (v *Verifier) getPublicAsc(filename string) ([]byte, error) {
-	fullPath := filepath.Join(getDropPath(v.config), filename+ascSuffix)
+func (v *Verifier) getPublicAsc(sourcePath string) ([]byte, error) {
+	fullPath := filepath.Clean(sourcePath + ascSuffix)
 
 	b, err := os.ReadFile(fullPath)
 	if err != nil {

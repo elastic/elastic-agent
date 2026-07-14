@@ -13,7 +13,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 // Downloader is a downloader with a predefined set of downloaders.
@@ -36,13 +35,13 @@ func NewDownloader(downloaders ...download.Downloader) *Downloader {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *version.ParsedSemVer) (string, error) {
+func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, filename, sourceDir, targetDir string) (string, error) {
 	var errs []error
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
 
 	for _, d := range e.dd {
-		s, e := d.Download(ctx, a, version)
+		s, e := d.Download(ctx, a, filename, sourceDir, targetDir)
 		if e == nil {
 			return s, nil
 		}
