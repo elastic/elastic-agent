@@ -57,6 +57,24 @@ jobs:
           git add internal/edot/go.mod internal/edot/go.sum
           git commit -m "Update EDOT go.mod"
 
+      - name: Update archive-proxy go.mod if necessary
+        run: cd wrapper/windows/archive-proxy && go mod tidy
+
+      - name: check for modified archive-proxy go.mod
+        id: archive-proxy-check
+        run: |
+          if git diff --quiet HEAD -- wrapper/windows/archive-proxy/go.mod; then
+            echo "modified=false" >> $GITHUB_OUTPUT
+          else
+            echo "modified=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: commit archive-proxy changed files
+        if: steps.archive-proxy-check.outputs.modified == 'true'
+        run: |
+          git add wrapper/windows/archive-proxy/go.mod wrapper/windows/archive-proxy/go.sum
+          git commit -m "Update archive-proxy go.mod"
+
       - name: update NOTICE.txt and NOTICE-fips.txt
         run: make notice
 

@@ -11,12 +11,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
-	"strings"
+	"path/filepath"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	agtversion "github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -48,7 +46,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Veri
 		return nil, errors.New("expecting PGP key received none", errors.TypeSecurity)
 	}
 
-	client, err := config.HTTPTransportSettings.Client(
+	client, err := config.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
 			return download.WithHeaders(rt, download.Headers)
@@ -73,7 +71,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Veri
 
 func (v *Verifier) Reload(c *artifact.Config) error {
 	// reload client
-	client, err := c.HTTPTransportSettings.Client(
+	client, err := c.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
 			return download.WithHeaders(rt, download.Headers)
@@ -91,26 +89,27 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
-	artifactPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
+func (v *Verifier) Verify(ctx context.Context, _ artifact.Artifact, filename, sourceDir, targetDir string, skipDefaultPgp bool, pgpBytes ...string) error {
+	sourceURI, err := url.JoinPath(sourceDir, filename)
 	if err != nil {
-		return errors.New(err, "retrieving package path")
+		return errors.New(err, "invalid upstream source URI")
 	}
+	targetPath := filepath.Join(targetDir, filename)
 
-	if err = download.VerifySHA512HashWithCleanup(v.log, artifactPath); err != nil {
+	if err := download.VerifySHA512HashWithCleanup(v.log, targetPath); err != nil {
 		return fmt.Errorf("failed to verify SHA512 hash: %w", err)
 	}
 
-	if err = v.verifyAsc(ctx, a, version, skipDefaultPgp, pgpBytes...); err != nil {
+	if err := v.verifyAsc(ctx, sourceURI, targetPath, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
-			if err := os.Remove(artifactPath); err != nil {
+			if err := os.Remove(targetPath); err != nil {
 				v.log.Warnf("failed clean up after signature verification: failed to remove %q: %v",
-					artifactPath, err)
+					targetPath, err)
 			}
-			if err := os.Remove(artifactPath + ascSuffix); err != nil {
+			if err := os.Remove(targetPath + ascSuffix); err != nil {
 				v.log.Warnf("failed clean up after sha512 check: failed to remove %q: %v",
-					artifactPath+ascSuffix, err)
+					targetPath+ascSuffix, err)
 			}
 		}
 		return err
@@ -119,22 +118,8 @@ func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtv
 	return nil
 }
 
-func (v *Verifier) verifyAsc(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultKey bool, pgpSources ...string) error {
-	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
-	if err != nil {
-		return errors.New(err, "retrieving package name")
-	}
-
-	fullPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
-	if err != nil {
-		return errors.New(err, "retrieving package path")
-	}
-
-	ascURI, err := v.composeURI(filename, a.Artifact)
-	if err != nil {
-		return errors.New(err, "composing URI for fetching asc file", errors.TypeNetwork)
-	}
-
+func (v *Verifier) verifyAsc(ctx context.Context, sourceURI, targetPath string, skipDefaultKey bool, pgpSources ...string) error {
+	ascURI := sourceURI + ascSuffix
 	ascBytes, err := v.getPublicAsc(ctx, ascURI)
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("fetching asc file from %s", ascURI), errors.TypeNetwork, errors.M(errors.MetaKeyURI, ascURI))
@@ -146,24 +131,7 @@ func (v *Verifier) verifyAsc(ctx context.Context, a artifact.Artifact, version a
 		return fmt.Errorf("could not fetch pgp keys: %w", err)
 	}
 
-	return download.VerifyPGPSignatureWithKeys(v.log, fullPath, ascBytes, pgpBytes)
-}
-
-func (v *Verifier) composeURI(filename, artifactName string) (string, error) {
-	upstream := v.config.SourceURI
-	if !strings.HasPrefix(upstream, "http") && !strings.HasPrefix(upstream, "file") && !strings.HasPrefix(upstream, "/") {
-		// always default to https
-		upstream = fmt.Sprintf("https://%s", upstream)
-	}
-
-	// example: https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.1.1-x86_64.rpm
-	uri, err := url.Parse(upstream)
-	if err != nil {
-		return "", errors.New(err, "invalid upstream URI", errors.TypeNetwork, errors.M(errors.MetaKeyURI, upstream))
-	}
-
-	uri.Path = path.Join(uri.Path, artifactName, filename+ascSuffix)
-	return uri.String(), nil
+	return download.VerifyPGPSignatureWithKeys(v.log, targetPath, ascBytes, pgpBytes)
 }
 
 func (v *Verifier) getPublicAsc(ctx context.Context, sourceURI string) ([]byte, error) {
