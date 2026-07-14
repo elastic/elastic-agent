@@ -1876,7 +1876,10 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		Sudo:  true,
 	})
 
-	ctx := t.Context()
+	ctx, cancel := testcontext.WithDeadline(t,
+		t.Context(),
+		time.Now().Add(5*time.Minute))
+	t.Cleanup(cancel)
 
 	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String())
 	createPolicyReq := kibana.AgentPolicy{
