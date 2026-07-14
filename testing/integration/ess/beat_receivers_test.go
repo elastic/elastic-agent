@@ -2121,7 +2121,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 
 	// A small number of duplicates is expected at runtime-switch boundaries; fail only if the
 	// count is large enough to indicate a re-ingestion regression.
-	const maxAllowedDuplicates = 20
+	const maxAllowedDuplicates = 10
 	require.LessOrEqualf(t, len(buckets), maxAllowedDuplicates, "len(buckets): %d, hits.total.value: %d, result was %s", len(buckets), int(value), string(resultBuf))
 
 	// Uninstall
