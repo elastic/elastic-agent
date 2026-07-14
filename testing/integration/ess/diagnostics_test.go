@@ -569,7 +569,8 @@ agent.internal.runtime.filebeat.httpjson: process
 					"edot/block.profile.gz",
 					"edot/mutex.profile.gz",
 					"edot/threadcreate.profile.gz",
-					"edot/otel-merged-actual.yaml")
+					"edot/otel-merged-actual.yaml",
+					"edot/environment.yaml")
 			}
 			if tc.monitoringEnabled {
 				// When OTel-based elasticsearch monitoring is active, the manager
@@ -669,6 +670,7 @@ agent.internal.runtime.filebeat.filestream: otel
 	// at the component level and land under the component directory, same as for process-runtime beats.
 	expectedFiles := []string{
 		"edot/otel-merged-actual.yaml",
+		"edot/environment.yaml",
 		"edot/allocs.profile.gz",
 		"edot/block.profile.gz",
 		"edot/goroutine.profile.gz",
