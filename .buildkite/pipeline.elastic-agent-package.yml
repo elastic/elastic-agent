@@ -204,10 +204,6 @@ steps:
       sudo chown -R :1000 build/distributions/
       echo "--- File listing"
       ls -alR build
-      echo "--- Copy workaround for helmchart filename"
-      .buildkite/scripts/steps/helmchart-cp-workaround.sh
-      echo "--- File listing after workaround"
-      ls -alR build
       echo "+++ Checking artifact validity with release-manager collect dry run"
       DRA_DRY_RUN="--dry-run"
       export DRA_DRY_RUN
