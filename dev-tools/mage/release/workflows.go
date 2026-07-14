@@ -14,6 +14,10 @@ import (
 
 var releasePRLabels = []string{"backport-skip", "skip-changelog"}
 
+var patchVersionPRLabels = []string{"Team:Automation", "release", "skip-changelog"}
+
+var patchDocsPRLabels = []string{"Team:Automation", "release", "docs", "in progress", "skip-changelog"}
+
 func checkRequirements(cfg *ReleaseConfig) error {
 	parts := strings.Split(cfg.CurrentRelease, ".")
 	if len(parts) < 2 {
@@ -101,7 +105,7 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	return nil
 }
 
-// RunPatchRelease creates a feature branch from the release branch and opens a PR with version/doc updates.
+// RunPatchRelease opens two PRs into the release branch: a version bump and a docs-only update.
 func RunPatchRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Patch Release Workflow ===")
 
@@ -122,69 +126,105 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 		releaseBranch = inferReleaseBranch(cfg.CurrentRelease)
 	}
 
-	patchBranch := patchDocsBranchName(cfg.CurrentRelease)
-
 	fmt.Printf("Using release branch: %s\n", releaseBranch)
-	fmt.Println("--- Creating PR: Version and docs ---")
-	fmt.Printf("Creating branch: %s from %s\n", patchBranch, releaseBranch)
-	if err := repo.EnsureBranchFrom(releaseBranch, patchBranch); err != nil {
-		return err
-	}
 
-	if err := UpdateVersion(cfg.CurrentRelease); err != nil {
-		return err
-	}
-	if err := UpdateDocs(cfg.CurrentRelease); err != nil {
-		return err
-	}
+	gh := NewGitHubClient(cfg.GitHubToken)
 
-	commitMsg := fmt.Sprintf("[Release] Prepare patch release %s", cfg.CurrentRelease)
-	committed, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail)
+	fmt.Println("--- Creating PR 1: Version bump ---")
+	versionPR, err := createPatchReleasePR(repo, gh, cfg, releaseBranch, patchVersionBranchName(cfg.CurrentRelease), func() error {
+		if err := UpdateVersion(cfg.CurrentRelease); err != nil {
+			return err
+		}
+		return UpdateDocs(cfg.CurrentRelease)
+	}, fmt.Sprintf("update version to %s", cfg.CurrentRelease), PROptions{
+		Owner:     cfg.ProjectOwner,
+		Repo:      cfg.ProjectRepo,
+		Title:     fmt.Sprintf("[Release] Update version to %s", cfg.CurrentRelease),
+		Head:      patchVersionBranchName(cfg.CurrentRelease),
+		Base:      releaseBranch,
+		Body:      patchVersionPRBody(cfg.CurrentRelease, cfg.LatestRelease),
+		Reviewers: cfg.ProjectReviewers,
+		Labels:    patchVersionPRLabels,
+	})
 	if err != nil {
 		return err
 	}
 
-	if cfg.DryRun {
-		fmt.Println("\nDRY RUN: Skipping push and PR creation")
-		fmt.Printf("Branch prepared: %s\n", patchBranch)
-		if committed {
-			fmt.Println("Review changes with 'git diff'")
-		}
-		return nil
-	}
-
-	if !committed {
-		fmt.Printf("No new changes on %s; checking for existing PR\n", patchBranch)
-	}
-
-	prOpts := PROptions{
+	fmt.Println("--- Creating PR 2: Docs ---")
+	docsPR, err := createPatchReleasePR(repo, gh, cfg, releaseBranch, patchDocsBranchName(cfg.CurrentRelease), func() error {
+		return UpdatePatchDocs(cfg.CurrentRelease)
+	}, fmt.Sprintf("update docs version %s", cfg.CurrentRelease), PROptions{
 		Owner:     cfg.ProjectOwner,
 		Repo:      cfg.ProjectRepo,
 		Title:     fmt.Sprintf("docs: update docs versions %s", cfg.CurrentRelease),
-		Head:      patchBranch,
+		Head:      patchDocsBranchName(cfg.CurrentRelease),
 		Base:      releaseBranch,
 		Body:      patchReleasePRBody(cfg.CurrentRelease),
 		Reviewers: cfg.ProjectReviewers,
-		Labels:    releasePRLabels,
-	}
-
-	pr, err := finalizePR(repo, NewGitHubClient(cfg.GitHubToken), patchBranch, releaseBranch, prOpts)
+		Labels:    patchDocsPRLabels,
+	})
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("\n=== Patch Release Workflow Complete ===\n")
-	if pr != nil {
-		fmt.Printf("PR: %s\n", pr.GetHTMLURL())
+	if versionPR != nil {
+		fmt.Printf("PR 1 (version): %s\n", versionPR.GetHTMLURL())
 	} else {
-		fmt.Println("No PR created (release already up to date)")
+		fmt.Println("PR 1 (version): not created (already up to date)")
+	}
+	if docsPR != nil {
+		fmt.Printf("PR 2 (docs): %s\n", docsPR.GetHTMLURL())
+	} else {
+		fmt.Println("PR 2 (docs): not created (already up to date)")
 	}
 
 	return nil
 }
 
+func createPatchReleasePR(repo *GitRepo, gh *GitHubClient, cfg *ReleaseConfig, releaseBranch, branchName string, prepare func() error, commitMsg string, prOpts PROptions) (*github.PullRequest, error) {
+	fmt.Printf("Creating branch: %s from %s\n", branchName, releaseBranch)
+	if err := repo.EnsureBranchFrom(releaseBranch, branchName); err != nil {
+		return nil, err
+	}
+
+	if err := prepare(); err != nil {
+		return nil, err
+	}
+
+	committed, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail)
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.DryRun {
+		fmt.Printf("DRY RUN: Branch prepared: %s\n", branchName)
+		if committed {
+			fmt.Println("Review changes with 'git diff'")
+		}
+		return nil, nil
+	}
+
+	if !committed {
+		fmt.Printf("No new changes on %s; checking for existing PR\n", branchName)
+	}
+
+	return finalizePR(repo, gh, branchName, releaseBranch, prOpts)
+}
+
+func patchVersionBranchName(version string) string {
+	return fmt.Sprintf("update-version-next-%s", version)
+}
+
 func patchDocsBranchName(version string) string {
 	return fmt.Sprintf("update-docs-version-%s", version)
+}
+
+func patchVersionPRBody(current, previous string) string {
+	if previous == "" {
+		return fmt.Sprintf("Updates references to the new release %s.", current)
+	}
+	return fmt.Sprintf("Updates references to the new release %s.\n\nMerge after the release %s.", current, previous)
 }
 
 func patchReleasePRBody(version string) string {

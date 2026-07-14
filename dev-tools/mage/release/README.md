@@ -5,7 +5,7 @@ This directory contains the mage-based release automation system for elastic-age
 | File | Purpose |
 |------|---------|
 | `config.go` | Environment-based `ReleaseConfig` and version inference |
-| `release.go` | File updates (`UpdateVersion`, `UpdateDocs`) |
+| `release.go` | File updates (`UpdateVersion`, `UpdateDocs`, `UpdatePatchDocs`) |
 | `mergify.go` | `.mergify.yml` backport rule updates |
 | `workflows.go` | Orchestration (`RunMajorMinorRelease`, `RunPatchRelease`) |
 | `git.go` | Git operations (`EnsureBranchFrom`, `CommitAll`, …) |
@@ -23,8 +23,9 @@ export GITHUB_TOKEN="ghp_your_token_here"
 # Run the complete major/minor release workflow
 mage release:runMajorMinor
 
-# Or for patch releases (creates update-docs-version-<version> PR into the release branch)
+# Or for patch releases (creates version bump + docs PRs into the release branch)
 export CURRENT_RELEASE="9.4.1"
+export LATEST_RELEASE="9.4.0"
 export RELEASE_BRANCH="9.4"
 mage release:runPatch
 ```
@@ -275,11 +276,12 @@ This creates a PR from `9.5` → `main` with:
 
 ```bash
 export CURRENT_RELEASE="9.4.1"
+export LATEST_RELEASE="9.4.0"
 export RELEASE_BRANCH="9.4"
 export GITHUB_TOKEN="ghp_your_token_here"
 export DRY_RUN=true
 
-# Test the workflow (creates update-docs-version-9.4.1 locally from 9.4)
+# Test the workflow (creates update-version-next-9.4.1 and update-docs-version-9.4.1 locally)
 mage release:runPatch
 
 # Review changes
@@ -298,18 +300,16 @@ mage release:runPatch
 
 This will:
 1. Check requirements
-2. Create branch `update-docs-version-9.4.1` from the release branch
-3. Update version and docs files
-4. Commit changes
-5. Push the branch and open a PR targeting the release branch
+2. Create branch `update-version-next-9.4.1` from the release branch, bump `version/version.go` and deployment manifests, and open PR 1
+3. Create branch `update-docs-version-9.4.1` from the release branch, update `version/docs/version.asciidoc`, and open PR 2
 
-**Done!** Review and merge the PR on release day.
+**Done!** Review and merge both PRs per the release checklist.
 
 ---
 
 #### Manual Workflow
 
-For patch releases, the manual process creates a feature branch and opens a PR into the release branch:
+For patch releases, the manual process creates two feature branches and opens two PRs into the release branch:
 
 ```bash
 # Set the patch version
@@ -317,17 +317,25 @@ export CURRENT_RELEASE="9.4.1"
 export RELEASE_BRANCH="9.4"
 export GITHUB_TOKEN="ghp_..."
 
-# Create the feature branch from the release branch
+# PR 1: version bump (version.go + deployment manifests)
 git fetch origin 9.4
-git checkout -b update-docs-version-9.4.1 origin/9.4
-
-# Prepare files
+git checkout -b update-version-next-9.4.1 origin/9.4
 mage release:updateVersion 9.4.1
 mage release:updateDocs 9.4.1
-
-# Commit, push, and open a PR
 git add -A
-git commit -m "[Release] Prepare patch release 9.4.1"
+git commit -m "update version to 9.4.1"
+git push -u origin update-version-next-9.4.1
+gh pr create --base 9.4 --head update-version-next-9.4.1 \
+  --title "[Release] Update version to 9.4.1" \
+  --body "Updates references to the new release 9.4.1.
+
+Merge after the release 9.4.0."
+
+# PR 2: docs only (version.asciidoc)
+git checkout -b update-docs-version-9.4.1 origin/9.4
+mage release:updatePatchDocs 9.4.1
+git add -A
+git commit -m "update docs version 9.4.1"
 git push -u origin update-docs-version-9.4.1
 gh pr create --base 9.4 --head update-docs-version-9.4.1 \
   --title "docs: update docs versions 9.4.1" \
@@ -678,7 +686,7 @@ A: No, everything runs in pure Go.
 A: Before pushing, you can reset with `git reset --hard origin/main`. After pushing, you can delete the branch and start over.
 
 **Q: Can I use this for patch releases?**
-A: Yes, set `CURRENT_RELEASE` to the patch version (e.g., `9.4.1`). The workflow infers `RELEASE_BRANCH` as `9.4` and opens a PR from `update-docs-version-9.4.1` into that branch.
+A: Yes, set `CURRENT_RELEASE` to the patch version (e.g., `9.4.1`). The workflow infers `RELEASE_BRANCH` as `9.4`, opens a version-bump PR from `update-version-next-9.4.1`, and a docs PR from `update-docs-version-9.4.1`.
 
 **Q: How do I test without affecting production?**
 A: Use a fork by setting `PROJECT_OWNER` to your GitHub username.

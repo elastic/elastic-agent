@@ -454,6 +454,44 @@ func TestUpdateMergifyIdempotent(t *testing.T) {
 	}
 }
 
+func TestUpdatePatchDocs(t *testing.T) {
+	tmpDir := t.TempDir()
+	docsDir := filepath.Join(tmpDir, "version", "docs")
+	if err := os.MkdirAll(docsDir, 0755); err != nil {
+		t.Fatalf("failed to create docs dir: %v", err)
+	}
+
+	asciidocPath := filepath.Join(docsDir, "version.asciidoc")
+	if err := os.WriteFile(asciidocPath, []byte(`:stack-version: 9.4.2
+:doc-branch: 9.4
+`), 0644); err != nil {
+		t.Fatalf("failed to write asciidoc: %v", err)
+	}
+
+	originalWd, _ := os.Getwd()
+	defer func() {
+		_ = os.Chdir(originalWd)
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+
+	if err := UpdatePatchDocs("9.4.3"); err != nil {
+		t.Fatalf("UpdatePatchDocs() error = %v", err)
+	}
+
+	content, err := os.ReadFile(asciidocPath)
+	if err != nil {
+		t.Fatalf("failed to read asciidoc: %v", err)
+	}
+	if !strings.Contains(string(content), ":stack-version: 9.4.3") {
+		t.Errorf("UpdatePatchDocs() content = %q, want stack-version 9.4.3", string(content))
+	}
+	if strings.Contains(string(content), ":stack-version: 9.4.2") {
+		t.Errorf("UpdatePatchDocs() still contains old stack version")
+	}
+}
+
 func TestPrepareMajorMinorRelease(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -562,6 +600,19 @@ func TestPatchDocsBranchName(t *testing.T) {
 				t.Errorf("patchDocsBranchName(%q) = %q, want %q", tt.version, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestPatchVersionBranchName(t *testing.T) {
+	if got := patchVersionBranchName("9.7.1"); got != "update-version-next-9.7.1" {
+		t.Errorf("patchVersionBranchName() = %q, want update-version-next-9.7.1", got)
+	}
+}
+
+func TestPatchVersionPRBody(t *testing.T) {
+	body := patchVersionPRBody("9.7.1", "9.7.0")
+	if !strings.Contains(body, "9.7.1") || !strings.Contains(body, "9.7.0") {
+		t.Errorf("patchVersionPRBody() = %q, want both versions", body)
 	}
 }
 

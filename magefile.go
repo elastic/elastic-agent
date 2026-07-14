@@ -4390,6 +4390,11 @@ func (Release) UpdateDocs(version string) error {
 	return release.UpdateDocs(version)
 }
 
+// UpdatePatchDocs updates :stack-version: in version/docs/version.asciidoc
+func (Release) UpdatePatchDocs(version string) error {
+	return release.UpdatePatchDocs(version)
+}
+
 // UpdateMergify adds a new backport rule to .mergify.yml
 func (Release) UpdateMergify(version string) error {
 	return release.UpdateMergify(version)

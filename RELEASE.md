@@ -49,6 +49,7 @@ mage release:createPR
 ```bash
 # Dry run first
 export CURRENT_RELEASE="9.4.1"
+export LATEST_RELEASE="9.4.0"
 export RELEASE_BRANCH="9.4"
 export GITHUB_TOKEN="ghp_..."
 export DRY_RUN=true
@@ -59,24 +60,29 @@ export DRY_RUN=false
 mage release:runPatch
 ```
 
-Creates branch `update-docs-version-9.4.1` and opens a PR into `9.4`.
+Creates two PRs into the release branch:
+- `update-version-next-9.4.1` — bumps `version/version.go` and deployment manifests ([example](https://github.com/elastic/elastic-agent/pull/14423))
+- `update-docs-version-9.4.1` — updates `:stack-version:` in `version/docs/version.asciidoc` ([example](https://github.com/elastic/elastic-agent/pull/15000))
 
 ### Manual Steps
 
 ```bash
-# 1. Create feature branch from release branch
+# PR 1: version bump
 export CURRENT_RELEASE="9.4.1"
 export RELEASE_BRANCH="9.4"
 git fetch origin 9.4
-git checkout -b update-docs-version-9.4.1 origin/9.4
-
-# 2. Update files
+git checkout -b update-version-next-9.4.1 origin/9.4
 mage release:updateVersion 9.4.1
 mage release:updateDocs 9.4.1
+git add -A && git commit -m "update version to 9.4.1"
+git push -u origin update-version-next-9.4.1
+gh pr create --base 9.4 --head update-version-next-9.4.1 \
+  --title "[Release] Update version to 9.4.1"
 
-# 3. Commit, push, and open PR
-git add -A
-git commit -m "[Release] Prepare patch release 9.4.1"
+# PR 2: docs only
+git checkout -b update-docs-version-9.4.1 origin/9.4
+mage release:updatePatchDocs 9.4.1
+git add -A && git commit -m "update docs version 9.4.1"
 git push -u origin update-docs-version-9.4.1
 gh pr create --base 9.4 --head update-docs-version-9.4.1 \
   --title "docs: update docs versions 9.4.1"
@@ -90,6 +96,9 @@ mage release:updateVersion 9.5.0
 
 # Update docs only
 mage release:updateDocs 9.5.0
+
+# Update patch docs only (version.asciidoc)
+mage release:updatePatchDocs 9.4.1
 
 # Update mergify only
 mage release:updateMergify 9.5.0

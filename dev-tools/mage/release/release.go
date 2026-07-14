@@ -75,6 +75,40 @@ func UpdateVersion(newVersion string) error {
 	return nil
 }
 
+const versionAsciidocPath = "version/docs/version.asciidoc"
+
+// UpdatePatchDocs updates :stack-version: in version/docs/version.asciidoc for patch releases.
+func UpdatePatchDocs(newVersion string) error {
+	safePath, err := validateRepoRelativePath(versionAsciidocPath)
+	if err != nil {
+		return err
+	}
+
+	content, err := os.ReadFile(safePath)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", safePath, err)
+	}
+
+	re := regexp.MustCompile(`(:stack-version:\s*)` + semverCore)
+	newContent := re.ReplaceAllString(string(content), `${1}`+newVersion)
+	if newContent == string(content) {
+		stackVersionRe := regexp.MustCompile(`:stack-version:\s*(` + semverCore + `)`)
+		matches := stackVersionRe.FindStringSubmatch(string(content))
+		if len(matches) >= 2 && matches[1] == newVersion {
+			fmt.Printf("Stack version already set to %s in %s\n", newVersion, safePath)
+			return nil
+		}
+		return fmt.Errorf("stack-version pattern not found in %s", safePath)
+	}
+
+	if err := writeRepoFile(safePath, []byte(newContent)); err != nil {
+		return fmt.Errorf("failed to write %s: %w", safePath, err)
+	}
+
+	fmt.Printf("Updated stack version to %s in %s\n", newVersion, safePath)
+	return nil
+}
+
 // UpdateDocs updates version references in K8s manifests, Helm charts, and kustomize files.
 func UpdateDocs(newVersion string) error {
 	files, err := collectDocFiles()
