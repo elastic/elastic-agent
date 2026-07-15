@@ -56,7 +56,7 @@ updates:
           - "github.com/josephspurrier/goversioninfo"
           - "github.com/rednafi/link-patrol"
           - "gotest.tools/*"
-          - "github.com/vektra/mockery"
+          - "github.com/vektra/mockery*"
       misc:
         patterns:
           - "*"
