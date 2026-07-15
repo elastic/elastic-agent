@@ -5,6 +5,8 @@
 package logger
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,6 +15,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 func Test_SetLevel(t *testing.T) {
@@ -85,4 +88,45 @@ func TestNewInMemory(t *testing.T) {
 	assert.Contains(t, logs[3], "an error message")
 	assert.Contains(t, logs[3], "error_key")
 	assert.Contains(t, logs[3], "error_val")
+}
+
+func TestNewNamedLogger(t *testing.T) {
+	const name = "test-component"
+
+	tmp := t.TempDir()
+	topPath, logsPath := paths.Top(), paths.Logs()
+	paths.SetTop(tmp)
+	paths.SetLogs(filepath.Join(tmp, DefaultLogDirectory))
+	t.Cleanup(func() {
+		paths.SetTop(topPath)
+		paths.SetLogs(logsPath)
+	})
+
+	log, err := NewNamedLogger(name, DefaultLoggingConfig(), DefaultEventLoggingConfig())
+	require.NoError(t, err)
+
+	log.Info("normal message")
+	log.Infow("event message", logp.TypeKey, logp.EventType)
+
+	// Flush any buffered writes.
+	err = log.Core().Sync()
+	require.NoError(t, err)
+
+	logGlob := filepath.Join(paths.Home(), DefaultLogDirectory, name+"-*.ndjson")
+	logMatches, err := filepath.Glob(logGlob)
+	require.NoError(t, err)
+	require.NotEmpty(t, logMatches, "normal log file should exist at %s", logGlob)
+	normalData, err := os.ReadFile(logMatches[0])
+	require.NoError(t, err)
+	assert.Contains(t, string(normalData), "normal message", "normal log file should contain normal message")
+	assert.NotContains(t, string(normalData), "event message", "event message should not leak into normal log file")
+
+	eventGlob := filepath.Join(paths.Home(), DefaultLogDirectory, "events", name+"-event-log-*.ndjson")
+	eventMatches, err := filepath.Glob(eventGlob)
+	require.NoError(t, err)
+	require.NotEmpty(t, eventMatches, "event log file should exist at %s", eventGlob)
+	eventData, err := os.ReadFile(eventMatches[0])
+	require.NoError(t, err)
+	assert.Contains(t, string(eventData), "event message", "event log file should contain event message")
+	assert.NotContains(t, string(eventData), "normal message", "normal message should not appear in event log file")
 }

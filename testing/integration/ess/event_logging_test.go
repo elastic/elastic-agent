@@ -38,7 +38,7 @@ outputs:
   default:
     type: elasticsearch
     hosts:
-      - %s
+      - %[1]s
     protocol: http
     preset: latency
 inputs:
@@ -50,109 +50,173 @@ inputs:
         data_stream:
           dataset: generic
         paths:
-          - %s
-
-# Disable metrics monitoring so there are less beats running and less logs being generated.
-agent.monitoring:
-  enabled: true
-  logs: true
-  metrics: false
-  pprof.enabled: false
-  use_output: default
-  # Needed if you already have an Elastic-Agent running on your machine
-  # That's very helpful for running the tests locally
-  http:
-    enabled: false
-    port: 7002
-agent.grpc:
-  address: localhost
-  port: 7001
-agent.internal.runtime.filebeat.default: process
+          - %[2]s
+agent:
+    logging.level: debug
+    monitoring.enabled: false
+    internal.runtime.filebeat.default: %[3]s
+    grpc:
+        address: localhost
+        port: 7001
 `
+
+const (
+	runtimeProcess = "process"
+	runtimeOtel    = "otel"
+)
+
+var allRuntimes = []string{runtimeProcess, runtimeOtel}
 
 func TestEventLogFile(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
 		Group: integration.Default,
-		Stack: &define.Stack{},
 		Local: true,
 		Sudo:  false,
 	})
-	ctx, cancel := testcontext.WithDeadline(
-		t,
-		t.Context(),
-		time.Now().Add(10*time.Minute))
-	defer cancel()
 
-	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
+	for _, runtime := range allRuntimes {
+		t.Run(runtime, func(t *testing.T) {
+			ctx, cancel := testcontext.WithDeadline(
+				t,
+				t.Context(),
+				time.Now().Add(10*time.Minute))
+			defer cancel()
 
-	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+			agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+			require.NoError(t, err)
 
-	logFilepath := path.Join(t.TempDir(), t.Name())
-	integration.GenerateLogFile(t, logFilepath, time.Millisecond*100, 20)
+			esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
-	cfg := fmt.Sprintf(eventLogConfig, esURL.String(), logFilepath)
+			logFilepath := path.Join(t.TempDir(), "flog.log")
+			integration.GenerateLogFile(t, logFilepath, time.Millisecond*100, 20)
 
-	if err := agentFixture.Prepare(ctx); err != nil {
-		t.Fatalf("cannot prepare Elastic-Agent fixture: %s", err)
+			cfg := fmt.Sprintf(eventLogConfig, esURL.String(), logFilepath, runtime)
+
+			if err := agentFixture.Prepare(ctx); err != nil {
+				t.Fatalf("cannot prepare Elastic-Agent fixture: %s", err)
+			}
+
+			if err := agentFixture.Configure(ctx, []byte(cfg)); err != nil {
+				t.Fatalf("cannot configure Elastic-Agent fixture: %s", err)
+			}
+
+			cmd, err := agentFixture.PrepareAgentCommand(ctx, nil)
+			if err != nil {
+				t.Fatalf("cannot prepare Elastic-Agent command: %s", err)
+			}
+
+			output := strings.Builder{}
+			cmd.Stderr = &output
+			cmd.Stdout = &output
+
+			if err := cmd.Start(); err != nil {
+				t.Fatalf("could not start Elastic-Agent: %s", err)
+			}
+
+			// Make sure the Elastic-Agent process is not running before
+			// exiting the test
+			t.Cleanup(func() {
+				// Ignore the error because we cancelled the context,
+				// and that always returns an error
+				_ = cmd.Wait()
+				if t.Failed() {
+					t.Log("Elastic-Agent output:")
+					t.Log(output.String())
+				}
+			})
+
+			// Now the Elastic-Agent is running, so validate the Event log file.
+			requireEventLogFileExistsWithData(t, agentFixture, "Publish event: ")
+			requireNoCopyProcessorError(t, agentFixture)
+
+			logsDirGlob := filepath.Join(agentFixture.WorkDir(),
+				"data", "elastic-agent-*", "logs")
+			requireLogFileLayoutForRuntime(t, logsDirGlob, runtime)
+			requireNoEventLeakage(t, logsDirGlob)
+
+			// Diagnostics command behavior is tested elsewhere, here we only
+			// check that log filenames are included/excluded correctly.
+			expectedLogFiles, expectedEventLogFiles := getLogFilenames(t, logsDirGlob)
+			require.NotEmpty(t, expectedLogFiles)
+			require.NotEmpty(t, expectedEventLogFiles)
+
+			collectDiagnosticsAndVeriflyLogs(
+				t,
+				ctx,
+				agentFixture,
+				[]string{"diagnostics", "collect"},
+				append(expectedLogFiles, expectedEventLogFiles...))
+
+			collectDiagnosticsAndVeriflyLogs(
+				t,
+				ctx,
+				agentFixture,
+				[]string{"diagnostics", "collect", "--exclude-events"},
+				expectedLogFiles)
+		})
+	}
+}
+
+func requireLogFileLayoutForRuntime(t *testing.T, logsDirGlob, runtime string) {
+	t.Helper()
+
+	logFileLayoutByRuntime := map[string][]string{
+		runtimeProcess: {
+			"logs/elastic-agent-*.ndjson",
+			"logs/events/elastic-agent-*.ndjson",
+		},
+		runtimeOtel: {
+			"logs/elastic-agent-*.ndjson",
+			"logs/elastic-otel-collector-*.ndjson",
+			"logs/events/elastic-otel-collector-*.ndjson",
+		},
 	}
 
-	if err := agentFixture.Configure(ctx, []byte(cfg)); err != nil {
-		t.Fatalf("cannot configure Elastic-Agent fixture: %s", err)
-	}
+	want, ok := logFileLayoutByRuntime[runtime]
+	require.Truef(t, ok, "unknown runtime %q", runtime)
 
-	cmd, err := agentFixture.PrepareAgentCommand(ctx, nil)
-	if err != nil {
-		t.Fatalf("cannot prepare Elastic-Agent command: %s", err)
-	}
+	baseDir := filepath.Dir(logsDirGlob)
 
-	output := strings.Builder{}
-	cmd.Stderr = &output
-	cmd.Stdout = &output
-
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("could not start Elastic-Agent: %s", err)
-	}
-
-	// Make sure the Elastic-Agent process is not running before
-	// exiting the test
-	t.Cleanup(func() {
-		// Ignore the error because we cancelled the context,
-		// and that always returns an error
-		_ = cmd.Wait()
-		if t.Failed() {
-			t.Log("Elastic-Agent output:")
-			t.Log(output.String())
+	// Every expected pattern must match at least one file.
+	expected := map[string]bool{}
+	for _, pattern := range want {
+		matches, err := filepath.Glob(filepath.Join(baseDir, pattern))
+		require.NoErrorf(t, err, "could not glob %q", pattern)
+		require.NotEmptyf(t, matches, "expected a log file matching %q under the %s runtime", pattern, runtime)
+		for _, m := range matches {
+			expected[m] = true
 		}
-	})
+	}
 
-	// Now the Elastic-Agent is running, so validate the Event log file.
-	requireEventLogFileExistsWithData(t, agentFixture, "Publish event: ")
-	requireNoCopyProcessorError(t, agentFixture)
+	// No other log files should exist.
+	logFiles, err := filepath.Glob(filepath.Join(logsDirGlob, "*.ndjson"))
+	require.NoError(t, err, "could not glob log files")
+	eventFiles, err := filepath.Glob(filepath.Join(logsDirGlob, "events", "*.ndjson"))
+	require.NoError(t, err, "could not glob event log files")
+	for _, f := range append(logFiles, eventFiles...) {
+		require.Truef(t, expected[f], "unexpected log file %q under the %s runtime", f, runtime)
+	}
+}
 
-	// The diagnostics command is already tested by another test,
-	// here we just want to validate the events log behaviour
-	// extract the zip file into a temp folder
-	expectedLogFiles, expectedEventLogFiles := getLogFilenames(
-		t,
-		filepath.Join(agentFixture.WorkDir(),
-			"data",
-			"elastic-agent-*",
-			"logs"))
+func requireNoEventLeakage(t *testing.T, logsDirGlob string) {
+	t.Helper()
 
-	collectDiagnosticsAndVeriflyLogs(
-		t,
-		ctx,
-		agentFixture,
-		[]string{"diagnostics", "collect"},
-		append(expectedLogFiles, expectedEventLogFiles...))
+	logFiles, err := filepath.Glob(filepath.Join(logsDirGlob, "*.ndjson"))
+	require.NoError(t, err, "could not glob log files")
+	require.NotEmpty(t, logFiles, "no log files found to check for event leakage")
 
-	collectDiagnosticsAndVeriflyLogs(
-		t,
-		ctx,
-		agentFixture,
-		[]string{"diagnostics", "collect", "--exclude-events"},
-		expectedLogFiles)
+	for _, f := range logFiles {
+		data, err := os.ReadFile(f)
+		require.NoErrorf(t, err, "cannot read file %q", f)
+
+		for _, line := range strings.Split(string(data), "\n") {
+			if len(line) == 0 {
+				continue
+			}
+			require.NotContainsf(t, line, `"log.type":"event"`,
+				"found a log.type:event entry leaked into non-event log file %q", f)
+		}
+	}
 }
 
 func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
@@ -181,27 +245,21 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		policyName,
 		outputID)
 
-	// Switch to process monitoring, as event logging is not yet supported for otel.
-	// https://github.com/elastic/elastic-agent/issues/8845
-	processMonUpdateReq := kibana.AgentPolicyUpdateRequest{
+	// Debug level is required for event log lines to be emitted under the otel runtime.
+	debugLoggingUpdateReq := kibana.AgentPolicyUpdateRequest{
 		Name:      policyName,
 		Namespace: info.Namespace,
 		Overrides: map[string]any{
 			"agent": map[string]any{
-				"internal": map[string]any{
-					"runtime": map[string]any{
-						"default": "process",
-						"filebeat": map[string]any{
-							"default": "process",
-						},
-					},
+				"logging": map[string]any{
+					"level": "debug",
 				},
 			},
 		},
 	}
 
 	_, err = info.KibanaClient.UpdatePolicy(ctx,
-		policyID, processMonUpdateReq)
+		policyID, debugLoggingUpdateReq)
 	require.NoError(t, err)
 
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
@@ -219,8 +277,9 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		enrollmentAPIKey,
 	}
 
-	addLogIntegration(t, info, policyID, "/tmp/flog.log")
-	integration.GenerateLogFile(t, "/tmp/flog.log", time.Second/2, 100)
+	logFilePath := filepath.Join(t.TempDir(), "flog.log")
+	addLogIntegration(t, info, policyID, logFilePath)
+	integration.GenerateLogFile(t, logFilePath, time.Second/2, 100)
 
 	enrollCmd, err := agentFixture.PrepareAgentCommand(ctx, enrollArgs)
 	if err != nil {
@@ -297,19 +356,12 @@ func addOverwriteToPolicy(t *testing.T, info *define.Info, policyName, policyID 
   "overrides": {
     "agent": {
       "logging": {
+        "level": "debug",
         "event_data": {
           "to_stderr": true,
           "to_files": false
         }
-      },
-	  "internal": {
-		"runtime": {
-		  "default": "process",
-  		  "filebeat": {
-	  		"default": "process"
-		  }
-		}
-	  }
+      }
     }
   }
 }`, policyName, info.Namespace)
@@ -453,6 +505,7 @@ func sendPolicyUpdate(t *testing.T, info *define.Info, policyID, body string) {
 	if err != nil {
 		t.Fatalf("could not execute request to Kibana/Fleet: %s", err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		respDump, dumpErr := httputil.DumpResponse(resp, true)
 		if dumpErr != nil {

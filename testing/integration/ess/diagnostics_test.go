@@ -39,8 +39,6 @@ import (
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
-const diagnosticsArchiveGlobPattern = "elastic-agent-diagnostics-*.zip"
-
 var diagnosticsFiles = []string{
 	"package.version",
 	"agent-info.yaml",
@@ -594,7 +592,7 @@ agent.internal.runtime.filebeat.httpjson: process
 func TestEDOTDiagnostics(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,
-		Local: false,
+		Local: true,
 	})
 
 	configTemplate := `
@@ -678,13 +676,17 @@ agent.internal.runtime.filebeat.filestream: otel
 		"components/filestream-default/registry.tar.gz",
 		"components/filestream-default/beat_metrics.json",
 		"components/filestream-default/input_metrics.json",
+		"logs/elastic-agent-*/elastic-agent-*.ndjson",
+		"logs/elastic-agent-*/elastic-otel-collector-*.ndjson",
 	}
 
 	for _, f := range expectedFiles {
-		path := filepath.Join(extractionDir, f)
-		stat, err := os.Stat(path)
-		require.NoErrorf(t, err, "stat file %q failed", path)
-		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
+		matches, err := filepath.Glob(filepath.Join(extractionDir, f))
+		require.NoErrorf(t, err, "glob %q failed", f)
+		require.NotEmptyf(t, matches, "no file matching %q", f)
+		stat, err := os.Stat(matches[0])
+		require.NoErrorf(t, err, "stat file %q failed", matches[0])
+		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", matches[0])
 	}
 	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
 }
@@ -713,6 +715,7 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 		}
 
 		diagZip, err := fix.ExecDiagnostics(ctx, cmd...)
+		require.NoError(t, err)
 
 		// get the version of the running agent
 		avi, err := getRunningAgentVersion(ctx, fix)
@@ -812,7 +815,7 @@ func extractZipArchive(t *testing.T, zipFile string, dst string) {
 
 	t.Logf("extracting diagnostic archive in dir %q", dst)
 	for _, zf := range zReader.File {
-		filePath := filepath.Join(dst, zf.Name)
+		filePath := filepath.Join(dst, zf.Name) //nolint:gosec // G305: validated against dst below before use
 		t.Logf("unzipping file %q", filePath)
 		require.Truef(t, strings.HasPrefix(filePath, filepath.Clean(dst)+string(os.PathSeparator)), "file %q points outside of extraction dir %q", filePath, dst)
 
@@ -827,7 +830,6 @@ func extractZipArchive(t *testing.T, zipFile string, dst string) {
 		require.NoErrorf(t, err, "error creating parent folder for file %q", filePath)
 
 		extractSingleFileFromArchive(t, zf, filePath)
-
 	}
 }
 
@@ -842,7 +844,7 @@ func extractSingleFileFromArchive(t *testing.T, src *zip.File, dst string) {
 
 	defer srcFile.Close()
 
-	_, err = io.Copy(dstFile, srcFile)
+	_, err = io.Copy(dstFile, srcFile) //nolint:gosec // G110: extracting a diagnostics archive the test itself just generated, not untrusted input
 	require.NoErrorf(t, err, "error copying content from zipped file %q to extracted file %q", src.Name, dst)
 }
 
@@ -884,6 +886,12 @@ func compileExpectedDiagnosticFilePatterns(avi *client.Version, diagfiles []stri
 	// optional: it doesn't have to be there (in some cases the watcher has not written any logs)
 	files = append(files, filePattern{
 		pattern:  path.Join("logs", "elastic-agent-"+avi.Commit[:6], "elastic-agent-watcher-*.ndjson"),
+		optional: true,
+	})
+	// optional: only present when a component runs under the otel runtime, which
+	// gives the collector its own log file instead of sharing the agent's.
+	files = append(files, filePattern{
+		pattern:  path.Join("logs", "elastic-agent-"+avi.Commit[:6], "elastic-otel-collector-*.ndjson"),
 		optional: true,
 	})
 

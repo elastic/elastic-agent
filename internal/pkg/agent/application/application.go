@@ -251,10 +251,17 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
+	collectorLogger, err := logger.NewNamedLogger(
+		otelmanager.CollectorLogFileName, cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig)
+	if err != nil {
+		log.Warnf("failed to create collector logger, falling back to base logger: %v", err)
+		collectorLogger = baseLogger
+	}
+
 	otelManager, err := otelmanager.NewOTelManager(
 		log.Named("otel_manager"),
 		logLevel,
-		baseLogger,
+		collectorLogger,
 		agentInfo,
 		cfg.Settings.Collector,
 		otelmanager.CollectorStopTimeout,

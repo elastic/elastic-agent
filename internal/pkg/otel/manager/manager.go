@@ -45,6 +45,9 @@ const (
 	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
 	CollectorStopTimeout = 3 * time.Second
 
+	// CollectorLogFileName is the base name of the collector subprocess's own log file.
+	CollectorLogFileName = "elastic-otel-collector"
+
 	// elasticMonitoringReceiverName is the component type name for the elastic monitoring receiver.
 	elasticMonitoringReceiverName = "elasticmonitoringreceiver"
 	// elasticMonitoringConnectorName is the component type name for the elastic monitoring connector.
@@ -139,7 +142,7 @@ type OTelManager struct {
 // NewOTelManager returns a OTelManager.
 // If execFactory is nil, the default subprocess execution is used.
 func NewOTelManager(
-	logger *logger.Logger,
+	managerLogger *logger.Logger,
 	collectorLogLevel logp.Level,
 	collectorLogger *logger.Logger,
 	agentInfo info.Agent,
@@ -195,7 +198,7 @@ func NewOTelManager(
 	}
 
 	return &OTelManager{
-		managerLogger:             logger,
+		managerLogger:             managerLogger,
 		collectorLogger:           collectorLogger,
 		agentInfo:                 agentInfo,
 		healthCheckExtComponentID: healthCheckExtComponentID,
