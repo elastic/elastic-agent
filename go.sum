@@ -284,6 +284,10 @@ github.com/elastic/gosigar v0.14.4 h1:7NRnWJDFjEKpOjnHhtzrPGZWr9EMrYFsLjF4q0Czos
 github.com/elastic/gosigar v0.14.4/go.mod h1:tx91Eb3YgFk6y++h88fRAnxic3Si1ZDHooqnJU/hqo8=
 github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6 h1:JVNuBrmOoqLJgp9o68YBMnOrXCzQI3mCppW+suwRSlw=
 github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
+github.com/elastic/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057 h1:jBz4E5yQcQw7xaKax8EMd+HKSuBa4rILlK8xdIz1FoA=
+github.com/elastic/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057/go.mod h1:/R9dgXJABmOizLuUmCXJdBlE/qpAFOiHOPwXJRFuN08=
+github.com/elastic/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057 h1:5TIY+buJraOXaDiMxGXBFLn1MoZ+E7cV6+DHEK5M4lE=
+github.com/elastic/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057/go.mod h1:L9Rs1QOuz5syuz678aZA1D5WchQle+3WVRav5PPGiMs=
 github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 h1:QFDM5JuLch52FxjHizLP2tiuzfhulUdyOsUe/JuPhrQ=
 github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603/go.mod h1:J0lqNUlLxjFJpAGJDmFT8+vOlAnOMbQCoBQmUJ79zT4=
 github.com/emicklei/go-restful/v3 v3.13.0 h1:C4Bl2xDndpU6nJ4bc1jXd+uTmYPVUwkD6bFY/oTyCes=
@@ -946,8 +950,6 @@ go.opentelemetry.io/collector/internal/telemetry v0.155.0 h1:BwmCo2vm97Vf8X42VLI
 go.opentelemetry.io/collector/internal/telemetry v0.155.0/go.mod h1:DtD9GRqxYxLVapCHYRXAEhXCFJmiH3dPVBR5bWl7VS8=
 go.opentelemetry.io/collector/internal/testutil v0.155.0 h1:ExZ3lqM1e1Y83AAXKr6Xsw20v4LHW6GZ8VeLLQHiOrA=
 go.opentelemetry.io/collector/internal/testutil v0.155.0/go.mod h1:Jkjs6rkqs973LqgZ0Fe3zrokQRKULYXPIf4HuqStiEE=
-go.opentelemetry.io/collector/otelcol v0.155.0 h1:/iIheFNWIThgFdgC+xM0OK7Vm2Czxi+UaWCfHjn7Bog=
-go.opentelemetry.io/collector/otelcol v0.155.0/go.mod h1:Vc75MFbaLtZ+Z+V38cZ9g/aVqJte6FW49cXLMLiF77k=
 go.opentelemetry.io/collector/pdata v1.61.0 h1:EVfGB/9dcyMXhMsZ5kzKeGFJj8QWqvmZjgg4RMjnRhE=
 go.opentelemetry.io/collector/pdata v1.61.0/go.mod h1:qYEsyeIJ9tWHb2jSR5HQ9/VmbCGVca+G+ZDAB8dFCMc=
 go.opentelemetry.io/collector/pdata/pprofile v0.155.0 h1:13LsyUy9SN88xcqbz89kvDqyn6qQSF5RpvXJ/c84nrw=
@@ -972,8 +974,6 @@ go.opentelemetry.io/collector/receiver/receivertest v0.155.0 h1:Wp2fSQ1jfNzPmcZz
 go.opentelemetry.io/collector/receiver/receivertest v0.155.0/go.mod h1:eBl5iImBqIs9pQNdwyqypDiThJWn1L1G3N1Z1m9BcYY=
 go.opentelemetry.io/collector/receiver/xreceiver v0.155.0 h1:cWwLtXC3RF/EaSz9uZHD0TXqVBpjXk0zkkcE6W4Szz4=
 go.opentelemetry.io/collector/receiver/xreceiver v0.155.0/go.mod h1:oCB455B5Qs7tiyO6JThT+Zv20H5XeNKJQ+u4jHyCFbI=
-go.opentelemetry.io/collector/service v0.155.0 h1:YOjjBl8rOYwKODsiwI8yCSG21SZAF0N4K9hBBqUH2eM=
-go.opentelemetry.io/collector/service v0.155.0/go.mod h1:L9Rs1QOuz5syuz678aZA1D5WchQle+3WVRav5PPGiMs=
 go.opentelemetry.io/collector/service/hostcapabilities v0.155.0 h1:QlEati40MkWtSnExqkUzFf6URZ2XkVqxBfW32Ssh+pw=
 go.opentelemetry.io/collector/service/hostcapabilities v0.155.0/go.mod h1:WYb5TuxmbNIJAM/cVdFvV58ujglArYnDz81+1m4+Z9c=
 go.opentelemetry.io/collector/service/telemetry/telemetrytest v0.155.0 h1:lUMDv4eUkbv9CHWaYNdXAZ9c6QBHEYkvi62yXXHRZY0=
