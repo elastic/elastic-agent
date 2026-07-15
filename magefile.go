@@ -633,32 +633,11 @@ func Package(ctx context.Context) error {
 		return errors.New("elastic-agent package is expected to build at least one platform package")
 	}
 
-<<<<<<< HEAD
-	// needs elastic-agent-core built first
-	mg.CtxDeps(ctx, PackageAgentCore)
-
-	// switch to the main package target
-	pkgSpec, err := mage.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
-	if err != nil {
-		return err
-	}
-
-	// manifest is not passed into packageAgent below because we want packageAgent to go through the
-	// flow using the elastic-agent-core that was built above. if it was passed in, it would download
-	// elastic-agent-core from the manifest and it would not be the code from this repository in the package
-	cfgWithManifest, err := cfg.WithManifestInfo(ctx)
-=======
 	cfg, err := cfg.WithManifestInfo(ctx)
->>>>>>> dce51a67b ([mage] Unify packaging targets (#14871))
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
 
-<<<<<<< HEAD
-	if cfg.Packaging.ManifestURL != "" {
-		// don't download the elastic-agent-core components; built above
-		if err := downloadManifest(ctx, cfg, pkgSpec, packaging.WithoutProjectName(mage.AgentCoreProjectName)); err != nil {
-=======
 	if cfg.Packaging.CoreSource == devtools.CoreSourceManifest && cfg.Packaging.Manifest == nil {
 		return errors.New("AGENT_CORE_SOURCE=manifest requires MANIFEST_URL to be set")
 	}
@@ -680,7 +659,6 @@ func Package(ctx context.Context) error {
 		}
 
 		if err := downloadManifest(ctx, cfg, pkgSpec, filters...); err != nil {
->>>>>>> dce51a67b ([mage] Unify packaging targets (#14871))
 			return fmt.Errorf("failed downloading manifest components: %w", err)
 		}
 	}
@@ -1203,11 +1181,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-<<<<<<< HEAD
-func packageAgent(ctx context.Context, cfg *mage.Settings, pkgSpecs []mage.OSPackageArgs, dependenciesVersion string, manifestResponse *manifest.Build) error {
-=======
 func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs) error {
->>>>>>> dce51a67b ([mage] Unify packaging targets (#14871))
 	fmt.Println("--- Package elastic-agent")
 
 	// DependenciesVersion is populated by WithManifestInfo when MANIFEST_URL
@@ -1475,12 +1449,6 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 			}
 		}
 
-<<<<<<< HEAD
-		checksums := make(map[string]string)
-		// Operate on the files depending on if we're packaging from a manifest or not
-		if manifestResponse != nil {
-			checksums = devtools.ChecksumsWithManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, manifestResponse, dependencies)
-=======
 		var checksums map[string]string
 		// Manifest-declared SHAs are only correct when every binary being
 		// checksummed came from the manifest — i.e. CoreSource=manifest. When
@@ -1488,7 +1456,6 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 		// manifest's entry, so compute everything from the files on disk.
 		if cfg.Packaging.CoreSource == devtools.CoreSourceManifest {
 			checksums = devtools.ChecksumsWithManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, cfg.Packaging.Manifest, dependencies)
->>>>>>> dce51a67b ([mage] Unify packaging targets (#14871))
 		} else {
 			checksums = devtools.ChecksumsWithoutManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, dependencies)
 		}
@@ -1559,39 +1526,6 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	return nil
 }
 
-<<<<<<< HEAD
-// PackageUsingDRA packages elastic-agent for distribution using Daily Released Artifacts specified in manifest.
-func PackageUsingDRA(ctx context.Context) error {
-	cfg := devtools.SettingsFromContext(ctx)
-	start := time.Now()
-	defer func() { fmt.Println("package ran for", time.Since(start)) }()
-
-	if len(cfg.GetPlatforms()) == 0 {
-		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
-	}
-
-	// final package build
-	pkgSpec, err := mage.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
-	if err != nil {
-		return err
-	}
-
-	// When MANIFEST_URL is not provided in the environment elastic-agent-core packages from build/distributions
-	// will be used instead of pulling from the manifest.
-	if cfg.Packaging.ManifestURL == "" {
-		fmt.Println("NOTICE: No MANIFEST_URL was provided, using elastic-agent-core packages from build/distributions.")
-	}
-	cfg, err = cfg.WithManifestInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed downloading manifest: %w", err)
-	}
-	ctx = devtools.ContextWithSettings(ctx, cfg)
-
-	return packageAgent(ctx, cfg, pkgSpec, cfg.Build.DependenciesVersion, cfg.Packaging.Manifest)
-}
-
-=======
->>>>>>> dce51a67b ([mage] Unify packaging targets (#14871))
 func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string) (*branchInfo, error) {
 	// latest build info for a branch is at "<base url>/latest/<branch>.json"
 	branchLatestBuildUrl := strings.TrimSuffix(baseURL, "/") + fmt.Sprintf("/latest/%s.json", branch)
@@ -1707,11 +1641,7 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 	return downloadedArtifacts, errGrp.Wait()
 }
 
-<<<<<<< HEAD
-func extractAgentCoreForPackage(ctx context.Context, cfg *mage.Settings, manifestResponse *manifest.Build, version string) error {
-=======
 func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, version string) error {
->>>>>>> dce51a67b ([mage] Unify packaging targets (#14871))
 	components, err := packaging.Components()
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
