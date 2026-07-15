@@ -28,7 +28,6 @@ import (
 
 // knownViolations lists all current x/crypto imports in the FIPS build.
 // Key: "importer → x/crypto/subpkg". Remove entries as violations are fixed.
-// TestFIPSFullyCompliant passes when this map is empty.
 var knownViolations = map[string]string{
 	// --- bcrypt (Blowfish) — not FIPS-approved ---
 	// Fix: keep prometheusreceiver in !requirefips until exporter-toolkit adds a !requirefips guard.
@@ -202,8 +201,8 @@ func TestFIPSXCryptoViolations(t *testing.T) {
 	}
 }
 
-// TestFIPSFullyCompliant passes only when all x/crypto violations are resolved.
-// It currently fails — track progress by removing entries from knownViolations.
+// TestFIPSFullyCompliant passes only when the dep scan finds zero x/crypto violations.
+// It currently fails. Track progress by fixing violations and removing them from knownViolations.
 func TestFIPSFullyCompliant(t *testing.T) {
 	violations, importGraph := runDepScan(t)
 	if len(violations) == 0 {
