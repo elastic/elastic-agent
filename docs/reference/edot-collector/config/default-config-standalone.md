@@ -175,7 +175,7 @@ With a self-managed Gateway, you own authentication (TLS/mTLS, or optionally the
 The `sending_queue` batching tuning described in the [Batching configuration for contrib OpenTelemetry Collector](#batching-configuration-for-contrib-opentelemetry-collector) section applies to this OTLP output as well and is already included in the EDOT Collector.
 :::
 
-For information on sending data from a non-EDOT upstream OpenTelemetry Collector to an EDOT Gateway, refer to [Send data from an upstream OpenTelemetry Collector](docs-content://solutions/observability/get-started/opentelemetry/use-cases/upstream-collector.md).
+For information on sending data from a non-EDOT upstream OpenTelemetry Collector to an EDOT Gateway, refer to [Send data from an upstream OpenTelemetry Collector](docs-content://solutions/observability/get-started/opentelemetry/use-cases/upstream-collector/index.md).
 
 ### Batching configuration for contrib OpenTelemetry Collector
 
