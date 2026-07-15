@@ -58,8 +58,8 @@ var knownXCryptoImports = map[string]string{
 	"github.com/foxboron/go-tpm-keyfiles → golang.org/x/crypto/cryptobyte":       "TPM key file ASN.1 parsing",
 	"github.com/foxboron/go-tpm-keyfiles → golang.org/x/crypto/cryptobyte/asn1":  "TPM key file ASN.1 parsing",
 	"github.com/foxboron/go-tpm-keyfiles → golang.org/x/crypto/hkdf":             "TPM key derivation; HKDF not FIPS-certified via x/crypto",
-	// LDAP: MD4 used for NTLM challenge-response. Avoid NTLM bind in FIPS environments.
-	"github.com/go-ldap/ldap/v3 → golang.org/x/crypto/md4": "LDAP NTLM auth (MD4); use Kerberos or simple bind instead",
+	// go-ldap/ldap: MD4 used for NTLM challenge-response. Avoid NTLM bind in FIPS environments.
+	"github.com/go-ldap/ldap/v3 → golang.org/x/crypto/md4": "LDAP NTLM auth (MD4); upstream PR to go-ldap/ldap to check fips140.Enabled()",
 	// Google S2A (Session to Application layer security) — used by Google Cloud client libs.
 	"github.com/google/s2a-go/internal/record/internal/aeadcrypter → golang.org/x/crypto/chacha20poly1305": "Google S2A ChaCha20-Poly1305; not FIPS-approved",
 	"github.com/google/s2a-go/internal/record/internal/halfconn → golang.org/x/crypto/cryptobyte":          "Google S2A TLS record parsing",
