@@ -519,6 +519,81 @@ func TestGetComponentStatus(t *testing.T) {
 	}
 }
 
+// TestUpdateStatusPartialReloadReceiverRemoved covers the workaround for the upstream
+// aggregation bug: a pipeline with one healthy receiver and one receiver stuck at a terminal
+// Stopped (as left behind by a partial receiver reload) must resolve to StatusOK overall, since
+// upstream's aggregation function would otherwise report it as StatusStopping forever.
+func TestUpdateStatusPartialReloadReceiverRemoved(t *testing.T) {
+	tests := []struct {
+		name     string
+		pipeline *status.AggregateStatus
+		expected componentstatus.Status
+	}{
+		{
+			name: "OK receiver plus a Stopped receiver resolves to OK",
+			pipeline: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusStopping),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"receiver:filebeatreceiver/filestream-monitoring-agent": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+					"receiver:filebeatreceiver/filestream-monitoring-endpoint": {
+						Event: componentstatus.NewEvent(componentstatus.StatusStopped),
+					},
+					"exporter:elasticsearch/output-1": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+				},
+			},
+			expected: componentstatus.StatusOK,
+		},
+		{
+			name: "a real error alongside an OK receiver is not masked",
+			pipeline: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"receiver:filebeatreceiver/filestream-monitoring-agent": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+					"receiver:filebeatreceiver/filestream-monitoring-endpoint": {
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+					},
+				},
+			},
+			expected: componentstatus.StatusRecoverableError,
+		},
+		{
+			name: "no OK receiver at all is not forced to OK",
+			pipeline: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusStopping),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"receiver:filebeatreceiver/filestream-monitoring-agent": {
+						Event: componentstatus.NewEvent(componentstatus.StatusStopped),
+					},
+				},
+			},
+			expected: componentstatus.StatusStopping,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			otelStatus := &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusNone),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"pipeline:logs/" + OtelNamePrefix + "filestream-monitoring": tt.pipeline,
+				},
+			}
+
+			result, err := MaybeMuteExporterStatus(otelStatus, nil)
+			require.NoError(t, err)
+
+			pipelineResult := result.ComponentStatusMap["pipeline:logs/"+OtelNamePrefix+"filestream-monitoring"]
+			assert.Equal(t, tt.expected, pipelineResult.Status())
+		})
+	}
+}
+
 func TestGetComponentStateSingleReceiver(t *testing.T) {
 	// A component with single_receiver: true has exactly one receiver whose name is
 	// OtelNamePrefix+comp.ID (no stream suffix). getComponentState must map all input
