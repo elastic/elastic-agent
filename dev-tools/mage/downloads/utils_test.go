@@ -13,7 +13,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	backoff "github.com/cenkalti/backoff/v4"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
@@ -32,6 +34,62 @@ func TestDownloadFile(t *testing.T) {
 	err := downloadFile(&dRequest)
 	assert.Nil(t, err)
 	assert.FileExistsf(t, dRequest.TargetPath, "file should exist")
+}
+
+// useFastDownloadFileBackoff replaces the download retry policy with one that
+// does not wait between attempts and gives up after maxRetries retries.
+func useFastDownloadFileBackoff(t *testing.T, maxRetries uint64) {
+	orig := downloadFileBackoff
+	downloadFileBackoff = func() backoff.BackOff {
+		return backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Millisecond), maxRetries)
+	}
+	t.Cleanup(func() { downloadFileBackoff = orig })
+}
+
+func TestDownloadFileRetriesOnServerError(t *testing.T) {
+	useFastDownloadFileBackoff(t, 5)
+
+	const content = "some content"
+	attempts := 0
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts <= 2 {
+			http.Error(w, "temporarily unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte(content))
+	}))
+	t.Cleanup(s.Close)
+
+	var dRequest = downloadRequest{
+		URL:        s.URL,
+		TargetPath: filepath.Join(t.TempDir(), "some-file.txt"),
+	}
+
+	err := downloadFile(&dRequest)
+	require.NoError(t, err)
+	assert.Equal(t, 3, attempts, "expected two failed attempts and one successful one")
+	got, err := os.ReadFile(dRequest.TargetPath)
+	require.NoError(t, err)
+	assert.Equal(t, content, string(got), "the error response body must not be saved as the file")
+}
+
+func TestDownloadFileFailsOnPersistentServerError(t *testing.T) {
+	useFastDownloadFileBackoff(t, 2)
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+	t.Cleanup(s.Close)
+
+	var dRequest = downloadRequest{
+		URL:        s.URL,
+		TargetPath: filepath.Join(t.TempDir(), "some-file.txt"),
+	}
+
+	err := downloadFile(&dRequest)
+	require.Error(t, err)
+	assert.NoFileExists(t, dRequest.TargetPath, "the error response body must not be saved as the file")
 }
 
 func TestVerifyChecksum(t *testing.T) {
