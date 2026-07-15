@@ -65,10 +65,13 @@ var knownXCryptoImports = map[string]string{
 	"github.com/google/s2a-go/internal/record/internal/halfconn → golang.org/x/crypto/cryptobyte":          "Google S2A TLS record parsing",
 	"github.com/google/s2a-go/internal/record/internal/halfconn → golang.org/x/crypto/hkdf":               "Google S2A key derivation",
 	// jcmturner/gokrb5: same Kerberos concerns as elastic/gokrb5 above.
-	"github.com/jcmturner/gokrb5/v8/crypto → golang.org/x/crypto/md4":            "Kerberos MD4 (NTLMv1/RC4-HMAC)",
-	"github.com/jcmturner/gokrb5/v8/crypto/rfc4757 → golang.org/x/crypto/md4":    "Kerberos MD4 (RC4-HMAC legacy enctype)",
-	// Same as elastic/gokrb5: SHA-1 paths deprecated; SHA-256/384 paths use FIPS-certified primitives.
-	"github.com/jcmturner/gokrb5/v8/crypto/rfc8009 → golang.org/x/crypto/pbkdf2": "PBKDF2 via x/crypto; SHA-1 enctype paths deprecated SP 800-131A; upstream PR needed",
+	// NOTE: jcmturner/gokrb5 is abandoned (last commit 2023-05, 106 open issues); upstream PR
+	// is not viable. Fix path: gate sqlserverreceiver behind !requirefips, or PR to
+	// microsoft/go-mssqldb to replace this dependency.
+	"github.com/jcmturner/gokrb5/v8/crypto → golang.org/x/crypto/md4":            "Kerberos MD4 (NTLMv1/RC4-HMAC); jcmturner/gokrb5 abandoned — gate sqlserverreceiver",
+	"github.com/jcmturner/gokrb5/v8/crypto/rfc4757 → golang.org/x/crypto/md4":    "Kerberos MD4 (RC4-HMAC legacy enctype); jcmturner/gokrb5 abandoned",
+	// SHA-1 paths deprecated; SHA-256/384 paths use FIPS-certified primitives via crypto/hmac.
+	"github.com/jcmturner/gokrb5/v8/crypto/rfc8009 → golang.org/x/crypto/pbkdf2": "PBKDF2 via x/crypto; SHA-1 enctype paths deprecated SP 800-131A; jcmturner/gokrb5 abandoned",
 	// go-mssqldb: NTLM for SQL Server integrated auth. Avoid in FIPS environments.
 	"github.com/microsoft/go-mssqldb/integratedauth/ntlm → golang.org/x/crypto/md4": "MSSQL NTLM auth (MD4); use SQL auth instead in FIPS",
 	// Prometheus exporter-toolkit: bcrypt for HTTP basic auth password hashing.
