@@ -8,30 +8,32 @@ import (
 	"context"
 	"time"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// ExecutionFactory creates a collectorExecution. It receives the collector binary path,
-// the health check extension component ID (e.g. "healthcheckv2/<uuid>"), and the
-// user-configured health check port (0 means pick a random port per-start).
-type ExecutionFactory func(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (collectorExecution, error)
+// ExecutionFactory creates a collectorExecution. It receives the collector
+// binary path. Status reporting and liveness monitoring are handled by the
+// manager's embedded OpAMP server (see opamp_server.go), so the execution
+// layer does not need any extra handles.
+type ExecutionFactory func(collectorPath string) (collectorExecution, error)
 
 type collectorExecution interface {
-	// startCollector starts the otel collector with the given arguments, returning a handle allowing it to be stopped.
-	// Cancelling the context will stop all goroutines involved in the execution.
-	// The collector will report status events in the statusCh channel and errors on errCh in a non-blocking fashion,
-	// draining the channel before writing to it.
-	// After the collector exits, it will emit an error describing the exit status (nil if successful) and a nil status.
-	// Parameters:
-	//   - cfg: Configuration for the collector.
-	//   - errCh: Process exit errors are sent to the errCh channel
-	//   - statusCh: Collector's status updates are sent to statusCh channel.
-	//   - forceFetchStatusCh: Channel that is used to trigger a forced status update.
-	startCollector(ctx context.Context, logLevel logp.Level, collectorLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error)
+	// startCollector starts the otel collector with the given configuration,
+	// returning a handle that allows the manager to stop it. Cancelling ctx
+	// stops all goroutines involved in the execution. Process exit errors are
+	// reported via errCh; the manager observes status via the OpAMP server,
+	// not through this interface.
+	startCollector(
+		ctx context.Context,
+		logLevel logp.Level,
+		collectorLogger *logger.Logger,
+		logger *logger.Logger,
+		cfg *confmap.Conf,
+		errCh chan error,
+	) (collectorHandle, error)
 }
 
 type collectorHandle interface {
