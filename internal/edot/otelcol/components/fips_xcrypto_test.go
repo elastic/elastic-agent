@@ -12,9 +12,8 @@ package components_test
 //
 // TestFIPSXCryptoViolations reports all violations with their full dependency
 // chain and fails on any violation not listed in knownViolations. Remove
-// entries from knownViolations as fixes land.
-//
-// TestFIPSFullyCompliant passes only when no x/crypto violations remain.
+// entries from knownViolations as fixes land. Once the map is empty the test
+// becomes a strict no-violations gate.
 
 import (
 	"bytes"
@@ -198,28 +197,5 @@ func TestFIPSXCryptoViolations(t *testing.T) {
 		if !found[key] {
 			t.Errorf("stale knownViolations entry (no longer in dep tree — remove it): %s", key)
 		}
-	}
-}
-
-// TestFIPSFullyCompliant passes only when the dep scan finds zero x/crypto violations.
-// Skipped until all 25 violations in knownViolations are resolved. Remove the Skip once
-// knownViolations is empty.
-func TestFIPSFullyCompliant(t *testing.T) {
-	if len(knownViolations) > 0 {
-		t.Skipf("%d x/crypto violation(s) remain — see knownViolations for fix tracking", len(knownViolations))
-	}
-	violations, importGraph := runDepScan(t)
-	if len(violations) == 0 {
-		return
-	}
-	t.Errorf("binary has %d x/crypto violation(s) — not fully FIPS compliant:", len(violations))
-	for _, v := range violations {
-		chain := shortestChain(rootPackage, v.importer, importGraph)
-		if chain == nil {
-			chain = []string{v.importer}
-		}
-		chain = append(chain, v.imported)
-		t.Logf("  [%s]\n      → %s",
-			v.imported[len("golang.org/x/crypto/"):], formatChain(chain))
 	}
 }
