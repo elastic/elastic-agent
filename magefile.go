@@ -1450,12 +1450,6 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 			}
 		}
 
-<<<<<<< HEAD
-		checksums := make(map[string]string)
-		// Operate on the files depending on if we're packaging from a manifest or not
-		if manifestResponse != nil {
-			checksums = devtools.ChecksumsWithManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, manifestResponse, dependencies)
-=======
 		var checksums map[string]string
 		// Manifest-declared SHAs are only correct when every binary being
 		// checksummed came from the manifest — i.e. CoreSource=manifest. When
@@ -1463,7 +1457,6 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 		// manifest's entry, so compute everything from the files on disk.
 		if cfg.Packaging.CoreSource == devtools.CoreSourceManifest {
 			checksums = devtools.ChecksumsWithManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, cfg.Packaging.Manifest, dependencies)
->>>>>>> dce51a67b ([mage] Unify packaging targets (#14871))
 		} else {
 			checksums = devtools.ChecksumsWithoutManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, dependencies)
 		}
