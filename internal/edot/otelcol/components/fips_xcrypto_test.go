@@ -10,7 +10,7 @@ package components_test
 // golang.org/x/crypto is NOT covered by Go's FIPS 140-3 certified module
 // (GOFIPS140); only crypto/* standard library packages are certified.
 //
-// TestFIPSXCryptoViolations reports all violations with their full dependency
+// TestFIPSFullyCompliant reports all violations with their full dependency
 // chain and fails on any violation not listed in knownViolations. Remove
 // entries from knownViolations as fixes land. Once the map is empty the test
 // becomes a strict no-violations gate.
@@ -166,9 +166,9 @@ func formatChain(chain []string) string {
 	return strings.Join(chain, "\n      → ")
 }
 
-// TestFIPSXCryptoViolations reports all x/crypto violations with their full
+// TestFIPSFullyCompliant reports all x/crypto violations with their full
 // dependency chain and fails on any violation not present in knownViolations.
-func TestFIPSXCryptoViolations(t *testing.T) {
+func TestFIPSFullyCompliant(t *testing.T) {
 	violations, importGraph := runDepScan(t)
 
 	found := make(map[string]bool, len(violations))
