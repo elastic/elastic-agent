@@ -93,7 +93,9 @@ func TestNewInMemory(t *testing.T) {
 func TestNewNamedLogger(t *testing.T) {
 	const name = "test-component"
 
-	tmp := t.TempDir()
+	tmp, err := os.MkdirTemp("", "TestNewNamedLogger*")
+	require.NoError(t, err)
+
 	topPath, logsPath := paths.Top(), paths.Logs()
 	paths.SetTop(tmp)
 	paths.SetLogs(filepath.Join(tmp, DefaultLogDirectory))

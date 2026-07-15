@@ -45,6 +45,18 @@ func createPolicy(
 	policyName string,
 	dataOutputID string,
 ) (string, string) {
+	return createPolicyWithOverride(t, ctx, agentFixture, info, policyName, dataOutputID, nil)
+}
+
+func createPolicyWithOverride(
+	t *testing.T,
+	ctx context.Context,
+	agentFixture *atesting.Fixture,
+	info *define.Info,
+	policyName string,
+	dataOutputID string,
+	overrides map[string]any,
+) (string, string) {
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        policyName,
 		Namespace:   info.Namespace,
@@ -71,13 +83,23 @@ func createPolicy(
 		t.Fatalf("could not create Agent Policy: %s", err)
 	}
 
-	// Create enrollment API key
-	createEnrollmentAPIKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
-		PolicyID: policy.ID,
+	// Update policy with overrides
+	if overrides != nil {
+		_, err = info.KibanaClient.UpdatePolicy(ctx, policy.ID, kibana.AgentPolicyUpdateRequest{
+			Name:      policyName,
+			Namespace: info.Namespace,
+			Overrides: overrides,
+		})
+		if err != nil {
+			t.Fatalf("could not update Agent Policy overrides: %s", err)
+		}
 	}
 
+	// Create enrollment API key
 	t.Logf("Creating enrollment API key...")
-	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(ctx, createEnrollmentAPIKeyReq)
+	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(ctx, kibana.CreateEnrollmentAPIKeyRequest{
+		PolicyID: policy.ID,
+	})
 	if err != nil {
 		t.Fatalf("unable to create enrolment API key: %s", err)
 	}
