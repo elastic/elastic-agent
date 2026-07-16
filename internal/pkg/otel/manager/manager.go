@@ -33,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -373,6 +374,14 @@ func (m *OTelManager) Run(ctx context.Context) error {
 // Errors returns channel that can send an error that affects the state of the running agent.
 func (m *OTelManager) Errors() <-chan error {
 	return m.errCh
+}
+
+// PerformAction routes a Fleet action to the receiver instance backing
+// com. The action is delivered  through the elasticdiagnostics extension
+// over its Unix socket (seeotel.PerformActionExt); the receiver's
+// registered action handler runs the action and this returns its result.
+func (m *OTelManager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	return otel.PerformActionExt(ctx, comp.ID, name, params)
 }
 
 // collectorRunning checks if the otel collector is running.
