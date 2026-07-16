@@ -3137,6 +3137,9 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	timestamp := cfg.IntegrationTest.TimestampEnabled
 
 	extraEnv := map[string]string{}
+	if cfg.IntegrationTest.AgentDevelop != "" {
+		extraEnv["TEST_AGENT_DEVELOP"] = cfg.IntegrationTest.AgentDevelop
+	}
 	if cfg.IntegrationTest.CollectDiag != "" {
 		extraEnv["AGENT_COLLECT_DIAG"] = cfg.IntegrationTest.CollectDiag
 	}
