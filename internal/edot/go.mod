@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent/internal/edot
 
-go 1.26.4
+go 1.26.5
 
 // use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
@@ -11,9 +11,9 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260714154211-df2e9bf105bc
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260715194011-384190f400be
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.46.0
+	github.com/elastic/elastic-agent-libs v0.46.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.62.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.62.0
@@ -112,6 +112,7 @@ require (
 	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
 	github.com/elastic/go-licenser v0.4.2 // indirect
 	github.com/elastic/go-quark v0.3.0 // indirect
+	github.com/elastic/lumberjack v0.0.0-20260715013204-c5b60bbeaaab // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.62.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/tk-btf v0.2.0 // indirect
@@ -777,7 +778,6 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9 // indirect
 	k8s.io/api v0.35.4 // indirect
@@ -804,6 +804,15 @@ replace (
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
 	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
 	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
+)
+
+// Use a fork of the OTel Collector otelcol and service modules that adds partial
+// receiver reload on config change (feature gates service.partialReload and
+// service.partialReloadReceivers). Fork: https://github.com/elastic/opentelemetry-collector
+// commit 86a6a75a9057 on branch v01550/partial-reload on top of v0.155.0.
+replace (
+	go.opentelemetry.io/collector/otelcol => github.com/elastic/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057
+	go.opentelemetry.io/collector/service => github.com/elastic/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057
 )
 
 // Replace statements carried forward from Beats https://github.com/elastic/beats/blob/0678f4d96212ac968fc90596e60475ed2f3979e1/go.mod#L503

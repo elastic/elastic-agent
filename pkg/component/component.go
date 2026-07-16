@@ -38,15 +38,16 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default       string            `yaml:"default" config:"default" json:"default"`
-	Auditbeat     BeatRuntimeConfig `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
-	Filebeat      BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Heartbeat     BeatRuntimeConfig `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
-	Metricbeat    BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
-	Osquerybeat   BeatRuntimeConfig `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
-	Packetbeat    BeatRuntimeConfig `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
-	DynamicInputs string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
-	Output        map[string]string `yaml:"output" config:"output" json:"output"`
+	Default                 string            `yaml:"default" config:"default" json:"default"`
+	Auditbeat               BeatRuntimeConfig `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
+	Filebeat                BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Heartbeat               BeatRuntimeConfig `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
+	Metricbeat              BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	Osquerybeat             BeatRuntimeConfig `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
+	Packetbeat              BeatRuntimeConfig `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
+	DynamicInputs           string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	Output                  map[string]string `yaml:"output" config:"output" json:"output"`
+	OtelPartialConfigReload bool              `yaml:"otel_partial_config_reload" config:"otel_partial_config_reload" json:"otel_partial_config_reload"`
 }
 
 type BeatRuntimeConfig struct {
@@ -56,8 +57,9 @@ type BeatRuntimeConfig struct {
 
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
-		Default:       string(DefaultRuntimeManager),
-		DynamicInputs: string(ProcessRuntimeManager),
+		Default:                 string(DefaultRuntimeManager),
+		DynamicInputs:           "",
+		OtelPartialConfigReload: true,
 		Auditbeat: BeatRuntimeConfig{
 			Default: string(OtelRuntimeManager),
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier

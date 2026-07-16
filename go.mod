@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.26.4
+go 1.26.5
 
 replace github.com/elastic/beats/v7 => ./beats
 
@@ -15,11 +15,11 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260714154211-df2e9bf105bc
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260715194011-384190f400be
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-autodiscover v0.10.3
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-	github.com/elastic/elastic-agent-libs v0.46.0
+	github.com/elastic/elastic-agent-libs v0.46.1
 	github.com/elastic/elastic-agent-system-metrics v0.14.4
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-20260515154942-99dc973fd52e
@@ -135,6 +135,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
+	github.com/brunoga/deep v1.3.1 // indirect
 	github.com/buger/goterm v1.0.4 // indirect
 	github.com/cenkalti/backoff/v6 v6.0.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
@@ -182,6 +183,7 @@ require (
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
+	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/foxboron/go-tpm-keyfiles v0.0.0-20251226215517-609e4778396f // indirect
 	github.com/fsnotify/fsevents v0.2.0 // indirect
@@ -192,13 +194,13 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
-	github.com/go-openapi/jsonpointer v0.22.5 // indirect
+	github.com/go-openapi/jsonpointer v0.23.1 // indirect
 	github.com/go-openapi/jsonreference v0.21.5 // indirect
 	github.com/go-openapi/swag v0.25.5 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.5 // indirect
 	github.com/go-openapi/swag/conv v0.25.5 // indirect
 	github.com/go-openapi/swag/fileutils v0.25.5 // indirect
-	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
+	github.com/go-openapi/swag/jsonname v0.26.0 // indirect
 	github.com/go-openapi/swag/jsonutils v0.25.5 // indirect
 	github.com/go-openapi/swag/loading v0.25.5 // indirect
 	github.com/go-openapi/swag/mangling v0.25.5 // indirect
@@ -245,7 +247,12 @@ require (
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
+	github.com/knadh/koanf/parsers/yaml v1.1.0 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
+	github.com/knadh/koanf/providers/env v1.1.0 // indirect
+	github.com/knadh/koanf/providers/file v1.2.1 // indirect
+	github.com/knadh/koanf/providers/posflag v1.0.1 // indirect
+	github.com/knadh/koanf/providers/structs v1.0.0 // indirect
 	github.com/knadh/koanf/v2 v2.3.5 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
@@ -332,10 +339,14 @@ require (
 	github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea // indirect
 	github.com/tonistiigi/vt100 v0.0.0-20240514184818-90bafcd6abab // indirect
 	github.com/urfave/cli/v2 v2.27.7 // indirect
+	github.com/vektra/mockery/v3 v3.7.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.2.0 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
+	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
+	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
+	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
@@ -450,6 +461,15 @@ replace (
 	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
 )
 
+// Use a fork of the OTel Collector otelcol and service modules that adds partial
+// receiver reload on config change (feature gates service.partialReload and
+// service.partialReloadReceivers). Fork: https://github.com/elastic/opentelemetry-collector
+// commit 86a6a75a9057 on branch v01550/partial-reload on top of v0.155.0.
+replace (
+	go.opentelemetry.io/collector/otelcol => github.com/elastic/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057
+	go.opentelemetry.io/collector/service => github.com/elastic/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057
+)
+
 // Replace statements carried forward from Beats https://github.com/elastic/beats/blob/0678f4d96212ac968fc90596e60475ed2f3979e1/go.mod#L503
 replace (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption => github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic
@@ -465,6 +485,7 @@ tool (
 	github.com/elastic/go-licenser
 	github.com/magefile/mage
 	github.com/rednafi/link-patrol/cmd/link-patrol
+	github.com/vektra/mockery/v3
 	go.elastic.co/go-licence-detector
 	golang.org/x/tools/cmd/deadcode
 	golang.org/x/tools/cmd/goimports
