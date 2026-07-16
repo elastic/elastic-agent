@@ -133,7 +133,7 @@ func New(
 	}
 	runtime.SetServiceCheckinGracePeriod(cfg.Settings.Upgrade.Watcher.GracePeriod)
 	if initialUpdateMarker != nil && initialUpdateMarker.GracePeriod > 0 {
-		runtime.SetUpgradeGracePeriodCeiling(initialUpdateMarker.GracePeriod)
+		runtime.SetUpgradeGracePeriod(initialUpdateMarker.GracePeriod)
 	}
 
 	// prepare initialUpgradeDetails for injecting it in coordinator later on
