@@ -149,6 +149,7 @@ func upgradeGracePeriod(cfg *configuration.UpgradeConfig) time.Duration {
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
 func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper, ars ttl.Source) (*Upgrader, error) {
+	gracePeriod := upgradeGracePeriod(upgradeConfig)
 	return &Upgrader{
 		log:                      log,
 		settings:                 settings,
@@ -164,8 +165,8 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *c
 		extractAgentVersion:      extractAgentVersion,
 		copyActionStore:          copyActionStoreProvider(os.ReadFile, os.WriteFile),
 		copyRunDirectory:         copyRunDirectoryProvider(os.MkdirAll, filecopy.Copy),
-		writeUpgradeMarker:       writeUpgradeMarkerProvider(upgradeGracePeriod(upgradeConfig)),
-		markUpgrade:              markUpgradeProvider(UpdateActiveCommit, os.WriteFile, upgradeGracePeriod(upgradeConfig)),
+		writeUpgradeMarker:       writeUpgradeMarkerProvider(gracePeriod),
+		markUpgrade:              markUpgradeProvider(UpdateActiveCommit, os.WriteFile, gracePeriod),
 		changeSymlink:            changeSymlink,
 		rollbackInstall:          rollbackInstall,
 	}, nil
