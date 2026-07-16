@@ -17,10 +17,8 @@ updates:
       - dependency-name: "github.com/elastic/beats/*"
       # Otel dependency updates are done in lock-step with Otel core framework updates
       - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
-<<<<<<< HEAD
       # elastic/sarama fork should be managed manually to avoid path mismatch issues
       - dependency-name: "github.com/elastic/sarama"
-=======
       # k8s dependencies are bumped transitively by Otel dependency updates; do not update independently
       - dependency-name: "k8s.io/*"
       - dependency-name: "sigs.k8s.io/*"
@@ -60,7 +58,6 @@ updates:
       misc:
         patterns:
           - "*"
->>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
     open-pull-requests-limit: 10
 
   - package-ecosystem: "github-actions"
