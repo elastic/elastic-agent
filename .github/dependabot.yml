@@ -13,15 +13,13 @@ updates:
       # Only update internal dependencies for now while we evaluate this workflow.
       - dependency-name: "github.com/elastic/*"
       - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
-<<<<<<< HEAD
     ignore:
       - dependency-name: "github.com/elastic/beats/*"
-    reviewers:
-      - "elastic/elastic-agent-control-plane"
-=======
       # k8s dependencies are bumped transitively by Otel dependency updates; do not update independently
       - dependency-name: "k8s.io/*"
       - dependency-name: "sigs.k8s.io/*"
+    reviewers:
+      - "elastic/elastic-agent-control-plane"
     groups:
       elastic:
         patterns:
@@ -58,7 +56,6 @@ updates:
       misc:
         patterns:
           - "*"
->>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
     open-pull-requests-limit: 10
 
   - package-ecosystem: "github-actions"
