@@ -13,7 +13,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260714192123-df57e349e665
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260715115313-07e825c0cf24
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-autodiscover v0.10.3
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
@@ -305,6 +305,7 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.4 // indirect
+	github.com/elastic/lumberjack v0.0.0-20260715013204-c5b60bbeaaab // indirect
 	github.com/elastic/lunes v0.2.2 // indirect
 	github.com/elastic/mito v1.24.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.62.0 // indirect
@@ -771,7 +772,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260622175928-b703f567277d // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9 // indirect
 	k8s.io/apiextensions-apiserver v0.35.1 // indirect
 	k8s.io/apiserver v0.35.4 // indirect

@@ -5,7 +5,7 @@ go 1.26.5
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260714192123-df57e349e665
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260715115313-07e825c0cf24
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.46.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.62.0
@@ -65,6 +65,7 @@ require (
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/coreos/go-oidc/v3 v3.19.0 // indirect
 	github.com/elastic/apm-data v1.22.0 // indirect
+	github.com/elastic/lumberjack v0.0.0-20260715013204-c5b60bbeaaab // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.62.0 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.5 // indirect
@@ -689,7 +690,6 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9 // indirect
 	k8s.io/api v0.35.4 // indirect
