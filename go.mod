@@ -131,12 +131,9 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-<<<<<<< HEAD
-=======
 	github.com/brunoga/deep v1.3.1 // indirect
 	github.com/buger/goterm v1.0.4 // indirect
 	github.com/cenkalti/backoff/v6 v6.0.0 // indirect
->>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/containerd/containerd v1.7.30 // indirect
@@ -209,11 +206,8 @@ require (
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
-<<<<<<< HEAD
-=======
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/parsers/yaml v1.1.0 // indirect
->>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
 	github.com/knadh/koanf/providers/env v1.1.0 // indirect
 	github.com/knadh/koanf/providers/file v1.2.1 // indirect
@@ -272,8 +266,6 @@ require (
 	github.com/urfave/cli/v2 v2.27.7 // indirect
 	github.com/vektra/mockery/v3 v3.7.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-<<<<<<< HEAD
-=======
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.2.0 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
@@ -281,7 +273,6 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
->>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
@@ -385,9 +376,6 @@ replace (
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
 )
 
-<<<<<<< HEAD
-tool golang.org/x/tools/cmd/deadcode
-=======
 tool (
 	github.com/elastic/go-licenser
 	github.com/magefile/mage
@@ -399,4 +387,3 @@ tool (
 	golang.org/x/tools/cmd/stringer
 	gotest.tools/gotestsum
 )
->>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
