@@ -116,14 +116,11 @@ func (runner *OsqueryManagerRunner) TestLiveQueryRoutingNoSchedule() {
 		integration.PreinstalledPackages["osquery_manager"], noScheduleFile, uuid.Must(uuid.NewV4()).String(), runner.policyID)
 	require.NoError(t, err, "failed to install no-schedule osquery package policy")
 	packagePolicyID := pkgResp.Item.ID
-
-	t.Cleanup(func() {
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cleanupCancel()
-		if _, err := runner.info.KibanaClient.DeleteFleetPackage(cleanupCtx, packagePolicyID); err != nil {
+	defer func() {
+		if _, err := runner.info.KibanaClient.DeleteFleetPackage(t.Context(), packagePolicyID); err != nil {
 			t.Logf("failed to delete no-schedule osquery package policy %s: %v", packagePolicyID, err)
 		}
-	})
+	}()
 
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(t, err, "could not get agent status")
