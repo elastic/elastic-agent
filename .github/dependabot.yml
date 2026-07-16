@@ -15,47 +15,8 @@ updates:
       - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
     ignore:
       - dependency-name: "github.com/elastic/beats/*"
-      # k8s dependencies are bumped transitively by Otel dependency updates; do not update independently
-      - dependency-name: "k8s.io/*"
-      - dependency-name: "sigs.k8s.io/*"
     reviewers:
       - "elastic/elastic-agent-control-plane"
-    groups:
-      elastic:
-        patterns:
-          # github.com/elastic/* and go.elastic.co/* cover all Elastic and APM Go packages
-          - "github.com/elastic/*"
-          - "go.elastic.co/*"
-      golang-x:
-        patterns:
-          - "golang.org/x/*"
-      tooling-test:
-        patterns:
-          # Test frameworks and helpers
-          - "github.com/stretchr/*"
-          - "github.com/testcontainers/*"
-          # Helm: only used in k8s integration tests
-          - "helm.sh/helm/*"
-          # Only used in *_test.go files
-          - "github.com/google/pprof"
-          - "github.com/google/go-containerregistry"
-          - "github.com/cavaliergopher/*"
-          - "github.com/blakesmith/*"
-          # Only used in pkg/testing/
-          - "github.com/sajari/*"
-          - "github.com/moby/*"
-      packaging:
-        patterns:
-          # Build tooling: only used in magefile.go, dev-tools/, or tools/tools.go
-          - "github.com/magefile/*"
-          - "github.com/Jeffail/gabs/*"
-          - "github.com/josephspurrier/goversioninfo"
-          - "github.com/rednafi/link-patrol"
-          - "gotest.tools/*"
-          - "github.com/vektra/mockery/*"
-      misc:
-        patterns:
-          - "*"
     open-pull-requests-limit: 10
 
   - package-ecosystem: "github-actions"
