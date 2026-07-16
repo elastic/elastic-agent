@@ -12,11 +12,12 @@ import (
 	"context"
 	"time"
 
+	mock "github.com/stretchr/testify/mock"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	mock "github.com/stretchr/testify/mock"
 )
 
 // newMockAgentWatcher creates a new instance of mockAgentWatcher. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
