@@ -119,10 +119,10 @@ import (
 	kafkapartitionerextension "github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
 	verifierreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
-
 	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
 	"github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension"
 	"github.com/elastic/opentelemetry-collector-components/extension/awscredentialsproviderextension"
+	quarkreceiver "github.com/elastic/otel-quark-receiver/quarkreceiver"
 
 	// Connectors
 	otlpjsonconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector"
@@ -171,6 +171,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			zipkinreceiver.NewFactory(),
 			elasticmonitoringreceiver.NewFactory(),
 			verifierreceiver.NewFactory(),
+			quarkreceiver.NewFactory(),
 			abreceiver.NewFactoryWithSettings(abreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			fbreceiver.NewFactoryWithSettings(fbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			mbreceiver.NewFactoryWithSettings(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),

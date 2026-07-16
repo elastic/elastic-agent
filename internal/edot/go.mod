@@ -7,6 +7,8 @@ replace github.com/elastic/elastic-agent => ../../
 
 replace github.com/elastic/beats/v7 => ../../beats
 
+replace github.com/elastic/otel-quark-receiver/quarkreceiver => ./../../../otel-quark-receiver/quarkreceiver
+
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
@@ -26,6 +28,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.62.0
 	github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver v0.1.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.65.0
+	github.com/elastic/otel-quark-receiver/quarkreceiver v0.0.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector v0.155.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.155.0
