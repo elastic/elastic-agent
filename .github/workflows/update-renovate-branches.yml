@@ -1,0 +1,59 @@
+---
+name: update-renovate-branches
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+env:
+  JOB_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: generator
+        uses: elastic/oblt-actions/elastic/active-branches@v1
+        with:
+          filter-branches: true
+
+      - uses: actions/checkout@v7
+
+      - name: Update baseBranches in renovate.json
+        env:
+          MATRIX: ${{ steps.generator.outputs.matrix }}
+        run: |
+          branches=$(printf '%s' "$MATRIX" | jq -c '[.include[].branch]')
+          jq --argjson branches "$branches" '.baseBranches = ["main"] + $branches' \
+            .github/renovate.json > renovate.json.new
+          mv renovate.json.new .github/renovate.json
+
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "[Automation] Update Renovate baseBranches to current active branches"
+          title: "[Automation] Update Renovate baseBranches to current active branches"
+          body: |
+            Updates `baseBranches` in `.github/renovate.json` to match the current set of active release branches queried from the Elastic release schedule.
+          branch: update-renovate-branches
+          base: main
+          delete-branch: true
+          labels: |
+            automation
+            skip-changelog
+            backport-skip
+            Team:Elastic-Agent-Control-Plane
+
+      - if: ${{ failure() }}
+        uses: elastic/oblt-actions/slack/send@v1
+        with:
+          bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel-id: "#ingest-notifications"
+          message: ":traffic_cone: Renovate branches update failed for `${{ github.repository }}`, @agent-control-plane-team please look what's going on <${{ env.JOB_URL }}|here>"

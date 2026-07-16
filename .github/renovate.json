@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
+  "baseBranches": ["main", "9.5", "9.4", "9.3", "8.19"],
   "pip_requirements": {
     "fileMatch": ["^docs/scripts/update-docs/"]
   },
@@ -12,8 +13,7 @@
       "labels": [
         "automation",
         "skip-changelog",
-        "Team:Elastic-Agent-Control-Plane",
-        "backport-active-all"
+        "Team:Elastic-Agent-Control-Plane"
       ],
       "prConcurrentLimit": 10
     },
@@ -94,8 +94,7 @@
       "labels": [
         "automation",
         "skip-changelog",
-        "Team:Elastic-Agent-Control-Plane",
-        "backport-active-all"
+        "Team:Elastic-Agent-Control-Plane"
       ],
       "prConcurrentLimit": 10
     },
