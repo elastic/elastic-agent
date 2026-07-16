@@ -334,7 +334,7 @@ func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *at
 					DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 						if runtime.GOOS != "windows" {
 							path := strings.ReplaceAll(socketPath, "unix://", "")
-							return net.Dial("unix", path)
+							return (&net.Dialer{}).DialContext(ctx, "unix", path)
 						} else {
 							if strings.HasPrefix(socketPath, "npipe:///") {
 								path := strings.TrimPrefix(socketPath, "npipe:///")
@@ -357,7 +357,9 @@ func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *at
 func (gm *goroutinesMonitor) Update(t *testing.T, fixture *atesting.Fixture) {
 	// reach out to the unix sockets to get the raw stats that includes a count of gorutines
 	for _, comp := range gm.handles {
-		resp, err := comp.httpClient.Get("http://unix/stats")
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://unix/stats", nil)
+		require.NoError(t, err)
+		resp, err := comp.httpClient.Do(req)
 		require.NoError(t, err)
 		respRaw, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)

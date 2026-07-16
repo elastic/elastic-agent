@@ -210,9 +210,6 @@ func k8sStepHelmTemplateApplyWithValueOptions(chartPath string, releaseName stri
 }
 
 func mergeValues(t *testing.T, namespace string, values values.Options) map[string]any {
-	// Initialize a map to hold the parsed data
-	helmValues := make(map[string]any)
-
 	settings := cli.New()
 	settings.SetNamespace(namespace)
 	providers := getter.All(settings)
