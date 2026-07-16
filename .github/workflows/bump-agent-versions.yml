@@ -44,11 +44,7 @@ jobs:
         run: ./.github/workflows/bump-agent-versions.sh
 
       - if: ${{ failure()  }}
-<<<<<<< HEAD
-        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
-=======
         uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
->>>>>>> 6669dfcf1 (build(deps): bump slackapi/slack-github-action from 3.0.5 to 4.0.0 (#15571))
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -71,11 +67,7 @@ jobs:
 
         # if a PR was created as a result of this job, we notify on the Slack channel
       - if: ${{ startsWith(steps.update.outputs.pr, 'https') }}
-<<<<<<< HEAD
-        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
-=======
         uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
->>>>>>> 6669dfcf1 (build(deps): bump slackapi/slack-github-action from 3.0.5 to 4.0.0 (#15571))
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}
