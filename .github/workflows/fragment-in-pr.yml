@@ -16,7 +16,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
+<<<<<<< HEAD
     - uses: actions/setup-go@v6
+=======
+      with:
+        submodules: true
+    - uses: actions/setup-go@v7
+>>>>>>> e501aeea0 (build(deps): bump actions/setup-go from 6 to 7 (#15570))
       with:
         go-version-file: .go-version
     - name: check pr-has-fragment
