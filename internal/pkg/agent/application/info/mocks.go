@@ -11,10 +11,9 @@ package info
 import (
 	"context"
 
-	mock "github.com/stretchr/testify/mock"
-
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
+	mock "github.com/stretchr/testify/mock"
 )
 
 // NewMockAgent creates a new instance of MockAgent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

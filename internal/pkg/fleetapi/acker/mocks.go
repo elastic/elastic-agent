@@ -11,9 +11,8 @@ package acker
 import (
 	"context"
 
-	mock "github.com/stretchr/testify/mock"
-
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
+	mock "github.com/stretchr/testify/mock"
 )
 
 // NewMockAcker creates a new instance of MockAcker. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

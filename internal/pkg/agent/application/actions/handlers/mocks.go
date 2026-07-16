@@ -12,8 +12,6 @@ import (
 	"context"
 	"io"
 
-	mock "github.com/stretchr/testify/mock"
-
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
@@ -22,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
+	mock "github.com/stretchr/testify/mock"
 )
 
 // NewMockUploader creates a new instance of MockUploader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
