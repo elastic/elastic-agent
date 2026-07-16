@@ -673,8 +673,6 @@ func FindFilesRecursive(match func(path string, d fs.FileInfo) bool) ([]string, 
 			return filepath.SkipDir
 		}
 
-<<<<<<< HEAD
-=======
 		// Skip directories that are the root of a separate git repository
 		// (submodules and worktrees have a .git file at their root).
 		if d.IsDir() && path != "." {
@@ -683,7 +681,6 @@ func FindFilesRecursive(match func(path string, d fs.FileInfo) bool) ([]string, 
 			}
 		}
 
->>>>>>> 4ee454f2e ([mage] Fix FindFilesRecursive walking into git submodules and worktrees (#15520))
 		if !d.Type().IsRegular() {
 			// continue
 			return nil
