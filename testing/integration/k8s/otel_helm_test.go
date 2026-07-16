@@ -152,32 +152,6 @@ func k8sStepHelmDeployWithValueOptions(chartPath string, releaseName string, val
 	}
 }
 
-<<<<<<< HEAD
-=======
-// k8sStepHelmTemplateApplyWithValueOptions is like k8sStepHelmDeployWithValueOptions but
-// uses "helm template | kubectl apply" instead of "helm install". Exercises the
-// template+apply path on the cluster; any config issues cause pods to fail and the
-// test fails (e.g. #12878 - missing debug exporter).
-func k8sStepHelmTemplateApplyWithValueOptions(chartPath string, releaseName string, values values.Options) k8sTestStep {
-	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		helmValues := mergeValues(t, namespace, values)
-
-		k8sStepHelmTemplateApply(chartPath, releaseName, helmValues)(t, ctx, kCtx, namespace)
-	}
-}
-
-func mergeValues(t *testing.T, namespace string, values values.Options) map[string]any {
-	settings := cli.New()
-	settings.SetNamespace(namespace)
-	providers := getter.All(settings)
-	helmValues, err := values.MergeValues(providers)
-	if err != nil {
-		require.NoError(t, err, "failed to helm values")
-	}
-	return helmValues
-}
-
->>>>>>> 6e0a0f523 (Retry transient failures in integration test infrastructure (#15552))
 // k8sStepCheckRunningPods checks the status of the agent inside the pods returned by the selector
 func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, containerName string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
