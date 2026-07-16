@@ -614,7 +614,7 @@ func (Format) All() {
 // License applies the right license header.
 func (Format) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
-	return sh.RunV("go-licenser", "-license", "Elastic", "-exclude", "beats")
+	return sh.RunV("go-licenser", "-license", "Elasticv2", "-exclude", "beats")
 }
 
 // Package packages the Elastic Agent for distribution.
