@@ -803,7 +803,7 @@ func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiver
 	//
 	// The osquery object may be nil when the integration has no scheduled queries (live-query-only policy).
 	// In that case we still need to reorder streams so that osquery_manager.result is at
-	// inputs[0] — osquerybeat wires it's client to inputs[0] and live-query result rows must
+	// inputs[0] — osquerybeat wires its client to inputs[0] and live-query result rows must
 	// land in the result stream, not action.responses.
 	osqMap, _ := unit.Config.GetSource().AsMap()["osquery"].(map[string]any)
 	for i, ri := range result {

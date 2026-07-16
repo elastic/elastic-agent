@@ -176,8 +176,7 @@ func (runner *OsqueryManagerRunner) TestLiveQueryRoutingNoSchedule() {
 	for _, hit := range misroutedRes.Hits.Hits {
 		_, hasActionResponse := hit.Source["action_response"]
 		assert.True(t, hasActionResponse,
-			"logs-osquery_manager.action.responses* must contain an action-response; found a misrouted result row: %v",
-			liveQuery.QueryActionID, hit.Source)
+			"logs-osquery_manager.action.responses* must contain an action-response; found a misrouted result row: %v", hit.Source)
 	}
 
 }

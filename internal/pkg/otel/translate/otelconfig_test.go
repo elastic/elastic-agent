@@ -637,7 +637,7 @@ func TestGetOtelConfig(t *testing.T) {
 	// expectedOsquerybeatSingleReceiverConfig is the expected config for an osquery component
 	// with single_receiver: true and two streams merged into one receiver.
 	// The osquery_manager.result stream must be first (index 0) so that
-	// osquerybeat assigns it's client to it.
+	// osquerybeat assigns its client to it.
 	expectedOsquerybeatSingleReceiverConfig := func(id string) map[string]any {
 		cfg := beatReceiverBaseConfig(id, "osquerybeat", "osquery")
 		cfg["osquerybeat"] = map[string]any{
