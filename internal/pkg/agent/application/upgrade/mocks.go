@@ -49,11 +49,11 @@ func (_m *MockWatcherHelper) EXPECT() *MockWatcherHelper_Expecter {
 // InvokeWatcher provides a mock function for the type MockWatcherHelper
 func (_mock *MockWatcherHelper) InvokeWatcher(log *logger.Logger, agentExecutable string, additionalWatchArgs ...string) (*exec.Cmd, error) {
 	// string
-	_va := make([]interface{}, len(additionalWatchArgs))
+	_va := make([]any, len(additionalWatchArgs))
 	for _i := range additionalWatchArgs {
 		_va[_i] = additionalWatchArgs[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, log, agentExecutable)
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
@@ -91,9 +91,9 @@ type MockWatcherHelper_InvokeWatcher_Call struct {
 //   - log *logger.Logger
 //   - agentExecutable string
 //   - additionalWatchArgs ...string
-func (_e *MockWatcherHelper_Expecter) InvokeWatcher(log interface{}, agentExecutable interface{}, additionalWatchArgs ...interface{}) *MockWatcherHelper_InvokeWatcher_Call {
+func (_e *MockWatcherHelper_Expecter) InvokeWatcher(log any, agentExecutable any, additionalWatchArgs ...any) *MockWatcherHelper_InvokeWatcher_Call {
 	return &MockWatcherHelper_InvokeWatcher_Call{Call: _e.mock.On("InvokeWatcher",
-		append([]interface{}{log, agentExecutable}, additionalWatchArgs...)...)}
+		append([]any{log, agentExecutable}, additionalWatchArgs...)...)}
 }
 
 func (_c *MockWatcherHelper_InvokeWatcher_Call) Run(run func(log *logger.Logger, agentExecutable string, additionalWatchArgs ...string)) *MockWatcherHelper_InvokeWatcher_Call {
@@ -159,7 +159,7 @@ type MockWatcherHelper_SelectWatcherExecutable_Call struct {
 //   - topDir string
 //   - previous agentInstall
 //   - current agentInstall
-func (_e *MockWatcherHelper_Expecter) SelectWatcherExecutable(topDir interface{}, previous interface{}, current interface{}) *MockWatcherHelper_SelectWatcherExecutable_Call {
+func (_e *MockWatcherHelper_Expecter) SelectWatcherExecutable(topDir any, previous any, current any) *MockWatcherHelper_SelectWatcherExecutable_Call {
 	return &MockWatcherHelper_SelectWatcherExecutable_Call{Call: _e.mock.On("SelectWatcherExecutable", topDir, previous, current)}
 }
 
@@ -233,7 +233,7 @@ type MockWatcherHelper_TakeOverWatcher_Call struct {
 //   - ctx context.Context
 //   - log *logger.Logger
 //   - topDir string
-func (_e *MockWatcherHelper_Expecter) TakeOverWatcher(ctx interface{}, log interface{}, topDir interface{}) *MockWatcherHelper_TakeOverWatcher_Call {
+func (_e *MockWatcherHelper_Expecter) TakeOverWatcher(ctx any, log any, topDir any) *MockWatcherHelper_TakeOverWatcher_Call {
 	return &MockWatcherHelper_TakeOverWatcher_Call{Call: _e.mock.On("TakeOverWatcher", ctx, log, topDir)}
 }
 
@@ -297,7 +297,7 @@ type MockWatcherHelper_WaitForWatcher_Call struct {
 //   - log *logger.Logger
 //   - markerFilePath string
 //   - waitTime time.Duration
-func (_e *MockWatcherHelper_Expecter) WaitForWatcher(ctx interface{}, log interface{}, markerFilePath interface{}, waitTime interface{}) *MockWatcherHelper_WaitForWatcher_Call {
+func (_e *MockWatcherHelper_Expecter) WaitForWatcher(ctx any, log any, markerFilePath any, waitTime any) *MockWatcherHelper_WaitForWatcher_Call {
 	return &MockWatcherHelper_WaitForWatcher_Call{Call: _e.mock.On("WaitForWatcher", ctx, log, markerFilePath, waitTime)}
 }
 
@@ -391,7 +391,7 @@ type mockWatcherGrappler_TakeDownWatcher_Call struct {
 // TakeDownWatcher is a helper method to define mock.On call
 //   - ctx context.Context
 //   - log *logger.Logger
-func (_e *mockWatcherGrappler_Expecter) TakeDownWatcher(ctx interface{}, log interface{}) *mockWatcherGrappler_TakeDownWatcher_Call {
+func (_e *mockWatcherGrappler_Expecter) TakeDownWatcher(ctx any, log any) *mockWatcherGrappler_TakeDownWatcher_Call {
 	return &mockWatcherGrappler_TakeDownWatcher_Call{Call: _e.mock.On("TakeDownWatcher", ctx, log)}
 }
 

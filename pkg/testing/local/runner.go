@@ -69,6 +69,9 @@ func (Runner) Run(ctx context.Context, verbose bool, sshClient ssh.SSHClient, lo
 
 		env["AGENT_VERSION"] = agentVersion
 		env["TEST_DEFINE_PREFIX"] = testPrefix
+		if _, ok := env["TEST_AGENT_DEVELOP"]; !ok {
+			env["TEST_AGENT_DEVELOP"] = "true"
+		}
 
 		params := devtools.GoTestArgs{
 			LogName:         testName,
