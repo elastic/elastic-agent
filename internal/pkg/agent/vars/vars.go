@@ -23,6 +23,7 @@ func WaitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config,
 	var cancel context.CancelFunc
 	var vars []*transpiler.Vars
 
+	// Ensure all composable providers are registered before constructing the controller.
 	include.Providers()
 	composable, err := composable.New(l, cfg, false)
 	if err != nil {

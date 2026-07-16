@@ -247,6 +247,7 @@ func New(
 		}
 	}
 
+	// Ensure all composable providers are registered before constructing the controller.
 	include.Providers()
 	varsManager, err := composable.New(log, cfg.GetUCfg(), composableManaged)
 	if err != nil {
