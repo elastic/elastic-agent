@@ -378,12 +378,12 @@ func requireLogFileLayoutForRuntime(t *testing.T, logsDirGlob, runtime string) {
 	logFileLayoutByRuntime := map[string][]string{
 		runtimeProcess: {
 			"logs/elastic-agent-*.ndjson",
-			"logs/events/elastic-agent-*.ndjson",
+			"logs/events/elastic-agent-event-log-*.ndjson",
 		},
 		runtimeOtel: {
 			"logs/elastic-agent-*.ndjson",
 			"logs/elastic-otel-collector-*.ndjson",
-			"logs/events/elastic-otel-collector-*.ndjson",
+			"logs/events/elastic-otel-collector-event-log-*.ndjson",
 		},
 	}
 
