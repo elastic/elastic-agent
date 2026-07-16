@@ -148,7 +148,8 @@ type Manager struct {
 // gracePeriodValue holds a grace period that can be read and updated safely
 // from multiple goroutines, so a config reload takes effect right away.
 type gracePeriodValue struct {
-	d atomic.Int64
+	d       atomic.Int64
+	ceiling atomic.Int64
 }
 
 func newGracePeriodValue(d time.Duration) *gracePeriodValue {
@@ -159,9 +160,15 @@ func newGracePeriodValue(d time.Duration) *gracePeriodValue {
 
 // Get returns the current value. A nil receiver returns zero, so callers
 // that never configured a grace period (e.g. existing tests) can pass nil.
+// If a ceiling was set (e.g. from the upgrade marker), it takes precedence
+// over the config value so config reloads cannot extend the window past the
+// deadline the upgrade watcher already committed to.
 func (v *gracePeriodValue) Get() time.Duration {
 	if v == nil {
 		return 0
+	}
+	if c := v.ceiling.Load(); c > 0 {
+		return time.Duration(c)
 	}
 	return time.Duration(v.d.Load())
 }
@@ -170,11 +177,23 @@ func (v *gracePeriodValue) Set(d time.Duration) {
 	v.d.Store(int64(d))
 }
 
+func (v *gracePeriodValue) SetCeiling(d time.Duration) {
+	v.ceiling.Store(int64(d))
+}
+
 // SetServiceCheckinGracePeriod sets the configured upgrade watcher grace
 // period, so service-runtime components can cap their failure window to a
 // safe margin below it. Safe to call at any time. Zero disables the cap.
 func (m *Manager) SetServiceCheckinGracePeriod(d time.Duration) {
 	m.serviceCheckinGracePeriod.Set(d)
+}
+
+// SetUpgradeGracePeriodCeiling pins the grace period to the value recorded
+// in the upgrade marker. While the ceiling is set, config reloads cannot
+// increase the effective grace period above it, so the check-in failure
+// window stays consistent with the deadline the upgrade watcher committed to.
+func (m *Manager) SetUpgradeGracePeriodCeiling(d time.Duration) {
+	m.serviceCheckinGracePeriod.SetCeiling(d)
 }
 
 // NewManager creates a new manager.

@@ -222,6 +222,7 @@ func TestMarkUpgrade(t *testing.T) {
 			return nil
 		},
 		os.WriteFile,
+		0,
 	)
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {

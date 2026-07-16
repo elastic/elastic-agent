@@ -140,6 +140,13 @@ func IsUpgradeable() bool {
 	return release.Upgradeable() || (paths.RunningInstalled() && info.RunningUnderSupervisor())
 }
 
+func upgradeGracePeriod(cfg *configuration.UpgradeConfig) time.Duration {
+	if cfg == nil || cfg.Watcher == nil {
+		return 0
+	}
+	return cfg.Watcher.GracePeriod
+}
+
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
 func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper, ars ttl.Source) (*Upgrader, error) {
 	return &Upgrader{
@@ -157,8 +164,8 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *c
 		extractAgentVersion:      extractAgentVersion,
 		copyActionStore:          copyActionStoreProvider(os.ReadFile, os.WriteFile),
 		copyRunDirectory:         copyRunDirectoryProvider(os.MkdirAll, filecopy.Copy),
-		writeUpgradeMarker:       writeUpgradeMarkerProvider(),
-		markUpgrade:              markUpgradeProvider(UpdateActiveCommit, os.WriteFile),
+		writeUpgradeMarker:       writeUpgradeMarkerProvider(upgradeGracePeriod(upgradeConfig)),
+		markUpgrade:              markUpgradeProvider(UpdateActiveCommit, os.WriteFile, upgradeGracePeriod(upgradeConfig)),
 		changeSymlink:            changeSymlink,
 		rollbackInstall:          rollbackInstall,
 	}, nil
