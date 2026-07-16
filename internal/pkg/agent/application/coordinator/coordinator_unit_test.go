@@ -2731,11 +2731,11 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 		assert.Equal(t, pkgcomponent.RuntimeManager(runtimeCfg.DynamicInputs), comp.RuntimeManager)
 	})
 
-	t.Run("default configuration switches dynamic otel components to process runtime", func(t *testing.T) {
+	t.Run("default configuration leaves dynamic otel components on otel runtime", func(t *testing.T) {
 		runtimeCfg := pkgcomponent.DefaultRuntimeConfig()
 		comp := otelSupportedComponent(true)
 		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
-		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager)
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager)
 	})
 }
 

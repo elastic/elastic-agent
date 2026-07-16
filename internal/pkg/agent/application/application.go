@@ -261,6 +261,7 @@ func New(
 		cfg.Settings.Collector,
 		otelmanager.CollectorStopTimeout,
 		nil,
+		cfg.Settings.Internal.Runtime.OtelPartialConfigReload,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)

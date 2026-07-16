@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source .buildkite/scripts/retry.sh
 source .buildkite/scripts/steps/ess.sh
 source .buildkite/scripts/steps/fleet.sh
 
 # Make sure that all tools are installed
-asdf install
+retry 3 asdf install
 
 GROUP_NAME=$1
 TEST_SUDO=$2

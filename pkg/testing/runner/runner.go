@@ -97,6 +97,12 @@ func NewRunner(cfg common.Config, ip common.InstanceProvisioner, sp common.Stack
 	if ip.Type() == common.ProvisionerTypeLocal {
 		for i := range osBatches {
 			osBatches[i].OS.Runner = local.Runner{}
+			// The Skip flag is set when an OS isn't in the known VM infrastructure.
+			// For local mode the provisioner runs directly on the host, so if it
+			// reports the OS as supported we can clear the flag and run the tests.
+			if osBatches[i].Skip && ip.Supported(osBatches[i].OS.OS) {
+				osBatches[i].Skip = false
+			}
 		}
 	}
 
@@ -149,6 +155,19 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 		return Result{}, err
 	}
 
+	// VM provisioners need an SSH key in place before Provision runs, since
+	// they use it to seed the instances they create.
+	var sshAuth ssh.AuthMethod
+	var repoArchive string
+	if r.ip.Type() == common.ProvisionerTypeVM {
+		prepareCtx, prepareCancel := context.WithTimeout(ctx, 10*time.Minute)
+		sshAuth, repoArchive, err = r.prepare(prepareCtx, cacheDir)
+		prepareCancel()
+		if err != nil {
+			return Result{}, err
+		}
+	}
+
 	// only send to the provisioner the batches that need to be created
 	var instances []StateInstance
 	var batches []common.OSBatch
@@ -178,14 +197,6 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 	var results map[string]common.OSRunnerResult
 	switch r.ip.Type() {
 	case common.ProvisionerTypeVM:
-		// prepare an SSH key and repo archive to reach the instances
-		prepareCtx, prepareCancel := context.WithTimeout(ctx, 10*time.Minute)
-		sshAuth, repoArchive, prepareErr := r.prepare(prepareCtx, cacheDir)
-		prepareCancel()
-		if prepareErr != nil {
-			return Result{}, prepareErr
-		}
-
 		// use SSH to perform all the required work on the instances
 		results, err = r.runInstances(ctx, sshAuth, repoArchive, instances)
 		if err != nil {

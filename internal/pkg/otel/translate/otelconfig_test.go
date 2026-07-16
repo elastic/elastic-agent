@@ -569,11 +569,6 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": false,
 			},
 			"management.otel.enabled": true,
-			"features": map[string]any{
-				"fqdn": map[string]any{
-					"enabled": false,
-				},
-			},
 		}
 	}
 
@@ -740,11 +735,6 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": false,
 			},
 			"management.otel.enabled": true,
-			"features": map[string]any{
-				"fqdn": map[string]any{
-					"enabled": false,
-				},
-			},
 		}
 	}
 
@@ -794,11 +784,6 @@ func TestGetOtelConfig(t *testing.T) {
 			"enabled": false,
 		},
 		"management.otel.enabled": true,
-		"features": map[string]any{
-			"fqdn": map[string]any{
-				"enabled": false,
-			},
-		},
 	}
 
 	tests := []struct {
@@ -1101,11 +1086,6 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": false,
 						},
 						"management.otel.enabled": true,
-						"features": map[string]any{
-							"fqdn": map[string]any{
-								"enabled": false,
-							},
-						},
 					},
 				},
 				"service": map[string]any{
@@ -1667,11 +1647,6 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": false,
 						},
 						"management.otel.enabled": true,
-						"features": map[string]any{
-							"fqdn": map[string]any{
-								"enabled": false,
-							},
-						},
 					},
 				},
 				"service": map[string]any{
@@ -1866,11 +1841,6 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": false,
 						},
 						"management.otel.enabled": true,
-						"features": map[string]any{
-							"fqdn": map[string]any{
-								"enabled": false,
-							},
-						},
 					},
 				},
 				"service": map[string]any{
@@ -1982,11 +1952,6 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": false,
 						},
 						"management.otel.enabled": true,
-						"features": map[string]any{
-							"fqdn": map[string]any{
-								"enabled": false,
-							},
-						},
 					},
 				},
 				"service": map[string]any{
@@ -2719,7 +2684,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			result, err := getReceiversConfigForComponent(
 				tt.component,
 				testAgentInfo,
-				false,
 				tt.outputQueueConfig,
 			)
 
@@ -2773,11 +2737,11 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 }
 
-// TestGetReceiversConfigForComponentFQDN verifies that the agent's FQDN feature flag is
-// propagated into the generated beat receiver config.
-func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
+// TestGetReceiversConfigForComponentFeatures verifies that all agent feature flags
+// are propagated into the generated Beat receiver config.
+func TestGetReceiversConfigForComponentFeatures(t *testing.T) {
 	comp := &component.Component{
-		ID:        "filestream-fqdn",
+		ID:        "filestream-features",
 		InputType: "filestream",
 		InputSpec: &component.InputRuntimeSpec{
 			BinaryName: "elastic-otel-collector",
@@ -2811,31 +2775,85 @@ func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
 		},
 	}
 
-	fqdnConfig := func(t *testing.T, enabled bool) map[string]any {
-		t.Helper()
+	featureFlags, err := features.Parse(map[string]any{
+		"agent": map[string]any{
+			"features": map[string]any{
+				"fqdn": map[string]any{
+					"enabled": false,
+				},
+				"log_input_run_as_filestream": map[string]any{
+					"enabled": true,
+				},
+				"aws_s3_v2": map[string]any{
+					"enabled": true,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	comp.Features = featureFlags.AsProto()
+	// The raw source is the only propagation path; the typed FQDN value must
+	// not override the value preserved in agent.features.
+	comp.Features.Fqdn.Enabled = true
 
-		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, enabled, nil)
-		require.NoError(t, err)
-		require.Len(t, result, 1)
+	result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
 
-		var receiverConfig map[string]any
-		for _, v := range result {
-			receiverConfig = v.(map[string]any)
-		}
-		featuresConfig, ok := receiverConfig["features"].(map[string]any)
-		require.True(t, ok, "features config should be present and a map")
-		return featuresConfig
+	var receiverConfig map[string]any
+	for _, value := range result {
+		receiverConfig = value.(map[string]any)
+	}
+	require.Equal(t, map[string]any{
+		"fqdn": map[string]any{
+			"enabled": false,
+		},
+		"log_input_run_as_filestream": map[string]any{
+			"enabled": true,
+		},
+		"aws_s3_v2": map[string]any{
+			"enabled": true,
+		},
+	}, receiverConfig["features"])
+	require.Equal(t, false, comp.Features.Source.AsMap()["agent"].(map[string]any)["features"].(map[string]any)["fqdn"].(map[string]any)["enabled"],
+		"building receiver config must not mutate the component feature source")
+}
+
+func TestGetReceiversConfigForComponentWithoutFeatures(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-no-features",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"streams": []any{
+						map[string]any{
+							"id":    "test-1",
+							"paths": []any{"/var/log/*.log"},
+						},
+					},
+				}),
+			},
+		},
 	}
 
-	t.Run("enabled", func(t *testing.T) {
-		featuresConfig := fqdnConfig(t, true)
-		assert.Equal(t, map[string]any{"fqdn": map[string]any{"enabled": true}}, featuresConfig)
-	})
-
-	t.Run("disabled", func(t *testing.T) {
-		featuresConfig := fqdnConfig(t, false)
-		assert.Equal(t, map[string]any{"fqdn": map[string]any{"enabled": false}}, featuresConfig)
-	})
+	result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	for _, value := range result {
+		require.NotContains(t, value.(map[string]any), "features")
+	}
 }
 
 func TestVerifyComponentIsOtelSupported(t *testing.T) {
