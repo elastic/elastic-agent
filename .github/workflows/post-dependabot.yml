@@ -70,4 +70,31 @@ jobs:
           git add internal/pkg/otel/README.md
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
           git commit -m "Update otel README.md"
+<<<<<<< HEAD
           git push
+=======
+
+      - name: regenerate mocks
+        run: go tool mockery
+
+      - name: add license headers to regenerated mocks
+        run: mage format:license
+
+      - name: check for modified mocks
+        id: mocks-check
+        run: |
+          if git diff --quiet HEAD -- '*/mocks.go'; then
+            echo "modified=false" >> $GITHUB_OUTPUT
+          else
+            echo "modified=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: commit regenerated mocks
+        if: steps.mocks-check.outputs.modified == 'true'
+        run: |
+          git add '*/mocks.go'
+          git commit -m "Regenerate mocks"
+
+      - name: Push added commits
+        run: git push
+>>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))

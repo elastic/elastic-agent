@@ -42,6 +42,71 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 	return &MockClient_Expecter{mock: &_m.Mock}
 }
 
+<<<<<<< HEAD
+=======
+// AvailableRollbacks provides a mock function for the type MockClient
+func (_mock *MockClient) AvailableRollbacks(ctx context.Context) ([]AvailableRollback, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AvailableRollbacks")
+	}
+
+	var r0 []AvailableRollback
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]AvailableRollback, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []AvailableRollback); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]AvailableRollback)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_AvailableRollbacks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AvailableRollbacks'
+type MockClient_AvailableRollbacks_Call struct {
+	*mock.Call
+}
+
+// AvailableRollbacks is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockClient_Expecter) AvailableRollbacks(ctx any) *MockClient_AvailableRollbacks_Call {
+	return &MockClient_AvailableRollbacks_Call{Call: _e.mock.On("AvailableRollbacks", ctx)}
+}
+
+func (_c *MockClient_AvailableRollbacks_Call) Run(run func(ctx context.Context)) *MockClient_AvailableRollbacks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_AvailableRollbacks_Call) Return(availableRollbacks []AvailableRollback, err error) *MockClient_AvailableRollbacks_Call {
+	_c.Call.Return(availableRollbacks, err)
+	return _c
+}
+
+func (_c *MockClient_AvailableRollbacks_Call) RunAndReturn(run func(ctx context.Context) ([]AvailableRollback, error)) *MockClient_AvailableRollbacks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+>>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
 // Configure provides a mock function for the type MockClient
 func (_mock *MockClient) Configure(ctx context.Context, config string) error {
 	ret := _mock.Called(ctx, config)
@@ -67,7 +132,7 @@ type MockClient_Configure_Call struct {
 // Configure is a helper method to define mock.On call
 //   - ctx context.Context
 //   - config string
-func (_e *MockClient_Expecter) Configure(ctx interface{}, config interface{}) *MockClient_Configure_Call {
+func (_e *MockClient_Expecter) Configure(ctx any, config any) *MockClient_Configure_Call {
 	return &MockClient_Configure_Call{Call: _e.mock.On("Configure", ctx, config)}
 }
 
@@ -102,11 +167,11 @@ func (_c *MockClient_Configure_Call) RunAndReturn(run func(ctx context.Context, 
 // Connect provides a mock function for the type MockClient
 func (_mock *MockClient) Connect(ctx context.Context, opts ...grpc.DialOption) error {
 	// grpc.DialOption
-	_va := make([]interface{}, len(opts))
+	_va := make([]any, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, ctx)
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
@@ -132,9 +197,9 @@ type MockClient_Connect_Call struct {
 // Connect is a helper method to define mock.On call
 //   - ctx context.Context
 //   - opts ...grpc.DialOption
-func (_e *MockClient_Expecter) Connect(ctx interface{}, opts ...interface{}) *MockClient_Connect_Call {
+func (_e *MockClient_Expecter) Connect(ctx any, opts ...any) *MockClient_Connect_Call {
 	return &MockClient_Connect_Call{Call: _e.mock.On("Connect",
-		append([]interface{}{ctx}, opts...)...)}
+		append([]any{ctx}, opts...)...)}
 }
 
 func (_c *MockClient_Connect_Call) Run(run func(ctx context.Context, opts ...grpc.DialOption)) *MockClient_Connect_Call {
@@ -205,7 +270,7 @@ type MockClient_DiagnosticAgent_Call struct {
 // DiagnosticAgent is a helper method to define mock.On call
 //   - ctx context.Context
 //   - additionalDiags []AdditionalMetrics
-func (_e *MockClient_Expecter) DiagnosticAgent(ctx interface{}, additionalDiags interface{}) *MockClient_DiagnosticAgent_Call {
+func (_e *MockClient_Expecter) DiagnosticAgent(ctx any, additionalDiags any) *MockClient_DiagnosticAgent_Call {
 	return &MockClient_DiagnosticAgent_Call{Call: _e.mock.On("DiagnosticAgent", ctx, additionalDiags)}
 }
 
@@ -240,11 +305,11 @@ func (_c *MockClient_DiagnosticAgent_Call) RunAndReturn(run func(ctx context.Con
 // DiagnosticComponents provides a mock function for the type MockClient
 func (_mock *MockClient) DiagnosticComponents(ctx context.Context, additionalDiags []AdditionalMetrics, components ...DiagnosticComponentRequest) ([]DiagnosticComponentResult, error) {
 	// DiagnosticComponentRequest
-	_va := make([]interface{}, len(components))
+	_va := make([]any, len(components))
 	for _i := range components {
 		_va[_i] = components[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, ctx, additionalDiags)
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
@@ -282,9 +347,9 @@ type MockClient_DiagnosticComponents_Call struct {
 //   - ctx context.Context
 //   - additionalDiags []AdditionalMetrics
 //   - components ...DiagnosticComponentRequest
-func (_e *MockClient_Expecter) DiagnosticComponents(ctx interface{}, additionalDiags interface{}, components ...interface{}) *MockClient_DiagnosticComponents_Call {
+func (_e *MockClient_Expecter) DiagnosticComponents(ctx any, additionalDiags any, components ...any) *MockClient_DiagnosticComponents_Call {
 	return &MockClient_DiagnosticComponents_Call{Call: _e.mock.On("DiagnosticComponents",
-		append([]interface{}{ctx, additionalDiags}, components...)...)}
+		append([]any{ctx, additionalDiags}, components...)...)}
 }
 
 func (_c *MockClient_DiagnosticComponents_Call) Run(run func(ctx context.Context, additionalDiags []AdditionalMetrics, components ...DiagnosticComponentRequest)) *MockClient_DiagnosticComponents_Call {
@@ -327,11 +392,11 @@ func (_c *MockClient_DiagnosticComponents_Call) RunAndReturn(run func(ctx contex
 // DiagnosticUnits provides a mock function for the type MockClient
 func (_mock *MockClient) DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitRequest) ([]DiagnosticUnitResult, error) {
 	// DiagnosticUnitRequest
-	_va := make([]interface{}, len(units))
+	_va := make([]any, len(units))
 	for _i := range units {
 		_va[_i] = units[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, ctx)
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
@@ -368,9 +433,9 @@ type MockClient_DiagnosticUnits_Call struct {
 // DiagnosticUnits is a helper method to define mock.On call
 //   - ctx context.Context
 //   - units ...DiagnosticUnitRequest
-func (_e *MockClient_Expecter) DiagnosticUnits(ctx interface{}, units ...interface{}) *MockClient_DiagnosticUnits_Call {
+func (_e *MockClient_Expecter) DiagnosticUnits(ctx any, units ...any) *MockClient_DiagnosticUnits_Call {
 	return &MockClient_DiagnosticUnits_Call{Call: _e.mock.On("DiagnosticUnits",
-		append([]interface{}{ctx}, units...)...)}
+		append([]any{ctx}, units...)...)}
 }
 
 func (_c *MockClient_DiagnosticUnits_Call) Run(run func(ctx context.Context, units ...DiagnosticUnitRequest)) *MockClient_DiagnosticUnits_Call {
@@ -462,7 +527,7 @@ type MockClient_Restart_Call struct {
 
 // Restart is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClient_Expecter) Restart(ctx interface{}) *MockClient_Restart_Call {
+func (_e *MockClient_Expecter) Restart(ctx any) *MockClient_Restart_Call {
 	return &MockClient_Restart_Call{Call: _e.mock.On("Restart", ctx)}
 }
 
@@ -524,7 +589,7 @@ type MockClient_State_Call struct {
 
 // State is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClient_Expecter) State(ctx interface{}) *MockClient_State_Call {
+func (_e *MockClient_Expecter) State(ctx any) *MockClient_State_Call {
 	return &MockClient_State_Call{Call: _e.mock.On("State", ctx)}
 }
 
@@ -552,8 +617,21 @@ func (_c *MockClient_State_Call) RunAndReturn(run func(ctx context.Context) (*Ag
 }
 
 // StateWatch provides a mock function for the type MockClient
+<<<<<<< HEAD
 func (_mock *MockClient) StateWatch(ctx context.Context) (ClientStateWatch, error) {
 	ret := _mock.Called(ctx)
+=======
+func (_mock *MockClient) StateWatch(ctx context.Context, opts ...StateWatchOption) (ClientStateWatch, error) {
+	// StateWatchOption
+	_va := make([]any, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []any
+	_ca = append(_ca, ctx)
+	_ca = append(_ca, _va...)
+	ret := _mock.Called(_ca...)
+>>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
 
 	if len(ret) == 0 {
 		panic("no return value specified for StateWatch")
@@ -586,8 +664,15 @@ type MockClient_StateWatch_Call struct {
 
 // StateWatch is a helper method to define mock.On call
 //   - ctx context.Context
+<<<<<<< HEAD
 func (_e *MockClient_Expecter) StateWatch(ctx interface{}) *MockClient_StateWatch_Call {
 	return &MockClient_StateWatch_Call{Call: _e.mock.On("StateWatch", ctx)}
+=======
+//   - opts ...StateWatchOption
+func (_e *MockClient_Expecter) StateWatch(ctx any, opts ...any) *MockClient_StateWatch_Call {
+	return &MockClient_StateWatch_Call{Call: _e.mock.On("StateWatch",
+		append([]any{ctx}, opts...)...)}
+>>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
 }
 
 func (_c *MockClient_StateWatch_Call) Run(run func(ctx context.Context)) *MockClient_StateWatch_Call {
@@ -616,12 +701,17 @@ func (_c *MockClient_StateWatch_Call) RunAndReturn(run func(ctx context.Context)
 // Upgrade provides a mock function for the type MockClient
 func (_mock *MockClient) Upgrade(ctx context.Context, version string, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error) {
 	// string
-	_va := make([]interface{}, len(pgpBytes))
+	_va := make([]any, len(pgpBytes))
 	for _i := range pgpBytes {
 		_va[_i] = pgpBytes[_i]
 	}
+<<<<<<< HEAD
 	var _ca []interface{}
 	_ca = append(_ca, ctx, version, sourceURI, skipVerify, skipDefaultPgp)
+=======
+	var _ca []any
+	_ca = append(_ca, ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp)
+>>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -659,9 +749,15 @@ type MockClient_Upgrade_Call struct {
 //   - skipVerify bool
 //   - skipDefaultPgp bool
 //   - pgpBytes ...string
+<<<<<<< HEAD
 func (_e *MockClient_Expecter) Upgrade(ctx interface{}, version interface{}, sourceURI interface{}, skipVerify interface{}, skipDefaultPgp interface{}, pgpBytes ...interface{}) *MockClient_Upgrade_Call {
 	return &MockClient_Upgrade_Call{Call: _e.mock.On("Upgrade",
 		append([]interface{}{ctx, version, sourceURI, skipVerify, skipDefaultPgp}, pgpBytes...)...)}
+=======
+func (_e *MockClient_Expecter) Upgrade(ctx any, version any, rollback any, sourceURI any, skipVerify any, skipDefaultPgp any, pgpBytes ...any) *MockClient_Upgrade_Call {
+	return &MockClient_Upgrade_Call{Call: _e.mock.On("Upgrade",
+		append([]any{ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp}, pgpBytes...)...)}
+>>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
 }
 
 func (_c *MockClient_Upgrade_Call) Run(run func(ctx context.Context, version string, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string)) *MockClient_Upgrade_Call {
@@ -749,7 +845,7 @@ type MockClient_Version_Call struct {
 
 // Version is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClient_Expecter) Version(ctx interface{}) *MockClient_Version_Call {
+func (_e *MockClient_Expecter) Version(ctx any) *MockClient_Version_Call {
 	return &MockClient_Version_Call{Call: _e.mock.On("Version", ctx)}
 }
 

@@ -209,7 +209,7 @@ func (Dev) Package(ctx context.Context) {
 }
 
 func (Dev) RegenerateMocks() error {
-	err := sh.Run("mockery")
+	err := sh.Run("go", "tool", "mockery")
 	if err != nil {
 		return fmt.Errorf("generating mocks: %w", err)
 	}

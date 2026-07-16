@@ -242,8 +242,13 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
+<<<<<<< HEAD
 	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
+=======
+	github.com/brunoga/deep v1.3.1 // indirect
+	github.com/buger/goterm v1.0.4 // indirect
+>>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
 	github.com/cenkalti/backoff/v6 v6.0.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
@@ -325,11 +330,15 @@ require (
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
+<<<<<<< HEAD
 	github.com/expr-lang/expr v1.17.8 // indirect
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb // indirect
 	github.com/fearful-symmetry/gomsr v0.0.1 // indirect
 	github.com/fearful-symmetry/gorapl v0.0.4 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
+=======
+	github.com/fatih/structs v1.1.0 // indirect
+>>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/foxboron/go-tpm-keyfiles v0.0.0-20251226215517-609e4778396f // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
@@ -447,7 +456,12 @@ require (
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
+	github.com/knadh/koanf/parsers/yaml v1.1.0 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
+	github.com/knadh/koanf/providers/env v1.1.0 // indirect
+	github.com/knadh/koanf/providers/file v1.2.1 // indirect
+	github.com/knadh/koanf/providers/posflag v1.0.1 // indirect
+	github.com/knadh/koanf/providers/structs v1.0.0 // indirect
 	github.com/knadh/koanf/v2 v2.3.5 // indirect
 	github.com/kolo/xmlrpc v0.0.0-20220921171641-a4b6fa1dd06b // indirect
 	github.com/kr/pretty v0.3.1 // indirect
@@ -642,13 +656,24 @@ require (
 	github.com/ua-parser/uap-go v0.0.0-20251207011819-db9adb27a0b8 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/urfave/cli/v2 v2.27.7 // indirect
+<<<<<<< HEAD
 	github.com/valyala/fastjson v1.6.10 // indirect
 	github.com/vmware/govmomi v0.52.0 // indirect
 	github.com/vultr/govultr/v3 v3.31.2 // indirect
+=======
+	github.com/vektra/mockery/v3 v3.7.1 // indirect
+>>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.2.0 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
+<<<<<<< HEAD
+=======
+	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
+	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
+	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
+	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
+>>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
@@ -815,4 +840,18 @@ replace (
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
 )
 
+<<<<<<< HEAD
 tool golang.org/x/tools/cmd/deadcode
+=======
+tool (
+	github.com/elastic/go-licenser
+	github.com/magefile/mage
+	github.com/rednafi/link-patrol/cmd/link-patrol
+	github.com/vektra/mockery/v3
+	go.elastic.co/go-licence-detector
+	golang.org/x/tools/cmd/deadcode
+	golang.org/x/tools/cmd/goimports
+	golang.org/x/tools/cmd/stringer
+	gotest.tools/gotestsum
+)
+>>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
