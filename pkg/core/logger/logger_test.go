@@ -19,19 +19,15 @@ import (
 )
 
 func Test_SetLevel(t *testing.T) {
+	t.Cleanup(func() { SetLevel(logp.InfoLevel) })
+
 	l, err := NewWithLogpLevel("", logp.ErrorLevel, true)
 	require.NoError(t, err)
 
-	// core logger works
 	require.Equal(t, false, l.Core().Enabled(zapcore.DebugLevel))
 	require.Equal(t, false, l.Core().Enabled(zapcore.InfoLevel))
 	require.Equal(t, false, l.Core().Enabled(zapcore.WarnLevel))
 	require.Equal(t, true, l.Core().Enabled(zapcore.ErrorLevel))
-	// enabler updated
-	require.Equal(t, false, internalLevelEnabler.Enabled(zapcore.DebugLevel))
-	require.Equal(t, false, internalLevelEnabler.Enabled(zapcore.InfoLevel))
-	require.Equal(t, false, internalLevelEnabler.Enabled(zapcore.WarnLevel))
-	require.Equal(t, true, internalLevelEnabler.Enabled(zapcore.ErrorLevel))
 
 	tests := []struct {
 		SetLogLevel  logp.Level
@@ -49,16 +45,10 @@ func Test_SetLevel(t *testing.T) {
 	for _, tc := range tests {
 		SetLevel(tc.SetLogLevel)
 
-		// core logger works
 		require.Equal(t, tc.DebugEnabled, l.Core().Enabled(zapcore.DebugLevel))
 		require.Equal(t, tc.InfoEnabled, l.Core().Enabled(zapcore.InfoLevel))
 		require.Equal(t, tc.WarnEnabled, l.Core().Enabled(zapcore.WarnLevel))
 		require.Equal(t, tc.ErrEnabled, l.Core().Enabled(zapcore.ErrorLevel))
-		// enabler updated
-		require.Equal(t, tc.DebugEnabled, internalLevelEnabler.Enabled(zapcore.DebugLevel))
-		require.Equal(t, tc.InfoEnabled, internalLevelEnabler.Enabled(zapcore.InfoLevel))
-		require.Equal(t, tc.WarnEnabled, internalLevelEnabler.Enabled(zapcore.WarnLevel))
-		require.Equal(t, tc.ErrEnabled, internalLevelEnabler.Enabled(zapcore.ErrorLevel))
 	}
 }
 
@@ -104,31 +94,58 @@ func TestNewNamedLogger(t *testing.T) {
 		paths.SetLogs(logsPath)
 	})
 
-	log, err := NewNamedLogger(name, DefaultLoggingConfig(), DefaultEventLoggingConfig())
+	named, err := NewNamedLogger(name, DefaultLoggingConfig(), DefaultEventLoggingConfig())
 	require.NoError(t, err)
 
-	log.Info("normal message")
-	log.Infow("event message", logp.TypeKey, logp.EventType)
+	named.Info("normal message")
+	named.Infow("event message", logp.TypeKey, logp.EventType)
+	require.NoError(t, named.Core().Sync())
 
-	// Flush any buffered writes.
-	err = log.Core().Sync()
-	require.NoError(t, err)
+	t.Run("normal log file", func(t *testing.T) {
+		glob := filepath.Join(paths.Home(), DefaultLogDirectory, name+"-*.ndjson")
+		matches, err := filepath.Glob(glob)
+		require.NoError(t, err)
+		require.NotEmpty(t, matches, "normal log file should exist at %s", glob)
+		data, err := os.ReadFile(matches[0])
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "normal message")
+		assert.NotContains(t, string(data), "event message")
+	})
 
-	logGlob := filepath.Join(paths.Home(), DefaultLogDirectory, name+"-*.ndjson")
-	logMatches, err := filepath.Glob(logGlob)
-	require.NoError(t, err)
-	require.NotEmpty(t, logMatches, "normal log file should exist at %s", logGlob)
-	normalData, err := os.ReadFile(logMatches[0])
-	require.NoError(t, err)
-	assert.Contains(t, string(normalData), "normal message", "normal log file should contain normal message")
-	assert.NotContains(t, string(normalData), "event message", "event message should not leak into normal log file")
+	t.Run("event log file", func(t *testing.T) {
+		glob := filepath.Join(paths.Home(), DefaultLogDirectory, "events", name+"-event-log-*.ndjson")
+		matches, err := filepath.Glob(glob)
+		require.NoError(t, err)
+		require.NotEmpty(t, matches, "event log file should exist at %s", glob)
+		data, err := os.ReadFile(matches[0])
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "event message")
+		assert.NotContains(t, string(data), "normal message")
+	})
 
-	eventGlob := filepath.Join(paths.Home(), DefaultLogDirectory, "events", name+"-event-log-*.ndjson")
-	eventMatches, err := filepath.Glob(eventGlob)
-	require.NoError(t, err)
-	require.NotEmpty(t, eventMatches, "event log file should exist at %s", eventGlob)
-	eventData, err := os.ReadFile(eventMatches[0])
-	require.NoError(t, err)
-	assert.Contains(t, string(eventData), "event message", "event log file should contain event message")
-	assert.NotContains(t, string(eventData), "normal message", "normal message should not appear in event log file")
+	t.Run("log level change propagates to named logger", func(t *testing.T) {
+		t.Cleanup(func() { SetLevel(logp.InfoLevel) })
+
+		base, err := New("", true)
+		require.NoError(t, err)
+
+		require.False(t, named.Core().Enabled(zapcore.DebugLevel))
+		named.Debug("dropped debug")
+
+		SetLevel(logp.DebugLevel)
+		require.True(t, base.Core().Enabled(zapcore.DebugLevel))
+		require.True(t, named.Core().Enabled(zapcore.DebugLevel))
+
+		named.Debug("kept debug")
+		require.NoError(t, named.Core().Sync())
+
+		glob := filepath.Join(paths.Home(), DefaultLogDirectory, name+"-*.ndjson")
+		matches, err := filepath.Glob(glob)
+		require.NoError(t, err)
+		require.NotEmpty(t, matches, "log file should exist at %s", glob)
+		data, err := os.ReadFile(matches[0])
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "kept debug")
+		assert.NotContains(t, string(data), "dropped debug")
+	})
 }
