@@ -146,6 +146,7 @@ func NewOTelManager(
 	agentCollectorConfig *configuration.CollectorConfig,
 	stopTimeout time.Duration,
 	execFactory ExecutionFactory,
+	enablePartialReload bool,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
@@ -185,7 +186,7 @@ func NewOTelManager(
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
 	if execFactory == nil {
 		execFactory = func(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (collectorExecution, error) {
-			return newSubprocessExecution(collectorPath, healthCheckExtensionID, healthCheckPort)
+			return newSubprocessExecution(collectorPath, healthCheckExtensionID, healthCheckPort, enablePartialReload)
 		}
 	}
 	exec, err = execFactory(executable, healthCheckExtComponentID, collectorHealthCheckPort)
