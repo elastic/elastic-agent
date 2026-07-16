@@ -32,8 +32,8 @@ jobs:
         run: |
           branches=$(printf '%s' "$MATRIX" | jq -c '[.include[].branch]')
           jq --argjson branches "$branches" '.baseBranches = ["main"] + $branches' \
-            .github/renovate.json > renovate.json.new
-          mv renovate.json.new .github/renovate.json
+            renovate.json > renovate.json.new
+          mv renovate.json.new renovate.json
 
       - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
