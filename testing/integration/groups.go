@@ -59,6 +59,9 @@ const (
 	// ECHDeployment group of tests. Used for tests that orchestrate ECH deployments.
 	ECHDeployment = "ech-deployment"
 
+	// HostnameOverride group of tests. Used for testing ELASTIC_AGENT_HOSTNAME override.
+	HostnameOverride = "hostname-override"
+
 	// Stress test suite that contains tests that do not need to run on each PR.
 	Stress = "stress"
 )
