@@ -22,7 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func TestManagerReload(t *testing.T) {
+func TestManagerReloadGracePeriod(t *testing.T) {
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
@@ -48,6 +48,42 @@ func TestManagerReload(t *testing.T) {
 	// a reload that omits the section should keep the default, not zero it out
 	require.NoError(t, m.Reload(config.MustNewConfigFrom(map[string]interface{}{})))
 	require.Equal(t, 10*time.Minute, m.serviceCheckinGracePeriod.Get())
+}
+
+func TestManagerGracePeriodUpgradeFreeze(t *testing.T) {
+	m, err := NewManager(
+		newDebugLogger(t),
+		newDebugLogger(t),
+		&info.AgentInfo{},
+		apmtest.DiscardTracer,
+		newTestMonitoringMgr(),
+		testGrpcConfig())
+	require.NoError(t, err)
+
+	// seed live value from config
+	m.SetServiceCheckinGracePeriod(15 * time.Minute)
+	require.Equal(t, 15*time.Minute, m.serviceCheckinGracePeriod.Get())
+
+	// upgrade starts: freeze at marker value
+	m.SetUpgradeGracePeriod(20 * time.Minute)
+	require.Equal(t, 20*time.Minute, m.serviceCheckinGracePeriod.Get(), "upgrade value should take precedence")
+
+	// Reload during upgrade must not override the frozen value
+	cfg15 := config.MustNewConfigFrom(map[string]interface{}{
+		"agent": map[string]interface{}{
+			"upgrade": map[string]interface{}{
+				"watcher": map[string]interface{}{
+					"grace_period": "15m",
+				},
+			},
+		},
+	})
+	require.NoError(t, m.Reload(cfg15))
+	require.Equal(t, 20*time.Minute, m.serviceCheckinGracePeriod.Get(), "Reload must not override frozen upgrade value")
+
+	// upgrade completes: clear freeze, live value takes effect immediately
+	m.ClearUpgradeGracePeriod()
+	require.Equal(t, 15*time.Minute, m.serviceCheckinGracePeriod.Get(), "live value should be returned after clear")
 }
 
 func TestManager_SimpleComponentErr(t *testing.T) {

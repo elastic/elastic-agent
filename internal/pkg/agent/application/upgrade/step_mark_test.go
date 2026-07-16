@@ -291,3 +291,50 @@ func TestMarkUpgradeFailed(t *testing.T) {
 			"det must still reflect failure even when persistence fails")
 	})
 }
+
+func TestUpdateMarkerIsUpgradeActive(t *testing.T) {
+	active := details.NewDetails("8.15.0", details.StateWatching, "action-1")
+
+	tests := []struct {
+		name   string
+		marker UpdateMarker
+		want   bool
+	}{
+		{
+			name:   "active: non-terminal, grace period set, not acked",
+			marker: UpdateMarker{GracePeriod: 10 * time.Minute, Details: active},
+			want:   true,
+		},
+		{
+			name:   "inactive: acked",
+			marker: UpdateMarker{GracePeriod: 10 * time.Minute, Details: active, Acked: true},
+			want:   false,
+		},
+		{
+			name:   "inactive: zero grace period",
+			marker: UpdateMarker{GracePeriod: 0, Details: active},
+			want:   false,
+		},
+		{
+			name:   "inactive: terminal state (completed)",
+			marker: UpdateMarker{GracePeriod: 10 * time.Minute, Details: details.NewDetails("8.15.0", details.StateCompleted, "action-1")},
+			want:   false,
+		},
+		{
+			name:   "inactive: terminal state (rollback)",
+			marker: UpdateMarker{GracePeriod: 10 * time.Minute, Details: details.NewDetails("8.15.0", details.StateRollback, "action-1")},
+			want:   false,
+		},
+		{
+			name:   "inactive: terminal state (failed)",
+			marker: UpdateMarker{GracePeriod: 10 * time.Minute, Details: details.NewDetails("8.15.0", details.StateFailed, "action-1")},
+			want:   false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, tc.marker.IsUpgradeActive())
+		})
+	}
+}

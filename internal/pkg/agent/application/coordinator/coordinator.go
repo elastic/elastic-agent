@@ -150,6 +150,9 @@ type RuntimeManager interface {
 	// Reload reloads the configuration for the runtime manager.
 	Reload(rawConfig *config.Config) error
 
+	// ClearUpgradeGracePeriod lifts the upgrade grace period pin.
+	ClearUpgradeGracePeriod()
+
 	// PerformAction executes an action on a unit.
 	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
 
@@ -1707,6 +1710,12 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 	case upgradeMarker := <-c.managerChans.upgradeMarkerUpdate:
 		if ctx.Err() == nil {
 			c.setUpgradeDetails(upgradeMarker.Details)
+			// Lift the grace period freeze when the upgrade is done.
+			// nil Details means the marker file was removed; calling Clear when no
+			// freeze was active is safe.
+			if upgradeMarker.Details == nil || upgrade.IsTerminalState(&upgradeMarker) {
+				c.runtimeMgr.ClearUpgradeGracePeriod()
+			}
 		}
 	}
 

@@ -344,6 +344,14 @@ func markerFilePath(dataDirPath string) string {
 	return filepath.Join(dataDirPath, markerFilename)
 }
 
+// IsUpgradeActive returns true when the marker represents an upgrade that is
+// still in progress and whose grace period should be frozen. It returns false
+// when the upgrade has already been acked, has reached a terminal state
+// (completed, rolled back, or failed), or has no grace period recorded.
+func (um *UpdateMarker) IsUpgradeActive() bool {
+	return !um.Acked && um.GracePeriod > 0 && !IsTerminalState(um)
+}
+
 // IsTerminalState returns true if the state in the upgrade marker contains details and the upgrade details state is a
 // terminal one: UPG_COMPLETE, UPG_ROLLBACK and UPG_FAILED
 // If the upgrade marker or the upgrade marker details are nil the function will return false: as

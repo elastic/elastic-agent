@@ -1752,6 +1752,7 @@ type fakeUpgradeManager struct {
 	upgradeable   bool
 	upgradeErr    error // An error to return when Upgrade is called
 	upgradeCalled bool  // Set when Upgrade is called
+	markerWatcher upgrade.MarkerWatcher
 }
 
 func (f *fakeUpgradeManager) Upgradeable() bool {
@@ -1794,7 +1795,100 @@ func (f *fakeUpgradeManager) AckAction(ctx context.Context, acker acker.Acker, a
 }
 
 func (f *fakeUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
+	return f.markerWatcher
+}
+
+type fakeMarkerWatcher struct {
+	ch     chan upgrade.UpdateMarker
+	doneCh chan struct{}
+}
+
+func newFakeMarkerWatcher() *fakeMarkerWatcher {
+	return &fakeMarkerWatcher{
+		ch:     make(chan upgrade.UpdateMarker, 8),
+		doneCh: make(chan struct{}),
+	}
+}
+
+func (f *fakeMarkerWatcher) Watch() <-chan upgrade.UpdateMarker { return f.ch }
+
+func (f *fakeMarkerWatcher) Run(ctx context.Context) error {
+	go func() {
+		defer close(f.doneCh)
+		<-ctx.Done()
+	}()
 	return nil
+}
+
+func (f *fakeMarkerWatcher) Done() <-chan struct{} { return f.doneCh }
+func (f *fakeMarkerWatcher) SetUpgradeStarted()    {}
+
+func TestCoordinatorClearUpgradeGracePeriodOnMarkerUpdate(t *testing.T) {
+	tests := []struct {
+		name        string
+		marker      upgrade.UpdateMarker
+		expectClear bool
+	}{
+		{
+			name: "terminal state clears grace period",
+			marker: upgrade.UpdateMarker{
+				Details: details.NewDetails("8.15.0", details.StateCompleted, "action-1"),
+			},
+			expectClear: true,
+		},
+		{
+			name:        "nil details (marker removed) clears grace period",
+			marker:      upgrade.UpdateMarker{Details: nil},
+			expectClear: true,
+		},
+		{
+			name: "non-terminal active state does not clear",
+			marker: upgrade.UpdateMarker{
+				Details: details.NewDetails("8.15.0", details.StateWatching, "action-2"),
+			},
+			expectClear: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+
+				watcher := newFakeMarkerWatcher()
+				clearCh := make(chan struct{}, 1)
+				runtimeMgr := &fakeRuntimeManager{clearGracePeriodCh: clearCh}
+
+				coord, _, _ := createCoordinator(t, ctx,
+					WithUpgradeManager(&fakeUpgradeManager{markerWatcher: watcher}),
+					WithRuntimeManager(runtimeMgr))
+
+				coordCh := make(chan error, 1)
+				go func() {
+					err := coord.Run(ctx)
+					if errors.Is(err, context.Canceled) {
+						err = nil
+					}
+					coordCh <- err
+				}()
+
+				synctest.Wait()
+
+				watcher.ch <- tc.marker
+				synctest.Wait()
+
+				if tc.expectClear {
+					require.Equal(t, 1, len(clearCh), "ClearUpgradeGracePeriod must be called")
+				} else {
+					require.Equal(t, 0, len(clearCh), "ClearUpgradeGracePeriod must not be called")
+				}
+
+				cancel()
+				require.NoError(t, <-coordCh)
+			})
+		})
+	}
 }
 
 type testMonitoringManager struct{}
@@ -2070,6 +2164,7 @@ type fakeRuntimeManager struct {
 	performActionCallback               func(context.Context, component.Component, component.Unit, string, map[string]interface{}) (map[string]interface{}, error)
 	result                              error
 	errChan                             chan error
+	clearGracePeriodCh                  chan struct{}
 }
 
 func (r *fakeRuntimeManager) Run(ctx context.Context) error {
@@ -2080,6 +2175,15 @@ func (r *fakeRuntimeManager) Run(ctx context.Context) error {
 func (r *fakeRuntimeManager) Errors() <-chan error { return nil }
 
 func (r *fakeRuntimeManager) Reload(rawConfig *config.Config) error { return nil }
+
+func (r *fakeRuntimeManager) ClearUpgradeGracePeriod() {
+	if r.clearGracePeriodCh != nil {
+		select {
+		case r.clearGracePeriodCh <- struct{}{}:
+		default:
+		}
+	}
+}
 
 func (r *fakeRuntimeManager) Update(model component.Model) {
 	r.result = nil

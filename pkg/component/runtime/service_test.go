@@ -471,7 +471,9 @@ func makeServiceForCheckStatusWithGracePeriod(t *testing.T, installTimeout, unin
 		},
 	}
 
-	service, err := newServiceRuntime(endpoint, log, true, newGracePeriodValue(checkinGracePeriod))
+	gp := &gracePeriodValue{}
+	gp.setLive(checkinGracePeriod)
+	service, err := newServiceRuntime(endpoint, log, true, gp)
 	require.NoError(t, err)
 	// simulate the service already being up and running
 	service.state.State = client.UnitStateHealthy
@@ -535,7 +537,8 @@ func TestServiceMaxCheckinMissesGracePeriodCap(t *testing.T) {
 func TestServiceMaxCheckinMissesGracePeriodLiveUpdate(t *testing.T) {
 	const checkinPeriod = 30 * time.Second
 
-	gracePeriod := newGracePeriodValue(600 * time.Second)
+	gracePeriod := &gracePeriodValue{}
+	gracePeriod.setLive(600 * time.Second)
 	log, _ := loggertest.New("test")
 	endpoint := makeEndpointComponent(t, map[string]interface{}{})
 	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
@@ -552,7 +555,7 @@ func TestServiceMaxCheckinMissesGracePeriodLiveUpdate(t *testing.T) {
 
 	// simulate a config reload lowering the grace period, without recreating
 	// the serviceRuntime
-	gracePeriod.Set(60 * time.Second)
+	gracePeriod.setLive(60 * time.Second)
 	require.Equal(t, maxCheckinMisses, service.maxCheckinMisses(checkinPeriod))
 }
 

@@ -110,16 +110,12 @@ type Manager struct {
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
 
-	// serviceCheckinGracePeriod is the configured upgrade watcher grace
-	// period. Service-runtime components cap their failure window against
-	// it so a truly failed component is still caught before the watcher
-	// gives up. Zero means no cap.
+	// serviceCheckinGracePeriod holds the grace period used by service-runtime
+	// components to cap their failure window. During an upgrade the upgrade
+	// field is set from the marker (frozen); outside an upgrade the live field
+	// is updated freely by Reload. Get() returns the upgrade value when
+	// non-zero, falling back to the live value.
 	serviceCheckinGracePeriod *gracePeriodValue
-
-	// upgradeGracePeriod is the grace period read from the upgrade marker at
-	// startup. When non-zero, Reload will not overwrite serviceCheckinGracePeriod,
-	// keeping the value consistent with what the watcher committed to.
-	upgradeGracePeriod time.Duration
 
 	// Set when the RPC server is ready to receive requests, for use by tests.
 	serverReady chan struct{}
@@ -150,44 +146,51 @@ type Manager struct {
 	doneChan chan struct{}
 }
 
-// gracePeriodValue holds a grace period that can be read and updated safely
-// from multiple goroutines, so a config reload takes effect right away.
+// gracePeriodValue holds the grace period for service-runtime check-in failure
+// detection. Config Reload updates the live value; when an upgrade is in
+// progress the upgrade value takes precedence, and is cleared once the upgrade
+// completes.
 type gracePeriodValue struct {
-	d atomic.Int64
+	live    atomic.Int64
+	upgrade atomic.Int64
 }
 
-func newGracePeriodValue(d time.Duration) *gracePeriodValue {
-	v := &gracePeriodValue{}
-	v.Set(d)
-	return v
-}
-
-// Get returns the current value. A nil receiver returns zero, so callers
-// that never configured a grace period (e.g. existing tests) can pass nil.
+// Get returns the upgrade grace period when an upgrade is in progress,
+// otherwise the live config value. A nil receiver returns zero.
 func (v *gracePeriodValue) Get() time.Duration {
 	if v == nil {
 		return 0
 	}
-	return time.Duration(v.d.Load())
+	if u := time.Duration(v.upgrade.Load()); u != 0 {
+		return u
+	}
+	return time.Duration(v.live.Load())
 }
 
-func (v *gracePeriodValue) Set(d time.Duration) {
-	v.d.Store(int64(d))
+func (v *gracePeriodValue) setLive(d time.Duration) {
+	v.live.Store(int64(d))
 }
 
-// SetServiceCheckinGracePeriod sets the configured upgrade watcher grace
-// period, so service-runtime components can cap their failure window to a
-// safe margin below it. Safe to call at any time. Zero disables the cap.
+func (v *gracePeriodValue) setUpgrade(d time.Duration) {
+	v.upgrade.Store(int64(d))
+}
+
+// SetServiceCheckinGracePeriod sets the live grace period from config.
+// Has no effect on the frozen upgrade value, if one is active.
 func (m *Manager) SetServiceCheckinGracePeriod(d time.Duration) {
-	m.serviceCheckinGracePeriod.Set(d)
+	m.serviceCheckinGracePeriod.setLive(d)
 }
 
-// SetUpgradeGracePeriod records the grace period from the upgrade marker.
-// While set, Reload will not overwrite the grace period, keeping it
-// consistent with the deadline the upgrade watcher committed to.
+// SetUpgradeGracePeriod pins the grace period for the duration of an upgrade,
+// preventing config reloads from changing it.
 func (m *Manager) SetUpgradeGracePeriod(d time.Duration) {
-	m.upgradeGracePeriod = d
-	m.serviceCheckinGracePeriod.Set(d)
+	m.serviceCheckinGracePeriod.setUpgrade(d)
+}
+
+// ClearUpgradeGracePeriod lifts the pin set by SetUpgradeGracePeriod, restoring
+// live config control.
+func (m *Manager) ClearUpgradeGracePeriod() {
+	m.serviceCheckinGracePeriod.setUpgrade(0)
 }
 
 // NewManager creates a new manager.
@@ -230,7 +233,7 @@ func NewManager(
 		errCh:                     make(chan error),
 		monitor:                   monitor,
 		grpcConfig:                grpcConfig,
-		serviceCheckinGracePeriod: newGracePeriodValue(0),
+		serviceCheckinGracePeriod: &gracePeriodValue{},
 		serverReady:               make(chan struct{}),
 		doneChan:                  make(chan struct{}),
 	}
@@ -249,9 +252,7 @@ func (m *Manager) Reload(rawConfig *config.Config) error {
 	if err := rawConfig.UnpackTo(&watcherCfg); err != nil {
 		return fmt.Errorf("failed to unpack config during reload: %w", err)
 	}
-	if m.upgradeGracePeriod == 0 {
-		m.serviceCheckinGracePeriod.Set(watcherCfg.GracePeriod)
-	}
+	m.serviceCheckinGracePeriod.setLive(watcherCfg.GracePeriod)
 	return nil
 }
 

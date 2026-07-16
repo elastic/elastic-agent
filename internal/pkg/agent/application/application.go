@@ -132,7 +132,7 @@ func New(
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
 	runtime.SetServiceCheckinGracePeriod(cfg.Settings.Upgrade.Watcher.GracePeriod)
-	if initialUpdateMarker != nil && initialUpdateMarker.GracePeriod > 0 {
+	if initialUpdateMarker != nil && initialUpdateMarker.IsUpgradeActive() {
 		runtime.SetUpgradeGracePeriod(initialUpdateMarker.GracePeriod)
 	}
 
