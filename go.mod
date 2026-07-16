@@ -471,9 +471,6 @@ replace (
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
 )
 
-<<<<<<< HEAD
-tool golang.org/x/tools/cmd/deadcode
-=======
 tool (
 	github.com/elastic/go-licenser
 	github.com/magefile/mage
@@ -485,4 +482,3 @@ tool (
 	golang.org/x/tools/cmd/stringer
 	gotest.tools/gotestsum
 )
->>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
