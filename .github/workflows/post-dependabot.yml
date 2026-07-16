@@ -70,9 +70,6 @@ jobs:
           git add internal/pkg/otel/README.md
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
           git commit -m "Update otel README.md"
-<<<<<<< HEAD
-          git push
-=======
 
       - name: regenerate mocks
         run: go tool mockery
@@ -97,4 +94,3 @@ jobs:
 
       - name: Push added commits
         run: git push
->>>>>>> ebcb9f47d (Pin mockery v3 and regenerate mocks (#15513))
