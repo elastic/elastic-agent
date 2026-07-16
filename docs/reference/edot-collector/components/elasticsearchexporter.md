@@ -40,9 +40,101 @@ The exporter supports standard OpenTelemetry [authentication configuration](http
 - `user` and `password`: For HTTP Basic Authentication
 - `api_key`: For [{{es}} API key authentication](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-security-create-api-key)
 
+:::{note} Authentication to and from the EDOT Collector
+
+The `api_key` setting on the {{es}} exporter controls outbound authentication from the EDOT Collector to {{es}} for bulk indexing. This is separate from the `apikeyauth` extension, which authenticates incoming OTLP traffic from SDKs to the EDOT Collector. 
+
+Using the same API key for both inbound and outbound authentication is not recommended from a security perspective. Use separate keys with the minimum required privileges for each purpose.
+
+Refer to [Authentication methods for the EDOT Collector](/reference/edot-collector/config/authentication-methods.md) for details.
+:::
+
+#### Creating an API key for the {{es}} exporter
+
+The API key used in the `api_key` setting authenticates bulk indexing requests to {{es}}. The key must have index-level privileges on the data streams that the exporter writes to.
+
+The EDOT Collector writes to OTel-native data streams by default: `logs-*-*`, `metrics-*-*`, and `traces-*-*`. The required index privileges are:
+
+- `auto_configure`: Allows automatic creation and configuration of data stream templates.
+- `create_doc`: Allows writing documents using the Bulk API.
+
+Create the API key using the {{es}} Security API:
+
+::::{dropdown} Example: Create an API key for the {{es}} exporter
+```json
+POST /_security/api_key
+{
+  "name": "edot-collector-exporter",
+  "role_descriptors": {
+    "edot_writer": {
+      "cluster": [],
+      "indices": [
+        {
+          "names": ["logs-*-*", "metrics-*-*", "traces-*-*"],
+          "privileges": ["auto_configure", "create_doc"]
+        }
+      ]
+    }
+  }
+}
+```
+
+The response includes an `encoded` field. Use that value as the `api_key` in your exporter configuration.
+
+:::{note}
+If you write to custom data streams or indices outside the default patterns, add those patterns to the `names` list with the same privileges.
+:::
+
+::::
+
 ### TLS and security settings
 
 The exporter supports standard OpenTelemetry TLS configuration for secure connections. You can configure TLS certificates, client authentication, and other security settings through the standard [TLS configuration options](https://github.com/open-telemetry/opentelemetry-collector/blob/main/config/configtls/README.md#tls-configuration-settings).
+
+#### {{ecloud}} and serverless
+
+For {{ecloud}} and {{serverless-full}}, TLS is enforced automatically and certificates are signed by a public CA trusted by default on most systems. Use `tls: insecure: false` (or omit the `tls` block entirely) and authenticate with an API key:
+
+```yaml subs=true
+exporters:
+  elasticsearch:
+    endpoint: "https://my-deployment.es.us-east-1.aws.elastic-cloud.com:443"
+    api_key: "${ELASTIC_API_KEY}"
+    tls:
+      insecure: false
+```
+
+#### Self-managed with a custom or self-signed CA
+
+For self-managed {{es}} deployments using a private CA or self-signed certificate, provide the CA certificate file so the exporter can verify the server:
+
+```yaml subs=true
+exporters:
+  elasticsearch:
+    endpoint: "https://elasticsearch:9200"
+    api_key: "${ELASTIC_API_KEY}"
+    tls:
+      insecure: false
+      ca_file: "/path/to/ca.crt"
+```
+
+The `ca_file` path must be readable by the EDOT Collector process. To skip verification entirely during testing, you can set `insecure_skip_verify: true`, but this is not recommended for production.
+
+#### Mutual TLS (mTLS)
+
+For self-managed deployments that require client certificate authentication:
+
+```yaml subs=true
+exporters:
+  elasticsearch:
+    endpoint: "https://elasticsearch:9200"
+    api_key: "${ELASTIC_API_KEY}"
+    tls:
+      insecure: false
+      ca_file: "/path/to/ca.crt"
+      cert_file: "/path/to/client.crt"
+      key_file: "/path/to/client.key"
+```
 
 ## Mapping modes
 
