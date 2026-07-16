@@ -9,6 +9,8 @@
 package include
 
 import (
+	"sync"
+
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/agent"
 	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/docker"
@@ -23,17 +25,22 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/path"
 )
 
+var once sync.Once
+
 // Providers registers all known composable providers with composable.Providers.
+// It is safe to call multiple times; registration happens exactly once.
 func Providers() {
-	composable.Providers.MustAddContextProvider("agent", agent.ContextProviderBuilder)
-	composable.Providers.MustAddDynamicProvider("docker", docker.DynamicProviderBuilder)
-	composable.Providers.MustAddContextProvider("env", env.ContextProviderBuilder)
-	composable.Providers.MustAddContextProvider("filesource", filesource.ContextProviderBuilder)
-	composable.Providers.MustAddContextProvider("host", host.ContextProviderBuilder)
-	composable.Providers.MustAddDynamicProvider("kubernetes", kubernetes.DynamicProviderBuilder)
-	composable.Providers.MustAddContextProvider("kubernetes_leaderelection", kubernetesleaderelection.ContextProviderBuilder)
-	composable.Providers.MustAddContextProvider("kubernetes_secrets", kubernetessecrets.ContextProviderBuilder)
-	composable.Providers.MustAddContextProvider("local", local.ContextProviderBuilder)
-	composable.Providers.MustAddDynamicProvider("local_dynamic", localdynamic.DynamicProviderBuilder)
-	composable.Providers.MustAddContextProvider("path", path.ContextProviderBuilder)
+	once.Do(func() {
+		composable.Providers.MustAddContextProvider("agent", agent.ContextProviderBuilder)
+		composable.Providers.MustAddDynamicProvider("docker", docker.DynamicProviderBuilder)
+		composable.Providers.MustAddContextProvider("env", env.ContextProviderBuilder)
+		composable.Providers.MustAddContextProvider("filesource", filesource.ContextProviderBuilder)
+		composable.Providers.MustAddContextProvider("host", host.ContextProviderBuilder)
+		composable.Providers.MustAddDynamicProvider("kubernetes", kubernetes.DynamicProviderBuilder)
+		composable.Providers.MustAddContextProvider("kubernetes_leaderelection", kubernetesleaderelection.ContextProviderBuilder)
+		composable.Providers.MustAddContextProvider("kubernetes_secrets", kubernetessecrets.ContextProviderBuilder)
+		composable.Providers.MustAddContextProvider("local", local.ContextProviderBuilder)
+		composable.Providers.MustAddDynamicProvider("local_dynamic", localdynamic.DynamicProviderBuilder)
+		composable.Providers.MustAddContextProvider("path", path.ContextProviderBuilder)
+	})
 }

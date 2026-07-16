@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -17,21 +18,18 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
-	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/env"
-	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/host"
-	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/local"
-	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/include"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func TestController(t *testing.T) {
-	composable.Providers.MustAddContextProvider("env", env.ContextProviderBuilder)
-	composable.Providers.MustAddContextProvider("host", host.ContextProviderBuilder)
-	composable.Providers.MustAddContextProvider("local", local.ContextProviderBuilder)
-	composable.Providers.MustAddDynamicProvider("local_dynamic", localdynamic.DynamicProviderBuilder)
+func TestMain(m *testing.M) {
+	include.Providers()
+	os.Exit(m.Run())
+}
 
+func TestController(t *testing.T) {
 	cfg, err := config.NewConfigFrom(map[string]interface{}{
 		"providers": map[string]interface{}{
 			"env": map[string]interface{}{

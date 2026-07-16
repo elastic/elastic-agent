@@ -14,6 +14,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/include"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -22,6 +23,7 @@ func WaitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config,
 	var cancel context.CancelFunc
 	var vars []*transpiler.Vars
 
+	include.Providers()
 	composable, err := composable.New(l, cfg, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create composable controller: %w", err)
