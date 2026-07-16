@@ -45,6 +45,7 @@ import (
 	xpacketbeat "github.com/elastic/beats/v7/x-pack/packetbeat/scripts/mage"
 
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
+	"github.com/elastic/elastic-agent/dev-tools/licenses"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
@@ -524,7 +525,7 @@ func (Check) LintAll() error {
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
-	return sh.RunV("go-licenser", "-d", "-license", "Elasticv2", "-exclude", "beats")
+	return sh.RunV("go-licenser", "-d", "-license", licenses.Elasticv2LicenseName, "-exclude", "beats")
 }
 
 // DocsFiles validates that files required by the docs generation script exist.
@@ -614,7 +615,7 @@ func (Format) All() {
 // License applies the right license header.
 func (Format) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
-	return sh.RunV("go-licenser", "-license", "Elastic", "-exclude", "beats")
+	return sh.RunV("go-licenser", "-license", licenses.Elasticv2LicenseName, "-exclude", "beats")
 }
 
 // Package packages the Elastic Agent for distribution.
