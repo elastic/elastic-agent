@@ -636,20 +636,12 @@ func TestGetOtelConfig(t *testing.T) {
 
 	// expectedOsquerybeatSingleReceiverConfig is the expected config for an osquery component
 	// with single_receiver: true and two streams merged into one receiver.
+	// The osquery_manager.result stream must be first (index 0) so that
+	// osquerybeat assigns it's client to it.
 	expectedOsquerybeatSingleReceiverConfig := func(id string) map[string]any {
 		cfg := beatReceiverBaseConfig(id, "osquerybeat", "osquery")
 		cfg["osquerybeat"] = map[string]any{
 			"inputs": []map[string]any{
-				{
-					"id": "action-responses",
-					"data_stream": map[string]any{
-						"dataset": "osquery_manager.action.responses",
-					},
-					"query":      nil,
-					"index":      "logs-osquery_manager.action.responses-default",
-					"processors": defaultInputProcessors("action-responses", "osquery_manager.action.responses", "logs"),
-					"type":       "osquery",
-				},
 				{
 					"id": "results",
 					"data_stream": map[string]any{
@@ -659,6 +651,16 @@ func TestGetOtelConfig(t *testing.T) {
 					"interval":   "3600",
 					"index":      "logs-osquery_manager.result-default",
 					"processors": defaultInputProcessors("results", "osquery_manager.result", "logs"),
+					"type":       "osquery",
+				},
+				{
+					"id": "action-responses",
+					"data_stream": map[string]any{
+						"dataset": "osquery_manager.action.responses",
+					},
+					"query":      nil,
+					"index":      "logs-osquery_manager.action.responses-default",
+					"processors": defaultInputProcessors("action-responses", "osquery_manager.action.responses", "logs"),
 					"type":       "osquery",
 				},
 			},
@@ -2511,6 +2513,53 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		},
 	}
 
+	// osquerybeat with single_receiver but without an "osquery" key (no scheduled queries
+	// or packs configured — live-query-only policy). The result stream must still be
+	// placed first so publisher.Configure routes live-query result rows correctly.
+	// Regression test for https://github.com/elastic/elastic-agent/issues/15601.
+	osquerybeatSingleReceiverNoOsqueryKeyComponent := &component.Component{
+		ID:        "osquerybeat-test-id",
+		InputType: "osquery",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "osquery",
+				Command: &component.CommandSpec{
+					Args: []string{"osquerybeat"},
+				},
+				SingleReceiver: true,
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "osquerybeat-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "osquery",
+					"streams": []any{
+						map[string]any{
+							"id": "action-responses",
+							"data_stream": map[string]any{
+								"dataset": "osquery_manager.action.responses",
+							},
+							"query": nil,
+						},
+						map[string]any{
+							"id": "results",
+							"data_stream": map[string]any{
+								"dataset": "osquery_manager.result",
+							},
+						},
+					},
+					// Intentionally no "osquery" key — simulates a live-query-only policy
+					// with no scheduled queries or packs.
+				}),
+			},
+		},
+	}
+
 	packetbeatComponent := &component.Component{
 		ID:        "packetbeat-test-id",
 		InputType: "packet",
@@ -2632,6 +2681,25 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				actionInput := inputs[1]
 				_, hasOsquery := actionInput["osquery"]
 				assert.False(t, hasOsquery, "action-responses stream must not have osquery injected")
+			},
+		},
+		{
+			name:               "osquerybeat single_receiver without osquery key still puts result stream first",
+			component:          osquerybeatSingleReceiverNoOsqueryKeyComponent,
+			outputQueueConfig:  nil,
+			expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id",
+			expectedBeatName:   "osquerybeat",
+			verifyBeatConfig: func(t *testing.T, beatConfig map[string]any) {
+				inputs, ok := beatConfig["inputs"].([]map[string]any)
+				require.True(t, ok, "osquerybeat inputs should be a slice of maps")
+				require.Len(t, inputs, 2, "both streams must be merged into the single receiver")
+
+				// Even without an "osquery" key, the result stream must be at position 0.
+				// If action.responses were first, live-query result rows would be routed to the wrong data stream.
+				assert.Equal(t, "results", inputs[0]["id"], "osquery_manager.result stream must be first even without osquery key")
+
+				_, hasOsquery := inputs[0]["osquery"]
+				assert.False(t, hasOsquery, "no osquery section should be injected when key is absent from unit config")
 			},
 		},
 		{

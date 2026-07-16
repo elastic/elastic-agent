@@ -800,10 +800,12 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 // beat startup.
 func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiverInput {
 	// Mirror the implementation from https://github.com/elastic/beats/blob/7764586737b76758db262a06fb3c594c52185c48/x-pack/osquerybeat/cmd/root.go#L92
-	osqMap, ok := unit.Config.GetSource().AsMap()["osquery"].(map[string]any)
-	if !ok {
-		return result
-	}
+	//
+	// The osquery object may be nil when the integration has no scheduled queries (live-query-only policy).
+	// In that case we still need to reorder streams so that osquery_manager.result is at
+	// inputs[0] — osquerybeat wires it's client to inputs[0] and live-query result rows must
+	// land in the result stream, not action.responses.
+	osqMap, _ := unit.Config.GetSource().AsMap()["osquery"].(map[string]any)
 	for i, ri := range result {
 		// "osquery_manager.result" is the dataset of the stream that carries osquery
 		// scheduled query results and must receive the input-level osquery configuration.
@@ -815,12 +817,14 @@ func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiver
 		if dataset != "osquery_manager.result" {
 			continue
 		}
-		if _, exists := result[i].config["osquery"]; !exists {
-			// Clone before mutating so we don't modify the map returned by CreateInputsFromStreamsForReceiver.
-			result[i].config = maps.Clone(result[i].config)
-			result[i].config["osquery"] = osqMap
+		if osqMap != nil {
+			if _, exists := result[i].config["osquery"]; !exists {
+				// Clone before mutating so we don't modify the map returned by CreateInputsFromStreamsForReceiver.
+				result[i].config = maps.Clone(result[i].config)
+				result[i].config["osquery"] = osqMap
+			}
 		}
-		// Place the result stream first so inputs[0].Osquery is set.
+		// Place the result stream first as osquerybeat requires the result data stream to be first.
 		result[0], result[i] = result[i], result[0]
 		break
 	}
