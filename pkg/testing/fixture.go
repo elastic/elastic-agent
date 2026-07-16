@@ -171,6 +171,13 @@ func WithAdditionalArgs(args []string) FixtureOpt {
 	}
 }
 
+// WithAppendAdditionalArgs appends to any additional args already set on the fixture.
+func WithAppendAdditionalArgs(args []string) FixtureOpt {
+	return func(f *Fixture) {
+		f.additionalArgs = append(f.additionalArgs, args...)
+	}
+}
+
 func WithFIPSArtifact() FixtureOpt {
 	return func(f *Fixture) {
 		f.fipsArtifact = true
