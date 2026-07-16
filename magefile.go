@@ -94,7 +94,7 @@ import (
 )
 
 const (
-	goLicenserRepo = "github.com/elastic/go-licenser"
+	goLicenserRepo   = "github.com/elastic/go-licenser"
 	buildDir         = "build"
 	metaDir          = "_meta"
 	configFile       = "elastic-agent.yml"
