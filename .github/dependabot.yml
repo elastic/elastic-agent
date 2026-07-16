@@ -21,10 +21,20 @@ updates:
       - dependency-name: "go.opentelemetry.io/*"
       - dependency-name: "github.com/open-telemetry/*"
       - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
-      # k8s dependencies are bumped transitively by Otel dependency updates; do not update independently
-      - dependency-name: "k8s.io/*"
-      - dependency-name: "sigs.k8s.io/*"
     groups:
+      # k8s-ecosystem must come before the elastic group: Dependabot assigns a dependency to
+      # the first matching group, and elastic/cloud-on-k8s and elastic/elastic-agent-autodiscover
+      # would otherwise match the elastic group's wildcard pattern first.
+      k8s-ecosystem:
+        patterns:
+          # k8s core libraries
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
+          # Direct dependencies whose own go.mod requires k8s.io/* and must be bumped
+          # in lockstep when k8s has a breaking API change
+          - "helm.sh/helm/*"
+          - "github.com/elastic/cloud-on-k8s/*"
+          - "github.com/elastic/elastic-agent-autodiscover"
       elastic:
         patterns:
           # github.com/elastic/* and go.elastic.co/* cover all Elastic and APM Go packages
@@ -38,8 +48,6 @@ updates:
           # Test frameworks and helpers
           - "github.com/stretchr/*"
           - "github.com/testcontainers/*"
-          # Helm: only used in k8s integration tests
-          - "helm.sh/helm/*"
           # Only used in *_test.go files
           - "github.com/google/pprof"
           - "github.com/google/go-containerregistry"
@@ -56,6 +64,7 @@ updates:
           - "github.com/josephspurrier/goversioninfo"
           - "github.com/rednafi/link-patrol"
           - "gotest.tools/*"
+          - "github.com/vektra/mockery/*"
       misc:
         patterns:
           - "*"

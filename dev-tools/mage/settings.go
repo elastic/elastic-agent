@@ -1264,6 +1264,10 @@ type IntegrationTestSettings struct {
 	// TestEnvironmentEnabled indicates if the test environment is enabled (from TEST_ENVIRONMENT env var).
 	// Defaults to true if not set.
 	TestEnvironmentEnabled bool
+
+	// AgentDevelop enables development mode for the agent fixture (from TEST_AGENT_DEVELOP env var).
+	// When true, --develop is passed to elastic-agent. Only applies to local runs by default.
+	AgentDevelop string
 }
 
 // DockerSettings contains Docker-related settings.
@@ -1694,6 +1698,9 @@ func (s *Settings) loadIntegrationTestSettingsFromEnv() error {
 	}
 	if v := os.Getenv("GOTEST_FLAGS"); v != "" {
 		s.IntegrationTest.GoTestFlags = v
+	}
+	if v := os.Getenv("TEST_AGENT_DEVELOP"); v != "" {
+		s.IntegrationTest.AgentDevelop = v
 	}
 
 	var err error

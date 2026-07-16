@@ -45,6 +45,27 @@ const (
 	elasticsearchStateStoreExtensionName  = "elasticsearch_storage"
 )
 
+// ComponentIDFromReceiverName extracts the elastic-agent component ID from an
+// OTel receiver/component name of the form
+// "<receiverType>/OtelNamePrefix<comp.ID>/<streamID>". All "/" characters are
+// literal string delimiters, not filesystem path separators, so this is
+// consistent across platforms including Windows. It returns false if name
+// does not contain OtelNamePrefix.
+//
+// comp.ID is extracted as the segment between OtelNamePrefix and the next
+// "/". This is exact and unambiguous for normal IDs. Both comp.ID and
+// streamID are user-supplied (from the policy input "id" field), so either
+// could contain "/" — making the result ambiguous in that case. Callers
+// should treat such IDs as a known limitation.
+func ComponentIDFromReceiverName(name string) (string, bool) {
+	parts := strings.SplitN(name, OtelNamePrefix, 2)
+	if len(parts) != 2 {
+		return "", false
+	}
+	compID, _, _ := strings.Cut(parts[1], "/")
+	return compID, true
+}
+
 type (
 	// exporter translation logic takes output config, output name, logger
 	// and returns exporter config, processor config (if any) and error
