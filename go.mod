@@ -54,11 +54,6 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
-<<<<<<< HEAD
-=======
-	github.com/testcontainers/testcontainers-go v0.43.0
-	github.com/testcontainers/testcontainers-go/modules/compose v0.43.0
->>>>>>> 61e22122f (build(deps): bump the tooling-test group across 1 directory with 3 updates (#15595))
 	github.com/winlabs/gowin32 v0.0.0-20260308155911-6a6dc53430f0
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.12
 	go.elastic.co/apm/module/apmgrpc/v2 v2.7.12
@@ -139,11 +134,6 @@ require (
 	github.com/brunoga/deep v1.3.1 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
-<<<<<<< HEAD
-=======
-	github.com/compose-spec/compose-go/v2 v2.11.0 // indirect
-	github.com/containerd/console v1.0.5 // indirect
->>>>>>> 61e22122f (build(deps): bump the tooling-test group across 1 directory with 3 updates (#15595))
 	github.com/containerd/containerd v1.7.30 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
@@ -153,13 +143,6 @@ require (
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
-<<<<<<< HEAD
-=======
-	github.com/docker/buildx v0.33.0 // indirect
-	github.com/docker/cli v29.5.3+incompatible // indirect
-	github.com/docker/compose/v5 v5.1.4 // indirect
-	github.com/docker/docker v28.5.2+incompatible // indirect
->>>>>>> 61e22122f (build(deps): bump the tooling-test group across 1 directory with 3 updates (#15595))
 	github.com/docker/docker-credential-helpers v0.9.5 // indirect
 	github.com/docker/go-connections v0.7.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -212,11 +195,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
-<<<<<<< HEAD
-=======
-	github.com/in-toto/attestation v1.1.2 // indirect
-	github.com/in-toto/in-toto-golang v0.11.0 // indirect
->>>>>>> 61e22122f (build(deps): bump the tooling-test group across 1 directory with 3 updates (#15595))
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jaypipes/pcidb v1.1.1 // indirect
 	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
@@ -241,24 +219,13 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
-<<<<<<< HEAD
-=======
-	github.com/mattn/go-shellwords v1.0.13 // indirect
->>>>>>> 61e22122f (build(deps): bump the tooling-test group across 1 directory with 3 updates (#15595))
 	github.com/mileusna/useragent v1.3.5 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
-<<<<<<< HEAD
-	github.com/moby/moby/api v1.54.2 // indirect
-=======
-	github.com/moby/go-archive v0.2.0 // indirect
-	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/moby/api v1.55.0 // indirect
-	github.com/moby/patternmatcher v0.6.1 // indirect
->>>>>>> 61e22122f (build(deps): bump the tooling-test group across 1 directory with 3 updates (#15595))
 	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/moby/term v0.5.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
