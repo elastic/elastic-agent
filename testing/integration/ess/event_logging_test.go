@@ -22,12 +22,20 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/logp"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
+
+const (
+	runtimeProcess = "process"
+	runtimeOtel    = "otel"
+)
+
+var allRuntimes = []string{runtimeProcess, runtimeOtel}
 
 var eventLogConfig = `
 outputs:
@@ -40,28 +48,18 @@ outputs:
 inputs:
   - type: filestream
     id: your-input-id
-    log_level: debug
     streams:
       - id: your-filestream-stream-id
         data_stream:
           dataset: generic
         paths:
           - %[2]s
+    log_level: %[3]s
 agent:
-    logging.level: debug
     monitoring.enabled: false
-    internal.runtime.filebeat.default: %[3]s
-    grpc:
-        address: localhost
-        port: 7001
+    internal.runtime.filebeat.default: %[4]s
+    grpc.port: 0
 `
-
-const (
-	runtimeProcess = "process"
-	runtimeOtel    = "otel"
-)
-
-var allRuntimes = []string{runtimeProcess, runtimeOtel}
 
 func TestEventLogFile(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
@@ -86,15 +84,15 @@ func runEventLogFile(t *testing.T, runtime string) {
 	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
 	logFilepath := path.Join(t.TempDir(), "flog.log")
-	integration.GenerateLogFile(t, logFilepath, time.Millisecond*100, 20)
+	integration.GenerateLogFile(t, logFilepath, time.Millisecond*500, 0)
 
-	cfg := fmt.Sprintf(eventLogConfig, esURL.String(), logFilepath, runtime)
+	cfgInfo := fmt.Sprintf(eventLogConfig, esURL.String(), logFilepath, logp.InfoLevel.String(), runtime)
 
 	if err := agentFixture.Prepare(ctx); err != nil {
 		t.Fatalf("cannot prepare Elastic-Agent fixture: %s", err)
 	}
 
-	if err := agentFixture.Configure(ctx, []byte(cfg)); err != nil {
+	if err := agentFixture.Configure(ctx, []byte(cfgInfo)); err != nil {
 		t.Fatalf("cannot configure Elastic-Agent fixture: %s", err)
 	}
 
@@ -114,16 +112,27 @@ func runEventLogFile(t *testing.T, runtime string) {
 	t.Cleanup(func() {
 		_ = cmd.Wait()
 		if t.Failed() {
-			t.Log("Elastic-Agent output:")
-			t.Log(output.String())
+			t.Errorf("Elastic-Agent output:\n%s", output.String())
 		}
 	})
 
-	requireEventLogFileExistsWithData(t, agentFixture, "Publish event: ")
-	requireNoCopyProcessorError(t, agentFixture)
+	logsDirGlob := filepath.Join(agentFixture.WorkDir(), "data/elastic-agent-*/logs")
 
-	logsDirGlob := filepath.Join(agentFixture.WorkDir(), "data", "elastic-agent-*", "logs")
-	requireLogFileLayoutForRuntime(t, logsDirGlob, runtime)
+	// Event logs should not be created at info level.
+	requireLogFilesForRuntime(t, logsDirGlob, runtime)
+	requireEventLogFileNeverExists(t, logsDirGlob)
+
+	// Switch to debug level to enable event log file creation.
+	cfgDebug := fmt.Sprintf(eventLogConfig, esURL.String(), logFilepath, logp.DebugLevel.String(), runtime)
+	if err := agentFixture.Configure(ctx, []byte(cfgDebug)); err != nil {
+		t.Fatalf("cannot reconfigure Elastic-Agent: %s", err)
+	}
+
+	requireEventLogFileExistsWithData(t, logsDirGlob, "Publish event: ")
+	requireNoCopyProcessorError(t, logsDirGlob)
+
+	requireLogFilesForRuntime(t, logsDirGlob, runtime)
+	requireEventLogFilesForRuntime(t, logsDirGlob, runtime)
 	requireNoEventLeakage(t, logsDirGlob)
 
 	// Diagnostics command behavior is tested elsewhere, here we only
@@ -151,9 +160,7 @@ var fleetManagedAgentConfig = `
 fleet:
   enabled: true
 agent:
-  grpc:
-    address: localhost
-    port: 7002
+  grpc.port: 0
 `
 
 func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
@@ -192,7 +199,7 @@ func runEventLogOutputConfiguredViaFleet(t *testing.T, info *define.Info, runtim
 		map[string]any{
 			"agent": map[string]any{
 				"logging": map[string]any{
-					"level": "debug",
+					"level": logp.DebugLevel.String(),
 				},
 				"internal": map[string]any{
 					"runtime": map[string]any{
@@ -251,8 +258,10 @@ func runEventLogOutputConfiguredViaFleet(t *testing.T, info *define.Info, runtim
 		return waitForAgentAndFleetHealthy(ctx, t, agentFixture)
 	}, 2*time.Minute, time.Second, "elastic-agent did not report healthy")
 
+	logsDirGlob := filepath.Join(agentFixture.WorkDir(), "data/elastic-agent-*/logs")
+
 	// Ensure the event logs are going to the events log file by default.
-	requireEventLogFileExistsWithData(t, agentFixture, "Publish event:")
+	requireEventLogFileExistsWithData(t, logsDirGlob, "Publish event:")
 
 	// Add a policy overwrite to change the events output to stderr.
 	err = applyEventLogStderrPolicy(ctx, info, policyName, policyID, runtime)
@@ -284,7 +293,7 @@ func applyEventLogStderrPolicy(ctx context.Context, info *define.Info, policyNam
 		Overrides: map[string]any{
 			"agent": map[string]any{
 				"logging": map[string]any{
-					"level": "debug",
+					"level": logp.DebugLevel.String(),
 					"event_data": map[string]any{
 						"to_stderr": true,
 						"to_files":  false,
@@ -305,8 +314,8 @@ func applyEventLogStderrPolicy(ctx context.Context, info *define.Info, policyNam
 	return err
 }
 
-func readEventLogFile(agentFixture *atesting.Fixture) (string, error) {
-	glob := filepath.Join(agentFixture.WorkDir(), "data", "elastic-agent-*", "logs", "events", "*")
+func readEventLogFile(logsDirGlob string) (string, error) {
+	glob := filepath.Join(logsDirGlob, "events/*")
 	files, err := filepath.Glob(glob)
 	if err != nil {
 		return "", fmt.Errorf("could not scan for events log file: %w", err)
@@ -321,8 +330,8 @@ func readEventLogFile(agentFixture *atesting.Fixture) (string, error) {
 	return string(data), nil
 }
 
-func eventLogFileContains(agentFixture *atesting.Fixture, expectedStr string) error {
-	data, err := readEventLogFile(agentFixture)
+func eventLogFileContains(logsDirGlob, expectedStr string) error {
+	data, err := readEventLogFile(logsDirGlob)
 	if err != nil {
 		return err
 	}
@@ -332,23 +341,31 @@ func eventLogFileContains(agentFixture *atesting.Fixture, expectedStr string) er
 	return nil
 }
 
-func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixture, expectedStr string) {
+func requireEventLogFileExistsWithData(t *testing.T, logsDirGlob, expectedStr string) {
 	t.Helper()
 	require.Eventually(t, func() bool {
-		return eventLogFileContains(agentFixture, expectedStr) == nil
+		return eventLogFileContains(logsDirGlob, expectedStr) == nil
 	}, time.Minute, time.Second,
 		"did not find %q in the events log file", expectedStr)
 }
 
-func requireNoCopyProcessorError(t *testing.T, agentFixture *atesting.Fixture) {
+func requireEventLogFileNeverExists(t *testing.T, logsDirGlob string) {
 	t.Helper()
-	require.Eventually(t, func() bool {
-		return copyProcessorError(agentFixture) == nil
-	}, time.Minute, time.Second, "copy_fields processor error found in events log")
+	require.Never(t, func() bool {
+		return eventLogFileContains(logsDirGlob, "") == nil
+	}, 10*time.Second, time.Second,
+		"events log file should not have been created")
 }
 
-func copyProcessorError(agentFixture *atesting.Fixture) error {
-	data, err := readEventLogFile(agentFixture)
+func requireNoCopyProcessorError(t *testing.T, logsDirGlob string) {
+	t.Helper()
+	require.Never(t, func() bool {
+		return copyProcessorError(logsDirGlob) != nil
+	}, 10*time.Second, time.Second, "copy_fields processor error found in events log")
+}
+
+func copyProcessorError(logsDirGlob string) error {
+	data, err := readEventLogFile(logsDirGlob)
 	if err != nil {
 		return err
 	}
@@ -372,45 +389,39 @@ func copyProcessorError(agentFixture *atesting.Fixture) error {
 	return nil
 }
 
-func requireLogFileLayoutForRuntime(t *testing.T, logsDirGlob, runtime string) {
+func requireLogFilesForRuntime(t *testing.T, logsDirGlob, runtime string) {
 	t.Helper()
 
-	logFileLayoutByRuntime := map[string][]string{
+	patternsByRuntime := map[string][]string{
 		runtimeProcess: {
-			"logs/elastic-agent-*.ndjson",
-			"logs/events/elastic-agent-event-log-*.ndjson",
+			"elastic-agent-*.ndjson",
 		},
 		runtimeOtel: {
-			"logs/elastic-agent-*.ndjson",
-			"logs/elastic-otel-collector-*.ndjson",
-			"logs/events/elastic-otel-collector-event-log-*.ndjson",
+			"elastic-agent-*.ndjson",
+			"elastic-otel-collector-*.ndjson",
 		},
 	}
-
-	want, ok := logFileLayoutByRuntime[runtime]
+	want, ok := patternsByRuntime[runtime]
 	require.Truef(t, ok, "unknown runtime %q", runtime)
 
-	baseDir := filepath.Dir(logsDirGlob)
+	requireFilesMatchExactly(t, logsDirGlob, want)
+}
 
-	// Every expected pattern must match at least one file.
-	expected := map[string]bool{}
-	for _, pattern := range want {
-		matches, err := filepath.Glob(filepath.Join(baseDir, pattern))
-		require.NoErrorf(t, err, "could not glob %q", pattern)
-		require.NotEmptyf(t, matches, "expected a log file matching %q under the %s runtime", pattern, runtime)
-		for _, m := range matches {
-			expected[m] = true
-		}
-	}
+func requireEventLogFilesForRuntime(t *testing.T, logsDirGlob, runtime string) {
+	t.Helper()
 
-	// No other log files should exist.
-	logFiles, err := filepath.Glob(filepath.Join(logsDirGlob, "*.ndjson"))
-	require.NoError(t, err, "could not glob log files")
-	eventFiles, err := filepath.Glob(filepath.Join(logsDirGlob, "events", "*.ndjson"))
-	require.NoError(t, err, "could not glob event log files")
-	for _, f := range append(logFiles, eventFiles...) {
-		require.Truef(t, expected[f], "unexpected log file %q under the %s runtime", f, runtime)
+	patternsByRuntime := map[string][]string{
+		runtimeProcess: {
+			"elastic-agent-event-log-*.ndjson",
+		},
+		runtimeOtel: {
+			"elastic-otel-collector-event-log-*.ndjson",
+		},
 	}
+	want, ok := patternsByRuntime[runtime]
+	require.Truef(t, ok, "unknown runtime %q", runtime)
+
+	requireFilesMatchExactly(t, filepath.Join(logsDirGlob, "events"), want)
 }
 
 func requireNoEventLeakage(t *testing.T, logsDirGlob string) {
@@ -434,6 +445,37 @@ func requireNoEventLeakage(t *testing.T, logsDirGlob string) {
 	}
 }
 
+func requireFilesMatchExactly(t *testing.T, dirGlob string, patterns []string) {
+	t.Helper()
+
+	// Wait until every pattern has at least one matching file.
+	require.Eventually(t, func() bool {
+		for _, pat := range patterns {
+			if m, _ := filepath.Glob(filepath.Join(dirGlob, pat)); len(m) == 0 {
+				return false
+			}
+		}
+		return true
+	}, time.Minute, time.Second, "expected files did not appear in %s", dirGlob)
+
+	// Collect every file that was expected.
+	expected := map[string]bool{}
+	for _, pat := range patterns {
+		matches, err := filepath.Glob(filepath.Join(dirGlob, pat))
+		require.NoErrorf(t, err, "could not glob %q", pat)
+		for _, m := range matches {
+			expected[m] = true
+		}
+	}
+
+	// Fail if any .ndjson file exists that was not expected.
+	all, err := filepath.Glob(filepath.Join(dirGlob, "*.ndjson"))
+	require.NoError(t, err)
+	for _, f := range all {
+		require.Truef(t, expected[f], "unexpected file %q", f)
+	}
+}
+
 func collectDiagnosticsAndVeriflyLogs(
 	t *testing.T,
 	ctx context.Context,
@@ -450,7 +492,7 @@ func collectDiagnosticsAndVeriflyLogs(
 	extractZipArchive(t, diagPath, extractionDir)
 	diagLogFiles, diagEventLogFiles := getLogFilenames(
 		t,
-		filepath.Join(extractionDir, "logs", "elastic-agent*"))
+		filepath.Join(extractionDir, "logs/elastic-agent*"))
 	allLogs := append(diagLogFiles, diagEventLogFiles...)
 
 	require.ElementsMatch(
@@ -474,7 +516,7 @@ func getLogFilenames(
 		logFiles = append(logFiles, filepath.Base(f))
 	}
 
-	eventLogFilesGlob := filepath.Join(basepath, "events", "*.ndjson")
+	eventLogFilesGlob := filepath.Join(basepath, "events/*.ndjson")
 	eventLogFilesPath, err := filepath.Glob(eventLogFilesGlob)
 	if err != nil {
 		t.Fatalf("could not get log file names:%s", err)

@@ -29,6 +29,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -77,6 +78,36 @@ var (
 					"processors": []string{"batch"},
 					"exporters":  []string{"nop"},
 				},
+				"logs": map[string]interface{}{
+					"receivers":  []string{"nop"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"nop"},
+				},
+			},
+		},
+	}
+
+	testConfigDebugLogLevel = map[string]interface{}{
+		"receivers": map[string]interface{}{
+			"nop": map[string]interface{}{},
+		},
+		"processors": map[string]interface{}{
+			"batch": map[string]interface{}{},
+		},
+		"exporters": map[string]interface{}{
+			"nop": map[string]interface{}{},
+		},
+		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{
+					"level":   "none",
+					"readers": []any{},
+				},
+				"logs": map[string]interface{}{
+					"level": "debug",
+				},
+			},
+			"pipelines": map[string]interface{}{
 				"logs": map[string]interface{}{
 					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
@@ -144,12 +175,12 @@ func testExecutionFactory(testBinary string, inner ExecutionFactory) (ExecutionF
 	return factory, te
 }
 
-func (e *testExecution) startCollector(ctx context.Context, level logp.Level, collectorLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
+func (e *testExecution) startCollector(ctx context.Context, agentLogger, collectorLogger *logger.Logger, collectorLevel logp.Level, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
 	var err error
-	e.handle, err = e.exec.startCollector(ctx, level, collectorLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
+	e.handle, err = e.exec.startCollector(ctx, agentLogger, collectorLogger, collectorLevel, cfg, errCh, statusCh, forceFetchStatusCh)
 	return e.handle, err
 }
 
@@ -173,9 +204,9 @@ type mockExecution struct {
 
 func (e *mockExecution) startCollector(
 	ctx context.Context,
-	level logp.Level,
 	_ *logger.Logger,
 	_ *logger.Logger,
+	collectorLevel logp.Level,
 	cfg *confmap.Conf,
 	errCh chan error,
 	statusCh chan *status.AggregateStatus,
@@ -195,7 +226,7 @@ func (e *mockExecution) startCollector(
 		stopCh:            stopCh,
 		cancel:            collectorCancel,
 		execution:         e,
-		collectorLogLevel: level,
+		collectorLogLevel: collectorLevel,
 	}
 	if e.collectorStarted != nil {
 		e.collectorStartCount++
@@ -936,7 +967,7 @@ func TestOTelManager_Logging(t *testing.T) {
 		}
 	})
 
-	cfg := confmap.NewFromStringMap(testConfig)
+	cfg := confmap.NewFromStringMap(testConfigDebugLogLevel)
 	m.Update(cfg, nil, logp.InfoLevel, nil)
 
 	// Normal collector logs must appear in the dedicated log file, not in the agent's own log.
@@ -1391,6 +1422,17 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			components:       []component.Component{testComp},
 			expectedKeys:     []string{"receivers", "exporters", "service", "processors"},
 			expectedLogLevel: configUpdateLevel,
+		},
+		{
+			name:         "unit log level overrides agent log level",
+			collectorCfg: nil,
+			components: func() []component.Component {
+				c := testComponent("debug-comp")
+				c.Units[0].LogLevel = client.UnitLogLevelDebug
+				return []component.Component{c}
+			}(),
+			expectedKeys:     []string{"receivers", "exporters", "service"},
+			expectedLogLevel: logp.DebugLevel,
 		},
 		{
 			name:         "component config generation error",

@@ -136,7 +136,7 @@ type OTelManager struct {
 	// stopTimeout is the timeout to wait for the collector to stop.
 	stopTimeout time.Duration
 
-	// log level of the collector
+	// collectorLogLevel is the log level the collector subprocess runs at.
 	collectorLogLevel logp.Level
 }
 
@@ -411,8 +411,8 @@ func (m *OTelManager) startCollector(ctx context.Context,
 	if m.collectorRunning() {
 		return errors.New("tried to start otel collector, but it's already running")
 	}
-	proc, err := m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
-		m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+	proc, err := m.execution.startCollector(ctx, m.managerLogger, m.collectorLogger, m.collectorLogLevel,
+		m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 	if err != nil {
 		// failed to create the collector (this is different then
 		// it's failing to run). we do not retry creation on failure
@@ -500,8 +500,9 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
 
-	// if the otel log level is unset, use the agent log level
-	if err := maybeInjectLogLevel(mergedOtelCfg, cfgUpdate.agentLogLevel); err != nil {
+	// if the otel log level is unset, use the most verbose level across agent and all units
+	minLogLevel := component.MinLogLevel(cfgUpdate.agentLogLevel, cfgUpdate.components)
+	if err := maybeInjectLogLevel(mergedOtelCfg, minLogLevel); err != nil {
 		return nil, err
 	}
 

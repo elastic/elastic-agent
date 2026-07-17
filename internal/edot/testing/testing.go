@@ -48,7 +48,7 @@ func main() {
 	}
 
 	if os.Getenv("TEST_SUPERVISED_COLLECTOR_EMIT_EVENT_LOG") != "" {
-		fmt.Println(`{"log.level":"info","log.type":"event","message":"Publish event: test event log"}`)
+		fmt.Println(`{"log.level":"debug","log.type":"event","message":"Publish event: test event log"}`)
 	}
 
 	collectorCmd := cmd.NewOtelCommandWithArgs(os.Args, cli.NewIOStreams(), testComponents)
