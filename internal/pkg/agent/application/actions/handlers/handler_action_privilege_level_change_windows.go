@@ -8,18 +8,17 @@ package handlers
 
 import (
 	"fmt"
-	"os/user"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // currentEffectiveIDs returns the SID of the current user and primary group,
 // matching the SID strings that install.FindUID and install.FindGID return on
-// Windows. The os/user.Current() pitfall described in the Unix variant does
-// not apply on Windows — the process token is the source of truth and
-// user.Current() reads it correctly.
+// Windows.
 func currentEffectiveIDs() (string, string, error) {
-	u, err := user.Current()
+	u, err := utils.CurrentFileOwner()
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get current user: %w", err)
 	}
-	return u.Uid, u.Gid, nil
+	return u.UID, u.GID, nil
 }

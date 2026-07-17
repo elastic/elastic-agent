@@ -9,7 +9,6 @@ package ipc
 import (
 	"fmt"
 	"net"
-	"os/user"
 	"strings"
 
 	"golang.org/x/sys/windows"
@@ -47,12 +46,12 @@ func CleanupListener(log *logger.Logger, address string) {
 }
 
 func securityDescriptor(log *logger.Logger) (string, error) {
-	u, err := user.Current()
+	u, err := utils.CurrentFileOwner()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current user: %w", err)
 	}
 
-	descriptor := "D:P(A;;GA;;;" + u.Uid + ")"
+	descriptor := "D:P(A;;GA;;;" + u.UID + ")"
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
