@@ -506,7 +506,71 @@ func buildTestBinaries(testBinaryPkgs []string) error {
 
 // All run all the code and docs checks.
 func (Check) All() {
-	mg.SerialDeps(Check.License, Integration.Check, Check.DocsFiles)
+	mg.SerialDeps(Check.License, Integration.Check, Check.DocsFiles, Check.FIPSTest)
+}
+
+// FIPSTest validates that every Go module in the repository contains a
+// fips_xcrypto_test.go file. The convention requires this fixed name.
+func (Check) FIPSTest() error {
+	goModFiles, err := devtools.FindFilesRecursive(func(path string, _ os.FileInfo) bool {
+		return filepath.Base(path) == "go.mod"
+	})
+	if err != nil {
+		return err
+	}
+
+	fipsTestFiles, err := devtools.FindFilesRecursive(func(path string, _ os.FileInfo) bool {
+		return filepath.Base(path) == fipsTestFileName
+	})
+	if err != nil {
+		return err
+	}
+
+	// Map each fips test file to the module that owns it (longest module-dir prefix).
+	moduleDirs := make([]string, 0, len(goModFiles))
+	for _, f := range goModFiles {
+		moduleDirs = append(moduleDirs, filepath.ToSlash(filepath.Dir(f)))
+	}
+	covered := make(map[string]bool, len(moduleDirs))
+	for _, testFile := range fipsTestFiles {
+		testDir := filepath.ToSlash(filepath.Dir(testFile))
+		if owner := longestPrefix(testDir, moduleDirs); owner != "" {
+			covered[owner] = true
+		}
+	}
+
+	var missing []string
+	for _, dir := range moduleDirs {
+		if covered[dir] {
+			fmt.Printf("OK   %s\n", dir)
+		} else {
+			fmt.Printf("FAIL %s: missing %s\n", dir, fipsTestFileName)
+			missing = append(missing, dir)
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("%d module(s) missing %s", len(missing), fipsTestFileName)
+	}
+	return nil
+}
+
+const fipsTestFileName = "fips_compliance_test.go"
+
+// longestPrefix returns the element of dirs that is the longest prefix of path,
+// or "" if none match.
+func longestPrefix(path string, dirs []string) string {
+	best := ""
+	for _, dir := range dirs {
+		prefix := dir
+		if dir != "." {
+			prefix = dir + "/"
+		}
+		if (dir == "." || strings.HasPrefix(path+"/", prefix)) && len(dir) > len(best) {
+			best = dir
+		}
+	}
+	return best
 }
 
 // Lint downloads golangci-lint and runs the linter on current changes only.
