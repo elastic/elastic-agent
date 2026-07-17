@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"go.elastic.co/ecszap"
@@ -45,15 +44,7 @@ type Logger = logp.Logger
 // Config is a logging config.
 type Config = logp.Config
 
-var (
-	agentLogLevelOnce sync.Once
-	agentLogLevel     zap.AtomicLevel
-)
-
-func globalLogLevel(level logp.Level) zap.AtomicLevel {
-	agentLogLevelOnce.Do(func() { agentLogLevel = zap.NewAtomicLevelAt(level.ZapLevel()) })
-	return agentLogLevel
-}
+var internalLevelEnabler *zap.AtomicLevel
 
 // New returns a configured ECS Logger
 func New(name string, logInternal bool) (*Logger, error) {
@@ -111,7 +102,7 @@ func NewInMemory(selector string, encCfg zapcore.EncoderConfig) (*Logger, *bytes
 	return logger, &buff
 }
 
-// NewNamedLogger creates a logger for a named component with its own log files.
+// NewNamedLogger creates a logger with typed output routing.
 func NewNamedLogger(name string, cfg, eventLogCfg *Config) (*Logger, error) {
 	namedCfg := *cfg
 	namedCfg.Beat = name
@@ -121,9 +112,9 @@ func NewNamedLogger(name string, cfg, eventLogCfg *Config) (*Logger, error) {
 		return nil, fmt.Errorf("could not convert log config: %w", err)
 	}
 
-	logLevel := globalLogLevel(namedCfg.Level)
-
-	fileOutput, err := makeFileOutput(name, logLevel)
+	// Own level enabler to avoid touching the global one.
+	al := zap.NewAtomicLevelAt(namedCfg.Level.ZapLevel())
+	fileOutput, err := makeFileOutput(&namedCfg, &al)
 	if err != nil {
 		return nil, fmt.Errorf("could not create named logger file output: %w", err)
 	}
@@ -135,9 +126,7 @@ func NewNamedLogger(name string, cfg, eventLogCfg *Config) (*Logger, error) {
 		return nil, fmt.Errorf("could not convert event log config: %w", err)
 	}
 
-	logger, err := configure.LoggingWithTypedOutputsNonGlobalWithLevel(
-		name, commonCfg, eventCommonCfg, logp.TypeKey, logp.EventType, logLevel, fileOutput,
-	)
+	logger, err := configure.LoggingWithTypedOutputsNonGlobal(name, commonCfg, eventCommonCfg, logp.TypeKey, logp.EventType, fileOutput)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing named logger: %w", err)
 	}
@@ -158,11 +147,9 @@ func new(name string, cfg, eventLoggerCfg *Config, logInternal bool) (*Logger, e
 		return nil, fmt.Errorf("could not convert log config: %w", err)
 	}
 
-	logLevel := globalLogLevel(cfg.Level)
-
 	var outputs []zapcore.Core
 	if logInternal {
-		internal, err := makeFileOutput(cfg.Beat, logLevel)
+		internal, err := MakeInternalFileOutput(cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +162,7 @@ func new(name string, cfg, eventLoggerCfg *Config, logInternal bool) (*Logger, e
 		return nil, fmt.Errorf("could not convert event log config: %w", err)
 	}
 
-	logger, err := configure.LoggingWithTypedOutputsLocalWithLevel("", commonCfg, eventLoggercommonCfg, logp.TypeKey, logp.EventType, logLevel, outputs...)
+	logger, err := configure.LoggingWithTypedOutputsLocal("", commonCfg, eventLoggercommonCfg, logp.TypeKey, logp.EventType, outputs...)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
@@ -203,7 +190,11 @@ func ToCommonConfig(cfg *Config) (*config.C, error) {
 
 // SetLevel changes the overall log level of the global logger.
 func SetLevel(lvl logp.Level) {
-	globalLogLevel(DefaultLogLevel).SetLevel(lvl.ZapLevel())
+	zapLevel := lvl.ZapLevel()
+	logp.SetLevel(zapLevel)
+	if internalLevelEnabler != nil {
+		internalLevelEnabler.SetLevel(zapLevel)
+	}
 }
 
 // DefaultLoggingConfig returns default configuration for agent logging.
@@ -245,17 +236,19 @@ func DefaultEventLoggingConfig() *Config {
 // MakeInternalFileOutput creates a zapcore.Core logger that cannot be changed with configuration.
 //
 // This is the logger that the spawned filebeat expects to read the log file from and ship to ES.
-func MakeInternalFileOutput(name string, level logp.Level) (zapcore.Core, error) {
-	return makeFileOutput(name, globalLogLevel(level))
+func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
+	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
+	internalLevelEnabler = &al // directly persisting struct will panic on accessing unitialized backing pointer
+	return makeFileOutput(cfg, internalLevelEnabler)
 }
 
 // makeFileOutput builds a log file output in the agent's log directory with
 // fixed rotation settings. Each caller passes its own level so they can control
 // their verbosity independently.
-func makeFileOutput(name string, levelEnabler zapcore.LevelEnabler) (zapcore.Core, error) {
+func makeFileOutput(cfg *Config, levelEnabler zapcore.LevelEnabler) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	filename := filepath.Join(paths.Home(), DefaultLogDirectory, name)
+	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
 	permissions := 0600        // default user only
 	root, _ := utils.HasRoot() // error ignored
 	if !root {

@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 // TODO: revert once https://github.com/elastic/elastic-agent-libs/pull/435 is merged.
-replace github.com/elastic/elastic-agent-libs => github.com/samuelvl/elastic-agent-libs v0.0.0-20260716140305-dde1c7b3ea9e
+replace github.com/elastic/elastic-agent-libs => github.com/samuelvl/elastic-agent-libs v0.0.0-20260715082207-6d89bae36cf6
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
