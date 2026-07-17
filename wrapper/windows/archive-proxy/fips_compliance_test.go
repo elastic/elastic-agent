@@ -13,5 +13,5 @@ import (
 )
 
 func TestFIPSCompliance(t *testing.T) {
-	fipsscan.CheckModule(t, "github.com/elastic/elastic-agent/wrapper/windows/archive-proxy", nil, nil)
+	fipsscan.CheckModule(t, []string{"./..."}, nil, nil, nil)
 }

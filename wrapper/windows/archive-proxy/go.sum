@@ -4,6 +4,8 @@ github.com/elastic/elastic-agent-libs v0.46.2-0.20260717072702-02294d812c7d h1:J
 github.com/elastic/elastic-agent-libs v0.46.2-0.20260717072702-02294d812c7d/go.mod h1:axkpqDCCzAky6G4D/cklgtZQa3jTNGAMVHVkU0u6YbU=
 github.com/elastic/elastic-agent-libs v0.46.2-0.20260717093148-897085ab2c7b h1:SoBXr+viX0MSf3vpAOsfscVm5FTV4DW3zPLAq7jwXdc=
 github.com/elastic/elastic-agent-libs v0.46.2-0.20260717093148-897085ab2c7b/go.mod h1:axkpqDCCzAky6G4D/cklgtZQa3jTNGAMVHVkU0u6YbU=
+github.com/elastic/elastic-agent-libs v0.46.2-0.20260717103017-7f523dc354ff h1:kdTUyCPXF19aWqFO31GMddDjAvcoUCwAlLJCBnpITr0=
+github.com/elastic/elastic-agent-libs v0.46.2-0.20260717103017-7f523dc354ff/go.mod h1:axkpqDCCzAky6G4D/cklgtZQa3jTNGAMVHVkU0u6YbU=
 github.com/elastic/go-ucfg v0.9.1 h1:OwbVLC9pAmHqlBDq5owRC7HbfldsLuqPqrwg23n17BQ=
 github.com/elastic/go-ucfg v0.9.1/go.mod h1:6Z66LNkFK5xAlWg3Ny7qgtrvBUadaAcor+kYxw2pXBk=
 github.com/magefile/mage v1.17.2 h1:fyXVu1eadI8Ap1HCCNgEhJ5McIWiYhLR8uol64ZZc40=
