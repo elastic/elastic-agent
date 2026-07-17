@@ -198,24 +198,12 @@ func (runner *OsqueryManagerRunner) TestOtelAndProcessMode() {
 
 	testStart := time.Now()
 
-	// Validate process mode
-	var processDoc mapstr.M
-	t.Run("process", func(t *testing.T) {
-		processDoc = runner.validateOsqueryEvents(t, ctx, agentStatus.Info.ID, testStart)
-	})
-
-	// Switch to OTel runtime and validate the same data
+	// Validate OTel mode (the default for osquerybeat).
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
-		policyRevision := switchPolicyToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
-
-		// Wait for the agent to apply the new policy revision
-		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
-			5*time.Minute, time.Second)
-
 		// Verify that an osquery component is running as a beats receiver.
-		// The component may not appear immediately after the policy switch, so we
-		// look for it inside the loop rather than capturing its ID up front.
+		// The component may not appear immediately after startup, so we look
+		// for it inside the loop rather than capturing its ID up front.
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			status, statusErr := runner.agentFixture.ExecStatus(ctx)
 			require.NoError(collect, statusErr)
@@ -224,7 +212,7 @@ func (runner *OsqueryManagerRunner) TestOtelAndProcessMode() {
 				if strings.HasPrefix(comp.ID, "osquery") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
 					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected osquery component to be healthy, got %s", cproto.State(comp.State))
+						"expected osquery component to be healthy, got state %d", comp.State)
 					foundReceiver = true
 					break
 				}
@@ -235,12 +223,42 @@ func (runner *OsqueryManagerRunner) TestOtelAndProcessMode() {
 		otelDoc = runner.validateOsqueryEvents(t, ctx, agentStatus.Info.ID, testStart)
 	})
 
-	// Compare documents from process and otel modes have the same keys
+	// Switch to process runtime and validate the same data.
+	var processDoc mapstr.M
+	t.Run("process", func(t *testing.T) {
+		processSince := time.Now()
+		policyRevision := switchOsquerybeatToProcessRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
+
+		// Wait for the agent to apply the new policy revision.
+		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
+			5*time.Minute, time.Second)
+
+		// Verify that the osquery component has switched to process mode.
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			status, statusErr := runner.agentFixture.ExecStatus(ctx)
+			require.NoError(collect, statusErr)
+			var foundProcess bool
+			for _, comp := range status.Components {
+				if strings.HasPrefix(comp.ID, "osquery") &&
+					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.ProcessRuntimeManager) {
+					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
+						"expected osquery component to be healthy, got state %d", comp.State)
+					foundProcess = true
+					break
+				}
+			}
+			assert.True(collect, foundProcess, "expected an osquery component to be running as a process")
+		}, 2*time.Minute, 5*time.Second, "beat component should be running as a process")
+
+		processDoc = runner.validateOsqueryEvents(t, ctx, agentStatus.Info.ID, processSince)
+	})
+
+	// Compare documents from otel and process modes have the same keys.
 	t.Run("compare", func(t *testing.T) {
-		if processDoc == nil || otelDoc == nil {
+		if otelDoc == nil || processDoc == nil {
 			t.Skip("skipping comparison because a previous subtest failed")
 		}
-		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields, "expected osquery document keys to be equal between process and otel modes")
+		AssertMapstrKeysEqual(t, otelDoc, processDoc, RuntimeComparisonIgnoredFields, "expected osquery document keys to be equal between otel and process modes")
 	})
 }
 
