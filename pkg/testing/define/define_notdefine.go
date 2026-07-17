@@ -189,6 +189,17 @@ func getESClient() (*elasticsearch.Client, error) {
 		Addresses: []string{esHost},
 		Username:  esUser,
 		Password:  esPass,
+		// Retry transient failures with a backoff, mirroring the Kibana client
+		// below. The transport defaults (3 immediate retries on 502/503/504
+		// only) leave 429 - common on ESS and serverless - and 500 unhandled.
+		MaxRetries:    5,
+		RetryOnStatus: []int{429, 500, 502, 503, 504},
+		RetryBackoff: func(attempt int) time.Duration {
+			base := time.Second
+			maxWait := 10 * time.Second
+			wait := (1 << (attempt - 1)) * base
+			return min(wait, maxWait)
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create elasticsearch client: %w", err)

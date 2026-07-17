@@ -114,8 +114,8 @@ jobs:
       - name: regenerate mocks
         run: go tool mockery
 
-      - name: add license headers to regenerated mocks
-        run: mage format:license
+      - name: format regenerated mocks
+        run: mage fmt
 
       - name: check for modified mocks
         id: mocks-check
