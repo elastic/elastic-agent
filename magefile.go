@@ -226,7 +226,7 @@ func (Dev) RegenerateMocks() error {
 		return fmt.Errorf("generating mocks: %w", err)
 	}
 
-	mg.Deps(devtools.Format)
+	mg.SerialDeps(Format.License, devtools.Format)
 	return nil
 }
 
