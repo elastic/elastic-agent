@@ -16,10 +16,9 @@ var knownViolations = map[string]map[string][]fipsscan.KnownViolation{
 	"github.com/elastic/elastic-agent": {
 		// elastic/gokrb5 is an Elastic fork of jcmturner/gokrb5 used for Kerberos auth.
 		"github.com/elastic/gokrb5/v8": {
-			{Imported: "github.com/jcmturner/gofork/encoding/asn1", Reason: "Elastic gokrb5 fork depends on jcmturner gofork for ASN.1 encoding"},
+			{Imported: "github.com/jcmturner/gofork", Reason: "Elastic gokrb5 fork depends on jcmturner gofork (ASN.1, pbkdf2)"},
 			{Imported: "golang.org/x/crypto/md4", Reason: "Kerberos RC4-HMAC requires MD4; no FIPS-approved substitute"},
-			{Imported: "github.com/jcmturner/aescts/v2", Reason: "Elastic gokrb5 fork depends on jcmturner aescts for AES-CBC-CTS"},
-			{Imported: "github.com/jcmturner/gofork/x/crypto/pbkdf2", Reason: "Elastic gokrb5 fork depends on jcmturner gofork pbkdf2"},
+			{Imported: "github.com/jcmturner/aescts", Reason: "Elastic gokrb5 fork depends on jcmturner aescts for AES-CBC-CTS"},
 			{Imported: "golang.org/x/crypto/pbkdf2", Reason: "Kerberos key derivation requires PBKDF2; x/crypto not FIPS-certified"},
 		},
 		// artifact/download uses x/crypto/openpgp for GPG artifact signature verification.

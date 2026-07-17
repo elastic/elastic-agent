@@ -20,9 +20,8 @@ var skipBinaries = []string{
 var knownViolations = map[string]map[string][]fipsscan.KnownViolation{
 	"github.com/elastic/elastic-agent/internal/edot": {
 		// fbreceiver (Beats Filebeat) pulls in non-FIPS crypto through its Azure
-		// Event Hubs input (AMQP/ADAL, pkcs12), Azure Blob Storage input (Azure
-		// SDK, pkcs12), Active Directory entity analytics input (go-ldap, NTLM),
-		// and GCS input (s2a-go/ALTS).
+		// Event Hubs input (AMQP/ADAL), Azure Blob Storage input, Active Directory
+		// entity analytics input (go-ldap/NTLM), and GCS input (s2a-go/ALTS).
 		"github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver": {
 			{Imported: "golang.org/x/crypto/pkcs12", Reason: "Azure inputs (Event Hubs, Blob Storage) load PKCS#12 client certificates"},
 			{Imported: "github.com/Azure/go-ntlmssp", Reason: "Active Directory LDAP requires NTLM authentication"},
@@ -57,23 +56,17 @@ var knownViolations = map[string]map[string][]fipsscan.KnownViolation{
 		// beatsauthextension uses elastic/gokrb5 (Elastic's Kerberos fork) for
 		// Kerberos-based authentication in Beats components.
 		"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension": {
-			{Imported: "github.com/jcmturner/gofork/encoding/asn1", Reason: "Elastic gokrb5 fork depends on jcmturner gofork for ASN.1 encoding"},
+			{Imported: "github.com/jcmturner/gofork", Reason: "Elastic gokrb5 fork depends on jcmturner gofork (ASN.1, pbkdf2)"},
 			{Imported: "golang.org/x/crypto/md4", Reason: "Kerberos RC4-HMAC requires MD4; no FIPS-approved substitute"},
-			{Imported: "github.com/jcmturner/aescts/v2", Reason: "Elastic gokrb5 fork depends on jcmturner aescts for AES-CBC-CTS"},
-			{Imported: "github.com/jcmturner/gofork/x/crypto/pbkdf2", Reason: "Elastic gokrb5 fork depends on jcmturner gofork pbkdf2"},
+			{Imported: "github.com/jcmturner/aescts", Reason: "Elastic gokrb5 fork depends on jcmturner aescts for AES-CBC-CTS"},
 			{Imported: "golang.org/x/crypto/pbkdf2", Reason: "Kerberos key derivation requires PBKDF2; x/crypto not FIPS-certified"},
 		},
 
 		// kafkametricsreceiver uses internal/kafka and franz-go with Kerberos
 		// SASL (GSSAPI) and SCRAM SASL authentication.
 		"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkametricsreceiver": {
-			{Imported: "github.com/jcmturner/gokrb5/v8/client", Reason: "Kafka Kerberos SASL (GSSAPI) requires gokrb5"},
-			{Imported: "github.com/jcmturner/gokrb5/v8/config", Reason: "Kafka Kerberos SASL (GSSAPI) requires gokrb5"},
-			{Imported: "github.com/jcmturner/gokrb5/v8/keytab", Reason: "Kafka Kerberos SASL (GSSAPI) requires gokrb5"},
+			{Imported: "github.com/jcmturner/gokrb5/v8", Reason: "Kafka Kerberos SASL (GSSAPI) requires gokrb5"},
 			{Imported: "golang.org/x/crypto/pbkdf2", Reason: "Kafka SCRAM SASL key derivation uses PBKDF2; x/crypto not FIPS-certified"},
-			{Imported: "github.com/jcmturner/gokrb5/v8/gssapi", Reason: "Kafka Kerberos SASL (GSSAPI) requires gokrb5"},
-			{Imported: "github.com/jcmturner/gokrb5/v8/messages", Reason: "Kafka Kerberos SASL (GSSAPI) requires gokrb5"},
-			{Imported: "github.com/jcmturner/gokrb5/v8/types", Reason: "Kafka Kerberos SASL (GSSAPI) requires gokrb5"},
 		},
 
 		// mongodbreceiver uses mongo-driver with youmark/pkcs8 for encrypted keys
@@ -91,12 +84,7 @@ var knownViolations = map[string]map[string][]fipsscan.KnownViolation{
 
 		// sqlserverreceiver uses go-mssqldb with Kerberos integrated auth and NTLM.
 		"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver": {
-			{Imported: "github.com/jcmturner/gokrb5/v8/client", Reason: "SQL Server Kerberos integrated auth requires gokrb5"},
-			{Imported: "github.com/jcmturner/gokrb5/v8/config", Reason: "SQL Server Kerberos integrated auth requires gokrb5"},
-			{Imported: "github.com/jcmturner/gokrb5/v8/credentials", Reason: "SQL Server Kerberos integrated auth requires gokrb5"},
-			{Imported: "github.com/jcmturner/gokrb5/v8/gssapi", Reason: "SQL Server Kerberos integrated auth requires gokrb5"},
-			{Imported: "github.com/jcmturner/gokrb5/v8/keytab", Reason: "SQL Server Kerberos integrated auth requires gokrb5"},
-			{Imported: "github.com/jcmturner/gokrb5/v8/spnego", Reason: "SQL Server Kerberos integrated auth requires gokrb5"},
+			{Imported: "github.com/jcmturner/gokrb5/v8", Reason: "SQL Server Kerberos integrated auth requires gokrb5"},
 			{Imported: "golang.org/x/crypto/md4", Reason: "SQL Server NTLM auth requires MD4; no FIPS-approved substitute"},
 		},
 	},
