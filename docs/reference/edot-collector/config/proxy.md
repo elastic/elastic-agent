@@ -1,6 +1,6 @@
 ---
 navigation_title: Proxy settings
-description: Configuration of the EDOT Collector's proxy settings.
+description: Configuration of the {{agent}}'s proxy settings.
 applies_to:
   stack:
   serverless:
@@ -13,9 +13,9 @@ products:
   - id: edot-collector
 ---
 
-# Configure proxy settings for EDOT components
+# Configure proxy settings for {{agent}} components
 
-When running Elastic Distributions of OpenTelemetry (EDOT) in environments that require outbound traffic to go through a proxy, you must explicitly configure proxy settings.
+When running the {{agent}} in environments that require outbound traffic to go through a proxy, you must explicitly configure proxy settings.
 
 You may need to configure a proxy if:
 
@@ -31,9 +31,9 @@ You may need to configure a proxy if:
 | HTTPS_PROXY  | URL of the proxy server for HTTPS requests  |
 | NO_PROXY     | Comma-separated list of hosts to exclude    |
 
-## Configure proxy settings for the EDOT Collector
+## Configure proxy settings for the {{agent}}
 
-Most EDOT components honor common proxy environment variables. The following examples show how to configure them:
+Most {{agent}} components honor common proxy environment variables. The following examples show how to configure them:
 
 ::::{tab-set}
 
@@ -77,9 +77,9 @@ Environment="NO_PROXY=<address1>,<address2>"
 ::::
 
 :::{{note}}
-For the EDOT Collector, proxy support applies to all exporters, including those using gRPC. No special configuration is needed beyond the environment variables.
+For the {{agent}}, proxy support applies to all exporters, including those using gRPC. No special configuration is needed beyond the environment variables.
 
-If you're using an SDK that doesn't support proxy variables directly, consider routing telemetry through an EDOT Collector configured with proxy settings. This ensures consistent proxy handling. For more information, refer to [Proxy settings for EDOT SDKs](docs-content://troubleshoot/ingest/opentelemetry/edot-sdks/proxy.md).
+If you're using an SDK that doesn't support proxy variables directly, consider routing telemetry through the {{agent}} configured with proxy settings. This ensures consistent proxy handling. For more information, refer to [Proxy settings for Elastic OTel SDKs](docs-content://troubleshoot/ingest/opentelemetry/edot-sdks/proxy.md).
 :::
 
 

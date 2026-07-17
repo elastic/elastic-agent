@@ -1,6 +1,6 @@
 ---
 navigation_title: Authentication methods
-description: Learn how to configure authentication for the EDOT Collector using API key authentication, bearer token authentication, and other security methods.
+description: Learn how to configure authentication for the {{agent}} using API key authentication, bearer token authentication, and other security methods.
 applies_to:
   stack: ga
   serverless: ga
@@ -12,24 +12,24 @@ products:
   - id: edot-collector
 ---
 
-# Authentication methods for the EDOT Collector
+# Authentication methods for the {{agent}}
 
-The {{edot}} Collector supports multiple authentication methods to secure connections and ensure only authorized clients can send telemetry data. This guide covers the available authentication extensions and how to configure them.
+The {{agent}} supports multiple authentication methods to secure connections and ensure only authorized clients can send telemetry data. This guide covers the available authentication extensions and how to configure them.
 
 ## Overview
 
-Authentication in the EDOT Collector is handled through extensions that implement the `extensionauth` interface. These extensions can be used to:
+Authentication in the {{agent}} is handled through extensions that implement the `extensionauth` interface. These extensions can be used to:
 
 - Authenticate incoming requests from SDKs and other collectors.
 - Authenticate outgoing requests to external services.
 
 ## Available authentication extensions
 
-The EDOT Collector supports the following authentication extensions:
+The {{agent}} supports the following authentication extensions:
 
 ### Elastic API key authentication (`apikeyauth`)
 
-The `apikeyauth` extension is an Elastic-specific authentication method that validates Elasticsearch API keys against your {{es}} cluster. This extension is ideal for authenticating requests from EDOT SDKs and other Collectors that use Elasticsearch API keys.
+The `apikeyauth` extension is an Elastic-specific authentication method that validates {{es}} API keys against your {{es}} cluster. This extension is ideal for authenticating requests from Elastic OTel SDKs and other Collectors that use {{es}} API keys.
 
 ### Bearer token authentication (`bearertokenauth`)
 
@@ -71,11 +71,11 @@ service:
   extensions: [apikeyauth]
 ```
 
-#### Using `apikeyauth` with EDOT SDKs and central configuration
+#### Using `apikeyauth` with Elastic OTel SDKs and central configuration
 
-The `apikeyauth` authenticator is also used by the `apmconfig` extension when EDOT SDKs retrieve central configuration from the EDOT Collector.
+The `apikeyauth` authenticator is also used by the `apmconfig` extension when Elastic OTel SDKs retrieve central configuration from the {{agent}}.
 
-EDOT SDKs send their own {{es}} API key to the Collector in the `Authorization` header (for example: `Authorization: ApiKey <Base64(id:key)>`).
+Elastic OTel SDKs send their own {{es}} API key to the Collector in the `Authorization` header (for example: `Authorization: ApiKey <Base64(id:key)>`).
 
 The Collector does not store or embed the API key. Instead, the `apikeyauth` extension validates the incoming key by calling {{es}} and checking that it has:
 
@@ -107,7 +107,7 @@ service:
   extensions: [apikeyauth]
 ```
 
-Use `resources: ["*"]` to grant read access for all APM services. A literal dash (`"-"`) is not valid.
+Use `resources: ["*"]` to grant read access for all {{product.apm}} services. A literal dash (`"-"`) is not valid.
 
 #### Configuration options
 
@@ -115,7 +115,7 @@ The following configuration options are available for the `apikeyauth` extension
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `endpoint` | string | The Elasticsearch endpoint for API key validation | Required |
+| `endpoint` | string | The {{es}} endpoint for API key validation | Required |
 | `application_privileges` | array | List of required application privileges and resources | Required |
 | `application_privileges.application` | string | Name of the application for which privileges are defined | `""` |
 | `application_privileges.privileges` | array | List of application-specific privileges that the API Key must have to be considered valid | `[]` |
@@ -183,9 +183,9 @@ The extension automatically monitors the token file for changes and reloads the 
 
 These use cases show how to configure the `apikeyauth` and `bearertokenauth` extensions for different scenarios.
 
-### Authenticating EDOT SDKs
+### Authenticating Elastic OTel SDKs
 
-When EDOT SDKs retrieve central configuration from the Collector, they authenticate using an {{es}} API key. The Collector validates this key using the `apikeyauth` extension.
+When Elastic OTel SDKs retrieve central configuration from the Collector, they authenticate using an {{es}} API key. The Collector validates this key using the `apikeyauth` extension.
 
 For example:
 
@@ -213,7 +213,7 @@ service:
 ```
 
 ::::{note}
-EDOT SDKs authenticate by sending their API key in the `Authorization` header. The EDOT Collector doesn't store the API key, it only validates it.
+Elastic OTel SDKs authenticate by sending their API key in the `Authorization` header. The {{agent}} doesn't store the API key, it only validates it.
 
 Ensure the API key has:
 
@@ -287,7 +287,7 @@ In general, be aware of the following security considerations:
 The following issues might occur.
 
 :::{dropdown} API key validation failures
-- Verify the Elasticsearch endpoint is accessible.
+- Verify the {{es}} endpoint is accessible.
 - Check API key permissions and application privileges.
 - Ensure the API key is valid and not expired.
 - Verify network connectivity and firewall rules.

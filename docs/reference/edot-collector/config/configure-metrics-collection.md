@@ -1,6 +1,6 @@
 ---
 navigation_title: Metrics collection
-description: Learn how to configure and customize metrics collection through the Elastic Distribution of OpenTelemetry Collector. 
+description: Learn how to configure and customize metrics collection through the {{agent}}. 
 applies_to:
   stack:
   serverless:
@@ -15,7 +15,7 @@ products:
 
 # Configure metrics collection
 
-Learn how to configure and customize metrics collection through the {{edot}} Collector. 
+Learn how to configure and customize metrics collection through the {{agent}}. 
 
 :::{note}
 {{es}} Ingest Pipelines are not yet applicable to OTel-native data. Use OTel Collector processing pipelines for pre-processing metrics.
@@ -23,7 +23,7 @@ Learn how to configure and customize metrics collection through the {{edot}} Col
 
 ## OTLP metrics
 
-Any application emitting metrics through OpenTelemetry Protocol (OTLP) can forward them to the EDOT Collector using the OTLP receiver. This is the recommended method for collecting application-level telemetry.
+Any application emitting metrics through OpenTelemetry Protocol (OTLP) can forward them to the {{agent}} using the OTLP receiver. This is the recommended method for collecting application-level telemetry.
 
 The following OTLP receiver configuration turns on both gRPC and HTTP protocols for incoming OTLP traffic:
 
@@ -205,14 +205,14 @@ Run a single instance of this receiver, for example as a Deployment, with suffic
 
 ## Other metrics
 
-The EDOT Collector supports a wide range of metrics receivers for popular software systems, including:
+The {{agent}} supports a wide range of metrics receivers for popular software systems, including:
 
  - Redis ([redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver)): Retrieve Redis INFO data from a single Redis instance.
 
- - JMX-based applications: The `jmxreceiver` was removed in EDOT Collector 9.4.0. Use [JMX Scraper](https://github.com/open-telemetry/opentelemetry-java-contrib/tree/main/jmx-scraper) as a standalone Java program instead. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
+ - JMX-based applications: The `jmxreceiver` was removed in {{agent}} 9.4.0. Use [JMX Scraper](https://github.com/open-telemetry/opentelemetry-java-contrib/tree/main/jmx-scraper) as a standalone Java program instead. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
 
  - Prometheus scrape targets ([prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)): Receives metric data in [Prometheus](https://prometheus.io/) format.
 
  - Kafka ([kafkareceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kafkareceiver)): Receives telemetry data from Kafka, with configurable topics and encodings.
 
-For a full list of supported receivers, see the EDOT Collector components [reference](/reference/edot-collector/components.md).
+For a full list of supported receivers, see the {{agent}} components [reference](/reference/edot-collector/components.md).

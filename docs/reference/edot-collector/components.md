@@ -1,6 +1,6 @@
 ---
 navigation_title: Components
-description: List of components included in the EDOT Collector, categorized as Core or Extended.
+description: List of components included in Elastic Agent, categorized as Core or Extended.
 applies_to:
   stack:
   serverless:
@@ -13,15 +13,15 @@ products:
   - id: edot-collector
 ---
 
-# Components included in the EDOT Collector
+# Components included in {{agent}}
 
-The {{edot}} (EDOT) Collector includes embedded Collector components from the [OTel Collector Core](https://github.com/open-telemetry/opentelemetry-collector),
+{{agent}} includes embedded Collector components from the [OTel Collector Core](https://github.com/open-telemetry/opentelemetry-collector),
 [OTel Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-contrib) and the [Elastic Collector Components](https://github.com/elastic/opentelemetry-collector-components) repositories.
 
-The components included in the EDOT Collector are categorized into **[Core]** and **[Extended]** components. The following table describes the current components included in the EDOT Collector, their source, and support status.
+The components are categorized into **[Core]** and **[Extended]**. The following table describes the current components, their source, and support status.
 
 ::::{note}
-Components marked as "Deprecated" in the table are retained in EDOT Collector 9.x to maintain backwards compatibility during the official deprecation window. If you're running EDOT Collector 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using these deprecated components as specified in the configuration for your Stack version. For more details, refer to [Configuration compatibility with {{product.elastic-stack}} versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions). To migrate your configuration to the new components, refer to [Migrate components](/reference/edot-collector/components/migrate-components.md).
+Components marked as "Deprecated" in the table are retained in {{agent}} 9.x to maintain backwards compatibility during the official deprecation window. If you're running {{agent}} 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using these deprecated components as specified in the configuration for your Stack version. For more details, refer to [Configuration compatibility with {{product.elastic-stack}} versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions). To migrate your configuration to the new components, refer to [Migrate components](/reference/edot-collector/components/migrate-components.md).
 ::::
 
 % The following table is automatically generated from the EDOT Collector source code.
@@ -142,12 +142,12 @@ These components are included in EDOT Collector version 9.4.3.
 
 [^2]: Deprecated in 9.2.0. Replaced by the `elasticapm` processor. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
 
-[^3]: The following features and configuration options are **NOT** officially supported in the EDOT Collector with the Kafka receiver:
+[^3]: The following features and configuration options are **NOT** officially supported in {{agent}} with the Kafka receiver:
 - Encoding options other than `otlp_proto` or `otlp_json`
 - Using the Sarama client (i.e. opting out of the `exporter.kafkaexporter.UseFranzGo` feature gate is not supported)
 - Partitioning configuration (i.e. `partition_*` options).
 
-[^4]: The following features and configuration options are **NOT** officially supported in the EDOT Collector with the Kafka receiver:
+[^4]: The following features and configuration options are **NOT** officially supported in {{agent}} with the Kafka receiver:
 - Encoding options other than `otlp_proto` or `otlp_json`
 - Using the Sarama client (i.e. opting out of the `exporter.kafkaexporter.UseFranzGo` feature gate is not supported)
 

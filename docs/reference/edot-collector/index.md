@@ -1,6 +1,6 @@
 ---
-navigation_title: EDOT Collector
-description: Introduction to the Elastic Distribution of OpenTelemetry (EDOT) Collector, a curated and supported distribution of the OpenTelemetry Collector.
+navigation_title: Elastic Agent
+description: Elastic Agent includes a built-in OpenTelemetry Collector for collecting and forwarding traces, metrics, and logs to Elastic Observability.
 applies_to:
   stack:
   serverless:
@@ -13,36 +13,40 @@ products:
   - id: edot-collector
 ---
 
-# Elastic Distribution of OpenTelemetry Collector
+# {{agent}}
 
-The {{edot}} (EDOT) Collector is an open-source distribution of the OpenTelemetry Collector. 
+:::{note}
+Starting with version 9.5, the EDOT Collector is part of {{agent}}. If you're on an earlier version, the product was called the EDOT Collector — the configuration and components are the same.
+:::
+
+{{agent}} includes a built-in OpenTelemetry Collector: an open-source distribution of the [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/).
 
 ## Get started
 
-To install the EDOT Collector with basic settings in your environment, follow the [quickstart guides](docs-content://solutions/observability/get-started/opentelemetry/quickstart/index.md).
+To install {{agent}} with basic settings in your environment, follow the [quickstart guides](docs-content://solutions/observability/get-started/opentelemetry/quickstart/index.md).
 
 ## Deployment modes
- 
-You can deploy the EDOT Collector in different modes to meet your architectural needs. The two primary Collector modes are Agent and Gateway. Depending on your Elastic deployment type, various EDOT Collector instances might be required in each mode to support the target architecture. Refer to [Deployment modes](/reference/edot-collector/modes.md) for more details.
 
-## Configure the Collector
+You can deploy {{agent}} in different modes to meet your architectural needs. The two primary modes are Agent and Gateway. Depending on your Elastic deployment type, various {{agent}} instances might be required in each mode to support the target architecture. Refer to [Deployment modes](/reference/edot-collector/modes.md) for more details.
 
-You can configure the EDOT Collector to use the standard OTel Collector configuration file or `values.yml` file if you have deployed it using Helm.
+## Configure
 
-For full details on each option, see [Configuration](/reference/edot-collector/config/index.md)
+You can configure {{agent}} to use the standard OTel Collector configuration file or `values.yml` file if you have deployed it using Helm.
 
-## Collector components
+For full details on each option, see [Configuration](/reference/edot-collector/config/index.md).
 
-Built on OpenTelemetry’s modular architecture, the EDOT Collector offers a curated and fully supported selection of components designed for production-grade reliability.
+## Components
 
-Refer to [Components](/reference/edot-collector/components.md) for the full list of components embedded in the EDOT Collector.
+Built on OpenTelemetry's modular architecture, {{agent}} offers a curated and fully supported selection of components designed for production-grade reliability.
 
-To request a component to be added to EDOT Collector, submit a [GitHub issue here](https://github.com/elastic/elastic-agent/issues/new/choose).
+Refer to [Components](/reference/edot-collector/components.md) for the full list of components included in {{agent}}.
 
-## Limitations 
+To request a component to be added, submit a [GitHub issue](https://github.com/elastic/elastic-agent/issues/new/choose).
 
-The EDOT Collector inherits the same limitations from the contrib components. Refer to [Limitations](opentelemetry://reference/compatibility/limitations.md) for a complete list.
+## Limitations
+
+{{agent}} inherits limitations from the contrib components it includes. Refer to [Limitations](opentelemetry://reference/compatibility/limitations.md) for a complete list.
 
 ## License
 
-For details on the EDOT Collector license, see the [LICENSE.txt](https://github.com/elastic/elastic-agent/blob/main/LICENSE.txt) file.
+For details on the license, see the [LICENSE.txt](https://github.com/elastic/elastic-agent/blob/main/LICENSE.txt) file.

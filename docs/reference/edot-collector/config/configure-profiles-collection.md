@@ -1,6 +1,6 @@
 ---
 navigation_title: Profiles collection
-description: Learn how to configure and customize profiles collection through the Elastic Distribution of OpenTelemetry Collector.
+description: Learn how to configure and customize profiles collection through the {{agent}}.
 applies_to:
   stack: preview 9.2+
   serverless:
@@ -14,7 +14,7 @@ products:
 
 # Configure profiles collection
 
-The {{edot}} (EDOT) Collector includes a profiling receiver, which offers an eBPF-based, system-wide profiler.
+The {{agent}} includes a profiling receiver, which offers an eBPF-based, system-wide profiler.
 
 To activate and configure profiling and send profiles to {{ecloud}} or {{es}}, follow these instructions.
 
@@ -26,13 +26,13 @@ OpenTelemetry profiling is still under active development. Refer to [The State o
 
 Follow these steps to turn on profiling.
 
-### Prepare Elasticsearch for profiling data
+### Prepare {{es}} for profiling data
 
-Before EDOT Collector ingests profiling data into Elasticsearch, make sure that [Universal Profiling](https://www.elastic.co/docs/solutions/observability/infra-and-hosts/get-started-with-universal-profiling#profiling-configure-data-ingestion) is configured for ingestion.
+Before {{agent}} ingests profiling data into {{es}}, make sure that [Universal Profiling](https://www.elastic.co/docs/solutions/observability/infra-and-hosts/get-started-with-universal-profiling#profiling-configure-data-ingestion) is configured for ingestion.
 
-### Configure and run EDOT Collector with profiling
+### Configure and run {{agent}} with profiling
 
-Follow these steps to configure profiles collection through the EDOT Collector.
+Follow these steps to configure profiles collection through the {{agent}}.
 
 ::::{applies-switch}
 
@@ -74,7 +74,7 @@ service:
 
 :::::{stepper}
 ::::{step} Activate profiling in the Collector
-To activate profiling in the EDOT Collector, start it using the additional argument `--feature-gates=service.profilesSupport`.
+To activate profiling in the {{agent}}, start it using the additional argument `--feature-gates=service.profilesSupport`.
 
 For example:
 
@@ -184,4 +184,4 @@ Two additional metrics are available but disabled by default:
 
 ## Kubernetes deployments
 
-In Kubernetes, we suggest deploying the EDOT Collector with a profiling receiver as a DaemonSet. This ensures comprehensive, node-level profiling across the entire cluster, providing consistent data collection, resilience, scalability, and simplified management. This approach is recommended for optimal performance and full observability.
+In Kubernetes, we suggest deploying the {{agent}} with a profiling receiver as a DaemonSet. This ensures comprehensive, node-level profiling across the entire cluster, providing consistent data collection, resilience, scalability, and simplified management. This approach is recommended for optimal performance and full observability.

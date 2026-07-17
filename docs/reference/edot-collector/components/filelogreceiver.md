@@ -18,9 +18,9 @@ The file log receiver ingests logs from local files and forwards them for proces
 The receiver supports multiline parsing, filtering, persistent tracking of file offsets, and routing based on file metadata or log content.
 
 
-## Default usage in EDOT
+## Default usage in {{agent}}
 
-The `filelogreceiver` is included by default in the EDOT Collector's Kubernetes Helm chart. It is preconfigured to collect logs from pod log files such as `/var/log/pods/*/*/*.log`, and uses the `file_storage` extension to track read positions and avoid duplicate ingestion after restarts.
+The `filelogreceiver` is included by default in {{agent}}'s Kubernetes Helm chart. It is preconfigured to collect logs from pod log files such as `/var/log/pods/*/*/*.log`, and uses the `file_storage` extension to track read positions and avoid duplicate ingestion after restarts.
 
 To view or customize the default configuration, refer to:
 
@@ -122,5 +122,5 @@ Like any component, file log receiver has some trade-offs and behaviors to be aw
 ## Resources
 
 * [Upstream component: filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/filelogreceiver/README.md)
-* [Configure logs collection in EDOT](../config/configure-logs-collection.md)
+* [Configure logs collection in {{agent}}](../config/configure-logs-collection.md)
 * [Helm chart default values](https://github.com/elastic/elastic-agent/blob/v9.1.4/deploy/helm/edot-collector/kube-stack/values.yaml)

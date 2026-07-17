@@ -1,6 +1,6 @@
 ---
 navigation_title: APM Config extension
-description: The APM Config extension is an OpenTelemetry Collector component that enables central configuration delivery for EDOT SDKs using the Open Agent Management Protocol (OpAMP).
+description: The APM Config extension is an OpenTelemetry Collector component that enables central configuration delivery for Elastic OTel SDKs using the Open Agent Management Protocol (OpAMP).
 applies_to:
   stack: ga
   serverless:
@@ -13,9 +13,9 @@ products:
 
 # APM Config extension
 
-The {{product.apm}} Config extension (`apmconfigextension`) enables central configuration for {{edot}} SDKs through the Open Agent Management Protocol (OpAMP). It establishes a control channel between the {{edot}} Collector and an OpAMP-enabled {{product.apm-server}} endpoint so that configuration updates can be retrieved and delivered dynamically to connected SDKs.
+The {{product.apm}} Config extension (`apmconfigextension`) enables central configuration for Elastic OTel SDKs through the Open Agent Management Protocol (OpAMP). It establishes a control channel between {{agent}} and an OpAMP-enabled {{product.apm-server}} endpoint so that configuration updates can be retrieved and delivered dynamically to connected SDKs.
 
-{applies_to}`stack: ga 9.1` This extension is required when using the [Central Configuration feature](docs-content://solutions/observability/apm/opentelemetry/edot-sdks-central-configuration.md) for {{edot}} SDKs.
+{applies_to}`stack: ga 9.1` This extension is required when using the [Central Configuration feature](docs-content://solutions/observability/apm/opentelemetry/edot-sdks-central-configuration.md) for Elastic OTel SDKs.
 
 For full contrib details, refer to the [OpenTelemetry `apmconfigextension` documentation](https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/apmconfigextension).
 
@@ -23,9 +23,9 @@ For full contrib details, refer to the [OpenTelemetry `apmconfigextension` docum
 
 The extension acts as an OpAMP client, opening a bidirectional control channel to the OpAMP endpoint exposed by {{product.apm-server}}. Through this channel:
 
-1. The Collector requests configuration bundles for connected {{edot}} SDKs.
+1. The Collector requests configuration bundles for connected Elastic OTel SDKs.
 2. The configuration server sends updates based on user changes in the Applications UI.
-3. Updated configuration is distributed to {{edot}} SDKs using OpAMP-supported mechanisms.
+3. Updated configuration is distributed to Elastic OTel SDKs using OpAMP-supported mechanisms.
 
 The extension does not modify telemetry or manage pipelines. Its sole purpose is configuration synchronization.
 
@@ -33,9 +33,9 @@ The extension does not modify telemetry or manage pipelines. Its sole purpose is
 
 Common scenarios where the {{product.apm}} Config extension is required:
 
-* Central configuration for {{edot}} SDKs. Enables dynamic updates to sampling, attribute collection, security settings, and custom SDK options.
+* Central configuration for Elastic OTel SDKs. Enables dynamic updates to sampling, attribute collection, security settings, and custom SDK options.
 
-* Standalone {{edot}} Collector deployments. The extension can connect directly to the {{product.apm-server}} OpAMP endpoint.
+* Standalone {{agent}} deployments. The extension can connect directly to the {{product.apm-server}} OpAMP endpoint.
 
 * Managing large fleets of instrumented services. Allows consistent and centralized control of SDK configuration without requiring application restarts.
 
@@ -47,7 +47,7 @@ Integration with {{fleet}} Server (Fleet OpAMP endpoint) is not available at thi
 
 The following examples show how to configure the {{product.apm}} Config extension for different deployment scenarios:
 
-### Standalone {{edot}} Collector
+### Standalone {{agent}}
 
 ```yaml
 extensions:
@@ -108,4 +108,4 @@ For the complete list of configuration options, refer to the [contrib `apmconfig
 
 * [Contrib component: apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/apmconfigextension)
 * [OpAMP specification](https://opentelemetry.io/docs/specs/opamp/)
-* [Central configuration for {{edot}} SDKs](docs-content://solutions/observability/apm/apm-agent-central-configuration.md)
+* [Central configuration for Elastic OTel SDKs](docs-content://solutions/observability/apm/apm-agent-central-configuration.md)

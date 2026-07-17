@@ -49,7 +49,7 @@ The exporter supports standard OpenTelemetry TLS configuration for secure connec
 The exporter uses the `otel` mapping mode by default. In this mode, the {{es}} Exporter stores documents in Elastic's preferred OTel-native schema. Documents use the original attribute names and closely follow the event structure from the OTLP events.
 
 :::{note}
-The exporter supports other mapping modes (`ecs`, `bodymap`, `none`, `raw`) through the `mapping::mode` setting, but configuring these modes is not officially supported by the EDOT Collector. In a future release, the configuration option will be removed in favor of automatic mode selection.
+The exporter supports other mapping modes (`ecs`, `bodymap`, `none`, `raw`) through the `mapping::mode` setting, but configuring these modes is not officially supported by {{agent}}. In a future release, the configuration option will be removed in favor of automatic mode selection.
 :::
 
 ## Document routing
@@ -148,7 +148,7 @@ stack: ga 9.0-9.1, deprecated =9.2, removed 9.3
 ```
 
 :::{warning}
-The `batcher` configuration is removed in {{edot}} Collector 9.3. Use `sending_queue::batch` instead.
+The `batcher` configuration is removed in {{agent}} 9.3. Use `sending_queue::batch` instead.
 :::
 
 Batching can be enabled and configured with the `batcher` section, using [common `batcher` settings](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/internal/queue_sender.go).
