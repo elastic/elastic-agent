@@ -19,11 +19,6 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
-if [ "${FIPS:-false}" == "true" ]; then
-  echo "~~~FIPS: Checking msft-go is installed"
-  GOEXPERIMENT=systemcrypto go version
-fi
-
 if [ "$TEST_SUDO" == "true" ]; then
   echo "Re-initializing ASDF. The user is changed to root..."
   export ASDF_DATA_DIR="/opt/buildkite-agent/.asdf"
@@ -34,6 +29,11 @@ fi
 
 # Make sure that all tools are installed
 retry 3 asdf install
+
+if [ "${FIPS:-false}" == "true" ]; then
+  echo "~~~FIPS: Checking msft-go is installed"
+  GOEXPERIMENT=systemcrypto go version
+fi
 
 echo "~~~ Running integration tests as $USER"
 
