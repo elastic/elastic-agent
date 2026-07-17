@@ -13,8 +13,9 @@
   },
   "packageRules": [
     {
-      "description": "Go modules: schedule, labels, and PR limit",
+      "description": "Go modules: schedule, labels, PR limit, and branch prefix",
       "matchManagers": ["gomod"],
+      "additionalBranchPrefix": "golang/",
       "schedule": ["on monday"],
       "prConcurrentLimit": 10
     },
