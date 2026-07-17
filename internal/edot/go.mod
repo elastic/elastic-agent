@@ -13,7 +13,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260716204719-92632adab392
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.46.2-0.20260717120524-f4b911dbb113
+	github.com/elastic/elastic-agent-libs v0.46.2-0.20260717131932-54519f16e2cb
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.62.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.62.0
