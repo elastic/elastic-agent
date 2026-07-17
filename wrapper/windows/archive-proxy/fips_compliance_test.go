@@ -12,8 +12,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/testing/fipsscan"
 )
 
-const binaryPkg = "github.com/elastic/elastic-agent/wrapper/windows/archive-proxy"
-
-func TestFIPSFullyCompliant(t *testing.T) {
-	fipsscan.CheckViolations(t, binaryPkg, binaryPkg, nil, nil)
+func TestFIPSCompliance(t *testing.T) {
+	fipsscan.CheckModule(t, "github.com/elastic/elastic-agent/wrapper/windows/archive-proxy", nil, nil)
 }

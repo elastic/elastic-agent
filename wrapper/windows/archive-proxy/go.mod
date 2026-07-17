@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.46.2-0.20260717072702-02294d812c7d
+	github.com/elastic/elastic-agent-libs v0.46.2-0.20260717093148-897085ab2c7b
 )
 
 require (
