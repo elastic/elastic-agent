@@ -17,7 +17,7 @@ The Elastic {{product.apm}} processor enriches OpenTelemetry trace data with Ela
 
 The processor works together with the [Elastic {{product.apm}} connector](elasticapmconnector.md), which generates pre-aggregated {{product.apm}} metrics from trace data.
 
-## Default usage in {{agent}}
+## Default usage in {{agent}} [default-usage-in-edot]
 
 The `elasticapmprocessor` is included by default in {{agent}} deployments that ingest trace data directly into {{es}}. It's not needed when using the [{{motlp}}](opentelemetry://reference/motlp.md), as the enrichment happens server-side.
 

@@ -69,7 +69,7 @@ The Daemonset collectors receive that data through [`OTLP`], batch the data ([`b
 
 The Gateway collectors pipelines differ between the two different deployment use cases, direct ingestion into {{es}} and using the [{{motlp}}](opentelemetry://reference/motlp.md).
 
-### Direct ingestion into {{es}}
+### Direct ingestion into {{es}} [direct-ingestion-into-elasticsearch]
 
 In self-managed and {{ech}} Stack deployment use cases, the main purpose of the Gateway Collector is the central enrichment of data before the OpenTelemetry data is being ingested directly into {{es}} using the [`elasticsearch`] exporter.
 

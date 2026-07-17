@@ -17,7 +17,7 @@ The Elastic {{product.apm}} connector generates pre-aggregated metrics from Open
 
 The connector works together with the [Elastic {{product.apm}} processor](elasticapmprocessor.md), which enriches OpenTelemetry traces with Elastic-specific attributes to ensure optimal compatibility with Elastic {{product.apm}} UIs.
 
-## Default usage in {{agent}}
+## Default usage in {{agent}} [default-usage-in-edot]
 
 The `elasticapm` connector is included by default in {{agent}} deployments that ingest trace data directly into {{es}}. It's not needed when using the [{{motlp}}](opentelemetry://reference/motlp.md), as the metric aggregation happens server-side.
 

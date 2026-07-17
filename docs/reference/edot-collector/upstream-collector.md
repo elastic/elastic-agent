@@ -30,7 +30,7 @@ The contrib OpenTelemetry Collector is the community-maintained version that pro
 
 The configuration requirements vary depending on your use case and the Elastic deployment model you want to send data to. The following sections outline what you need for each scenario.
 
-### {{serverless-full}}
+### {{serverless-full}} [elastic-cloud-serverless]
 
 {{serverless-full}} provides a [Managed OTLP Endpoint](opentelemetry://reference/motlp.md) that accepts OpenTelemetry data in its native format. This makes it the simplest scenario for using contrib components because scaling and signal processing (for example producing metrics from events) is handled by Elastic.
 
@@ -53,13 +53,13 @@ service:
       exporters: [otlp]
 ```
 
-### {{ech}}
+### {{ech}} [elastic-cloud-hosted-ech]
 
 Because {{motlp}} is not yet available for {{ech}}, you need to set up {{agent}} as a gateway, handling processing required for some use cases, like deriving metrics from events in {{product.apm}}, and writing data directly to {{es}}.
 
 Point your contrib Collector OTLP exporter to the {{agent}} gateway. Refer to [Gateway configuration](/reference/edot-collector/config/default-config-standalone.md#gateway-mode) for more information.
 
-### {{product.self}}
+### {{product.self}} [self-managed-elastic-stack]
 
 Self-managed deployments have similar requirements to {{ech}} but with your own {{es}} instance. The configuration is similar to {{ech}}. You also need to:
 

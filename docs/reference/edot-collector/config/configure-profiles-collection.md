@@ -26,11 +26,11 @@ OpenTelemetry profiling is still under active development. Refer to [The State o
 
 Follow these steps to turn on profiling.
 
-### Prepare {{es}} for profiling data
+### Prepare {{es}} for profiling data [prepare-elasticsearch-for-profiling-data]
 
 Before {{agent}} ingests profiling data into {{es}}, make sure that [Universal Profiling](https://www.elastic.co/docs/solutions/observability/infra-and-hosts/get-started-with-universal-profiling#profiling-configure-data-ingestion) is configured for ingestion.
 
-### Configure and run {{agent}} with profiling
+### Configure and run {{agent}} with profiling [configure-and-run-edot-collector-with-profiling]
 
 Follow these steps to configure profiles collection through the {{agent}}.
 

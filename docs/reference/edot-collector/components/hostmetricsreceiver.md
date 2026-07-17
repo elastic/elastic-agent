@@ -17,7 +17,7 @@ The host metrics receiver collects system-level metrics from the host machine, i
 
 The receiver uses a set of specialized scrapers to gather metrics from different subsystems, making it flexible enough to collect only the metrics you need.
 
-## Default usage in {{agent}}
+## Default usage in {{agent}} [default-usage-in-edot]
 
 The `hostmetricsreceiver` is included by default in {{agent}} for both standalone and Kubernetes deployments.
 

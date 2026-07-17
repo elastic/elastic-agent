@@ -427,7 +427,7 @@ receivers:
 
 This encrypts data between SDKs and the Collector over both gRPC and HTTP protocols.
 
-### Secure the connection between the {{agent}} and Elastic
+### Secure the connection between the {{agent}} and Elastic [secure-the-connection-between-the-edot-collector-and-elastic]
 
 After securing communication between the Elastic OTel SDKs and the `apmconfigextension`, you should secure the connection between the {{agent}} and {{es}} endpoints.
 

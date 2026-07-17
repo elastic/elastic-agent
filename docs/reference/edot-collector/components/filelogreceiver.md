@@ -18,7 +18,7 @@ The file log receiver ingests logs from local files and forwards them for proces
 The receiver supports multiline parsing, filtering, persistent tracking of file offsets, and routing based on file metadata or log content.
 
 
-## Default usage in {{agent}}
+## Default usage in {{agent}} [default-usage-in-edot]
 
 The `filelogreceiver` is included by default in {{agent}}'s Kubernetes Helm chart. It is preconfigured to collect logs from pod log files such as `/var/log/pods/*/*/*.log`, and uses the `file_storage` extension to track read positions and avoid duplicate ingestion after restarts.
 

@@ -13,7 +13,7 @@ products:
   - id: edot-collector
 ---
 
-# Components included in {{agent}}
+# Components included in {{agent}} [collector-components]
 
 {{agent}} includes embedded Collector components from the [OTel Collector Core](https://github.com/open-telemetry/opentelemetry-collector),
 [OTel Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-contrib) and the [Elastic Collector Components](https://github.com/elastic/opentelemetry-collector-components) repositories.

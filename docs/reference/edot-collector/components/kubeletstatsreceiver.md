@@ -77,7 +77,7 @@ The following configuration parameters determine how the Kubelet stats receiver 
 
 For all available settings, refer to the [contrib configuration documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver#configuration).
 
-## How it works in {{agent}}
+## How it works in {{agent}} [how-it-works-in-the-edot-collector]
 
 In {{agent}}, the Kubelet stats receiver is typically used when:
 

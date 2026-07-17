@@ -71,7 +71,7 @@ service:
   extensions: [apikeyauth]
 ```
 
-#### Using `apikeyauth` with Elastic OTel SDKs and central configuration
+#### Using `apikeyauth` with Elastic OTel SDKs and central configuration [using-apikeyauth-with-edot-sdks-and-central-configuration]
 
 The `apikeyauth` authenticator is also used by the `apmconfig` extension when Elastic OTel SDKs retrieve central configuration from the {{agent}}.
 
@@ -183,7 +183,7 @@ The extension automatically monitors the token file for changes and reloads the 
 
 These use cases show how to configure the `apikeyauth` and `bearertokenauth` extensions for different scenarios.
 
-### Authenticating Elastic OTel SDKs
+### Authenticating Elastic OTel SDKs [authenticating-edot-sdks]
 
 When Elastic OTel SDKs retrieve central configuration from the Collector, they authenticate using an {{es}} API key. The Collector validates this key using the `apikeyauth` extension.
 

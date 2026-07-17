@@ -19,7 +19,7 @@ You can deploy {{agent}} in different modes to meet your architectural needs. Th
 
 Use the information in the following sections to better understand deployment modes and patterns for your specific environment.
 
-## Agent mode
+## Agent mode [edot-collector-as-agent]
 
 In Agent mode, {{agent}} runs close to the data source, collecting telemetry data directly from the local environment. An instance in Agent mode usually runs on the same host or virtual machine as the application or infrastructure component it is monitoring, or as a sidecar container or daemonset in Kubernetes.
 
@@ -28,7 +28,7 @@ Use {{agent}} in Agent mode when:
 - You need to collect data directly from hosts or applications.
 - You have a deployment with a small number of hosts.
 
-## Gateway mode
+## Gateway mode [edot-collector-as-gateway]
 
 In Gateway mode, {{agent}} acts as a central aggregation point, receiving data from multiple Agent instances or instrumented applications before forwarding it to Elastic. The flexibility of Gateway mode allows {{agent}} to centralize the scaling needs and data transformation operations of the data pipeline.
 
@@ -84,7 +84,7 @@ This multi-tier architecture in Kubernetes provides an efficient way to collect 
 
 For more details on Kubernetes deployment architecture, see [Kubernetes environments](opentelemetry://reference/architecture/k8s.md).
 
-## Direct SDK to Managed OTLP (No Collector)
+## Direct SDK to Managed OTLP (No Collector) [direct-edot-sdk-to-managed-otlp-no-collector]
 
 In some scenarios, you don't need a Collector at all. Elastic OTel SDKs can send telemetry data directly to the [{{motlp}}](opentelemetry://reference/motlp.md). This is the simplest deployment pattern for getting application telemetry data into {{product.observability}}.
 

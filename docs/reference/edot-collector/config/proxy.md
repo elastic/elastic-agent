@@ -31,7 +31,7 @@ You may need to configure a proxy if:
 | HTTPS_PROXY  | URL of the proxy server for HTTPS requests  |
 | NO_PROXY     | Comma-separated list of hosts to exclude    |
 
-## Configure proxy settings for the {{agent}}
+## Configure proxy settings for the {{agent}} [configure-proxy-settings-for-the-edot-collector]
 
 Most {{agent}} components honor common proxy environment variables. The following examples show how to configure them:
 
