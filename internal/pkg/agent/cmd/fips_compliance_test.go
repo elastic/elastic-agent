@@ -14,34 +14,24 @@ import (
 
 var knownViolations = map[string]map[string][]fipsscan.KnownViolation{
 	"github.com/elastic/elastic-agent": {
-		// elastic/gokrb5 is an Elastic fork of jcmturner/gokrb5 and pulls in its
-		// jcmturner support packages (gofork, aescts) and x/crypto (md4, pbkdf2).
+		// elastic/gokrb5 is an Elastic fork of jcmturner/gokrb5 used for Kerberos auth.
 		"github.com/elastic/gokrb5/v8": {
-			{Importer: "github.com/elastic/gokrb5/v8/asn1tools", Imported: "github.com/jcmturner/gofork/encoding/asn1", Reason: "Elastic gokrb5 fork depends on jcmturner gofork for ASN.1 encoding"},
-			{Importer: "github.com/elastic/gokrb5/v8/config", Imported: "github.com/jcmturner/gofork/encoding/asn1", Reason: "Elastic gokrb5 fork depends on jcmturner gofork for ASN.1 encoding"},
-			{Importer: "github.com/elastic/gokrb5/v8/credentials", Imported: "github.com/jcmturner/gofork/encoding/asn1", Reason: "Elastic gokrb5 fork depends on jcmturner gofork for ASN.1 encoding"},
-			{Importer: "github.com/elastic/gokrb5/v8/crypto", Imported: "golang.org/x/crypto/md4", Reason: "Kerberos RC4-HMAC requires MD4; no FIPS-approved substitute"},
-			{Importer: "github.com/elastic/gokrb5/v8/crypto/rfc3962", Imported: "github.com/jcmturner/aescts/v2", Reason: "Elastic gokrb5 fork depends on jcmturner aescts for AES-CBC-CTS"},
-			{Importer: "github.com/elastic/gokrb5/v8/crypto/rfc3962", Imported: "github.com/jcmturner/gofork/x/crypto/pbkdf2", Reason: "Elastic gokrb5 fork depends on jcmturner gofork pbkdf2"},
-			{Importer: "github.com/elastic/gokrb5/v8/crypto/rfc4757", Imported: "golang.org/x/crypto/md4", Reason: "Kerberos RC4-HMAC requires MD4; no FIPS-approved substitute"},
-			{Importer: "github.com/elastic/gokrb5/v8/crypto/rfc8009", Imported: "github.com/jcmturner/aescts/v2", Reason: "Elastic gokrb5 fork depends on jcmturner aescts for AES-CBC-CTS"},
-			{Importer: "github.com/elastic/gokrb5/v8/crypto/rfc8009", Imported: "golang.org/x/crypto/pbkdf2", Reason: "Kerberos key derivation requires PBKDF2; x/crypto not FIPS-certified"},
-			{Importer: "github.com/elastic/gokrb5/v8/gssapi", Imported: "github.com/jcmturner/gofork/encoding/asn1", Reason: "Elastic gokrb5 fork depends on jcmturner gofork for ASN.1 encoding"},
-			{Importer: "github.com/elastic/gokrb5/v8/kadmin", Imported: "github.com/jcmturner/gofork/encoding/asn1", Reason: "Elastic gokrb5 fork depends on jcmturner gofork for ASN.1 encoding"},
-			{Importer: "github.com/elastic/gokrb5/v8/messages", Imported: "github.com/jcmturner/gofork/encoding/asn1", Reason: "Elastic gokrb5 fork depends on jcmturner gofork for ASN.1 encoding"},
-			{Importer: "github.com/elastic/gokrb5/v8/spnego", Imported: "github.com/jcmturner/gofork/encoding/asn1", Reason: "Elastic gokrb5 fork depends on jcmturner gofork for ASN.1 encoding"},
-			{Importer: "github.com/elastic/gokrb5/v8/types", Imported: "github.com/jcmturner/gofork/encoding/asn1", Reason: "Elastic gokrb5 fork depends on jcmturner gofork for ASN.1 encoding"},
+			{Imported: "github.com/jcmturner/gofork/encoding/asn1", Reason: "Elastic gokrb5 fork depends on jcmturner gofork for ASN.1 encoding"},
+			{Imported: "golang.org/x/crypto/md4", Reason: "Kerberos RC4-HMAC requires MD4; no FIPS-approved substitute"},
+			{Imported: "github.com/jcmturner/aescts/v2", Reason: "Elastic gokrb5 fork depends on jcmturner aescts for AES-CBC-CTS"},
+			{Imported: "github.com/jcmturner/gofork/x/crypto/pbkdf2", Reason: "Elastic gokrb5 fork depends on jcmturner gofork pbkdf2"},
+			{Imported: "golang.org/x/crypto/pbkdf2", Reason: "Kerberos key derivation requires PBKDF2; x/crypto not FIPS-certified"},
 		},
 		// artifact/download uses x/crypto/openpgp for GPG artifact signature verification.
 		"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download": {
-			{Importer: "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download", Imported: "golang.org/x/crypto/openpgp", Reason: "GPG signature verification of upgrade artifacts requires openpgp"},
+			{Imported: "golang.org/x/crypto/openpgp", Reason: "GPG signature verification of upgrade artifacts requires openpgp"},
 		},
 		// go-tpm-keyfiles uses x/crypto for TPM key file parsing (ChaCha20, HKDF, ASN.1).
 		"github.com/foxboron/go-tpm-keyfiles": {
-			{Importer: "github.com/foxboron/go-tpm-keyfiles", Imported: "golang.org/x/crypto/chacha20poly1305", Reason: "TPM key file parsing uses ChaCha20; no FIPS-certified alternative in go-tpm-keyfiles"},
-			{Importer: "github.com/foxboron/go-tpm-keyfiles", Imported: "golang.org/x/crypto/cryptobyte", Reason: "TPM key file parsing uses x/crypto ASN.1 utilities"},
-			{Importer: "github.com/foxboron/go-tpm-keyfiles", Imported: "golang.org/x/crypto/cryptobyte/asn1", Reason: "TPM key file parsing uses x/crypto ASN.1 utilities"},
-			{Importer: "github.com/foxboron/go-tpm-keyfiles", Imported: "golang.org/x/crypto/hkdf", Reason: "TPM key file parsing uses HKDF from x/crypto"},
+			{Imported: "golang.org/x/crypto/chacha20poly1305", Reason: "TPM key file parsing uses ChaCha20; no FIPS-certified alternative in go-tpm-keyfiles"},
+			{Imported: "golang.org/x/crypto/cryptobyte", Reason: "TPM key file parsing uses x/crypto ASN.1 utilities"},
+			{Imported: "golang.org/x/crypto/cryptobyte/asn1", Reason: "TPM key file parsing uses x/crypto ASN.1 utilities"},
+			{Imported: "golang.org/x/crypto/hkdf", Reason: "TPM key file parsing uses HKDF from x/crypto"},
 		},
 	},
 }
