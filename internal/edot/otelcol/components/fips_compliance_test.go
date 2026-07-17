@@ -19,73 +19,56 @@ var skipBinaries = []string{
 
 var knownViolations = map[string]map[string][]fipsscan.KnownViolation{
 	"github.com/elastic/elastic-agent/internal/edot": {
-		// fbreceiver (Beats Filebeat) pulls in non-FIPS crypto through its Azure
-		// Event Hubs input (AMQP/ADAL), Azure Blob Storage input, Active Directory
-		// entity analytics input (go-ldap/NTLM), and GCS input (s2a-go/ALTS).
+		// fbreceiver (Beats Filebeat): Azure Event Hubs/Blob Storage (pkcs12),
+		// Active Directory LDAP (NTLM/md4), GCS input (s2a-go/ALTS).
 		"github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver": {
-			{Imported: "golang.org/x/crypto/pkcs12", Reason: "Azure inputs (Event Hubs, Blob Storage) load PKCS#12 client certificates"},
+			{Imported: "golang.org/x/crypto", Reason: "Azure inputs (pkcs12), NTLM (md4), GCS s2a-go ALTS (chacha20, hkdf, cryptobyte)"},
 			{Imported: "github.com/Azure/go-ntlmssp", Reason: "Active Directory LDAP requires NTLM authentication"},
-			{Imported: "golang.org/x/crypto/md4", Reason: "NTLM authentication requires MD4; no FIPS-approved substitute"},
-			{Imported: "golang.org/x/crypto/chacha20poly1305", Reason: "GCS input pulls in s2a-go ALTS which uses ChaCha20-Poly1305"},
-			{Imported: "golang.org/x/crypto/cryptobyte", Reason: "GCS input pulls in s2a-go ALTS which uses x/crypto ASN.1 utilities"},
-			{Imported: "golang.org/x/crypto/hkdf", Reason: "GCS input pulls in s2a-go ALTS which uses HKDF for key derivation"},
 		},
 
-		// azureauthextension uses the Azure identity SDK for AAD authentication.
+		// azureauthextension: Azure identity SDK for AAD authentication.
 		"github.com/open-telemetry/opentelemetry-collector-contrib/extension/azureauthextension": {
-			{Imported: "golang.org/x/crypto/pkcs12", Reason: "Azure identity SDK loads PKCS#12 client certificates for AAD auth"},
+			{Imported: "golang.org/x/crypto", Reason: "Azure identity SDK loads PKCS#12 client certificates for AAD auth"},
 		},
 
-		// opampextension uses s2a-go (ALTS) for secure OpAMP connections.
+		// opampextension: s2a-go (ALTS) for secure OpAMP connections.
 		"github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension": {
-			{Imported: "golang.org/x/crypto/chacha20poly1305", Reason: "ALTS S2A record layer uses ChaCha20-Poly1305 for session encryption"},
-			{Imported: "golang.org/x/crypto/cryptobyte", Reason: "ALTS S2A record layer uses x/crypto ASN.1 utilities"},
-			{Imported: "golang.org/x/crypto/hkdf", Reason: "ALTS S2A record layer uses HKDF for session key derivation"},
+			{Imported: "golang.org/x/crypto", Reason: "ALTS S2A record layer uses ChaCha20-Poly1305, HKDF, cryptobyte"},
 		},
 
-		// apikeyauthextension uses x/crypto/pbkdf2 for APM API key derivation,
-		// and pulls in go-tpm-keyfiles via confighttp -> configtls.
+		// apikeyauthextension: PBKDF2 for APM API key derivation;
+		// go-tpm-keyfiles pulled in via confighttp -> configtls.
 		"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension": {
-			{Imported: "golang.org/x/crypto/pbkdf2", Reason: "APM API key derivation uses PBKDF2; x/crypto not FIPS-certified"},
-			{Imported: "golang.org/x/crypto/chacha20poly1305", Reason: "go-tpm-keyfiles (pulled via configtls) uses ChaCha20; no FIPS alternative"},
-			{Imported: "golang.org/x/crypto/cryptobyte", Reason: "go-tpm-keyfiles (pulled via configtls) uses x/crypto ASN.1 utilities"},
-			{Imported: "golang.org/x/crypto/cryptobyte/asn1", Reason: "go-tpm-keyfiles (pulled via configtls) uses x/crypto ASN.1 utilities"},
-			{Imported: "golang.org/x/crypto/hkdf", Reason: "go-tpm-keyfiles (pulled via configtls) uses HKDF from x/crypto"},
+			{Imported: "golang.org/x/crypto", Reason: "PBKDF2 for API key derivation; ChaCha20/HKDF/cryptobyte via go-tpm-keyfiles (configtls)"},
 		},
 
-		// beatsauthextension uses elastic/gokrb5 (Elastic's Kerberos fork) for
-		// Kerberos-based authentication in Beats components.
+		// beatsauthextension: elastic/gokrb5 fork for Kerberos auth.
 		"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension": {
-			{Imported: "github.com/jcmturner/gofork", Reason: "Elastic gokrb5 fork depends on jcmturner gofork (ASN.1, pbkdf2)"},
-			{Imported: "golang.org/x/crypto/md4", Reason: "Kerberos RC4-HMAC requires MD4; no FIPS-approved substitute"},
-			{Imported: "github.com/jcmturner/aescts", Reason: "Elastic gokrb5 fork depends on jcmturner aescts for AES-CBC-CTS"},
-			{Imported: "golang.org/x/crypto/pbkdf2", Reason: "Kerberos key derivation requires PBKDF2; x/crypto not FIPS-certified"},
+			{Imported: "github.com/jcmturner", Reason: "Elastic gokrb5 fork depends on jcmturner gofork (ASN.1, pbkdf2) and aescts (AES-CBC-CTS)"},
+			{Imported: "golang.org/x/crypto", Reason: "Kerberos RC4-HMAC (md4) and key derivation (pbkdf2); x/crypto not FIPS-certified"},
 		},
 
-		// kafkametricsreceiver uses internal/kafka and franz-go with Kerberos
-		// SASL (GSSAPI) and SCRAM SASL authentication.
+		// kafkametricsreceiver: Kerberos SASL (GSSAPI) and SCRAM SASL.
 		"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkametricsreceiver": {
 			{Imported: "github.com/jcmturner/gokrb5/v8", Reason: "Kafka Kerberos SASL (GSSAPI) requires gokrb5"},
-			{Imported: "golang.org/x/crypto/pbkdf2", Reason: "Kafka SCRAM SASL key derivation uses PBKDF2; x/crypto not FIPS-certified"},
+			{Imported: "golang.org/x/crypto", Reason: "Kafka SCRAM SASL key derivation uses PBKDF2; x/crypto not FIPS-certified"},
 		},
 
-		// mongodbreceiver uses mongo-driver with youmark/pkcs8 for encrypted keys
-		// and x/crypto/ocsp for certificate revocation.
+		// mongodbreceiver: encrypted PKCS#8 keys and OCSP revocation.
 		"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mongodbreceiver": {
 			{Imported: "github.com/youmark/pkcs8", Reason: "MongoDB TLS client auth with encrypted PKCS#8 keys requires youmark/pkcs8"},
-			{Imported: "golang.org/x/crypto/ocsp", Reason: "MongoDB OCSP certificate revocation checking uses x/crypto/ocsp"},
+			{Imported: "golang.org/x/crypto", Reason: "MongoDB OCSP certificate revocation checking uses x/crypto/ocsp"},
 		},
 
-		// mysqlreceiver uses go-sql-driver/mysql which requires filippo.io/edwards25519
-		// for the MySQL caching_sha2_password Ed25519 auth plugin.
+		// mysqlreceiver: Ed25519 auth plugin.
 		"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver": {
 			{Imported: "filippo.io/edwards25519", Reason: "MySQL Ed25519 auth plugin requires edwards25519; not available in FIPS stdlib"},
 		},
 
-		// sqlserverreceiver uses go-mssqldb with Kerberos integrated auth and NTLM.
+		// sqlserverreceiver: Kerberos integrated auth and NTLM.
 		"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver": {
 			{Imported: "github.com/jcmturner/gokrb5/v8", Reason: "SQL Server Kerberos integrated auth requires gokrb5"},
-			{Imported: "golang.org/x/crypto/md4", Reason: "SQL Server NTLM auth requires MD4; no FIPS-approved substitute"},
+			{Imported: "golang.org/x/crypto", Reason: "SQL Server NTLM auth requires MD4; no FIPS-approved substitute"},
 		},
 	},
 }
