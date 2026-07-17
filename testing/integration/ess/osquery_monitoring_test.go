@@ -7,8 +7,12 @@
 package ess
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -121,9 +125,6 @@ func (runner *OsqueryManagerRunner) TestLiveQueryRoutingNoSchedule() {
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(t, err, "could not get agent status")
 
-<<<<<<< HEAD
-func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
-=======
 	// Wait for the osquery component to become healthy in OTel mode.
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		status, statusErr := runner.agentFixture.ExecStatus(ctx)
@@ -181,7 +182,6 @@ func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
 }
 
 func (runner *OsqueryManagerRunner) TestOtelAndProcessMode() {
->>>>>>> 304a3d476 (Fix live OSQuery results being misrouted when in a policy with no scheduled queries (#15610))
 	t := runner.T()
 
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute*20)
@@ -207,7 +207,6 @@ func (runner *OsqueryManagerRunner) TestOtelAndProcessMode() {
 	// Switch to OTel runtime and validate the same data
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
-		otelSince := time.Now()
 		policyRevision := switchPolicyToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
 
 		// Wait for the agent to apply the new policy revision
@@ -233,11 +232,7 @@ func (runner *OsqueryManagerRunner) TestOtelAndProcessMode() {
 			assert.True(collect, foundReceiver, "expected an osquery component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
-<<<<<<< HEAD
-		otelDoc = runner.validateOsqueryEvents(t, ctx, agentStatus.Info.ID, otelSince)
-=======
 		otelDoc = runner.validateOsqueryEvents(t, ctx, agentStatus.Info.ID, testStart)
->>>>>>> 304a3d476 (Fix live OSQuery results being misrouted when in a policy with no scheduled queries (#15610))
 	})
 
 	// Compare documents from process and otel modes have the same keys
@@ -248,8 +243,6 @@ func (runner *OsqueryManagerRunner) TestOtelAndProcessMode() {
 		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields, "expected osquery document keys to be equal between process and otel modes")
 	})
 }
-<<<<<<< HEAD
-=======
 
 // switchOsquerybeatToProcessRuntime updates the given policy to override the
 // osquerybeat runtime to process and returns the new policy revision.
@@ -411,4 +404,3 @@ func doOsqueryRequest(ctx context.Context, client *kibana.Client, method, path s
 	}
 	return body, nil
 }
->>>>>>> 304a3d476 (Fix live OSQuery results being misrouted when in a policy with no scheduled queries (#15610))
