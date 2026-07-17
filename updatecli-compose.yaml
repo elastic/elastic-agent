@@ -6,6 +6,11 @@ policies:
     values:
       - .ci/updatecli/values.d/scm.yml
       - .ci/updatecli/values.d/ironbank.yml
+  - name: Handle default oblt-cli version
+    policy: ghcr.io/elastic/oblt-updatecli-policies/oblt-cli/version:0.4.0@sha256:2f7214fc2b20f67f2ad4a2dde969c37126e8a023f55361162d6b91996f211a49
+    values:
+      - .ci/updatecli/values.d/scm.yml
+      - .ci/updatecli/values.d/oblt-cli.yml
   - name: Update Updatecli policies
     policy: ghcr.io/updatecli/policies/autodiscovery/updatecli:0.10.0@sha256:588fb5b274c1e484198885723b5a67688416feeec414d41a33908826e448fd41
     values:
