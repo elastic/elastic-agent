@@ -78,6 +78,7 @@
     },
     {
       "description": "Disabled: beats (git submodule), sarama (manual path handling), OTel packages (own release cycle)",
+      "matchManagers": ["gomod"],
       "matchPackagePatterns": [
         "^github\\.com/elastic/beats/",
         "^github\\.com/elastic/sarama$",
