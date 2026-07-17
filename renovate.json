@@ -2,6 +2,12 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "baseBranches": ["main", "9.5", "9.4", "9.3", "8.19"],
+  "labels": [
+    "automation",
+    "skip-changelog",
+    "backport-skip",
+    "Team:Elastic-Agent-Control-Plane"
+  ],
   "pip_requirements": {
     "fileMatch": ["^docs/scripts/update-docs/"]
   },
@@ -10,11 +16,6 @@
       "description": "Go modules: schedule, labels, and PR limit",
       "matchManagers": ["gomod"],
       "schedule": ["on monday"],
-      "labels": [
-        "automation",
-        "skip-changelog",
-        "Team:Elastic-Agent-Control-Plane"
-      ],
       "prConcurrentLimit": 10
     },
     {
@@ -92,30 +93,20 @@
       "description": "GitHub Actions: weekly Sunday updates",
       "matchManagers": ["github-actions"],
       "schedule": ["on sunday"],
-      "labels": [
-        "automation",
-        "skip-changelog",
-        "Team:Elastic-Agent-Control-Plane"
-      ],
       "prConcurrentLimit": 10
     },
     {
       "description": "pip (docs/scripts/update-docs): weekly Monday updates",
       "matchManagers": ["pip_requirements"],
       "schedule": ["on monday"],
-      "labels": [
-        "automation",
-        "skip-changelog",
-        "Team:Docs",
-        "documentation"
-      ],
+      "addLabels": ["Team:Docs", "documentation"],
       "prConcurrentLimit": 5
     },
     {
       "description": "pre-commit: weekly Sunday updates",
       "matchManagers": ["pre-commit"],
       "schedule": ["on sunday"],
-      "labels": ["changelog:dependencies"],
+      "addLabels": ["changelog:dependencies"],
       "prConcurrentLimit": 5
     }
   ]
