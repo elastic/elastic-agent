@@ -22,7 +22,7 @@ var releaseWritablePrefixes = []string{
 }
 
 func isReleaseWritablePath(path string) bool {
-	if path == ".mergify.yml" {
+	if path == ".mergify.yml" || path == "README.md" {
 		return true
 	}
 	for _, prefix := range releaseWritablePrefixes {

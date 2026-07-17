@@ -134,4 +134,10 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	if cfg.ProjectRepo != "elastic-agent" {
 		t.Errorf("ProjectRepo = %s, want elastic-agent", cfg.ProjectRepo)
 	}
+	if cfg.NextProjectMinorVersion != "9.6.0" {
+		t.Errorf("NextProjectMinorVersion = %s, want 9.6.0", cfg.NextProjectMinorVersion)
+	}
+	if cfg.NextProjectMinorBranch != "9.6" {
+		t.Errorf("NextProjectMinorBranch = %s, want 9.6", cfg.NextProjectMinorBranch)
+	}
 }

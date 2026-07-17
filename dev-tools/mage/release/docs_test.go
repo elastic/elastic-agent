@@ -170,7 +170,7 @@ func TestIsReleaseWritablePath(t *testing.T) {
 		{path: "deploy/helm/elastic-agent/Chart.yaml", want: true},
 		{path: "testing/integration/k8s/testdata/elastic-agent-kustomize.yaml", want: true},
 		{path: ".mergify.yml", want: true},
-		{path: "README.md", want: false},
+		{path: "README.md", want: true},
 		{path: "../outside", want: false},
 	}
 

@@ -5,11 +5,14 @@
 package release
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"golang.org/x/sys/execabs"
 )
 
 func validateRepoRelativePath(path string) (string, error) {
@@ -39,6 +42,15 @@ func writeRepoFile(relPath string, content []byte) error {
 	}
 
 	return os.WriteFile(safePath, content, 0644) //nolint:gosec // safePath is validated and allowlisted for release automation files
+}
+
+// DocsUpdateOptions configures documentation and manifest updates.
+// Mirrors ingest-dev release_scripts/elastic-agent.mak update-docs (BASE/CURRENT/RELEASE).
+type DocsUpdateOptions struct {
+	BaseBranch     string
+	CurrentVersion string
+	ReleaseBranch  string
+	DocBranch      string // if empty, inferred per workflow
 }
 
 // UpdateVersion updates the version in version/version.go.
@@ -109,19 +121,131 @@ func UpdatePatchDocs(newVersion string) error {
 	return nil
 }
 
-// UpdateDocs updates version references in K8s manifests, Helm charts, and kustomize files.
+// UpdateDocs updates version references using release-branch defaults.
 func UpdateDocs(newVersion string) error {
+	releaseBranch := inferReleaseBranch(newVersion)
+	return UpdateDocsWithOptions(DocsUpdateOptions{
+		BaseBranch:     releaseBranch,
+		CurrentVersion: newVersion,
+		ReleaseBranch:  releaseBranch,
+	})
+}
+
+// UpdateDocsWithOptions updates asciidoc, K8s/Helm manifests, and docs URLs.
+// Mirrors ingest-dev elastic-agent.mak update-docs.
+func UpdateDocsWithOptions(opts DocsUpdateOptions) error {
+	if opts.CurrentVersion == "" {
+		return fmt.Errorf("CurrentVersion is required")
+	}
+	if opts.ReleaseBranch == "" {
+		opts.ReleaseBranch = inferReleaseBranch(opts.CurrentVersion)
+	}
+	if opts.BaseBranch == "" {
+		opts.BaseBranch = opts.ReleaseBranch
+	}
+
+	docBranch := opts.DocBranch
+	if docBranch == "" {
+		docBranch = opts.BaseBranch
+		if docBranch == "main" || docBranch == "current" {
+			docBranch = opts.ReleaseBranch
+		}
+	}
+
+	if err := updateAsciidocVersion(opts.CurrentVersion, docBranch); err != nil {
+		return err
+	}
+
 	files, err := collectDocFiles()
 	if err != nil {
 		return err
 	}
-
 	for _, file := range files {
-		if err := updateVersionInFile(file, newVersion); err != nil {
+		if err := updateVersionInFile(file, opts.CurrentVersion); err != nil {
 			return err
 		}
 	}
 
+	if err := rewriteBranchRefs("deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml", opts.BaseBranch, opts.ReleaseBranch); err != nil {
+		return err
+	}
+	if err := rewriteBranchRefs("README.md", opts.BaseBranch, opts.ReleaseBranch); err != nil {
+		return err
+	}
+
+	fmt.Printf("Updated documentation files to version %s\n", opts.CurrentVersion)
+	return nil
+}
+
+func updateAsciidocVersion(currentVersion, docBranch string) error {
+	safePath, err := validateRepoRelativePath(versionAsciidocPath)
+	if err != nil {
+		return err
+	}
+
+	content, err := os.ReadFile(safePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Printf("Skipping missing file %s\n", safePath)
+			return nil
+		}
+		return fmt.Errorf("failed to read %s: %w", safePath, err)
+	}
+
+	newContent := string(content)
+	newContent = regexp.MustCompile(`(:stack-version:\s*)`+semverCore).ReplaceAllString(newContent, `${1}`+currentVersion)
+	newContent = regexp.MustCompile(`(:doc-branch:\s*)\S+`).ReplaceAllString(newContent, `${1}`+docBranch)
+
+	if newContent == string(content) {
+		fmt.Printf("No asciidoc version changes needed in %s\n", safePath)
+		return nil
+	}
+
+	if err := writeRepoFile(safePath, []byte(newContent)); err != nil {
+		return fmt.Errorf("failed to write %s: %w", safePath, err)
+	}
+	fmt.Printf("Updated asciidoc version refs in %s\n", safePath)
+	return nil
+}
+
+func rewriteBranchRefs(relPath, baseBranch, releaseBranch string) error {
+	if baseBranch == "" || releaseBranch == "" || baseBranch == releaseBranch {
+		return nil
+	}
+
+	safePath, err := validateRepoRelativePath(relPath)
+	if err != nil {
+		return err
+	}
+
+	content, err := os.ReadFile(safePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Printf("Skipping missing file %s\n", safePath)
+			return nil
+		}
+		return fmt.Errorf("failed to read %s: %w", safePath, err)
+	}
+
+	var newContent string
+	switch safePath {
+	case "README.md":
+		re := regexp.MustCompile(regexp.QuoteMeta("/" + baseBranch + "/"))
+		newContent = re.ReplaceAllString(string(content), "/"+releaseBranch+"/")
+	default:
+		re := regexp.MustCompile(regexp.QuoteMeta(baseBranch))
+		newContent = re.ReplaceAllString(string(content), releaseBranch)
+	}
+
+	if newContent == string(content) {
+		fmt.Printf("No branch ref changes needed in %s\n", safePath)
+		return nil
+	}
+
+	if err := writeRepoFile(safePath, []byte(newContent)); err != nil {
+		return fmt.Errorf("failed to write %s: %w", safePath, err)
+	}
+	fmt.Printf("Updated branch refs in %s (%s → %s)\n", safePath, baseBranch, releaseBranch)
 	return nil
 }
 
@@ -155,6 +279,25 @@ func updateVersionInFile(filePath, newVersion string) error {
 	return nil
 }
 
+// RunMageUpdate runs 'mage update' in the repository (elastic-agent.mak update-project).
+func RunMageUpdate() error {
+	return runMageUpdate()
+}
+
+// runMageUpdate is the default implementation; tests may replace it.
+var runMageUpdate = func() error {
+	fmt.Println("Running 'mage update'...")
+	ctx := context.Background()
+	cmd := execabs.CommandContext(ctx, "mage", "update")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("mage update failed: %w", err)
+	}
+	fmt.Println("Completed 'mage update'")
+	return nil
+}
+
 // PrepareMajorMinorRelease updates version, docs, and mergify for a major/minor release.
 func PrepareMajorMinorRelease(cfg *ReleaseConfig) error {
 	fmt.Printf("=== Preparing Major/Minor Release %s ===\n", cfg.CurrentRelease)
@@ -162,7 +305,11 @@ func PrepareMajorMinorRelease(cfg *ReleaseConfig) error {
 	if err := UpdateVersion(cfg.CurrentRelease); err != nil {
 		return err
 	}
-	if err := UpdateDocs(cfg.CurrentRelease); err != nil {
+	if err := UpdateDocsWithOptions(DocsUpdateOptions{
+		BaseBranch:     cfg.BaseBranch,
+		CurrentVersion: cfg.CurrentRelease,
+		ReleaseBranch:  cfg.ReleaseBranch,
+	}); err != nil {
 		return err
 	}
 	if err := UpdateMergify(cfg.CurrentRelease); err != nil {

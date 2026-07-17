@@ -585,44 +585,21 @@ const Agent = defaultBeatVersion
 	}
 }
 
-func TestPatchDocsBranchName(t *testing.T) {
-	tests := []struct {
-		version string
-		want    string
-	}{
-		{version: "9.7.1", want: "update-docs-version-9.7.1"},
-		{version: "9.4.0", want: "update-docs-version-9.4.0"},
+func TestPatchPRBodies(t *testing.T) {
+	versionBody := patchVersionPRBody("9.7.1")
+	if !strings.Contains(versionBody, "9.7.1") {
+		t.Errorf("patchVersionPRBody() = %q, want version", versionBody)
+	}
+	if !strings.Contains(versionBody, "Merge before the final Release build") {
+		t.Errorf("patchVersionPRBody() = %q, want merge guidance", versionBody)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.version, func(t *testing.T) {
-			if got := patchDocsBranchName(tt.version); got != tt.want {
-				t.Errorf("patchDocsBranchName(%q) = %q, want %q", tt.version, got, tt.want)
-			}
-		})
+	docsBody := patchDocsPRBody("9.7.1")
+	if !strings.Contains(docsBody, "9.7.1") {
+		t.Errorf("patchDocsPRBody() = %q, want version", docsBody)
 	}
-}
-
-func TestPatchVersionBranchName(t *testing.T) {
-	if got := patchVersionBranchName("9.7.1"); got != "update-version-next-9.7.1" {
-		t.Errorf("patchVersionBranchName() = %q, want update-version-next-9.7.1", got)
-	}
-}
-
-func TestPatchVersionPRBody(t *testing.T) {
-	body := patchVersionPRBody("9.7.1", "9.7.0")
-	if !strings.Contains(body, "9.7.1") || !strings.Contains(body, "9.7.0") {
-		t.Errorf("patchVersionPRBody() = %q, want both versions", body)
-	}
-}
-
-func TestPatchReleasePRBody(t *testing.T) {
-	body := patchReleasePRBody("9.7.1")
-	if !strings.Contains(body, "9.7.1") {
-		t.Errorf("patchReleasePRBody() = %q, want to contain version", body)
-	}
-	if !strings.Contains(body, "Merge before the final Release build") {
-		t.Errorf("patchReleasePRBody() = %q, want merge guidance", body)
+	if !strings.Contains(docsBody, "Merge before the final Release build") {
+		t.Errorf("patchDocsPRBody() = %q, want merge guidance", docsBody)
 	}
 }
 

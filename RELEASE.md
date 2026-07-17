@@ -2,108 +2,84 @@
 
 Quick reference for running elastic-agent releases using mage automation.
 
+Feature-freeze and patch workflows are aligned with the former
+[`elastic-agent.mak`](https://github.com/elastic/ingest-dev/blob/main/release_scripts/elastic-agent.mak)
+/ vault-bot outputs, using the same grouped-PR and merge-timing label style as
+[elastic/beats#51831](https://github.com/elastic/beats/pull/51831).
+
 ## Prerequisites
 
 ```bash
-# Install mage (if not already installed)
 go install github.com/magefile/mage@latest
 
-# Configure environment
 export CURRENT_RELEASE="9.5.0"
 export GITHUB_TOKEN="ghp_your_token_here"
 ```
 
-## Major/Minor Release
+`CURRENT_RELEASE` must be plain `major.minor.patch` (no prerelease suffixes).
 
-### Automated (Recommended)
+## Feature freeze — `mage release:runMajorMinor`
+
+Creates the release branch and **4 merge-ordered PRs**.
+
+Example: `CURRENT_RELEASE=9.5.0` → branch `9.5`, next minor `9.6.0`, next patch `9.5.1`.
+
+| Step | Target | Branch | Merge label | Former outputs | What changes |
+|------|--------|--------|-------------|----------------|--------------|
+| 0 | — | `9.5` | — | branch push | Direct push from `main` |
+| **PR-A** | `main` | `ff-prep-main-9.5.0` | `merge:1-ff-day` | bump-version + add-backport | `.mergify.yml` + `version.go` → next minor + manifests |
+| **PR-B** | `9.5` | `ff-release-9.5.0` | `merge:2-after-branch` | release-branch content | version + docs + `mage update` |
+| **PR-C** | `main` | `ff-prep-main-docs-9.6.0` | `merge:3-after-images` | update-dev-docs | docs with `RELEASE=main` |
+| **PR-D** | `9.5` | `ff-prep-next-patch-9.5.1` | `merge:4-after-release` | update-version-next | `version.go` → next patch (+ `mage update`) |
 
 ```bash
-# Dry run first
-export CURRENT_RELEASE="9.5.0"
-export GITHUB_TOKEN="ghp_..."
+export PROJECT_OWNER="your-user"
+export GITHUB_TOKEN=$(gh auth token)
 export DRY_RUN=true
+export CURRENT_RELEASE="9.5.0"
+
 mage release:runMajorMinor
 
-# Review changes, then run for real
-export DRY_RUN=false
-mage release:runMajorMinor
+# Expect local branches:
+#   9.5, ff-prep-main-9.5.0, ff-release-9.5.0,
+#   ff-prep-main-docs-9.6.0, ff-prep-next-patch-9.5.1
 ```
 
-### Manual Steps
+## Patch release — `mage release:runPatch`
+
+Creates **3 merge-ordered PRs** on the release branch (no test-env PR; agent has none).
+
+Example: `CURRENT_RELEASE=9.4.3` → branch `9.4`, next patch `9.4.4`.
+
+| Step | Target | Branch | Merge label | Former outputs | What changes |
+|------|--------|--------|-------------|----------------|--------------|
+| **PR-A** | `9.4` | `update-version-9.4.3` | `merge:1-before-build` | version + manifests | `version.go` + deploy manifests |
+| **PR-B** | `9.4` | `update-docs-version-9.4.3` | `merge:1-before-build` | update-docs-version | `:stack-version:` in asciidoc |
+| **PR-D** | `9.4` | `ff-prep-next-patch-9.4.4` | `merge:4-after-release` | update-version-next | next patch version (+ `mage update`) |
+
+Labels on version/next PRs: `release`, `Team:Automation`, `skip-changelog` (+ merge label).
+Docs PR also gets `docs`, `in progress`.
 
 ```bash
-# 1. Start from a clean working tree (automation checks out main)
-export CURRENT_RELEASE="9.5.0"
-
-# 2. Create release branch from main, update files, and commit
-mage release:createBranch
-
-# 3. Push branch and create pull request
-mage release:createPR
-```
-
-## Patch Release
-
-### Automated (Recommended)
-
-```bash
-# Dry run first
-export CURRENT_RELEASE="9.4.1"
-export LATEST_RELEASE="9.4.0"
-export RELEASE_BRANCH="9.4"
-export GITHUB_TOKEN="ghp_..."
+export PROJECT_OWNER="your-user"
+export GITHUB_TOKEN=$(gh auth token)
 export DRY_RUN=true
+export CURRENT_RELEASE="9.4.3"
+
+git fetch origin 9.4:9.4
 mage release:runPatch
 
-# Review changes, then run for real
-export DRY_RUN=false
-mage release:runPatch
-```
-
-Creates two PRs into the release branch:
-- `update-version-next-9.4.1` — bumps `version/version.go` and deployment manifests ([example](https://github.com/elastic/elastic-agent/pull/14423))
-- `update-docs-version-9.4.1` — updates `:stack-version:` in `version/docs/version.asciidoc` ([example](https://github.com/elastic/elastic-agent/pull/15000))
-
-### Manual Steps
-
-```bash
-# PR 1: version bump
-export CURRENT_RELEASE="9.4.1"
-export RELEASE_BRANCH="9.4"
-git fetch origin 9.4
-git checkout -b update-version-next-9.4.1 origin/9.4
-mage release:updateVersion 9.4.1
-mage release:updateDocs 9.4.1
-git add -A && git commit -m "update version to 9.4.1"
-git push -u origin update-version-next-9.4.1
-gh pr create --base 9.4 --head update-version-next-9.4.1 \
-  --title "[Release] Update version to 9.4.1"
-
-# PR 2: docs only
-git checkout -b update-docs-version-9.4.1 origin/9.4
-mage release:updatePatchDocs 9.4.1
-git add -A && git commit -m "update docs version 9.4.1"
-git push -u origin update-docs-version-9.4.1
-gh pr create --base 9.4 --head update-docs-version-9.4.1 \
-  --title "docs: update docs versions 9.4.1"
+# Expect local branches:
+#   update-version-9.4.3, update-docs-version-9.4.3, ff-prep-next-patch-9.4.4
 ```
 
 ## Individual Commands
 
 ```bash
-# Update version only
 mage release:updateVersion 9.5.0
-
-# Update docs only
 mage release:updateDocs 9.5.0
-
-# Update patch docs only (version.asciidoc)
 mage release:updatePatchDocs 9.4.1
-
-# Update mergify only
 mage release:updateMergify 9.5.0
-
-# See all release commands
 mage -l | grep release
 ```
 
@@ -112,39 +88,20 @@ mage -l | grep release
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `CURRENT_RELEASE` | ✓ | - | Version to release (e.g., `9.5.0`) |
-| `GITHUB_TOKEN` | ✓ | - | GitHub personal access token |
-| `DRY_RUN` | | `false` | Preview mode (set to `true` to skip push/PR) |
-| `BASE_BRANCH` | | `main` | Base branch for PRs |
-| `PROJECT_OWNER` | | `elastic` | GitHub repository owner |
+| `GITHUB_TOKEN` | ✓* | - | GitHub token (*not required in `DRY_RUN`) |
+| `DRY_RUN` | | `false` | Preview mode (skip push/PR) |
+| `BASE_BRANCH` | | `main` | Base branch for mainline PRs |
+| `RELEASE_BRANCH` | | inferred | Release branch (`major.minor`) |
+| `NEXT_RELEASE` | | inferred | Next patch (`patch+1`) |
+| `NEXT_PROJECT_MINOR_VERSION` | | inferred | Next minor (`minor+1.0`) |
+| `LATEST_RELEASE` | | inferred | Previous patch (optional) |
+| `PROJECT_OWNER` | | `elastic` | GitHub owner |
 | `PROJECT_REPO` | | `elastic-agent` | Repository name |
 
-## Troubleshooting
+## Validation
 
-**"CURRENT_RELEASE environment variable not set"**
 ```bash
-export CURRENT_RELEASE="9.5.0"
+go test ./dev-tools/mage/release/... -count=1
 ```
 
-**"GITHUB_TOKEN environment variable not set"**
-```bash
-# Create token at: https://github.com/settings/tokens
-export GITHUB_TOKEN="ghp_..."
-```
-
-**"failed to create branch: reference already exists"**
-```bash
-# Delete existing branch
-git branch -D 9.5
-# Or checkout existing branch
-git checkout 9.5
-```
-
-## Full Documentation
-
-For detailed documentation, see [dev-tools/mage/release/README.md](dev-tools/mage/release/README.md)
-
-## Help
-
-- **Issues**: https://github.com/elastic/elastic-agent/issues
-- **Slack**: #ingest-team
-- **Migration Plan**: [specs/MIGRATION_PLAN_ELASTIC_AGENT.md](specs/MIGRATION_PLAN_ELASTIC_AGENT.md)
+Discard local workflow artifacts after review with `git reset --hard HEAD` / branch cleanup.
