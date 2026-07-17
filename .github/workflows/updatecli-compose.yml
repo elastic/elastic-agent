@@ -29,14 +29,7 @@ jobs:
 
       - uses: elastic/oblt-actions/updatecli/run@v1
         with:
-          command: --experimental compose diff
-          version-file: .updatecli-version
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: elastic/oblt-actions/updatecli/run@v1
-        with:
-          command: --experimental compose apply
+          command: compose apply
           version-file: .updatecli-version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
