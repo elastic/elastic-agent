@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -472,7 +473,7 @@ func requireFilesMatchExactly(t *testing.T, dirGlob string, patterns []string) {
 	all, err := filepath.Glob(filepath.Join(dirGlob, "*.ndjson"))
 	require.NoError(t, err)
 	for _, f := range all {
-		require.Truef(t, expected[f], "unexpected file %q", f)
+		assert.Truef(t, expected[f], "unexpected file %q", f)
 	}
 }
 

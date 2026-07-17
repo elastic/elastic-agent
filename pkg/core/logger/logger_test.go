@@ -93,9 +93,7 @@ func TestNewInMemory(t *testing.T) {
 func TestNewNamedLogger(t *testing.T) {
 	const name = "test-component"
 
-	tmp, err := os.MkdirTemp("", "TestNewNamedLogger*")
-	require.NoError(t, err)
-
+	tmp := t.TempDir()
 	topPath, logsPath := paths.Top(), paths.Logs()
 	paths.SetTop(tmp)
 	paths.SetLogs(filepath.Join(tmp, DefaultLogDirectory))
@@ -106,6 +104,7 @@ func TestNewNamedLogger(t *testing.T) {
 
 	log, err := NewNamedLogger(name, DefaultLoggingConfig(), DefaultEventLoggingConfig())
 	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, log.Close()) })
 
 	log.Info("normal message")
 	log.Infow("event message", logp.TypeKey, logp.EventType)

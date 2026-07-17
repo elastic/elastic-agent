@@ -187,7 +187,7 @@ func TestMonitoringConfigWatchesCollectorLog(t *testing.T) {
 	streamPaths, ok := paths[0].(map[string]any)["paths"].([]any)
 	require.True(t, ok, "expected paths to be a []any")
 
-	assert.Contains(t, streamPaths, filepath.Join(filepath.Dir(loggingPath("unit", "")), "elastic-otel-collector-*.ndjson"))
+	assert.Contains(t, streamPaths, filepath.Join(filepath.Dir(loggingPath("unit", "")), collectorName+"-*.ndjson"))
 }
 
 func TestMonitoringWithEndpoint(t *testing.T) {

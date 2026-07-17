@@ -7,6 +7,7 @@ package logger
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -270,8 +271,24 @@ func makeFileOutput(cfg *Config, levelEnabler zapcore.LevelEnabler) (zapcore.Cor
 	encoderConfig := ecszap.ECSCompatibleEncoderConfig(logp.JSONEncoderConfig())
 	encoderConfig.EncodeTime = UtcTimestampEncode
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
-	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, levelEnabler)), nil
+	return &closerCore{
+		Core:   ecszap.WrapCore(zapcore.NewCore(encoder, rotator, levelEnabler)),
+		closer: rotator,
+	}, nil
 }
+
+// closerCore pairs a log core with the file rotator that backs it so the
+// rotator is closed when the logger is closed.
+type closerCore struct {
+	zapcore.Core
+	closer io.Closer
+}
+
+func (c *closerCore) With(fields []zapcore.Field) zapcore.Core {
+	return &closerCore{Core: c.Core.With(fields), closer: c.closer}
+}
+
+func (c *closerCore) Close() error { return c.closer.Close() }
 
 // UtcTimestampEncode is a zapcore.TimeEncoder that formats time.Time in ISO-8601 in UTC.
 func UtcTimestampEncode(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
