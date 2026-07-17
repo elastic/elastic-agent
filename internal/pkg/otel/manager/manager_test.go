@@ -1108,6 +1108,114 @@ func TestOTelManager_PartialReceiverReload(t *testing.T) {
 		"collector performed a full service restart instead of a partial receiver reload")
 }
 
+// TestOTelManager_FullReloadWhenPartialReloadDisabled verifies that when partial
+// reload is disabled, a receiver-only config change triggers a full service
+// restart rather than a partial receiver reload.
+func TestOTelManager_FullReloadWhenPartialReloadDisabled(t *testing.T) {
+	wd, erWd := os.Getwd()
+	require.NoError(t, erWd, "cannot get working directory")
+
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
+	require.FileExists(t, testBinary, "testing binary not found")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	const waitTimeForStop = 30 * time.Second
+
+	base, obs := loggertest.New("otel")
+	l, _ := loggertest.New("otel-manager")
+
+	// Use an inner factory that explicitly disables partial reload.
+	innerFactory := func(collectorPath, healthCheckExtID string, healthCheckPort int) (collectorExecution, error) {
+		return newSubprocessExecution(collectorPath, healthCheckExtID, healthCheckPort, false)
+	}
+	factory, _ := testExecutionFactory(testBinary, innerFactory)
+	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, false)
+	require.NoError(t, err, "could not create otel manager")
+
+	go func() {
+		err := m.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+	}()
+	go func() {
+		for {
+			select {
+			case <-m.WatchCollector():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	countMsg := func(msg string) int {
+		n := 0
+		for _, entry := range obs.All() {
+			if strings.Contains(entry.Message, msg) {
+				n++
+			}
+		}
+		return n
+	}
+
+	// initial config: single nop receiver feeding a logs pipeline.
+	initialCfg := map[string]interface{}{
+		"receivers":  map[string]interface{}{"nop": map[string]interface{}{}},
+		"processors": map[string]interface{}{"batch": map[string]interface{}{}},
+		"exporters":  map[string]interface{}{"nop": map[string]interface{}{}},
+		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{"level": "none", "readers": []any{}},
+			},
+			"pipelines": map[string]interface{}{
+				"logs": map[string]interface{}{
+					"receivers":  []string{"nop"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"nop"},
+				},
+			},
+		},
+	}
+	m.Update(confmap.NewFromStringMap(initialCfg), nil, logp.InfoLevel, nil)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.Positive(collect, countMsg("Everything is ready. Begin running and processing data"),
+			"collector did not start")
+	}, 30*time.Second, 500*time.Millisecond)
+
+	// updated config: add a second nop receiver to the same logs pipeline.
+	// With partial reload disabled this must trigger a full service restart.
+	updatedCfg := map[string]interface{}{
+		"receivers": map[string]interface{}{
+			"nop":   map[string]interface{}{},
+			"nop/2": map[string]interface{}{},
+		},
+		"processors": map[string]interface{}{"batch": map[string]interface{}{}},
+		"exporters":  map[string]interface{}{"nop": map[string]interface{}{}},
+		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{"level": "none", "readers": []any{}},
+			},
+			"pipelines": map[string]interface{}{
+				"logs": map[string]interface{}{
+					"receivers":  []string{"nop", "nop/2"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"nop"},
+				},
+			},
+		},
+	}
+	restartsBeforeUpdate := countMsg("Config updated, restart service")
+	m.Update(confmap.NewFromStringMap(updatedCfg), nil, logp.InfoLevel, nil)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.Greater(collect, countMsg("Config updated, restart service"), restartsBeforeUpdate,
+			"collector did not perform a full service restart after config change with partial reload disabled")
+	}, 30*time.Second, 500*time.Millisecond)
+
+	assert.Equal(t, 0, countMsg("Config updated, performing partial receiver reload"),
+		"collector performed a partial receiver reload even though partial reload was disabled")
+}
+
 func TestOTelManager_Ports(t *testing.T) {
 	ports, err := findRandomTCPPorts(2)
 	require.NoError(t, err)

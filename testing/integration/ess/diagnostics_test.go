@@ -567,7 +567,8 @@ agent.internal.runtime.filebeat.httpjson: process
 					"edot/block.profile.gz",
 					"edot/mutex.profile.gz",
 					"edot/threadcreate.profile.gz",
-					"edot/otel-merged-actual.yaml")
+					"edot/otel-merged-actual.yaml",
+					"edot/environment.yaml")
 			}
 			if tc.monitoringEnabled {
 				// When OTel-based elasticsearch monitoring is active, the manager
@@ -667,6 +668,7 @@ agent.internal.runtime.filebeat.filestream: otel
 	// at the component level and land under the component directory, same as for process-runtime beats.
 	expectedFiles := []string{
 		"edot/otel-merged-actual.yaml",
+		"edot/environment.yaml",
 		"edot/allocs.profile.gz",
 		"edot/block.profile.gz",
 		"edot/goroutine.profile.gz",
@@ -815,7 +817,7 @@ func extractZipArchive(t *testing.T, zipFile string, dst string) {
 
 	t.Logf("extracting diagnostic archive in dir %q", dst)
 	for _, zf := range zReader.File {
-		filePath := filepath.Join(dst, zf.Name) //nolint:gosec // G305: validated against dst below before use
+		filePath := filepath.Join(dst, zf.Name) //nolint:gosec // G305: test file
 		t.Logf("unzipping file %q", filePath)
 		require.Truef(t, strings.HasPrefix(filePath, filepath.Clean(dst)+string(os.PathSeparator)), "file %q points outside of extraction dir %q", filePath, dst)
 
@@ -844,7 +846,7 @@ func extractSingleFileFromArchive(t *testing.T, src *zip.File, dst string) {
 
 	defer srcFile.Close()
 
-	_, err = io.Copy(dstFile, srcFile) //nolint:gosec // G110: extracting a diagnostics archive the test itself just generated, not untrusted input
+	_, err = io.Copy(dstFile, srcFile) //nolint:gosec // G110: test file
 	require.NoErrorf(t, err, "error copying content from zipped file %q to extracted file %q", src.Name, dst)
 }
 
