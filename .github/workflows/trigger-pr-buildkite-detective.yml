@@ -24,11 +24,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           count=$(gh api "repos/${{ github.repository }}/commits/${{ github.event.sha }}/pulls" \
-            --jq --arg repo "${{ github.repository }}" '
-              [.[] | select(
-                .state == "open" and
-                .base.repo.full_name == $repo
-              )] | length')
+            --jq '[.[] | select(.state == "open")] | length')
           if [ "$count" -gt 0 ]; then
             echo "has-open-pr=true" >> "$GITHUB_OUTPUT"
           else
