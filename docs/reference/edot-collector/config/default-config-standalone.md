@@ -54,7 +54,7 @@ Use the previous example configurations as a reference when configuring your con
 
 The following sections describe the default pipelines by use cases.
 
-### Direct ingestion into {{es}}
+### Direct ingestion into Elasticsearch
 
 For self-managed and {{ech}} stack deployment use cases, ingest OpenTelemetry data from the {{agent}} directly into {{es}} using the [`elasticsearch`] exporter.
 
@@ -65,7 +65,7 @@ The `elasticsearch` exporter comes with two relevant data ingestion modes:
 - `ecs`: Writes data in backwards compatible {{product.ecs}} format. Original attribute names and semantics might be lost during translation.
 - `otel`: OTel attribute names and semantics are preserved.
 
-The goal of the {{agent}} is to preserve OTel data formats and semantics as much as possible, so `otel` is the default mode for the {{agent}}. Some use cases might require data to be exported in ECS format for backwards compatibility.
+The goal of {{agent}} is to preserve OTel data formats and semantics as much as possible, so `otel` is the default mode for the {{agent}}. Some use cases might require data to be exported in ECS format for backwards compatibility.
 
 #### Logs collection pipeline
 
@@ -91,10 +91,10 @@ Application-related OTel data is ingested into {{es}} in OTel-native format usin
 Both the `elasticapm` processor and the `elasticapm` connector are required for Elastic APM UIs to work properly. As they aren't included in the OpenTelemetry [Collector Contrib repository](https://github.com/open-telemetry/opentelemetry-collector-contrib), you can:
 
 * Use the {{agent}} with the available configuration to ingest data into {{es}}.
-* [Build a custom, {{agent}}-like Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
+* [Build a custom Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
 * Use Elastic's [managed OTLP endpoint](docs-content://solutions/observability/get-started/opentelemetry/quickstart/serverless/index.md) that does the enrichment for you.
 
-If you're running {{agent}} 9.x with {{stack}} 8.18 or 8.19, use the deprecated `elastictrace` processor instead of `elasticapm` processor as specified in the configuration for your Stack version.
+If you're running {{agent}} 9.x with Elastic Stack 8.18 or 8.19, use the deprecated `elastictrace` processor instead of `elasticapm` processor as specified in the configuration for your Stack version.
 :::
 
 #### Host metrics collection pipeline
@@ -120,10 +120,6 @@ The `elasticinframetrics` processor is deprecated in {{agent}} 9.2 but is retain
 
 When ingesting OTel data through the [{{motlp}}](opentelemetry://reference/motlp.md), all the enrichment that is required for an optimal experience in the Elastic solutions happens at the endpoint level and is transparent to users.
 
-:::{note}
-The {{motlp}} is available only on {{ecloud}} ({{serverless-full}} and {{ech}}) and doesn't apply to self-managed deployments. For self-managed environments, use a Gateway Collector as described in [Forwarding to a self-managed Gateway Collector](#forwarding-to-a-self-managed-gateway-collector).
-:::
-
 The Collector configuration for all use cases that involve the {{motlp}} is only concerned with local data collection and context enrichment.
 
 Platform logs are scraped with the [`filelog`] receiver, host metrics are collected through the [`hostmetrics`] receiver and both signals are enriched with meta information through the [`resourcedetection`] processor.
@@ -131,51 +127,6 @@ Platform logs are scraped with the [`filelog`] receiver, host metrics are collec
 Data from OTel SDKs is piped through the [`OTLP`] receiver directly to the OTLP exporter that sends data for all signals to the {{motlp}}.
 
 With the {{motlp}}, there is no need to configure any Elastic-specific components, such as the [`elasticinframetrics`] and [`elasticapm`] processors, the [`elasticapm`] connector, or the [`elasticsearch`] exporter. Edge setup and configuration can be fully vendor agnostic.
-
-### Forwarding to a self-managed Gateway Collector
-
-When the {{motlp}} isn't an option (for example in self-managed Elastic deployments), the Collector can forward all signals to a self-managed Gateway Collector over OTLP instead.
-
-Like the {{motlp}} path, this approach keeps the edge configuration vendor-agnostic, meaning that no Elastic-specific components are required in the Agent Collector. Data enrichment and the authenticated export to {{es}} happen centrally at the Gateway Collector. For guidance on when to use a Gateway Collector and the required Gateway components for self-managed environments, refer to [Deployment modes](/reference/edot-collector/modes.md).
-
-The local-collection pipelines (receivers and processors) are the same as the {{motlp}} configuration. Only the exporter destination changes to targeting your own Gateway Collector's OTLP endpoint:
-
-```yaml
-exporters:
-  # Forward all signals to a self-managed Gateway Collector over OTLP/gRPC.
-  otlp/gateway:
-    endpoint: "gateway-host:4317"
-    tls:
-      insecure: false
-      ca_file: /path/to/gateway-ca.crt
-    # The exporter batches automatically using sending_queue (already tuned in the EDOT Collector).
-    # Refer to the "Batching configuration" section to customize.
-
-service:
-  pipelines:
-    logs:
-      receivers: [file_log/platformlogs, otlp/fromsdk]
-      processors: [resourcedetection]
-      exporters: [otlp/gateway]
-    metrics:
-      receivers: [hostmetrics/system, otlp/fromsdk]
-      processors: [resourcedetection]
-      exporters: [otlp/gateway]
-    traces:
-      receivers: [otlp/fromsdk]
-      processors: []
-      exporters: [otlp/gateway]
-```
-
-No `elasticsearch` exporter and no `elasticapm`/`elasticinframetrics` components are needed in the Agent Collector configuration, because the enrichment and the authenticated export to Elastic are the Gateway's responsibility. For configuring the receiving Gateway Collector, refer to the [Gateway Collector configuration](#gateway-mode) section.
-
-:::{note}
-With a self-managed Gateway, you own authentication (TLS/mTLS, or optionally the `apikeyauth` extension), scaling, and availability. Authentication to {{es}} is configured on the Gateway Collector, not on the Agent Collector, meaning that no Elastic API key is needed on the `otlp/gateway` exporter.
-
-The `sending_queue` batching tuning described in the [Batching configuration for contrib OpenTelemetry Collector](#batching-configuration-for-contrib-opentelemetry-collector) section applies to this OTLP output as well and is already included in the {{agent}}.
-:::
-
-For information on sending data from a non-{{agent}} upstream OpenTelemetry Collector to a {{agent}} Gateway, refer to [Send data from an upstream OpenTelemetry Collector](docs-content://solutions/observability/get-started/opentelemetry/use-cases/upstream-collector.md).
 
 ### Batching configuration for contrib OpenTelemetry Collector
 
@@ -200,7 +151,7 @@ otlp/ingest:
 The previous configuration leverages an in-memory queue and optimized batching defaults to improve throughput, minimize data loss, and maintain low end-to-end latency.
 
 :::{note}
-The previous configuration is already included in the {{agent}}.
+The previous configuration is already included in the {{edot}} Collector.
 :::
 
 ## Gateway mode
@@ -284,12 +235,12 @@ processors:
 :::{note}
 :applies_to: edot_collector: ga 9.2
 
-The `elasticapm` processor replaces the deprecated `elastictrace` processor. If you're running {{agent}} 9.x with {{stack}} 8.18 or 8.19, use the `elastictrace` processor and the `elasticinframetrics` processor as specified in the Gateway configuration for your Stack version.
+The `elasticapm` processor replaces the deprecated `elastictrace` processor. If you're running {{agent}} 9.x with Elastic Stack 8.18 or 8.19, use the `elastictrace` processor and the `elasticinframetrics` processor as specified in the Gateway configuration for your Stack version.
 :::
 
 ### Data export
 
-The Gateway exports data to {{es}} in two formats:
+The Gateway exports data to Elasticsearch in two formats:
 
 - OTel-native format using the `elasticsearch/otel` exporter.
 - Elastic Common Schema (ECS) format using the `elasticsearch/ecs` exporter.
@@ -317,7 +268,7 @@ Each pipeline connects specific receivers, processors, and exporters to handle d
 
 ## Central configuration
 
-The {{agent}} can be configured to use [{{product.apm-agent}} Central Configuration](docs-content://solutions/observability/apm/apm-agent-central-configuration.md). Refer to [Central configuration docs](opentelemetry://reference/central-configuration.md) for more details.
+The {{agent}} can be configured to use [APM Agent Central Configuration](docs-content://solutions/observability/apm/apm-agent-central-configuration.md). Refer to [Central configuration docs](opentelemetry://reference/central-configuration.md) for more details.
 
 To activate the central configuration feature, add the [`apmconfig`](https://github.com/elastic/opentelemetry-collector-components/blob/main/extension/apmconfigextension/README.md). For example:
 
@@ -394,7 +345,7 @@ extensions:
             authenticator: apikeyauth
 ```
 
-Create an API key with the minimum required application permissions through {{kib}} under **Observability** → **Applications** → **Settings** → **Agent Keys**, or by using the {{es}} Security API:
+Create an API key with the minimum required application permissions through {{kib}} under **Observability** → **Applications** → **Settings** → **Agent Keys**, or by using the Elasticsearch Security API:
 
 ::::{dropdown} Example JSON payload
 ```json
