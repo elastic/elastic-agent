@@ -319,11 +319,8 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("DEV=%v", cfg.Build.DevBuild),
 		"--env", fmt.Sprintf("EXTERNAL=%v", cfg.Build.ExternalBuild),
 		"--env", fmt.Sprintf("FIPS=%v", cfg.Build.FIPSBuild),
-<<<<<<< HEAD
 		"--env", fmt.Sprintf("OTEL_COMPONENT=%v", cfg.Build.OTELComponentBuild),
-=======
 		"--env", fmt.Sprintf("USE_PACKAGE_VERSION=%v", cfg.Packaging.UsePackageVersion),
->>>>>>> 7d1f73666 ([mage] Pass USE_PACKAGE_VERSION to crossbuild container (#15631))
 		"-v", repoInfo.RootDir+":"+mountPoint,
 	)
 
