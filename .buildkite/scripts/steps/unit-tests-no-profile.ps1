@@ -5,6 +5,29 @@
 # See https://github.com/elastic/elastic-agent/issues/15626
 $ErrorActionPreference = "Stop"
 
+# Reads a file that another process may have open for writing.
+# Returns $null if the file does not exist or cannot be read.
+function Read-LogFile([string]$path) {
+  if (-not (Test-Path $path)) { return $null }
+  try {
+    $fs = [System.IO.File]::Open($path, [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+    try {
+      $sr = New-Object System.IO.StreamReader($fs)
+      return $sr.ReadToEnd()
+    } finally {
+      $fs.Dispose()
+    }
+  } catch {
+    return $null
+  }
+}
+
+function Format-ExitCode($code) {
+  if ($null -eq $code) { return "<null>" }
+  return ("{0} (0x{1:X8})" -f $code, $code)
+}
+
 Write-Host "-- Fixing CRLF in git checkout --"
 git config core.autocrlf input
 git rm --quiet --cached -r .
@@ -96,10 +119,38 @@ mage unitTest 2>&1
 exit /b %ERRORLEVEL%
 "@ | Set-Content -Path $runner -Encoding ASCII
 
-Write-Host "--- Unit tests (as $username, no user profile)"
 $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
 $credential = New-Object System.Management.Automation.PSCredential(".\$username", $securePassword)
 
+# Before the real run, verify that a process can be started and produce output
+# as the test user at all. whoami /groups also shows whether UAC handed the
+# process a filtered token (Administrators marked "group used for deny only").
+Write-Host "--- Canary run as $username"
+Write-Host "parent session interactive: $([Environment]::UserInteractive)"
+$canaryOut = Join-Path $scratch "canary.log"
+$canaryErr = Join-Path $scratch "canary.err.log"
+$canary = Start-Process -FilePath "$env:SystemRoot\System32\cmd.exe" `
+  -ArgumentList @("/d", "/c", "whoami /groups") `
+  -Credential $credential -WorkingDirectory $scratch `
+  -RedirectStandardOutput $canaryOut -RedirectStandardError $canaryErr `
+  -PassThru
+if (-not $canary.WaitForExit(60000)) {
+  $canary.Kill()
+  throw "canary process did not exit within 60 seconds"
+}
+Write-Host "canary exit code: $(Format-ExitCode $canary.ExitCode)"
+Write-Host "canary stdout:"
+Write-Host (Read-LogFile $canaryOut)
+$canaryStderr = Read-LogFile $canaryErr
+if ($canaryStderr) {
+  Write-Host "canary stderr:"
+  Write-Host $canaryStderr
+}
+if ($canary.ExitCode -ne 0) {
+  throw "cannot run processes as $username, see canary output above"
+}
+
+Write-Host "--- Unit tests (as $username, no user profile)"
 $process = Start-Process -FilePath "$env:SystemRoot\System32\cmd.exe" `
   -ArgumentList @("/d", "/c", $runner) `
   -Credential $credential -WorkingDirectory $checkout `
@@ -110,31 +161,31 @@ $process = Start-Process -FilePath "$env:SystemRoot\System32\cmd.exe" `
 $offset = 0
 do {
   $exited = $process.WaitForExit(5000)
-  try {
-    if (Test-Path $stdoutLog) {
-      $content = Get-Content $stdoutLog -Raw -ErrorAction Stop
-      if ($content -and $content.Length -gt $offset) {
-        Write-Host $content.Substring($offset) -NoNewline
-        $offset = $content.Length
-      }
-    }
-  } catch {
-    # The log file can be transiently locked by the child process.
+  $content = Read-LogFile $stdoutLog
+  if ($content -and $content.Length -gt $offset) {
+    Write-Host $content.Substring($offset) -NoNewline
+    $offset = $content.Length
   }
 } until ($exited)
 
-if (Test-Path $stderrLog) {
-  $stderrContent = Get-Content $stderrLog -Raw
-  if ($stderrContent) {
-    Write-Host "--- stderr"
-    Write-Host $stderrContent
-  }
+$stderrContent = Read-LogFile $stderrLog
+if ($stderrContent) {
+  Write-Host "--- stderr"
+  Write-Host $stderrContent
 }
 
 $process.WaitForExit()
-$testsExitCode = $process.ExitCode
+$rawExitCode = $process.ExitCode
+Write-Host "--- Unit tests exited with code $(Format-ExitCode $rawExitCode)"
+foreach ($f in @($stdoutLog, $stderrLog)) {
+  if (Test-Path $f) {
+    Write-Host "$f : $((Get-Item $f).Length) bytes"
+  } else {
+    Write-Host "$f : missing"
+  }
+}
+$testsExitCode = $rawExitCode
 if ($null -eq $testsExitCode) { $testsExitCode = 1 }
-Write-Host "--- Unit tests exited with code $testsExitCode"
 
 net user $username /delete | Out-Null
 
