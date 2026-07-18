@@ -74,9 +74,9 @@ func TestExtension(t *testing.T) {
 	client := &http.Client{Transport: tr}
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		req, err := http.NewRequest(http.MethodGet, "http://localhost/diagnostics?cpu=true&cpuduration=5s", nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://localhost/diagnostics?cpu=true&cpuduration=5s", nil)
 		require.NoError(collect, err)
-		resp, err := client.Do(req.WithContext(context.Background()))
+		resp, err := client.Do(req)
 		require.NoError(collect, err)
 		require.Equal(collect, http.StatusOK, resp.StatusCode)
 
