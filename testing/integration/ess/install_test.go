@@ -14,6 +14,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -22,11 +23,11 @@ import (
 	"time"
 
 	"github.com/schollz/progressbar/v3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
@@ -581,7 +582,7 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 
 func testComponentsPresence(ctx context.Context, fixture *atesting.Fixture, requiredComponents []componentPresenceDefinition, unwantedComponents []componentPresenceDefinition) func(*testing.T) {
 	return func(t *testing.T) {
-		componentsDir, err := aTesting.FindComponentsDir(fixture.AgentDataDir(), fixture.Version())
+		componentsDir, err := atesting.FindComponentsDir(fixture.AgentDataDir(), fixture.Version())
 		require.NoError(t, err)
 
 		componentsPaths := func(component string) []string {
@@ -880,4 +881,145 @@ func randStr(length int) string {
 	}
 
 	return string(runes)
+}
+
+// Regression test for elastic-agent/issues/15626
+func TestInstalledServiceWithoutUserProfile(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+		},
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(15*time.Minute))
+	defer cancel()
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	require.NoError(t, fixture.Prepare(ctx))
+
+	config := `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+inputs: []
+agent.monitoring.enabled: false
+`
+	require.NoError(t, fixture.Configure(ctx, []byte(config)))
+
+	profileListKey := `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\S-1-5-18`
+
+	backup := filepath.Join(t.TempDir(), "profilelist-s-1-5-18.reg")
+	out, err := exec.CommandContext(ctx, "reg", "export", profileListKey, backup, "/y").CombinedOutput()
+	require.NoError(t, err, "failed to export ProfileList key: %s", out)
+	defer func() {
+		out, err := exec.CommandContext(t.Context(), "reg", "import", backup).CombinedOutput()
+		if err != nil {
+			t.Errorf("failed to restore ProfileList key: %v: %s", err, out)
+		}
+	}()
+
+	// Remove profile path value so LocalSystem has no resolvable profile.
+	out, err = exec.CommandContext(ctx, "reg", "delete", profileListKey, "/v", "ProfileImagePath", "/f").CombinedOutput()
+	require.NoError(t, err, "failed to delete ProfileImagePath: %s", out)
+	out, err = exec.CommandContext(ctx, "reg", "query", profileListKey, "/v", "ProfileImagePath").CombinedOutput()
+	require.Error(t, err, "ProfileImagePath must be absent for this test to be valid: %s", out)
+
+	opts := atesting.InstallOpts{
+		Privileged:     true,
+		Force:          true,
+		NonInteractive: true,
+	}
+	out, err = fixture.Install(ctx, &opts)
+	if err != nil {
+		t.Logf("install output: %s", out)
+		require.NoError(t, err)
+	}
+
+	checks := &installtest.CheckOpts{
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
+		TopPath:       installtest.DefaultTopPath(),
+	}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, checks))
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	})
+
+	serviceName := paths.ServiceName()
+
+	defer func() {
+		if t.Failed() {
+			out, err := exec.CommandContext(t.Context(), "sc", "query", serviceName).CombinedOutput()
+			t.Logf("service state (err=%v):\n%s", err, out)
+		}
+	}()
+
+	queryService := func() string {
+		out, err := exec.CommandContext(t.Context(), "sc", "query", serviceName).CombinedOutput()
+		if err != nil {
+			return fmt.Sprintf("sc query failed: %v: %s", err, out)
+		}
+		return string(out)
+	}
+
+	logPattern := filepath.Join(fixture.WorkDir(), "data", "elastic-agent-*", "logs", "elastic-agent-*.ndjson")
+	waitForHealthy := func(timeout time.Duration, failureMessage string) {
+		t.Helper()
+
+		var lastErr error
+		if assert.Eventually(t, func() bool {
+			lastErr = fixture.IsHealthy(ctx)
+			return lastErr == nil
+		}, timeout, 5*time.Second, failureMessage) {
+			return
+		}
+
+		t.Fatalf("%s\nlast status error: %v\nservice state:\n%s\nagent error logs:\n%s",
+			failureMessage, lastErr, queryService(), readAgentErrorLogs(logPattern, 20))
+	}
+
+	waitForHealthy(3*time.Minute, "agent did not become healthy with the profile unresolvable")
+
+	_, err = fixture.ExecDiagnostics(ctx)
+	require.NoError(t, err, "diagnostics collection failed")
+
+	require.NoError(t, fixture.ExecRestart(ctx), "daemon restart failed")
+	waitForHealthy(2*time.Minute, "agent did not become healthy again after restart")
+}
+
+func readAgentErrorLogs(pattern string, limit int) string {
+	matches, _ := filepath.Glob(pattern)
+	var lines []string
+	for _, match := range matches {
+		b, err := os.ReadFile(match)
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(b), "\n") {
+			if line == "" {
+				continue
+			}
+			var entry struct {
+				Timestamp string `json:"@timestamp"`
+				LogLevel  string `json:"log.level"`
+				Message   string `json:"message"`
+			}
+			if err := json.Unmarshal([]byte(line), &entry); err != nil || entry.LogLevel != "error" {
+				continue
+			}
+			lines = append(lines, fmt.Sprintf("%s %s", entry.Timestamp, entry.Message))
+			if len(lines) > limit {
+				lines = lines[len(lines)-limit:]
+			}
+		}
+	}
+	if len(lines) == 0 {
+		return "(no agent error logs found)"
+	}
+	return strings.Join(lines, "\n")
 }
