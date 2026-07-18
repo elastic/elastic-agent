@@ -179,6 +179,31 @@ steps:
         plugins:
           - *google_oidc_plugin
 
+      # Runs the unit tests as a local user without a profile directory to
+      # catch code that assumes one exists, e.g. os/user.Current().
+      # See https://github.com/elastic/elastic-agent/issues/15626
+      - label: "Unit tests - Windows 2022 (no user profile)"
+        key: "unit-tests-win2022-no-profile"
+        command: .buildkite/scripts/steps/unit-tests-no-profile.ps1
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_WIN_2022}"
+          machineType: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
       - label: "Unit tests - fips140=only Windows 2022"
         key: "unit-tests-win2022-fips140-only"
         command: .buildkite/scripts/steps/unit-tests.ps1
@@ -365,6 +390,8 @@ steps:
       - step: "unit-tests-win2022"
         allow_failure: true
       - step: "unit-tests-win2016"
+        allow_failure: true
+      - step: "unit-tests-win2022-no-profile"
         allow_failure: true
       - step: "macos-unit-tests"
         allow_failure: true
