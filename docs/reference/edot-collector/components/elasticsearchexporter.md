@@ -53,10 +53,14 @@ Refer to [Authentication methods for the EDOT Collector](/reference/edot-collect
 
 The API key used in the `api_key` setting authenticates bulk indexing requests to {{es}}. The key must have index-level privileges on the data streams that the exporter writes to.
 
-The EDOT Collector writes to OTel-native data streams by default: `logs-*-*`, `metrics-*-*`, and `traces-*-*`. The required index privileges are:
+For logs, metrics, and traces (the default signals) the EDOT Collector writes to OTel-native data streams matching `logs-*-*`, `metrics-*-*`, and `traces-*-*`. The required index privileges are:
 
 - `auto_configure`: Allows automatic creation and configuration of data stream templates.
 - `create_doc`: Allows writing documents using the Bulk API.
+
+:::{note}
+Profiling data requires [universal profiling](https://www.elastic.co/docs/solutions/observability/infra-and-hosts/get-started-with-universal-profiling#profiling-configure-data-ingestion) to be configured in {{es}} separately, which manages its own index setup and permissions. The following API key example covers logs, metrics, and traces only.
+:::
 
 Create the API key using the {{es}} Security API:
 
@@ -93,7 +97,7 @@ The exporter supports standard OpenTelemetry TLS configuration for secure connec
 
 #### {{ecloud}} and serverless
 
-For {{ecloud}} and {{serverless-full}}, TLS is enforced automatically and certificates are signed by a public CA trusted by default on most systems. Use `tls: insecure: false` (or omit the `tls` block entirely) and authenticate with an API key:
+For {{ecloud}} and {{serverless-full}}, TLS is enforced automatically and certificates are signed by a public CA trusted by default on most systems. You can omit the `tls` block entirely, or set it explicitly as shown:
 
 ```yaml subs=true
 exporters:
