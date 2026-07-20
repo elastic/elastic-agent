@@ -1,0 +1,140 @@
+version: 9.3.8
+entries:
+    - kind: bug-fix
+      summary: Fix duplicate entries, empty unit dirs, and EDOT error handling in OTel diagnostics
+      description: |
+        The OTel diagnostics ZIP no longer contains duplicate entries and no longer creates empty unit subdirectories. Components with no EDOT diagnostics no longer produce a spurious error in the archive. Also, an unexpected EDOT error used to abort the whole component-diagnostics request; now it is recorded per component so the diagnostics archive is still produced.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15531
+        - https://github.com/elastic/elastic-agent/pull/15542
+        - https://github.com/elastic/elastic-agent/pull/15595
+        - https://github.com/elastic/elastic-agent/pull/15627
+        - https://github.com/elastic/elastic-agent/pull/15573
+        - https://github.com/elastic/elastic-agent/pull/15665
+        - https://github.com/elastic/elastic-agent/pull/15671
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1782214855
+      file:
+        name: 1782214855-fix-duplicate-entries-and-empty-unit-dirs-in-otel-diagnostics-zip.yaml
+        checksum: 5cf663b946ff66bf443cc79bdeb915730f577d12
+    - kind: other
+      summary: Bump Node.js to 22.23.1 and npm to 11.18.0 in the Heartbeat synthetics Docker image.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15531
+        - https://github.com/elastic/elastic-agent/pull/15542
+        - https://github.com/elastic/elastic-agent/pull/15595
+        - https://github.com/elastic/elastic-agent/pull/15627
+        - https://github.com/elastic/elastic-agent/pull/15573
+        - https://github.com/elastic/elastic-agent/pull/15665
+        - https://github.com/elastic/elastic-agent/pull/15671
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1782833975
+      file:
+        name: 1782833975-bump-heartbeat-nodejs-22.23-npm-11.18.yaml
+        checksum: 9415858c9b9b4c53f18d83b440cc7debfbcb10aa
+    - kind: bug-fix
+      summary: Preserve locally-configured monitoring.http.host across Fleet policy check-ins
+      description: |
+        A regression introduced in 9.4.2 caused the agent's monitoring HTTP listener to rebind to the
+        default host (localhost) on every Fleet policy check-in, discarding any host configured locally
+        via agent.monitoring.http.host (e.g. 0.0.0.0). The policy-change handler now only applies
+        monitoring.http/pprof settings from the policy when they are explicitly present, leaving the
+        locally-configured values untouched otherwise.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15531
+        - https://github.com/elastic/elastic-agent/pull/15542
+        - https://github.com/elastic/elastic-agent/pull/15595
+        - https://github.com/elastic/elastic-agent/pull/15627
+        - https://github.com/elastic/elastic-agent/pull/15573
+        - https://github.com/elastic/elastic-agent/pull/15665
+        - https://github.com/elastic/elastic-agent/pull/15671
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1782932182
+      file:
+        name: 1782932182-preserve-locally-configured-monitoring.http.host-across-fleet-policy-check-ins.yaml
+        checksum: cf22cd730528fc3a736f17028e78dc34212b120e
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.155.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15531
+        - https://github.com/elastic/elastic-agent/pull/15542
+        - https://github.com/elastic/elastic-agent/pull/15595
+        - https://github.com/elastic/elastic-agent/pull/15627
+        - https://github.com/elastic/elastic-agent/pull/15573
+        - https://github.com/elastic/elastic-agent/pull/15665
+        - https://github.com/elastic/elastic-agent/pull/15671
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1782979541
+      file:
+        name: 1782979541-update-otel-components-to-v0.155.0.yaml
+        checksum: d1205e9f9c97cb5c48e5a1f21ec9cd67a95a9b9d
+    - kind: security
+      summary: Redact sensitive HTTP header values embedded in Fleet env vars in diagnostics archives
+      description: |
+        Diagnostics archives could expose authentication tokens when Fleet header environment
+        variables (such as FLEET_HEADER, FLEET_HEADERS, FLEET_KIBANA_HEADER, and
+        FLEET_KIBANA_HEADERS) contained sensitive HTTP header values. The diagnostics redaction
+        logic now expands and redacts individual header values within these variables.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15284
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1783056842
+      file:
+        name: 1783056842-redact-fleet-header-values-in-diagnostics-env-vars.yaml
+        checksum: 7a363ee772629a77aaa8c15465928fd37570b669
+    - kind: bug-fix
+      summary: Fix spurious "failed to unmarshal checkin actions" error on idle Fleet check-ins
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15531
+        - https://github.com/elastic/elastic-agent/pull/15542
+        - https://github.com/elastic/elastic-agent/pull/15595
+        - https://github.com/elastic/elastic-agent/pull/15627
+        - https://github.com/elastic/elastic-agent/pull/15573
+        - https://github.com/elastic/elastic-agent/pull/15665
+        - https://github.com/elastic/elastic-agent/pull/15671
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/15397
+      impact: ""
+      action: ""
+      timestamp: 1783412071
+      file:
+        name: 1783412071-fix-spurious-failed-to-unmarshal-checkin-actions-error-on-idle-fleet-check-ins.yaml
+        checksum: f3f7b3bc633fca8f0e0b5782e5f43ea16b48560e
+    - kind: bug-fix
+      summary: Override fleet.ssl.certificate_authorities from env vars in container mode
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15531
+        - https://github.com/elastic/elastic-agent/pull/15542
+        - https://github.com/elastic/elastic-agent/pull/15595
+        - https://github.com/elastic/elastic-agent/pull/15627
+        - https://github.com/elastic/elastic-agent/pull/15573
+        - https://github.com/elastic/elastic-agent/pull/15665
+        - https://github.com/elastic/elastic-agent/pull/15671
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1783541510
+      file:
+        name: 1783541510-container-fleet-ca-override.yaml
+        checksum: 6923d08d800b64d4a6741d668f92d0c020171524
