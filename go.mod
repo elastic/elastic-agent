@@ -4,9 +4,6 @@ go 1.26.5
 
 replace github.com/elastic/beats/v7 => ./beats
 
-// TODO: revert once https://github.com/elastic/elastic-agent-libs/pull/435 is merged.
-replace github.com/elastic/elastic-agent-libs => github.com/samuelvl/elastic-agent-libs v0.0.0-20260717201955-b55fd520949d
-
 require (
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/Microsoft/go-winio v0.6.2
@@ -22,7 +19,7 @@ require (
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-autodiscover v0.10.3
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-	github.com/elastic/elastic-agent-libs v0.46.1
+	github.com/elastic/elastic-agent-libs v0.46.2
 	github.com/elastic/elastic-agent-system-metrics v0.14.4
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-20260515154942-99dc973fd52e
