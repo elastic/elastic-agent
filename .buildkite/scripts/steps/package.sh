@@ -26,7 +26,7 @@ MAGE_TARGETS+=("fixDRADockerArtifacts")
 mage "${MAGE_TARGETS[@]}"
 
 echo  "+++ Generate dependencies report"
-BEAT_VERSION_FULL=$(curl -s -XGET "${MANIFEST_URL}" |jq '.version' -r )
+BEAT_VERSION_FULL=$(curl -sf --retry 5 --retry-delay 5 --retry-all-errors -XGET "${MANIFEST_URL}" |jq '.version' -r )
 bash "${_SELF}/../../../dev-tools/dependencies-report"
 mkdir -p build/distributions/reports
 mv dependencies.csv "build/distributions/reports/dependencies-${BEAT_VERSION_FULL}.csv"
