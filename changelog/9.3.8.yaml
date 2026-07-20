@@ -6,13 +6,7 @@ entries:
         The OTel diagnostics ZIP no longer contains duplicate entries and no longer creates empty unit subdirectories. Components with no EDOT diagnostics no longer produce a spurious error in the archive. Also, an unexpected EDOT error used to abort the whole component-diagnostics request; now it is recorded per component so the diagnostics archive is still produced.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15531
-        - https://github.com/elastic/elastic-agent/pull/15542
-        - https://github.com/elastic/elastic-agent/pull/15595
-        - https://github.com/elastic/elastic-agent/pull/15627
-        - https://github.com/elastic/elastic-agent/pull/15573
-        - https://github.com/elastic/elastic-agent/pull/15665
-        - https://github.com/elastic/elastic-agent/pull/15671
+        - https://github.com/elastic/elastic-agent/pull/15108
       issue: []
       impact: ""
       action: ""
@@ -25,13 +19,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15531
-        - https://github.com/elastic/elastic-agent/pull/15542
-        - https://github.com/elastic/elastic-agent/pull/15595
-        - https://github.com/elastic/elastic-agent/pull/15627
-        - https://github.com/elastic/elastic-agent/pull/15573
-        - https://github.com/elastic/elastic-agent/pull/15665
-        - https://github.com/elastic/elastic-agent/pull/15671
+        - https://github.com/elastic/elastic-agent/pull/15242
       issue: []
       impact: ""
       action: ""
@@ -49,13 +37,7 @@ entries:
         locally-configured values untouched otherwise.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15531
-        - https://github.com/elastic/elastic-agent/pull/15542
-        - https://github.com/elastic/elastic-agent/pull/15595
-        - https://github.com/elastic/elastic-agent/pull/15627
-        - https://github.com/elastic/elastic-agent/pull/15573
-        - https://github.com/elastic/elastic-agent/pull/15665
-        - https://github.com/elastic/elastic-agent/pull/15671
+        - https://github.com/elastic/elastic-agent/pull/15291
       issue: []
       impact: ""
       action: ""
@@ -68,13 +50,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15531
-        - https://github.com/elastic/elastic-agent/pull/15542
-        - https://github.com/elastic/elastic-agent/pull/15595
-        - https://github.com/elastic/elastic-agent/pull/15627
-        - https://github.com/elastic/elastic-agent/pull/15573
-        - https://github.com/elastic/elastic-agent/pull/15665
-        - https://github.com/elastic/elastic-agent/pull/15671
+        - https://github.com/elastic/elastic-agent/pull/15414
       issue: []
       impact: ""
       action: ""

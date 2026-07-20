@@ -5,7 +5,7 @@
 ### Features and enhancements [elastic-agent-9.3.8-features-enhancements]
 
 
-* Update OTel Collector components to v0.155.0. [#15531](https://github.com/elastic/elastic-agent/pull/15531) [#15542](https://github.com/elastic/elastic-agent/pull/15542) [#15595](https://github.com/elastic/elastic-agent/pull/15595) [#15627](https://github.com/elastic/elastic-agent/pull/15627) [#15573](https://github.com/elastic/elastic-agent/pull/15573) [#15665](https://github.com/elastic/elastic-agent/pull/15665) [#15671](https://github.com/elastic/elastic-agent/pull/15671) 
+* Update OTel Collector components to v0.155.0. [#15414](https://github.com/elastic/elastic-agent/pull/15414) 
 
 
 ### Fixes [elastic-agent-9.3.8-fixes]
@@ -18,11 +18,11 @@
   FLEET_KIBANA_HEADERS) contained sensitive HTTP header values. The diagnostics redaction
   logic now expands and redacts individual header values within these variables.
   
-* Fix duplicate entries, empty unit dirs, and EDOT error handling in OTel diagnostics. [#15531](https://github.com/elastic/elastic-agent/pull/15531) [#15542](https://github.com/elastic/elastic-agent/pull/15542) [#15595](https://github.com/elastic/elastic-agent/pull/15595) [#15627](https://github.com/elastic/elastic-agent/pull/15627) [#15573](https://github.com/elastic/elastic-agent/pull/15573) [#15665](https://github.com/elastic/elastic-agent/pull/15665) [#15671](https://github.com/elastic/elastic-agent/pull/15671) 
+* Fix duplicate entries, empty unit dirs, and EDOT error handling in OTel diagnostics. [#15108](https://github.com/elastic/elastic-agent/pull/15108) 
 
   The OTel diagnostics ZIP no longer contains duplicate entries and no longer creates empty unit subdirectories. Components with no EDOT diagnostics no longer produce a spurious error in the archive. Also, an unexpected EDOT error used to abort the whole component-diagnostics request; now it is recorded per component so the diagnostics archive is still produced.
   
-* Preserve locally-configured monitoring.http.host across Fleet policy check-ins. [#15531](https://github.com/elastic/elastic-agent/pull/15531) [#15542](https://github.com/elastic/elastic-agent/pull/15542) [#15595](https://github.com/elastic/elastic-agent/pull/15595) [#15627](https://github.com/elastic/elastic-agent/pull/15627) [#15573](https://github.com/elastic/elastic-agent/pull/15573) [#15665](https://github.com/elastic/elastic-agent/pull/15665) [#15671](https://github.com/elastic/elastic-agent/pull/15671) 
+* Preserve locally-configured monitoring.http.host across Fleet policy check-ins. [#15291](https://github.com/elastic/elastic-agent/pull/15291) 
 
   A regression introduced in 9.4.2 caused the agent&#39;s monitoring HTTP listener to rebind to the
   default host (localhost) on every Fleet policy check-in, discarding any host configured locally
