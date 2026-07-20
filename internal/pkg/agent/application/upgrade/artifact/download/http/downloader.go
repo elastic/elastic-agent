@@ -16,12 +16,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	pkgdownload "github.com/elastic/elastic-agent/pkg/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
@@ -160,7 +162,11 @@ func (e *Downloader) downloadFile(ctx context.Context, sourceURI, targetPath str
 
 	if resp.StatusCode != 200 {
 		// return path, file already exists and needs to be cleaned up
-		return targetPath, errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", sourceURI, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		httpErr := errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", sourceURI, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		if pkgdownload.IsPermanentDownloadError(resp.StatusCode) {
+			return targetPath, backoff.Permanent(httpErr)
+		}
+		return targetPath, httpErr
 	}
 
 	fileSize := -1
