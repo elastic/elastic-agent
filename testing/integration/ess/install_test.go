@@ -26,7 +26,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
@@ -583,7 +582,7 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 
 func testComponentsPresence(ctx context.Context, fixture *atesting.Fixture, requiredComponents []componentPresenceDefinition, unwantedComponents []componentPresenceDefinition) func(*testing.T) {
 	return func(t *testing.T) {
-		componentsDir, err := aTesting.FindComponentsDir(fixture.AgentDataDir(), fixture.Version())
+		componentsDir, err := atesting.FindComponentsDir(fixture.AgentDataDir(), fixture.Version())
 		require.NoError(t, err)
 
 		componentsPaths := func(component string) []string {
