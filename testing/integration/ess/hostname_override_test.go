@@ -81,7 +81,7 @@ func TestHostnameEnvOverride(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+		cleanupCtx, cleanupCancel := context.WithTimeout(t.Context(), time.Minute)
 		defer cleanupCancel()
 
 		t.Log("Un-enrolling Elastic Agent...")
