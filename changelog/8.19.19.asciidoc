@@ -1,0 +1,50 @@
+// begin 8.19.19 relnotes
+
+[[release-notes-8.19.19]]
+==  8.19.19
+
+Review important information about the  8.19.19 release.
+
+[discrete]
+[[security-updates-8.19.19]]
+=== Security updates
+
+
+
+
+* Redact sensitive HTTP header values embedded in Fleet env vars in diagnostics archives. https://github.com/elastic/elastic-agent/pull/15284[#15284] 
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.19.19]]
+=== Enhancements
+
+
+
+
+* Update OTel Collector components to v0.155.0. https://github.com/elastic/elastic-agent/pull/15451[#15451] https://github.com/elastic/elastic-agent/pull/15529[#15529] https://github.com/elastic/elastic-agent/pull/15595[#15595] https://github.com/elastic/elastic-agent/pull/15627[#15627] https://github.com/elastic/elastic-agent/pull/15573[#15573] https://github.com/elastic/elastic-agent/pull/15663[#15663] https://github.com/elastic/elastic-agent/pull/15669[#15669] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.19]]
+=== Bug fixes
+
+
+
+
+* Fix duplicate entries, empty unit dirs, and EDOT error handling in OTel diagnostics. https://github.com/elastic/elastic-agent/pull/15451[#15451] https://github.com/elastic/elastic-agent/pull/15529[#15529] https://github.com/elastic/elastic-agent/pull/15595[#15595] https://github.com/elastic/elastic-agent/pull/15627[#15627] https://github.com/elastic/elastic-agent/pull/15573[#15573] https://github.com/elastic/elastic-agent/pull/15663[#15663] https://github.com/elastic/elastic-agent/pull/15669[#15669] 
+* Preserve locally-configured monitoring.http.host across Fleet policy check-ins. https://github.com/elastic/elastic-agent/pull/15451[#15451] https://github.com/elastic/elastic-agent/pull/15529[#15529] https://github.com/elastic/elastic-agent/pull/15595[#15595] https://github.com/elastic/elastic-agent/pull/15627[#15627] https://github.com/elastic/elastic-agent/pull/15573[#15573] https://github.com/elastic/elastic-agent/pull/15663[#15663] https://github.com/elastic/elastic-agent/pull/15669[#15669] 
+* Fix spurious &#34;failed to unmarshal checkin actions&#34; error on idle Fleet check-ins. https://github.com/elastic/elastic-agent/pull/15451[#15451] https://github.com/elastic/elastic-agent/pull/15529[#15529] https://github.com/elastic/elastic-agent/pull/15595[#15595] https://github.com/elastic/elastic-agent/pull/15627[#15627] https://github.com/elastic/elastic-agent/pull/15573[#15573] https://github.com/elastic/elastic-agent/pull/15663[#15663] https://github.com/elastic/elastic-agent/pull/15669[#15669] https://github.com/elastic/elastic-agent/issues/15397[#15397]
+* Override fleet.ssl.certificate_authorities from env vars in container mode. https://github.com/elastic/elastic-agent/pull/15451[#15451] https://github.com/elastic/elastic-agent/pull/15529[#15529] https://github.com/elastic/elastic-agent/pull/15595[#15595] https://github.com/elastic/elastic-agent/pull/15627[#15627] https://github.com/elastic/elastic-agent/pull/15573[#15573] https://github.com/elastic/elastic-agent/pull/15663[#15663] https://github.com/elastic/elastic-agent/pull/15669[#15669] 
+
+// end 8.19.19 relnotes
