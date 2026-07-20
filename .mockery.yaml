@@ -4,6 +4,7 @@ template: testify
 filename: mocks.go
 template-data:
   unroll-variadic: true
+  boilerplate-file: dev-tools/licenses/ELASTIC-LICENSE-2.0-header.txt
 packages:
   github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers:
     interfaces:
