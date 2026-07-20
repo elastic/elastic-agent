@@ -30,6 +30,6 @@
   monitoring.http/pprof settings from the policy when they are explicitly present, leaving the
   locally-configured values untouched otherwise.
   
-* Fix spurious &#34;failed to unmarshal checkin actions&#34; error on idle Fleet check-ins. [#15531](https://github.com/elastic/elastic-agent/pull/15531) [#15542](https://github.com/elastic/elastic-agent/pull/15542) [#15595](https://github.com/elastic/elastic-agent/pull/15595) [#15627](https://github.com/elastic/elastic-agent/pull/15627) [#15573](https://github.com/elastic/elastic-agent/pull/15573) [#15665](https://github.com/elastic/elastic-agent/pull/15665) [#15671](https://github.com/elastic/elastic-agent/pull/15671) [#15397](https://github.com/elastic/elastic-agent/issues/15397)
-* Override fleet.ssl.certificate_authorities from env vars in container mode. [#15531](https://github.com/elastic/elastic-agent/pull/15531) [#15542](https://github.com/elastic/elastic-agent/pull/15542) [#15595](https://github.com/elastic/elastic-agent/pull/15595) [#15627](https://github.com/elastic/elastic-agent/pull/15627) [#15573](https://github.com/elastic/elastic-agent/pull/15573) [#15665](https://github.com/elastic/elastic-agent/pull/15665) [#15671](https://github.com/elastic/elastic-agent/pull/15671) 
+* Fix spurious &#34;failed to unmarshal checkin actions&#34; error on idle Fleet check-ins. [#15398](https://github.com/elastic/elastic-agent/pull/15398) [#15397](https://github.com/elastic/elastic-agent/issues/15397)
+* Override fleet.ssl.certificate_authorities from env vars in container mode. [#15427](https://github.com/elastic/elastic-agent/pull/15427) 
 
