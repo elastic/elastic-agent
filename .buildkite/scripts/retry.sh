@@ -1,5 +1,4 @@
 #!/bin/bash
-set -euo pipefail
 
 # retry runs the given command up to $1 times total, with exponential backoff
 # between attempts, to protect against transient failures.

@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# shellcheck source=.buildkite/scripts/retry.sh
-source "$(dirname "$0")/retry.sh"
-
 GROUP_NAME=$1
 TEST_SUDO=$2
 
@@ -26,6 +23,9 @@ if [ "$TEST_SUDO" == "true" ]; then
   source /opt/buildkite-agent/hooks/pre-command
   source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 fi
+
+# shellcheck source=.buildkite/scripts/retry.sh
+source "$(dirname "$0")/retry.sh"
 
 # Make sure that all tools are installed
 retry 3 asdf install
