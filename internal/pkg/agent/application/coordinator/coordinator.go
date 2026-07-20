@@ -1002,8 +1002,7 @@ func (c *Coordinator) logUpgradeDetails(details *details.Details) {
 // upgradeDetailsFromMarkerUpdate returns the upgrade details the coordinator
 // should report for a marker change. While the upgrade marker exists, its
 // details are used directly. Once removed, the watcher marker is consulted to
-// recover any non-completed terminal state for Fleet reporting. Reporting the
-// same state twice is idempotent on the Fleet side.
+// recover any non-completed terminal state for Fleet reporting.
 func upgradeDetailsFromMarkerUpdate(log *logger.Logger, marker upgrade.UpdateMarker, dataDirPath string) *details.Details {
 	if marker.Details != nil {
 		return marker.Details
