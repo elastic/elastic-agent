@@ -111,6 +111,12 @@ func testSwitchUnprivilegedWithoutBasePathCustomUser(ctx context.Context, t *tes
 	if customUsername != "" {
 		pt := progressbar.NewOptions(-1)
 		_, err = install.EnsureUserAndGroup(customUsername, customGroup, pt, true)
+		// Finish the progress bar to stop its background render goroutine;
+		// otherwise it keeps writing spinner frames to stdout for the rest of
+		// the package run, corrupting the `go test -json` stream and causing
+		// gotestsum to report later passing tests as failed.
+		_ = pt.Finish()
+		_ = pt.Exit()
 		require.NoError(t, err)
 	}
 
