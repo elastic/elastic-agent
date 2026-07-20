@@ -15,11 +15,11 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260714231012-4698e5d9878c
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260717192854-b1bc38420262
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-autodiscover v0.10.3
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-	github.com/elastic/elastic-agent-libs v0.46.0
+	github.com/elastic/elastic-agent-libs v0.46.1
 	github.com/elastic/elastic-agent-system-metrics v0.14.4
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-20260515154942-99dc973fd52e
@@ -131,6 +131,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
+	github.com/brunoga/deep v1.3.1 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/containerd/containerd v1.7.30 // indirect
@@ -154,6 +155,7 @@ require (
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
+	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
@@ -161,13 +163,13 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
-	github.com/go-openapi/jsonpointer v0.22.5 // indirect
+	github.com/go-openapi/jsonpointer v0.23.1 // indirect
 	github.com/go-openapi/jsonreference v0.21.5 // indirect
 	github.com/go-openapi/swag v0.25.5 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.5 // indirect
 	github.com/go-openapi/swag/conv v0.25.5 // indirect
 	github.com/go-openapi/swag/fileutils v0.25.5 // indirect
-	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
+	github.com/go-openapi/swag/jsonname v0.26.0 // indirect
 	github.com/go-openapi/swag/jsonutils v0.25.5 // indirect
 	github.com/go-openapi/swag/loading v0.25.5 // indirect
 	github.com/go-openapi/swag/mangling v0.25.5 // indirect
@@ -202,7 +204,12 @@ require (
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
+	github.com/knadh/koanf/parsers/yaml v1.1.0 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
+	github.com/knadh/koanf/providers/env v1.1.0 // indirect
+	github.com/knadh/koanf/providers/file v1.2.1 // indirect
+	github.com/knadh/koanf/providers/posflag v1.0.1 // indirect
+	github.com/knadh/koanf/providers/structs v1.0.0 // indirect
 	github.com/knadh/koanf/v2 v2.3.5 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
@@ -254,7 +261,11 @@ require (
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/urfave/cli/v2 v2.27.7 // indirect
+	github.com/vektra/mockery/v3 v3.7.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
+	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
+	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
@@ -358,4 +369,14 @@ replace (
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
 )
 
-tool golang.org/x/tools/cmd/deadcode
+tool (
+	github.com/elastic/go-licenser
+	github.com/magefile/mage
+	github.com/rednafi/link-patrol/cmd/link-patrol
+	github.com/vektra/mockery/v3
+	go.elastic.co/go-licence-detector
+	golang.org/x/tools/cmd/deadcode
+	golang.org/x/tools/cmd/goimports
+	golang.org/x/tools/cmd/stringer
+	gotest.tools/gotestsum
+)

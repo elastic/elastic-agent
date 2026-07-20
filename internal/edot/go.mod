@@ -8,9 +8,9 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260714231012-4698e5d9878c
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260717192854-b1bc38420262
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.46.0
+	github.com/elastic/elastic-agent-libs v0.46.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.62.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.62.0
