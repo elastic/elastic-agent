@@ -518,6 +518,114 @@ func TestManualRollback(t *testing.T) {
 			},
 		},
 		{
+			// When no upgrade marker is present the lock-wait code acquires and
+			// immediately releases watcher.lock (no lingering watcher). Verify
+			// that the lock is free after the rollback call returns.
+			name: "no update marker, no lingering watcher - lock acquired and released before rollback watcher starts",
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
+				rollbacksSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
+					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {
+						Version:    "1.2.3",
+						Hash:       "oldver",
+						ValidUntil: aMomentTomorrow,
+					},
+				}, nil, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstallCurrent).Return(newerWatcherExecutable)
+				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", filepath.Join("data", "elastic-agent-1.2.3-oldver")).
+					Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for rollbacksies"}, Process: &os.Process{Pid: 123}}, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings: &configuration.UpgradeConfig{
+				Rollback: &configuration.UpgradeRollbackConfig{
+					Window: 24 * time.Hour,
+				},
+			},
+			now:     aMomentInTime,
+			version: "1.2.3",
+			wantErr: assert.NoError,
+			additionalAsserts: func(t *testing.T, topDir string) {
+				// The lock-wait code must have acquired and released watcher.lock;
+				// verify it is free after rollbackToPreviousVersion returns.
+				locker := filelock.NewAppLocker(topDir, watcherApplockerFileName)
+				require.NoError(t, locker.TryLock(), "watcher.lock should be free after rollback call — lock-wait code must have released it")
+				_ = locker.Unlock()
+			},
+		},
+		{
+			// Covers the TryLock-fails → withTakeOverWatcher-errors sub-path:
+			// the fake upgrade marker created by rollbackUsingAgentInstalls must
+			// be cleaned up and an error returned.
+			name: "no update marker, lingering watcher takeover fails - fake marker cleaned up and error returned",
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
+				rollbacksSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
+					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {
+						Version:    "1.2.3",
+						Hash:       "oldver",
+						ValidUntil: aMomentTomorrow,
+					},
+				}, nil, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstallCurrent).Return(newerWatcherExecutable)
+				// Hold watcher.lock to simulate a lingering watcher — TryLock in
+				// the production code will see the lock held and call TakeOverWatcher.
+				locker := filelock.NewAppLocker(topDir, watcherApplockerFileName)
+				err := locker.TryLock()
+				require.NoError(t, err, "test setup: error acquiring watcher.lock to simulate lingering watcher")
+				t.Cleanup(func() { _ = locker.Unlock() })
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(nil, errors.New("takeover failed"))
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings: &configuration.UpgradeConfig{
+				Rollback: &configuration.UpgradeRollbackConfig{
+					Window: 24 * time.Hour,
+				},
+			},
+			now:     aMomentInTime,
+			version: "1.2.3",
+			wantErr: assert.Error,
+			additionalAsserts: func(t *testing.T, topDir string) {
+				actualMarkerFilePath := filepath.Join(topDir, "data", markerFilename)
+				require.NoFileExists(t, actualMarkerFilePath, "fake upgrade marker must be cleaned up after takeover failure")
+			},
+		},
+		{
+			// Covers the TryLock-fails → withTakeOverWatcher-succeeds sub-path:
+			// the rollback watcher must be started normally after takeover.
+			name: "no update marker, lingering watcher takeover succeeds - rollback watcher started",
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
+				rollbacksSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
+					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {
+						Version:    "1.2.3",
+						Hash:       "oldver",
+						ValidUntil: aMomentTomorrow,
+					},
+				}, nil, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstallCurrent).Return(newerWatcherExecutable)
+				// Hold watcher.lock to simulate a lingering watcher.
+				locker := filelock.NewAppLocker(topDir, watcherApplockerFileName)
+				err := locker.TryLock()
+				require.NoError(t, err, "test setup: error acquiring watcher.lock to simulate lingering watcher")
+				t.Cleanup(func() { _ = locker.Unlock() })
+				// Takeover succeeds — returns the locker it acquired.
+				takenOverLocker := filelock.NewAppLocker(topDir, watcherApplockerFileName)
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(takenOverLocker, nil)
+				// After takeover the rollback watcher must be started.
+				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", filepath.Join("data", "elastic-agent-1.2.3-oldver")).
+					Return(&exec.Cmd{Path: newerWatcherExecutable, Process: &os.Process{Pid: 456}}, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings: &configuration.UpgradeConfig{
+				Rollback: &configuration.UpgradeRollbackConfig{
+					Window: 24 * time.Hour,
+				},
+			},
+			now:     aMomentInTime,
+			version: "1.2.3",
+			wantErr: assert.NoError,
+		},
+		{
 			name: "no update marker, available install for rollback with expired TTL - error",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
 				rollbacksSource.EXPECT().GetAll().Return(

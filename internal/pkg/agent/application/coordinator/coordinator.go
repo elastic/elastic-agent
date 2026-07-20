@@ -999,6 +999,56 @@ func (c *Coordinator) logUpgradeDetails(details *details.Details) {
 	c.logger.Infow("updated upgrade details", "upgrade_details", details)
 }
 
+// upgradeDetailsFromMarkerUpdate returns the upgrade details the coordinator
+// should report for a marker change. While the upgrade marker exists, its
+// details are used directly. Once removed, the watcher marker is consulted to
+// recover any non-completed terminal state for Fleet reporting. Reporting the
+// same state twice is idempotent on the Fleet side.
+func upgradeDetailsFromMarkerUpdate(log *logger.Logger, marker upgrade.UpdateMarker, dataDirPath string) *details.Details {
+	if marker.Details != nil {
+		return marker.Details
+	}
+
+	// Upgrade marker removed — check the watcher marker for a terminal outcome.
+	wm, err := upgrade.LoadWatcherMarker(dataDirPath)
+	if err != nil {
+		log.Warnw("failed to load watcher marker; upgrade details cleared", "error.message", err)
+		return nil
+	}
+	if wm == nil || !watcherMarkerMatchesUpgrade(wm, marker) {
+		return nil
+	}
+
+	if wm.Outcome == details.StateCompleted {
+		return nil
+	}
+
+	det := details.NewDetails(wm.TargetVersion, wm.Outcome, wm.ActionID)
+	switch wm.Outcome {
+	case details.StateRollback:
+		det.Metadata.Reason = wm.Reason
+	case details.StateFailed:
+		det.Metadata.ErrorMsg = wm.ErrorMsg
+	}
+	return det
+}
+
+// watcherMarkerMatchesUpgrade reports whether wm belongs to the same upgrade
+// as marker, not a stale result from a previous upgrade cycle.
+func watcherMarkerMatchesUpgrade(wm *upgrade.WatcherMarker, marker upgrade.UpdateMarker) bool {
+	if wm.TargetVersion != marker.Version || wm.PreviousVersion != marker.PrevVersion {
+		return false
+	}
+	// If both sides have an ActionID, they must match — retries to the same
+	// version get a different ActionID so the version tuple alone isn't enough.
+	if wm.ActionID != "" && marker.GetActionID() != "" && wm.ActionID != marker.GetActionID() {
+		return false
+	}
+	// False if the watcher marker was written before the upgrade marker was last updated (stale).
+	// Both timestamps come from the same machine, so wall-clock ordering is normally reliable here.
+	return !wm.CompletedAt.Before(marker.UpdatedOn)
+}
+
 // AckUpgrade is the method used on startup to ack a previously successful upgrade action.
 // Called from external goroutines.
 func (c *Coordinator) AckUpgrade(ctx context.Context, acker acker.Acker) error {
@@ -1703,7 +1753,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 	case upgradeMarker := <-c.managerChans.upgradeMarkerUpdate:
 		if ctx.Err() == nil {
-			c.setUpgradeDetails(upgradeMarker.Details)
+			c.setUpgradeDetails(upgradeDetailsFromMarkerUpdate(c.logger, upgradeMarker, paths.Data()))
 		}
 	}
 
