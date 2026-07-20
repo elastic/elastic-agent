@@ -33,7 +33,7 @@ require (
 	github.com/gofrs/flock v0.13.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/google/go-cmp v0.7.0
-	github.com/google/go-containerregistry v0.21.6
+	github.com/google/go-containerregistry v0.21.7
 	github.com/google/pprof v0.0.0-20260604005048-7023385849c0
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.24.0
