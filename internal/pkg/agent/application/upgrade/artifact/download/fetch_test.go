@@ -344,6 +344,37 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.Equal(t, *upgradeDetailsRetryErrorMsg, upgradeDetails.Metadata.RetryErrorMsg)
 	})
 
+	t.Run("permanent HTTP statuses stop retries", func(t *testing.T) {
+		for _, statusCode := range []int{
+			http.StatusBadRequest,
+			http.StatusUnauthorized,
+			http.StatusForbidden,
+			http.StatusNotFound,
+			http.StatusGone,
+		} {
+			t.Run(http.StatusText(statusCode), func(t *testing.T) {
+				attempts := 0
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					attempts++
+					w.WriteHeader(statusCode)
+				}))
+				defer server.Close()
+
+				log, _ := loggertest.New(t.Name())
+				err := downloadWithRetries(context.Background(), log, &settings,
+					details.NewDetails(parsedVersion.String(), details.StateRequested, ""), server.URL,
+					filepath.Join(t.TempDir(), target.FileName()),
+					func(ctx context.Context, source, dst string) error {
+						return download(ctx, log, &settings,
+							details.NewDetails(parsedVersion.String(), details.StateRequested, ""),
+							server.Client(), source, dst, defaultFileOps())
+					})
+				require.ErrorIs(t, err, upgradeErrors.ErrPermanentHTTP)
+				require.Equal(t, 1, attempts)
+			})
+		}
+	})
+
 	t.Run("insufficient diskspace stops retries", func(t *testing.T) {
 		dst := filepath.Join(t.TempDir(), target.FileName())
 		source := "https://example.com/" + target.FileName()

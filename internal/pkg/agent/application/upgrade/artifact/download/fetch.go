@@ -61,6 +61,9 @@ func downloadWithRetries(ctx context.Context, log *logger.Logger, config *artifa
 		attempt++
 		log.Infof("download attempt %d", attempt)
 		if err := downloadFn(cancelCtx, source, dst); err != nil {
+			if upgradeErrors.IsPermanentHTTPError(err) {
+				return backoff.Permanent(err)
+			}
 			if upgradeErrors.IsDiskSpaceError(err) {
 				log.Infof("insufficient disk space error detected, stopping retries")
 				return backoff.Permanent(err)
@@ -133,7 +136,7 @@ func download(ctx context.Context, log *logger.Logger, config *artifact.Config, 
 		switch resp.StatusCode {
 		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden,
 			http.StatusNotFound, http.StatusGone:
-			return backoff.Permanent(err)
+			return goerrors.Join(err, upgradeErrors.ErrPermanentHTTP)
 		}
 		return err
 	}
