@@ -1,5 +1,5 @@
 ---
-navigation_title: EDOT Collector
+navigation_title: OpenTelemetry
 description: Introduction to the Elastic Distribution of OpenTelemetry (EDOT) Collector, a curated and supported distribution of the OpenTelemetry Collector.
 applies_to:
   stack:
@@ -12,6 +12,10 @@ products:
   - id: observability
   - id: edot-collector
 ---
+
+:::{note}
+Before version 9.5, the functionality described in this section was distributed as a standalone package called the **EDOT Collector**. From 9.5 onwards, this capability is built into {{agent}}.
+:::
 
 # Elastic Distribution of OpenTelemetry Collector
 

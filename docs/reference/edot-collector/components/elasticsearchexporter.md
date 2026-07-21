@@ -40,20 +40,20 @@ The exporter supports standard OpenTelemetry [authentication configuration](http
 - `user` and `password`: For HTTP Basic Authentication
 - `api_key`: For [{{es}} API key authentication](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-security-create-api-key)
 
-:::{note} Authentication to and from the EDOT Collector
+:::{note} Authentication to and from {{agent}}
 
-The `api_key` setting on the {{es}} exporter controls outbound authentication from the EDOT Collector to {{es}} for bulk indexing. This is separate from the `apikeyauth` extension, which authenticates incoming OTLP traffic from SDKs to the EDOT Collector. 
+The `api_key` setting on the {{es}} exporter controls outbound authentication from {{agent}} to {{es}} for bulk indexing. This is separate from the `apikeyauth` extension, which authenticates incoming OTLP traffic from SDKs to {{agent}}. 
 
 Using the same API key for both inbound and outbound authentication is not recommended from a security perspective. Use separate keys with the minimum required privileges for each purpose.
 
-Refer to [Authentication methods for the EDOT Collector](/reference/edot-collector/config/authentication-methods.md) for details.
+Refer to [Authentication methods for {{agent}}](/reference/edot-collector/config/authentication-methods.md) for details.
 :::
 
 #### Creating an API key for the {{es}} exporter
 
 The API key used in the `api_key` setting authenticates bulk indexing requests to {{es}}. The key must have index-level privileges on the data streams that the exporter writes to.
 
-For logs, metrics, and traces (the default signals) the EDOT Collector writes to OTel-native data streams matching `logs-*-*`, `metrics-*-*`, and `traces-*-*`. The required index privileges are:
+For logs, metrics, and traces (the default signals) {{agent}} writes to OTel-native data streams matching `logs-*-*`, `metrics-*-*`, and `traces-*-*`. The required index privileges are:
 
 - `auto_configure`: Allows automatic creation and configuration of data stream templates.
 - `create_doc`: Allows writing documents using the Bulk API.
@@ -122,7 +122,7 @@ exporters:
       ca_file: "/path/to/ca.crt"
 ```
 
-The `ca_file` path must be readable by the EDOT Collector process. To skip verification entirely during testing, you can set `insecure_skip_verify: true`, but this is not recommended for production.
+The `ca_file` path must be readable by the {{agent}} process. To skip verification entirely during testing, you can set `insecure_skip_verify: true`, but this is not recommended for production.
 
 #### Mutual TLS (mTLS)
 
