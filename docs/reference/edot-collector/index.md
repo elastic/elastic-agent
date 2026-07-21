@@ -1,5 +1,5 @@
 ---
-navigation_title: Elastic Agent
+navigation_title: OpenTelemetry
 description: Elastic Agent includes a built-in OpenTelemetry Collector for collecting and forwarding traces, metrics, and logs to Elastic Observability.
 applies_to:
   stack:
@@ -16,7 +16,7 @@ products:
 # {{agent}}
 
 :::{note}
-Starting with version 9.5, the EDOT Collector is part of {{agent}}. If you're on an earlier version, the product was called the EDOT Collector — the configuration and components are the same.
+Starting with version 9.5, the **EDOT Collector** was renamed to **{{agent}}**. The configuration and components are the same across versions.
 :::
 
 {{agent}} includes a built-in OpenTelemetry Collector: an open-source distribution of the [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/).

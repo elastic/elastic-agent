@@ -15,7 +15,7 @@ products:
 
 # Download {{agent}}
 
-{{agent}} is embedded in the {{agent}} package as a separate binary that invokes OpenTelemetry Collector components.
+The {{agent}} package includes a separate `otelcol` binary that runs the OpenTelemetry Collector components.
 
 The following table contains direct download links for the latest version for different operating systems and architectures.
 
