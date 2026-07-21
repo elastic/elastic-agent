@@ -27,17 +27,15 @@ import (
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
-// serviceEnvFilePath returns the systemd EnvironmentFile path for the given service namespace.
-// The systemd unit uses EnvironmentFile=-/etc/sysconfig/<service-name>, so env vars written
-// here are injected into the service process before it starts.
-func serviceEnvFilePath(namespace string) string {
-	return fmt.Sprintf("/etc/sysconfig/%s", paths.ServiceNameForNamespace(namespace))
+// serviceDropInDir returns the path of the systemd drop-in directory for the given service namespace.
+func serviceDropInDir(namespace string) string {
+	return fmt.Sprintf("/etc/systemd/system/%s.service.d", paths.ServiceNameForNamespace(namespace))
 }
 
 func TestHostnameEnvOverride(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Hostname,
-		// Linux-only: the env-injection mechanism (systemd EnvironmentFile) is Linux-specific.
+		// Linux-only: the env-injection mechanism (systemd drop-in) is Linux-specific.
 		// Non-service deployments (containers, standalone binary) inherit ELASTIC_AGENT_HOSTNAME
 		// directly from their process environment; that path is covered by TestGetHostNameEnvOverride.
 		OS: []define.OS{
@@ -61,13 +59,15 @@ func TestHostnameEnvOverride(t *testing.T) {
 
 	customHostname := fmt.Sprintf("custom-node-%s", randStr(6))
 
-	// Write ELASTIC_AGENT_HOSTNAME into the systemd EnvironmentFile before the service starts.
-	// The file must exist before install because the service is started immediately on install.
-	// /etc/sysconfig/ does not exist by default on Debian-based systems, so create it first.
-	envFilePath := serviceEnvFilePath(installOpts.Namespace)
-	require.NoError(t, os.MkdirAll(filepath.Dir(envFilePath), 0o755))
-	require.NoError(t, os.WriteFile(envFilePath, []byte(fmt.Sprintf("ELASTIC_AGENT_HOSTNAME=%s\n", customHostname)), 0o644))
-	t.Cleanup(func() { os.Remove(envFilePath) })
+	// Inject ELASTIC_AGENT_HOSTNAME via a systemd drop-in before the service starts.
+	// Drop-ins are the standard, distro-agnostic way to override systemd unit settings;
+	// this is equivalent to what `systemctl edit elastic-agent` would produce.
+	// The drop-in must exist before install because the service starts immediately on install.
+	dropInDir := serviceDropInDir(installOpts.Namespace)
+	dropInFile := filepath.Join(dropInDir, "elastic-agent-hostname.conf")
+	require.NoError(t, os.MkdirAll(dropInDir, 0o755))
+	require.NoError(t, os.WriteFile(dropInFile, []byte(fmt.Sprintf("[Service]\nEnvironment=ELASTIC_AGENT_HOSTNAME=%s\n", customHostname)), 0o644))
+	t.Cleanup(func() { os.RemoveAll(dropInDir) })
 
 	createPolicyReq := kibana.AgentPolicy{
 		Name:      "test-policy-hostname-override-" + customHostname,
