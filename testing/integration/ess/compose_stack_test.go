@@ -71,7 +71,7 @@ func (s *composeStack) run(ctx context.Context, args ...string) error {
 
 func (s *composeStack) output(ctx context.Context, args ...string) ([]byte, error) {
 	base := []string{"compose", "-f", s.file, "-p", s.project}
-	cmd := exec.CommandContext(ctx, "docker", append(base, args...)...)
+	cmd := exec.CommandContext(ctx, "docker", append(base, args...)...) //nolint:gosec // args are test-controlled docker compose subcommands
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("docker compose %s: %w\n%s", strings.Join(args, " "), err, out)
