@@ -89,16 +89,23 @@ func TestExtension(t *testing.T) {
 		require.NotEmpty(collect, res.GlobalDiagnostics)
 		require.NotEmpty(collect, res.ComponentDiagnostics)
 		foundCPU := false
+		foundEnv := false
 		for _, global := range res.GlobalDiagnostics {
-			if global.Name == "cpu" {
+			switch global.Name {
+			case "cpu":
 				foundCPU = true
-				break
-			}
-			if strings.HasSuffix(global.Filename, "profile.gz") {
-				verifyPprof(t, global.Content)
+			case "environment":
+				foundEnv = true
+				require.Equal(collect, "edot/environment.yaml", global.Filename)
+				require.Equal(collect, "application/yaml", global.ContentType)
+			default:
+				if strings.HasSuffix(global.Filename, "profile.gz") {
+					verifyPprof(t, global.Content)
+				}
 			}
 		}
 		require.True(collect, foundCPU, "cpu.pprof not found in global diagnostics")
+		require.True(collect, foundEnv, "environment not found in global diagnostics")
 
 		for _, comp := range res.ComponentDiagnostics {
 			switch comp.Name {
