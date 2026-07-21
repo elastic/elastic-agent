@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v68/github"
+	"golang.org/x/oauth2"
 )
 
 // GitHubClient wraps the GitHub API client.
@@ -35,10 +36,19 @@ type PROptions struct {
 }
 
 // NewGitHubClient creates a new GitHub API client.
+// An empty token uses unauthenticated public API access (sufficient for reading public releases).
 func NewGitHubClient(token string) *GitHubClient {
 	ctx := context.Background()
+	var httpClient *http.Client
+	if token != "" {
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: token},
+		)
+		httpClient = oauth2.NewClient(ctx, ts)
+	}
+
 	return &GitHubClient{
-		client: github.NewClient(nil).WithAuthToken(token),
+		client: github.NewClient(httpClient),
 		ctx:    ctx,
 	}
 }
@@ -95,27 +105,130 @@ func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
 
 // FindOpenPR returns an open pull request for the given head and base branches, if one exists.
 func (gh *GitHubClient) FindOpenPR(owner, repo, head, base string) (*github.PullRequest, bool, error) {
+	prs, err := gh.listPRsByHeadBase(owner, repo, head, base, "open")
+	if err != nil {
+		return nil, false, err
+	}
+	if len(prs) == 0 {
+		return nil, false, nil
+	}
+	return prs[0], true, nil
+}
+
+// FindRelatedPR returns the best matching PR for head→base (open preferred, then
+// merged, then closed). When none match by head/base, it falls back to an exact
+// title match against the same base branch so already-merged release PRs still resolve.
+func (gh *GitHubClient) FindRelatedPR(owner, repo, head, base, title string) (*github.PullRequest, bool, error) {
+	prs, err := gh.listPRsByHeadBase(owner, repo, head, base, "all")
+	if err != nil {
+		return nil, false, err
+	}
+	if pr := pickRelatedPR(prs); pr != nil {
+		return pr, true, nil
+	}
+	if title == "" {
+		return nil, false, nil
+	}
+	return gh.findPRByExactTitle(owner, repo, base, title)
+}
+
+func (gh *GitHubClient) listPRsByHeadBase(owner, repo, head, base, state string) ([]*github.PullRequest, error) {
 	headQuery := head
 	if !strings.Contains(head, ":") {
 		headQuery = fmt.Sprintf("%s:%s", owner, head)
 	}
 
 	prs, _, err := gh.client.PullRequests.List(gh.ctx, owner, repo, &github.PullRequestListOptions{
-		State: "open",
+		State: state,
 		Head:  headQuery,
 		Base:  base,
 		ListOptions: github.ListOptions{
-			PerPage: 1,
+			PerPage: 30,
 		},
 	})
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to list pull requests: %w", err)
+		return nil, fmt.Errorf("failed to list pull requests: %w", err)
 	}
-	if len(prs) == 0 {
-		return nil, false, nil
+	return prs, nil
+}
+
+func (gh *GitHubClient) findPRByExactTitle(owner, repo, base, title string) (*github.PullRequest, bool, error) {
+	query := fmt.Sprintf(`repo:%s/%s is:pr base:%s "%s" in:title`, owner, repo, base, title)
+	result, _, err := gh.client.Search.Issues(gh.ctx, query, &github.SearchOptions{
+		Sort:  "updated",
+		Order: "desc",
+		ListOptions: github.ListOptions{
+			PerPage: 10,
+		},
+	})
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to search pull requests by title: %w", err)
 	}
 
-	return prs[0], true, nil
+	var matches []*github.PullRequest
+	for _, issue := range result.Issues {
+		if !issue.IsPullRequest() {
+			continue
+		}
+		if issue.GetTitle() != title {
+			continue
+		}
+		pr, _, err := gh.client.PullRequests.Get(gh.ctx, owner, repo, issue.GetNumber())
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to get pull request #%d: %w", issue.GetNumber(), err)
+		}
+		matches = append(matches, pr)
+	}
+	if pr := pickRelatedPR(matches); pr != nil {
+		return pr, true, nil
+	}
+	return nil, false, nil
+}
+
+// pickRelatedPR prefers open PRs, then merged, then other closed PRs.
+func pickRelatedPR(prs []*github.PullRequest) *github.PullRequest {
+	var open, merged, closed *github.PullRequest
+	for _, pr := range prs {
+		if pr == nil {
+			continue
+		}
+		switch {
+		case pr.GetState() == "open":
+			if open == nil {
+				open = pr
+			}
+		case pr.GetMerged() || pr.MergedAt != nil:
+			if merged == nil {
+				merged = pr
+			}
+		default:
+			if closed == nil {
+				closed = pr
+			}
+		}
+	}
+	if open != nil {
+		return open
+	}
+	if merged != nil {
+		return merged
+	}
+	return closed
+}
+
+// prDisplayState returns a short state label for workflow summaries.
+func prDisplayState(pr *github.PullRequest) string {
+	if pr == nil {
+		return "unknown"
+	}
+	if pr.GetMerged() || pr.MergedAt != nil {
+		return "merged"
+	}
+	state := pr.GetState()
+	if state == "" {
+		return "unknown"
+	}
+	return state
 }
 
 // mergeLabelDefs are auto-created when missing so merge-timing labels can be applied.
@@ -192,6 +305,114 @@ func (gh *GitHubClient) AddLabels(owner, repo string, number int, labels []strin
 
 	fmt.Printf("Added labels to #%d: %v\n", number, labels)
 	return nil
+}
+
+// FindIssueByTitle finds an issue with an exact title match (open preferred over closed).
+func (gh *GitHubClient) FindIssueByTitle(owner, repo, title string) (*github.Issue, bool, error) {
+	query := fmt.Sprintf(`repo:%s/%s is:issue in:title "%s"`, owner, repo, title)
+	result, _, err := gh.client.Search.Issues(gh.ctx, query, &github.SearchOptions{
+		Sort:  "updated",
+		Order: "desc",
+		ListOptions: github.ListOptions{
+			PerPage: 20,
+		},
+	})
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to search issues for title %q: %w", title, err)
+	}
+
+	var closedMatch *github.Issue
+	for _, issue := range result.Issues {
+		if issue.IsPullRequest() {
+			continue
+		}
+		if issue.GetTitle() != title {
+			continue
+		}
+		if issue.GetState() == "open" {
+			return issue, true, nil
+		}
+		if closedMatch == nil {
+			closedMatch = issue
+		}
+	}
+	if closedMatch != nil {
+		return closedMatch, true, nil
+	}
+	return nil, false, nil
+}
+
+// CreateIssue creates a repository issue with the given labels.
+func (gh *GitHubClient) CreateIssue(owner, repo, title, body string, labels []string) (*github.Issue, error) {
+	req := &github.IssueRequest{
+		Title: github.Ptr(title),
+		Body:  github.Ptr(body),
+	}
+	if len(labels) > 0 {
+		req.Labels = &labels
+	}
+	issue, _, err := gh.client.Issues.Create(gh.ctx, owner, repo, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create issue %q: %w", title, err)
+	}
+	return issue, nil
+}
+
+// UpdateIssueBody replaces the body of an existing issue.
+func (gh *GitHubClient) UpdateIssueBody(owner, repo string, number int, body string) error {
+	_, _, err := gh.client.Issues.Edit(gh.ctx, owner, repo, number, &github.IssueRequest{
+		Body: github.Ptr(body),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update issue #%d body: %w", number, err)
+	}
+	return nil
+}
+
+// ListReleaseLabeledPRsForVersion returns Elastic Agent PRs with label "release" whose title
+// mentions the exact version. Open and recently updated closed/merged PRs are included.
+func (gh *GitHubClient) ListReleaseLabeledPRsForVersion(owner, repo, version string) ([]*github.PullRequest, error) {
+	query := fmt.Sprintf(`repo:%s/%s is:pr label:release "%s"`, owner, repo, version)
+	opts := &github.SearchOptions{
+		Sort:  "updated",
+		Order: "desc",
+		ListOptions: github.ListOptions{
+			PerPage: 100,
+		},
+	}
+
+	var prs []*github.PullRequest
+	seen := map[int]struct{}{}
+	for {
+		result, resp, err := gh.client.Search.Issues(gh.ctx, query, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to search release PRs for %s: %w", version, err)
+		}
+		for _, issue := range result.Issues {
+			if !issue.IsPullRequest() {
+				continue
+			}
+			if !versionMentioned(issue.GetTitle(), version) {
+				continue
+			}
+			num := issue.GetNumber()
+			if _, ok := seen[num]; ok {
+				continue
+			}
+			seen[num] = struct{}{}
+			prs = append(prs, &github.PullRequest{
+				Number:  github.Ptr(num),
+				HTMLURL: github.Ptr(issue.GetHTMLURL()),
+				Title:   github.Ptr(issue.GetTitle()),
+				State:   github.Ptr(issue.GetState()),
+			})
+		}
+		if resp == nil || resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return prs, nil
 }
 
 // GetDefaultBranch gets the default branch for a repository.

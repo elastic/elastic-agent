@@ -58,20 +58,6 @@ func LoadConfigFromEnv() (*ReleaseConfig, error) {
 	}
 	nextProjectMinorBranch := inferNextProjectMinorBranch(currentRelease)
 
-	if envLatest := os.Getenv("LATEST_RELEASE"); envLatest != "" {
-		latestRelease = envLatest
-	}
-	if envNext := os.Getenv("NEXT_RELEASE"); envNext != "" {
-		nextRelease = envNext
-	}
-	if envBranch := os.Getenv("RELEASE_BRANCH"); envBranch != "" {
-		releaseBranch = envBranch
-	}
-	if envNextMinor := os.Getenv("NEXT_PROJECT_MINOR_VERSION"); envNextMinor != "" {
-		nextProjectMinorVersion = envNextMinor
-		nextProjectMinorBranch = inferReleaseBranch(envNextMinor)
-	}
-
 	cfg := &ReleaseConfig{
 		CurrentRelease:          currentRelease,
 		LatestRelease:           latestRelease,
@@ -183,7 +169,6 @@ var fetchLatestReleaseBefore = func(token, owner, repo, current string) (string,
 }
 
 // EnsureLatestRelease sets LatestRelease when unset by querying elastic/elastic-agent releases.
-// LATEST_RELEASE env (loaded into LatestRelease) remains an optional override.
 func (c *ReleaseConfig) EnsureLatestRelease() error {
 	if c.LatestRelease != "" {
 		return nil

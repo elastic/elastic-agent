@@ -15,6 +15,22 @@ import (
 	"golang.org/x/sys/execabs"
 )
 
+var defaultBeatVersionPattern = regexp.MustCompile(`const defaultBeatVersion = "([^"]+)"`)
+
+// ReadAgentVersion returns defaultBeatVersion from version/version.go.
+func ReadAgentVersion() (string, error) {
+	versionFile := "version/version.go"
+	content, err := os.ReadFile(versionFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to read %s: %w", versionFile, err)
+	}
+	match := defaultBeatVersionPattern.FindSubmatch(content)
+	if match == nil {
+		return "", fmt.Errorf("version pattern not found in %s", versionFile)
+	}
+	return string(match[1]), nil
+}
+
 func validateRepoRelativePath(path string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("path must not be empty")

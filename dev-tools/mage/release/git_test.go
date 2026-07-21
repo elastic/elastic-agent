@@ -5,6 +5,7 @@
 package release
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -449,4 +450,114 @@ func TestCommitAllIdempotent(t *testing.T) {
 	if headBefore.Hash() != headAfter.Hash() {
 		t.Error("CommitAll() is not idempotent - HEAD changed on second call")
 	}
+}
+
+func TestHasCommitsAheadOf(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(t *testing.T, dir, baseBranch string)
+		want     bool
+		wantErr  bool
+		baseName string
+	}{
+		{
+			name:     "equal tips",
+			baseName: "base",
+			setup: func(t *testing.T, dir, baseBranch string) {
+				runGit(t, dir, "branch", baseBranch)
+			},
+			want: false,
+		},
+		{
+			name:     "ahead of base",
+			baseName: "base",
+			setup: func(t *testing.T, dir, baseBranch string) {
+				runGit(t, dir, "branch", baseBranch)
+				writeAndCommit(t, dir, "feature.txt", "feature", "feature commit")
+			},
+			want: true,
+		},
+		{
+			name:     "behind base",
+			baseName: "base",
+			setup: func(t *testing.T, dir, baseBranch string) {
+				runGit(t, dir, "branch", baseBranch)
+				runGit(t, dir, "checkout", baseBranch)
+				writeAndCommit(t, dir, "base-only.txt", "base", "base commit")
+				runGit(t, dir, "checkout", "-")
+			},
+			want: false,
+		},
+		{
+			name:     "diverged from base",
+			baseName: "base",
+			setup: func(t *testing.T, dir, baseBranch string) {
+				runGit(t, dir, "branch", baseBranch)
+				writeAndCommit(t, dir, "feature.txt", "feature", "feature commit")
+				runGit(t, dir, "checkout", baseBranch)
+				writeAndCommit(t, dir, "base-only.txt", "base", "base commit")
+				runGit(t, dir, "checkout", "-")
+			},
+			want: true,
+		},
+		{
+			name:     "missing base branch",
+			baseName: "does-not-exist",
+			setup:    func(t *testing.T, dir, baseBranch string) {},
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := initGitRepoForAheadTest(t)
+			tt.setup(t, dir, tt.baseName)
+
+			repo, err := OpenRepo(dir)
+			if err != nil {
+				t.Fatalf("OpenRepo failed: %v", err)
+			}
+
+			got, err := repo.HasCommitsAheadOf(tt.baseName)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("HasCommitsAheadOf() error = nil, want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("HasCommitsAheadOf() unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("HasCommitsAheadOf() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func initGitRepoForAheadTest(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	ctx := context.Background()
+
+	cmd := exec.CommandContext(ctx, "git", "init")
+	cmd.Dir = dir
+	if err := cmd.Run(); err != nil {
+		t.Skipf("git not available: %v", err)
+	}
+
+	runGit(t, dir, "config", "user.name", "Test User")
+	runGit(t, dir, "config", "user.email", "test@example.com")
+	writeAndCommit(t, dir, "README", "initial", "initial commit")
+	return dir
+}
+
+func writeAndCommit(t *testing.T, dir, filename, content, message string) {
+	t.Helper()
+	path := filepath.Join(dir, filename)
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("write %s: %v", filename, err)
+	}
+	runGit(t, dir, "add", filename)
+	runGit(t, dir, "commit", "-m", message)
 }

@@ -35,7 +35,6 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
-	"github.com/elastic/elastic-agent/dev-tools/mage/release"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	filecopy "github.com/otiai10/copy"
@@ -4380,75 +4379,53 @@ func getMacOSMajorVersion() (int, error) {
 	return majorVer, nil
 }
 
+const releaseToolDir = "dev-tools/mage/release"
+
+// runReleaseTool invokes the nested-module CLI with the Elastic Agent repo as cwd.
+func runReleaseTool(args ...string) error {
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	env := map[string]string{"ELASTIC_AGENT_REPO_ROOT": root}
+	cmdArgs := append([]string{"run", "-C", releaseToolDir, "./cmd/agent-release"}, args...)
+	return sh.RunWithV(env, "go", cmdArgs...)
+}
+
 // UpdateVersion updates the version in version/version.go
 func (Release) UpdateVersion(version string) error {
-	return release.UpdateVersion(version)
+	return runReleaseTool("update-version", version)
 }
 
 // UpdateDocs updates version references in documentation and K8s manifests
 func (Release) UpdateDocs(version string) error {
-	return release.UpdateDocs(version)
+	return runReleaseTool("update-docs", version)
 }
 
 // UpdatePatchDocs updates :stack-version: in version/docs/version.asciidoc
 func (Release) UpdatePatchDocs(version string) error {
-	return release.UpdatePatchDocs(version)
+	return runReleaseTool("update-patch-docs", version)
 }
 
 // UpdateMergify adds a new backport rule to .mergify.yml
 func (Release) UpdateMergify(version string) error {
-	return release.UpdateMergify(version)
-}
-
-// PrepareMajorMinor prepares files for a major/minor release using env vars
-func (Release) PrepareMajorMinor() error {
-	cfg, err := release.LoadConfigFromEnv()
-	if err != nil {
-		return err
-	}
-	return release.PrepareMajorMinorRelease(cfg)
-}
-
-// CreateBranch creates a release branch with all changes committed
-func (Release) CreateBranch() error {
-	cfg, err := release.LoadConfigFromEnv()
-	if err != nil {
-		return err
-	}
-	return release.CreateReleaseBranch(cfg, ".")
-}
-
-// CreatePR creates a pull request for the release (requires GITHUB_TOKEN)
-func (Release) CreatePR() error {
-	cfg, err := release.LoadConfigFromEnv()
-	if err != nil {
-		return err
-	}
-
-	ghClient, err := release.NewGitHubClientFromEnv()
-	if err != nil {
-		return err
-	}
-
-	return release.CreateReleasePR(cfg, ghClient)
+	return runReleaseTool("update-mergify", version)
 }
 
 // RunMajorMinor orchestrates the complete major/minor release workflow
 // Set DRY_RUN=true to preview changes without pushing
 func (Release) RunMajorMinor() error {
-	cfg, err := release.LoadConfigFromEnv()
-	if err != nil {
-		return err
-	}
-	return release.RunMajorMinorRelease(cfg)
+	return runReleaseTool("run-major-minor")
 }
 
 // RunPatch orchestrates the complete patch release workflow
 // Set DRY_RUN=true to preview changes without pushing
 func (Release) RunPatch() error {
-	cfg, err := release.LoadConfigFromEnv()
-	if err != nil {
-		return err
-	}
-	return release.RunPatchRelease(cfg)
+	return runReleaseTool("run-patch")
+}
+
+// EnsureIssueTracker creates or updates the Elastic Agent release checklist issue for
+// CURRENT_RELEASE, linking related Elastic Agent PRs labeled "release".
+func (Release) EnsureIssueTracker() error {
+	return runReleaseTool("ensure-issue-tracker")
 }

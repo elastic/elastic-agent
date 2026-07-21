@@ -52,9 +52,7 @@ func prDNextPatchLabels() []string {
 	return append(append([]string{}, releasePRLabels...), mergeLabelAfterRelease)
 }
 
-// patchReleasePRLabels match Beats collapsed before-build patch PRs
-// (docs + in progress + release automation labels).
-func patchReleasePRLabels() []string {
+func patchBeforeBuildPRLabels() []string {
 	return append(append([]string{}, patchDocsPRLabels...), mergeLabelBeforeBuild)
 }
 
@@ -69,6 +67,7 @@ func checkRequirements(cfg *ReleaseConfig) error {
 	if len(parts) >= 3 {
 		patch = parts[2]
 	}
+
 	if (major == "6" || major == "7" || major == "8") && patch == "0" {
 		return fmt.Errorf("minor releases for version %s.x are deprecated and blocked", major)
 	}
@@ -95,6 +94,11 @@ type workflowPR struct {
 	opts   PROptions
 }
 
+type workflowPRResult struct {
+	item workflowPR
+	pr   *github.PullRequest
+}
+
 // RunMajorMinorRelease executes the feature-freeze workflow:
 // 1. Creates the release branch from BASE_BRANCH
 // 2. Opens PR-A on main (backport rule + next minor version + manifests)
@@ -104,15 +108,24 @@ type workflowPR struct {
 func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Major/Minor Release Workflow ===")
 
+	if err := cfg.EnsureLatestRelease(); err != nil {
+		return err
+	}
+
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
+
 	if err := checkRequirements(cfg); err != nil {
 		return err
 	}
 
 	repo, err := OpenRepo(".")
 	if err != nil {
+		return err
+	}
+
+	if err := ensureMajorMinorCurrentReleaseMatchesBase(repo, cfg); err != nil {
 		return err
 	}
 
@@ -148,6 +161,7 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 		for _, item := range branchesToFinalize {
 			fmt.Printf("Branch prepared: %s\n", item.branch)
 		}
+		warnEnsureReleaseIssueTracker(cfg, nil)
 		return nil
 	}
 
@@ -159,26 +173,17 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	}
 
 	gh := NewGitHubClient(cfg.GitHubToken)
-	var prs []*github.PullRequest
-	for i, item := range branchesToFinalize {
-		pr, err := finalizePR(repo, gh, item.branch, item.base, item.opts)
-		if err != nil {
-			return fmt.Errorf("failed to finalize PR %d/%d: %w", i+1, len(branchesToFinalize), err)
-		}
-		if pr != nil {
-			prs = append(prs, pr)
-		}
+	results, err := finalizeWorkflowPRs(repo, gh, branchesToFinalize)
+	if err != nil {
+		return err
 	}
 
 	fmt.Printf("\n=== Major/Minor Release Workflow Complete ===\n")
 	fmt.Printf("Release branch created: %s\n", releaseBranch)
-	for i, pr := range prs {
-		fmt.Printf("PR %d: %s\n", i+1, pr.GetHTMLURL())
-	}
-	if len(prs) == 0 {
-		fmt.Println("No PRs created (release already up to date)")
-	}
+	printWorkflowPRResults(results)
+	fmt.Println("\nNote: Release notes PR should be created separately via .github/workflows/release-notes.yml")
 
+	warnEnsureReleaseIssueTracker(cfg, prsFromWorkflowResults(results))
 	return nil
 }
 
@@ -195,11 +200,10 @@ func prepMainBackportAndVersion(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, 
 	if err := UpdateVersion(cfg.NextProjectMinorVersion); err != nil {
 		return workflowPR{}, err
 	}
-	// Match vault bump-version PRs that also refresh deployment manifests.
 	if err := UpdateDocs(cfg.NextProjectMinorVersion); err != nil {
 		return workflowPR{}, err
 	}
-	commitMsg := fmt.Sprintf("[Release] Prepare main for %s (backport + version %s)", cfg.CurrentRelease, cfg.NextProjectMinorVersion)
+	commitMsg := fmt.Sprintf("[Release %s] Prepare main for %s and mergify backport-%s", cfg.CurrentRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch)
 	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
 	}
@@ -210,7 +214,7 @@ func prepMainBackportAndVersion(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, 
 		opts: PROptions{
 			Owner:     cfg.ProjectOwner,
 			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release] Prepare main for %s (backport + version %s)", cfg.CurrentRelease, cfg.NextProjectMinorVersion),
+			Title:     fmt.Sprintf("[Release %s] Prepare main for %s and mergify backport-%s", cfg.CurrentRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch),
 			Head:      branch,
 			Base:      cfg.BaseBranch,
 			Body:      prAMainBody(cfg),
@@ -234,13 +238,14 @@ func prepFFRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 		BaseBranch:     cfg.BaseBranch,
 		CurrentVersion: cfg.CurrentRelease,
 		ReleaseBranch:  cfg.ReleaseBranch,
+		DocBranch:      "main",
 	}); err != nil {
 		return workflowPR{}, err
 	}
 	if err := runMageUpdate(); err != nil {
 		return workflowPR{}, err
 	}
-	commitMsg := fmt.Sprintf("ff-release: update versions %s", cfg.CurrentRelease)
+	commitMsg := fmt.Sprintf("[Release %s] ff-release: update versions %s", cfg.CurrentRelease, cfg.CurrentRelease)
 	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
 	}
@@ -251,7 +256,7 @@ func prepFFRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 		opts: PROptions{
 			Owner:     cfg.ProjectOwner,
 			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("ff-release: update versions %s", cfg.CurrentRelease),
+			Title:     fmt.Sprintf("[Release %s] ff-release: update versions %s", cfg.CurrentRelease, cfg.CurrentRelease),
 			Head:      branch,
 			Base:      cfg.ReleaseBranch,
 			Body:      prBReleaseBody(cfg),
@@ -277,7 +282,7 @@ func prepMainDocs(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	}); err != nil {
 		return workflowPR{}, err
 	}
-	commitMsg := fmt.Sprintf("[Release] Update docs for %s", cfg.NextProjectMinorVersion)
+	commitMsg := fmt.Sprintf("[Release %s] Update docs for %s", cfg.CurrentRelease, cfg.NextProjectMinorVersion)
 	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
 	}
@@ -288,7 +293,7 @@ func prepMainDocs(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 		opts: PROptions{
 			Owner:     cfg.ProjectOwner,
 			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release] Update docs for the %s release", cfg.NextProjectMinorVersion),
+			Title:     fmt.Sprintf("[Release %s] Update docs for the %s release", cfg.CurrentRelease, cfg.NextProjectMinorVersion),
 			Head:      branch,
 			Base:      cfg.BaseBranch,
 			Body:      prCMainBody(cfg),
@@ -305,14 +310,13 @@ func prepNextPatchOnReleaseBranch(repo *GitRepo, cfg *ReleaseConfig) (workflowPR
 	if err := repo.EnsureBranchFrom(cfg.ReleaseBranch, branch); err != nil {
 		return workflowPR{}, err
 	}
-	// elastic-agent.mak prepare-next-release: update-version (+ mage update when needed)
 	if err := UpdateVersion(cfg.NextRelease); err != nil {
 		return workflowPR{}, err
 	}
 	if err := runMageUpdate(); err != nil {
 		return workflowPR{}, err
 	}
-	commitMsg := fmt.Sprintf("[Release] Update version to %s", cfg.NextRelease)
+	commitMsg := fmt.Sprintf("[Release %s] Update version to %s", cfg.CurrentRelease, cfg.NextRelease)
 	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
 	}
@@ -323,7 +327,7 @@ func prepNextPatchOnReleaseBranch(repo *GitRepo, cfg *ReleaseConfig) (workflowPR
 		opts: PROptions{
 			Owner:     cfg.ProjectOwner,
 			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release] Update version to %s", cfg.NextRelease),
+			Title:     fmt.Sprintf("[Release %s] Update version to %s", cfg.CurrentRelease, cfg.NextRelease),
 			Head:      branch,
 			Base:      cfg.ReleaseBranch,
 			Body:      prDNextPatchBody(cfg),
@@ -334,46 +338,85 @@ func prepNextPatchOnReleaseBranch(repo *GitRepo, cfg *ReleaseConfig) (workflowPR
 }
 
 func prAMainBody(cfg *ReleaseConfig) string {
-	return fmt.Sprintf(`Prepares main for the %s feature freeze.
+	return fmt.Sprintf(`## [Release %s]
+
+Prepares %s for the %s feature freeze.
 
 - Adds Mergify backport rule for branch %s (label %s)
-- Bumps version/version.go to %s
+- Bumps version/version.go to %s (next minor)
 - Refreshes deployment manifests for %s
 
-Merge as soon as the %s branch is created.
-`, cfg.CurrentRelease, cfg.ReleaseBranch, backportLabel(cfg.ReleaseBranch), cfg.NextProjectMinorVersion, cfg.NextProjectMinorVersion, cfg.ReleaseBranch)
+**Merge:** before release branch work is finalized.
+`, cfg.CurrentRelease, cfg.BaseBranch, cfg.CurrentRelease, cfg.ReleaseBranch, backportLabel(cfg.ReleaseBranch), cfg.NextProjectMinorVersion, cfg.NextProjectMinorVersion)
 }
 
 func prBReleaseBody(cfg *ReleaseConfig) string {
-	return fmt.Sprintf(`Feature-freeze release branch updates for %s.
+	return fmt.Sprintf(`## [Release %s]
 
-Merge as soon as the %s branch exists.
-`, cfg.CurrentRelease, cfg.ReleaseBranch)
+Feature-freeze release branch updates for %s (version, docs, mage update).
+
+**Merge:** as soon as the %s branch exists.
+`, cfg.CurrentRelease, cfg.CurrentRelease, cfg.ReleaseBranch)
 }
 
 func prCMainBody(cfg *ReleaseConfig) string {
-	return fmt.Sprintf(`Updates documentation for the next minor %s.
+	return fmt.Sprintf(`## [Release %s]
 
-Merge after the %s branch is created.
-`, cfg.NextProjectMinorVersion, cfg.ReleaseBranch)
+Updates documentation on %s for the next minor %s.
+
+**Merge:** after the %s branch is created. CI may stay red until Docker images exist.
+`, cfg.CurrentRelease, cfg.BaseBranch, cfg.NextProjectMinorVersion, cfg.ReleaseBranch)
 }
 
 func prDNextPatchBody(cfg *ReleaseConfig) string {
-	return fmt.Sprintf(`Prepares the %s branch for the next patch release %s.
+	return fmt.Sprintf(`## [Release %s]
 
-Merge after release of %s.
-`, cfg.ReleaseBranch, cfg.NextRelease, cfg.CurrentRelease)
+Prepares the %s branch after release of %s.
+
+- Bumps version/version.go to %s
+- Runs mage update for generated artifacts
+
+**Merge:** after the release of %s.
+`, cfg.CurrentRelease, cfg.ReleaseBranch, cfg.CurrentRelease, cfg.NextRelease, cfg.CurrentRelease)
+}
+
+func ensureMajorMinorCurrentReleaseMatchesBase(repo *GitRepo, cfg *ReleaseConfig) error {
+	base := cfg.BaseBranch
+	if base == "" {
+		base = "main"
+	}
+	if err := repo.CheckoutBranch(base); err != nil {
+		return err
+	}
+	branchVersion, err := ReadAgentVersion()
+	if err != nil {
+		return err
+	}
+	if branchVersion != cfg.CurrentRelease {
+		return fmt.Errorf(
+			"CURRENT_RELEASE=%s does not match version on %s (%s in version/version.go); "+
+				"set CURRENT_RELEASE to the version already on %s (the minor being feature-frozen)",
+			cfg.CurrentRelease, base, branchVersion, base,
+		)
+	}
+	fmt.Printf("Verified CURRENT_RELEASE=%s matches %s on branch %s\n", cfg.CurrentRelease, branchVersion, base)
+	return nil
 }
 
 // RunPatchRelease executes the patch release workflow on an existing release branch:
-// 1. Opens PR-A (version + docs/manifests for CURRENT_RELEASE) — merge before build
-// 2. Opens PR-B (next patch prep) — merge after release
+// 1. Opens PR-A (docs only for CURRENT_RELEASE — before build; version already on branch)
+// 2. Opens PR-B (next patch version — after release)
 func RunPatchRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Patch Release Workflow ===")
+
+	if err := cfg.EnsureLatestRelease(); err != nil {
+		return err
+	}
 
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
+
 	if err := checkRequirements(cfg); err != nil {
 		return err
 	}
@@ -387,7 +430,11 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 		cfg.ReleaseBranch = inferReleaseBranch(cfg.CurrentRelease)
 	}
 
-	prA, err := prepPatchRelease(repo, cfg)
+	if err := ensurePatchCurrentReleaseMatchesBranch(repo, cfg); err != nil {
+		return err
+	}
+
+	prA, err := prepPatchBeforeBuild(repo, cfg)
 	if err != nil {
 		return err
 	}
@@ -403,52 +450,57 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 		for _, item := range branchesToFinalize {
 			fmt.Printf("Branch prepared: %s\n", item.branch)
 		}
+		warnEnsureReleaseIssueTracker(cfg, nil)
 		return nil
 	}
 
 	gh := NewGitHubClient(cfg.GitHubToken)
-	var prs []*github.PullRequest
-	for i, item := range branchesToFinalize {
-		pr, err := finalizePR(repo, gh, item.branch, item.base, item.opts)
-		if err != nil {
-			return fmt.Errorf("failed to finalize PR %d/%d: %w", i+1, len(branchesToFinalize), err)
-		}
-		if pr != nil {
-			prs = append(prs, pr)
-		}
+	results, err := finalizeWorkflowPRs(repo, gh, branchesToFinalize)
+	if err != nil {
+		return err
 	}
 
 	fmt.Printf("\n=== Patch Release Workflow Complete ===\n")
-	for i, pr := range prs {
-		fmt.Printf("PR %d: %s\n", i+1, pr.GetHTMLURL())
-	}
-	if len(prs) == 0 {
-		fmt.Println("No PRs created (release already up to date)")
-	}
+	printWorkflowPRResults(results)
+	fmt.Println("\nNote: Release notes PR should be created separately via .github/workflows/release-notes.yml")
 
+	warnEnsureReleaseIssueTracker(cfg, prsFromWorkflowResults(results))
 	return nil
 }
 
-// prepPatchRelease groups former update-version + update-docs-version into one
-// before-build PR (same merge gate as Beats runPatch PR-A).
-func prepPatchRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
+func ensurePatchCurrentReleaseMatchesBranch(repo *GitRepo, cfg *ReleaseConfig) error {
+	if err := repo.CheckoutBranch(cfg.ReleaseBranch); err != nil {
+		return err
+	}
+	branchVersion, err := ReadAgentVersion()
+	if err != nil {
+		return err
+	}
+	if branchVersion != cfg.CurrentRelease {
+		return fmt.Errorf(
+			"CURRENT_RELEASE=%s does not match version on branch %s (%s in version/version.go); "+
+				"set CURRENT_RELEASE to the version already on the release branch (the patch being released)",
+			cfg.CurrentRelease, cfg.ReleaseBranch, branchVersion,
+		)
+	}
+	fmt.Printf("Verified CURRENT_RELEASE=%s matches %s on branch %s\n", cfg.CurrentRelease, branchVersion, cfg.ReleaseBranch)
+	return nil
+}
+
+func prepPatchBeforeBuild(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	branch := fmt.Sprintf("patch-release-%s", cfg.CurrentRelease)
-	fmt.Printf("\n--- Preparing PR-A: patch release %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch)
+	fmt.Printf("\n--- Preparing PR-A: docs for %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch)
 
 	if err := repo.EnsureBranchFrom(cfg.ReleaseBranch, branch); err != nil {
-		return workflowPR{}, err
-	}
-	if err := UpdateVersion(cfg.CurrentRelease); err != nil {
 		return workflowPR{}, err
 	}
 	if err := UpdateDocs(cfg.CurrentRelease); err != nil {
 		return workflowPR{}, err
 	}
-	// Former update-docs-version target; idempotent when UpdateDocs already set stack-version.
 	if err := UpdatePatchDocs(cfg.CurrentRelease); err != nil {
 		return workflowPR{}, err
 	}
-	commitMsg := fmt.Sprintf("patch-release: update versions %s", cfg.CurrentRelease)
+	commitMsg := fmt.Sprintf("[Release %s] Update docs versions %s", cfg.CurrentRelease, cfg.CurrentRelease)
 	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
 	}
@@ -459,21 +511,105 @@ func prepPatchRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 		opts: PROptions{
 			Owner:     cfg.ProjectOwner,
 			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release] Prepare patch release %s", cfg.CurrentRelease),
+			Title:     fmt.Sprintf("[Release %s] Update docs versions %s", cfg.CurrentRelease, cfg.CurrentRelease),
 			Head:      branch,
 			Base:      cfg.ReleaseBranch,
-			Body:      patchReleasePRBody(cfg.CurrentRelease),
+			Body:      patchBeforeBuildPRBody(cfg.CurrentRelease),
 			Reviewers: cfg.ProjectReviewers,
-			Labels:    patchReleasePRLabels(),
+			Labels:    patchBeforeBuildPRLabels(),
 		},
 	}, nil
 }
 
-func patchReleasePRBody(currentRelease string) string {
-	return fmt.Sprintf(`Prepares patch release %s (version, docs, and deploy manifests).
+func patchBeforeBuildPRBody(currentRelease string) string {
+	return fmt.Sprintf(`## [Release %s]
 
-Merge before the final Release build.
-`, currentRelease)
+Updates docs versions to %s (former prepare-patch-release docs PR).
+
+- Updates :stack-version: / :doc-branch: and K8s manifests
+- Does **not** bump version/version.go (already %s on the release branch)
+
+**Merge:** before the final Release build.
+`, currentRelease, currentRelease, currentRelease)
+}
+
+func finalizeWorkflowPRs(repo *GitRepo, gh *GitHubClient, items []workflowPR) ([]workflowPRResult, error) {
+	results := make([]workflowPRResult, 0, len(items))
+	for i, item := range items {
+		pr, err := finalizePR(repo, gh, item.branch, item.base, item.opts)
+		if err != nil {
+			return results, fmt.Errorf("failed to finalize PR %d/%d: %w", i+1, len(items), err)
+		}
+		results = append(results, workflowPRResult{item: item, pr: pr})
+	}
+	return results, nil
+}
+
+func printWorkflowPRResults(results []workflowPRResult) {
+	for i, result := range results {
+		fmt.Println(formatWorkflowPRLine(i+1, result))
+	}
+}
+
+func prsFromWorkflowResults(results []workflowPRResult) []*github.PullRequest {
+	var prs []*github.PullRequest
+	for _, result := range results {
+		if result.pr != nil {
+			prs = append(prs, result.pr)
+		}
+	}
+	return prs
+}
+
+func formatWorkflowPRLine(index int, result workflowPRResult) string {
+	if result.pr != nil {
+		return fmt.Sprintf("PR %d: %s (%s)", index, result.pr.GetHTMLURL(), prDisplayState(result.pr))
+	}
+	return fmt.Sprintf(
+		"PR %d: skipped (no related open/merged PR for %s → %s)",
+		index, result.item.branch, result.item.base,
+	)
+}
+
+// finalizePR pushes a branch when it has new commits and creates or reuses an open PR.
+// When the branch has nothing new to push, it still resolves a related open or merged PR
+// so workflow summaries always list every expected slot.
+func finalizePR(repo *GitRepo, gh *GitHubClient, branchName, baseBranch string, opts PROptions) (*github.PullRequest, error) {
+	if err := repo.CheckoutBranch(branchName); err != nil {
+		return nil, err
+	}
+
+	existingPR, found, err := gh.FindOpenPR(opts.Owner, opts.Repo, opts.Head, opts.Base)
+	if err != nil {
+		return nil, err
+	}
+	if found {
+		gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels)
+		return existingPR, nil
+	}
+
+	ahead, err := repo.HasCommitsAheadOf(baseBranch)
+	if err != nil {
+		return nil, err
+	}
+	if !ahead {
+		fmt.Printf("No new commits on %s compared to %s; skipping push and PR creation\n", branchName, baseBranch)
+		related, found, err := gh.FindRelatedPR(opts.Owner, opts.Repo, opts.Head, opts.Base, opts.Title)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			fmt.Printf("Related PR #%d (%s): %s\n", related.GetNumber(), prDisplayState(related), related.GetHTMLURL())
+			return related, nil
+		}
+		return nil, nil
+	}
+
+	if err := repo.Push("origin"); err != nil {
+		return nil, err
+	}
+
+	return gh.CreatePR(opts)
 }
 
 // CreateReleaseBranch creates the release branch from main and commits prepared changes.
@@ -504,7 +640,7 @@ func CreateReleaseBranch(cfg *ReleaseConfig, repoPath string) error {
 		return err
 	}
 
-	commitMsg := fmt.Sprintf("[Release] Prepare release %s", cfg.CurrentRelease)
+	commitMsg := fmt.Sprintf("[Release %s] Prepare release %s", cfg.CurrentRelease, cfg.CurrentRelease)
 	if _, err := gitRepo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return err
 	}
@@ -560,35 +696,4 @@ func majorMinorPRBody(version string) string {
 - [ ] Confirm mergify config is updated
 - [ ] Run integration tests
 `, version, version)
-}
-
-// finalizePR pushes a branch when it has new commits and creates or reuses an open PR.
-func finalizePR(repo *GitRepo, gh *GitHubClient, branchName, baseBranch string, opts PROptions) (*github.PullRequest, error) {
-	if err := repo.CheckoutBranch(branchName); err != nil {
-		return nil, err
-	}
-
-	existingPR, found, err := gh.FindOpenPR(opts.Owner, opts.Repo, opts.Head, opts.Base)
-	if err != nil {
-		return nil, err
-	}
-	if found {
-		gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels)
-		return existingPR, nil
-	}
-
-	ahead, err := repo.HasCommitsAheadOf(baseBranch)
-	if err != nil {
-		return nil, err
-	}
-	if !ahead {
-		fmt.Printf("No new commits on %s compared to %s; skipping push and PR creation\n", branchName, baseBranch)
-		return nil, nil
-	}
-
-	if err := repo.Push("origin"); err != nil {
-		return nil, err
-	}
-
-	return gh.CreatePR(opts)
 }
