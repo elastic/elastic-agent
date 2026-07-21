@@ -2511,7 +2511,7 @@ func TestOtelElasticsearchStateStore_Agentless(t *testing.T) {
 			{Type: define.Darwin},
 		},
 		Stack: &define.Stack{},
-	})
+	}) //nolint:staticheck // This needs to be the first statement in the test body
 	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/13822")
 
 	esEndpoint, err := integration.GetESHost()
