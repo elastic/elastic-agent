@@ -375,6 +375,21 @@ func collectComponentInputMetrics(md pmetric.Metrics) map[string]componentInputD
 	return components
 }
 
+// receiverMetricField builds the Beats monitoring field path for a metric
+// emitted by the RegistryBridge. The RegistryBridge uses raw monitoring registry
+// keys as OTel metric names, which already carry a namespace prefix:
+//
+//   - "libbeat.*" keys are generic across all beat types: beat.stats.libbeat.*
+//   - "<beatType>.*" keys already carry the type prefix; adding it again would
+//     produce a double prefix.
+//   - Unqualified names get the beat-type prefix: beat.stats.<beatType>.<name>.
+func receiverMetricField(beatType, metricName string) string {
+	if strings.HasPrefix(metricName, "libbeat.") || strings.HasPrefix(metricName, beatType+".") {
+		return "beat.stats." + metricName
+	}
+	return "beat.stats." + beatType + "." + metricName
+}
+
 // addReceiverDataPoint records a single data point from a RegistryBridge metric
 // into the components map. otelID is the receiver's OTel component ID.
 func addReceiverDataPoint(components map[string]map[string]any, dp pmetric.NumberDataPoint, otelID string, metricName string) {
@@ -382,7 +397,7 @@ func addReceiverDataPoint(components map[string]map[string]any, dp pmetric.Numbe
 	if compID == "" {
 		return
 	}
-	field := "beat.stats." + beatTypeFromOtelID(otelID) + "." + metricName
+	field := receiverMetricField(beatTypeFromOtelID(otelID), metricName)
 	if _, exists := components[compID]; !exists {
 		components[compID] = map[string]any{}
 	}
@@ -393,8 +408,9 @@ func addReceiverDataPoint(components map[string]map[string]any, dp pmetric.Numbe
 
 // collectReceiverMetrics collects all metrics emitted by the RegistryBridge
 // (scope name: registryBridgeScopeName). Each data point carries a "receiver"
-// attribute containing the OTel component ID. Metrics are mapped to fields as
-// "beat.stats.{beatType}.{metricName}", matching the standard Beats monitoring schema.
+// attribute containing the OTel component ID. Metrics are mapped using
+// receiverMetricField so that libbeat.* and <beatType>.* prefixes are handled
+// correctly.
 func collectReceiverMetrics(md pmetric.Metrics) map[string]map[string]any {
 	components := map[string]map[string]any{}
 	for i := 0; i < md.ResourceMetrics().Len(); i++ {

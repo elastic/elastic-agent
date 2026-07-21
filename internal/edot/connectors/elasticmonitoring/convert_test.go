@@ -399,3 +399,42 @@ func TestAgentComponentID(t *testing.T) {
 		})
 	}
 }
+
+func TestReceiverMetricField(t *testing.T) {
+	tests := []struct {
+		beatType   string
+		metricName string
+		expected   string
+	}{
+		// libbeat.* names: no beat-type infix
+		{"filebeat", "libbeat.output.events.total", "beat.stats.libbeat.output.events.total"},
+		{"filebeat", "libbeat.output.events.acked", "beat.stats.libbeat.output.events.acked"},
+		// beat-type prefixed names: no double-prefix
+		{"filebeat", "filebeat.harvester.running", "beat.stats.filebeat.harvester.running"},
+		{"metricbeat", "metricbeat.some.metric", "beat.stats.metricbeat.some.metric"},
+		// unqualified names: get beat-type infix
+		{"filebeat", "pipeline.clients", "beat.stats.filebeat.pipeline.clients"},
+		{"filebeat", "harvester.running", "beat.stats.filebeat.harvester.running"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.beatType+"/"+tt.metricName, func(t *testing.T) {
+			assert.Equal(t, tt.expected, receiverMetricField(tt.beatType, tt.metricName))
+		})
+	}
+}
+
+func TestCollectReceiverPipelineMetrics_LibbeatPrefix(t *testing.T) {
+	// libbeat.* metric names should NOT get an extra beat-type infix.
+	const receiverID = "filebeatreceiver/_agent-component/filestream-default"
+	md, sm := newMetricsWithRegistryBridgeScope()
+	appendSumIntWithAttrs(sm, "libbeat.output.events.total", int64(200), registryBridgeReceiverKey, receiverID)
+	appendSumIntWithAttrs(sm, "libbeat.output.events.acked", int64(180), registryBridgeReceiverKey, receiverID)
+
+	result := collectReceiverMetrics(md)
+	require.Len(t, result, 1)
+	fields := result["filestream-default"]
+	assert.Equal(t, int64(200), fields["beat.stats.libbeat.output.events.total"])
+	assert.Equal(t, int64(180), fields["beat.stats.libbeat.output.events.acked"])
+	// Confirm the double-prefix form does NOT exist
+	assert.Nil(t, fields["beat.stats.filebeat.libbeat.output.events.total"])
+}
