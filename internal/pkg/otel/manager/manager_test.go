@@ -133,7 +133,7 @@ func testExecutionFactory(testBinary string, inner ExecutionFactory) (ExecutionF
 		if inner != nil {
 			exec, err = inner(testBinary, healthCheckExtID, healthCheckPort)
 		} else {
-			exec, err = newSubprocessExecution(testBinary, healthCheckExtID, healthCheckPort)
+			exec, err = newSubprocessExecution(testBinary, healthCheckExtID, healthCheckPort, true)
 		}
 		if err != nil {
 			return nil, err
@@ -442,10 +442,15 @@ func TestOTelManager_Run(t *testing.T) {
 				m.Update(cfg, nil, logp.InfoLevel, nil)
 				e.EnsureHealthy(t, updateTime)
 
-				// trigger update
+				// trigger update: switch the collector log level to debug.
 				updateTime = time.Now()
-				ok := cfg.Delete("service::telemetry::logs::level") // modify the config
-				require.True(t, ok)
+				require.NoError(t, cfg.Merge(confmap.NewFromStringMap(map[string]any{
+					"service": map[string]any{
+						"telemetry": map[string]any{
+							"logs": map[string]any{"level": "debug"},
+						},
+					},
+				})))
 				m.Update(cfg, nil, logp.InfoLevel, nil)
 				e.EnsureHealthy(t, updateTime)
 
@@ -596,7 +601,7 @@ func TestOTelManager_Run(t *testing.T) {
 			name: "subprocess collector killed if delayed and manager is stopped",
 			makeExecFactory: func(collectorRunErr chan error) ExecutionFactory {
 				return func(collectorPath, healthCheckExtID string, healthCheckPort int) (collectorExecution, error) {
-					exec, err := newSubprocessExecution(collectorPath, healthCheckExtID, healthCheckPort)
+					exec, err := newSubprocessExecution(collectorPath, healthCheckExtID, healthCheckPort, true)
 					if err != nil {
 						return nil, err
 					}
@@ -648,7 +653,7 @@ func TestOTelManager_Run(t *testing.T) {
 			name: "subprocess collector gracefully exited if delayed a bit and manager is stopped",
 			makeExecFactory: func(collectorRunErr chan error) ExecutionFactory {
 				return func(collectorPath, healthCheckExtID string, healthCheckPort int) (collectorExecution, error) {
-					exec, err := newSubprocessExecution(collectorPath, healthCheckExtID, healthCheckPort)
+					exec, err := newSubprocessExecution(collectorPath, healthCheckExtID, healthCheckPort, true)
 					if err != nil {
 						return nil, err
 					}
@@ -833,7 +838,7 @@ func TestOTelManager_Run(t *testing.T) {
 			}
 			factory, testExec := testExecutionFactory(testBinary, innerFactory)
 
-			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory)
+			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
 			require.NoError(t, err, "could not create otel manager")
 			m.recoveryTimer = tc.restarter
 			if tc.makeExecFactory != nil {
@@ -905,7 +910,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			factory, _ := testExecutionFactory(testBinary, nil)
-			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory)
+			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
 			require.NoError(t, err, "could not create otel manager")
 
 			go func() {
@@ -942,6 +947,220 @@ func TestOTelManager_Logging(t *testing.T) {
 			}, time.Second*10, time.Second)
 		})
 	}
+}
+
+// TestOTelManager_PartialReceiverReload drives the real supervised collector
+// subprocess through the manager and verifies that adding a receiver to an
+// existing pipeline results in a partial receiver reload (feature gates
+// service.partialReload / service.partialReloadReceivers, passed by
+// newSubprocessExecution) rather than a full service restart.
+func TestOTelManager_PartialReceiverReload(t *testing.T) {
+	wd, erWd := os.Getwd()
+	require.NoError(t, erWd, "cannot get working directory")
+
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
+	require.FileExists(t, testBinary, "testing binary not found")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	const waitTimeForStop = 30 * time.Second
+
+	base, obs := loggertest.New("otel")
+	l, _ := loggertest.New("otel-manager")
+
+	factory, _ := testExecutionFactory(testBinary, nil)
+	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
+	require.NoError(t, err, "could not create otel manager")
+
+	go func() {
+		err := m.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+	}()
+	go func() {
+		for {
+			select {
+			case <-m.WatchCollector():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	countMsg := func(msg string) int {
+		n := 0
+		for _, entry := range obs.All() {
+			if strings.Contains(entry.Message, msg) {
+				n++
+			}
+		}
+		return n
+	}
+
+	// initial config: single nop receiver feeding a logs pipeline.
+	initialCfg := map[string]interface{}{
+		"receivers":  map[string]interface{}{"nop": map[string]interface{}{}},
+		"processors": map[string]interface{}{"batch": map[string]interface{}{}},
+		"exporters":  map[string]interface{}{"nop": map[string]interface{}{}},
+		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{"level": "none", "readers": []any{}},
+			},
+			"pipelines": map[string]interface{}{
+				"logs": map[string]interface{}{
+					"receivers":  []string{"nop"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"nop"},
+				},
+			},
+		},
+	}
+	m.Update(confmap.NewFromStringMap(initialCfg), nil, logp.InfoLevel, nil)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.Positive(collect, countMsg("Everything is ready. Begin running and processing data"),
+			"collector did not start")
+	}, 30*time.Second, 500*time.Millisecond)
+
+	// updated config: add a second nop receiver to the same logs pipeline. This is
+	// a receiver-only change, so the collector should reload only the receivers.
+	updatedCfg := map[string]interface{}{
+		"receivers": map[string]interface{}{
+			"nop":   map[string]interface{}{},
+			"nop/2": map[string]interface{}{},
+		},
+		"processors": map[string]interface{}{"batch": map[string]interface{}{}},
+		"exporters":  map[string]interface{}{"nop": map[string]interface{}{}},
+		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{"level": "none", "readers": []any{}},
+			},
+			"pipelines": map[string]interface{}{
+				"logs": map[string]interface{}{
+					"receivers":  []string{"nop", "nop/2"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"nop"},
+				},
+			},
+		},
+	}
+	restartsBefore := countMsg("Config updated, restart service")
+	m.Update(confmap.NewFromStringMap(updatedCfg), nil, logp.InfoLevel, nil)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.Positive(collect, countMsg("Config updated, performing partial receiver reload"),
+			"collector did not perform a partial receiver reload after a receiver-only change")
+	}, 30*time.Second, 500*time.Millisecond)
+
+	assert.Equal(t, restartsBefore, countMsg("Config updated, restart service"),
+		"collector performed a full service restart instead of a partial receiver reload")
+}
+
+// TestOTelManager_FullReloadWhenPartialReloadDisabled verifies that when partial
+// reload is disabled, a receiver-only config change triggers a full service
+// restart rather than a partial receiver reload.
+func TestOTelManager_FullReloadWhenPartialReloadDisabled(t *testing.T) {
+	wd, erWd := os.Getwd()
+	require.NoError(t, erWd, "cannot get working directory")
+
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
+	require.FileExists(t, testBinary, "testing binary not found")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	const waitTimeForStop = 30 * time.Second
+
+	base, obs := loggertest.New("otel")
+	l, _ := loggertest.New("otel-manager")
+
+	// Use an inner factory that explicitly disables partial reload.
+	innerFactory := func(collectorPath, healthCheckExtID string, healthCheckPort int) (collectorExecution, error) {
+		return newSubprocessExecution(collectorPath, healthCheckExtID, healthCheckPort, false)
+	}
+	factory, _ := testExecutionFactory(testBinary, innerFactory)
+	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, false)
+	require.NoError(t, err, "could not create otel manager")
+
+	go func() {
+		err := m.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+	}()
+	go func() {
+		for {
+			select {
+			case <-m.WatchCollector():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	countMsg := func(msg string) int {
+		n := 0
+		for _, entry := range obs.All() {
+			if strings.Contains(entry.Message, msg) {
+				n++
+			}
+		}
+		return n
+	}
+
+	// initial config: single nop receiver feeding a logs pipeline.
+	initialCfg := map[string]interface{}{
+		"receivers":  map[string]interface{}{"nop": map[string]interface{}{}},
+		"processors": map[string]interface{}{"batch": map[string]interface{}{}},
+		"exporters":  map[string]interface{}{"nop": map[string]interface{}{}},
+		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{"level": "none", "readers": []any{}},
+			},
+			"pipelines": map[string]interface{}{
+				"logs": map[string]interface{}{
+					"receivers":  []string{"nop"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"nop"},
+				},
+			},
+		},
+	}
+	m.Update(confmap.NewFromStringMap(initialCfg), nil, logp.InfoLevel, nil)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.Positive(collect, countMsg("Everything is ready. Begin running and processing data"),
+			"collector did not start")
+	}, 30*time.Second, 500*time.Millisecond)
+
+	// updated config: add a second nop receiver to the same logs pipeline.
+	// With partial reload disabled this must trigger a full service restart.
+	updatedCfg := map[string]interface{}{
+		"receivers": map[string]interface{}{
+			"nop":   map[string]interface{}{},
+			"nop/2": map[string]interface{}{},
+		},
+		"processors": map[string]interface{}{"batch": map[string]interface{}{}},
+		"exporters":  map[string]interface{}{"nop": map[string]interface{}{}},
+		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{"level": "none", "readers": []any{}},
+			},
+			"pipelines": map[string]interface{}{
+				"logs": map[string]interface{}{
+					"receivers":  []string{"nop", "nop/2"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"nop"},
+				},
+			},
+		},
+	}
+	restartsBeforeUpdate := countMsg("Config updated, restart service")
+	m.Update(confmap.NewFromStringMap(updatedCfg), nil, logp.InfoLevel, nil)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.Greater(collect, countMsg("Config updated, restart service"), restartsBeforeUpdate,
+			"collector did not perform a full service restart after config change with partial reload disabled")
+	}, 30*time.Second, 500*time.Millisecond)
+
+	assert.Equal(t, 0, countMsg("Config updated, performing partial receiver reload"),
+		"collector performed a partial receiver reload even though partial reload was disabled")
 }
 
 func TestOTelManager_Ports(t *testing.T) {
@@ -996,6 +1215,7 @@ func TestOTelManager_Ports(t *testing.T) {
 				&agentCollectorConfig,
 				waitTimeForStop,
 				factory,
+				true,
 			)
 			require.NoError(t, err, "could not create otel manager")
 
@@ -1115,6 +1335,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 		nil,
 		waitTimeForStop,
 		factory,
+		true,
 	)
 	require.NoError(t, err, "could not create otel manager")
 
@@ -1759,6 +1980,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		nil,
 		time.Second,
 		mockFactory,
+		true,
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
@@ -1959,7 +2181,7 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	mockFactory := func(string, string, int) (collectorExecution, error) {
 		return execution, nil
 	}
-	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, time.Second, mockFactory)
+	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, time.Second, mockFactory, true)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
 
@@ -2026,6 +2248,7 @@ func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
 		nil,
 		time.Second,
 		mockFactory,
+		true,
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
@@ -2082,6 +2305,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		nil,
 		time.Second,
 		mockFactory,
+		true,
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
@@ -2182,6 +2406,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		nil,
 		time.Second,
 		mockFactory,
+		true,
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()

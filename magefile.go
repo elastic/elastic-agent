@@ -45,6 +45,7 @@ import (
 	xpacketbeat "github.com/elastic/beats/v7/x-pack/packetbeat/scripts/mage"
 
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
+	"github.com/elastic/elastic-agent/dev-tools/licenses"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
@@ -222,12 +223,12 @@ func (Dev) Package(ctx context.Context) {
 }
 
 func (Dev) RegenerateMocks() error {
-	err := sh.Run("mockery")
+	err := sh.Run("go", "tool", "mockery")
 	if err != nil {
 		return fmt.Errorf("generating mocks: %w", err)
 	}
 
-	mg.Deps(devtools.Format)
+	mg.SerialDeps(Format.License, devtools.Format)
 	return nil
 }
 
@@ -322,7 +323,7 @@ func (Build) WindowsArchiveRootBinary(ctx context.Context) {
 	}
 }
 
-// GolangCrossBuild build the Beat binary inside of the golang-builder.
+// GolangCrossBuild build the elastic-agent binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
 func GolangCrossBuild(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
@@ -330,6 +331,16 @@ func GolangCrossBuild(ctx context.Context) error {
 	params.OutputDir = "build/golang-crossbuild"
 	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(cfg, params.Vars)
+
+	// The elastic-agent binary only requires cgo on darwin (Keychain access
+	// in internal/pkg/agent/vault and host/process stats). On every other
+	// platform CGO_ENABLED=1 forces external/dynamic linking against glibc,
+	// which pulls in the cgo runtime support and NSS resolver as opaque C
+	// objects that bypass the Go linker's dead code elimination entirely
+	// and produces a dynamically linked binary instead of a static one.
+	if cfg.Platform().GOOS != "darwin" {
+		params.CGO = false
+	}
 
 	if err := devtools.GolangCrossBuild(ctx, cfg, params); err != nil {
 		return err
@@ -517,7 +528,7 @@ func (Check) LintAll() error {
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
-	return sh.RunV("go-licenser", "-d", "-license", "Elasticv2", "-exclude", "beats")
+	return sh.RunV("go-licenser", "-d", "-license", licenses.Elasticv2LicenseName, "-exclude", "beats")
 }
 
 // DocsFiles validates that files required by the docs generation script exist.
@@ -607,7 +618,7 @@ func (Format) All() {
 // License applies the right license header.
 func (Format) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
-	return sh.RunV("go-licenser", "-license", "Elastic", "-exclude", "beats")
+	return sh.RunV("go-licenser", "-license", licenses.Elasticv2LicenseName, "-exclude", "beats")
 }
 
 // Package packages the Elastic Agent for distribution.
@@ -1084,7 +1095,9 @@ func (Cloud) Push(ctx context.Context) error {
 	fmt.Println(">> Docker image tag updated successfully")
 
 	fmt.Println(">> Pushing a docker image to remote registry")
-	err = sh.RunV("docker", "image", "push", targetCloudImageName)
+	err = devtools.Retry(func() error {
+		return sh.RunV("docker", "image", "push", targetCloudImageName)
+	})
 	if err != nil {
 		return fmt.Errorf("failed pushing docker image: %w", err)
 	}
@@ -1546,6 +1559,24 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string) (*branchInfo, error) {
 	// latest build info for a branch is at "<base url>/latest/<branch>.json"
 	branchLatestBuildUrl := strings.TrimSuffix(baseURL, "/") + fmt.Sprintf("/latest/%s.json", branch)
+	var bi *branchInfo
+	err := devtools.Retry(func() error {
+		var fetchErr error
+		bi, fetchErr = fetchBranchInfo(ctx, branchLatestBuildUrl)
+		return fetchErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if mg.Verbose() {
+		log.Printf("Received branch information for %q: %+v", branch, bi)
+	}
+
+	return bi, nil
+}
+
+func fetchBranchInfo(ctx context.Context, branchLatestBuildUrl string) (*branchInfo, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, branchLatestBuildUrl, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error composing request for finding latest build using %q: %w", branchLatestBuildUrl, err)
@@ -1569,10 +1600,6 @@ func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string
 	err = json.NewDecoder(resp.Body).Decode(bi)
 	if err != nil {
 		return nil, fmt.Errorf("decoding json branch information: %w", err)
-	}
-
-	if mg.Verbose() {
-		log.Printf("Received branch information for %q: %+v", branch, bi)
 	}
 
 	return bi, nil
@@ -3155,6 +3182,9 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	timestamp := cfg.IntegrationTest.TimestampEnabled
 
 	extraEnv := map[string]string{}
+	if cfg.IntegrationTest.AgentDevelop != "" {
+		extraEnv["TEST_AGENT_DEVELOP"] = cfg.IntegrationTest.AgentDevelop
+	}
 	if cfg.IntegrationTest.CollectDiag != "" {
 		extraEnv["AGENT_COLLECT_DIAG"] = cfg.IntegrationTest.CollectDiag
 	}
@@ -4118,7 +4148,10 @@ func (Helm) ensureRepository(repoName, repoURL string, settings *cli.EnvSettings
 		return fmt.Errorf("could not create repo %s: %w", repoURL, err)
 	}
 
-	_, err = chartRepo.DownloadIndexFile()
+	err = devtools.Retry(func() error {
+		_, err := chartRepo.DownloadIndexFile()
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("could not download index file for repo %s: %w", repoURL, err)
 	}
@@ -4201,12 +4234,12 @@ func (h Helm) handleDependencies(update bool) error {
 	}
 
 	if update {
-		if err = man.Update(); err != nil {
-			return fmt.Errorf("failed to build helm dependencies: %w", err)
+		if err = devtools.Retry(man.Update); err != nil {
+			return fmt.Errorf("failed to update helm dependencies: %w", err)
 		}
 	} else {
-		if err = man.Build(); err != nil {
-			return fmt.Errorf("failed to update helm dependencies: %w", err)
+		if err = devtools.Retry(man.Build); err != nil {
+			return fmt.Errorf("failed to build helm dependencies: %w", err)
 		}
 	}
 

@@ -23,7 +23,7 @@ jobs:
         with:
           submodules: true
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: .go-version
 
@@ -110,6 +110,27 @@ jobs:
         run: |
           git add internal/edot/README.md
           git commit -m "Update otel README.md"
+
+      - name: regenerate mocks
+        run: go tool mockery
+
+      - name: format regenerated mocks
+        run: mage fmt
+
+      - name: check for modified mocks
+        id: mocks-check
+        run: |
+          if git diff --quiet HEAD -- '*/mocks.go'; then
+            echo "modified=false" >> $GITHUB_OUTPUT
+          else
+            echo "modified=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: commit regenerated mocks
+        if: steps.mocks-check.outputs.modified == 'true'
+        run: |
+          git add '*/mocks.go'
+          git commit -m "Regenerate mocks"
 
       - name: Push added commits
         run: git push
