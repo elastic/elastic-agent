@@ -430,8 +430,8 @@ func runElasticAgent(
 		collectorLogger = baseLogger
 	} else {
 		defer func() {
-			collectorLogger.Sync()  //nolint:errcheck // flushing buffered logs is best effort
-			collectorLogger.Close() //nolint:errcheck // best-effort close on shutdown
+			collectorLogger.Sync() //nolint:errcheck // flushing buffered logs is best effort
+			collectorLogger.Close()
 		}()
 	}
 
