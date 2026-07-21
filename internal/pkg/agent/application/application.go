@@ -55,6 +55,7 @@ func New(
 	ctx context.Context,
 	log *logger.Logger,
 	baseLogger *logger.Logger,
+	collectorLogger *logger.Logger,
 	logLevel logp.Level,
 	agentInfo info.Agent,
 	reexec coordinator.ReExecManager,
@@ -252,13 +253,6 @@ func New(
 	varsManager, err := composable.New(log, cfg.GetUCfg(), composableManaged)
 	if err != nil {
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
-	}
-
-	collectorLogger, err := logger.NewNamedLogger(
-		otelmanager.CollectorLogFileName, cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig)
-	if err != nil {
-		log.Warnf("failed to create collector logger, falling back to base logger: %v", err)
-		collectorLogger = baseLogger
 	}
 
 	otelManager, err := otelmanager.NewOTelManager(
