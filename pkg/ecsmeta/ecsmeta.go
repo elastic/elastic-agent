@@ -47,4 +47,7 @@ type HostECSMeta struct {
 	ID       string   `json:"id"`
 	IP       []string `json:"ip"`
 	MAC      []string `json:"mac"`
+	// Memory is the total physical memory of the host in bytes.
+	// Omitted when the platform does not report it (value 0).
+	Memory uint64 `json:"memory,omitempty"`
 }
