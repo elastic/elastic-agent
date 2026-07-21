@@ -438,3 +438,24 @@ func TestCollectReceiverPipelineMetrics_LibbeatPrefix(t *testing.T) {
 	// Confirm the double-prefix form does NOT exist
 	assert.Nil(t, fields["beat.stats.filebeat.libbeat.output.events.total"])
 }
+
+func TestCollectReceiverPipelineMetrics_PerContainerAggregation(t *testing.T) {
+	// Two per-container receivers for the same base component should be aggregated.
+	const base = "filebeatreceiver/_agent-component/filestream-default"
+	const r1 = base + "/container-hash-aaa"
+	const r2 = base + "/container-hash-bbb"
+	md, sm := newMetricsWithRegistryBridgeScope()
+	appendSumIntWithAttrs(sm, "libbeat.output.events.acked", int64(100), registryBridgeReceiverKey, r1)
+	appendSumIntWithAttrs(sm, "libbeat.output.events.acked", int64(50), registryBridgeReceiverKey, r2)
+	appendGaugeIntWithAttrs(sm, "filebeat.harvester.running", int64(3), registryBridgeReceiverKey, r1)
+	appendGaugeIntWithAttrs(sm, "filebeat.harvester.running", int64(2), registryBridgeReceiverKey, r2)
+
+	result := collectReceiverMetrics(md)
+	// Only one base component entry
+	require.Len(t, result, 1)
+	fields, ok := result["filestream-default"]
+	require.True(t, ok)
+	// Values from both containers are summed
+	assert.Equal(t, int64(150), fields["beat.stats.libbeat.output.events.acked"])
+	assert.Equal(t, int64(5), fields["beat.stats.filebeat.harvester.running"])
+}
