@@ -79,7 +79,7 @@ Environment="NO_PROXY=<address1>,<address2>"
 :::{{note}}
 For the {{agent}}, proxy support applies to all exporters, including those using gRPC. No special configuration is needed beyond the environment variables.
 
-If you're using an SDK that doesn't support proxy variables directly, consider routing telemetry through the {{agent}} configured with proxy settings. This ensures consistent proxy handling. For more information, refer to [Proxy settings for Elastic OTel SDKs](docs-content://troubleshoot/ingest/opentelemetry/edot-sdks/proxy.md).
+If you're using an SDK that doesn't support proxy variables directly, consider routing telemetry through the {{agent}} configured with proxy settings. This ensures consistent proxy handling. For more information, refer to [Proxy settings for EDOT SDKs](docs-content://troubleshoot/ingest/opentelemetry/edot-sdks/proxy.md).
 :::
 
 

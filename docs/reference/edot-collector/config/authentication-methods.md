@@ -29,7 +29,7 @@ The {{agent}} supports the following authentication extensions:
 
 ### Elastic API key authentication (`apikeyauth`)
 
-The `apikeyauth` extension is an Elastic-specific authentication method that validates {{es}} API keys against your {{es}} cluster. This extension is ideal for authenticating requests from Elastic OTel SDKs and other Collectors that use {{es}} API keys.
+The `apikeyauth` extension is an Elastic-specific authentication method that validates {{es}} API keys against your {{es}} cluster. This extension is ideal for authenticating requests from EDOT SDKs and other Collectors that use {{es}} API keys.
 
 ### Bearer token authentication (`bearertokenauth`)
 
@@ -71,11 +71,11 @@ service:
   extensions: [apikeyauth]
 ```
 
-#### Using `apikeyauth` with Elastic OTel SDKs and central configuration [using-apikeyauth-with-edot-sdks-and-central-configuration]
+#### Using `apikeyauth` with EDOT SDKs and central configuration [using-apikeyauth-with-edot-sdks-and-central-configuration]
 
-The `apikeyauth` authenticator is also used by the `apmconfig` extension when Elastic OTel SDKs retrieve central configuration from the {{agent}}.
+The `apikeyauth` authenticator is also used by the `apmconfig` extension when EDOT SDKs retrieve central configuration from the {{agent}}.
 
-Elastic OTel SDKs send their own {{es}} API key to the Collector in the `Authorization` header (for example: `Authorization: ApiKey <Base64(id:key)>`).
+EDOT SDKs send their own {{es}} API key to the Collector in the `Authorization` header (for example: `Authorization: ApiKey <Base64(id:key)>`).
 
 The Collector does not store or embed the API key. Instead, the `apikeyauth` extension validates the incoming key by calling {{es}} and checking that it has:
 
@@ -183,9 +183,9 @@ The extension automatically monitors the token file for changes and reloads the 
 
 These use cases show how to configure the `apikeyauth` and `bearertokenauth` extensions for different scenarios.
 
-### Authenticating Elastic OTel SDKs [authenticating-edot-sdks]
+### Authenticating EDOT SDKs [authenticating-edot-sdks]
 
-When Elastic OTel SDKs retrieve central configuration from the Collector, they authenticate using an {{es}} API key. The Collector validates this key using the `apikeyauth` extension.
+When EDOT SDKs retrieve central configuration from the Collector, they authenticate using an {{es}} API key. The Collector validates this key using the `apikeyauth` extension.
 
 For example:
 
@@ -213,7 +213,7 @@ service:
 ```
 
 ::::{note}
-Elastic OTel SDKs authenticate by sending their API key in the `Authorization` header. The {{agent}} doesn't store the API key, it only validates it.
+EDOT SDKs authenticate by sending their API key in the `Authorization` header. The {{agent}} doesn't store the API key, it only validates it.
 
 Ensure the API key has:
 

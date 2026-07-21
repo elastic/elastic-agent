@@ -74,7 +74,7 @@ For logs collection, the default configuration uses the [`filelog`] receiver to 
 :::{note}
 The `from_context: client_metadata` option in the `resource` processor only applies to transport-level metadata. It cannot extract custom application attributes.
 
-To propagate such values into your telemetry, set them explicitly in your application code using Elastic OTel SDK instrumentation. For more information, refer to [{{agent}} doesn’t propagate client metadata](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/metadata.md).
+To propagate such values into your telemetry, set them explicitly in your application code using EDOT SDK instrumentation. For more information, refer to [{{agent}} doesn’t propagate client metadata](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/metadata.md).
 :::
 
 Data is exported directly to {{es}} using the [`elasticsearch`] exporter in `OTel-native` mode.
@@ -292,7 +292,7 @@ extensions:
 ::::{note}
 The {{agent}} doesn't store or embed the {{es}} API key.
 
-Each Elastic OTel SDK sends its own API key in the `Authorization` header (for example: `Authorization: ApiKey <Base64(id:key)>`).
+Each EDOT SDK sends its own API key in the `Authorization` header (for example: `Authorization: ApiKey <Base64(id:key)>`).
 
 The `apikeyauth` extension only validates incoming API keys against {{es}}, ensuring they include the `apm` to `config_agent:read` privilege and `resources: ["*"]`.
 ::::
@@ -305,7 +305,7 @@ To secure the connection between the {{agent}} and Elastic, you can use TLS or m
 
 ### TLS configuration
 
-You can turn on TLS or mutual TLS to encrypt data in transit between Elastic OTel SDKs and the extension. Refer to [OpenTelemetry TLS server configuration](https://github.com/open-telemetry/opentelemetry-collector/blob/main/config/configtls/README.md#server-configuration) for more details.
+You can turn on TLS or mutual TLS to encrypt data in transit between EDOT SDKs and the extension. Refer to [OpenTelemetry TLS server configuration](https://github.com/open-telemetry/opentelemetry-collector/blob/main/config/configtls/README.md#server-configuration) for more details.
 
 For example:
 
@@ -382,7 +382,7 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 
 ### Secure SDK to Collector connection (TLS)
 
-To secure the connection between the Elastic OTel SDKs and the {{agent}}, configure TLS on both ends.
+To secure the connection between the EDOT SDKs and the {{agent}}, configure TLS on both ends.
 
 #### SDK configuration
 
@@ -429,7 +429,7 @@ This encrypts data between SDKs and the Collector over both gRPC and HTTP protoc
 
 ### Secure the connection between the {{agent}} and Elastic [secure-the-connection-between-the-edot-collector-and-elastic]
 
-After securing communication between the Elastic OTel SDKs and the `apmconfigextension`, you should secure the connection between the {{agent}} and {{es}} endpoints.
+After securing communication between the EDOT SDKs and the `apmconfigextension`, you should secure the connection between the {{agent}} and {{es}} endpoints.
 
 The {{agent}} uses the `elasticsearch/otel` or `elasticsearch/ecs` exporter to send telemetry data to Elastic. Elastic recommends using HTTPS to encrypt the connection and verify the server's certificate.
 

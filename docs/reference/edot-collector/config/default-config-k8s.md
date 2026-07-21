@@ -56,7 +56,7 @@ Logs and metrics are batched for better performance ([`batch`] processor) and th
 ::::
 
 :::{note}
-The `from_context: client_metadata` option in the `resource` processor only applies to transport-level metadata. It cannot extract custom application attributes. To propagate such values into your telemetry, set them explicitly in your application code using Elastic OTel SDK instrumentation. For more information, refer to [{{agent}} doesn’t propagate client metadata](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/metadata.md).
+The `from_context: client_metadata` option in the `resource` processor only applies to transport-level metadata. It cannot extract custom application attributes. To propagate such values into your telemetry, set them explicitly in your application code using EDOT SDK instrumentation. For more information, refer to [{{agent}} doesn’t propagate client metadata](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/metadata.md).
 :::
 
 ### Application telemetry through OTLP from OTel SDKs

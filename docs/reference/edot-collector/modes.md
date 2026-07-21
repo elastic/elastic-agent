@@ -86,7 +86,7 @@ For more details on Kubernetes deployment architecture, see [Kubernetes environm
 
 ## Direct SDK to Managed OTLP (No Collector) [direct-edot-sdk-to-managed-otlp-no-collector]
 
-In some scenarios, you don't need a Collector at all. Elastic OTel SDKs can send telemetry data directly to the [{{motlp}}](opentelemetry://reference/motlp.md). This is the simplest deployment pattern for getting application telemetry data into {{product.observability}}.
+In some scenarios, you don't need a Collector at all. EDOT SDKs can send telemetry data directly to the [{{motlp}}](opentelemetry://reference/motlp.md). This is the simplest deployment pattern for getting application telemetry data into {{product.observability}}.
 
 Use direct SDK export to Managed OTLP when:
 
