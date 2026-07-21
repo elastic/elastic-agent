@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -62,7 +63,9 @@ func TestHostnameEnvOverride(t *testing.T) {
 
 	// Write ELASTIC_AGENT_HOSTNAME into the systemd EnvironmentFile before the service starts.
 	// The file must exist before install because the service is started immediately on install.
+	// /etc/sysconfig/ does not exist by default on Debian-based systems, so create it first.
 	envFilePath := serviceEnvFilePath(installOpts.Namespace)
+	require.NoError(t, os.MkdirAll(filepath.Dir(envFilePath), 0o755))
 	require.NoError(t, os.WriteFile(envFilePath, []byte(fmt.Sprintf("ELASTIC_AGENT_HOSTNAME=%s\n", customHostname)), 0o644))
 	t.Cleanup(func() { os.Remove(envFilePath) })
 
