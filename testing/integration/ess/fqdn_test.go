@@ -36,7 +36,7 @@ import (
 
 func TestFQDN(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.FQDN,
+		Group: integration.Hostname,
 		OS: []define.OS{
 			{Type: define.Linux},
 		},

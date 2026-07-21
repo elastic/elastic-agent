@@ -32,8 +32,13 @@ const (
 	// upgrading to a build built from the PR being tested.
 	FleetUpgradeToPRBuild = "fleet-upgrade-to-pr-build"
 
-	// FQDN group of tests. Used for testing Elastic Agent with FQDN enabled.
-	FQDN = "fqdn"
+	// Hostname group of tests. Used for testing Elastic Agent hostname behaviour (FQDN, env override).
+	Hostname = "hostname"
+
+	// FQDN is an alias kept for compatibility; prefer Hostname for new tests.
+	//
+	// Deprecated: use Hostname.
+	FQDN = Hostname
 
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"
@@ -58,9 +63,6 @@ const (
 
 	// ECHDeployment group of tests. Used for tests that orchestrate ECH deployments.
 	ECHDeployment = "ech-deployment"
-
-	// HostnameOverride group of tests. Used for testing ELASTIC_AGENT_HOSTNAME override.
-	HostnameOverride = "hostname-override"
 
 	// Stress test suite that contains tests that do not need to run on each PR.
 	Stress = "stress"

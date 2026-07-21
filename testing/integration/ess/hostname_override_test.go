@@ -35,7 +35,7 @@ func serviceEnvFilePath(namespace string) string {
 
 func TestHostnameEnvOverride(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.HostnameOverride,
+		Group: integration.Hostname,
 		// Linux-only: the env-injection mechanism (systemd EnvironmentFile) is Linux-specific.
 		// Non-service deployments (containers, standalone binary) inherit ELASTIC_AGENT_HOSTNAME
 		// directly from their process environment; that path is covered by TestGetHostNameEnvOverride.
