@@ -32,13 +32,13 @@ func IsLocal(source string) bool {
 }
 
 type fileOps struct {
-	copy     func(dst io.Writer, src io.Reader) (int64, error)
+	copyFile func(dst io.Writer, src io.Reader) (int64, error)
 	openFile func(name string, flag int, perm os.FileMode) (*os.File, error)
 }
 
 func defaultFileOps() fileOps {
 	return fileOps{
-		copy:     io.Copy,
+		copyFile: io.Copy,
 		openFile: os.OpenFile,
 	}
 }
@@ -152,7 +152,7 @@ func download(ctx context.Context, log *logger.Logger, config *artifact.Config, 
 	dp := newDownloadProgressReporter(sourceURI, config.Timeout, fileSize, observers...)
 	dp.Report(ctx)
 
-	_, err = ops.copy(targetFile, io.TeeReader(resp.Body, dp))
+	_, err = ops.copyFile(targetFile, io.TeeReader(resp.Body, dp))
 	if err != nil {
 		reportedErr := err
 		if upgradeErrors.IsDiskSpaceError(err) {
@@ -166,7 +166,7 @@ func download(ctx context.Context, log *logger.Logger, config *artifact.Config, 
 	return nil
 }
 
-func copy(log *logger.Logger, sourcePath string, targetPath string, ops fileOps) (err error) {
+func copyFile(log *logger.Logger, sourcePath string, targetPath string, ops fileOps) (err error) {
 	defer func() {
 		if err != nil {
 			if removeErr := os.Remove(targetPath); removeErr != nil && !os.IsNotExist(removeErr) {
@@ -188,7 +188,7 @@ func copy(log *logger.Logger, sourcePath string, targetPath string, ops fileOps)
 	}
 	defer targetFile.Close()
 
-	if _, err = ops.copy(targetFile, sourceFile); err != nil {
+	if _, err = ops.copyFile(targetFile, sourceFile); err != nil {
 		return err
 	}
 
@@ -197,7 +197,7 @@ func copy(log *logger.Logger, sourcePath string, targetPath string, ops fileOps)
 
 func Fetch(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, source, targetPath string) (err error) {
 	if IsLocal(source) {
-		err = copy(log, source, targetPath, defaultFileOps())
+		err = copyFile(log, source, targetPath, defaultFileOps())
 	} else {
 		err = downloadWithRetries(ctx, log, config, upgradeDetails, source, targetPath,
 			func(ctx context.Context, source, dst string) error {

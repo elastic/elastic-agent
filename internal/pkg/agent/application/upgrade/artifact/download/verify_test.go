@@ -410,8 +410,8 @@ func TestVerify(t *testing.T) {
 								require.NoError(t, os.WriteFile(filepath.Join(srcDir, name), body, 0o644))
 							}
 							srcPath := filepath.Join(srcDir, fileName)
-							require.NoError(t, copy(log, srcPath, artifactPath, defaultFileOps()))
-							require.NoError(t, copy(log, srcPath+".sha512", artifactPath+".sha512", defaultFileOps()))
+							require.NoError(t, copyFile(log, srcPath, artifactPath, defaultFileOps()))
+							require.NoError(t, copyFile(log, srcPath+".sha512", artifactPath+".sha512", defaultFileOps()))
 							return "file://" + srcPath, artifactPath
 						},
 					})

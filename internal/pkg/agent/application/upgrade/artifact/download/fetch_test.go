@@ -47,7 +47,7 @@ var fetchCases = []struct {
 		wantError: io.ErrUnexpectedEOF,
 		ops: func() fileOps {
 			ops := defaultFileOps()
-			ops.copy = func(io.Writer, io.Reader) (int64, error) { return 0, io.ErrUnexpectedEOF }
+			ops.copyFile = func(io.Writer, io.Reader) (int64, error) { return 0, io.ErrUnexpectedEOF }
 			return ops
 		},
 	},
@@ -71,7 +71,7 @@ func TestCopy(t *testing.T) {
 			require.NoError(t, os.WriteFile(src, []byte("fake archive"), 0o666))
 
 			log, _ := loggertest.New(t.Name())
-			err := copy(log, src, dst, tc.ops())
+			err := copyFile(log, src, dst, tc.ops())
 			if tc.wantError == nil {
 				require.NoError(t, err)
 				require.FileExists(t, dst)
@@ -122,10 +122,10 @@ func TestCopyDiskSpaceError(t *testing.T) {
 	require.NoError(t, os.WriteFile(source, []byte("fake archive"), 0o666))
 
 	ops := defaultFileOps()
-	ops.copy = func(io.Writer, io.Reader) (int64, error) { return 0, diskSpaceError }
+	ops.copyFile = func(io.Writer, io.Reader) (int64, error) { return 0, diskSpaceError }
 	log, _ := loggertest.New(t.Name())
 
-	err := copy(log, source, target, ops)
+	err := copyFile(log, source, target, ops)
 	require.ErrorIs(t, err, diskSpaceError)
 	require.NoFileExists(t, target)
 }
@@ -140,7 +140,7 @@ func TestDownloadDiskSpaceError(t *testing.T) {
 
 	target := filepath.Join(t.TempDir(), "artifact")
 	ops := defaultFileOps()
-	ops.copy = func(io.Writer, io.Reader) (int64, error) { return 0, diskSpaceError }
+	ops.copyFile = func(io.Writer, io.Reader) (int64, error) { return 0, diskSpaceError }
 
 	log, _ := loggertest.New(t.Name())
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
