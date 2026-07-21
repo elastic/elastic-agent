@@ -41,7 +41,7 @@ jobs:
           commit-message: "[Automation] Update Renovate baseBranches to current active branches"
           title: "[Automation] Update Renovate baseBranches to current active branches"
           body: |
-            Updates `baseBranches` in `.github/renovate.json` to match the current set of active release branches queried from the Elastic release schedule.
+            Updates `baseBranches` in `renovate.json` to match the current set of active release branches queried from the Elastic release schedule.
           branch: update-renovate-branches
           base: main
           delete-branch: true
