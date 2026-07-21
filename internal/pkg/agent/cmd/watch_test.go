@@ -163,15 +163,15 @@ func Test_watchCmd(t *testing.T) {
 				dataDirPath := paths.DataFrom(topDir)
 				err := os.MkdirAll(dataDirPath, 0755)
 				require.NoError(t, err)
-				previousVersionedHome := filepath.Join("data", "elastic-agent-9.3.0-prvver")
+				previousVersionedHome := filepath.Join("data", "elastic-agent-9.2.0-prvver")
 				err = upgrade.SaveMarker(
 					dataDirPath,
 					&upgrade.UpdateMarker{
-						Version:           "9.4.0",
+						Version:           "9.3.0",
 						Hash:              "newver",
-						VersionedHome:     filepath.Join("data", "elastic-agent-9.4.0-newver"),
+						VersionedHome:     filepath.Join("data", "elastic-agent-9.3.0-newver"),
 						UpdatedOn:         time.Now(),
-						PrevVersion:       "9.3.0",
+						PrevVersion:       "9.2.0",
 						PrevHash:          "prvver",
 						PrevVersionedHome: previousVersionedHome,
 						Acked:             false,
@@ -203,12 +203,12 @@ func Test_watchCmd(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, wm, "watcher marker must be written before rollback")
 				assert.Equal(t, details.StateRollback, wm.Outcome)
-				assert.Equal(t, "9.4.0", wm.TargetVersion)
-				assert.Equal(t, "9.3.0", wm.PreviousVersion)
+				assert.Equal(t, "9.3.0", wm.TargetVersion)
+				assert.Equal(t, "9.2.0", wm.PreviousVersion)
 			},
 		},
 		{
-			name: "unhappy path: error watching, rollback to previous install, removing upgrade marker if version is < 9.3.0-SNAPSHOT",
+			name: "unhappy path: error watching, rollback to previous install, removing upgrade marker if version is < 9.2.0-SNAPSHOT",
 			setupUpgradeMarker: func(t *testing.T, topDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
 				dataDirPath := paths.DataFrom(topDir)
 				err := os.MkdirAll(dataDirPath, 0755)
