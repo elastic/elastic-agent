@@ -459,3 +459,23 @@ func TestCollectReceiverPipelineMetrics_PerContainerAggregation(t *testing.T) {
 	assert.Equal(t, int64(150), fields["beat.stats.libbeat.output.events.acked"])
 	assert.Equal(t, int64(5), fields["beat.stats.filebeat.harvester.running"])
 }
+
+func TestCollectReceiverPipelineMetrics_MonitoringComponentPreservesFullID(t *testing.T) {
+	// Monitoring components have "/" in their comp.ID (e.g. "http/metrics-monitoring").
+	// Per-container receivers append another "/" + streamID, so the full agent component
+	// ID after agentComponentID() is "http/metrics-monitoring/<streamID>".
+	// baseComponentID must cut at the LAST "/" to preserve "http/metrics-monitoring",
+	// not collapse it to "http".
+	const r1 = "metricbeatreceiver/_agent-component/http/metrics-monitoring/stream-aaa"
+	const r2 = "metricbeatreceiver/_agent-component/beat/metrics-monitoring/stream-bbb"
+	md, sm := newMetricsWithRegistryBridgeScope()
+	appendSumIntWithAttrs(sm, "libbeat.output.events.acked", int64(10), registryBridgeReceiverKey, r1)
+	appendSumIntWithAttrs(sm, "libbeat.output.events.acked", int64(20), registryBridgeReceiverKey, r2)
+
+	result := collectReceiverMetrics(md)
+	require.Len(t, result, 2)
+	assert.Contains(t, result, "http/metrics-monitoring")
+	assert.Contains(t, result, "beat/metrics-monitoring")
+	assert.NotContains(t, result, "http")
+	assert.NotContains(t, result, "beat")
+}

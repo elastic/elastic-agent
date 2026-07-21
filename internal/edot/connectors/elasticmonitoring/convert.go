@@ -375,12 +375,17 @@ func collectComponentInputMetrics(md pmetric.Metrics) map[string]componentInputD
 	return components
 }
 
-// baseComponentID strips any per-container suffix after "/" so that all
-// receivers sharing the same base component (e.g. "filestream-default/<hash>")
-// are aggregated into a single entry.
+// baseComponentID strips the per-container stream ID suffix from an agent
+// component ID so that all receivers sharing the same base component
+// (e.g. "filestream-default/<streamID>" or "http/metrics-monitoring/<streamID>")
+// are aggregated into a single entry. The stream ID is always the last
+// slash-delimited segment, so we cut at the last "/" rather than the first.
 func baseComponentID(compID string) string {
-	base, _, _ := strings.Cut(compID, "/")
-	return base
+	i := strings.LastIndexByte(compID, '/')
+	if i < 0 {
+		return compID
+	}
+	return compID[:i]
 }
 
 // receiverMetricField builds the Beats monitoring field path for a metric
