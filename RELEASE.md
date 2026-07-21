@@ -47,18 +47,17 @@ mage release:runMajorMinor
 
 ## Patch release — `mage release:runPatch`
 
-Creates **3 merge-ordered PRs** on the release branch (no test-env PR; agent has none).
+Creates **2 merge-ordered PRs** on the release branch (one PR per merge step; no test-env PR).
 
 Example: `CURRENT_RELEASE=9.4.3` → branch `9.4`, next patch `9.4.4`.
 
 | Step | Target | Branch | Merge label | Former outputs | What changes |
 |------|--------|--------|-------------|----------------|--------------|
-| **PR-A** | `9.4` | `update-version-9.4.3` | `merge:1-before-build` | version + manifests | `version.go` + deploy manifests |
-| **PR-B** | `9.4` | `update-docs-version-9.4.3` | `merge:1-before-build` | update-docs-version | `:stack-version:` in asciidoc |
-| **PR-D** | `9.4` | `ff-prep-next-patch-9.4.4` | `merge:4-after-release` | update-version-next | next patch version (+ `mage update`) |
+| **PR-A** | `9.4` | `patch-release-9.4.3` | `merge:1-before-build` | update-version + update-docs-version | `version.go` + docs/manifests |
+| **PR-B** | `9.4` | `ff-prep-next-patch-9.4.4` | `merge:4-after-release` | update-version-next | next patch version (+ `mage update`) |
 
-Labels on version/next PRs: `release`, `Team:Automation`, `skip-changelog` (+ merge label).
-Docs PR also gets `docs`, `in progress`.
+Labels on PR-A: `docs`, `in progress`, `release`, `Team:Automation`, `skip-changelog`, `merge:1-before-build`.
+PR-B: `release`, `Team:Automation`, `skip-changelog`, `merge:4-after-release`.
 
 ```bash
 export PROJECT_OWNER="your-user"
@@ -70,7 +69,7 @@ git fetch origin 9.4:9.4
 mage release:runPatch
 
 # Expect local branches:
-#   update-version-9.4.3, update-docs-version-9.4.3, ff-prep-next-patch-9.4.4
+#   patch-release-9.4.3, ff-prep-next-patch-9.4.4
 ```
 
 ## Individual Commands

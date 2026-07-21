@@ -173,8 +173,7 @@ func TestRunPatchReleaseDryRunBranches(t *testing.T) {
 	}
 
 	wantBranches := []string{
-		"update-version-9.5.1",
-		"update-docs-version-9.5.1",
+		"patch-release-9.5.1",
 		"ff-prep-next-patch-9.5.2",
 	}
 	for _, branch := range wantBranches {
@@ -187,8 +186,8 @@ func TestRunPatchReleaseDryRunBranches(t *testing.T) {
 		}
 	}
 
-	assertGitShowContains(t, tmpDir, "update-version-9.5.1", "version/version.go", `defaultBeatVersion = "9.5.1"`)
-	assertGitShowContains(t, tmpDir, "update-docs-version-9.5.1", "version/docs/version.asciidoc", ":stack-version: 9.5.1")
+	assertGitShowContains(t, tmpDir, "patch-release-9.5.1", "version/version.go", `defaultBeatVersion = "9.5.1"`)
+	assertGitShowContains(t, tmpDir, "patch-release-9.5.1", "version/docs/version.asciidoc", ":stack-version: 9.5.1")
 	assertGitShowContains(t, tmpDir, "ff-prep-next-patch-9.5.2", "version/version.go", `defaultBeatVersion = "9.5.2"`)
 }
 
@@ -198,9 +197,8 @@ func TestPatchPrepLabels(t *testing.T) {
 		labels []string
 		want   string
 	}{
-		{name: "PR-A version", labels: patchVersionPRLabels(), want: mergeLabelBeforeBuild},
-		{name: "PR-B docs", labels: patchDocsPRLabelsWithMerge(), want: mergeLabelBeforeBuild},
-		{name: "PR-D next", labels: prDNextPatchLabels(), want: mergeLabelAfterRelease},
+		{name: "PR-A patch", labels: patchReleasePRLabels(), want: mergeLabelBeforeBuild},
+		{name: "PR-B next", labels: prDNextPatchLabels(), want: mergeLabelAfterRelease},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -210,10 +208,10 @@ func TestPatchPrepLabels(t *testing.T) {
 		})
 	}
 
-	docsLabels := patchDocsPRLabelsWithMerge()
+	patchLabels := patchReleasePRLabels()
 	for _, want := range []string{"docs", "in progress", "release", "Team:Automation", "skip-changelog"} {
-		if !slices.Contains(docsLabels, want) {
-			t.Errorf("docs labels should include %q, got %v", want, docsLabels)
+		if !slices.Contains(patchLabels, want) {
+			t.Errorf("patch release labels should include %q, got %v", want, patchLabels)
 		}
 	}
 }

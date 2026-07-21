@@ -30,7 +30,7 @@ mage release:runMajorMinor
 Creates release branch + PR-A/B/C/D with `merge:1-ff-day` … `merge:4-after-release`.
 See [RELEASE.md](../../../RELEASE.md) for the full mapping table.
 
-### Patch (`runPatch`) — 3 PRs
+### Patch (`runPatch`) — 2 PRs
 
 ```bash
 export CURRENT_RELEASE="9.4.3"
@@ -41,7 +41,7 @@ git fetch origin 9.4:9.4
 mage release:runPatch
 ```
 
-Creates version, docs, and next-patch PRs with `merge:1-before-build` / `merge:4-after-release`.
+Creates `patch-release-*` and next-patch PRs with `merge:1-before-build` / `merge:4-after-release`.
 
 ### Prerequisites
 

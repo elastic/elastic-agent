@@ -586,20 +586,12 @@ const Agent = defaultBeatVersion
 }
 
 func TestPatchPRBodies(t *testing.T) {
-	versionBody := patchVersionPRBody("9.7.1")
-	if !strings.Contains(versionBody, "9.7.1") {
-		t.Errorf("patchVersionPRBody() = %q, want version", versionBody)
+	body := patchReleasePRBody("9.7.1")
+	if !strings.Contains(body, "9.7.1") {
+		t.Errorf("patchReleasePRBody() = %q, want version", body)
 	}
-	if !strings.Contains(versionBody, "Merge before the final Release build") {
-		t.Errorf("patchVersionPRBody() = %q, want merge guidance", versionBody)
-	}
-
-	docsBody := patchDocsPRBody("9.7.1")
-	if !strings.Contains(docsBody, "9.7.1") {
-		t.Errorf("patchDocsPRBody() = %q, want version", docsBody)
-	}
-	if !strings.Contains(docsBody, "Merge before the final Release build") {
-		t.Errorf("patchDocsPRBody() = %q, want merge guidance", docsBody)
+	if !strings.Contains(body, "Merge before the final Release build") {
+		t.Errorf("patchReleasePRBody() = %q, want merge guidance", body)
 	}
 }
 
