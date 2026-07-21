@@ -1204,7 +1204,7 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 					// to match the test namespace
 					if volume.Name == "elastic-agent-state" {
 						hostPathType := corev1.HostPathDirectoryOrCreate
-						pod.Volumes[volumeIdx].VolumeSource.HostPath = &corev1.HostPathVolumeSource{
+						pod.Volumes[volumeIdx].HostPath = &corev1.HostPathVolumeSource{
 							Type: &hostPathType,
 							Path: fmt.Sprintf("/var/lib/elastic-agent-standalone/%s/state", namespace),
 						}
@@ -1626,7 +1626,7 @@ func k8sStepHintsRedisCheckAgentStatus(agentPodLabelSelector string, hintDeploye
 			require.NotEmpty(t, redisPodList.Items, "no redis pods found with selector ", redisPodSelector)
 			// check that redis pods have the correct annotations
 			for _, redisPod := range redisPodList.Items {
-				hintPackage, ok := redisPod.ObjectMeta.Annotations["co.elastic.hints/package"]
+				hintPackage, ok := redisPod.Annotations["co.elastic.hints/package"]
 				require.True(t, ok, "missing hints annotation")
 				require.Equal(t, "redis", hintPackage, "hints annotation package wrong value")
 			}
