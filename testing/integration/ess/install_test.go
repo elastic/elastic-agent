@@ -398,6 +398,8 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 	if customUsername != "" {
 		pt := progressbar.NewOptions(-1)
 		_, err := install.EnsureUserAndGroup(customUsername, customGroup, pt, true)
+		_ = pt.Finish()
+		_ = pt.Exit()
 		require.NoError(t, err)
 	}
 
