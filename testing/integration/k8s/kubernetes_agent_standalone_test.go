@@ -870,12 +870,12 @@ func TestKubernetesAgentHelm(t *testing.T) {
 								// simulating restricted environments (e.g. AKS + Cilium).
 								"hostNetwork": false,
 								// Inject the node name as ELASTIC_AGENT_HOSTNAME via the downward API.
-								"extraEnvs": []map[string]any{
-									{
+								"extraEnvs": []any{
+									map[string]any{
 										"name":  "ELASTIC_NETINFO",
 										"value": "false",
 									},
-									{
+									map[string]any{
 										"name": "ELASTIC_AGENT_HOSTNAME",
 										"valueFrom": map[string]any{
 											"fieldRef": map[string]any{
