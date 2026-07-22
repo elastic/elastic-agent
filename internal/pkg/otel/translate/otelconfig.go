@@ -43,6 +43,10 @@ const (
 	outputOtelOverrideExporterFieldName   = "exporter"
 	outputOtelOverrideExtensionsFieldName = "extensions"
 	elasticsearchStateStoreExtensionName  = "elasticsearch_storage"
+	// singleReceiverStreamID is the placeholder stream ID used in receiver names for
+	// components with single_receiver: true, so that all receiver names uniformly have
+	// the form "<comp.ID>/<streamID>" regardless of how many receivers a component has.
+	singleReceiverStreamID = "single"
 )
 
 // ComponentIDFromReceiverName extracts the elastic-agent component ID from an
@@ -388,7 +392,8 @@ func getCollectorConfigForComponent(
 
 // getReceiversConfigForComponent returns the receivers configuration for a component.
 // By default each input stream produces its own receiver. When the component's InputSpec has
-// SingleReceiver set, all streams are merged into one receiver keyed by component ID alone.
+// SingleReceiver set, all streams are merged into one receiver keyed by the component ID with
+// the placeholder singleReceiverStreamID as the stream suffix.
 func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
@@ -474,15 +479,16 @@ func getReceiversConfigForComponent(
 		},
 	}
 
-	// When SingleReceiver is set, merge all stream inputs into one receiver keyed by
-	// component ID instead of creating one receiver per stream. Some components have
-	// shared state that cannot easily be split across receivers.
+	// When SingleReceiver is set, merge all stream inputs into one receiver instead of
+	// creating one receiver per stream. Some components have shared state that cannot
+	// easily be split across receivers. The receiver still gets a placeholder stream ID
+	// suffix so that all receiver names uniformly contain a stream segment.
 	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
 		allInputConfigs := make([]map[string]any, 0, len(inputs))
 		for _, ri := range inputs {
 			allInputConfigs = append(allInputConfigs, ri.config)
 		}
-		receiverID := GetReceiverID(receiverType, comp.ID)
+		receiverID := GetReceiverID(receiverType, comp.ID+"/"+singleReceiverStreamID)
 		receiverConfig := maps.Clone(sharedConfig)
 		receiverConfig[beatName] = map[string]any{
 			beatInputsKey(beatName): allInputConfigs,
