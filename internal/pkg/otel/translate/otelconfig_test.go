@@ -2173,8 +2173,8 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 				"processors": defaultExpectedProcessors("osquerybeat-default"),
 				"receivers": map[string]any{
-					// Single receiver keyed by component ID only — no stream suffix.
-					"osquerybeatreceiver/_agent-component/osquerybeat-default": expectedOsquerybeatSingleReceiverConfig("osquerybeat-default"),
+					// Single receiver keyed by component ID with the placeholder "single" stream suffix.
+					"osquerybeatreceiver/_agent-component/osquerybeat-default/single": expectedOsquerybeatSingleReceiverConfig("osquerybeat-default"),
 				},
 				"service": map[string]any{
 					"extensions": []any{"beatsauth/_agent-component/default"},
@@ -2182,7 +2182,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"logs/_agent-component/osquerybeat-default": map[string][]string{
 							"exporters":  {"elasticsearch/_agent-component/default"},
 							"processors": {beatProcessorID("osquerybeat-default")},
-							"receivers":  {"osquerybeatreceiver/_agent-component/osquerybeat-default"},
+							"receivers":  {"osquerybeatreceiver/_agent-component/osquerybeat-default/single"},
 						},
 					},
 				},
@@ -2653,7 +2653,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			name:               "osquerybeat component with single_receiver merges streams",
 			component:          osquerybeatSingleReceiverComponent,
 			outputQueueConfig:  nil,
-			expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id",
+			expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id/single",
 			expectedBeatName:   "osquerybeat",
 			verifyBeatConfig: func(t *testing.T, beatConfig map[string]any) {
 				inputs, ok := beatConfig["inputs"].([]map[string]any)
@@ -2687,7 +2687,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			name:               "osquerybeat single_receiver without osquery key still puts result stream first",
 			component:          osquerybeatSingleReceiverNoOsqueryKeyComponent,
 			outputQueueConfig:  nil,
-			expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id",
+			expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id/single",
 			expectedBeatName:   "osquerybeat",
 			verifyBeatConfig: func(t *testing.T, beatConfig map[string]any) {
 				inputs, ok := beatConfig["inputs"].([]map[string]any)
