@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -137,6 +138,100 @@ func TestSyncSubmodulesNoSubmodules(t *testing.T) {
 
 	if err := gitRepo.SyncSubmodules(); err != nil {
 		t.Fatalf("SyncSubmodules() error = %v", err)
+	}
+}
+
+func TestIsSubmoduleIndexLockError(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   bool
+	}{
+		{
+			name: "index.lock file exists",
+			output: "fatal: Unable to create '/repo/.git/modules/beats/index.lock': File exists.\n" +
+				"Another git process seems to be running",
+			want: true,
+		},
+		{
+			name:   "unrelated submodule failure",
+			output: "fatal: remote error: upload-pack: not our ref abcdef",
+			want:   false,
+		},
+		{
+			name:   "empty",
+			output: "",
+			want:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isSubmoduleIndexLockError(tt.output); got != tt.want {
+				t.Fatalf("isSubmoduleIndexLockError() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSyncSubmodulesRetriesIndexLock(t *testing.T) {
+	gitRepo, parentDir, _, _ := createRepoWithSubmodule(t)
+
+	lockPath := filepath.Join(parentDir, ".git", "modules", "beats", "index.lock")
+	if err := os.WriteFile(lockPath, []byte{}, 0644); err != nil {
+		t.Fatalf("failed to create index.lock: %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		time.Sleep(300 * time.Millisecond)
+		_ = os.Remove(lockPath)
+	}()
+
+	if err := gitRepo.SyncSubmodules(); err != nil {
+		t.Fatalf("SyncSubmodules() error = %v", err)
+	}
+	<-done
+}
+
+func TestCheckoutBranchSwitchesSubmodulePins(t *testing.T) {
+	gitRepo, parentDir, v2, v1 := createRepoWithSubmodule(t)
+
+	if err := gitRepo.CreateBranch("9.6"); err != nil {
+		t.Fatalf("CreateBranch(9.6) error = %v", err)
+	}
+	if err := gitRepo.CheckoutBranch("9.6"); err != nil {
+		t.Fatalf("CheckoutBranch(9.6) initial error = %v", err)
+	}
+	runGit(t, filepath.Join(parentDir, "beats"), "checkout", v1.String())
+	runGit(t, parentDir, "add", "beats")
+	runGit(t, parentDir, "commit", "-m", "pin submodule to v1")
+
+	if err := gitRepo.CheckoutBranch("main"); err != nil {
+		t.Fatalf("CheckoutBranch(main) error = %v", err)
+	}
+	current := strings.TrimSpace(runGit(t, filepath.Join(parentDir, "beats"), "rev-parse", "HEAD"))
+	if current != v2.String() {
+		t.Fatalf("after main checkout submodule = %s, want %s", current, v2.String())
+	}
+
+	if err := gitRepo.CheckoutBranch("9.6"); err != nil {
+		t.Fatalf("CheckoutBranch(9.6) error = %v", err)
+	}
+	current = strings.TrimSpace(runGit(t, filepath.Join(parentDir, "beats"), "rev-parse", "HEAD"))
+	if current != v1.String() {
+		t.Fatalf("after 9.6 checkout submodule = %s, want %s", current, v1.String())
+	}
+
+	if err := gitRepo.CheckoutBranch("main"); err != nil {
+		t.Fatalf("CheckoutBranch(main) second error = %v", err)
+	}
+	current = strings.TrimSpace(runGit(t, filepath.Join(parentDir, "beats"), "rev-parse", "HEAD"))
+	if current != v2.String() {
+		t.Fatalf("after second main checkout submodule = %s, want %s", current, v2.String())
+	}
+	if status := gitStatusPorcelain(t, parentDir); status != "" {
+		t.Fatalf("worktree dirty after branch switches:\n%s", status)
 	}
 }
 

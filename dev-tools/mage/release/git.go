@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -18,6 +19,19 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
+
+const (
+	submoduleSyncAttempts  = 5
+	submoduleSyncRetryWait = 200 * time.Millisecond
+)
+
+// isSubmoduleIndexLockError reports whether git submodule update failed because
+// another process briefly held a submodule index.lock (common under rapid
+// branch switches).
+func isSubmoduleIndexLockError(output string) bool {
+	return strings.Contains(output, "index.lock") &&
+		(strings.Contains(output, "File exists") || strings.Contains(output, "Unable to create"))
+}
 
 // GitRepo wraps go-git Repository with helper methods.
 type GitRepo struct {
@@ -128,26 +142,34 @@ func (g *GitRepo) EnsureBranch(branchName string) error {
 }
 
 // SyncSubmodules aligns submodule working trees with the commits recorded at HEAD.
+// Transient submodule index.lock contention is retried with backoff.
 func (g *GitRepo) SyncSubmodules() error {
-	cmd := exec.CommandContext(context.Background(), "git", "submodule", "update", "--init", "--recursive", "--force")
-	cmd.Dir = g.path
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to sync submodules: %w: %s", err, string(output))
+	var lastErr error
+	var lastOutput string
+	for attempt := 1; attempt <= submoduleSyncAttempts; attempt++ {
+		cmd := exec.CommandContext(context.Background(), "git", "submodule", "update", "--init", "--recursive", "--force")
+		cmd.Dir = g.path
+		output, err := cmd.CombinedOutput()
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+		lastOutput = string(output)
+		if !isSubmoduleIndexLockError(lastOutput) || attempt == submoduleSyncAttempts {
+			break
+		}
+		fmt.Printf("Submodule sync hit index.lock (attempt %d/%d); retrying...\n", attempt, submoduleSyncAttempts)
+		time.Sleep(submoduleSyncRetryWait * time.Duration(attempt))
 	}
-	return nil
+	return fmt.Errorf("failed to sync submodules: %w: %s", lastErr, lastOutput)
 }
 
-// CheckoutBranch checks out an existing branch.
+// CheckoutBranch checks out an existing branch, then syncs submodules to HEAD.
 func (g *GitRepo) CheckoutBranch(branchName string) error {
 	currentBranch, err := g.GetCurrentBranch()
 	if err == nil && currentBranch == branchName {
 		fmt.Printf("Already on branch: %s\n", branchName)
 		return g.SyncSubmodules()
-	}
-
-	if err := g.SyncSubmodules(); err != nil {
-		return err
 	}
 
 	w, err := g.repo.Worktree()
@@ -157,6 +179,9 @@ func (g *GitRepo) CheckoutBranch(branchName string) error {
 
 	err = w.Checkout(&git.CheckoutOptions{
 		Branch: plumbing.NewBranchReferenceName(branchName),
+		// Force discards unstaged submodule drift left by the previous branch's
+		// gitlink; SyncSubmodules immediately after restores HEAD's pins.
+		Force: true,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
