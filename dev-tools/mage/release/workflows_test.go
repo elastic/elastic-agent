@@ -116,6 +116,7 @@ const defaultBeatVersion = "9.5.0"
 
 	assertGitShowContains(t, tmpDir, "ff-prep-next-patch-9.5.1", "version/version.go", `defaultBeatVersion = "9.5.1"`)
 	assertGitShowContains(t, tmpDir, "ff-prep-next-patch-9.5.1", "version/docs/version.asciidoc", ":stack-version: 9.4.3")
+	assertGitShowContains(t, tmpDir, "ff-prep-next-patch-9.5.1", "deploy/kubernetes/elastic-agent-managed-kubernetes.yaml", "elastic-agent:9.5.1")
 }
 
 func TestRunMajorMinorReleaseRejectsMismatchedCurrentRelease(t *testing.T) {

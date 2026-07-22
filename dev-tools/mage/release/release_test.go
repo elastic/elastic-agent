@@ -165,6 +165,54 @@ spec:
 	}
 }
 
+func TestUpdateDeploymentManifests(t *testing.T) {
+	tmpDir := t.TempDir()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+
+	manifest := "deploy/kubernetes/elastic-agent-managed-kubernetes.yaml"
+	if err := os.MkdirAll(filepath.Dir(manifest), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(manifest, []byte("image: docker.elastic.co/elastic-agent/elastic-agent:9.6.0\n"), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	asciidoc := "version/docs/version.asciidoc"
+	if err := os.MkdirAll(filepath.Dir(asciidoc), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(asciidoc, []byte(":stack-version: 9.6.0\n:doc-branch: main\n"), 0644); err != nil {
+		t.Fatalf("write asciidoc: %v", err)
+	}
+
+	if err := UpdateDeploymentManifests("9.6.1"); err != nil {
+		t.Fatalf("UpdateDeploymentManifests: %v", err)
+	}
+
+	got, err := os.ReadFile(manifest)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !strings.Contains(string(got), "elastic-agent:9.6.1") {
+		t.Fatalf("manifest = %q, want 9.6.1 image", got)
+	}
+	adoc, err := os.ReadFile(asciidoc)
+	if err != nil {
+		t.Fatalf("read asciidoc: %v", err)
+	}
+	if !strings.Contains(string(adoc), ":stack-version: 9.6.0") {
+		t.Fatalf("asciidoc should be unchanged, got %q", adoc)
+	}
+}
+
 func TestUpdateVersionInFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	manifestPath := filepath.Join("deploy", "kubernetes", "elastic-agent-managed-kubernetes.yaml")

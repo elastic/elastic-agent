@@ -40,7 +40,7 @@ Example: `CURRENT_RELEASE=9.5.0` → branch `9.5`, next minor `9.6.0`, next patc
 | **PR-A** | `main` | `ff-prep-main-9.5.0` | `merge:1-ff-day` | Mergify backport + `version.go` → next minor |
 | **PR-B** | `9.5` | `ff-release-9.5.0` | `merge:2-after-branch` | version + docs + `mage update` |
 | **PR-C** | `main` | `ff-prep-main-docs-9.6.0` | `merge:3-after-images` | docs + deployment manifests with `RELEASE=main` |
-| **PR-D** | `9.5` | `ff-prep-next-patch-9.5.1` | `merge:4-after-release` | `version.go` → next patch + `mage update` |
+| **PR-D** | `9.5` | `ff-prep-next-patch-9.5.1` | `merge:4-after-release` | `version.go` + Helm/K8s manifests → next patch + `mage update` |
 
 Titles use `[Release <CURRENT_RELEASE>] …`.
 
@@ -72,7 +72,7 @@ Example: branch `9.4` already has `version/version.go` at `9.4.3` →
 | Step | Target | Branch | Merge label | What changes |
 |------|--------|--------|-------------|--------------|
 | **PR-A** | `9.4` | `patch-release-9.4.3` | `merge:1-before-build` | docs + `:stack-version:` only (no `version.go` bump) |
-| **PR-B** | `9.4` | `ff-prep-next-patch-9.4.4` | `merge:4-after-release` | next patch `version.go` + `mage update` |
+| **PR-B** | `9.4` | `ff-prep-next-patch-9.4.4` | `merge:4-after-release` | next patch `version.go` + Helm/K8s manifests + `mage update` |
 
 ```bash
 export PROJECT_OWNER="your-user"

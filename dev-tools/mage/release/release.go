@@ -172,14 +172,8 @@ func UpdateDocsWithOptions(opts DocsUpdateOptions) error {
 		return err
 	}
 
-	files, err := collectDocFiles()
-	if err != nil {
+	if err := UpdateDeploymentManifests(opts.CurrentVersion); err != nil {
 		return err
-	}
-	for _, file := range files {
-		if err := updateVersionInFile(file, opts.CurrentVersion); err != nil {
-			return err
-		}
 	}
 
 	if err := rewriteBranchRefs("deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml", opts.BaseBranch, opts.ReleaseBranch); err != nil {
@@ -190,6 +184,28 @@ func UpdateDocsWithOptions(opts DocsUpdateOptions) error {
 	}
 
 	fmt.Printf("Updated documentation files to version %s\n", opts.CurrentVersion)
+	return nil
+}
+
+// UpdateDeploymentManifests updates Helm/K8s deployment manifests to newVersion.
+// Mirrors the helm/k8s portion of make check-ci after a version.go bump
+// (mage helm:updateAgentVersion + rendered/kustomize manifests), without
+// touching version.asciidoc or README branch refs. Used by FF/patch PR-D
+// (prepare-next-release).
+func UpdateDeploymentManifests(newVersion string) error {
+	if newVersion == "" {
+		return fmt.Errorf("version is required")
+	}
+	files, err := collectDocFiles()
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		if err := updateVersionInFile(file, newVersion); err != nil {
+			return err
+		}
+	}
+	fmt.Printf("Updated deployment manifests to version %s\n", newVersion)
 	return nil
 }
 

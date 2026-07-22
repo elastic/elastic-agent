@@ -311,6 +311,10 @@ func prepNextPatchOnReleaseBranch(repo *GitRepo, cfg *ReleaseConfig) (workflowPR
 	if err := UpdateVersion(cfg.NextRelease); err != nil {
 		return workflowPR{}, err
 	}
+	// Helm/K8s sync formerly applied via make check-ci after prepare-next-release.
+	if err := UpdateDeploymentManifests(cfg.NextRelease); err != nil {
+		return workflowPR{}, err
+	}
 	if err := runMageUpdate(); err != nil {
 		return workflowPR{}, err
 	}
@@ -371,10 +375,11 @@ func prDNextPatchBody(cfg *ReleaseConfig) string {
 Prepares the %s branch after release of %s.
 
 - Bumps version/version.go to %s
+- Syncs Helm/K8s deployment manifests to %s (former check-ci helm:updateAgentVersion path)
 - Runs mage update for generated artifacts
 
 **Merge:** after the release of %s.
-`, cfg.CurrentRelease, cfg.ReleaseBranch, cfg.CurrentRelease, cfg.NextRelease, cfg.CurrentRelease)
+`, cfg.CurrentRelease, cfg.ReleaseBranch, cfg.CurrentRelease, cfg.NextRelease, cfg.NextRelease, cfg.CurrentRelease)
 }
 
 func ensureMajorMinorCurrentReleaseMatchesBase(repo *GitRepo, cfg *ReleaseConfig) error {
