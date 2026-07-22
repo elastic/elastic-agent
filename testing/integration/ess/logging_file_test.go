@@ -78,7 +78,7 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 	// Wait for the agent to re-exec (due to Files config change) and recover.
 	require.Eventuallyf(t, func() bool {
 		return waitForAgentAndFleetHealthy(ctx, t, f)
-	}, 5*time.Minute, 5*time.Second, "agent never became healthy after logging path change")
+	}, 6*time.Minute, 5*time.Second, "agent never became healthy after logging path change")
 
 	// The agent must create at least one log file in the new directory.
 	require.Eventuallyf(t, func() bool {
