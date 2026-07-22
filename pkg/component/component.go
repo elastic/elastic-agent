@@ -58,7 +58,7 @@ type BeatRuntimeConfig struct {
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
 		Default:                 string(DefaultRuntimeManager),
-		DynamicInputs:           "",
+		DynamicInputs:           string(ProcessRuntimeManager),
 		OtelPartialConfigReload: true,
 		Auditbeat: BeatRuntimeConfig{
 			Default: string(OtelRuntimeManager),
