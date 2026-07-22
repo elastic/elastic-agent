@@ -49,5 +49,5 @@ type HostECSMeta struct {
 	MAC      []string `json:"mac"`
 	// Memory is the total physical memory of the host in bytes.
 	// Omitted when the platform does not report it (value 0).
-	Memory uint64 `json:"memory,omitempty"`
+	Memory uint64 `json:"memory,omitempty" yaml:",omitempty"`
 }
