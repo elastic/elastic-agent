@@ -4278,7 +4278,7 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	config := DefaultRuntimeConfig()
 	require.NotNil(t, config)
 	assert.Equal(t, string(DefaultRuntimeManager), config.Default)
-	assert.Equal(t, "", config.DynamicInputs)
+	assert.Equal(t, string(ProcessRuntimeManager), config.DynamicInputs)
 	assert.Equal(t, "otel", config.Auditbeat.Default)
 	assert.Empty(t, config.Auditbeat.InputType)
 	assert.Equal(t, "otel", config.Filebeat.Default)
