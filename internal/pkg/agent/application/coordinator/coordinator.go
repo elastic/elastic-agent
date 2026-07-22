@@ -147,9 +147,6 @@ type RuntimeManager interface {
 	// Update updates the current components model.
 	Update(model component.Model)
 
-	// Reload reloads the configuration for the runtime manager.
-	Reload(rawConfig *config.Config) error
-
 	// PerformAction executes an action on a unit.
 	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
 
@@ -1864,12 +1861,6 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 	if c.monitoringServerReloader != nil {
 		if err := c.monitoringServerReloader.Reload(cfg); err != nil {
 			return fmt.Errorf("failed to reload monitor manager configuration: %w", err)
-		}
-	}
-
-	if c.runtimeMgr != nil {
-		if err := c.runtimeMgr.Reload(cfg); err != nil {
-			return fmt.Errorf("failed to reload runtime manager configuration: %w", err)
 		}
 	}
 

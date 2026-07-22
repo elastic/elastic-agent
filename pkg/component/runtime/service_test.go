@@ -492,9 +492,28 @@ func makeServiceForCheckStatus(t *testing.T, installTimeout, uninstallTimeout, c
 // TestUpgradeGracePeriodExceedsMaxServiceTimeout ensures the default upgrade
 // watcher grace period always exceeds the longest service operation timeout so
 // a service that never checks back in is still caught before the watcher gives up.
+// It loads the real endpoint-security spec so a spec change that breaks the
+// invariant fails this test.
 func TestUpgradeGracePeriodExceedsMaxServiceTimeout(t *testing.T) {
-	service := makeServiceForCheckStatus(t, 600*time.Second, 600*time.Second, 600*time.Second)
-	maxTimeout := service.checkinFailureTimeout()
+	specData, err := os.ReadFile(filepath.Join("..", "..", "..", "specs", "endpoint-security.spec.yml"))
+	require.NoError(t, err, "reading endpoint-security.spec.yml")
+	spec, err := component.LoadSpec(specData)
+	require.NoError(t, err, "parsing endpoint-security.spec.yml")
+
+	var maxTimeout time.Duration
+	for _, input := range spec.Inputs {
+		if input.Service == nil {
+			continue
+		}
+		ops := input.Service.Operations
+		for _, op := range []*component.ServiceOperationsCommandSpec{ops.Check, ops.Install} {
+			if op != nil && op.Timeout > maxTimeout {
+				maxTimeout = op.Timeout
+			}
+		}
+	}
+	require.NotZero(t, maxTimeout, "endpoint spec must have at least one service operation timeout")
+
 	gracePeriod := configuration.DefaultUpgradeConfig().Watcher.GracePeriod
 	require.Greater(t, gracePeriod, maxTimeout,
 		"upgrade watcher grace period (%v) must exceed max service operation timeout (%v)", gracePeriod, maxTimeout)

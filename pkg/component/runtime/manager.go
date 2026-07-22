@@ -32,7 +32,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
@@ -182,12 +181,6 @@ func NewManager(
 		doneChan:      make(chan struct{}),
 	}
 	return m, nil
-}
-
-// Reload satisfies the RuntimeManager interface. Currently a no-op; reserved
-// for future config-driven tuning of the runtime manager.
-func (m *Manager) Reload(_ *config.Config) error {
-	return nil
 }
 
 // Run runs the manager's grpc server, implementing the

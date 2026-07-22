@@ -13,7 +13,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -333,57 +332,6 @@ func (_c *MockRuntimeManager_PerformDiagnostics_Call) Return(componentUnitDiagno
 }
 
 func (_c *MockRuntimeManager_PerformDiagnostics_Call) RunAndReturn(run func(context1 context.Context, componentUnitDiagnosticRequests ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic) *MockRuntimeManager_PerformDiagnostics_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Reload provides a mock function for the type MockRuntimeManager
-func (_mock *MockRuntimeManager) Reload(rawConfig *config.Config) error {
-	ret := _mock.Called(rawConfig)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Reload")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*config.Config) error); ok {
-		r0 = returnFunc(rawConfig)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockRuntimeManager_Reload_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Reload'
-type MockRuntimeManager_Reload_Call struct {
-	*mock.Call
-}
-
-// Reload is a helper method to define mock.On call
-//   - rawConfig *config.Config
-func (_e *MockRuntimeManager_Expecter) Reload(rawConfig interface{}) *MockRuntimeManager_Reload_Call {
-	return &MockRuntimeManager_Reload_Call{Call: _e.mock.On("Reload", rawConfig)}
-}
-
-func (_c *MockRuntimeManager_Reload_Call) Run(run func(rawConfig *config.Config)) *MockRuntimeManager_Reload_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *config.Config
-		if args[0] != nil {
-			arg0 = args[0].(*config.Config)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockRuntimeManager_Reload_Call) Return(err error) *MockRuntimeManager_Reload_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockRuntimeManager_Reload_Call) RunAndReturn(run func(rawConfig *config.Config) error) *MockRuntimeManager_Reload_Call {
 	_c.Call.Return(run)
 	return _c
 }

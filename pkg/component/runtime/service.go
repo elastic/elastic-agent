@@ -576,10 +576,9 @@ func (s *serviceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *t
 	}
 }
 
-// checkinFailureTimeout returns how long this service is allowed to take to
-// start up before a lack of check-ins is treated as a real failure.
-// Only check and install timeouts are considered; uninstall is irrelevant
-// for upgrade health.
+// checkinFailureTimeout returns the longest check or install operation timeout
+// for this service. Uninstall is excluded because it only runs on removal, not
+// during startup or upgrade.
 func (s *serviceRuntime) checkinFailureTimeout() time.Duration {
 	ops := s.comp.InputSpec.Spec.Service.Operations
 	var longest time.Duration
@@ -592,10 +591,9 @@ func (s *serviceRuntime) checkinFailureTimeout() time.Duration {
 }
 
 // maxCheckinMisses returns how many consecutive check-ins this component can
-// miss before it's marked FAILED. It uses the longest check/install operation
-// timeout, floored at the generic default. The upgrade watcher grace period is
-// always longer than this timeout (see defaultGracePeriodDuration), so a truly
-// failed service is still caught before the watcher gives up.
+// miss before it's marked FAILED. The window scales with the longest check/install
+// operation timeout so slow-starting services (e.g. Elastic Defend) are not
+// prematurely failed during an upgrade.
 func (s *serviceRuntime) maxCheckinMisses(checkinPeriod time.Duration) int {
 	misses := maxCheckinMisses
 	timeout := s.checkinFailureTimeout()
