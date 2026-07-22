@@ -16,9 +16,8 @@ import (
 // EnvHostName overrides the hostname reported by Elastic Agent when set.
 const EnvHostName = "ELASTIC_AGENT_HOSTNAME"
 
-// GetHostName returns the hostname for this agent. If ELASTIC_AGENT_HOSTNAME is set it is used
-// directly; otherwise the FQDN is returned when the FQDN feature flag is enabled, falling back
-// to the OS-provided hostname.
+// GetHostName returns the hostname for this agent. ELASTIC_AGENT_HOSTNAME takes precedence;
+// otherwise falls back to FQDN (when enabled) or the OS hostname.
 func GetHostName(isFqdnFeatureEnabled bool, hostInfo types.HostInfo, host types.Host, log *logger.Logger) string {
 	if override := os.Getenv(EnvHostName); override != "" {
 		return override

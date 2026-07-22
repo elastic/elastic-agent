@@ -890,8 +890,8 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				}),
 				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
 				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-					// For each agent pod, verify that the Fleet-reported hostname matches the
-					// Kubernetes node the pod is scheduled on (i.e. ELASTIC_AGENT_HOSTNAME took effect).
+					// For each agent pod, verify that the Fleet-reported hostname matches
+					// the Kubernetes node the pod is running on.
 					podList := &corev1.PodList{}
 					err := kCtx.client.Resources(namespace).List(ctx, podList, func(opt *metav1.ListOptions) {
 						opt.LabelSelector = "name=agent-pernode-helm-agent"

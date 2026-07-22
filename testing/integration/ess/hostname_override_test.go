@@ -35,9 +35,8 @@ func serviceDropInDir(namespace string) string {
 func TestHostnameEnvOverride(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Hostname,
-		// Linux-only: the env-injection mechanism (systemd drop-in) is Linux-specific.
-		// Non-service deployments (containers, standalone binary) inherit ELASTIC_AGENT_HOSTNAME
-		// directly from their process environment; that path is covered by TestGetHostNameEnvOverride.
+		// Linux-only: systemd drop-ins are Linux-specific. Container and standalone
+		// deployments set ELASTIC_AGENT_HOSTNAME directly; see TestGetHostNameEnvOverride.
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
@@ -60,8 +59,7 @@ func TestHostnameEnvOverride(t *testing.T) {
 	customHostname := fmt.Sprintf("custom-node-%s", randStr(6))
 
 	// Inject ELASTIC_AGENT_HOSTNAME via a systemd drop-in before the service starts.
-	// Drop-ins are the standard, distro-agnostic way to override systemd unit settings;
-	// this is equivalent to what `systemctl edit elastic-agent` would produce.
+	// This is the standard cross-distro approach (equivalent to `systemctl edit`).
 	// The drop-in must exist before install because the service starts immediately on install.
 	dropInDir := serviceDropInDir(installOpts.Namespace)
 	dropInFile := filepath.Join(dropInDir, "elastic-agent-hostname.conf")
