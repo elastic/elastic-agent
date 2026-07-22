@@ -10,9 +10,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"runtime/pprof"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,15 +29,18 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
 var (
 	_ component.Component = (*diagnosticsExtension)(nil)
 
-	// The elasticdiagnostics extension also implements the otelmanager.DiagnosticExtension interface.
+	// The elasticdiagnostics extension also implements the otelmanager.DiagnosticExtension
+	// and otelmanager.ActionExtension interfaces.
 	// NOTE: Changing the signature will require changes to libbeat and beatreceivers. Don't remove this.
 	_ otelmanager.DiagnosticExtension = (*diagnosticsExtension)(nil)
+	_ otelmanager.ActionExtension     = (*diagnosticsExtension)(nil)
 )
 
 type diagHook struct {
@@ -43,6 +49,10 @@ type diagHook struct {
 	contentType string
 	hook        func() []byte
 }
+
+// actionHandler is the callback a beat receiver registers to receive Fleet
+// actions routed to it. It matches the signature of management.Action.Execute.
+type actionHandler func(ctx context.Context, params map[string]any) (map[string]any, error)
 
 type diagnosticsExtension struct {
 	listener net.Listener
@@ -55,9 +65,22 @@ type diagnosticsExtension struct {
 	componentHooks    map[string][]*diagHook
 	globalHooks       map[string]*diagHook
 
-	mx        sync.Mutex
-	hooksMtx  sync.Mutex
-	configMtx sync.Mutex
+	// actionHandlers is keyed by elastic-agent component ID (e.g.
+	// "osquery-default"), resolved from the OTel receiver name at
+	// registration time via translate.ComponentIDFromReceiverName. The inner
+	// map is keyed by the full OTel receiver name, because a single component
+	// can be split across multiple receivers — one per input stream, unless
+	// the component's spec sets single_receiver: true.
+	// Routing an action requires exactly one receiver registered for the
+	// target component; more than one is treated as ambiguous (see
+	// serveAction) rather than guessing, since there is no per-stream
+	// targeting information in a Fleet action today.
+	actionHandlers map[string]map[string]actionHandler
+
+	mx         sync.Mutex
+	hooksMtx   sync.Mutex
+	configMtx  sync.Mutex
+	actionsMtx sync.Mutex
 }
 
 func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) error {
@@ -80,6 +103,7 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 
 	mux := http.NewServeMux()
 	mux.Handle("/diagnostics", d)
+	mux.HandleFunc("/actions", d.serveAction)
 
 	d.server = &http.Server{
 		Handler:           mux,
@@ -189,6 +213,148 @@ func (d *diagnosticsExtension) RegisterDiagnosticHook(componentName string, desc
 				hook:        hook,
 			},
 		}
+	}
+}
+
+// RegisterActionHandler API exposes the ability for beat receivers to register a
+// handler for Fleet actions routed to them. componentName is the OTel receiver
+// name (e.g. "osquerybeatreceiver/_agent-component/osquery-default/stream"). It
+// returns an error if this registration makes routing for the component
+// ambiguous (see ambiguousActionRoutingError); the handler is still recorded so
+// that action requests keep failing loudly via resolveActionHandler, but the
+// caller should log this error since it is otherwise only surfaced the next
+// time Fleet dispatches an action to this component.
+// NOTE: Changing the function signature will require changes to libbeat and beatreceivers. Proceed with caution.
+func (d *diagnosticsExtension) RegisterActionHandler(componentName string, handler func(ctx context.Context, params map[string]any) (map[string]any, error)) error {
+	compID, ok := translate.ComponentIDFromReceiverName(componentName)
+	if !ok {
+		return fmt.Errorf("receiver name %q does not contain the expected component prefix, ignoring registration", componentName)
+	}
+	d.actionsMtx.Lock()
+	defer d.actionsMtx.Unlock()
+	if d.actionHandlers[compID] == nil {
+		d.actionHandlers[compID] = make(map[string]actionHandler)
+	}
+	d.actionHandlers[compID][componentName] = handler
+	return ambiguityError(compID, d.actionHandlers[compID])
+}
+
+// UnregisterActionHandler removes a previously registered action handler.
+// NOTE: Changing the function signature will require changes to libbeat and beatreceivers. Proceed with caution.
+func (d *diagnosticsExtension) UnregisterActionHandler(componentName string) {
+	compID, ok := translate.ComponentIDFromReceiverName(componentName)
+	if !ok {
+		return
+	}
+	d.actionsMtx.Lock()
+	defer d.actionsMtx.Unlock()
+	delete(d.actionHandlers[compID], componentName)
+	if len(d.actionHandlers[compID]) == 0 {
+		delete(d.actionHandlers, compID)
+	}
+}
+
+// resolveActionHandler returns the sole action handler registered for
+// componentID. If more than one receiver has registered a handler for this
+// component (possible when a component's input runs as multiple per-stream
+// receivers, see actionHandlers), routing is ambiguous: there is no
+// per-stream targeting information in a Fleet action to pick the right one,
+// so this returns an error naming the conflicting receivers rather than
+// guessing. Components whose inputs register custom actions must set
+// single_receiver: true in their spec to avoid this.
+func (d *diagnosticsExtension) resolveActionHandler(componentID string) (actionHandler, error) {
+	d.actionsMtx.Lock()
+	defer d.actionsMtx.Unlock()
+	handlers := d.actionHandlers[componentID]
+	if len(handlers) == 0 {
+		return nil, fmt.Errorf("no action handler registered for component %q", componentID)
+	}
+	if err := ambiguityError(componentID, handlers); err != nil {
+		return nil, err
+	}
+	for _, handler := range handlers {
+		return handler, nil
+	}
+	// Unreachable in practice: len(handlers) is checked above (0 handled,
+	// >1 handled by ambiguityError), so exactly one iteration of the loop
+	// above always runs.
+	return nil, fmt.Errorf("no action handler registered for component %q", componentID)
+}
+
+// ambiguityError returns a non-nil error if more than one receiver has
+// registered an action handler for componentID. Callers must not invoke any
+// of these handlers in that case, since there is no per-stream targeting
+// information in a Fleet action to pick the right one.
+func ambiguityError(componentID string, handlers map[string]actionHandler) error {
+	if len(handlers) <= 1 {
+		return nil
+	}
+	receiverNames := slices.Sorted(maps.Keys(handlers))
+	return fmt.Errorf("%w for component %q: %d receivers registered actions (%s); "+
+		"this input must set single_receiver: true in its component spec to support actions",
+		errAmbiguousActionRouting, componentID, len(receiverNames), strings.Join(receiverNames, ", "))
+}
+
+// errAmbiguousActionRouting identifies the resolveActionHandler failure mode
+// where multiple receivers registered actions for the same component, so
+// serveAction can map it to a distinct HTTP status from a plain "not found".
+var errAmbiguousActionRouting = errors.New("ambiguous action routing")
+
+// serveAction handles POST /actions. It resolves the action handler registered
+// for the requested component ID and invokes it, returning the result (or
+// error) as JSON. It always responds 200 unless the request itself is
+// malformed or no handler is found for the requested component.
+func (d *diagnosticsExtension) serveAction(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var actionReq ActionRequest
+	if err := json.NewDecoder(req.Body).Decode(&actionReq); err != nil {
+		d.writeActionError(w, http.StatusBadRequest, fmt.Sprintf("failed to decode request: %v", err))
+		return
+	}
+
+	handler, err := d.resolveActionHandler(actionReq.ComponentID)
+	if err != nil {
+		status := http.StatusNotFound
+		if errors.Is(err, errAmbiguousActionRouting) {
+			status = http.StatusConflict
+		}
+		d.writeActionError(w, status, err.Error())
+		return
+	}
+
+	result, err := handler(req.Context(), actionReq.Params)
+	resp := ActionResponse{Result: result}
+	if err != nil {
+		resp.Error = err.Error()
+	}
+
+	b, err := json.Marshal(resp)
+	if err != nil {
+		d.writeActionError(w, http.StatusInternalServerError, fmt.Sprintf("failed marshaling response: %v", err))
+		return
+	}
+	w.Header().Add("content-type", "application/json")
+	if _, err := w.Write(b); err != nil {
+		d.logger.Error("Failed writing response to client.", zap.Error(err))
+	}
+}
+
+// writeActionError writes an ActionResponse{Error: msg} as the HTTP body with
+// the given status code, avoiding hand-rolled JSON string formatting.
+func (d *diagnosticsExtension) writeActionError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Add("content-type", "application/json")
+	w.WriteHeader(status)
+	b, err := json.Marshal(ActionResponse{Error: msg})
+	if err != nil {
+		d.logger.Error("Failed marshaling error response", zap.Error(err))
+		return
+	}
+	if _, err := w.Write(b); err != nil {
+		d.logger.Error("Failed writing response to client.", zap.Error(err))
 	}
 }
 
