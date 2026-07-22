@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -36,8 +35,7 @@ func TestContextProvider(t *testing.T) {
 		"check_interval": checkInterval,
 	})
 	require.NoError(t, err)
-	builder, _ := composable.Providers.GetContextProvider("host")
-	provider, err := builder(log, c, true)
+	provider, err := ContextProviderBuilder(log, c, true)
 	require.NoError(t, err)
 
 	hostProvider, _ := provider.(*contextProvider)
@@ -103,8 +101,7 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	builder, _ := composable.Providers.GetContextProvider("host")
-	provider, err := builder(log, c, true)
+	provider, err := ContextProviderBuilder(log, c, true)
 	require.NoError(t, err)
 
 	hostProvider, ok := provider.(*contextProvider)

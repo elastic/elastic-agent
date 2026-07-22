@@ -221,12 +221,12 @@ func (Dev) Package(ctx context.Context) {
 }
 
 func (Dev) RegenerateMocks() error {
-	err := sh.Run("mockery")
+	err := sh.Run("go", "tool", "mockery")
 	if err != nil {
 		return fmt.Errorf("generating mocks: %w", err)
 	}
 
-	mg.Deps(devtools.Format)
+	mg.SerialDeps(Format.License, devtools.Format)
 	return nil
 }
 
@@ -321,7 +321,7 @@ func (Build) WindowsArchiveRootBinary(ctx context.Context) {
 	}
 }
 
-// GolangCrossBuild build the Beat binary inside of the golang-builder.
+// GolangCrossBuild build the elastic-agent binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
 func GolangCrossBuild(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
@@ -329,6 +329,16 @@ func GolangCrossBuild(ctx context.Context) error {
 	params.OutputDir = "build/golang-crossbuild"
 	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(cfg, params.Vars)
+
+	// The elastic-agent binary only requires cgo on darwin (Keychain access
+	// in internal/pkg/agent/vault and host/process stats). On every other
+	// platform CGO_ENABLED=1 forces external/dynamic linking against glibc,
+	// which pulls in the cgo runtime support and NSS resolver as opaque C
+	// objects that bypass the Go linker's dead code elimination entirely
+	// and produces a dynamically linked binary instead of a static one.
+	if cfg.Platform().GOOS != "darwin" {
+		params.CGO = false
+	}
 
 	if err := devtools.GolangCrossBuild(ctx, cfg, params); err != nil {
 		return err
@@ -3180,6 +3190,9 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	timestamp := cfg.IntegrationTest.TimestampEnabled
 
 	extraEnv := map[string]string{}
+	if cfg.IntegrationTest.AgentDevelop != "" {
+		extraEnv["TEST_AGENT_DEVELOP"] = cfg.IntegrationTest.AgentDevelop
+	}
 	if cfg.IntegrationTest.CollectDiag != "" {
 		extraEnv["AGENT_COLLECT_DIAG"] = cfg.IntegrationTest.CollectDiag
 	}
