@@ -13,7 +13,48 @@ permissions:
   contents: read
 
 jobs:
+  check-latest:
+    runs-on: ubuntu-latest
+    outputs:
+      is_latest: ${{ steps.check_latest.outputs.is_latest }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # Fetch all history including tags
+
+      - name: Add upstream remote and fetch tags
+        run: |
+          git remote add upstream https://github.com/elastic/elastic-agent.git || true
+          git fetch upstream --tags
+
+      - name: Find latest semantic version
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            LATEST_VERSION="${{ github.event.release.tag_name }}"
+          else
+            # Get the latest semantic version tag (excluding pre-release versions)
+            LATEST_VERSION=$(git tag --list | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -1)
+          fi
+          echo "Latest version: $LATEST_VERSION"
+          echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if this is the latest release
+        id: check_latest
+        run: |
+          LATEST=$(git tag --list | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -1)
+          if [[ "${{ steps.get_version.outputs.version }}" != "$LATEST" ]]; then
+            echo "Released version ${{ steps.get_version.outputs.version }} is not the latest tag ($LATEST). Skipping."
+            echo "is_latest=false" >> $GITHUB_OUTPUT
+          else
+            echo "is_latest=true" >> $GITHUB_OUTPUT
+          fi
+
   update-docs:
+    needs: check-latest
+    if: needs.check-latest.outputs.is_latest == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -26,64 +67,36 @@ jobs:
           submodules: true
           fetch-depth: 0  # Fetch all history including tags
           persist-credentials: false  # Avoid credential conflicts with create-pull-request
-      
+
       - name: Add upstream remote and fetch tags
         run: |
           git remote add upstream https://github.com/elastic/elastic-agent.git || true
           git fetch upstream --tags
-      
-      - name: Find latest semantic version
-        id: get_version
-        run: |
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            LATEST_VERSION="${{ github.event.release.tag_name }}"
-          else
-            # Get the latest semantic version tag (excluding pre-release versions)
-            LATEST_VERSION=$(git tag --list | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -1)
-          fi
-          echo "Latest version: $LATEST_VERSION"
-          echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-      
-      - name: Check if this is the latest release
-        id: check_latest
-        run: |
-          LATEST=$(git tag --list | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -1)
-          if [[ "${{ steps.get_version.outputs.version }}" != "$LATEST" ]]; then
-            echo "Released version ${{ steps.get_version.outputs.version }} is not the latest tag ($LATEST). Skipping."
-            echo "is_latest=false" >> $GITHUB_OUTPUT
-          else
-            echo "is_latest=true" >> $GITHUB_OUTPUT
-          fi
 
       - name: Pass version to script
-        if: steps.check_latest.outputs.is_latest == 'true'
         run: |
-          echo "LATEST_VERSION=${{ steps.get_version.outputs.version }}" >> $GITHUB_ENV
-      
+          echo "LATEST_VERSION=${{ needs.check-latest.outputs.version }}" >> $GITHUB_ENV
+
       - name: Set up Python
-        if: steps.check_latest.outputs.is_latest == 'true'
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           cache: 'pip'
-      
+
       - name: Install dependencies
-        if: steps.check_latest.outputs.is_latest == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r docs/scripts/update-docs/requirements.txt
-      
+
       - name: Run documentation generator
-        if: steps.check_latest.outputs.is_latest == 'true'
         run: |
           cd docs/scripts/update-docs
           python update-components-docs.py
-      
+
       - name: Check if branch already exists
-        if: steps.check_latest.outputs.is_latest == 'true'
         id: check_branch
         run: |
-          BRANCH_NAME="update-docs-${{ steps.get_version.outputs.version }}"
+          BRANCH_NAME="update-docs-${{ needs.check-latest.outputs.version }}"
           if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
             echo "Branch $BRANCH_NAME already exists. Documentation for this version has already been updated."
             echo "branch_exists=true" >> $GITHUB_OUTPUT
@@ -91,42 +104,40 @@ jobs:
             echo "Branch $BRANCH_NAME does not exist. Proceeding with PR creation."
             echo "branch_exists=false" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Create Pull Request
-        if: steps.check_latest.outputs.is_latest == 'true' && steps.check_branch.outputs.branch_exists == 'false'
+        if: steps.check_branch.outputs.branch_exists == 'false'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "docs: update generated documentation for ${{ steps.get_version.outputs.version }}"
-          title: "Update generated documentation for ${{ steps.get_version.outputs.version }}"
+          commit-message: "docs: update generated documentation for ${{ needs.check-latest.outputs.version }}"
+          title: "Update generated documentation for ${{ needs.check-latest.outputs.version }}"
           body: |
-            This PR updates the generated documentation based on the latest released version **${{ steps.get_version.outputs.version }}**.
-            
+            This PR updates the generated documentation based on the latest released version **${{ needs.check-latest.outputs.version }}**.
+
             ## Changes
             - Updates EDOT Collector component tables
             - Updates OpenTelemetry Collector Builder (OCB) configuration
-            - Uses data from the latest released version tag: `${{ steps.get_version.outputs.version }}`
-            
+            - Uses data from the latest released version tag: `${{ needs.check-latest.outputs.version }}`
+
             ## References
-            - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/go.mod
-            - **Source components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/internal/edot/components.yaml
-            - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ steps.get_version.outputs.version }}
-            
+            - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/${{ needs.check-latest.outputs.version }}/go.mod
+            - **Source components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ needs.check-latest.outputs.version }}/internal/edot/components.yaml
+            - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ needs.check-latest.outputs.version }}
+
             cc @elastic/ski-docs
-            
+
             This is an automated PR created by the documentation update workflow.
-          branch: update-docs-${{ steps.get_version.outputs.version }}
+          branch: update-docs-${{ needs.check-latest.outputs.version }}
           base: main
           delete-branch: true
           labels: |
             documentation
             automated-pr
-          team-reviewers: |
-            elastic/ski-docs
-      
+
       - name: Skip PR creation (branch exists)
-        if: steps.check_latest.outputs.is_latest == 'true' && steps.check_branch.outputs.branch_exists == 'true'
+        if: steps.check_branch.outputs.branch_exists == 'true'
         run: |
-          echo "✅ Documentation for version ${{ steps.get_version.outputs.version }} has already been updated."
-          echo "Branch update-docs-${{ steps.get_version.outputs.version }} already exists."
+          echo "✅ Documentation for version ${{ needs.check-latest.outputs.version }} has already been updated."
+          echo "Branch update-docs-${{ needs.check-latest.outputs.version }} already exists."
           echo "Workflow completed successfully - no action needed."
