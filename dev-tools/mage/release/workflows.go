@@ -23,7 +23,6 @@ var (
 const (
 	mergeLabelFFDay        = "merge:1-ff-day"
 	mergeLabelAfterBranch  = "merge:2-after-branch"
-	mergeLabelAfterImages  = "merge:3-after-images"
 	mergeLabelAfterRelease = "merge:4-after-release"
 )
 
@@ -37,15 +36,11 @@ func backportLabel(releaseBranch string) string {
 }
 
 func prAMainLabels(releaseBranch string) []string {
-	return []string{"release", "impact:critical", backportLabel(releaseBranch), "skip-changelog", "Team:Automation", mergeLabelFFDay}
+	return []string{"release", "docs", "impact:critical", backportLabel(releaseBranch), "skip-changelog", "Team:Automation", mergeLabelFFDay}
 }
 
 func prBReleaseLabels() []string {
 	return append(append([]string{}, ffReleasePRLabels...), mergeLabelAfterBranch)
-}
-
-func prCMainLabels(releaseBranch string) []string {
-	return []string{"release", "docs", "in progress", backportLabel(releaseBranch), "skip-changelog", "Team:Automation", mergeLabelAfterImages}
 }
 
 func prDNextPatchLabels() []string {
@@ -101,10 +96,12 @@ type workflowPRResult struct {
 
 // RunMajorMinorRelease executes the feature-freeze workflow:
 // 1. Creates the release branch from BASE_BRANCH
-// 2. Opens PR-A on main (backport rule + next minor version only)
+// 2. Opens PR-A on main (backport rule + next minor version + docs/manifests)
 // 3. Opens PR-B on release branch (ff-release)
-// 4. Opens PR-C on main (docs + deployment manifests for next minor)
-// 5. Opens PR-D on release branch (next patch prep)
+// 4. Opens PR-D on release branch (next patch prep)
+//
+// Agent folds next-minor docs/manifests into PR-A (historical vault-bot / make check-ci
+// behavior). Beats keeps a separate after-images docs PR; agent does not.
 func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Major/Minor Release Workflow ===")
 
@@ -144,16 +141,12 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	if err != nil {
 		return err
 	}
-	prC, err := prepMainDocs(repo, cfg)
-	if err != nil {
-		return err
-	}
 	prD, err := prepNextPatchOnReleaseBranch(repo, cfg)
 	if err != nil {
 		return err
 	}
 
-	branchesToFinalize := []workflowPR{prA, prB, prC, prD}
+	branchesToFinalize := []workflowPR{prA, prB, prD}
 
 	if cfg.DryRun {
 		fmt.Println("\nDRY RUN: Skipping push and PR creation")
@@ -189,7 +182,7 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 
 func prepMainBackportAndVersion(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	branch := fmt.Sprintf("ff-prep-main-%s", cfg.CurrentRelease)
-	fmt.Printf("\n--- Preparing PR-A: backport rule + version %s on %s ---\n", cfg.NextProjectMinorVersion, cfg.BaseBranch)
+	fmt.Printf("\n--- Preparing PR-A: backport rule + version + docs %s on %s ---\n", cfg.NextProjectMinorVersion, cfg.BaseBranch)
 
 	if err := repo.EnsureBranchFrom(cfg.BaseBranch, branch); err != nil {
 		return workflowPR{}, err
@@ -200,7 +193,15 @@ func prepMainBackportAndVersion(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, 
 	if err := UpdateVersion(cfg.NextProjectMinorVersion); err != nil {
 		return workflowPR{}, err
 	}
-	// Docs and deployment manifests belong in PR-C (prepMainDocs), matching Beats.
+	// Docs + deployment manifests for next minor (former separate PR-C / make check-ci path).
+	if err := UpdateDocsWithOptions(DocsUpdateOptions{
+		BaseBranch:     cfg.BaseBranch,
+		CurrentVersion: cfg.NextProjectMinorVersion,
+		ReleaseBranch:  cfg.BaseBranch,
+		DocBranch:      "main",
+	}); err != nil {
+		return workflowPR{}, err
+	}
 	commitMsg := fmt.Sprintf("[Release %s] Prepare main for %s and mergify backport-%s", cfg.CurrentRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch)
 	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
@@ -264,43 +265,6 @@ func prepFFRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	}, nil
 }
 
-func prepMainDocs(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
-	branch := fmt.Sprintf("ff-prep-main-docs-%s", cfg.NextProjectMinorVersion)
-	fmt.Printf("\n--- Preparing PR-C: docs %s on %s ---\n", cfg.NextProjectMinorVersion, cfg.BaseBranch)
-
-	if err := repo.EnsureBranchFrom(cfg.BaseBranch, branch); err != nil {
-		return workflowPR{}, err
-	}
-	// elastic-agent.mak prepare-next-dev-minor: update-docs BASE=main CURRENT=next RELEASE=main
-	if err := UpdateDocsWithOptions(DocsUpdateOptions{
-		BaseBranch:     cfg.BaseBranch,
-		CurrentVersion: cfg.NextProjectMinorVersion,
-		ReleaseBranch:  cfg.BaseBranch,
-		DocBranch:      "main",
-	}); err != nil {
-		return workflowPR{}, err
-	}
-	commitMsg := fmt.Sprintf("[Release %s] Update docs for %s", cfg.CurrentRelease, cfg.NextProjectMinorVersion)
-	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
-		return workflowPR{}, err
-	}
-
-	return workflowPR{
-		branch: branch,
-		base:   cfg.BaseBranch,
-		opts: PROptions{
-			Owner:     cfg.ProjectOwner,
-			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release %s] Update docs for the %s release", cfg.CurrentRelease, cfg.NextProjectMinorVersion),
-			Head:      branch,
-			Base:      cfg.BaseBranch,
-			Body:      prCMainBody(cfg),
-			Reviewers: cfg.ProjectReviewers,
-			Labels:    prCMainLabels(cfg.ReleaseBranch),
-		},
-	}, nil
-}
-
 func prepNextPatchOnReleaseBranch(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	branch := fmt.Sprintf("ff-prep-next-patch-%s", cfg.NextRelease)
 	fmt.Printf("\n--- Preparing PR-D: next patch %s on %s ---\n", cfg.NextRelease, cfg.ReleaseBranch)
@@ -346,9 +310,10 @@ Prepares %s for the %s feature freeze.
 
 - Adds Mergify backport rule for branch %s (label %s)
 - Bumps version/version.go to %s (next minor)
+- Updates docs and deployment manifests for %s
 
-**Merge:** before release branch work is finalized.
-`, cfg.CurrentRelease, cfg.BaseBranch, cfg.CurrentRelease, cfg.ReleaseBranch, backportLabel(cfg.ReleaseBranch), cfg.NextProjectMinorVersion)
+**Merge:** on feature-freeze day (merge:1-ff-day).
+`, cfg.CurrentRelease, cfg.BaseBranch, cfg.CurrentRelease, cfg.ReleaseBranch, backportLabel(cfg.ReleaseBranch), cfg.NextProjectMinorVersion, cfg.NextProjectMinorVersion)
 }
 
 func prBReleaseBody(cfg *ReleaseConfig) string {
@@ -358,15 +323,6 @@ Feature-freeze release branch updates for %s (version, docs, mage update).
 
 **Merge:** as soon as the %s branch exists.
 `, cfg.CurrentRelease, cfg.CurrentRelease, cfg.ReleaseBranch)
-}
-
-func prCMainBody(cfg *ReleaseConfig) string {
-	return fmt.Sprintf(`## [Release %s]
-
-Updates documentation and deployment manifests on %s for the next minor %s.
-
-**Merge:** after the %s branch is created. CI may stay red until Docker images exist.
-`, cfg.CurrentRelease, cfg.BaseBranch, cfg.NextProjectMinorVersion, cfg.ReleaseBranch)
 }
 
 func prDNextPatchBody(cfg *ReleaseConfig) string {

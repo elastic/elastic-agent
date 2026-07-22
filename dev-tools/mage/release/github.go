@@ -244,10 +244,6 @@ var mergeLabelDefs = map[string]struct {
 		Color:       "D93F0B",
 		Description: "Merge 2nd: ASAP after release branch exists",
 	},
-	mergeLabelAfterImages: {
-		Color:       "FBCA04",
-		Description: "Merge 3rd: after branch exists; may wait on Docker images",
-	},
 	mergeLabelAfterRelease: {
 		Color:       "0E8A16",
 		Description: "Merge 4th: after release day",

@@ -30,19 +30,20 @@ on the release branch (set by the previous cycle's next-patch PR).
 
 ## Feature freeze — `mage release:runMajorMinor`
 
-Creates the release branch and **4 merge-ordered PRs**.
+Creates the release branch and **3 merge-ordered PRs**.
 
 Example: `CURRENT_RELEASE=9.5.0` → branch `9.5`, next minor `9.6.0`, next patch `9.5.1`.
 
 | Step | Target | Branch | Merge label | What changes |
 |------|--------|--------|-------------|--------------|
 | 0 | — | `9.5` | — | Direct push from `main` |
-| **PR-A** | `main` | `ff-prep-main-9.5.0` | `merge:1-ff-day` | Mergify backport + `version.go` → next minor |
+| **PR-A** | `main` | `ff-prep-main-9.5.0` | `merge:1-ff-day` | Mergify backport + `version.go` + docs/manifests → next minor |
 | **PR-B** | `9.5` | `ff-release-9.5.0` | `merge:2-after-branch` | version + docs + `mage update` |
-| **PR-C** | `main` | `ff-prep-main-docs-9.6.0` | `merge:3-after-images` | docs + deployment manifests with `RELEASE=main` |
 | **PR-D** | `9.5` | `ff-prep-next-patch-9.5.1` | `merge:4-after-release` | `version.go` + Helm/K8s manifests → next patch + `mage update` |
 
 Titles use `[Release <CURRENT_RELEASE>] …`.
+
+Next-minor docs/manifests live in **PR-A** (agent historical vault-bot / `make check-ci` behavior). Beats keeps a separate after-images docs PR; agent does not.
 
 After success (or in `DRY_RUN`), the workflow best-effort ensures the release
 checklist issue `[RELEASE <CURRENT_RELEASE>] Instructions & Checklist` (linked to
@@ -59,7 +60,7 @@ mage release:runMajorMinor
 
 # Expect local branches:
 #   9.5, ff-prep-main-9.5.0, ff-release-9.5.0,
-#   ff-prep-main-docs-9.6.0, ff-prep-next-patch-9.5.1
+#   ff-prep-next-patch-9.5.1
 ```
 
 ## Patch release — `mage release:runPatch`

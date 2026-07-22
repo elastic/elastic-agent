@@ -84,7 +84,6 @@ const defaultBeatVersion = "9.5.0"
 		"9.5",
 		"ff-prep-main-9.5.0",
 		"ff-release-9.5.0",
-		"ff-prep-main-docs-9.6.0",
 		"ff-prep-next-patch-9.5.1",
 	}
 	for _, branch := range wantBranches {
@@ -96,23 +95,26 @@ const defaultBeatVersion = "9.5.0"
 			t.Errorf("expected branch %s to exist after dry run", branch)
 		}
 	}
+	docsBranchExists, err := repo.BranchExists("ff-prep-main-docs-9.6.0")
+	if err != nil {
+		t.Fatalf("failed checking docs branch: %v", err)
+	}
+	if docsBranchExists {
+		t.Error("expected ff-prep-main-docs-9.6.0 not to exist; docs belong in PR-A")
+	}
 
 	assertGitShowContains(t, tmpDir, "ff-prep-main-9.5.0", "version/version.go", `defaultBeatVersion = "9.6.0"`)
 	assertGitShowContains(t, tmpDir, "ff-prep-main-9.5.0", ".mergify.yml", "backport-9.5")
-	// PR-A must not refresh docs/manifests (Beats parity: those belong in PR-C).
-	assertGitShowContains(t, tmpDir, "ff-prep-main-9.5.0", "version/docs/version.asciidoc", ":stack-version: 9.4.3")
-	assertGitShowContains(t, tmpDir, "ff-prep-main-9.5.0", "deploy/kubernetes/elastic-agent-managed-kubernetes.yaml", "elastic-agent:9.4.3")
-	assertGitShowNotContains(t, tmpDir, "ff-prep-main-9.5.0", "version/docs/version.asciidoc", ":stack-version: 9.6.0")
+	// PR-A includes next-minor docs/manifests (agent combines former PR-C).
+	assertGitShowContains(t, tmpDir, "ff-prep-main-9.5.0", "README.md", "/main/")
+	assertGitShowNotContains(t, tmpDir, "ff-prep-main-9.5.0", "README.md", "/9.6/")
+	assertGitShowContains(t, tmpDir, "ff-prep-main-9.5.0", "version/docs/version.asciidoc", ":stack-version: 9.6.0")
+	assertGitShowContains(t, tmpDir, "ff-prep-main-9.5.0", "version/docs/version.asciidoc", ":doc-branch: main")
+	assertGitShowContains(t, tmpDir, "ff-prep-main-9.5.0", "deploy/kubernetes/elastic-agent-managed-kubernetes.yaml", "elastic-agent:9.6.0")
 
 	assertGitShowContains(t, tmpDir, "ff-release-9.5.0", "version/version.go", `defaultBeatVersion = "9.5.0"`)
 	assertGitShowContains(t, tmpDir, "ff-release-9.5.0", "version/docs/version.asciidoc", ":stack-version: 9.5.0")
 	assertGitShowContains(t, tmpDir, "ff-release-9.5.0", "README.md", "/9.5/")
-
-	assertGitShowContains(t, tmpDir, "ff-prep-main-docs-9.6.0", "README.md", "/main/")
-	assertGitShowNotContains(t, tmpDir, "ff-prep-main-docs-9.6.0", "README.md", "/9.6/")
-	assertGitShowContains(t, tmpDir, "ff-prep-main-docs-9.6.0", "version/docs/version.asciidoc", ":stack-version: 9.6.0")
-	assertGitShowContains(t, tmpDir, "ff-prep-main-docs-9.6.0", "version/docs/version.asciidoc", ":doc-branch: main")
-	assertGitShowContains(t, tmpDir, "ff-prep-main-docs-9.6.0", "deploy/kubernetes/elastic-agent-managed-kubernetes.yaml", "elastic-agent:9.6.0")
 
 	assertGitShowContains(t, tmpDir, "ff-prep-next-patch-9.5.1", "version/version.go", `defaultBeatVersion = "9.5.1"`)
 	assertGitShowContains(t, tmpDir, "ff-prep-next-patch-9.5.1", "version/docs/version.asciidoc", ":stack-version: 9.4.3")
@@ -182,7 +184,6 @@ func TestMajorMinorPrepLabels(t *testing.T) {
 	}{
 		{name: "PR-A", labels: prAMainLabels(cfg.ReleaseBranch), want: mergeLabelFFDay},
 		{name: "PR-B", labels: prBReleaseLabels(), want: mergeLabelAfterBranch},
-		{name: "PR-C", labels: prCMainLabels(cfg.ReleaseBranch), want: mergeLabelAfterImages},
 		{name: "PR-D", labels: prDNextPatchLabels(), want: mergeLabelAfterRelease},
 	}
 	for _, tc := range casesLabels {
@@ -196,6 +197,9 @@ func TestMajorMinorPrepLabels(t *testing.T) {
 	labelsA := prAMainLabels(cfg.ReleaseBranch)
 	if !slices.Contains(labelsA, "backport-9.5") {
 		t.Errorf("PR-A labels should include backport-9.5, got %v", labelsA)
+	}
+	if !slices.Contains(labelsA, "docs") {
+		t.Errorf("PR-A labels should include docs, got %v", labelsA)
 	}
 }
 

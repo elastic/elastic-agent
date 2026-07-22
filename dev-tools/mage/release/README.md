@@ -17,7 +17,7 @@ root `go.mod` and `NOTICE.txt`. Root mage targets invoke
 `go run -C ./dev-tools/mage/release ./cmd/agent-release …`.
 
 **Workflows supported:**
-1. **Major/Minor Release (feature-freeze)** — Creates release branch + 4 grouped PRs
+1. **Major/Minor Release (feature-freeze)** — Creates release branch + 3 grouped PRs
 2. **Patch Release** — Creates 2 grouped PRs on the release branch (docs before build; next-patch version + Helm/K8s manifests after release)
 
 Release notes are handled separately via `.github/workflows/release-notes.yml`.
@@ -31,7 +31,7 @@ Release notes are handled separately via `.github/workflows/release-notes.yml`.
 
 ## Quick Start
 
-### Feature freeze (`runMajorMinor`) — 4 PRs
+### Feature freeze (`runMajorMinor`) — 3 PRs
 
 ```bash
 export CURRENT_RELEASE="9.5.0"
