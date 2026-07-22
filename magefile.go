@@ -169,6 +169,9 @@ type Otel mg.Namespace
 // Devmachine namespace contains tasks related to remote development machines.
 type Devmachine mg.Namespace
 
+// Release namespace contains tasks for release automation.
+type Release mg.Namespace
+
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
 	err := sh.RunV("go", "mod", "tidy", "-v")
@@ -4407,4 +4410,55 @@ func getMacOSMajorVersion() (int, error) {
 	}
 
 	return majorVer, nil
+}
+
+const releaseToolDir = "dev-tools/mage/release"
+
+// runReleaseTool invokes the nested-module CLI with the Elastic Agent repo as cwd.
+func runReleaseTool(args ...string) error {
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	env := map[string]string{"ELASTIC_AGENT_REPO_ROOT": root}
+	cmdArgs := append([]string{"run", "-C", releaseToolDir, "./cmd/agent-release"}, args...)
+	return sh.RunWithV(env, "go", cmdArgs...)
+}
+
+// UpdateVersion updates the version in version/version.go
+func (Release) UpdateVersion(version string) error {
+	return runReleaseTool("update-version", version)
+}
+
+// UpdateDocs updates version references in documentation and K8s manifests
+func (Release) UpdateDocs(version string) error {
+	return runReleaseTool("update-docs", version)
+}
+
+// UpdatePatchDocs updates :stack-version: in version/docs/version.asciidoc
+func (Release) UpdatePatchDocs(version string) error {
+	return runReleaseTool("update-patch-docs", version)
+}
+
+// UpdateMergify adds a new backport rule to .mergify.yml
+func (Release) UpdateMergify(version string) error {
+	return runReleaseTool("update-mergify", version)
+}
+
+// RunMajorMinor orchestrates the complete major/minor release workflow
+// Set DRY_RUN=true to preview changes without pushing
+func (Release) RunMajorMinor() error {
+	return runReleaseTool("run-major-minor")
+}
+
+// RunPatch orchestrates the complete patch release workflow
+// Set DRY_RUN=true to preview changes without pushing
+func (Release) RunPatch() error {
+	return runReleaseTool("run-patch")
+}
+
+// EnsureIssueTracker creates or updates the Elastic Agent release checklist issue for
+// CURRENT_RELEASE, linking related Elastic Agent PRs labeled "release".
+func (Release) EnsureIssueTracker() error {
+	return runReleaseTool("ensure-issue-tracker")
 }
