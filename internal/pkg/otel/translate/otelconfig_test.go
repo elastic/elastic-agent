@@ -460,7 +460,7 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"sending_queue": map[string]any{
 				"enabled":           true,
-				"num_consumers":     1,
+				"num_consumers":     2,
 				"queue_size":        3200,
 				"block_on_overflow": true,
 				"wait_for_result":   true,

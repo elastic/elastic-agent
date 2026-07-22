@@ -77,7 +77,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 60
+  num_consumers: 120
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -142,7 +142,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -206,7 +206,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -272,7 +272,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -361,7 +361,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -379,7 +379,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 4
+  num_consumers: 8
   queue_size: 12800
   wait_for_result: true
 suppress_conflict_errors: true
@@ -422,7 +422,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -449,7 +449,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 4100
   wait_for_result: true
 suppress_conflict_errors: true
@@ -467,7 +467,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -540,7 +540,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 60
+  num_consumers: 120
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -603,7 +603,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 60
+  num_consumers: 120
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -677,7 +677,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 2
+  num_consumers: 4
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true

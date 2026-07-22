@@ -130,7 +130,15 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 			"queue_size":        getQueueSize(logger, output),
 			"block_on_overflow": true,
 			"wait_for_result":   true,
-			"num_consumers":     getTotalNumWorkers(output), // num_workers * len(hosts) if loadbalance is true
+			// num_consumers = 2x the connection count (max_conns_per_host above).
+			// Unlike the classic beats ES output — which serializes events on the
+			// producer goroutines at enqueue — the exporter serializes pdata->JSON
+			// inline on the sending-queue consumer, serial with the ES round-trip, so
+			// each connection sits idle during its consumer's serialize. Running two
+			// consumers per connection lets one serialize the next batch while the
+			// other's request is in flight, hiding the serialize without adding ES
+			// connections. (Minimum is 2, since getTotalNumWorkers is always >= 1.)
+			"num_consumers": 2 * getTotalNumWorkers(output),
 		},
 
 		"logs_dynamic_pipeline": map[string]any{
