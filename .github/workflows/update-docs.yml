@@ -44,27 +44,43 @@ jobs:
           echo "Latest version: $LATEST_VERSION"
           echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
       
+      - name: Check if this is the latest release
+        id: check_latest
+        run: |
+          LATEST=$(git tag --list | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -1)
+          if [[ "${{ steps.get_version.outputs.version }}" != "$LATEST" ]]; then
+            echo "Released version ${{ steps.get_version.outputs.version }} is not the latest tag ($LATEST). Skipping."
+            echo "is_latest=false" >> $GITHUB_OUTPUT
+          else
+            echo "is_latest=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Pass version to script
+        if: steps.check_latest.outputs.is_latest == 'true'
         run: |
           echo "LATEST_VERSION=${{ steps.get_version.outputs.version }}" >> $GITHUB_ENV
       
       - name: Set up Python
+        if: steps.check_latest.outputs.is_latest == 'true'
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           cache: 'pip'
       
       - name: Install dependencies
+        if: steps.check_latest.outputs.is_latest == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r docs/scripts/update-docs/requirements.txt
       
       - name: Run documentation generator
+        if: steps.check_latest.outputs.is_latest == 'true'
         run: |
           cd docs/scripts/update-docs
           python update-components-docs.py
       
       - name: Check if branch already exists
+        if: steps.check_latest.outputs.is_latest == 'true'
         id: check_branch
         run: |
           BRANCH_NAME="update-docs-${{ steps.get_version.outputs.version }}"
@@ -77,7 +93,7 @@ jobs:
           fi
       
       - name: Create Pull Request
-        if: steps.check_branch.outputs.branch_exists == 'false'
+        if: steps.check_latest.outputs.is_latest == 'true' && steps.check_branch.outputs.branch_exists == 'false'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -107,7 +123,7 @@ jobs:
             automated-pr
       
       - name: Skip PR creation (branch exists)
-        if: steps.check_branch.outputs.branch_exists == 'true'
+        if: steps.check_latest.outputs.is_latest == 'true' && steps.check_branch.outputs.branch_exists == 'true'
         run: |
           echo "✅ Documentation for version ${{ steps.get_version.outputs.version }} has already been updated."
           echo "Branch update-docs-${{ steps.get_version.outputs.version }} already exists."
