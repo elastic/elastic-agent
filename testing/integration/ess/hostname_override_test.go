@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -78,7 +79,16 @@ func TestHostnameEnvOverride(t *testing.T) {
 
 	require.NoError(t, fleettools.UpdateESOutputPreset(ctx, info.KibanaClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
 	since := time.Now().UTC().Format(time.RFC3339)
-	_, agentID, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, agentFixture, info.KibanaClient, createPolicyReq)
+	policy, agentID, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, agentFixture, info.KibanaClient, createPolicyReq)
+	require.NoError(t, err)
+
+	// Add the system integration so that metricbeat (a beats process) collects user data.
+	// This lets us verify that beats — which resolves hostname independently — also picks up
+	// ELASTIC_AGENT_HOSTNAME. The check against metrics-system.*-* below would fail without
+	// the corresponding change in libbeat.
+	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "system",
+		integration.PreinstalledPackages["system"], "testdata/system_integration_setup.json",
+		uuid.Must(uuid.NewV4()).String(), policy.ID)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -96,4 +106,10 @@ func TestHostnameEnvOverride(t *testing.T) {
 	t.Log("Verify that host.name in logs-* and metrics-* matches ELASTIC_AGENT_HOSTNAME")
 	verifyHostNameInIndices(t, "logs-*", customHostname, since, info.Namespace, info.ESClient)
 	verifyHostNameInIndices(t, "metrics-*", customHostname, since, info.Namespace, info.ESClient)
+
+	// Verify beats-collected user data specifically. metrics-system.*-* is written by metricbeat,
+	// which resolves hostname independently from the agent. Without the libbeat patch this would
+	// contain the real OS hostname instead of customHostname.
+	t.Log("Verify that host.name in beats-collected system metrics matches ELASTIC_AGENT_HOSTNAME")
+	verifyHostNameInIndices(t, "metrics-system.*-*", customHostname, since, info.Namespace, info.ESClient)
 }
