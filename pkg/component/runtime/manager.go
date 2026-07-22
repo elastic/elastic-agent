@@ -17,7 +17,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -110,13 +109,6 @@ type Manager struct {
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
 
-	// serviceCheckinGracePeriod holds the grace period used by service-runtime
-	// components to cap their failure window. During an upgrade the upgrade
-	// field is set from the marker (frozen); outside an upgrade the live field
-	// is updated freely by Reload. Get() returns the upgrade value when
-	// non-zero, falling back to the live value.
-	serviceCheckinGracePeriod *gracePeriodValue
-
 	// Set when the RPC server is ready to receive requests, for use by tests.
 	serverReady chan struct{}
 
@@ -146,53 +138,6 @@ type Manager struct {
 	doneChan chan struct{}
 }
 
-// gracePeriodValue holds the grace period for service-runtime check-in failure
-// detection. Config Reload updates the live value; when an upgrade is in
-// progress the upgrade value takes precedence, and is cleared once the upgrade
-// completes.
-type gracePeriodValue struct {
-	live    atomic.Int64
-	upgrade atomic.Int64
-}
-
-// Get returns the upgrade grace period when an upgrade is in progress,
-// otherwise the live config value. A nil receiver returns zero.
-func (v *gracePeriodValue) Get() time.Duration {
-	if v == nil {
-		return 0
-	}
-	if u := time.Duration(v.upgrade.Load()); u != 0 {
-		return u
-	}
-	return time.Duration(v.live.Load())
-}
-
-func (v *gracePeriodValue) setLive(d time.Duration) {
-	v.live.Store(int64(d))
-}
-
-func (v *gracePeriodValue) setUpgrade(d time.Duration) {
-	v.upgrade.Store(int64(d))
-}
-
-// SetServiceCheckinGracePeriod sets the live grace period from config.
-// Has no effect on the frozen upgrade value, if one is active.
-func (m *Manager) SetServiceCheckinGracePeriod(d time.Duration) {
-	m.serviceCheckinGracePeriod.setLive(d)
-}
-
-// SetUpgradeGracePeriod pins the grace period for the duration of an upgrade,
-// preventing config reloads from changing it.
-func (m *Manager) SetUpgradeGracePeriod(d time.Duration) {
-	m.serviceCheckinGracePeriod.setUpgrade(d)
-}
-
-// ClearUpgradeGracePeriod lifts the pin set by SetUpgradeGracePeriod, restoring
-// live config control.
-func (m *Manager) ClearUpgradeGracePeriod() {
-	m.serviceCheckinGracePeriod.setUpgrade(0)
-}
-
 // NewManager creates a new manager.
 func NewManager(
 	logger,
@@ -220,39 +165,28 @@ func NewManager(
 	logger.With("address", listenAddr).Infof("GRPC comms socket listening at %s", listenAddr)
 
 	m := &Manager{
-		logger:                    logger,
-		baseLogger:                baseLogger,
-		ca:                        ca,
-		listenAddr:                listenAddr,
-		isLocal:                   ipc.IsLocal(listenAddr),
-		agentInfo:                 agentInfo,
-		tracer:                    tracer,
-		current:                   make(map[string]*componentRuntimeState),
-		subscriptions:             make(map[string][]*Subscription),
-		updateChan:                make(chan component.Model),
-		errCh:                     make(chan error),
-		monitor:                   monitor,
-		grpcConfig:                grpcConfig,
-		serviceCheckinGracePeriod: &gracePeriodValue{},
-		serverReady:               make(chan struct{}),
-		doneChan:                  make(chan struct{}),
+		logger:        logger,
+		baseLogger:    baseLogger,
+		ca:            ca,
+		listenAddr:    listenAddr,
+		isLocal:       ipc.IsLocal(listenAddr),
+		agentInfo:     agentInfo,
+		tracer:        tracer,
+		current:       make(map[string]*componentRuntimeState),
+		subscriptions: make(map[string][]*Subscription),
+		updateChan:    make(chan component.Model),
+		errCh:         make(chan error),
+		monitor:       monitor,
+		grpcConfig:    grpcConfig,
+		serverReady:   make(chan struct{}),
+		doneChan:      make(chan struct{}),
 	}
 	return m, nil
 }
 
-// Reload updates settings that can change via a config reload, such as the
-// upgrade watcher grace period. Safe to call from any goroutine.
-func (m *Manager) Reload(rawConfig *config.Config) error {
-	watcherCfg := struct {
-		GracePeriod time.Duration `config:"agent.upgrade.watcher.grace_period"`
-	}{
-		// seeded with the default so an incomplete reload doesn't zero it out
-		GracePeriod: configuration.DefaultUpgradeConfig().Watcher.GracePeriod,
-	}
-	if err := rawConfig.UnpackTo(&watcherCfg); err != nil {
-		return fmt.Errorf("failed to unpack config during reload: %w", err)
-	}
-	m.serviceCheckinGracePeriod.setLive(watcherCfg.GracePeriod)
+// Reload satisfies the RuntimeManager interface. Currently a no-op; reserved
+// for future config-driven tuning of the runtime manager.
+func (m *Manager) Reload(_ *config.Config) error {
 	return nil
 }
 
@@ -875,7 +809,7 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 	for _, comp := range newComponents {
 		// new component; create its runtime
 		logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
-		state, err := newComponentRuntimeState(m, logger, m.monitor, comp, m.isLocal, m.serviceCheckinGracePeriod)
+		state, err := newComponentRuntimeState(m, logger, m.monitor, comp, m.isLocal)
 		if err != nil {
 			return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
 		}

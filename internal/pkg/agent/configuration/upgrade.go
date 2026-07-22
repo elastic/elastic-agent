@@ -8,7 +8,10 @@ import "time"
 
 const (
 	// period during which we monitor for failures resulting in a rollback.
-	defaultGracePeriodDuration = 10 * time.Minute
+	// defaultGracePeriodDuration must remain longer than the longest service
+	// component operation timeout (currently 10 minutes for Elastic Defend
+	// install/check). See TestUpgradeGracePeriodExceedsMaxServiceTimeout.
+	defaultGracePeriodDuration = 11 * time.Minute
 
 	// interval between checks for new (upgraded) Agent returning an error status.
 	defaultStatusCheckInterval = 30 * time.Second

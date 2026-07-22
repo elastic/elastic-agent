@@ -59,11 +59,6 @@ type serviceRuntime struct {
 
 	isLocal bool // true if rpc is domain socket, or named pipe
 
-	// checkinGracePeriod is the configured upgrade watcher grace period,
-	// used to cap how long this component waits before being marked FAILED.
-	// Nil or zero means no cap.
-	checkinGracePeriod *gracePeriodValue
-
 	// The most recent mode received on actionCh. The mode will be either
 	// actionStart (indicating the process should be running, and should be
 	// created if it is not), or actionStop or actionTeardown (indicating that
@@ -76,7 +71,7 @@ type serviceRuntime struct {
 }
 
 // newServiceRuntime creates a new command runtime for the provided component.
-func newServiceRuntime(comp component.Component, logger *logger.Logger, isLocal bool, checkinGracePeriod *gracePeriodValue) (*serviceRuntime, error) {
+func newServiceRuntime(comp component.Component, logger *logger.Logger, isLocal bool) (*serviceRuntime, error) {
 	if comp.InputSpec == nil {
 		return nil, errors.New("service runtime requires an input specification to be defined")
 	}
@@ -96,7 +91,6 @@ func newServiceRuntime(comp component.Component, logger *logger.Logger, isLocal 
 		state:                     state,
 		executeServiceCommandImpl: executeServiceCommand,
 		isLocal:                   isLocal,
-		checkinGracePeriod:        checkinGracePeriod,
 		serviceRestartDelay:       30 * time.Second,
 	}
 
@@ -584,10 +578,12 @@ func (s *serviceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *t
 
 // checkinFailureTimeout returns how long this service is allowed to take to
 // start up before a lack of check-ins is treated as a real failure.
+// Only check and install timeouts are considered; uninstall is irrelevant
+// for upgrade health.
 func (s *serviceRuntime) checkinFailureTimeout() time.Duration {
 	ops := s.comp.InputSpec.Spec.Service.Operations
 	var longest time.Duration
-	for _, op := range []*component.ServiceOperationsCommandSpec{ops.Check, ops.Install, ops.Uninstall} {
+	for _, op := range []*component.ServiceOperationsCommandSpec{ops.Check, ops.Install} {
 		if op != nil && op.Timeout > longest {
 			longest = op.Timeout
 		}
@@ -595,31 +591,17 @@ func (s *serviceRuntime) checkinFailureTimeout() time.Duration {
 	return longest
 }
 
-// serviceCheckinGracePeriodSafetyTicks is the minimum number of missed
-// check-in cycles always left as headroom before the upgrade watcher's
-// grace period elapses, so a truly failed service is still caught in time.
-const serviceCheckinGracePeriodSafetyTicks = 3
-
 // maxCheckinMisses returns how many consecutive check-ins this component can
-// miss before it's marked FAILED. The result is capped so it always leaves
-// serviceCheckinGracePeriodSafetyTicks of headroom below the configured
-// upgrade watcher grace period, never below the generic default.
+// miss before it's marked FAILED. It uses the longest check/install operation
+// timeout, floored at the generic default. The upgrade watcher grace period is
+// always longer than this timeout (see defaultGracePeriodDuration), so a truly
+// failed service is still caught before the watcher gives up.
 func (s *serviceRuntime) maxCheckinMisses(checkinPeriod time.Duration) int {
 	misses := maxCheckinMisses
 	timeout := s.checkinFailureTimeout()
 	if timeout > 0 && checkinPeriod > 0 {
 		if m := int(timeout / checkinPeriod); m > misses {
 			misses = m
-		}
-	}
-	gracePeriod := s.checkinGracePeriod.Get()
-	if gracePeriod > 0 && checkinPeriod > 0 {
-		graceMisses := int(gracePeriod/checkinPeriod) - serviceCheckinGracePeriodSafetyTicks
-		if graceMisses < maxCheckinMisses {
-			graceMisses = maxCheckinMisses
-		}
-		if misses > graceMisses {
-			misses = graceMisses
 		}
 	}
 	return misses

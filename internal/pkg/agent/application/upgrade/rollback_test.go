@@ -831,7 +831,7 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		versionedHome: oldAgentVersionedHome,
 	}
 
-	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile, 0)
+	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
 	err := markUpgrade(log,
 		paths.DataFrom(topDir),
 		time.Now(),
@@ -881,7 +881,7 @@ func TestRollbackWithOpts_PreservesInTTLRollbacks(t *testing.T) {
 		ttl.NewTTLMarkerRegistry(testLogger, testTop).Set(availableRollbacks),
 		"writing TTL registry with two valid entries")
 
-	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile, 0)
+	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
 	err := markUpgrade(
 		testLogger,
 		paths.DataFrom(testTop),
@@ -958,7 +958,7 @@ func TestRollbackWithOpts_RemovesMalformedTTLEntries(t *testing.T) {
 		os.WriteFile(filepath.Join(testTop, relB, ".ttl"), []byte("this is not yaml"), 0644),
 		"writing corrupt .ttl for B")
 
-	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile, 0)
+	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
 	err := markUpgrade(
 		testLogger,
 		paths.DataFrom(testTop),
@@ -1031,7 +1031,7 @@ func TestRollbackWithOpts_RemovesExpiredTTLEntries(t *testing.T) {
 		ttl.NewTTLMarkerRegistry(testLogger, testTop).Set(availableRollbacks),
 		"writing TTL registry with mixed-TTL entries")
 
-	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile, 0)
+	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
 	err := markUpgrade(
 		testLogger,
 		paths.DataFrom(testTop),

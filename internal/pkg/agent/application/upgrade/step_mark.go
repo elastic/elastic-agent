@@ -52,9 +52,6 @@ type UpdateMarker struct {
 	// Agents older than 9.5.0 read rollback targets from this field on Windows.
 	// TODO: remove once the minimum supported upgrade-from version is 9.5.0.
 	RollbacksAvailable map[string]ttl.TTLMarker `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
-
-	// GracePeriod is the upgrade watcher grace period in effect when this upgrade started.
-	GracePeriod time.Duration `json:"grace_period,omitempty" yaml:"grace_period,omitempty"`
 }
 
 // GetActionID returns the Fleet Action ID associated with the
@@ -112,7 +109,6 @@ type updateMarkerSerializer struct {
 	Action             *MarkerActionUpgrade     `yaml:"action"`
 	Details            *details.Details         `yaml:"details"`
 	RollbacksAvailable map[string]ttl.TTLMarker `yaml:"rollbacks_available,omitempty"`
-	GracePeriod        time.Duration            `yaml:"grace_period,omitempty"`
 }
 
 func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
@@ -128,7 +124,6 @@ func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
 		Action:             convertToMarkerAction(m.Action),
 		Details:            m.Details,
 		RollbacksAvailable: m.RollbacksAvailable,
-		GracePeriod:        m.GracePeriod,
 	}
 }
 
@@ -143,7 +138,7 @@ type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, wr
 
 // writeUpgradeMarkerProvider returns a function that writes the upgrade marker file.
 // It does not update active.commit; use it to protect the target directory before unpacking starts.
-func writeUpgradeMarkerProvider(gracePeriod time.Duration) writeUpgradeMarkerFunc {
+func writeUpgradeMarkerProvider() writeUpgradeMarkerFunc {
 	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
 		if len(previousAgent.hash) > HashLen {
 			previousAgent.hash = previousAgent.hash[:HashLen]
@@ -160,7 +155,6 @@ func writeUpgradeMarkerProvider(gracePeriod time.Duration) writeUpgradeMarkerFun
 			Action:             action,
 			Details:            upgradeDetails,
 			RollbacksAvailable: availableRollbacks,
-			GracePeriod:        gracePeriod,
 		}
 
 		markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
@@ -180,8 +174,8 @@ func writeUpgradeMarkerProvider(gracePeriod time.Duration) writeUpgradeMarkerFun
 
 // markUpgradeProvider returns a function that writes the upgrade marker file and updates active.commit.
 // Use it after the symlink has been flipped to the new binary.
-func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc, gracePeriod time.Duration) markUpgradeFunc {
-	writeMarker := writeUpgradeMarkerProvider(gracePeriod)
+func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
+	writeMarker := writeUpgradeMarkerProvider()
 	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
 		if err := writeMarker(log, dataDirPath, updatedOn, agent, previousAgent, action, upgradeDetails, availableRollbacks); err != nil {
 			return err
@@ -306,7 +300,6 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 		Action:             convertToActionUpgrade(marker.Action),
 		Details:            marker.Details,
 		RollbacksAvailable: marker.RollbacksAvailable,
-		GracePeriod:        marker.GracePeriod,
 	}, nil
 }
 
@@ -330,7 +323,6 @@ func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool)
 		Action:             convertToMarkerAction(marker.Action),
 		Details:            marker.Details,
 		RollbacksAvailable: marker.RollbacksAvailable,
-		GracePeriod:        marker.GracePeriod,
 	}
 	markerBytes, err := yaml.Marshal(makerSerializer)
 	if err != nil {
@@ -342,14 +334,6 @@ func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool)
 
 func markerFilePath(dataDirPath string) string {
 	return filepath.Join(dataDirPath, markerFilename)
-}
-
-// IsUpgradeActive returns true when the marker represents an upgrade that is
-// still in progress and whose grace period should be frozen. It returns false
-// when the upgrade has already been acked, has reached a terminal state
-// (completed, rolled back, or failed), or has no grace period recorded.
-func (um *UpdateMarker) IsUpgradeActive() bool {
-	return !um.Acked && um.GracePeriod > 0 && !IsTerminalState(um)
 }
 
 // IsTerminalState returns true if the state in the upgrade marker contains details and the upgrade details state is a

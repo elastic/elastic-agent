@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
@@ -305,7 +306,7 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	t.Logf("mock binary path: %s\n", endpoint.InputSpec.BinaryPath)
 
 	// Create new service runtime with component
-	service, err := newServiceRuntime(endpoint, log, true, nil)
+	service, err := newServiceRuntime(endpoint, log, true)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -406,7 +407,7 @@ func TestServiceStartRetry(t *testing.T) {
 	t.Logf("mock binary path: %s\n", endpoint.InputSpec.BinaryPath)
 
 	// Create new service runtime with component
-	service, err := newServiceRuntime(endpoint, log, true, nil)
+	service, err := newServiceRuntime(endpoint, log, true)
 	require.NoError(t, err)
 
 	// Shorten service restart delay for testing
@@ -455,10 +456,6 @@ func TestServiceStartRetry(t *testing.T) {
 }
 
 func makeServiceForCheckStatus(t *testing.T, installTimeout, uninstallTimeout, checkTimeout time.Duration) *serviceRuntime {
-	return makeServiceForCheckStatusWithGracePeriod(t, installTimeout, uninstallTimeout, checkTimeout, 0)
-}
-
-func makeServiceForCheckStatusWithGracePeriod(t *testing.T, installTimeout, uninstallTimeout, checkTimeout, checkinGracePeriod time.Duration) *serviceRuntime {
 	log, _ := loggertest.New("test")
 	endpoint := makeEndpointComponent(t, map[string]interface{}{})
 	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
@@ -471,9 +468,7 @@ func makeServiceForCheckStatusWithGracePeriod(t *testing.T, installTimeout, unin
 		},
 	}
 
-	gp := &gracePeriodValue{}
-	gp.setLive(checkinGracePeriod)
-	service, err := newServiceRuntime(endpoint, log, true, gp)
+	service, err := newServiceRuntime(endpoint, log, true)
 	require.NoError(t, err)
 	// simulate the service already being up and running
 	service.state.State = client.UnitStateHealthy
@@ -494,6 +489,17 @@ func makeServiceForCheckStatusWithGracePeriod(t *testing.T, installTimeout, unin
 	return service
 }
 
+// TestUpgradeGracePeriodExceedsMaxServiceTimeout ensures the default upgrade
+// watcher grace period always exceeds the longest service operation timeout so
+// a service that never checks back in is still caught before the watcher gives up.
+func TestUpgradeGracePeriodExceedsMaxServiceTimeout(t *testing.T) {
+	service := makeServiceForCheckStatus(t, 600*time.Second, 600*time.Second, 600*time.Second)
+	maxTimeout := service.checkinFailureTimeout()
+	gracePeriod := configuration.DefaultUpgradeConfig().Watcher.GracePeriod
+	require.Greater(t, gracePeriod, maxTimeout,
+		"upgrade watcher grace period (%v) must exceed max service operation timeout (%v)", gracePeriod, maxTimeout)
+}
+
 func TestServiceCheckinFailureTimeout(t *testing.T) {
 	service := makeServiceForCheckStatus(t, 600*time.Second, 600*time.Second, 60*time.Second)
 	require.Equal(t, 600*time.Second, service.checkinFailureTimeout())
@@ -503,60 +509,6 @@ func TestServiceCheckinFailureTimeout(t *testing.T) {
 	noTimeouts := makeServiceForCheckStatus(t, 0, 0, 0)
 	require.Equal(t, time.Duration(0), noTimeouts.checkinFailureTimeout())
 	require.Equal(t, maxCheckinMisses, noTimeouts.maxCheckinMisses(30*time.Second))
-}
-
-func TestServiceMaxCheckinMissesGracePeriodCap(t *testing.T) {
-	const checkinPeriod = 30 * time.Second
-
-	t.Run("grace period well above the spec timeout does not change anything", func(t *testing.T) {
-		service := makeServiceForCheckStatusWithGracePeriod(t, 600*time.Second, 600*time.Second, 60*time.Second, 30*time.Minute)
-		require.Equal(t, 20, service.maxCheckinMisses(checkinPeriod))
-	})
-
-	t.Run("grace period matching the spec timeout caps to 3 ticks of margin", func(t *testing.T) {
-		// matches today's real Defend timeout (600s) vs default upgrade watcher grace period (600s)
-		service := makeServiceForCheckStatusWithGracePeriod(t, 600*time.Second, 600*time.Second, 60*time.Second, 600*time.Second)
-		require.Equal(t, 17, service.maxCheckinMisses(checkinPeriod))
-	})
-
-	t.Run("small grace period falls back to the generic default instead of going negative", func(t *testing.T) {
-		service := makeServiceForCheckStatusWithGracePeriod(t, 600*time.Second, 600*time.Second, 60*time.Second, 60*time.Second)
-		require.Equal(t, maxCheckinMisses, service.maxCheckinMisses(checkinPeriod))
-	})
-
-	t.Run("no grace period configured means no cap", func(t *testing.T) {
-		service := makeServiceForCheckStatusWithGracePeriod(t, 600*time.Second, 600*time.Second, 60*time.Second, 0)
-		require.Equal(t, 20, service.maxCheckinMisses(checkinPeriod))
-	})
-}
-
-// TestServiceMaxCheckinMissesGracePeriodLiveUpdate verifies that changing the
-// shared grace period (e.g. via Manager.Reload on a config change) is
-// reflected immediately by an already-constructed serviceRuntime, instead of
-// staying pinned to the value it was constructed with.
-func TestServiceMaxCheckinMissesGracePeriodLiveUpdate(t *testing.T) {
-	const checkinPeriod = 30 * time.Second
-
-	gracePeriod := &gracePeriodValue{}
-	gracePeriod.setLive(600 * time.Second)
-	log, _ := loggertest.New("test")
-	endpoint := makeEndpointComponent(t, map[string]interface{}{})
-	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
-		CPort:   9999,
-		CSocket: ".test.sock",
-		Operations: component.ServiceOperationsSpec{
-			Install:   &component.ServiceOperationsCommandSpec{Timeout: 600 * time.Second},
-			Uninstall: &component.ServiceOperationsCommandSpec{Timeout: 600 * time.Second},
-		},
-	}
-	service, err := newServiceRuntime(endpoint, log, true, gracePeriod)
-	require.NoError(t, err)
-	require.Equal(t, 17, service.maxCheckinMisses(checkinPeriod))
-
-	// simulate a config reload lowering the grace period, without recreating
-	// the serviceRuntime
-	gracePeriod.setLive(60 * time.Second)
-	require.Equal(t, maxCheckinMisses, service.maxCheckinMisses(checkinPeriod))
 }
 
 func TestServiceCheckStatus(t *testing.T) {

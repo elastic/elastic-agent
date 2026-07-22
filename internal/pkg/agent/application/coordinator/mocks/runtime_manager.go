@@ -46,39 +46,6 @@ func (_m *MockRuntimeManager) EXPECT() *MockRuntimeManager_Expecter {
 	return &MockRuntimeManager_Expecter{mock: &_m.Mock}
 }
 
-// ClearUpgradeGracePeriod provides a mock function for the type MockRuntimeManager
-func (_mock *MockRuntimeManager) ClearUpgradeGracePeriod() {
-	_mock.Called()
-	return
-}
-
-// MockRuntimeManager_ClearUpgradeGracePeriod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ClearUpgradeGracePeriod'
-type MockRuntimeManager_ClearUpgradeGracePeriod_Call struct {
-	*mock.Call
-}
-
-// ClearUpgradeGracePeriod is a helper method to define mock.On call
-func (_e *MockRuntimeManager_Expecter) ClearUpgradeGracePeriod() *MockRuntimeManager_ClearUpgradeGracePeriod_Call {
-	return &MockRuntimeManager_ClearUpgradeGracePeriod_Call{Call: _e.mock.On("ClearUpgradeGracePeriod")}
-}
-
-func (_c *MockRuntimeManager_ClearUpgradeGracePeriod_Call) Run(run func()) *MockRuntimeManager_ClearUpgradeGracePeriod_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockRuntimeManager_ClearUpgradeGracePeriod_Call) Return() *MockRuntimeManager_ClearUpgradeGracePeriod_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockRuntimeManager_ClearUpgradeGracePeriod_Call) RunAndReturn(run func()) *MockRuntimeManager_ClearUpgradeGracePeriod_Call {
-	_c.Run(run)
-	return _c
-}
-
 // Errors provides a mock function for the type MockRuntimeManager
 func (_mock *MockRuntimeManager) Errors() <-chan error {
 	ret := _mock.Called()
