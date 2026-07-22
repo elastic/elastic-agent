@@ -400,7 +400,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
 	}
 
-	target, err := artifact.New(AgentName, release.FIPSDistribution(), parsedVersion, u.settings.OS(), u.settings.Arch())
+	target, err := artifact.New(AgentName, release.FIPSDistribution(), parsedVersion, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build agent artifact: %w", err)
 	}

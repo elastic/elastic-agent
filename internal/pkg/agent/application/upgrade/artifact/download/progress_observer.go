@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package http
+package download
 
 import (
 	"sync"
@@ -12,6 +12,21 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
+)
+
+const (
+	// downloadProgressIntervalPercentage defines how often to report the current download progress when percentage
+	// of time has passed in the overall interval for the complete download to complete. 5% is a good default, as
+	// the default timeout is 10 minutes and this will have it log every 30 seconds.
+	downloadProgressIntervalPercentage = 0.05
+
+	// downloadProgressDefaultInterval defines the default interval at which the current download progress will be reported.
+	// This value is used if the timeout is not specified (and therefore equal to 0).
+	downloadProgressMinInterval = 10 * time.Second
+
+	// warningProgressIntervalPercentage defines how often to log messages as a warning once the amount of time
+	// passed is this percentage or more of the total allotted time to download.
+	warningProgressIntervalPercentage = 0.75
 )
 
 type progressObserver interface {
