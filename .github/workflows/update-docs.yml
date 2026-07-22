@@ -121,6 +121,8 @@ jobs:
           labels: |
             documentation
             automated-pr
+          team-reviewers: |
+            elastic/ski-docs
       
       - name: Skip PR creation (branch exists)
         if: steps.check_latest.outputs.is_latest == 'true' && steps.check_branch.outputs.branch_exists == 'true'
