@@ -74,9 +74,9 @@ func TestExtension(t *testing.T) {
 	client := &http.Client{Transport: tr}
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		req, err := http.NewRequest(http.MethodGet, "http://localhost/diagnostics?cpu=true&cpuduration=5s", nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://localhost/diagnostics?cpu=true&cpuduration=5s", nil)
 		require.NoError(collect, err)
-		resp, err := client.Do(req.WithContext(context.Background()))
+		resp, err := client.Do(req)
 		require.NoError(collect, err)
 		require.Equal(collect, http.StatusOK, resp.StatusCode)
 
@@ -89,16 +89,23 @@ func TestExtension(t *testing.T) {
 		require.NotEmpty(collect, res.GlobalDiagnostics)
 		require.NotEmpty(collect, res.ComponentDiagnostics)
 		foundCPU := false
+		foundEnv := false
 		for _, global := range res.GlobalDiagnostics {
-			if global.Name == "cpu" {
+			switch global.Name {
+			case "cpu":
 				foundCPU = true
-				break
-			}
-			if strings.HasSuffix(global.Filename, "profile.gz") {
-				verifyPprof(t, global.Content)
+			case "environment":
+				foundEnv = true
+				require.Equal(collect, "edot/environment.yaml", global.Filename)
+				require.Equal(collect, "application/yaml", global.ContentType)
+			default:
+				if strings.HasSuffix(global.Filename, "profile.gz") {
+					verifyPprof(t, global.Content)
+				}
 			}
 		}
 		require.True(collect, foundCPU, "cpu.pprof not found in global diagnostics")
+		require.True(collect, foundEnv, "environment not found in global diagnostics")
 
 		for _, comp := range res.ComponentDiagnostics {
 			switch comp.Name {
