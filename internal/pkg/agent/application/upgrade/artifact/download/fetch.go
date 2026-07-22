@@ -68,7 +68,8 @@ func downloadWithRetries(ctx context.Context, log *logger.Logger, config *artifa
 				log.Infof("insufficient disk space error detected, stopping retries")
 				return backoff.Permanent(err)
 			}
-			if agentErr := errors.Error(nil); goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem {
+			var agentErr errors.Error
+			if goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem {
 				log.Infof("filesystem error detected, stopping retries")
 				return backoff.Permanent(err)
 			}
