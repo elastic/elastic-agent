@@ -62,7 +62,8 @@
         "^github\\.com/Jeffail/gabs",
         "^github\\.com/josephspurrier/goversioninfo$",
         "^github\\.com/rednafi/link-patrol$",
-        "^gotest\\.tools/"
+        "^gotest\\.tools/",
+        "^github\\.com/vektra/mockery/"
       ],
       "groupName": "packaging"
     },
