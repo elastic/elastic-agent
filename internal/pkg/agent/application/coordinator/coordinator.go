@@ -186,6 +186,9 @@ type OTelManager interface {
 	// PerformComponentDiagnostics executes the diagnostic action for the provided components. If no components are provided,
 	// then it performs the diagnostics for all current units.
 	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
+
+	// PerformAction executes a Fleet action for the specified component and unit.
+	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
 }
 
 // ConfigChange provides an interface for receiving a new configuration.
@@ -1005,6 +1008,9 @@ func (c *Coordinator) AckUpgrade(ctx context.Context, acker acker.Acker) error {
 // PerformAction executes an action on a unit.
 // Called from external goroutines.
 func (c *Coordinator) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	if comp.RuntimeManager == component.OtelRuntimeManager {
+		return c.otelMgr.PerformAction(ctx, comp, unit, name, params)
+	}
 	return c.runtimeMgr.PerformAction(ctx, comp, unit, name, params)
 }
 
