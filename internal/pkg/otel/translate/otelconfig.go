@@ -781,7 +781,9 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 
 		// Strip per-input copies of default processors already run by the beatprocessor.
 		if features.DefaultProcessors() {
-			input["processors"] = stripDefaultProcessors(comp.BeatName(), input["processors"])
+			if _, ok := input["processors"]; ok {
+				input["processors"] = stripDefaultProcessors(comp.BeatName(), input["processors"])
+			}
 		}
 
 		var protoStreamID string
@@ -825,12 +827,8 @@ func stripDefaultProcessors(beatName string, raw any) []any {
 			filtered = append(filtered, item)
 			continue
 		}
-		var key string
-		var val any
-		for k, v := range p {
-			key, val = k, v
-		}
-		if defaultVal, isDefault := defaultsByName[key]; isDefault && reflect.DeepEqual(val, defaultVal) {
+		key := maps.Keys(p)[0]
+		if defaultVal, isDefault := defaultsByName[key]; isDefault && reflect.DeepEqual(p[key], defaultVal) {
 			continue
 		}
 		filtered = append(filtered, item)
