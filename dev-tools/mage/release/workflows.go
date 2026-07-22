@@ -101,9 +101,9 @@ type workflowPRResult struct {
 
 // RunMajorMinorRelease executes the feature-freeze workflow:
 // 1. Creates the release branch from BASE_BRANCH
-// 2. Opens PR-A on main (backport rule + next minor version + manifests)
+// 2. Opens PR-A on main (backport rule + next minor version only)
 // 3. Opens PR-B on release branch (ff-release)
-// 4. Opens PR-C on main (docs for next minor)
+// 4. Opens PR-C on main (docs + deployment manifests for next minor)
 // 5. Opens PR-D on release branch (next patch prep)
 func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Major/Minor Release Workflow ===")
@@ -200,9 +200,7 @@ func prepMainBackportAndVersion(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, 
 	if err := UpdateVersion(cfg.NextProjectMinorVersion); err != nil {
 		return workflowPR{}, err
 	}
-	if err := UpdateDocs(cfg.NextProjectMinorVersion); err != nil {
-		return workflowPR{}, err
-	}
+	// Docs and deployment manifests belong in PR-C (prepMainDocs), matching Beats.
 	commitMsg := fmt.Sprintf("[Release %s] Prepare main for %s and mergify backport-%s", cfg.CurrentRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch)
 	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
@@ -344,10 +342,9 @@ Prepares %s for the %s feature freeze.
 
 - Adds Mergify backport rule for branch %s (label %s)
 - Bumps version/version.go to %s (next minor)
-- Refreshes deployment manifests for %s
 
 **Merge:** before release branch work is finalized.
-`, cfg.CurrentRelease, cfg.BaseBranch, cfg.CurrentRelease, cfg.ReleaseBranch, backportLabel(cfg.ReleaseBranch), cfg.NextProjectMinorVersion, cfg.NextProjectMinorVersion)
+`, cfg.CurrentRelease, cfg.BaseBranch, cfg.CurrentRelease, cfg.ReleaseBranch, backportLabel(cfg.ReleaseBranch), cfg.NextProjectMinorVersion)
 }
 
 func prBReleaseBody(cfg *ReleaseConfig) string {
@@ -362,7 +359,7 @@ Feature-freeze release branch updates for %s (version, docs, mage update).
 func prCMainBody(cfg *ReleaseConfig) string {
 	return fmt.Sprintf(`## [Release %s]
 
-Updates documentation on %s for the next minor %s.
+Updates documentation and deployment manifests on %s for the next minor %s.
 
 **Merge:** after the %s branch is created. CI may stay red until Docker images exist.
 `, cfg.CurrentRelease, cfg.BaseBranch, cfg.NextProjectMinorVersion, cfg.ReleaseBranch)

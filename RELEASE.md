@@ -37,9 +37,9 @@ Example: `CURRENT_RELEASE=9.5.0` → branch `9.5`, next minor `9.6.0`, next patc
 | Step | Target | Branch | Merge label | What changes |
 |------|--------|--------|-------------|--------------|
 | 0 | — | `9.5` | — | Direct push from `main` |
-| **PR-A** | `main` | `ff-prep-main-9.5.0` | `merge:1-ff-day` | Mergify backport + `version.go` → next minor + manifests |
+| **PR-A** | `main` | `ff-prep-main-9.5.0` | `merge:1-ff-day` | Mergify backport + `version.go` → next minor |
 | **PR-B** | `9.5` | `ff-release-9.5.0` | `merge:2-after-branch` | version + docs + `mage update` |
-| **PR-C** | `main` | `ff-prep-main-docs-9.6.0` | `merge:3-after-images` | docs with `RELEASE=main` |
+| **PR-C** | `main` | `ff-prep-main-docs-9.6.0` | `merge:3-after-images` | docs + deployment manifests with `RELEASE=main` |
 | **PR-D** | `9.5` | `ff-prep-next-patch-9.5.1` | `merge:4-after-release` | `version.go` → next patch + `mage update` |
 
 Titles use `[Release <CURRENT_RELEASE>] …`.
