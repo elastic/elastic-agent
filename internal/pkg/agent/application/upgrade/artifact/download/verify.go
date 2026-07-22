@@ -33,6 +33,7 @@ import (
 const (
 	PgpSourceRawPrefix            = "pgp_raw:"
 	PgpSourceURIPrefix            = "pgp_uri:"
+	PgpFetchTimeout               = 30 * time.Second
 	defaultUpgradeFallbackPGP     = "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
 	fleetUpgradeFallbackPGPFormat = "/api/agents/upgrades/%d.%d.%d/pgp-public-key"
 )
@@ -324,7 +325,7 @@ func fetchPgpFromURI(uri string, client HTTPClient) ([]byte, error) {
 		return nil, err
 	}
 
-	ctx, cancelFn := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancelFn := context.WithTimeout(context.Background(), PgpFetchTimeout)
 	defer cancelFn()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 	if err != nil {
@@ -367,7 +368,7 @@ func FetchPGPSignature(ctx context.Context, log *logger.Logger, config *artifact
 		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, PgpFetchTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src, nil)
