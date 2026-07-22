@@ -43,7 +43,7 @@ require (
 	github.com/kardianos/service v1.2.4
 	github.com/knadh/koanf/maps v0.1.2
 	github.com/magefile/mage v1.17.2
-	github.com/moby/moby/client v0.4.1
+	github.com/moby/moby/client v0.5.0
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.156.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.155.0
