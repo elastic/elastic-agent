@@ -61,6 +61,12 @@ linters:
         - go.opentelemetry.io/otel/exporters/prometheus
         - github.com/elastic/elastic-agent/internal/edot
         - github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter
+<<<<<<< HEAD
+=======
+        - go.opentelemetry.io/collector/otelcol
+        - go.opentelemetry.io/collector/service
+        - github.com/elastic/elastic-agent-libs
+>>>>>>> 61463e62f (Write OTel collector logs to its own log file (#15491))
       replace-local: true
     gomodguard:
       blocked:

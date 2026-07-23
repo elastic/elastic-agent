@@ -148,6 +148,48 @@ func TestMonitoringFull(t *testing.T) {
 	}
 }
 
+func TestMonitoringConfigWatchesCollectorLog(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	testMon := BeatsMonitor{
+		enabled:   true,
+		config:    &monitoringConfig{C: monitoringcfg.DefaultConfig()},
+		agentInfo: agentInfo,
+		logger:    logp.NewNopLogger(),
+	}
+
+	policy := map[string]any{
+		"outputs": map[string]any{
+			"default": map[string]any{},
+		},
+	}
+	compList := []component.Component{
+		{ID: "filebeat-default", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}},
+	}
+
+	outCfg, err := testMon.MonitoringConfig(policy, compList, nil)
+	require.NoError(t, err)
+
+	var agentStream map[string]any
+	for _, cfg := range outCfg["inputs"].([]any) {
+		inputCfg := cfg.(map[string]any)
+		if inputCfg[idKey] == fmt.Sprintf("%s-agent", monitoringFilesUnitsID) {
+			agentStream = inputCfg
+			break
+		}
+	}
+	require.NotNil(t, agentStream, "expected to find the %s-agent input", monitoringFilesUnitsID)
+
+	paths, ok := agentStream["streams"].([]any)
+	require.True(t, ok, "expected streams to be a []any")
+	require.Len(t, paths, 1, "expected exactly one stream in the agent input")
+	streamPaths, ok := paths[0].(map[string]any)["paths"].([]any)
+	require.True(t, ok, "expected paths to be a []any")
+
+	assert.Contains(t, streamPaths, filepath.Join(filepath.Dir(loggingPath("unit", "")), collectorName+"-*.ndjson"))
+}
+
 func TestMonitoringWithEndpoint(t *testing.T) {
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
