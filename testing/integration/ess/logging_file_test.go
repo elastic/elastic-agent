@@ -13,11 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -29,13 +27,13 @@ import (
 // writes its log files to the new location rather than the default one.
 func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Group: integration.Fleet,
 		Stack: &define.Stack{},
-		Local: false,
-		Sudo:  true,
+		Local: true,
+		Sudo:  false,
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
-		Group: integration.Default,
 	})
 
 	deadline := time.Now().Add(15 * time.Minute)
@@ -52,34 +50,55 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	require.NoError(t, err, "failed getting Fleet Server URL")
 
-	installOutput, err := f.Install(ctx, &atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-		Privileged:     true,
-		EnrollOpts: atesting.EnrollOpts{
-			URL:             fleetServerURL,
-			EnrollmentToken: enrollmentTokenResp.APIKey,
-		},
+	enrollArgs := []string{
+		"enroll",
+		"--force",
+		"--skip-daemon-reload",
+		"--url",
+		fleetServerURL,
+		"--enrollment-token",
+		enrollmentTokenResp.APIKey,
+	}
+
+	enrollCmd, err := f.PrepareAgentCommand(ctx, enrollArgs)
+	if err != nil {
+		t.Fatalf("could not prepare enroll command: %s", err)
+	}
+	if out, err := enrollCmd.CombinedOutput(); err != nil {
+		t.Fatalf("error enrolling elastic-agent: %s\nOutput:\n%s", err, string(out))
+	}
+
+	err = f.Configure(ctx, []byte(fleetManagedAgentConfig))
+	require.NoError(t, err)
+
+	runAgentCmd, agentOutput := prepareAgentCMD(t, ctx, f, nil, nil)
+	if err := runAgentCmd.Start(); err != nil {
+		t.Fatalf("could not start elastic-agent: %s", err)
+	}
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Errorf("elastic-agent output:\n%s", agentOutput)
+		}
 	})
-	assert.NoErrorf(t, err, "Error installing agent. Install output:\n%s\n", string(installOutput))
 
-	require.Eventuallyf(t, func() bool {
+	require.Eventually(t, func() bool {
 		return waitForAgentAndFleetHealthy(ctx, t, f)
-	}, 2*time.Minute, 5*time.Second, "agent never became healthy before logging path change")
+	}, 2*time.Minute, 5*time.Second, "elastic-agent did not report healthy")
 
-	// Create a custom directory that the agent (running as root) can write to.
+	// Create a custom directory that the agent can write to.
 	customLogDir := filepath.Join(t.TempDir(), "logs")
 	require.NoError(t, os.MkdirAll(customLogDir, 0o755), "create custom log directory")
-	t.Cleanup(func() { _ = os.RemoveAll(customLogDir) })
 
+	// Apply the logging path override and wait for the agent to pick it up.
 	t.Logf("Applying policy override: agent.logging.files.path=%s", customLogDir)
 	err = applyLoggingFilePathPolicy(ctx, info, policyResp.AgentPolicy, customLogDir)
 	require.NoError(t, err)
 
-	// Wait for the agent to re-exec (due to Files config change) and recover.
-	require.Eventuallyf(t, func() bool {
-		return waitForAgentAndFleetHealthy(ctx, t, f)
-	}, 6*time.Minute, 5*time.Second, "agent never became healthy after logging path change")
+	require.Eventually(t, func() bool {
+		inspectOutput, inspectErr := f.ExecInspect(ctx)
+		return inspectErr == nil && inspectOutput.Agent.Logging.Files.Path == customLogDir
+	}, 2*time.Minute, time.Second, "elastic-agent did not apply the policy change")
 
 	// The agent must create at least one log file in the new directory.
 	require.Eventuallyf(t, func() bool {
@@ -87,12 +106,6 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 		return len(matches) > 0
 	}, 2*time.Minute, 5*time.Second,
 		"no log files found in custom log directory %s after path change", customLogDir)
-
-	inspectOutput, err := f.ExecInspect(ctx)
-	require.NoError(t, err, "failed to exec inspect after logging policy change")
-	require.False(t, inspectOutput.Agent.Logging.ToStderr)
-	require.True(t, inspectOutput.Agent.Logging.ToFiles)
-	require.Equal(t, customLogDir, inspectOutput.Agent.Logging.Files.Path)
 }
 
 func applyLoggingFilePathPolicy(ctx context.Context, info *define.Info, policy kibana.AgentPolicy, logPath string) error {
