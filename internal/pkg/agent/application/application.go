@@ -55,6 +55,7 @@ func New(
 	ctx context.Context,
 	log *logger.Logger,
 	baseLogger *logger.Logger,
+	collectorLogger *logger.Logger,
 	logLevel logp.Level,
 	agentInfo info.Agent,
 	reexec coordinator.ReExecManager,
@@ -257,7 +258,7 @@ func New(
 	otelManager, err := otelmanager.NewOTelManager(
 		log.Named("otel_manager"),
 		logLevel,
-		baseLogger,
+		collectorLogger,
 		agentInfo,
 		cfg.Settings.Collector,
 		otelmanager.CollectorStopTimeout,
