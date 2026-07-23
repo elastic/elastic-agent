@@ -4,7 +4,7 @@
 
 package kubernetesleaderelection
 
-import "github.com/elastic/elastic-agent-autodiscover/kubernetes"
+import "github.com/elastic/beats/v7/pkg/autodiscover/kubernetes"
 
 // Config for kubernetes_leaderelection provider
 type Config struct {

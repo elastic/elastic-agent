@@ -34,7 +34,6 @@ require (
 	go.opentelemetry.io/collector/processor/batchprocessor v0.119.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.119.0
 	golang.org/x/crypto v0.36.0
-	github.com/elastic/elastic-agent-autodiscover v0.9.0
 )
 require (
 	cel.dev/expr v0.19.1 // indirect
