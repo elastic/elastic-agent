@@ -65,6 +65,7 @@ linters:
         - github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter
         - go.opentelemetry.io/collector/otelcol
         - go.opentelemetry.io/collector/service
+        - github.com/elastic/elastic-agent-libs
       replace-local: true
     gomodguard_v2:
       blocked:

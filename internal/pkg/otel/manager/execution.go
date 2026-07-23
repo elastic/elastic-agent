@@ -27,11 +27,14 @@ type collectorExecution interface {
 	// draining the channel before writing to it.
 	// After the collector exits, it will emit an error describing the exit status (nil if successful) and a nil status.
 	// Parameters:
+	//   - agentLogger: Logger for the agent process.
+	//   - collectorLogger: Logger for the collector process.
+	//   - collectorLevel: Log level for the collector process (min of agent and unit levels).
 	//   - cfg: Configuration for the collector.
-	//   - errCh: Process exit errors are sent to the errCh channel
+	//   - errCh: Process exit errors are sent to the errCh channel.
 	//   - statusCh: Collector's status updates are sent to statusCh channel.
 	//   - forceFetchStatusCh: Channel that is used to trigger a forced status update.
-	startCollector(ctx context.Context, logLevel logp.Level, collectorLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error)
+	startCollector(ctx context.Context, agentLogger, collectorLogger *logger.Logger, collectorLevel logp.Level, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error)
 }
 
 type collectorHandle interface {

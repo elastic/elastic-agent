@@ -29,6 +29,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -77,6 +78,36 @@ var (
 					"processors": []string{"batch"},
 					"exporters":  []string{"nop"},
 				},
+				"logs": map[string]interface{}{
+					"receivers":  []string{"nop"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"nop"},
+				},
+			},
+		},
+	}
+
+	testConfigDebugLogLevel = map[string]interface{}{
+		"receivers": map[string]interface{}{
+			"nop": map[string]interface{}{},
+		},
+		"processors": map[string]interface{}{
+			"batch": map[string]interface{}{},
+		},
+		"exporters": map[string]interface{}{
+			"nop": map[string]interface{}{},
+		},
+		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{
+					"level":   "none",
+					"readers": []any{},
+				},
+				"logs": map[string]interface{}{
+					"level": "debug",
+				},
+			},
+			"pipelines": map[string]interface{}{
 				"logs": map[string]interface{}{
 					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
@@ -144,12 +175,12 @@ func testExecutionFactory(testBinary string, inner ExecutionFactory) (ExecutionF
 	return factory, te
 }
 
-func (e *testExecution) startCollector(ctx context.Context, level logp.Level, collectorLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
+func (e *testExecution) startCollector(ctx context.Context, agentLogger, collectorLogger *logger.Logger, collectorLevel logp.Level, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
 	var err error
-	e.handle, err = e.exec.startCollector(ctx, level, collectorLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
+	e.handle, err = e.exec.startCollector(ctx, agentLogger, collectorLogger, collectorLevel, cfg, errCh, statusCh, forceFetchStatusCh)
 	return e.handle, err
 }
 
@@ -173,9 +204,9 @@ type mockExecution struct {
 
 func (e *mockExecution) startCollector(
 	ctx context.Context,
-	level logp.Level,
 	_ *logger.Logger,
 	_ *logger.Logger,
+	collectorLevel logp.Level,
 	cfg *confmap.Conf,
 	errCh chan error,
 	statusCh chan *status.AggregateStatus,
@@ -195,7 +226,7 @@ func (e *mockExecution) startCollector(
 		stopCh:            stopCh,
 		cancel:            collectorCancel,
 		execution:         e,
-		collectorLogLevel: level,
+		collectorLogLevel: collectorLevel,
 	}
 	if e.collectorStarted != nil {
 		e.collectorStartCount++
@@ -898,55 +929,77 @@ func TestOTelManager_Logging(t *testing.T) {
 	defer cancel()
 	const waitTimeForStop = 30 * time.Second
 
-	base, obs := loggertest.New("otel")
+	tmp := t.TempDir()
+	topPath, logsPath := paths.Top(), paths.Logs()
+	paths.SetTop(tmp)
+	paths.SetLogs(filepath.Join(tmp, "logs"))
+	t.Cleanup(func() {
+		paths.SetTop(topPath)
+		paths.SetLogs(logsPath)
+	})
+
 	l, _ := loggertest.New("otel-manager")
 
-	for _, tc := range []struct {
-		name string
-	}{
-		{
-			name: "subprocess execution",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			factory, _ := testExecutionFactory(testBinary, nil)
-			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
-			require.NoError(t, err, "could not create otel manager")
+	t.Setenv("TEST_SUPERVISED_COLLECTOR_EMIT_EVENT_LOG", "1")
 
-			go func() {
-				err := m.Run(ctx)
-				assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
-			}()
+	factory, _ := testExecutionFactory(testBinary, nil)
 
-			// watch is synchronous, so we need to read from it to avoid blocking the manager
-			go func() {
-				for {
-					select {
-					case <-m.WatchCollector():
-					case <-ctx.Done():
-						return
-					}
-				}
-			}()
+	collectorLogger, err := logger.NewNamedLogger(CollectorLogFileName, logger.DefaultLoggingConfig(), logger.DefaultEventLoggingConfig())
+	require.NoError(t, err, "could not create collector logger")
 
-			cfg := confmap.NewFromStringMap(testConfig)
-			m.Update(cfg, nil, logp.InfoLevel, nil)
+	m, err := NewOTelManager(l, logp.InfoLevel, collectorLogger, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
+	require.NoError(t, err, "could not create otel manager")
 
-			// the collector should log to the base logger
-			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-				logs := obs.All()
-				require.NotEmpty(collect, logs, "Logs should not be empty")
-				found := false
-				for _, entry := range logs {
-					if entry.Message == "Internal metrics telemetry disabled" {
-						found = true
-						break
-					}
-				}
-				assert.True(collect, found, "Expected log message 'Internal metrics telemetry disabled' not found in logs")
-			}, time.Second*10, time.Second)
-		})
-	}
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		err := m.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+	})
+
+	// watch is synchronous, so we need to read from it to avoid blocking the manager
+	wg.Go(func() {
+		for {
+			select {
+			case <-m.WatchCollector():
+			case <-ctx.Done():
+				return
+			}
+		}
+	})
+
+	cfg := confmap.NewFromStringMap(testConfigDebugLogLevel)
+	m.Update(cfg, nil, logp.InfoLevel, nil)
+
+	// Normal collector logs must appear in the dedicated log file, not in the agent's own log.
+	logFileGlob := filepath.Join(paths.Home(), "logs", CollectorLogFileName+"-*.ndjson")
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		matches, globErr := filepath.Glob(logFileGlob)
+		require.NoError(collect, globErr)
+		require.NotEmpty(collect, matches, "collector log file should exist at %s", logFileGlob)
+
+		data, readErr := os.ReadFile(matches[0])
+		require.NoError(collect, readErr)
+		assert.Contains(collect, string(data), "Internal metrics telemetry disabled",
+			"expected log message not found in collector log file")
+		assert.NotContains(collect, string(data), `"log.type":"event"`,
+			"event line should not leak into the collector's normal log file")
+	}, time.Second*10, time.Second)
+
+	// Event-tagged lines must be routed to the collector's own events log file.
+	eventLogFileGlob := filepath.Join(paths.Home(), "logs", "events", CollectorLogFileName+"-event-log-*.ndjson")
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		matches, globErr := filepath.Glob(eventLogFileGlob)
+		require.NoError(collect, globErr)
+		require.NotEmpty(collect, matches, "collector event log file should exist at %s", eventLogFileGlob)
+
+		data, readErr := os.ReadFile(matches[0])
+		require.NoError(collect, readErr)
+		assert.Contains(collect, string(data), "Publish event: test event log",
+			"event line should be routed to the collector's events log file")
+	}, time.Second*10, time.Second)
+
+	cancel()
+	wg.Wait()
 }
 
 // TestOTelManager_PartialReceiverReload drives the real supervised collector
@@ -1477,6 +1530,17 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			components:       []component.Component{testComp},
 			expectedKeys:     []string{"receivers", "exporters", "service", "processors"},
 			expectedLogLevel: configUpdateLevel,
+		},
+		{
+			name:         "unit log level overrides agent log level",
+			collectorCfg: nil,
+			components: func() []component.Component {
+				c := testComponent("debug-comp")
+				c.Units[0].LogLevel = client.UnitLogLevelDebug
+				return []component.Component{c}
+			}(),
+			expectedKeys:     []string{"receivers", "exporters", "service"},
+			expectedLogLevel: logp.DebugLevel,
 		},
 		{
 			name:         "component config generation error",
