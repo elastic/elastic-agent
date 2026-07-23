@@ -41,7 +41,7 @@ collectors:
     fullnameOverride: "opentelemetry-kube-stack-cluster-stats"
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: "true"
+        value: '"true"'
     config:
       exporters:
         # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
@@ -188,7 +188,7 @@ collectors:
     fullnameOverride: "opentelemetry-kube-stack-daemon"
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: "true"
+        value: '"true"'
     presets:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
@@ -562,7 +562,7 @@ collectors:
     enabled: true
     env:
       - name: ELASTIC_AGENT_OTEL
-        value: "true"
+        value: '"true"'
       - name: ELASTIC_OTLP_ENDPOINT
         valueFrom:
           secretKeyRef:
@@ -649,10 +649,10 @@ instrumentation:
   java:
     image: docker.elastic.co/observability/elastic-otel-javaagent:1.11.0
   nodejs:
-    image: docker.elastic.co/observability/elastic-otel-node:1.11.0
+    image: docker.elastic.co/observability/elastic-otel-node:1.16.0
   dotnet:
     image: docker.elastic.co/observability/elastic-otel-dotnet:1.4.0
   python:
-    image: docker.elastic.co/observability/elastic-otel-python:1.12.0
+    image: docker.elastic.co/observability/elastic-otel-python:1.15.0
   go:
     image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.24.0
