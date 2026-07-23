@@ -2233,6 +2233,78 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			}),
 		},
+		{
+			name: "fleet policy global add_cloud_metadata stripped from input processors, kept in beatprocessor",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "filestream-default",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:   "filestream-unit",
+								Type: client.UnitTypeInput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"id":         "test",
+									"use_output": "default",
+									// Fleet integration packages include add_cloud_metadata at
+									// the input root; it must be stripped in OTel mode.
+									"processors": []any{
+										map[string]any{"add_cloud_metadata": nil},
+									},
+									"streams": []any{
+										map[string]any{
+											"id": "test-1",
+											"data_stream": map[string]any{
+												"dataset": "generic-1",
+											},
+											"paths": []any{"/var/log/*.log"},
+										},
+									},
+								}),
+							},
+							{
+								ID:     "filestream-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"processors": defaultExpectedProcessors("filestream-default"),
+				"receivers": map[string]any{
+					"filebeatreceiver/_agent-component/filestream-default/test-1": expectedFilestreamConfig("filestream-default", "test-1", "generic-1"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/filestream-default": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {beatProcessorID("filestream-default")},
+							"receivers":  {"filebeatreceiver/_agent-component/filestream-default/test-1"},
+						},
+					},
+				},
+			}),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3695,6 +3767,106 @@ func TestResolveStreamID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := resolveStreamID(tt.streamID, tt.streamSource, tt.unitID, tt.index)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestStripDefaultProcessors(t *testing.T) {
+	tests := []struct {
+		name     string
+		beatName string
+		raw      any
+		want     []any
+	}{
+		{
+			name:     "nil input returns nil",
+			beatName: "filebeat",
+			raw:      nil,
+			want:     nil,
+		},
+		{
+			name:     "non-list input returns nil",
+			beatName: "filebeat",
+			raw:      "not a list",
+			want:     nil,
+		},
+		{
+			name:     "heartbeat gets no defaults, list is unchanged",
+			beatName: "heartbeat",
+			raw: []any{
+				map[string]any{"add_cloud_metadata": nil},
+			},
+			want: []any{
+				map[string]any{"add_cloud_metadata": nil},
+			},
+		},
+		{
+			name:     "add_cloud_metadata null matches default and is stripped",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_agent_metadata": map[string]any{"stream_id": "s1"}},
+				map[string]any{"add_cloud_metadata": nil},
+				map[string]any{"timestamp": map[string]any{"field": "datetime"}},
+			},
+			want: []any{
+				map[string]any{"add_agent_metadata": map[string]any{"stream_id": "s1"}},
+				map[string]any{"timestamp": map[string]any{"field": "datetime"}},
+			},
+		},
+		{
+			name:     "add_cloud_metadata with custom config is preserved",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_cloud_metadata": map[string]any{"overwrite": true}},
+			},
+			want: []any{
+				map[string]any{"add_cloud_metadata": map[string]any{"overwrite": true}},
+			},
+		},
+		{
+			name:     "add_host_metadata null does not match default (default has when.not.contains.tags) and is preserved",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_host_metadata": nil},
+			},
+			want: []any{
+				map[string]any{"add_host_metadata": nil},
+			},
+		},
+		{
+			name:     "add_host_metadata exact-match default config is stripped",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_host_metadata": map[string]any{"when.not.contains.tags": "forwarded"}},
+			},
+			want: []any{},
+		},
+		{
+			name:     "multi-key processor entry is not a valid single-name proc and is preserved",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_cloud_metadata": nil, "extra_key": "value"},
+			},
+			want: []any{
+				map[string]any{"add_cloud_metadata": nil, "extra_key": "value"},
+			},
+		},
+		{
+			name:     "all default processors with null config are stripped",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_cloud_metadata": nil},
+				map[string]any{"add_docker_metadata": nil},
+				map[string]any{"add_kubernetes_metadata": nil},
+			},
+			want: []any{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripDefaultProcessors(tt.beatName, tt.raw)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
