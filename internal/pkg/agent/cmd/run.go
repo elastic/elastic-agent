@@ -53,6 +53,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
@@ -92,7 +93,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			}
 			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
-			if err := run(nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
+			if err := run(customLogsPathCfgOverride, nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				logExternal(fmt.Sprintf("%s run failed: %s", paths.BinaryName, err))
 				return err
@@ -125,7 +126,13 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func run(override configuration.CfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
+func run(
+	baseOverride configuration.CfgOverrider,
+	finalOverride configuration.CfgOverrider,
+	testingMode bool,
+	fleetInitTimeout time.Duration,
+	modifiers ...component.PlatformModifier,
+) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -150,7 +157,7 @@ func run(override configuration.CfgOverrider, testingMode bool, fleetInitTimeout
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopBeat)
 
-	return runElasticAgentCritical(ctx, cancel, override, stop, testingMode, fleetInitTimeout, modifiers...)
+	return runElasticAgentCritical(ctx, cancel, baseOverride, finalOverride, stop, testingMode, fleetInitTimeout, modifiers...)
 }
 
 func logReturn(l *logger.Logger, err error) error {
@@ -166,7 +173,8 @@ func logReturn(l *logger.Logger, err error) error {
 func runElasticAgentCritical(
 	ctx context.Context,
 	cancel context.CancelFunc,
-	override configuration.CfgOverrider,
+	baseOverride configuration.CfgOverrider,
+	finalOverride configuration.CfgOverrider,
 	stop chan bool,
 	testingMode bool,
 	fleetInitTimeout time.Duration,
@@ -203,15 +211,28 @@ func runElasticAgentCritical(
 	// the ones from the fleet configuration in case this feature is disabled.
 	_ = featuregate.GlobalRegistry().Set("confmap.enableMergeAppendOption", true)
 
+	var (
+		// baseCfg contains the startup settings used when Fleet does not provide a value.
+		baseCfg *configuration.Configuration
+		// cfg contains the final settings that the agent uses when it starts.
+		cfg *configuration.Configuration
+	)
+
 	// try load config, but don't error yet
-	cfg, err := configuration.LoadConfig(ctx, override)
+	baseCfg, err = configuration.LoadBaseConfig(baseOverride)
 	if err != nil {
 		// failed to load configuration, just load the default to create the logger
 		errs = append(errs, fmt.Errorf("failed to load configuration: %w", err))
+		baseCfg = configuration.DefaultConfiguration()
 		cfg = configuration.DefaultConfiguration()
+	} else {
+		cfg, err = configuration.LoadConfigFromBase(ctx, baseCfg, finalOverride)
+		if err != nil {
+			// failed to load configuration, just load the default to create the logger
+			errs = append(errs, fmt.Errorf("failed to load configuration: %w", err))
+			cfg = configuration.DefaultConfiguration()
+		}
 	}
-
-	applyCustomLogsPath(cfg)
 
 	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig, true)
 	if err != nil {
@@ -252,7 +273,7 @@ func runElasticAgentCritical(
 	}
 
 	// actually run the agent now
-	err = runElasticAgent(ctx, cancel, baseLogger, l, cfg, override, stop, testingMode, fleetInitTimeout, initialUpdateMarker, modifiers...)
+	err = runElasticAgent(ctx, cancel, baseLogger, l, baseCfg, cfg, finalOverride, stop, testingMode, fleetInitTimeout, initialUpdateMarker, modifiers...)
 	return logReturn(l, err)
 }
 
@@ -262,8 +283,9 @@ func runElasticAgent(
 	cancel context.CancelFunc,
 	baseLogger *logger.Logger,
 	l *logger.Logger,
+	baseCfg *configuration.Configuration,
 	cfg *configuration.Configuration,
-	override configuration.CfgOverrider,
+	finalOverride configuration.CfgOverrider,
 	stop chan bool,
 	testingMode bool,
 	fleetInitTimeout time.Duration,
@@ -331,7 +353,7 @@ func runElasticAgent(
 		"agent.version", version.GetAgentPackageVersion(),
 		"agent.unprivileged", !isRoot)
 
-	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
+	cfg, err = tryDelayEnroll(ctx, l, baseCfg, cfg, finalOverride)
 	if err != nil {
 		return errors.New(err, "failed to perform delayed enrollment")
 	}
@@ -365,7 +387,7 @@ func runElasticAgent(
 	}
 
 	// Reload in case migration wrote fleet.enc.
-	cfg, err = configuration.LoadConfig(ctx, override)
+	cfg, err = configuration.LoadConfigFromBase(ctx, baseCfg, finalOverride)
 	if err != nil {
 		return errors.New(err, "failed to reload configuration")
 	}
@@ -436,7 +458,7 @@ func runElasticAgent(
 	}
 
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, collectorLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, cfg, initialUpgradeMarker, availableRollbacksSource, modifiers...)
+		fleetInitTimeout, isBootstrap, cfg, baseCfg.Settings, initialUpgradeMarker, availableRollbacksSource, modifiers...)
 	if err != nil {
 		return err
 	}
@@ -587,25 +609,24 @@ func reexecPath() (string, error) {
 	return potentialReexec, nil
 }
 
-// applyCustomLogsPath overrides the logging config to write to the user-specified
+// customLogsPathCfgOverride overrides the logging config to write to the user-specified
 // --path.logs location when that flag was explicitly set on the CLI. This ensures
 // the flag takes precedence over yaml settings such as agent.logging.to_stderr.
 // The internal file output (consumed by diagnostics) is always written to
 // paths.Home() and is unaffected.
 // See https://github.com/elastic/elastic-agent/issues/13320
-func applyCustomLogsPath(cfg *configuration.Configuration) {
+func customLogsPathCfgOverride(cfg *config.Config) error {
 	if !paths.IsCustomLogsPath() {
-		return
+		return nil
 	}
-	if cfg.Settings.LoggingConfig != nil {
-		cfg.Settings.LoggingConfig.ToStderr = false
-		cfg.Settings.LoggingConfig.ToFiles = true
-		cfg.Settings.LoggingConfig.Files.Path = paths.Logs()
-	}
-	if cfg.Settings.EventLoggingConfig != nil {
-		cfg.Settings.EventLoggingConfig.ToStderr = false
-		cfg.Settings.EventLoggingConfig.ToFiles = true
-	}
+
+	return cfg.Merge(map[string]any{
+		"agent.logging.to_stderr":            false,
+		"agent.logging.to_files":             true,
+		"agent.logging.files.path":           paths.Logs(),
+		"agent.logging.event_data.to_stderr": false,
+		"agent.logging.event_data.to_files":  true,
+	})
 }
 
 func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) string {
@@ -623,7 +644,13 @@ func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) stri
 	return ""
 }
 
-func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override configuration.CfgOverrider) (*configuration.Configuration, error) {
+func tryDelayEnroll(
+	ctx context.Context,
+	logger *logger.Logger,
+	baseCfg *configuration.Configuration,
+	cfg *configuration.Configuration,
+	finalOverride configuration.CfgOverrider,
+) (*configuration.Configuration, error) {
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
 		//nolint:nilerr // ignore the error, this is expected
@@ -700,7 +727,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 			errors.M("path", enrollPath)))
 	}
 	logger.Info("Successfully performed delayed enrollment of this Elastic Agent.")
-	return configuration.LoadConfig(ctx, override)
+	return configuration.LoadConfigFromBase(ctx, baseCfg, finalOverride)
 }
 
 func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig) (*apm.Tracer, error) {

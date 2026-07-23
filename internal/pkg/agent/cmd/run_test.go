@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -157,7 +158,7 @@ func TestRunLoadConfig(t *testing.T) {
 			err := os.WriteFile(filepath.Join(dir, paths.DefaultConfigName), tt.file, 0o644)
 			require.NoError(t, err)
 
-			cfg, err := configuration.LoadConfig(t.Context(), nil)
+			cfg, err := configuration.LoadBaseConfig(nil)
 			require.NoError(t, err)
 			require.Equal(t, tt.expect().Fleet, cfg.Fleet)
 			require.Equal(t, tt.expect().Settings, cfg.Settings)
@@ -165,78 +166,37 @@ func TestRunLoadConfig(t *testing.T) {
 	}
 }
 
-// TestApplyCustomLogsPath exercises applyCustomLogsPath against a yaml config
-// that has agent.logging.to_stderr: true (the shipped default). The "set" case
-// simulates the user passing --path.logs on the CLI via the real flag mechanism.
-func TestApplyCustomLogsPath(t *testing.T) {
+func TestCustomLogsPathCfgOverride(t *testing.T) {
 	const customPath = "/tmp/custom-logs"
 
-	// Mirrors the shipped default: to_stderr wins over to_files.
-	toStderrYAML := []byte(`agent:
-  logging:
-    to_stderr: true
-`)
-
-	tests := map[string]struct {
-		flagValue     string // non-empty: set --path.logs to this value via flag.CommandLine
-		wantToStderr  bool
-		wantToFiles   bool
-		wantFilesPath string
-	}{
-		"--path.logs not set: config unchanged": {
-			// Without --path.logs, applyCustomLogsPath is a no-op.
-			// The raw loaded config has both ToStderr=true (from yaml) and
-			// ToFiles=true (default); applyFlags in logp resolves the conflict
-			// later when the logger is actually constructed.
-			wantToStderr: true,
-			wantToFiles:  true,
-		},
-		"--path.logs set: overrides yaml to_stderr, forces file output": {
-			flagValue:     customPath,
-			wantToStderr:  false,
-			wantToFiles:   true,
-			wantFilesPath: customPath,
-		},
-	}
-
-	// Ensure the path.logs flag is registered before we try to Set it.
 	paths.SetupFlags()
-
-	origCfgDir := paths.Config()
 	origLogsPath := paths.Logs()
 	t.Cleanup(func() {
-		paths.SetConfig(origCfgDir)
+		require.NoError(t, flag.CommandLine.Set("path.logs", ""))
 		paths.SetLogs(origLogsPath)
 	})
+	require.NoError(t, flag.CommandLine.Set("path.logs", customPath))
 
-	for name, tt := range tests {
-		require.NoError(t, flag.CommandLine.Set("path.logs", "")) // reset flag before each test
-		t.Run(name, func(t *testing.T) {
-			if tt.flagValue != "" {
-				require.NoError(t, flag.CommandLine.Set("path.logs", tt.flagValue))
-			}
+	rawCfg, err := config.NewConfigFrom(map[string]any{
+		"agent": map[string]any{
+			"logging": map[string]any{
+				"to_stderr": true,
+				"event_data": map[string]any{
+					"to_stderr": true,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, customLogsPathCfgOverride(rawCfg))
 
-			dir := t.TempDir()
-			paths.SetConfig(dir)
-			require.NoError(t, os.WriteFile(filepath.Join(dir, paths.DefaultConfigName), toStderrYAML, 0o644))
-
-			cfg, err := configuration.LoadConfig(t.Context(), nil)
-			require.NoError(t, err)
-
-			applyCustomLogsPath(cfg)
-
-			assert.Equal(t, tt.wantToStderr, cfg.Settings.LoggingConfig.ToStderr)
-			assert.Equal(t, tt.wantToFiles, cfg.Settings.LoggingConfig.ToFiles)
-			assert.Equal(t, filepath.Join(paths.Home(), logger.DefaultLogDirectory, "events"), cfg.Settings.EventLoggingConfig.Files.Path)
-			if tt.wantFilesPath != "" {
-				assert.Equal(t, tt.wantFilesPath, cfg.Settings.LoggingConfig.Files.Path)
-				assert.False(t, cfg.Settings.EventLoggingConfig.ToStderr)
-				assert.True(t, cfg.Settings.EventLoggingConfig.ToFiles)
-			} else {
-				assert.Equal(t, paths.Top(), cfg.Settings.LoggingConfig.Files.Path)
-			}
-		})
-	}
+	cfg, err := configuration.NewFromConfig(rawCfg)
+	require.NoError(t, err)
+	assert.False(t, cfg.Settings.LoggingConfig.ToStderr)
+	assert.True(t, cfg.Settings.LoggingConfig.ToFiles)
+	assert.Equal(t, customPath, cfg.Settings.LoggingConfig.Files.Path)
+	assert.False(t, cfg.Settings.EventLoggingConfig.ToStderr)
+	assert.True(t, cfg.Settings.EventLoggingConfig.ToFiles)
 }
 
 func TestTryDelayEnroll_ExitsOnCtxCancel(t *testing.T) {
@@ -272,7 +232,7 @@ func TestTryDelayEnroll_ExitsOnCtxCancel(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		_, err := tryDelayEnroll(ctx, log, cfg, nil)
+		_, err := tryDelayEnroll(ctx, log, cfg, cfg, nil)
 		errCh <- err
 	}()
 

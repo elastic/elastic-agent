@@ -69,10 +69,42 @@ type AgentInfo struct {
 	ID string `json:"id" yaml:"id" config:"id"`
 }
 
-func LoadConfig(ctx context.Context, override CfgOverrider) (*Configuration, error) {
+// LoadBaseConfig loads the local configuration and applies the provided
+// override without merging persisted Fleet configuration.
+func LoadBaseConfig(override CfgOverrider) (*Configuration, error) {
 	uCfg, err := loadBaseFileConfig()
 	if err != nil {
 		return nil, err
+	}
+
+	if override != nil {
+		if err := override(uCfg); err != nil {
+			return nil, errors.New(err, "could not apply base config override")
+		}
+	}
+
+	if err := info.InjectAgentConfig(uCfg); err != nil {
+		return nil, errors.New(err, "could not inject agent path/host/runtime config")
+	}
+
+	cfg, err := NewFromConfig(uCfg)
+	if err != nil {
+		return nil, errors.New(err, "could not parse base agent configuration")
+	}
+
+	return cfg, nil
+}
+
+// LoadConfigFromBase builds an applied configuration from base by merging
+// persisted Fleet configuration and applying the provided override.
+func LoadConfigFromBase(ctx context.Context, base *Configuration, override CfgOverrider) (*Configuration, error) {
+	if base == nil {
+		return nil, fmt.Errorf("base configuration is not defined")
+	}
+
+	uCfg, err := base.GetUCfg().Clone()
+	if err != nil {
+		return nil, errors.New(err, "could not clone base configuration")
 	}
 
 	loadFleet, _ := uCfg.Agent.Bool("fleet.enabled", -1, ucfg.PathSep("."))
@@ -88,10 +120,6 @@ func LoadConfig(ctx context.Context, override CfgOverrider) (*Configuration, err
 					errors.M(errors.MetaKeyPath, paths.AgentConfigFile()))
 			}
 		}
-	}
-
-	if err := info.InjectAgentConfig(uCfg); err != nil {
-		return nil, errors.New(err, "could not inject agent path/host/runtime config")
 	}
 
 	if override != nil {
