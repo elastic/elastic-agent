@@ -451,6 +451,31 @@ steps:
         - magefile.go
         - dev-tools/**/*
 
+  # NOTE: Tests the independent agent release (IAR) packaging workflow against a real
+  # staging manifest, to catch regressions before they reach the release pipeline.
+  # See https://buildkite.com/elastic/independent-agent-release-staging
+  - label: "Trigger Elastic Agent Package (IAR staging)"
+    if: build.pull_request.id != null
+    commands:
+      - .buildkite/scripts/steps/trigger-elastic-agent-package-iar.sh
+      - .buildkite/scripts/steps/trigger-elastic-agent-package-iar.sh | buildkite-agent pipeline upload
+    plugins:
+    - sparse-checkout#v1.6.0:
+        paths:
+        - .buildkite
+        - .go-version
+        - version/version.go
+        - .package-version
+        - magefile.go
+        - dev-tools
+    if_changed:
+      include:
+        - .buildkite/pipeline.elastic-agent-package.yml
+        - .buildkite/scripts/steps/package.sh
+        - .buildkite/scripts/steps/trigger-elastic-agent-package-iar.sh
+        - magefile.go
+        - dev-tools/**/*
+
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/pull/11725
   - label: "DRY RUN publish to serverless"
