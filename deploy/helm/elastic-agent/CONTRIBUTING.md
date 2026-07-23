@@ -57,11 +57,11 @@ helm upgrade elastic-agent . -f your-values.yaml --set kubernetes.enabled=false
 
 The README.md was originally generated using [helm-docs](https://github.com/norwoodj/helm-docs).
 However, it has diverged from the auto-generated version since.
-`helm-docs` is still usefull to can pick up changes to the `values.yaml` and
+`helm-docs` is still useful for picking up changes to the `values.yaml` and
 format them as the others. However, running it will completely override the
 README.md.
 You might use `helm-docs` to render the changes you made to `values.yaml`. Then,
-find you changes, copy it, restore the README.md and manually add your changes.
+find your changes, copy them, restore the README.md, and manually add your changes.
 
 
 ### Adding New Values Documentation
