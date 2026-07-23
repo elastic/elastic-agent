@@ -544,18 +544,68 @@ func beatInputsKey(beatName string) string {
 // These mirror the fleetDefaultProcessors that each beat sets for process mode.
 // Heartbeat sets fleetDefaultProcessors=nil, so it gets no default processors.
 func GetDefaultProcessors(beatName string) []map[string]any {
-	if beatName == "heartbeat" {
+	switch beatName {
+	case "heartbeat":
 		return nil
-	}
-	return []map[string]any{
-		{
-			"add_host_metadata": map[string]any{
-				"when.not.contains.tags": "forwarded",
+	case "metricbeat": // From https://github.com/elastic/beats/blob/1d17cc1b860da252d3cf6f29033609f1ec86dfdc/x-pack/metricbeat/cmd/root.go#L60
+		return []map[string]any{
+			{"add_host_metadata": nil},
+			{"add_cloud_metadata": nil},
+			{"add_docker_metadata": nil},
+			{"add_kubernetes_metadata": nil},
+		}
+	case "auditbeat": // From https://github.com/elastic/beats/blob/1d17cc1b860da252d3cf6f29033609f1ec86dfdc/x-pack/auditbeat/cmd/root.go#L76
+		return []map[string]any{
+			{"add_host_metadata": nil},
+			{"add_cloud_metadata": nil},
+			{"add_docker_metadata": nil},
+		}
+	case "osquerybeat": // From https://github.com/elastic/beats/blob/1d17cc1b860da252d3cf6f29033609f1ec86dfdc/x-pack/osquerybeat/cmd/root.go#L211
+		return []map[string]any{
+			{"add_host_metadata": nil},
+			{"add_cloud_metadata": nil},
+		}
+	case "packetbeat": // From https://github.com/elastic/beats/blob/1d17cc1b860da252d3cf6f29033609f1ec86dfdc/x-pack/packetbeat/cmd/root.go#L74
+		// Equivalent to the if/then/else in process mode but expressed using
+		// when conditions so the beatprocessor can handle each step independently.
+		return []map[string]any{
+			{
+				"drop_fields": map[string]any{
+					"when.contains.tags": "forwarded",
+					"fields":             []string{"host"},
+				},
 			},
-		},
-		{"add_cloud_metadata": nil},
-		{"add_docker_metadata": nil},
-		{"add_kubernetes_metadata": nil},
+			{
+				"add_host_metadata": map[string]any{
+					"when.not.contains.tags": "forwarded",
+				},
+			},
+			{"add_cloud_metadata": nil},
+			{"add_docker_metadata": nil},
+			{
+				"detect_mime_type": map[string]any{
+					"field":  "http.request.body.content",
+					"target": "http.request.mime_type",
+				},
+			},
+			{
+				"detect_mime_type": map[string]any{
+					"field":  "http.response.body.content",
+					"target": "http.response.mime_type",
+				},
+			},
+		}
+	default: // filebeat and all other beats including internal monitoring ("") from https://github.com/elastic/beats/blob/1d17cc1b860da252d3cf6f29033609f1ec86dfdc/x-pack/filebeat/cmd/root.go#L46
+		return []map[string]any{
+			{
+				"add_host_metadata": map[string]any{
+					"when.not.contains.tags": "forwarded",
+				},
+			},
+			{"add_cloud_metadata": nil},
+			{"add_docker_metadata": nil},
+			{"add_kubernetes_metadata": nil},
+		}
 	}
 }
 
