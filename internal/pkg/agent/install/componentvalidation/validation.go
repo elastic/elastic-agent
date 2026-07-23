@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"time"
 
 	"go.opentelemetry.io/collector/confmap"
@@ -145,7 +146,7 @@ func GetMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]
 
 	monitor := componentmonitoring.New(
 		agentCfg.Settings.V1MonitoringEnabled,
-		agentCfg.Settings.DownloadConfig.OS(),
+		runtime.GOOS,
 		agentCfg.Settings.MonitoringConfig,
 		agentInfo,
 		logger,

@@ -7,7 +7,7 @@
 package ess
 
 import (
-	"fmt"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -73,12 +73,13 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(customLogDir) })
 
 	t.Logf("Applying policy override: agent.logging.files.path=%s", customLogDir)
-	applyLoggingFilePathPolicy(t, info, policyResp.AgentPolicy, customLogDir)
+	err = applyLoggingFilePathPolicy(ctx, info, policyResp.AgentPolicy, customLogDir)
+	require.NoError(t, err)
 
 	// Wait for the agent to re-exec (due to Files config change) and recover.
 	require.Eventuallyf(t, func() bool {
 		return waitForAgentAndFleetHealthy(ctx, t, f)
-	}, 5*time.Minute, 5*time.Second, "agent never became healthy after logging path change")
+	}, 6*time.Minute, 5*time.Second, "agent never became healthy after logging path change")
 
 	// The agent must create at least one log file in the new directory.
 	require.Eventuallyf(t, func() bool {
@@ -94,25 +95,22 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 	require.Equal(t, customLogDir, inspectOutput.Agent.Logging.Files.Path)
 }
 
-func applyLoggingFilePathPolicy(t *testing.T, info *define.Info, policy kibana.AgentPolicy, logPath string) {
-	t.Helper()
-
-	body := fmt.Sprintf(`
-{
-  "name": %q,
-  "namespace": %q,
-  "overrides": {
-    "agent": {
-      "logging": {
-        "to_stderr": false,
-        "to_files": true,
-        "files": {
-          "path": %q
-        }
-      }
-    }
-  }
-}`, policy.Name, policy.Namespace, logPath)
-
-	sendPolicyUpdate(t, info, policy.ID, body)
+func applyLoggingFilePathPolicy(ctx context.Context, info *define.Info, policy kibana.AgentPolicy, logPath string) error {
+	req := kibana.AgentPolicyUpdateRequest{
+		Name:      policy.Name,
+		Namespace: policy.Namespace,
+		Overrides: map[string]any{
+			"agent": map[string]any{
+				"logging": map[string]any{
+					"to_stderr": false,
+					"to_files":  true,
+					"files": map[string]any{
+						"path": logPath,
+					},
+				},
+			},
+		},
+	}
+	_, err := info.KibanaClient.UpdatePolicy(ctx, policy.ID, req)
+	return err
 }
