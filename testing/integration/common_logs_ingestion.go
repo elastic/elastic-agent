@@ -23,6 +23,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+
 	"go.opentelemetry.io/otel/sdk/metric"
 
 	"github.com/gofrs/uuid/v5"
@@ -98,7 +100,11 @@ func LogIngestionFleetManaged(t *testing.T, info *define.Info) {
 	t.Logf("created policy: %s", policy.ID)
 
 	// 3. Ensure installation is correct.
-	require.NoError(t, installtest.CheckSuccess(ctx, agentFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged}))
+	var topPath string
+	if installOpts.BasePath != "" {
+		topPath = paths.InstallPath(installOpts.BasePath)
+	}
+	require.NoError(t, installtest.CheckSuccess(ctx, agentFixture, topPath, &installtest.CheckOpts{Privileged: installOpts.Privileged}))
 
 	// 4. Ensure healthy state at startup
 	checkHealthAtStartup(t, ctx, agentFixture)
