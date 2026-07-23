@@ -2324,7 +2324,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": defaultExpectedProcessors("filestream-default"),
+				"processors": defaultExpectedProcessors("filebeat", "filestream-default"),
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-default/test-1": expectedFilestreamConfig("filestream-default", "test-1", "generic-1"),
 				},
