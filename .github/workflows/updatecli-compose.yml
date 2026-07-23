@@ -21,7 +21,15 @@ jobs:
         with:
           submodules: true
 
+<<<<<<< HEAD
       - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+=======
+      - name: Get token
+        id: get_token
+        uses: elastic/oblt-actions/github/create-token@v1
+
+      - uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4.5.0
+>>>>>>> db0d395b5 (build(deps): bump docker/login-action from 4.4.0 to 4.5.0 (#15774))
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
