@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -828,6 +829,13 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 			}
 		}
 
+		// Strip per-input copies of default processors already run by the beatprocessor.
+		if features.DefaultProcessors() {
+			if _, ok := input["processors"]; ok {
+				input["processors"] = stripDefaultProcessors(comp.BeatName(), input["processors"])
+			}
+		}
+
 		var protoStreamID string
 		if i < len(streams) {
 			protoStreamID = streams[i].GetId()
@@ -841,6 +849,41 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 	}
 
 	return result, nil
+}
+
+// stripDefaultProcessors removes per-input processor entries that exactly match
+// (same name and config) a default processor handled by the beatprocessor, so
+// they don't run twice. Entries with a matching name but different config are
+// kept so user customisations are not silently discarded.
+func stripDefaultProcessors(beatName string, raw any) []any {
+	list, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	defaults := GetDefaultProcessors(beatName)
+	if len(defaults) == 0 {
+		return list
+	}
+	defaultsByName := make(map[string]any, len(defaults))
+	for _, p := range defaults {
+		for k, v := range p {
+			defaultsByName[k] = v
+		}
+	}
+	filtered := make([]any, 0, len(list))
+	for _, item := range list {
+		p, ok := item.(map[string]any)
+		if !ok || len(p) != 1 {
+			filtered = append(filtered, item)
+			continue
+		}
+		key := maps.Keys(p)[0]
+		if defaultVal, isDefault := defaultsByName[key]; isDefault && reflect.DeepEqual(p[key], defaultVal) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
 }
 
 // injectOsqueryConfig replicates what osquerybeatCfgFromStreams does in process
