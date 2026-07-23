@@ -23,8 +23,8 @@ updates:
       - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
     groups:
       # k8s-ecosystem must come before the elastic group: Dependabot assigns a dependency to
-      # the first matching group, and elastic/cloud-on-k8s and elastic/elastic-agent-autodiscover
-      # would otherwise match the elastic group's wildcard pattern first.
+      # the first matching group, and elastic/cloud-on-k8s would otherwise match the elastic
+      # group's wildcard pattern first.
       k8s-ecosystem:
         patterns:
           # k8s core libraries
@@ -34,7 +34,6 @@ updates:
           # in lockstep when k8s has a breaking API change
           - "helm.sh/helm/*"
           - "github.com/elastic/cloud-on-k8s/*"
-          - "github.com/elastic/elastic-agent-autodiscover"
       elastic:
         patterns:
           # github.com/elastic/* and go.elastic.co/* cover all Elastic and APM Go packages

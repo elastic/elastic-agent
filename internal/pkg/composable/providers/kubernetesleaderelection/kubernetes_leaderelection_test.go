@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	autodiscoverK8s "github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	autodiscoverK8s "github.com/elastic/beats/v7/pkg/autodiscover/kubernetes"
 
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/coordination/v1"
