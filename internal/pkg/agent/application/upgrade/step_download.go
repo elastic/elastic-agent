@@ -45,6 +45,7 @@ type artifactDownloader struct {
 	settings       *artifact.Config
 	fleetServerURI string
 	getPGPSources  func(log *logger.Logger, fleetServerURI string, targetVersion *agtversion.ParsedSemVer, pgpSources []string) []string
+	checkDiskSpace func(context.Context, *artifact.Config, *details.Details, string) (bool, error)
 	retryTimeout   time.Duration
 	totalTimeout   time.Duration
 	fileOps        download.FileOps
@@ -52,11 +53,12 @@ type artifactDownloader struct {
 
 func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artifactDownloader {
 	return &artifactDownloader{
-		log:           log,
-		settings:      settings,
-		getPGPSources: download.AppendFallbackPGP,
-		retryTimeout:  defaultRetryTimeout,
-		totalTimeout:  totalTimeout,
+		log:            log,
+		settings:       settings,
+		getPGPSources:  download.AppendFallbackPGP,
+		checkDiskSpace: CheckDiskSpaceAvailable,
+		retryTimeout:   defaultRetryTimeout,
+		totalTimeout:   totalTimeout,
 		fileOps: download.FileOps{
 			CopyFile: io.Copy,
 			OpenFile: os.OpenFile,
@@ -171,6 +173,26 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				skip[i] = true
 				continue
 			}
+
+			hasDiskSpace, err := a.checkDiskSpace(ctx, &settings, upgradeDetails, sourceURI)
+			if err != nil {
+				// Don't fail on err only as CheckDiskSpaceAvailable can err but
+				// still have hasDiskSpace=true if we failed to get the exact
+				// required size and had to fall back to using an estimate
+				e := fmt.Errorf("error checking available disk space for %s: %w", src, err)
+				a.log.Debugf("%v", e)
+				errs[i] = e
+			}
+			if !hasDiskSpace {
+				if goerrors.Is(err, downloaderrors.ErrFetchUpgradeSize) {
+					// Checking exact required upgrade size failed and an estimated
+					// required size was used. We might have enough diskspace for
+					// the actual upgrade artifact, so check other sources.
+					continue
+				}
+				break
+			}
+
 			if download.IsLocal(sourceURI) {
 				a.log.Infow("Copying local artifact", "source_uri", sourceURI)
 			} else {
