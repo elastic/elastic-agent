@@ -7,7 +7,7 @@ package kubernetessecrets
 import (
 	"time"
 
-	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/beats/v7/pkg/autodiscover/kubernetes"
 )
 
 // Config for kubernetes_secrets provider
