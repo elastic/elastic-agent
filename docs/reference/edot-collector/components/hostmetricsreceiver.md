@@ -17,9 +17,9 @@ The host metrics receiver collects system-level metrics from the host machine, i
 
 The receiver uses a set of specialized scrapers to gather metrics from different subsystems, making it flexible enough to collect only the metrics you need.
 
-## Default usage in EDOT
+## Default usage in {{agent}} [default-usage-in-edot]
 
-The `hostmetricsreceiver` is included by default in the EDOT Collector for both standalone and Kubernetes deployments.
+The `hostmetricsreceiver` is included by default in {{agent}} for both standalone and Kubernetes deployments.
 
 ### Standalone agent mode
 
@@ -124,7 +124,7 @@ Follow these recommendations to get the most value from the host metrics receive
 
 * **Use the `root_path` setting when running in containers**: When the collector runs inside a container, it needs access to the host's filesystem to collect accurate metrics. Mount the host's root directory (typically at `/`) and set `root_path: /hostfs` in your configuration. This ensures the receiver reads from the host's `/proc`, `/sys`, and other system directories rather than the container's isolated filesystem.
 
-* **Filter out non-data filesystems and mount points**: To avoid collecting metrics from temporary, virtual, or container-specific filesystems, use the `exclude_mount_points` and `exclude_fs_types` options in the filesystem scraper. The default EDOT configuration already excludes common noise sources like `/dev/*`, `/proc/*`, `/sys/*`, overlay filesystems, and various pseudo-filesystems.
+* **Filter out non-data filesystems and mount points**: To avoid collecting metrics from temporary, virtual, or container-specific filesystems, use the `exclude_mount_points` and `exclude_fs_types` options in the filesystem scraper. The default {{agent}} configuration already excludes common noise sources like `/dev/*`, `/proc/*`, `/sys/*`, overlay filesystems, and various pseudo-filesystems.
 
 * **Start with essential scrapers, then expand as needed**: Begin with the core scrapers (`cpu`, `memory`, `disk`, `filesystem`, `network`, `load`) that provide the foundation for infrastructure monitoring. These align with Elastic's Infrastructure dashboards and provide the most immediate value. Add additional scrapers like `paging` or `processes` based on your specific monitoring requirements.
 
@@ -139,7 +139,7 @@ Follow these recommendations to get the most value from the host metrics receive
 
 Be aware of these constraints and behaviors when using the host metrics receiver:
 
-* **Process metrics are turned off by default**: The `process` scraper generates significant metric volume and is commented out in EDOT default configuration. Turning it on can substantially increase storage requirements and costs. Refer to the contrib [issue #39423](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/39423) for ongoing discussion about optimizing process metrics collection.
+* **Process metrics are turned off by default**: The `process` scraper generates significant metric volume and is commented out in {{agent}} default configuration. Turning it on can substantially increase storage requirements and costs. Refer to the contrib [issue #39423](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/39423) for ongoing discussion about optimizing process metrics collection.
 
 * **Container deployment requires privileged access**: To collect host metrics from inside a container (Kubernetes DaemonSet), the collector must run with elevated privileges (`runAsUser: 0`) and have the host's `/proc` and `/sys` filesystems mounted. Refer to the [collecting host metrics from inside a container](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver#collecting-host-metrics-from-inside-a-container-linux-only) guide for details.
 
@@ -152,6 +152,6 @@ Be aware of these constraints and behaviors when using the host metrics receiver
 ## Resources
 
 * [Contrib component: hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/hostmetricsreceiver/README.md)
-* [Configure metrics collection in EDOT](../config/configure-metrics-collection.md)
+* [Configure metrics collection in {{agent}}](../config/configure-metrics-collection.md)
 * [{{product.observability}} host metrics reference](https://www.elastic.co/docs/reference/observability/observability-host-metrics)
 

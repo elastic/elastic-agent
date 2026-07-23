@@ -1,6 +1,6 @@
 ---
 navigation_title: Custom data stream routing
-description: Customize data stream routing in EDOT. Learn scenarios, patterns, and risks when modifying data_stream.namespace or data_stream.dataset.
+description: Customize data stream routing in {{agent}}. Learn scenarios, patterns, and risks when modifying data_stream.namespace or data_stream.dataset.
 applies_to:
   stack:
   serverless:
@@ -13,9 +13,9 @@ products:
   - id: edot-collector
 ---
 
-# Custom data stream routing with EDOT
+# Custom data stream routing with {{agent}}
 
-{{edot}} (EDOT) uses opinionated defaults for data stream naming to ensure compatibility with Elastic dashboards, {{product.apm}} visualizations, and curated UIs. While most use cases rely on these defaults, EDOT also supports advanced dynamic routing.
+{{agent}} uses opinionated defaults for data stream naming to ensure compatibility with Elastic dashboards, {{product.apm}} visualizations, and curated UIs. While most use cases rely on these defaults, {{agent}} also supports advanced dynamic routing.
 
 :::{warning}
 We strongly recommend not changing the default data stream names. Customizing data stream routing diverges from the standard ingestion model and there's no guarantee it will be valid for future versions.
@@ -101,7 +101,7 @@ Invalid names prevent data stream creation.
 
 This configuration diverges from the standard ingestion model. Be aware of the following:
 
-- Future EDOT versions may not support this configuration or may introduce breaking changes.
+- Future {{agent}} versions may not support this configuration or may introduce breaking changes.
 - Changes might lead to an increase in data streams and shard counts.
 - Dashboards and UIs may not recognize non-standard datasets.
 - OpenTelemetry content packs may not work with custom datasets. These content packs are required to visualize OpenTelemetry data stored natively as OpenTelemetry semantic conventions. Install content packs from the {{kib}} Integrations UI by searching for `otel`.
@@ -112,4 +112,4 @@ Use this feature only when necessary and validate in non-production environments
 ## Additional resources
 
 - [Data stream routing reference](docs-content://solutions/observability/apm/opentelemetry/data-stream-routing.md)
-- [EDOT Collector configuration examples](/reference/edot-collector/config/index.md)
+- [{{agent}} configuration examples](/reference/edot-collector/config/index.md)

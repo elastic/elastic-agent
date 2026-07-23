@@ -1,6 +1,6 @@
 ---
 navigation_title: Tracing collection
-description: Learn how to configure and customize tracing collection through the Elastic Distribution of OpenTelemetry Collector.
+description: Learn how to configure and customize tracing collection through the {{agent}}.
 applies_to:
   stack:
   serverless:
@@ -15,11 +15,11 @@ products:
 
 # Configure tracing collection
 
-Learn how to configure and customize tracing collection through the {{edot}} Collector.
+Learn how to configure and customize tracing collection through the {{agent}}.
 
 ## OTLP traces
 
-Any application instrumented with OpenTelemetry SDKs can forward traces to the EDOT Collector using the [OTLP receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver). This is the recommended method for collecting application traces.
+Any application instrumented with OpenTelemetry SDKs can forward traces to the {{agent}} using the [OTLP receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver). This is the recommended method for collecting application traces.
 
 The following minimal configuration receives traces over gRPC and HTTP, enriches them for the Elastic {{product.apm}} UIs, and exports them to {{es}}:
 
@@ -62,8 +62,8 @@ Both the [`elasticapm` processor](../components/elasticapmprocessor.md) and the 
 
 As they aren't included in the OpenTelemetry [Collector Contrib repository](https://github.com/open-telemetry/opentelemetry-collector-contrib), you can:
 
-* Use the EDOT Collector with the available configuration to ingest data into {{es}}.
-* [Build a custom, EDOT-like Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
+* Use the {{agent}} with the available configuration to ingest data into {{es}}.
+* [Build a custom, {{agent}}-like Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
 * Use Elastic's [managed OTLP endpoint](docs-content://solutions/observability/get-started/opentelemetry/quickstart/serverless/index.md) that does the enrichment for you.
 :::
 
@@ -78,7 +78,7 @@ Tail-based sampling analyzes a complete trace before deciding whether to keep it
 Within the OpenTelemetry Collector, any processor that generates metrics from traces must run before the tail-sampling processor. If sampling happens first, metrics will be calculated on an incomplete data set, leading to inaccurate and misleading reporting.
 
 :::{tip}
-To enforce a specific order of calculations and sampling decisions in the EDOT Collector, you can use the [Forward connector](https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector). Split the traces pipeline in two steps using the connector, with the first part applying calculations and the second part applying the tail-based sampling decision.
+To enforce a specific order of calculations and sampling decisions in the {{agent}}, you can use the [Forward connector](https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector). Split the traces pipeline in two steps using the connector, with the first part applying calculations and the second part applying the tail-based sampling decision.
 :::
 
 ### Create a two-step trace pipeline

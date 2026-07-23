@@ -1,6 +1,6 @@
 ---
 navigation_title: Download
-description: Direct download links for EDOT Collector binaries for various operating systems and architectures.
+description: Direct download links for Elastic Agent binaries for various operating systems and architectures.
 applies_to:
   stack:
   serverless:
@@ -13,11 +13,11 @@ products:
   - id: edot-collector
 ---
 
-# Download the EDOT Collector
+# Download {{agent}}
 
-The {{edot}} (EDOT) Collector is embedded in the {{agent}} package as a separate binary that invokes OpenTelemetry Collector components.
+The {{agent}} package includes a separate `otelcol` binary that runs the OpenTelemetry Collector components.
 
-The following table contains direct download links for the latest EDOT Collector version for different operating systems and architectures.
+The following table contains direct download links for the latest version for different operating systems and architectures.
 
 | Platform      | Architecture | Download link |
 |--------------|--------------|---------------|
@@ -31,7 +31,7 @@ The following table contains direct download links for the latest EDOT Collector
 | macOS        | x86_64       | [Download (Tar.gz)](https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-{{version.edot_collector}}-darwin-x86_64.tar.gz) |
 | macOS        | aarch64      | [Download (Tar.gz)](https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-{{version.edot_collector}}-darwin-aarch64.tar.gz) |
 
-After you've downloaded and uncompressed the file, you can get EDOT Collector running with the following command:
+After you've downloaded and uncompressed the file, you can start {{agent}} with the following command:
 
 ```
 sudo ./otelcol --config otel.yml
@@ -40,5 +40,5 @@ sudo ./otelcol --config otel.yml
 For specific configuration, refer to the [Quickstart guides](docs-content://solutions/observability/get-started/opentelemetry/quickstart/index.md) or refer to [Configuration](/reference/edot-collector/config/index.md).
 
 :::{tip}
-To download a specific version of the EDOT Collector, replace {{version.edot_collector}} with the version you want to download.
+To download a specific version, replace {{version.edot_collector}} with the version you want to download.
 :::

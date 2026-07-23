@@ -1,6 +1,6 @@
 ---
 navigation_title: Default config (Kubernetes)
-description: Default configuration of the EDOT Collector for Kubernetes.
+description: Default configuration of the {{agent}} for Kubernetes.
 applies_to:
   stack:
   serverless:
@@ -13,26 +13,26 @@ products:
   - id: edot-collector
 ---
 
-# Default configuration of the EDOT Collector (Kubernetes)
+# Default configuration of the {{agent}} (Kubernetes)
 
-The [Kubernetes setup](docs-content://solutions/observability/get-started/opentelemetry/quickstart/index.md) uses the OpenTelemetry Operator to automate orchestration of EDOT Collectors:
+The [Kubernetes setup](docs-content://solutions/observability/get-started/opentelemetry/quickstart/index.md) uses the OpenTelemetry Operator to automate orchestration of {{agent}} instances:
 
-* [EDOT Collector Cluster](#cluster-collector-pipeline): Collection of cluster metrics.
-* [EDOT Collector Daemon](#daemonset-collectors-pipeline): Collection of node metrics, logs and application telemetry.
-* [EDOT Collector Gateway](#gateway-collectors-pipeline): Pre-processing, aggregation and ingestion of data into Elastic.
+* [{{agent}} Cluster](#cluster-collector-pipeline): Collection of cluster metrics.
+* [{{agent}} Daemon](#daemonset-collectors-pipeline): Collection of node metrics, logs and application telemetry.
+* [{{agent}} Gateway](#gateway-collectors-pipeline): Pre-processing, aggregation and ingestion of data into Elastic.
 
 The following `values.yaml` files are used depending on the ingest scenario:
 
-* [Direct ingestion into Elasticsearch](https://github.com/elastic/elastic-agent/blob/main/deploy/helm/edot-collector/kube-stack/values.yaml)
+* [Direct ingestion into {{es}}](https://github.com/elastic/elastic-agent/blob/main/deploy/helm/edot-collector/kube-stack/values.yaml)
 * [Managed OTLP Endpoint](https://github.com/elastic/elastic-agent/blob/main/deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml)
 
 ::::{important}
 **Configuration compatibility with {{product.elastic-stack}} versions**
 
-If you're running EDOT Collector 9.x with {{product.elastic-stack}} 8.18 or 8.19, use the Helm `values.yaml` files and configuration aligned with your Stack version to ensure proper functionality with {{product.kibana}} Observability UIs. For more details, refer to [Configuration compatibility with Elastic Stack versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions).
+If you're running {{agent}} 9.x with {{product.elastic-stack}} 8.18 or 8.19, use the Helm `values.yaml` files and configuration aligned with your Stack version to ensure proper functionality with {{product.kibana}} Observability UIs. For more details, refer to [Configuration compatibility with {{stack}} versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions).
 ::::
 
-The following sections describe the default pipelines for the different roles of EDOT collectors in a Kubernetes setup.
+The following sections describe the default pipelines for the different roles of {{agent}} in a Kubernetes setup.
 
 ## Cluster Collector pipeline
 
@@ -56,7 +56,7 @@ Logs and metrics are batched for better performance ([`batch`] processor) and th
 ::::
 
 :::{note}
-The `from_context: client_metadata` option in the `resource` processor only applies to transport-level metadata. It cannot extract custom application attributes. To propagate such values into your telemetry, set them explicitly in your application code using EDOT SDK instrumentation. For more information, refer to [EDOT Collector doesn’t propagate client metadata](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/metadata.md).
+The `from_context: client_metadata` option in the `resource` processor only applies to transport-level metadata. It cannot extract custom application attributes. To propagate such values into your telemetry, set them explicitly in your application code using EDOT SDK instrumentation. For more information, refer to [{{agent}} doesn’t propagate client metadata](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/metadata.md).
 :::
 
 ### Application telemetry through OTLP from OTel SDKs
@@ -69,7 +69,7 @@ The Daemonset collectors receive that data through [`OTLP`], batch the data ([`b
 
 The Gateway collectors pipelines differ between the two different deployment use cases, direct ingestion into {{es}} and using the [{{motlp}}](opentelemetry://reference/motlp.md).
 
-### Direct ingestion into Elasticsearch
+### Direct ingestion into {{es}} [direct-ingestion-into-elasticsearch]
 
 In self-managed and {{ech}} Stack deployment use cases, the main purpose of the Gateway Collector is the central enrichment of data before the OpenTelemetry data is being ingested directly into {{es}} using the [`elasticsearch`] exporter.
 

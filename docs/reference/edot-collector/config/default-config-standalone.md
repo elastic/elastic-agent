@@ -1,6 +1,6 @@
 ---
 navigation_title: Default config (Standalone)
-description: Default configuration of the EDOT Collector in standalone mode.
+description: Default configuration of the {{agent}} in standalone mode.
 applies_to:
   stack:
   serverless:
@@ -13,14 +13,14 @@ products:
   - id: edot-collector
 ---
 
-# Default configuration of the EDOT Collector (standalone)
+# Default configuration of the {{agent}} (standalone)
 
-The default configuration of the {{edot}} (EDOT) Collector includes pipelines for the collection of logs, host metrics, and data from OpenTelemetry SDKs.
+The default configuration of the {{agent}} includes pipelines for the collection of logs, host metrics, and data from OpenTelemetry SDKs.
 
-The EDOT Collector can run in [Agent](https://opentelemetry.io/docs/collector/deployment/agent/) or [Gateway](https://opentelemetry.io/docs/collector/deployment/gateway/) mode:
+The {{agent}} can run in [Agent](https://opentelemetry.io/docs/collector/deployment/agent/) or [Gateway](https://opentelemetry.io/docs/collector/deployment/gateway/) mode:
 
-- Agent mode: The EDOT Collector ingests data from infrastructure and SDKs and forwards it to Elastic or to another collector running in Gateway mode.
-- Gateway mode: The EDOT Collector ingests data from other collectors running in Agent mode and forwards it to Elastic.
+- Agent mode: The {{agent}} ingests data from infrastructure and SDKs and forwards it to Elastic or to another collector running in Gateway mode.
+- Gateway mode: The {{agent}} ingests data from other collectors running in Agent mode and forwards it to Elastic.
 
 ## Agent mode
 
@@ -50,13 +50,13 @@ The following sample config files for Agent mode are available:
 
 ::::
 
-Use the previous example configurations as a reference when configuring your contrib Collector or customizing your EDOT Collector configuration.
+Use the previous example configurations as a reference when configuring your contrib Collector or customizing your {{agent}} configuration.
 
 The following sections describe the default pipelines by use cases.
 
 ### Direct ingestion into Elasticsearch
 
-For self-managed and {{ech}} stack deployment use cases, ingest OpenTelemetry data from the EDOT Collector directly into {{es}} using the [`elasticsearch`] exporter.
+For self-managed and {{ech}} stack deployment use cases, ingest OpenTelemetry data from the {{agent}} directly into {{es}} using the [`elasticsearch`] exporter.
 
 Learn more about the configuration options for the `elasticsearch` exporter in the [corresponding documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md#configuration-options).
 
@@ -65,7 +65,7 @@ The `elasticsearch` exporter comes with two relevant data ingestion modes:
 - `ecs`: Writes data in backwards compatible {{product.ecs}} format. Original attribute names and semantics might be lost during translation.
 - `otel`: OTel attribute names and semantics are preserved.
 
-The goal of EDOT is to preserve OTel data formats and semantics as much as possible, so `otel` is the default mode for the EDOT Collector. Some use cases might require data to be exported in ECS format for backwards compatibility.
+The goal of {{agent}} is to preserve OTel data formats and semantics as much as possible, so `otel` is the default mode for the {{agent}}. Some use cases might require data to be exported in ECS format for backwards compatibility.
 
 #### Logs collection pipeline
 
@@ -74,14 +74,14 @@ For logs collection, the default configuration uses the [`filelog`] receiver to 
 :::{note}
 The `from_context: client_metadata` option in the `resource` processor only applies to transport-level metadata. It cannot extract custom application attributes.
 
-To propagate such values into your telemetry, set them explicitly in your application code using EDOT SDK instrumentation. For more information, refer to [EDOT Collector doesn’t propagate client metadata](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/metadata.md).
+To propagate such values into your telemetry, set them explicitly in your application code using EDOT SDK instrumentation. For more information, refer to [{{agent}} doesn’t propagate client metadata](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/metadata.md).
 :::
 
 Data is exported directly to {{es}} using the [`elasticsearch`] exporter in `OTel-native` mode.
 
 #### Application and traces collection pipeline
 
-The application pipeline in the EDOT Collector receives data from OTel SDKs through the [`OTLP`] receiver. While logs and metrics are exported verbatim into {{es}}, traces require two additional components.
+The application pipeline in the {{agent}} receives data from OTel SDKs through the [`OTLP`] receiver. While logs and metrics are exported verbatim into {{es}}, traces require two additional components.
 
 {applies_to}`edot_collector: ga 9.2` The [`elasticapm` processor](../components/elasticapmprocessor.md) enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm` connector](../components/elasticapmconnector.md) generates pre-aggregated APM metrics from tracing data.
 
@@ -90,11 +90,11 @@ Application-related OTel data is ingested into {{es}} in OTel-native format usin
 :::{note}
 Both the `elasticapm` processor and the `elasticapm` connector are required for Elastic APM UIs to work properly. As they aren't included in the OpenTelemetry [Collector Contrib repository](https://github.com/open-telemetry/opentelemetry-collector-contrib), you can:
 
-* Use the EDOT Collector with the available configuration to ingest data into {{es}}.
-* [Build a custom, EDOT-like Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
+* Use the {{agent}} with the available configuration to ingest data into {{es}}.
+* [Build a custom Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
 * Use Elastic's [managed OTLP endpoint](docs-content://solutions/observability/get-started/opentelemetry/quickstart/serverless/index.md) that does the enrichment for you.
 
-If you're running EDOT Collector 9.x with Elastic Stack 8.18 or 8.19, use the deprecated `elastictrace` processor instead of `elasticapm` processor as specified in the configuration for your Stack version.
+If you're running {{agent}} 9.x with Elastic Stack 8.18 or 8.19, use the deprecated `elastictrace` processor instead of `elasticapm` processor as specified in the configuration for your Stack version.
 :::
 
 #### Host metrics collection pipeline
@@ -108,7 +108,7 @@ The [`resourcedetection`] processor enriches the metrics with meta information a
 :::{note}
 :applies_to: edot_collector: ga 9.2
 
-The `elasticinframetrics` processor is deprecated in EDOT Collector 9.2 but is retained for backwards compatibility. If you're running EDOT Collector 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using this processor as specified in the configuration for your Stack version.
+The `elasticinframetrics` processor is deprecated in {{agent}} 9.2 but is retained for backwards compatibility. If you're running {{agent}} 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using this processor as specified in the configuration for your Stack version.
 :::
 
 ::::{important}
@@ -187,11 +187,11 @@ The following example configuration files are available for the Gateway mode:
 ::::
 :::::
 
-Use the previous example configurations as a reference when configuring your Gateway Collector or customizing your EDOT Collector configuration.
+Use the previous example configurations as a reference when configuring your Gateway Collector or customizing your {{agent}} configuration.
 
 ### Data collection
 
-The EDOT Collector in Gateway mode collects data from other Collectors using the OTLP protocol. 
+The {{agent}} in Gateway mode collects data from other Collectors using the OTLP protocol. 
 
 By default, the sample Gateway configuration listens on port `4317` for gRPC and port `4318` for HTTP.
 
@@ -235,7 +235,7 @@ processors:
 :::{note}
 :applies_to: edot_collector: ga 9.2
 
-The `elasticapm` processor replaces the deprecated `elastictrace` processor. If you're running EDOT Collector 9.x with Elastic Stack 8.18 or 8.19, use the `elastictrace` processor and the `elasticinframetrics` processor as specified in the Gateway configuration for your Stack version.
+The `elasticapm` processor replaces the deprecated `elastictrace` processor. If you're running {{agent}} 9.x with Elastic Stack 8.18 or 8.19, use the `elastictrace` processor and the `elasticinframetrics` processor as specified in the Gateway configuration for your Stack version.
 :::
 
 ### Data export
@@ -268,7 +268,7 @@ Each pipeline connects specific receivers, processors, and exporters to handle d
 
 ## Central configuration
 
-The EDOT Collector can be configured to use [APM Agent Central Configuration](docs-content://solutions/observability/apm/apm-agent-central-configuration.md). Refer to [Central configuration docs](opentelemetry://reference/central-configuration.md) for more details.
+The {{agent}} can be configured to use [APM Agent Central Configuration](docs-content://solutions/observability/apm/apm-agent-central-configuration.md). Refer to [Central configuration docs](opentelemetry://reference/central-configuration.md) for more details.
 
 To activate the central configuration feature, add the [`apmconfig`](https://github.com/elastic/opentelemetry-collector-components/blob/main/extension/apmconfigextension/README.md). For example:
 
@@ -290,7 +290,7 @@ extensions:
 ```
 
 ::::{note}
-The EDOT Collector doesn't store or embed the {{es}} API key.
+The {{agent}} doesn't store or embed the {{es}} API key.
 
 Each EDOT SDK sends its own API key in the `Authorization` header (for example: `Authorization: ApiKey <Base64(id:key)>`).
 
@@ -301,7 +301,7 @@ Create an API Key following [these instructions](docs-content://deploy-manage/ap
 
 ## Secure connection
 
-To secure the connection between the EDOT Collector and Elastic, you can use TLS or mutual TLS, as well as the `apikeyauth` extension.
+To secure the connection between the {{agent}} and Elastic, you can use TLS or mutual TLS, as well as the `apikeyauth` extension.
 
 ### TLS configuration
 
@@ -382,7 +382,7 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 
 ### Secure SDK to Collector connection (TLS)
 
-To secure the connection between the {{edot}} SDKs and the EDOT Collector, configure TLS on both ends.
+To secure the connection between the EDOT SDKs and the {{agent}}, configure TLS on both ends.
 
 #### SDK configuration
 
@@ -427,11 +427,11 @@ receivers:
 
 This encrypts data between SDKs and the Collector over both gRPC and HTTP protocols.
 
-### Secure the connection between the EDOT Collector and Elastic
+### Secure the connection between the {{agent}} and Elastic [secure-the-connection-between-the-edot-collector-and-elastic]
 
-After securing communication between the {{edot}} SDKs and the `apmconfigextension`, you should secure the connection between the EDOT Collector and {{es}} endpoints.
+After securing communication between the EDOT SDKs and the `apmconfigextension`, you should secure the connection between the {{agent}} and {{es}} endpoints.
 
-The EDOT Collector uses the `elasticsearch/otel` or `elasticsearch/ecs` exporter to send telemetry data to Elastic. Elastic recommends using HTTPS to encrypt the connection and verify the server's certificate.
+The {{agent}} uses the `elasticsearch/otel` or `elasticsearch/ecs` exporter to send telemetry data to Elastic. Elastic recommends using HTTPS to encrypt the connection and verify the server's certificate.
 
 Example configuration:
 
@@ -481,14 +481,14 @@ For {{ecloud}} and {{serverless-full}} deployments, mTLS is not required. TLS an
 
 ## Configuration compatibility with Elastic Stack versions
 
-While EDOT Collector 9.x is compatible with {{product.elastic-stack}} 8.18 and 8.19, users running these Stack versions should use the EDOT Collector configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs. Refer to [Migrate components](/reference/edot-collector/components/migrate-components.md) to migrate your configuration to the new components.
+While {{agent}} 9.x is compatible with {{product.elastic-stack}} 8.18 and 8.19, users running these Stack versions should use the {{agent}} configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs. Refer to [Migrate components](/reference/edot-collector/components/migrate-components.md) to migrate your configuration to the new components.
 
 ::::{important}
-If you're upgrading EDOT Collector to 9.x but keeping your {{product.elastic-stack}} on 8.18 or 8.19:
+If you're upgrading {{agent}} to 9.x but keeping your {{product.elastic-stack}} on 8.18 or 8.19:
 
 - Use the configuration examples for your Stack version (8.18 or 8.19), not the latest 9.x configuration.
 - Continue using deprecated components (such as `elasticinframetrics` and `elastictrace` processors) that are included in the configuration for your Stack version.
-- These deprecated components are retained in EDOT Collector 9.x specifically to maintain backwards compatibility during the official deprecation window.
+- These deprecated components are retained in {{agent}} 9.x specifically to maintain backwards compatibility during the official deprecation window.
 
 For Gateway mode configurations by Stack version, refer to the [Gateway mode section](#gateway-mode).
 ::::
