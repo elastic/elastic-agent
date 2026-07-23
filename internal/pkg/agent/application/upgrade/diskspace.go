@@ -102,9 +102,9 @@ func getUpgradeSize(ctx context.Context, config *artifact.Config, uri string, up
 	var archiveSize, decompressedSize uint64
 	var err error
 	if download.IsLocal(uri) {
-		archiveSize, decompressedSize, err = getLocalUpgradeSize(uri)
+		archiveSize, decompressedSize, err = GetLocalUpgradeSize(uri)
 	} else {
-		archiveSize, decompressedSize, err = getHTTPUpgradeSize(ctx, config, uri, upgradeDetails)
+		archiveSize, decompressedSize, err = GetRemoteUpgradeSize(ctx, config, uri, upgradeDetails)
 	}
 
 	if err != nil {
@@ -113,7 +113,7 @@ func getUpgradeSize(ctx context.Context, config *artifact.Config, uri string, up
 	return archiveSize, decompressedSize, nil
 }
 
-func getLocalUpgradeSize(uri string) (uint64, uint64, error) {
+func GetLocalUpgradeSize(uri string) (uint64, uint64, error) {
 	decompressedSize := fallbackPayloadSize
 	archiveSize := fallbackArchiveSize
 
@@ -158,7 +158,7 @@ func getLocalUpgradeSize(uri string) (uint64, uint64, error) {
 	return archiveSize, decompressedSize, nil
 }
 
-func getHTTPUpgradeSize(ctx context.Context, config *artifact.Config, uri string, upgradeDetails *details.Details) (uint64, uint64, error) {
+func GetRemoteUpgradeSize(ctx context.Context, config *artifact.Config, uri string, upgradeDetails *details.Details) (uint64, uint64, error) {
 	decompressedSize := fallbackPayloadSize
 	archiveSize := fallbackArchiveSize
 

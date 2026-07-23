@@ -98,7 +98,7 @@ func TestGetUpgradeSize(t *testing.T) {
 		target := filepath.Join(t.TempDir(), "elastic-agent.tar.gz")
 		require.NoError(t, os.WriteFile(target, archive, 0o644))
 
-		archiveSize, payloadSize, err := getLocalUpgradeSize("file://" + target)
+		archiveSize, payloadSize, err := GetLocalUpgradeSize("file://" + target)
 		require.NoError(t, err)
 		require.Equal(t, uint64(len(archive)), archiveSize)
 		require.Equal(t, payload, payloadSize)
@@ -112,7 +112,7 @@ func TestGetUpgradeSize(t *testing.T) {
 		target := filepath.Join(t.TempDir(), "elastic-agent.zip")
 		require.NoError(t, os.WriteFile(target, archive, 0o644))
 
-		archiveSize, payloadSize, err := getLocalUpgradeSize("file://" + target)
+		archiveSize, payloadSize, err := GetLocalUpgradeSize("file://" + target)
 		require.NoError(t, err)
 		require.Equal(t, uint64(len(archive)), archiveSize)
 		require.Equal(t, payload, payloadSize)
@@ -121,7 +121,7 @@ func TestGetUpgradeSize(t *testing.T) {
 	t.Run("local file missing", func(t *testing.T) {
 		uri := "file://" + filepath.Join(t.TempDir(), "missing.tar.gz")
 
-		archiveSize, payloadSize, err := getLocalUpgradeSize(uri)
+		archiveSize, payloadSize, err := GetLocalUpgradeSize(uri)
 		require.ErrorContains(t, err, "could not stat")
 		require.Equal(t, fallbackArchiveSize, archiveSize)
 		require.Equal(t, fallbackPayloadSize, payloadSize)
@@ -134,7 +134,7 @@ func TestGetUpgradeSize(t *testing.T) {
 		}))
 		t.Cleanup(server.Close)
 
-		archiveSize, payloadSize, err := getHTTPUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
+		archiveSize, payloadSize, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
 		require.NoError(t, err)
 		require.Equal(t, uint64(len(archive)), archiveSize)
 		require.Equal(t, payload, payloadSize)
@@ -150,7 +150,7 @@ func TestGetUpgradeSize(t *testing.T) {
 		}))
 		t.Cleanup(server.Close)
 
-		archiveSize, payloadSize, err := getHTTPUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.zip", upgradeDetails())
+		archiveSize, payloadSize, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.zip", upgradeDetails())
 		require.NoError(t, err)
 		require.Equal(t, uint64(len(archive)), archiveSize)
 		require.Equal(t, payload, payloadSize)
@@ -164,7 +164,7 @@ func TestGetUpgradeSize(t *testing.T) {
 		}))
 		t.Cleanup(server.Close)
 
-		_, _, err := getHTTPUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
+		_, _, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
 		require.Error(t, err)
 		require.True(t, upgradeErrors.IsPermanentHTTPError(err))
 		require.Equal(t, 1, requests)
@@ -184,7 +184,7 @@ func TestGetUpgradeSize(t *testing.T) {
 		}))
 		t.Cleanup(server.Close)
 
-		_, _, err := getHTTPUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
+		_, _, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
 		require.ErrorContains(t, err, "does not support range requests")
 		require.True(t, upgradeErrors.IsPermanentHTTPError(err))
 		require.Equal(t, 1, getRequests)
@@ -203,7 +203,7 @@ func TestGetUpgradeSize(t *testing.T) {
 		}))
 		t.Cleanup(server.Close)
 
-		_, _, err := getHTTPUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
+		_, _, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
 		require.ErrorContains(t, err, "out of range")
 		require.True(t, upgradeErrors.IsPermanentHTTPError(err))
 		require.Equal(t, 1, getRequests)
@@ -222,7 +222,7 @@ func TestGetUpgradeSize(t *testing.T) {
 		}))
 		t.Cleanup(server.Close)
 
-		archiveSize, payloadSize, err := getHTTPUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
+		archiveSize, payloadSize, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
 		require.NoError(t, err)
 		require.Equal(t, uint64(len(archive)), archiveSize)
 		require.Equal(t, payload, payloadSize)
