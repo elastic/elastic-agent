@@ -1,0 +1,11 @@
+kind: enhancement
+
+summary: Report host total physical memory as `host.memory` in agent metadata
+
+description: |
+  The Elastic Agent now includes the host's total physical memory (in bytes) as
+  `host.memory` in the local metadata sent to Fleet on enrollment and check-in.
+  This lets Fleet distinguish the agent's own process memory usage from the total
+  RAM available on the host.
+
+component: elastic-agent
