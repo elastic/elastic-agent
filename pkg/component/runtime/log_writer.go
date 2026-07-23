@@ -43,6 +43,9 @@ type logWriter struct {
 	// inheritLevel is the level that will be used for a log message in the case it doesn't define a log level
 	// for stdout it is INFO and for stderr it is ERROR.
 	inheritLevel zapcore.Level
+
+	// levelScanKey is `"<LevelKey>"` pre-built for scanLevel.
+	levelScanKey []byte
 }
 
 func newLogWriter(core zapcoreWriter, logCfg component.CommandLogSpec, ll zapcore.Level, unitLevels map[string]zapcore.Level, src logSource) *logWriter {
@@ -56,6 +59,7 @@ func newLogWriter(core zapcoreWriter, logCfg component.CommandLogSpec, ll zapcor
 		logLevel:     zap.NewAtomicLevelAt(ll),
 		unitLevels:   unitLevels,
 		inheritLevel: inheritLevel,
+		levelScanKey: buildLevelScanKey(logCfg.LevelKey),
 	}
 }
 
@@ -67,7 +71,17 @@ func NewLogWriterWithDefaults(core zapcoreWriter, ll zapcore.Level) *logWriter {
 		logCfg:       cmdLogSpec,
 		logLevel:     zap.NewAtomicLevelAt(ll),
 		inheritLevel: ll,
+		levelScanKey: buildLevelScanKey(cmdLogSpec.LevelKey),
 	}
+}
+
+// buildLevelScanKey returns the JSON-quoted form of key, e.g. `"log.level"`.
+func buildLevelScanKey(key string) []byte {
+	b := make([]byte, len(key)+2)
+	b[0] = '"'
+	copy(b[1:], key)
+	b[len(key)+1] = '"'
+	return b
 }
 
 func (r *logWriter) SetLevels(ll zapcore.Level, unitLevels map[string]zapcore.Level) {
@@ -137,37 +151,85 @@ func (r *logWriter) Write(p []byte) (int, error) {
 }
 
 func (r *logWriter) handleJSON(line []byte) bool {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(line, &raw); err != nil {
-		return false
-	}
-	lvl := getLevel(raw, r.logCfg.LevelKey)
-
 	allowedLvl := r.logLevel.Level()
-	unitId := getUnitId(raw)
-	if unitId != "" {
-		if r.unitLevels != nil {
-			if unitLevel, ok := r.unitLevels[unitId]; ok {
-				allowedLvl = unitLevel
-			}
+
+	// When no per-unit levels are configured, use a cheap byte scan to skip
+	// json.Unmarshal entirely for messages that fall below the log level.
+	if r.unitLevels == nil {
+		if lvl := scanLevel(line, r.levelScanKey); !allowedLvl.Enabled(lvl) {
+			return true
 		}
 	}
+
+	// Full parse: needed either to emit the log or to resolve per-unit levels.
+	var evt map[string]interface{}
+	if err := json.Unmarshal(line, &evt); err != nil {
+		return false
+	}
+
+	lvl := getLevel(evt, r.logCfg.LevelKey)
+	unitId := getUnitId(evt)
+	if unitId != "" && r.unitLevels != nil {
+		if unitLevel, ok := r.unitLevels[unitId]; ok {
+			allowedLvl = unitLevel
+		}
+	}
+
 	if allowedLvl.Enabled(lvl) {
-		ts := getTimestamp(raw, r.logCfg.TimeKey, r.logCfg.TimeFormat)
-		msg := getMessage(raw, r.logCfg.MessageKey)
+		ts := getTimestamp(evt, r.logCfg.TimeKey, r.logCfg.TimeFormat)
+		msg := getMessage(evt, r.logCfg.MessageKey)
 		_ = r.loggerCore.Write(zapcore.Entry{
 			Level:   lvl,
 			Time:    ts,
 			Message: msg,
-		}, getFields(raw, r.logCfg.IgnoreKeys))
+		}, getFields(evt, r.logCfg.IgnoreKeys))
 	}
 	return true
 }
 
-func getLevel(raw map[string]json.RawMessage, key string) zapcore.Level {
+// scanLevel does a cheap byte scan for key and returns the corresponding
+// zapcore.Level without a full json.Unmarshal.
+func scanLevel(line, key []byte) zapcore.Level {
+	idx := bytes.Index(line, key)
+	if idx < 0 {
+		return zapcore.InfoLevel
+	}
+	i := idx + len(key)
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+	if i >= len(line) || line[i] != ':' {
+		return zapcore.InfoLevel
+	}
+	i++ // skip ':'
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+	if i >= len(line) || line[i] != '"' {
+		return zapcore.InfoLevel
+	}
+	i++ // skip opening '"'
+	end := bytes.IndexByte(line[i:], '"')
+	if end < 0 {
+		return zapcore.InfoLevel
+	}
 	lvl := zapcore.InfoLevel
-	if err := unmarshalLevel(&lvl, getStrVal(raw, key)); err == nil {
-		delete(raw, key)
+	_ = unmarshalLevel(&lvl, string(line[i:i+end]))
+	return lvl
+}
+
+func getLevel(evt map[string]interface{}, key string) zapcore.Level {
+	lvl := zapcore.InfoLevel
+	v, ok := evt[key]
+	if !ok {
+		return lvl
+	}
+	s, ok := v.(string)
+	if !ok {
+		return lvl
+	}
+	if err := unmarshalLevel(&lvl, s); err == nil {
+		delete(evt, key)
 	}
 	return lvl
 }
@@ -185,49 +247,45 @@ func unmarshalLevel(lvl *zapcore.Level, val string) error {
 	}
 }
 
-func getMessage(raw map[string]json.RawMessage, key string) string {
-	msg := getStrVal(raw, key)
-	if msg != "" {
-		delete(raw, key)
-	}
-	return msg
-}
-
-func getTimestamp(raw map[string]json.RawMessage, key string, format string) time.Time {
-	t, err := time.Parse(format, getStrVal(raw, key))
-	if err == nil {
-		delete(raw, key)
-		return t
-	}
-	return time.Now()
-}
-
-func getFields(raw map[string]json.RawMessage, ignore []string) []zapcore.Field {
-	fields := make([]zapcore.Field, 0, len(raw))
-	for k, v := range raw {
-		if len(ignore) > 0 && contains(ignore, k) {
-			continue
-		}
-		var val interface{}
-		if err := json.Unmarshal(v, &val); err != nil {
-			fields = append(fields, zap.String(k, string(v)))
-		} else {
-			fields = append(fields, zap.Any(k, val))
-		}
-	}
-	return fields
-}
-
-func getStrVal(raw map[string]json.RawMessage, key string) string {
-	v, ok := raw[key]
+func getMessage(evt map[string]interface{}, key string) string {
+	v, ok := evt[key]
 	if !ok {
 		return ""
 	}
-	var s string
-	if err := json.Unmarshal(v, &s); err != nil {
+	s, ok := v.(string)
+	if !ok {
 		return ""
 	}
+	delete(evt, key)
 	return s
+}
+
+func getTimestamp(evt map[string]interface{}, key, format string) time.Time {
+	v, ok := evt[key]
+	if !ok {
+		return time.Now()
+	}
+	s, ok := v.(string)
+	if !ok {
+		return time.Now()
+	}
+	t, err := time.Parse(format, s)
+	if err != nil {
+		return time.Now()
+	}
+	delete(evt, key)
+	return t
+}
+
+func getFields(evt map[string]interface{}, ignore []string) []zapcore.Field {
+	fields := make([]zapcore.Field, 0, len(evt))
+	for k, v := range evt {
+		if len(ignore) > 0 && contains(ignore, k) {
+			continue
+		}
+		fields = append(fields, zap.Any(k, v))
+	}
+	return fields
 }
 
 func contains(s []string, val string) bool {
@@ -239,15 +297,18 @@ func contains(s []string, val string) bool {
 	return false
 }
 
-func getUnitId(raw map[string]json.RawMessage) string {
-	if s := getStrVal(raw, "unit.id"); s != "" {
-		return s
+func getUnitId(evt map[string]interface{}) string {
+	if v, ok := evt["unit.id"]; ok {
+		if s, ok := v.(string); ok && s != "" {
+			return s
+		}
 	}
-	if v, ok := raw["unit"]; ok {
-		var unitMap map[string]json.RawMessage
-		if err := json.Unmarshal(v, &unitMap); err == nil {
-			if s := getStrVal(unitMap, "id"); s != "" {
-				return s
+	if v, ok := evt["unit"]; ok {
+		if m, ok := v.(map[string]interface{}); ok {
+			if id, ok := m["id"]; ok {
+				if s, ok := id.(string); ok {
+					return s
+				}
 			}
 		}
 	}
