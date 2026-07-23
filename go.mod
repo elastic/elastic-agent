@@ -133,7 +133,6 @@ require (
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/brunoga/deep v1.3.1 // indirect
-	github.com/buger/goterm v1.0.4 // indirect
 	github.com/cenkalti/backoff/v7 v7.0.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/cilium/ebpf v0.21.0 // indirect
@@ -220,7 +219,6 @@ require (
 	github.com/jcmturner/goidentity/v6 v6.0.1 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
-	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/klauspost/compress v1.18.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/parsers/yaml v1.1.0 // indirect
@@ -347,8 +345,6 @@ require (
 	go.opentelemetry.io/collector/receiver/xreceiver v0.156.0 // indirect
 	go.opentelemetry.io/collector/service v0.156.0 // indirect
 	go.opentelemetry.io/collector/service/hostcapabilities v0.156.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.63.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
 	go.opentelemetry.io/contrib/otelconf v0.24.0 // indirect
 	go.opentelemetry.io/ebpf-profiler v0.0.202623 // indirect
