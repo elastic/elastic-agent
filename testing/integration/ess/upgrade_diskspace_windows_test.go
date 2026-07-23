@@ -52,12 +52,12 @@ func makeTestFS(t *testing.T, size uint64) string {
 func runDiskPart(t *testing.T, ctx context.Context, tempDir string, commands ...string) {
 	t.Helper()
 
-	scriptPath := filepath.Join(tempDir, "diskpart.txt")
-	script := strings.Join(commands, "\r\n") + "\r\n"
-	require.NoError(t, os.WriteFile(scriptPath, []byte(script), 0o600))
+	diskPartCommandsPath := filepath.Join(tempDir, "diskpart.txt")
+	diskPartCommands := strings.Join(commands, "\r\n") + "\r\n"
+	require.NoError(t, os.WriteFile(diskPartCommandsPath, []byte(diskPartCommands), 0o600))
 	commandContext, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
-	command := exec.CommandContext(commandContext, "diskpart.exe", "/s", scriptPath) //nolint:gosec // G204: test input
+	command := exec.CommandContext(commandContext, "diskpart.exe", "/s", diskPartCommandsPath)
 	output, err := command.CombinedOutput()
 	require.NoError(t, err, "diskpart failed: %s", output)
 }
