@@ -8,12 +8,9 @@ package ess
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httputil"
 	"os"
 	"path"
 	"path/filepath"
@@ -26,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/logp"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
@@ -33,54 +31,52 @@ import (
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
+const (
+	runtimeProcess = "process"
+	runtimeOtel    = "otel"
+)
+
+var allRuntimes = []string{runtimeProcess, runtimeOtel}
+
 var eventLogConfig = `
 outputs:
   default:
     type: elasticsearch
     hosts:
-      - %s
+      - %[1]s
     protocol: http
     preset: latency
 inputs:
   - type: filestream
     id: your-input-id
-    log_level: debug
     streams:
       - id: your-filestream-stream-id
         data_stream:
           dataset: generic
         paths:
-          - %s
-
-# Disable metrics monitoring so there are less beats running and less logs being generated.
-agent.monitoring:
-  enabled: true
-  logs: true
-  metrics: false
-  pprof.enabled: false
-  use_output: default
-  # Needed if you already have an Elastic-Agent running on your machine
-  # That's very helpful for running the tests locally
-  http:
-    enabled: false
-    port: 7002
-agent.grpc:
-  address: localhost
-  port: 7001
-agent.internal.runtime.filebeat.default: process
+          - %[2]s
+    log_level: %[3]s
+agent:
+    monitoring.enabled: false
+    internal.runtime.filebeat.default: %[4]s
+    grpc.port: 0
 `
 
 func TestEventLogFile(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
 		Group: integration.Default,
-		Stack: &define.Stack{},
 		Local: true,
-		Sudo:  false,
 	})
-	ctx, cancel := testcontext.WithDeadline(
-		t,
-		t.Context(),
-		time.Now().Add(10*time.Minute))
+
+	for _, runtime := range allRuntimes {
+		t.Run(runtime, func(t *testing.T) {
+			runEventLogFile(t, runtime)
+		})
+	}
+}
+
+func runEventLogFile(t *testing.T, runtime string) {
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -88,16 +84,16 @@ func TestEventLogFile(t *testing.T) {
 
 	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
-	logFilepath := path.Join(t.TempDir(), t.Name())
-	integration.GenerateLogFile(t, logFilepath, time.Millisecond*100, 20)
+	logFilepath := path.Join(t.TempDir(), "flog.log")
+	integration.GenerateLogFile(t, logFilepath, time.Millisecond*500, 0)
 
-	cfg := fmt.Sprintf(eventLogConfig, esURL.String(), logFilepath)
+	cfgInfo := fmt.Sprintf(eventLogConfig, esURL.String(), logFilepath, logp.InfoLevel.String(), runtime)
 
 	if err := agentFixture.Prepare(ctx); err != nil {
 		t.Fatalf("cannot prepare Elastic-Agent fixture: %s", err)
 	}
 
-	if err := agentFixture.Configure(ctx, []byte(cfg)); err != nil {
+	if err := agentFixture.Configure(ctx, []byte(cfgInfo)); err != nil {
 		t.Fatalf("cannot configure Elastic-Agent fixture: %s", err)
 	}
 
@@ -114,31 +110,37 @@ func TestEventLogFile(t *testing.T) {
 		t.Fatalf("could not start Elastic-Agent: %s", err)
 	}
 
-	// Make sure the Elastic-Agent process is not running before
-	// exiting the test
 	t.Cleanup(func() {
-		// Ignore the error because we cancelled the context,
-		// and that always returns an error
 		_ = cmd.Wait()
 		if t.Failed() {
-			t.Log("Elastic-Agent output:")
-			t.Log(output.String())
+			t.Errorf("Elastic-Agent output:\n%s", output.String())
 		}
 	})
 
-	// Now the Elastic-Agent is running, so validate the Event log file.
-	requireEventLogFileExistsWithData(t, agentFixture, "Publish event: ")
-	requireNoCopyProcessorError(t, agentFixture)
+	logsDirGlob := filepath.Join(agentFixture.WorkDir(), "data/elastic-agent-*/logs")
 
-	// The diagnostics command is already tested by another test,
-	// here we just want to validate the events log behaviour
-	// extract the zip file into a temp folder
-	expectedLogFiles, expectedEventLogFiles := getLogFilenames(
-		t,
-		filepath.Join(agentFixture.WorkDir(),
-			"data",
-			"elastic-agent-*",
-			"logs"))
+	// Event logs should not be created at info level.
+	requireLogFilesForRuntime(t, logsDirGlob, runtime)
+	requireEventLogFileNeverExists(t, logsDirGlob)
+
+	// Switch to debug level to enable event log file creation.
+	cfgDebug := fmt.Sprintf(eventLogConfig, esURL.String(), logFilepath, logp.DebugLevel.String(), runtime)
+	if err := agentFixture.Configure(ctx, []byte(cfgDebug)); err != nil {
+		t.Fatalf("cannot reconfigure Elastic-Agent: %s", err)
+	}
+
+	requireEventLogFileExistsWithData(t, logsDirGlob, "Publish event: ")
+	requireNoCopyProcessorError(t, logsDirGlob)
+
+	requireLogFilesForRuntime(t, logsDirGlob, runtime)
+	requireEventLogFilesForRuntime(t, logsDirGlob, runtime)
+	requireNoEventLeakage(t, logsDirGlob)
+
+	// Diagnostics command behavior is tested elsewhere, here we only
+	// check that log filenames are included/excluded correctly.
+	expectedLogFiles, expectedEventLogFiles := getLogFilenames(t, logsDirGlob)
+	require.NotEmpty(t, expectedLogFiles)
+	require.NotEmpty(t, expectedEventLogFiles)
 
 	collectDiagnosticsAndVeriflyLogs(
 		t,
@@ -155,17 +157,32 @@ func TestEventLogFile(t *testing.T) {
 		expectedLogFiles)
 }
 
+var fleetManagedAgentConfig = `
+fleet:
+  enabled: true
+agent:
+  grpc.port: 0
+`
+
 func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Group: integration.Fleet,
 		Stack: &define.Stack{},
-		Local: false,
-		Sudo:  true,
+		Local: true,
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
-		Group: "container",
 	})
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
+
+	for _, runtime := range allRuntimes {
+		t.Run(runtime, func(t *testing.T) {
+			runEventLogOutputConfiguredViaFleet(t, info, runtime)
+		})
+	}
+}
+
+func runEventLogOutputConfiguredViaFleet(t *testing.T, info *define.Info, runtime string) {
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -173,36 +190,29 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 
 	_, outputID := createMockESOutput(t, info, 0, 0, 100, 0)
 	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String())
-	policyID, enrollmentAPIKey := createPolicy(
+	policyID, enrollmentAPIKey := createPolicyWithOverride(
 		t,
 		ctx,
 		agentFixture,
 		info,
 		policyName,
-		outputID)
-
-	// Switch to process monitoring, as event logging is not yet supported for otel.
-	// https://github.com/elastic/elastic-agent/issues/8845
-	processMonUpdateReq := kibana.AgentPolicyUpdateRequest{
-		Name:      policyName,
-		Namespace: info.Namespace,
-		Overrides: map[string]any{
+		outputID,
+		map[string]any{
 			"agent": map[string]any{
+				"logging": map[string]any{
+					"level": logp.DebugLevel.String(),
+				},
 				"internal": map[string]any{
 					"runtime": map[string]any{
-						"default": "process",
+						"default": runtime,
 						"filebeat": map[string]any{
-							"default": "process",
+							"default": runtime,
 						},
 					},
 				},
 			},
 		},
-	}
-
-	_, err = info.KibanaClient.UpdatePolicy(ctx,
-		policyID, processMonUpdateReq)
-	require.NoError(t, err)
+	)
 
 	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	if err != nil {
@@ -219,171 +229,251 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		enrollmentAPIKey,
 	}
 
-	addLogIntegration(t, info, policyID, "/tmp/flog.log")
-	integration.GenerateLogFile(t, "/tmp/flog.log", time.Second/2, 100)
+	logFilePath := filepath.Join(t.TempDir(), "flog.log")
+	addLogIntegration(t, info, policyID, logFilePath)
+	integration.GenerateLogFile(t, logFilePath, time.Second/2, 100)
 
 	enrollCmd, err := agentFixture.PrepareAgentCommand(ctx, enrollArgs)
 	if err != nil {
 		t.Fatalf("could not prepare enroll command: %s", err)
 	}
 	if out, err := enrollCmd.CombinedOutput(); err != nil {
-		t.Fatalf("error enrolling Elastic-Agent: %s\nOutput:\n%s", err, string(out))
+		t.Fatalf("error enrolling elastic-agent: %s\nOutput:\n%s", err, string(out))
 	}
+
+	err = agentFixture.Configure(ctx, []byte(fleetManagedAgentConfig))
+	require.NoError(t, err)
 
 	runAgentCMD, agentOutput := prepareAgentCMD(t, ctx, agentFixture, nil, nil)
 	if err := runAgentCMD.Start(); err != nil {
-		t.Fatalf("could not start Elastic-Agent: %s", err)
+		t.Fatalf("could not start elastic-agent: %s", err)
 	}
 
-	assert.Eventuallyf(t, func() bool {
-		// This will return errors until it connects to the agent,
-		// they're mostly noise because until the agent starts running
-		// we will get connection errors. If the test fails
-		// the agent logs will be present in the error message
-		// which should help to explain why the agent was not
-		// healthy.
-		err := agentFixture.IsHealthy(ctx)
-		return err == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
-		err, agentOutput,
-	)
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Errorf("elastic-agent output:\n%s", agentOutput)
+		}
+	})
 
-	// The default behaviour is to log events to the events log file
-	// so ensure this is happening
-	// As the mockEs returns indexing failures, we should see "Cannot index event" in the events log file
-	requireEventLogFileExistsWithData(t, agentFixture, "Cannot index event")
+	require.Eventually(t, func() bool {
+		return waitForAgentAndFleetHealthy(ctx, t, agentFixture)
+	}, 2*time.Minute, time.Second, "elastic-agent did not report healthy")
 
-	// Add a policy overwrite to change the events output to stderr
-	addOverwriteToPolicy(t, info, policyName, policyID)
+	logsDirGlob := filepath.Join(agentFixture.WorkDir(), "data/elastic-agent-*/logs")
 
-	// Ensure Elastic-Agent is healthy after the policy change
-	assert.Eventuallyf(t, func() bool {
-		// This will return errors until it connects to the agent,
-		// they're mostly noise because until the agent starts running
-		// we will get connection errors. If the test fails
-		// the agent logs will be present in the error message
-		// which should help to explain why the agent was not
-		// healthy.
-		err := agentFixture.IsHealthy(ctx)
-		return err == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy after policy change. Agent status error: \"%v\", Agent logs\n%s",
-		err, agentOutput,
-	)
+	// Ensure the event logs are going to the events log file by default.
+	requireEventLogFileExistsWithData(t, logsDirGlob, "Publish event:")
 
-	// Ensure the events logs are going to stderr
-	assert.Eventually(t, func() bool {
+	// Add a policy overwrite to change the events output to stderr.
+	err = applyEventLogStderrPolicy(ctx, info, policyName, policyID, runtime)
+	require.NoError(t, err)
+
+	// Wait until the agent has applied the policy change.
+	require.Eventually(t, func() bool {
+		inspect, inspectErr := agentFixture.ExecInspect(ctx)
+		return inspectErr == nil && inspect.Agent.Logging.EventData.ToStderr
+	}, 2*time.Minute, time.Second, "elastic-agent did not apply the policy change")
+
+	// Ensure the events logs are going to stderr after the policy change.
+	require.Eventually(t, func() bool {
 		agentOutputStr := agentOutput.String()
 		scanner := bufio.NewScanner(strings.NewReader(agentOutputStr))
 		for scanner.Scan() {
-			if strings.Contains(scanner.Text(), "Cannot index event") {
+			if strings.Contains(scanner.Text(), "Publish event:") {
 				return true
 			}
 		}
-
 		return false
 	}, 3*time.Minute, 10*time.Second, "cannot find events on stderr")
 }
 
-func addOverwriteToPolicy(t *testing.T, info *define.Info, policyName, policyID string) {
-	t.Helper()
-	body := fmt.Sprintf(`
-{
-  "name": "%s",
-  "namespace": "%s",
-  "overrides": {
-    "agent": {
-      "logging": {
-        "event_data": {
-          "to_stderr": true,
-          "to_files": false
-        }
-      },
-	  "internal": {
-		"runtime": {
-		  "default": "process",
-  		  "filebeat": {
-	  		"default": "process"
-		  }
-		}
-	  }
-    }
-  }
-}`, policyName, info.Namespace)
-	sendPolicyUpdate(t, info, policyID, body)
-}
-
-func readEventLogFile(t *testing.T, agentFixture *atesting.Fixture) string {
-	// Now the Elastic-Agent is running, so validate the Event log file.
-	// Because the path changes based on the Elastic-Agent version, we
-	// use glob to find the file
-	var logFileName string
-	require.Eventually(t, func() bool {
-		// We ignore this error because the folder might not be there.
-		// Once the folder and file are there, then this call should succeed
-		// and we can read the file.
-		glob := filepath.Join(
-			agentFixture.WorkDir(),
-			"data", "elastic-agent-*", "logs", "events", "*")
-		files, err := filepath.Glob(glob)
-		if err != nil {
-			t.Fatalf("could not scan for the events log file: %s", err)
-		}
-
-		if len(files) >= 1 {
-			logFileName = files[0]
-			return true
-		}
-
-		return false
-	}, time.Minute, time.Second, "could not find event log file")
-
-	logEntryBytes, err := os.ReadFile(logFileName)
-	if err != nil {
-		t.Fatalf("cannot read file '%s': %s", logFileName, err)
+func applyEventLogStderrPolicy(ctx context.Context, info *define.Info, policyName, policyID, runtime string) error {
+	req := kibana.AgentPolicyUpdateRequest{
+		Name:      policyName,
+		Namespace: info.Namespace,
+		Overrides: map[string]any{
+			"agent": map[string]any{
+				"logging": map[string]any{
+					"level": logp.DebugLevel.String(),
+					"event_data": map[string]any{
+						"to_stderr": true,
+						"to_files":  false,
+					},
+				},
+				"internal": map[string]any{
+					"runtime": map[string]any{
+						"default": runtime,
+						"filebeat": map[string]any{
+							"default": runtime,
+						},
+					},
+				},
+			},
+		},
 	}
-
-	return string(logEntryBytes)
+	_, err := info.KibanaClient.UpdatePolicy(ctx, policyID, req)
+	return err
 }
 
-func requireNoCopyProcessorError(t *testing.T, agentFixture *atesting.Fixture) {
-	data := readEventLogFile(t, agentFixture)
-	for _, line := range strings.Split(data, "\n") {
-		logEntry := struct {
-			LogLogger string `json:"log.logger"`
-			Message   string `json:"message"`
-		}{}
+func readEventLogFile(logsDirGlob string) (string, error) {
+	glob := filepath.Join(logsDirGlob, "events/*")
+	files, err := filepath.Glob(glob)
+	if err != nil {
+		return "", fmt.Errorf("could not scan for events log file: %w", err)
+	}
+	if len(files) == 0 {
+		return "", fmt.Errorf("no events log file found")
+	}
+	data, err := os.ReadFile(files[0])
+	if err != nil {
+		return "", fmt.Errorf("cannot read events log file %s: %w", files[0], err)
+	}
+	return string(data), nil
+}
 
+func eventLogFileContains(logsDirGlob, expectedStr string) error {
+	data, err := readEventLogFile(logsDirGlob)
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(data, expectedStr) {
+		return fmt.Errorf("events log file does not contain %q", expectedStr)
+	}
+	return nil
+}
+
+func requireEventLogFileExistsWithData(t *testing.T, logsDirGlob, expectedStr string) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		return eventLogFileContains(logsDirGlob, expectedStr) == nil
+	}, time.Minute, time.Second,
+		"did not find %q in the events log file", expectedStr)
+}
+
+func requireEventLogFileNeverExists(t *testing.T, logsDirGlob string) {
+	t.Helper()
+	require.Never(t, func() bool {
+		return eventLogFileContains(logsDirGlob, "") == nil
+	}, 10*time.Second, time.Second,
+		"events log file should not have been created")
+}
+
+func requireNoCopyProcessorError(t *testing.T, logsDirGlob string) {
+	t.Helper()
+	require.Never(t, func() bool {
+		return copyProcessorError(logsDirGlob) != nil
+	}, 10*time.Second, time.Second, "copy_fields processor error found in events log")
+}
+
+func copyProcessorError(logsDirGlob string) error {
+	data, err := readEventLogFile(logsDirGlob)
+	if err != nil {
+		return err
+	}
+	logEntry := struct {
+		LogLogger string `json:"log.logger"`
+		Message   string `json:"message"`
+	}{}
+	for _, line := range strings.Split(data, "\n") {
 		if len(line) == 0 {
 			continue
 		}
 		if err := json.Unmarshal([]byte(line), &logEntry); err != nil {
-			t.Fatalf("could not parse log entry: %q", line)
+			return fmt.Errorf("could not parse log entry: %q", line)
 		}
+		if logEntry.LogLogger == "copy_fields" &&
+			strings.Contains(logEntry.Message, "Failed to copy fields") &&
+			strings.Contains(logEntry.Message, "already exists, drop or rename this field first") {
+			return fmt.Errorf("copy_fields processor must not fail: %s", logEntry.Message)
+		}
+	}
+	return nil
+}
 
-		if logEntry.LogLogger == "copy_fields" {
-			if strings.Contains(logEntry.Message, "Failed to copy fields") {
-				if strings.Contains(logEntry.Message, "already exists, drop or rename this field first") {
-					t.Fatal("copy_fields processor must not fail")
-				}
+func requireLogFilesForRuntime(t *testing.T, logsDirGlob, runtime string) {
+	t.Helper()
+
+	patternsByRuntime := map[string][]string{
+		runtimeProcess: {
+			"elastic-agent-*.ndjson",
+		},
+		runtimeOtel: {
+			"elastic-agent-*.ndjson",
+			"elastic-otel-collector-*.ndjson",
+		},
+	}
+	want, ok := patternsByRuntime[runtime]
+	require.Truef(t, ok, "unknown runtime %q", runtime)
+
+	requireFilesMatchExactly(t, logsDirGlob, want)
+}
+
+func requireEventLogFilesForRuntime(t *testing.T, logsDirGlob, runtime string) {
+	t.Helper()
+
+	patternsByRuntime := map[string][]string{
+		runtimeProcess: {
+			"elastic-agent-event-log-*.ndjson",
+		},
+		runtimeOtel: {
+			"elastic-otel-collector-event-log-*.ndjson",
+		},
+	}
+	want, ok := patternsByRuntime[runtime]
+	require.Truef(t, ok, "unknown runtime %q", runtime)
+
+	requireFilesMatchExactly(t, filepath.Join(logsDirGlob, "events"), want)
+}
+
+func requireNoEventLeakage(t *testing.T, logsDirGlob string) {
+	t.Helper()
+
+	logFiles, err := filepath.Glob(filepath.Join(logsDirGlob, "*.ndjson"))
+	require.NoError(t, err, "could not glob log files")
+	require.NotEmpty(t, logFiles, "no log files found to check for event leakage")
+
+	for _, f := range logFiles {
+		data, err := os.ReadFile(f)
+		require.NoErrorf(t, err, "cannot read file %q", f)
+
+		for _, line := range strings.Split(string(data), "\n") {
+			if len(line) == 0 {
+				continue
 			}
+			require.NotContainsf(t, line, `"log.type":"event"`,
+				"found a log.type:event entry leaked into non-event log file %q", f)
 		}
 	}
 }
 
-func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixture, expectedStr string) {
-	logEntry := readEventLogFile(t, agentFixture)
-	// That's part of the generated event that is logged by the 'processor'
-	// logger at level debug
-	if !strings.Contains(logEntry, expectedStr) {
-		t.Errorf(
-			"did not find the expected log entry ('%s') in the events log file",
-			expectedStr)
-		t.Log("Event log file contents:")
-		t.Log(logEntry)
+func requireFilesMatchExactly(t *testing.T, dirGlob string, patterns []string) {
+	t.Helper()
+
+	// Wait until every pattern has at least one matching file.
+	require.Eventually(t, func() bool {
+		for _, pat := range patterns {
+			if m, _ := filepath.Glob(filepath.Join(dirGlob, pat)); len(m) == 0 {
+				return false
+			}
+		}
+		return true
+	}, time.Minute, time.Second, "expected files did not appear in %s", dirGlob)
+
+	// Collect every file that was expected.
+	expected := map[string]bool{}
+	for _, pat := range patterns {
+		matches, err := filepath.Glob(filepath.Join(dirGlob, pat))
+		require.NoErrorf(t, err, "could not glob %q", pat)
+		for _, m := range matches {
+			expected[m] = true
+		}
+	}
+
+	// Fail if any .ndjson file exists that was not expected.
+	all, err := filepath.Glob(filepath.Join(dirGlob, "*.ndjson"))
+	require.NoError(t, err)
+	for _, f := range all {
+		assert.Truef(t, expected[f], "unexpected file %q", f)
 	}
 }
 
@@ -403,7 +493,7 @@ func collectDiagnosticsAndVeriflyLogs(
 	extractZipArchive(t, diagPath, extractionDir)
 	diagLogFiles, diagEventLogFiles := getLogFilenames(
 		t,
-		filepath.Join(extractionDir, "logs", "elastic-agent*"))
+		filepath.Join(extractionDir, "logs/elastic-agent*"))
 	allLogs := append(diagLogFiles, diagEventLogFiles...)
 
 	require.ElementsMatch(
@@ -427,7 +517,7 @@ func getLogFilenames(
 		logFiles = append(logFiles, filepath.Base(f))
 	}
 
-	eventLogFilesGlob := filepath.Join(basepath, "events", "*.ndjson")
+	eventLogFilesGlob := filepath.Join(basepath, "events/*.ndjson")
 	eventLogFilesPath, err := filepath.Glob(eventLogFilesGlob)
 	if err != nil {
 		t.Fatalf("could not get log file names:%s", err)
@@ -438,28 +528,4 @@ func getLogFilenames(
 	}
 
 	return logFiles, eventLogFiles
-}
-
-func sendPolicyUpdate(t *testing.T, info *define.Info, policyID, body string) {
-	t.Helper()
-
-	resp, err := info.KibanaClient.Send(
-		http.MethodPut,
-		fmt.Sprintf("/api/fleet/agent_policies/%s", policyID),
-		nil,
-		nil,
-		bytes.NewBufferString(body),
-	)
-	if err != nil {
-		t.Fatalf("could not execute request to Kibana/Fleet: %s", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		respDump, dumpErr := httputil.DumpResponse(resp, true)
-		if dumpErr != nil {
-			t.Fatalf("could not dump Kibana error response: %s", dumpErr)
-		}
-		t.Log("Kibana error response:")
-		t.Log(string(respDump))
-		t.Fatalf("received non-200 status when updating Fleet policy: %d", resp.StatusCode)
-	}
 }
