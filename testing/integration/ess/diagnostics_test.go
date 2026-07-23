@@ -579,7 +579,7 @@ agent.internal.runtime.filebeat.httpjson: process
 func TestEDOTDiagnostics(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,
-		Local: false,
+		Local: true,
 	})
 
 	configTemplate := `
@@ -664,13 +664,17 @@ agent.internal.runtime.filebeat.filestream: otel
 		"components/filestream-default/registry.tar.gz",
 		"components/filestream-default/beat_metrics.json",
 		"components/filestream-default/input_metrics.json",
+		"logs/elastic-agent-*/elastic-agent-*.ndjson",
+		"logs/elastic-agent-*/elastic-otel-collector-*.ndjson",
 	}
 
 	for _, f := range expectedFiles {
-		path := filepath.Join(extractionDir, f)
-		stat, err := os.Stat(path)
-		require.NoErrorf(t, err, "stat file %q failed", path)
-		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
+		matches, err := filepath.Glob(filepath.Join(extractionDir, f))
+		require.NoErrorf(t, err, "glob %q failed", f)
+		require.NotEmptyf(t, matches, "no file matching %q", f)
+		stat, err := os.Stat(matches[0])
+		require.NoErrorf(t, err, "stat file %q failed", matches[0])
+		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", matches[0])
 	}
 	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
 }
@@ -814,7 +818,6 @@ func extractZipArchive(t *testing.T, zipFile string, dst string) {
 		require.NoErrorf(t, err, "error creating parent folder for file %q", filePath)
 
 		extractSingleFileFromArchive(t, zf, filePath)
-
 	}
 }
 
@@ -871,6 +874,12 @@ func compileExpectedDiagnosticFilePatterns(avi *client.Version, diagfiles []stri
 	// optional: it doesn't have to be there (in some cases the watcher has not written any logs)
 	files = append(files, filePattern{
 		pattern:  path.Join("logs", "elastic-agent-"+avi.Commit[:6], "elastic-agent-watcher-*.ndjson"),
+		optional: true,
+	})
+	// optional: only present when a component runs under the otel runtime, which
+	// gives the collector its own log file instead of sharing the agent's.
+	files = append(files, filePattern{
+		pattern:  path.Join("logs", "elastic-agent-"+avi.Commit[:6], "elastic-otel-collector-*.ndjson"),
 		optional: true,
 	})
 

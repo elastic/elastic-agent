@@ -125,6 +125,7 @@ func TestLimitsLog(t *testing.T) {
 		ctx,
 		log,
 		log,
+		log,
 		logp.DebugLevel,
 		&info.AgentInfo{}, // info.AgentInfo
 		nil,               // coordinator.ReExecManager
@@ -573,6 +574,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		t.Context(),
 		log,
 		log,
+		log,
 		logp.DebugLevel,
 		&info.AgentInfo{},
 		nil,
@@ -598,6 +600,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 	require.NoError(t, err)
 	_, _, _, err = New(
 		t.Context(),
+		log,
 		log,
 		log,
 		logp.DebugLevel,
@@ -633,6 +636,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		t.Context(),
 		log,
 		log,
+		log,
 		logp.DebugLevel,
 		&info.AgentInfo{},
 		nil,
@@ -666,6 +670,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 	require.NoError(t, err)
 	_, _, _, err = New(
 		t.Context(),
+		log,
 		log,
 		log,
 		logp.DebugLevel,
@@ -745,6 +750,7 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 	require.NoError(t, err)
 	_, _, _, err = New(
 		t.Context(),
+		log,
 		log,
 		log,
 		logp.DebugLevel,
