@@ -244,8 +244,6 @@ github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203 h1:XBBHcIb256gUJ
 github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203/go.mod h1:E1jcSv8FaEny+OP/5k9UxZVw9YFWGj7eI4KR/iOBqCg=
 github.com/elastic/cloud-on-k8s/v3 v3.4.1 h1:phOuio2iExpzRK/5VgERH6nByxpURmJGQ7/mOcMStUY=
 github.com/elastic/cloud-on-k8s/v3 v3.4.1/go.mod h1:C0y4c22pL3Lh/Dn/D+l+2OGpUDjRUBs6QuiJ9AWQ15s=
-github.com/elastic/elastic-agent-autodiscover v0.10.3 h1:3pGm0wOVOK5dNdqAypZzQCIjclVtjjvHwuFoLRw0GU4=
-github.com/elastic/elastic-agent-autodiscover v0.10.3/go.mod h1:HyjdiEVP/A7iMN0jeac2EoUohpHKAZIFRDQsvPDg2Dw=
 github.com/elastic/elastic-agent-client/v7 v7.18.1 h1:WnM53JjaukeysrAuiTyrhDPmFxJG07ZAByc2TrkcKcs=
 github.com/elastic/elastic-agent-client/v7 v7.18.1/go.mod h1:uDpSGZ+YCKgqgtkwCA0qjwX0gU/wmixDsVbPjY3GkPs=
 github.com/elastic/elastic-agent-libs v0.46.1 h1:1dVRKOaGWBxqDQPb/NCtoJHI8Nx3QbJOmr4v6y+UdKQ=
