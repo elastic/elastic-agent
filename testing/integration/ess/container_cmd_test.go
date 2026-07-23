@@ -45,6 +45,18 @@ func createPolicy(
 	policyName string,
 	dataOutputID string,
 ) (string, string) {
+	return createPolicyWithOverride(t, ctx, agentFixture, info, policyName, dataOutputID, nil)
+}
+
+func createPolicyWithOverride(
+	t *testing.T,
+	ctx context.Context,
+	agentFixture *atesting.Fixture,
+	info *define.Info,
+	policyName string,
+	dataOutputID string,
+	overrides map[string]any,
+) (string, string) {
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        policyName,
 		Namespace:   info.Namespace,
@@ -71,13 +83,23 @@ func createPolicy(
 		t.Fatalf("could not create Agent Policy: %s", err)
 	}
 
-	// Create enrollment API key
-	createEnrollmentAPIKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
-		PolicyID: policy.ID,
+	// Update policy with overrides
+	if overrides != nil {
+		_, err = info.KibanaClient.UpdatePolicy(ctx, policy.ID, kibana.AgentPolicyUpdateRequest{
+			Name:      policyName,
+			Namespace: info.Namespace,
+			Overrides: overrides,
+		})
+		if err != nil {
+			t.Fatalf("could not update Agent Policy overrides: %s", err)
+		}
 	}
 
+	// Create enrollment API key
 	t.Logf("Creating enrollment API key...")
-	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(ctx, createEnrollmentAPIKeyReq)
+	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(ctx, kibana.CreateEnrollmentAPIKeyRequest{
+		PolicyID: policy.ID,
+	})
 	if err != nil {
 		t.Fatalf("unable to create enrolment API key: %s", err)
 	}
@@ -390,8 +412,9 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	}
 
 	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
-	addLogIntegration(t, info, policyID, "/tmp/flog.log")
-	integration.GenerateLogFile(t, "/tmp/flog.log", time.Second/2, 100)
+	logFilePath := filepath.Join(t.TempDir(), "flog.log")
+	addLogIntegration(t, info, policyID, logFilePath)
+	integration.GenerateLogFile(t, logFilePath, time.Second/2, 100)
 
 	t.Logf(">> running binary with: %v", cmd.Args)
 	if err := cmd.Start(); err != nil {
@@ -653,8 +676,9 @@ func TestContainerCMDAgentMonitoringRuntimeExperimentalPolicy(t *testing.T) {
 				policyName,
 				"")
 
-			addLogIntegration(t, info, policyID, "/tmp/beats-receivers-test.log")
-			integration.GenerateLogFile(t, "/tmp/beats-receivers-test.log", time.Second/2, 50)
+			logFilePath := filepath.Join(t.TempDir(), "beats-receivers-test.log")
+			addLogIntegration(t, info, policyID, logFilePath)
+			integration.GenerateLogFile(t, logFilePath, time.Second/2, 50)
 
 			// set monitoring runtime to process via policy
 			setAgentMonitoringRuntime(t, info, policyID, policyName, monitoringCfg.ProcessRuntimeManager)
@@ -735,7 +759,7 @@ func addLogIntegration(t *testing.T, info *define.Info, policyID, logFilePath st
 		PolicyID:    policyID,
 		LogFilePath: logFilePath,
 		Dataset:     "logs",
-		Namespace:   "default",
+		Namespace:   info.Namespace,
 	})
 	if err != nil {
 		t.Fatalf("could not render template: %s", err)
