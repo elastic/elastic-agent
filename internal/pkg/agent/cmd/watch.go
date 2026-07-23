@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -196,22 +195,40 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			stateString = string(marker.Details.State)
 		}
 		log.Infof("not within grace [updatedOn %v] %v or agent have been rolled back [state: %s]", marker.UpdatedOn.String(), time.Since(marker.UpdatedOn).String(), stateString)
-		// if it is started outside of upgrade loop
-		// if we're not within grace and marker is still there it might mean
-		// that cleanup was not performed ok, cleanup everything except current version
-		// hash is the same as hash of agent which initiated watcher.
+		// Grace period elapsed or upgrade already resolved. Clean up and exit.
+		// Preserve whatever terminal state is recorded (could be from a previous
+		// watcher pass or from the agent itself) in the watcher marker before
+		// removing the upgrade marker.
 		var versionedHomesToKeep []string
+		outcome := &upgrade.WatcherMarker{
+			TargetVersion:   marker.Version,
+			PreviousVersion: marker.PrevVersion,
+			ActionID:        marker.GetActionID(),
+			CompletedAt:     time.Now(),
+		}
 		if marker.Details != nil && marker.Details.State == details.StateRollback {
-			// we need to keep the previous versioned home (we have rolled back)
+			// Keep the previous version — we rolled back to it.
 			versionedHomesToKeep = []string{marker.PrevVersionedHome}
+			outcome.Outcome = details.StateRollback
+			outcome.Reason = marker.Details.Metadata.Reason
 		} else {
-			// we need to keep the upgraded version, since it has not been rolled back
+			// Keep the upgraded version — no rollback occurred.
 			absCurrentVersionedHome := paths.VersionedHome(topDir)
 			currentVersionedHome, err := filepath.Rel(topDir, absCurrentVersionedHome)
 			if err != nil {
 				return fmt.Errorf("extracting current home path %q relative to %q: %w", absCurrentVersionedHome, topDir, err)
 			}
 			versionedHomesToKeep = []string{currentVersionedHome}
+			if marker.Details != nil && marker.Details.State == details.StateFailed {
+				outcome.Outcome = details.StateFailed
+				outcome.ErrorMsg = marker.Details.Metadata.ErrorMsg
+			} else {
+				// No terminal state on record — treat the running version as good.
+				outcome.Outcome = details.StateCompleted
+			}
+		}
+		if err := upgrade.WriteWatcherMarker(log, dataDir, outcome); err != nil {
+			log.Errorw("failed to write watcher marker", "error.message", err)
 		}
 
 		log.Infof("About to clean up upgrade. Keeping versioned homes: %v", versionedHomesToKeep)
@@ -241,7 +258,18 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 
 		upgradeDetails.SetStateWithReason(details.StateRollback, details.ReasonWatchFailed)
 
-		// by default remove marker (backward compatible behaviour)
+		outcome := &upgrade.WatcherMarker{
+			Outcome:         details.StateRollback,
+			TargetVersion:   marker.Version,
+			PreviousVersion: marker.PrevVersion,
+			ActionID:        marker.GetActionID(),
+			Reason:          details.ReasonWatchFailed,
+			CompletedAt:     time.Now(),
+		}
+		if werr := upgrade.WriteWatcherMarker(log, dataDir, outcome); werr != nil {
+			log.Errorw("failed to write watcher marker", "error.message", werr)
+		}
+
 		removeMarker := true
 
 		previousVersion, versionParseErr := semver.ParseVersion(marker.PrevVersion)
@@ -256,7 +284,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		// remove the registry entry when rolling back to pre-9.4 agents that don't manage it,
 		// for >= 9.4 the old agent's handleUpgrade() will update it on restart
 		revertRegistryHook := func(ctx context.Context, log *logger.Logger, topDirPath string) error {
-			if versionParseErr == nil && previousVersion.Less(*semver.NewParsedSemVer(9, 4, 0, "SNAPSHOT", "")) {
+			if versionParseErr == nil && previousVersion.Less(*upgrade.Version_9_4_0_SNAPSHOT) {
 				if err := install.RemoveUninstallEntry(); err != nil {
 					log.Warnf("failed to remove uninstall registry entry during rollback: %v", err)
 				}
@@ -268,20 +296,29 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)
+			// Rollback itself failed — escalate the outcome so the record is accurate.
+			outcome.Outcome = details.StateFailed
+			outcome.ErrorMsg = err.Error()
+			if werr := upgrade.WriteWatcherMarker(log, dataDir, outcome); werr != nil {
+				log.Errorw("failed to update watcher marker after rollback failure", "error.message", werr)
+			}
 		}
 		return err
 	}
 
-	// watch succeeded - upgrade was successful!
 	upgradeDetails.SetState(details.StateCompleted)
 
-	// cleanup older versions,
-	// in windows it might leave self untouched, this will get cleaned up
-	// later at the start, because for windows we leave marker untouched.
-	//
-	// Why is this being skipped on Windows? The comment above is not clear.
-	// issue: https://github.com/elastic/elastic-agent/issues/3027
-	removeMarker := !isWindows()
+	if err := upgrade.WriteWatcherMarker(log, dataDir, &upgrade.WatcherMarker{
+		Outcome:         details.StateCompleted,
+		TargetVersion:   marker.Version,
+		PreviousVersion: marker.PrevVersion,
+		ActionID:        marker.GetActionID(),
+		CompletedAt:     time.Now(),
+	}); err != nil {
+		log.Errorw("failed to write watcher marker", "error.message", err)
+	}
+
+	// Remove the upgrade marker on all platforms. https://github.com/elastic/elastic-agent/issues/3027
 	newVersionedHome := marker.VersionedHome
 	if newVersionedHome == "" {
 		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
@@ -289,7 +326,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	}
 	// Only newVersionedHome is explicitly kept here; rollback candidates are preserved by
 	// cleanupAgentDirectories reading the TTL registry and retaining unexpired entries.
-	err = installModifier.Cleanup(log, topDir, removeMarker, false /* keepLogs */, newVersionedHome)
+	err = installModifier.Cleanup(log, topDir, true /* removeMarker */, false /* keepLogs */, newVersionedHome)
 	if err != nil {
 		log.Error("cleanup after successful watch failed", err)
 	}
@@ -322,10 +359,22 @@ func rollback(log *logp.Logger, topDir string, client client.Client, installModi
 			marker.Details = details.NewDetails(marker.Version, details.StateRollback, actionID)
 		}
 		// use the previous version from the marker
-		marker.Details.SetStateWithReason(details.StateRollback, fmt.Sprintf(details.ReasonManualRollbackPattern, marker.PrevVersion))
+		reason := fmt.Sprintf(details.ReasonManualRollbackPattern, marker.PrevVersion)
+		marker.Details.SetStateWithReason(details.StateRollback, reason)
 		err = upgrade.SaveMarker(dataDir, marker, true)
 		if err != nil {
 			return fmt.Errorf("saving marker after rolling back: %w", err)
+		}
+
+		if werr := upgrade.WriteWatcherMarker(log, dataDir, &upgrade.WatcherMarker{
+			Outcome:         details.StateRollback,
+			TargetVersion:   marker.Version,
+			PreviousVersion: marker.PrevVersion,
+			ActionID:        marker.GetActionID(),
+			Reason:          reason,
+			CompletedAt:     time.Now(),
+		}); werr != nil {
+			log.Errorw("failed to write watcher marker", "error.message", werr)
 		}
 		return nil
 	}
@@ -347,10 +396,6 @@ func rollback(log *logp.Logger, topDir string, client client.Client, installModi
 	}
 
 	return nil
-}
-
-func isWindows() bool {
-	return runtime.GOOS == "windows"
 }
 
 // gracePeriod returns true if it is within grace period and time until grace period ends.
