@@ -142,8 +142,6 @@ func (r *logWriter) handleJSON(line []byte) bool {
 		return false
 	}
 	lvl := getLevel(raw, r.logCfg.LevelKey)
-	ts := getTimestamp(raw, r.logCfg.TimeKey, r.logCfg.TimeFormat)
-	msg := getMessage(raw, r.logCfg.MessageKey)
 
 	allowedLvl := r.logLevel.Level()
 	unitId := getUnitId(raw)
@@ -155,6 +153,8 @@ func (r *logWriter) handleJSON(line []byte) bool {
 		}
 	}
 	if allowedLvl.Enabled(lvl) {
+		ts := getTimestamp(raw, r.logCfg.TimeKey, r.logCfg.TimeFormat)
+		msg := getMessage(raw, r.logCfg.MessageKey)
 		_ = r.loggerCore.Write(zapcore.Entry{
 			Level:   lvl,
 			Time:    ts,
