@@ -6,7 +6,10 @@ package upgrade
 
 import (
 	"bytes"
+	"compress/gzip"
+	"context"
 	"crypto/sha512"
+	goerrors "errors"
 	"fmt"
 	"io"
 	"net"
@@ -26,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	downloaderrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -37,12 +41,27 @@ import (
 func TestDownloadArtifact(t *testing.T) {
 	fipsutils.SkipIfFIPSOnly(t, "test uses an OpenPGP key which results in a SHA-1 violation")
 
+	originalTop := paths.Top()
 	originalDownloads := paths.Downloads()
 	t.Cleanup(func() {
+		paths.SetTop(originalTop)
 		paths.SetDownloads(originalDownloads)
 	})
+	paths.SetTop(t.TempDir())
+	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
-	archiveContent := []byte("signed artifact content")
+	// gzipArchive produces a valid gzip file so the disk space check can read
+	// a real (small) decompressed size from the trailing ISIZE bytes.
+	gzipArchive := func(t *testing.T, content string) []byte {
+		var buf bytes.Buffer
+		gzw := gzip.NewWriter(&buf)
+		_, err := io.WriteString(gzw, content)
+		require.NoError(t, err)
+		require.NoError(t, gzw.Close())
+		return buf.Bytes()
+	}
+
+	archiveContent := gzipArchive(t, "signed artifact content")
 	pgpKey, signature := pgptest.Sign(t, bytes.NewReader(archiveContent))
 	pgpSource := download.PgpSourceRawPrefix + string(pgpKey)
 	hashFile := []byte(fmt.Sprintf("%x %s", sha512.Sum512(archiveContent), "elastic-agent-1.2.3-linux-x86_64.tar.gz"))
@@ -50,7 +69,11 @@ func TestDownloadArtifact(t *testing.T) {
 	requestCountHandler := func(files map[string][]byte, requestCounts map[string]int) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			path := r.URL.Path
-			requestCounts[path]++
+			// Only count full downloads; the disk space check probes with
+			// HEAD and Range requests before the artifact is fetched.
+			if r.Method != http.MethodHead && r.Header.Get("Range") == "" {
+				requestCounts[path]++
+			}
 
 			file, ok := files[path]
 			if !ok {
@@ -58,7 +81,7 @@ func TestDownloadArtifact(t *testing.T) {
 				return
 			}
 
-			_, _ = w.Write(file)
+			http.ServeContent(w, r, path, time.Time{}, bytes.NewReader(file))
 		}
 	}
 
@@ -281,6 +304,130 @@ func TestDownloadArtifact(t *testing.T) {
 				require.Equal(t, 1, requestCounts[remotePath+".asc"])
 				require.FileExists(t, artifactPath)
 				require.FileExists(t, download.AddHashExtension(artifactPath))
+			},
+		},
+		{
+			name: "local-only sourceURI fails when diskspace check fails",
+			run: func(t *testing.T, fx *fixture) {
+				dropPath := t.TempDir()
+				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()), archiveContent, 0o644))
+				fx.downloader.checkDiskSpace = func(_ context.Context, _ *artifact.Config, _ *details.Details, _ string) (bool, error) {
+					return false, goerrors.New("diskspace check failed")
+				}
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, "file://"+dropPath,
+					fx.upgradeDetails, true, true, pgpSource)
+				require.Error(t, err)
+				require.NoFileExists(t, artifactPath)
+			},
+		},
+		{
+			name: "local-only sourceURI succeeds when diskspace check passes",
+			run: func(t *testing.T, fx *fixture) {
+				dropPath := t.TempDir()
+				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()), archiveContent, 0o644))
+				fx.downloader.checkDiskSpace = func(_ context.Context, _ *artifact.Config, _ *details.Details, _ string) (bool, error) {
+					return true, nil
+				}
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, "file://"+dropPath,
+					fx.upgradeDetails, true, true, pgpSource)
+				require.NoError(t, err)
+				require.FileExists(t, artifactPath)
+			},
+		},
+		{
+			name: "remote sourceURI fails when diskspace check fails",
+			run: func(t *testing.T, fx *fixture) {
+				fx.settings.DropPath = t.TempDir()
+				fx.downloader.checkDiskSpace = func(_ context.Context, _ *artifact.Config, _ *details.Details, uri string) (bool, error) {
+					if download.IsLocal(uri) {
+						return true, nil
+					}
+					return false, goerrors.New("diskspace check failed")
+				}
+
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				serverURL, requestCounts := newFileServer(t, map[string][]byte{
+					remotePath: archiveContent,
+				})
+
+				_, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+					fx.upgradeDetails, true, true, pgpSource)
+				require.Error(t, err)
+				require.Empty(t, requestCounts)
+			},
+		},
+		{
+			name: "remote sourceURI succeeds when diskspace check passes",
+			run: func(t *testing.T, fx *fixture) {
+				fx.settings.DropPath = t.TempDir()
+				fx.downloader.checkDiskSpace = func(_ context.Context, _ *artifact.Config, _ *details.Details, _ string) (bool, error) {
+					return true, nil
+				}
+
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				serverURL, requestCounts := newFileServer(t, map[string][]byte{
+					remotePath: archiveContent,
+				})
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+					fx.upgradeDetails, true, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 1, requestCounts[remotePath])
+				require.FileExists(t, artifactPath)
+			},
+		},
+		{
+			name: "remote sourceURI proceeds when diskspace check uses a fallback estimate",
+			run: func(t *testing.T, fx *fixture) {
+				fx.settings.DropPath = t.TempDir()
+				fx.downloader.checkDiskSpace = func(_ context.Context, _ *artifact.Config, _ *details.Details, _ string) (bool, error) {
+					return true, goerrors.Join(downloaderrors.ErrFetchUpgradeSizeFailed, os.ErrNotExist)
+				}
+
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				serverURL, requestCounts := newFileServer(t, map[string][]byte{
+					remotePath: archiveContent,
+				})
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+					fx.upgradeDetails, true, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 1, requestCounts[remotePath])
+				require.FileExists(t, artifactPath)
+			},
+		},
+		{
+			name: "remote sourceURI is tried when drop path size uses an insufficient fallback estimate",
+			run: func(t *testing.T, fx *fixture) {
+				fx.settings.DropPath = t.TempDir()
+				localURI := "file://" + filepath.ToSlash(filepath.Join(fx.settings.DropPath, fx.target.FileName()))
+				diskSpaceCheckCounts := make(map[string]int)
+				fx.downloader.checkDiskSpace = func(_ context.Context, _ *artifact.Config, _ *details.Details, uri string) (bool, error) {
+					diskSpaceCheckCounts[uri]++
+					if uri == localURI {
+						return false, goerrors.Join(
+							downloaderrors.ErrFetchUpgradeSizeFailed,
+							downloaderrors.ErrInsufficientDiskSpace,
+							os.ErrNotExist,
+						)
+					}
+					return true, nil
+				}
+
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				serverURL, requestCounts := newFileServer(t, map[string][]byte{
+					remotePath: archiveContent,
+				})
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+					fx.upgradeDetails, true, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 1, diskSpaceCheckCounts[localURI])
+				require.Equal(t, 1, diskSpaceCheckCounts[serverURL+remotePath])
+				require.Equal(t, 1, requestCounts[remotePath])
+				require.FileExists(t, artifactPath)
 			},
 		},
 		{

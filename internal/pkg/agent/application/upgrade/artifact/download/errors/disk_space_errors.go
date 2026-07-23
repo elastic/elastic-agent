@@ -6,7 +6,10 @@ package errors
 
 import "errors"
 
-var ErrInsufficientDiskSpace = errors.New("insufficient disk space")
+var (
+	ErrInsufficientDiskSpace  = errors.New("insufficient disk space")
+	ErrFetchUpgradeSizeFailed = errors.New("failed to fetch upgrade size")
+)
 
 func IsDiskSpaceError(err error) bool {
 	for _, osErr := range OS_DiskSpaceErrors {
