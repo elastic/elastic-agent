@@ -164,6 +164,13 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	}
 	m.log.Infof("running managed config manager with checkin mode: %s", m.cfg.Fleet.Checkin.GetMode())
 
+	upgradeMarkerCleanCh := m.coord.UpgradeMarkerCleanCh()
+	onUpgradeCompleted := func() {
+		select {
+		case upgradeMarkerCleanCh <- struct{}{}:
+		default:
+		}
+	}
 	gateway, err := fleetgateway.New(
 		m.log,
 		m.agentInfo,
@@ -173,6 +180,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		stateFetcher,
 		m.cfg.Fleet.Checkin,
 		m.availableRollbacksSource,
+		onUpgradeCompleted,
 	)
 	if err != nil {
 		return err

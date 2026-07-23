@@ -480,6 +480,11 @@ func TestManualRollback(t *testing.T) {
 				}, nil, nil)
 				newerWatcherExecutable := filepath.Join(topDir, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "elastic-agent")
 				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstallCurrent).Return(newerWatcherExecutable)
+				// TakeOverWatcher is called to drain any lingering upgrade watcher before starting the rollback watcher.
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err := locker.TryLock()
+				require.NoError(t, err, "error locking watcher AppLocker")
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", filepath.Join("data", "elastic-agent-1.2.3-oldver")).
 					Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for rollbacksies"}, Process: &os.Process{Pid: 123}}, nil)
 			},
@@ -607,6 +612,11 @@ func TestManualRollback(t *testing.T) {
 				)
 				newerWatcherExecutable := filepath.Join(topDir, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "elastic-agent")
 				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstallCurrent).Return(newerWatcherExecutable)
+				// TakeOverWatcher is called to drain any lingering upgrade watcher before starting the rollback watcher.
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err := locker.TryLock()
+				require.NoError(t, err, "error locking watcher AppLocker")
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", filepath.Join("data", "elastic-agent-1.2.3-oldver")).
 					Return(nil, errors.New("error invoking watcher"))
 			},
@@ -622,6 +632,69 @@ func TestManualRollback(t *testing.T) {
 			additionalAsserts: func(t *testing.T, topDir string) {
 				actualMarkerFilePath := filepath.Join(topDir, "data", markerFilename)
 				require.NoFileExists(t, actualMarkerFilePath, "marker file must have been created")
+			},
+		},
+		{
+			name: "no update marker, no lingering watcher - rollback proceeds without TakeOverWatcher",
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
+				rollbacksSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
+					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {
+						Version:    "1.2.3",
+						Hash:       "oldver",
+						ValidUntil: aMomentTomorrow,
+					},
+				}, nil, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstallCurrent).Return(newerWatcherExecutable)
+				// watcher.lock is free: TryLock succeeds, TakeOverWatcher is NOT called.
+				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", filepath.Join("data", "elastic-agent-1.2.3-oldver")).
+					Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for rollbacksies"}, Process: &os.Process{Pid: 123}}, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings: &configuration.UpgradeConfig{
+				Rollback: &configuration.UpgradeRollbackConfig{
+					Window: 24 * time.Hour,
+				},
+			},
+			now:     aMomentInTime,
+			version: "1.2.3",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "no update marker, TakeOverWatcher fails - error, marker cleaned up",
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
+				rollbacksSource.EXPECT().GetAll().Return(map[string]ttl.TTLMarker{
+					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {
+						Version:    "1.2.3",
+						Hash:       "oldver",
+						ValidUntil: aMomentTomorrow,
+					},
+				}, nil, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstallCurrent).Return(newerWatcherExecutable)
+				// Pre-lock watcher.lock so TryLock fails, then simulate TakeOverWatcher failing.
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err := locker.TryLock()
+				require.NoError(t, err, "error locking watcher AppLocker")
+				t.Cleanup(func() {
+					unlockErr := locker.Unlock()
+					assert.NoError(t, unlockErr, "error unlocking watcher AppLocker")
+				})
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(nil, errors.New("error taking over watcher"))
+				// InvokeWatcher must NOT be called.
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings: &configuration.UpgradeConfig{
+				Rollback: &configuration.UpgradeRollbackConfig{
+					Window: 24 * time.Hour,
+				},
+			},
+			now:     aMomentInTime,
+			version: "1.2.3",
+			wantErr: assert.Error,
+			additionalAsserts: func(t *testing.T, topDir string) {
+				actualMarkerFilePath := filepath.Join(topDir, "data", markerFilename)
+				require.NoFileExists(t, actualMarkerFilePath, "fake upgrade marker must be cleaned up on error")
 			},
 		},
 	}
