@@ -551,7 +551,7 @@ func updateProcessors(newprocessors []mapstr.M, processors []map[string]interfac
 func hintsCheck(annotations mapstr.M, container string, prefix string, validate bool, allSupportedHints []string, logger *logp.Logger, pod *kubernetes.Pod) (mapstr.M, []string) {
 	hints, incorrecthints := utils.GenerateHints(annotations, container, prefix, validate, allSupportedHints)
 	for _, value := range incorrecthints { //We check whether the provided annotation follows the supported format and vocabulary. The check happens for annotations that have prefix co.elastic
-		logger.Warnf("provided hint: %s/%s is not recognised as supported annotation for pod %s in namespace %s", prefix, value, pod.Name, pod.ObjectMeta.Namespace)
+		logger.Warnf("provided hint: %s/%s is not recognised as supported annotation for pod %s in namespace %s", prefix, value, pod.Name, pod.Namespace)
 	}
 	return hints, incorrecthints
 }
