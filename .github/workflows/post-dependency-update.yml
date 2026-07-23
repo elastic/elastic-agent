@@ -1,13 +1,13 @@
-# Follow-on actions relating to dependabot PRs. In elastic/elastic-agent, any changes to
-# dependencies contained in go.mod requires the change to be reflected in the
-# NOTICE.txt and NOTICE-fips.txt files. When dependabot creates a branch for a go_modules
-# change this will update the NOTICE.txt and NOTICE-fips files for that change.
-name: post-dependabot
+# Follow-on actions for dependency update PRs (Dependabot and Renovate). Any changes to
+# dependencies in go.mod require the NOTICE.txt and NOTICE-fips.txt files to be updated.
+# This workflow applies those follow-on changes to the dependency update branch.
+name: post-dependency-update
 
 on:
   push:
     branches:
       - "dependabot/go_modules/**"
+      - "renovate/golang/**"
 
 permissions:
   contents: read
@@ -30,8 +30,8 @@ jobs:
       - name: set up git user
         uses: elastic/oblt-actions/git/setup@v1
         with:
-          username: 'dependabot[bot]'
-          email: 'dependabot[bot]@users.noreply.github.com'
+          username: 'github-actions[bot]'
+          email: 'github-actions[bot]@users.noreply.github.com'
 
       - name: Install mage
         uses: magefile/mage-action@a662bd8c29d8106879588cfff83b2faf6e6f59db # v4.0.0
