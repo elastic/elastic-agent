@@ -8,7 +8,10 @@ import "time"
 
 const (
 	// period during which we monitor for failures resulting in a rollback.
-	defaultGracePeriodDuration = 10 * time.Minute
+	// Must exceed the longest service component operation timeout to ensure
+	// a failed service is detected before the watcher gives up.
+	// See TestUpgradeGracePeriodExceedsMaxServiceTimeout.
+	defaultGracePeriodDuration = 11 * time.Minute
 
 	// interval between checks for new (upgraded) Agent returning an error status.
 	defaultStatusCheckInterval = 30 * time.Second

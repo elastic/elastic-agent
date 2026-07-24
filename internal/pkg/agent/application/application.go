@@ -133,7 +133,6 @@ func New(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
-
 	// prepare initialUpgradeDetails for injecting it in coordinator later on
 	var initialUpgradeDetails *details.Details
 	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil {

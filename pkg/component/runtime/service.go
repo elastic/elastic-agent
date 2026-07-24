@@ -563,16 +563,46 @@ func (s *serviceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *t
 		} else if now.Sub(*lastCheckin) <= checkinPeriod {
 			*missedCheckins = 0
 		}
+		maxMisses := s.maxCheckinMisses(checkinPeriod)
 		if *missedCheckins == 0 {
 			s.compState(client.UnitStateHealthy, *missedCheckins)
-		} else if *missedCheckins > 0 && *missedCheckins < maxCheckinMisses {
+		} else if *missedCheckins > 0 && *missedCheckins < maxMisses {
 			s.compState(client.UnitStateDegraded, *missedCheckins)
-		} else if *missedCheckins >= maxCheckinMisses {
+		} else if *missedCheckins >= maxMisses {
 			// something is wrong; the service should be checking in
-			msg := fmt.Sprintf("Failed: %s service missed %d check-ins", s.name(), maxCheckinMisses)
+			msg := fmt.Sprintf("Failed: %s service missed %d check-ins", s.name(), maxMisses)
 			s.forceCompState(client.UnitStateFailed, msg)
 		}
 	}
+}
+
+// checkinFailureTimeout returns the longest check or install operation timeout
+// for this service. Uninstall is excluded because it only runs on removal, not
+// during startup or upgrade.
+func (s *serviceRuntime) checkinFailureTimeout() time.Duration {
+	ops := s.comp.InputSpec.Spec.Service.Operations
+	var longest time.Duration
+	for _, op := range []*component.ServiceOperationsCommandSpec{ops.Check, ops.Install} {
+		if op != nil && op.Timeout > longest {
+			longest = op.Timeout
+		}
+	}
+	return longest
+}
+
+// maxCheckinMisses returns how many consecutive check-ins this component can
+// miss before it's marked FAILED. The window scales with the longest check/install
+// operation timeout so slow-starting services (e.g. Elastic Defend) are not
+// prematurely failed during an upgrade.
+func (s *serviceRuntime) maxCheckinMisses(checkinPeriod time.Duration) int {
+	misses := maxCheckinMisses
+	timeout := s.checkinFailureTimeout()
+	if timeout > 0 && checkinPeriod > 0 {
+		if m := int(timeout / checkinPeriod); m > misses {
+			misses = m
+		}
+	}
+	return misses
 }
 
 func (s *serviceRuntime) checkinPeriod() time.Duration {

@@ -73,9 +73,10 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 				return
 			case state := <-sub.Ch():
 				t.Logf("component state changed: %+v", state)
-				if state.State == client.UnitStateStarting {
+				switch state.State {
+				case client.UnitStateStarting:
 					// initial is starting
-				} else if state.State == client.UnitStateFailed {
+				case client.UnitStateFailed:
 					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "error-input"}]
 					if ok {
 						if unit.State == client.UnitStateFailed {
@@ -86,7 +87,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
 					}
-				} else {
+				default:
 					subErrCh <- fmt.Errorf("component reported unexpected state: %v", state.State)
 				}
 			}
