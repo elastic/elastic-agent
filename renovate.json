@@ -75,7 +75,6 @@
         "^sigs\\.k8s\\.io/",
         "^helm\\.sh/helm/",
         "^github\\.com/elastic/cloud-on-k8s/",
-        "^github\\.com/elastic/elastic-agent-autodiscover$"
       ],
       "groupName": "k8s-ecosystem"
     },
