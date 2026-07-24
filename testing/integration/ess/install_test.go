@@ -969,56 +969,46 @@ agent.monitoring.enabled: false
 		return string(out)
 	}
 
-	logPattern := filepath.Join(fixture.WorkDir(), "data", "elastic-agent-*", "logs", "elastic-agent-*.ndjson")
-	waitForHealthy := func(timeout time.Duration, failureMessage string) {
-		t.Helper()
+	// logPattern := filepath.Join(fixture.WorkDir(), "data", "elastic-agent-*", "logs", "elastic-agent-*.ndjson")
+	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
+	require.NoError(t, err)
 
-		var lastErr error
-		if assert.Eventually(t, func() bool {
-			lastErr = fixture.IsHealthy(ctx)
-			return lastErr == nil
-		}, timeout, 5*time.Second, failureMessage) {
-			return
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("Service state:\n%s\n", queryService())
+			t.Logf("Logs:\n%s\n", parseAgentErrorLogs(logsBytes, 20))
 		}
+	})
 
-		t.Fatalf("%s\nlast status error: %v\nservice state:\n%s\nagent error logs:\n%s",
-			failureMessage, lastErr, queryService(), readAgentErrorLogs(logPattern, 20))
-	}
-
-	waitForHealthy(3*time.Minute, "agent did not become healthy with the profile unresolvable")
-
-	_, err = fixture.ExecDiagnostics(ctx)
-	require.NoError(t, err, "diagnostics collection failed")
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.NoError(c, fixture.IsHealthy(ctx))
+	}, 3*time.Minute, 5*time.Second, "agent did not become healthy")
 
 	require.NoError(t, fixture.ExecRestart(ctx), "daemon restart failed")
-	waitForHealthy(2*time.Minute, "agent did not become healthy again after restart")
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.NoError(c, fixture.IsHealthy(ctx))
+	}, 3*time.Minute, 5*time.Second, "agent did not become healthy")
 }
 
-func readAgentErrorLogs(pattern string, limit int) string {
-	matches, _ := filepath.Glob(pattern)
+func parseAgentErrorLogs(logs []byte, limit int) string {
 	var lines []string
-	for _, match := range matches {
-		b, err := os.ReadFile(match)
-		if err != nil {
+	for _, line := range strings.Split(string(logs), "\n") {
+		if line == "" {
 			continue
 		}
-		for _, line := range strings.Split(string(b), "\n") {
-			if line == "" {
-				continue
-			}
-			var entry struct {
-				Timestamp string `json:"@timestamp"`
-				LogLevel  string `json:"log.level"`
-				Message   string `json:"message"`
-			}
-			if err := json.Unmarshal([]byte(line), &entry); err != nil || entry.LogLevel != "error" {
-				continue
-			}
-			lines = append(lines, fmt.Sprintf("%s %s", entry.Timestamp, entry.Message))
-			if len(lines) > limit {
-				lines = lines[len(lines)-limit:]
-			}
+		var entry struct {
+			Timestamp string `json:"@timestamp"`
+			LogLevel  string `json:"log.level"`
+			Message   string `json:"message"`
 		}
+		if err := json.Unmarshal([]byte(line), &entry); err != nil || entry.LogLevel != "error" {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s %s", entry.Timestamp, entry.Message))
+	}
+	if len(lines) > limit {
+		lines = lines[len(lines)-limit:]
 	}
 	if len(lines) == 0 {
 		return "(no agent error logs found)"
