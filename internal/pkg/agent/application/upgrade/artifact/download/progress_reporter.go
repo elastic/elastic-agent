@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package http
+package download
 
 import (
 	"context"
@@ -11,10 +11,9 @@ import (
 )
 
 type downloadProgressReporter struct {
-	sourceURI   string
-	interval    time.Duration
-	warnTimeout time.Duration
-	length      float64
+	sourceURI string
+	interval  time.Duration
+	length    float64
 
 	downloaded atomic.Int64
 	started    time.Time
@@ -32,7 +31,6 @@ func newDownloadProgressReporter(sourceURI string, timeout time.Duration, length
 	return &downloadProgressReporter{
 		sourceURI:         sourceURI,
 		interval:          interval,
-		warnTimeout:       time.Duration(float64(timeout) * warningProgressIntervalPercentage),
 		length:            float64(length),
 		progressObservers: progressObservers,
 		done:              make(chan struct{}),
