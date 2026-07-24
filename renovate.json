@@ -74,7 +74,7 @@
         "^k8s\\.io/",
         "^sigs\\.k8s\\.io/",
         "^helm\\.sh/helm/",
-        "^github\\.com/elastic/cloud-on-k8s/",
+        "^github\\.com/elastic/cloud-on-k8s/"
       ],
       "groupName": "k8s-ecosystem"
     },
