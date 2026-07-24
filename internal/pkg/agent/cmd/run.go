@@ -55,6 +55,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
@@ -422,7 +423,19 @@ func runElasticAgent(
 	// create an availableRollbackSource
 	availableRollbacksSource := ttl.NewTTLMarkerRegistry(l, paths.Top())
 
-	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode,
+	collectorLogger, err := logger.NewNamedLogger(
+		otelmanager.CollectorLogFileName, cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig)
+	if err != nil {
+		l.Warnf("failed to create collector logger, falling back to base logger: %v", err)
+		collectorLogger = baseLogger
+	} else {
+		defer func() {
+			collectorLogger.Sync() //nolint:errcheck // flushing buffered logs is best effort
+			collectorLogger.Close()
+		}()
+	}
+
+	coord, configMgr, _, err := application.New(ctx, l, baseLogger, collectorLogger, logLvl, agentInfo, rex, tracer, testingMode,
 		fleetInitTimeout, isBootstrap, cfg, initialUpgradeMarker, availableRollbacksSource, modifiers...)
 	if err != nil {
 		return err
