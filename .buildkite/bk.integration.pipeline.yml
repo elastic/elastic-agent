@@ -2,7 +2,7 @@
 
 env:
   ASDF_MAGE_VERSION: 1.14.0
-  ASDF_KIND_VERSION: "0.27.0"
+  ASDF_KIND_VERSION: "0.32.0"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
   # The following images are defined here and their values will be updated by updatecli
@@ -109,21 +109,13 @@ common:
   # key to hold the list of k8s version to test against
   - k8s_test:
     versions: &k8s_test_versions
-      - &k8s_min_test_version v1.27.16
-      - v1.28.15
-      - v1.29.14
-      - v1.30.0
-      - v1.31.0
-      - v1.32.0
-      - v1.33.0
-      - &k8s_max_test_version v1.34.0
+      - &k8s_min_test_version v1.33.0
+      - v1.34.0
+      - v1.35.0
+      - &k8s_max_test_version v1.36.1 # kind doesn't have a v1.36.0 image
     versions_without_min_max: &k8s_test_versions_without_min_max
-      - v1.28.15
-      - v1.29.14
-      - v1.30.0
-      - v1.31.0
-      - v1.32.0
-      - v1.33.0
+      - v1.34.0
+      - v1.35.0
     variants: &k8s_test_variants
       - basic
       - complete
