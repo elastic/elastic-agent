@@ -40,6 +40,14 @@ const (
 	OtelFeatureGatesFlagName                  = "feature-gates"
 	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
 	OtelProfilingSupportFeature               = "service.profilesSupport"
+	// OtelReceiverPartialReloadFeatures enables partial reload of receivers on a
+	// config change: a receiver-only change restarts just the affected receivers
+	// instead of tearing down and rebuilding the whole collector service. This
+	// requires both the master partial-reload gate (service.partialReload, Alpha,
+	// off by default) and the receiver-phase gate (service.partialReloadReceivers,
+	// Beta). Both are listed explicitly so the intent holds regardless of the
+	// gates' default stages.
+	OtelReceiverPartialReloadFeatures = "service.partialReload,service.partialReloadReceivers"
 
 	// stdinGobProviderScheme must match agentprovider.StdinGobProviderSchemeName.
 	// Duplicated here to avoid a cross-module import from the main module into
@@ -50,17 +58,23 @@ const (
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
 // healthCheckExtensionID is the pre-constructed component ID string (e.g. "healthcheckv2/<uuid>").
 // A healthCheckPort of 0 will result in a random port being selected on each start.
-func newSubprocessExecution(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (*subprocessExecution, error) {
+func newSubprocessExecution(collectorPath string, healthCheckExtensionID string, healthCheckPort int, enablePartialReload bool) (*subprocessExecution, error) {
+	args := []string{
+		fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
+		fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
+		// Enable feature gate to report internal telemetry for the Elasticsearch exporter partitioned
+		// by the exporter instance (e.g. separating the monitoring exporter from general inputs),
+		// matching the behavior of other Collector telemetry metrics like queue state.
+		fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelElasticsearchExporterTelemetryFeature),
+	}
+	if enablePartialReload {
+		// Enable partial receiver reload so a receiver-only config change restarts
+		// only the affected receivers instead of the whole collector service.
+		args = append(args, fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelReceiverPartialReloadFeatures))
+	}
 	return &subprocessExecution{
-		collectorPath: collectorPath,
-		collectorArgs: []string{
-			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
-			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
-			// Enable feature gate to report internal telemetry for the Elasticsearch exporter partitioned
-			// by the exporter instance (e.g. separating the monitoring exporter from general inputs),
-			// matching the behavior of other Collector telemetry metrics like queue state.
-			fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelElasticsearchExporterTelemetryFeature),
-		},
+		collectorPath:            collectorPath,
+		collectorArgs:            args,
 		healthCheckExtensionID:   healthCheckExtensionID,
 		collectorHealthCheckPort: healthCheckPort,
 		reportErrFn:              reportErr,
@@ -80,9 +94,8 @@ type subprocessExecution struct {
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
 func (r *subprocessExecution) startCollector(
 	_ context.Context,
-	lvl logp.Level,
-	collectorLogger *logger.Logger,
-	logger *logger.Logger,
+	agentLogger, collectorLogger *logger.Logger,
+	collectorLevel logp.Level,
 	cfg *confmap.Conf,
 	processErrCh chan error,
 	statusCh chan *otelstatus.AggregateStatus,
@@ -115,15 +128,14 @@ func (r *subprocessExecution) startCollector(
 	}
 
 	stdOutLast := newZapLast(collectorLogger.Core())
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
-	// info level for stdErr because by default collector writes to stderr
+	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(collectorLevel))
 	stdErrLast := newZapLast(collectorLogger.Core())
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
+	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(collectorLevel))
 
 	env := os.Environ()
 
 	// set collector args and add --config flag with the stdingob:stdin URI
-	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, collectorLevel))
 	if hasProfilesPipeline(cfg) {
 		collectorArgs = append(collectorArgs, fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelProfilingSupportFeature))
 	}
@@ -149,9 +161,9 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
 
-	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
+	agentLogger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
 
-	ctl := newProcHandle(processInfo, logger, lvl, r.healthCheckExtensionID, httpHealthCheckPort,
+	ctl := newProcHandle(processInfo, agentLogger, collectorLevel, r.healthCheckExtensionID, httpHealthCheckPort,
 		forceFetchStatusCh,
 		func(ctx context.Context, st *otelstatus.AggregateStatus) {
 			reportCollectorStatus(ctx, statusCh, cloneCollectorStatus(st))

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"time"
 
 	"go.elastic.co/apm/v2"
@@ -30,6 +31,7 @@ import (
 	stateStore "github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/include"
 	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -54,6 +56,7 @@ func New(
 	ctx context.Context,
 	log *logger.Logger,
 	baseLogger *logger.Logger,
+	collectorLogger *logger.Logger,
 	logLevel logp.Level,
 	agentInfo info.Agent,
 	reexec coordinator.ReExecManager,
@@ -113,7 +116,7 @@ func New(
 	}
 	monitor := componentmonitoring.New(
 		isMonitoringSupported,
-		cfg.Settings.DownloadConfig.OS(),
+		goruntime.GOOS,
 		cfg.Settings.MonitoringConfig,
 		agentInfo,
 		log,
@@ -246,6 +249,8 @@ func New(
 		}
 	}
 
+	// Ensure all composable providers are registered before constructing the controller.
+	include.Providers()
 	varsManager, err := composable.New(log, cfg.GetUCfg(), composableManaged)
 	if err != nil {
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
@@ -254,11 +259,12 @@ func New(
 	otelManager, err := otelmanager.NewOTelManager(
 		log.Named("otel_manager"),
 		logLevel,
-		baseLogger,
+		collectorLogger,
 		agentInfo,
 		cfg.Settings.Collector,
 		otelmanager.CollectorStopTimeout,
 		nil,
+		cfg.Settings.Internal.Runtime.OtelPartialConfigReload,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)

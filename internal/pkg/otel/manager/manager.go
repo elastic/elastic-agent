@@ -33,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -44,6 +45,9 @@ const (
 	// CollectorStopTimeout is the duration to wait for the collector to stop. Note: this needs to be shorter
 	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
 	CollectorStopTimeout = 3 * time.Second
+
+	// CollectorLogFileName is the base name of the collector subprocess's own log file.
+	CollectorLogFileName = "elastic-otel-collector"
 
 	// elasticMonitoringReceiverName is the component type name for the elastic monitoring receiver.
 	elasticMonitoringReceiverName = "elasticmonitoringreceiver"
@@ -132,20 +136,21 @@ type OTelManager struct {
 	// stopTimeout is the timeout to wait for the collector to stop.
 	stopTimeout time.Duration
 
-	// log level of the collector
+	// collectorLogLevel is the log level the collector subprocess runs at.
 	collectorLogLevel logp.Level
 }
 
 // NewOTelManager returns a OTelManager.
 // If execFactory is nil, the default subprocess execution is used.
 func NewOTelManager(
-	logger *logger.Logger,
+	managerLogger *logger.Logger,
 	collectorLogLevel logp.Level,
 	collectorLogger *logger.Logger,
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
 	stopTimeout time.Duration,
 	execFactory ExecutionFactory,
+	enablePartialReload bool,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
@@ -185,7 +190,7 @@ func NewOTelManager(
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
 	if execFactory == nil {
 		execFactory = func(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (collectorExecution, error) {
-			return newSubprocessExecution(collectorPath, healthCheckExtensionID, healthCheckPort)
+			return newSubprocessExecution(collectorPath, healthCheckExtensionID, healthCheckPort, enablePartialReload)
 		}
 	}
 	exec, err = execFactory(executable, healthCheckExtComponentID, collectorHealthCheckPort)
@@ -194,7 +199,7 @@ func NewOTelManager(
 	}
 
 	return &OTelManager{
-		managerLogger:             logger,
+		managerLogger:             managerLogger,
 		collectorLogger:           collectorLogger,
 		agentInfo:                 agentInfo,
 		healthCheckExtComponentID: healthCheckExtComponentID,
@@ -371,6 +376,14 @@ func (m *OTelManager) Errors() <-chan error {
 	return m.errCh
 }
 
+// PerformAction routes a Fleet action to the receiver instance backing
+// com. The action is delivered  through the elasticdiagnostics extension
+// over its Unix socket (seeotel.PerformActionExt); the receiver's
+// registered action handler runs the action and this returns its result.
+func (m *OTelManager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	return otel.PerformActionExt(ctx, comp.ID, name, params)
+}
+
 // collectorRunning checks if the otel collector is running.
 func (m *OTelManager) collectorRunning() bool {
 	return m.proc != nil && !m.proc.Stopped()
@@ -398,8 +411,8 @@ func (m *OTelManager) startCollector(ctx context.Context,
 	if m.collectorRunning() {
 		return errors.New("tried to start otel collector, but it's already running")
 	}
-	proc, err := m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
-		m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+	proc, err := m.execution.startCollector(ctx, m.managerLogger, m.collectorLogger, m.collectorLogLevel,
+		m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 	if err != nil {
 		// failed to create the collector (this is different then
 		// it's failing to run). we do not retry creation on failure
@@ -487,8 +500,9 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
 
-	// if the otel log level is unset, use the agent log level
-	if err := maybeInjectLogLevel(mergedOtelCfg, cfgUpdate.agentLogLevel); err != nil {
+	// if the otel log level is unset, use the most verbose level across agent and all units
+	minLogLevel := component.MinLogLevel(cfgUpdate.agentLogLevel, cfgUpdate.components)
+	if err := maybeInjectLogLevel(mergedOtelCfg, minLogLevel); err != nil {
 		return nil, err
 	}
 

@@ -55,7 +55,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
-	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/backoff"
@@ -72,6 +72,13 @@ import (
 var testSecretMarkerFunc = func(*logger.Logger, *config.Config) error {
 	// no-op secret marker function for testing
 	return nil
+}
+
+func TestMain(m *testing.M) {
+	// Register the local_dynamic provider so composable.IsDynamic can find it.
+	// In the actual application this is done by internal/pkg/composable/include.
+	composable.Providers.MustAddDynamicProvider("local_dynamic", localdynamic.DynamicProviderBuilder)
+	os.Exit(m.Run())
 }
 
 func TestVarsManagerError(t *testing.T) {
@@ -2724,18 +2731,15 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 		assert.Equal(t, pkgcomponent.RuntimeManager(runtimeCfg.DynamicInputs), comp.RuntimeManager)
 	})
 
-	t.Run("default configuration switches dynamic otel components to process runtime", func(t *testing.T) {
+	t.Run("default configuration leaves dynamic otel components on otel runtime", func(t *testing.T) {
 		runtimeCfg := pkgcomponent.DefaultRuntimeConfig()
 		comp := otelSupportedComponent(true)
 		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
-		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager)
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager)
 	})
 }
 
 func TestGetDynamicInputs(t *testing.T) {
-	// Import the kubernetes provider to register "kubernetes" as a dynamic provider
-	// This is done via import side effects in the actual application
-	_ = composable.Providers
 
 	t.Run("returns empty map when inputToDynamicProvider is nil", func(t *testing.T) {
 		result := getDynamicInputs(nil)

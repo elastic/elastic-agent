@@ -38,15 +38,16 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default       string            `yaml:"default" config:"default" json:"default"`
-	Auditbeat     BeatRuntimeConfig `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
-	Filebeat      BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Heartbeat     BeatRuntimeConfig `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
-	Metricbeat    BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
-	Osquerybeat   BeatRuntimeConfig `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
-	Packetbeat    BeatRuntimeConfig `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
-	DynamicInputs string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
-	Output        map[string]string `yaml:"output" config:"output" json:"output"`
+	Default                 string            `yaml:"default" config:"default" json:"default"`
+	Auditbeat               BeatRuntimeConfig `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
+	Filebeat                BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Heartbeat               BeatRuntimeConfig `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
+	Metricbeat              BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	Osquerybeat             BeatRuntimeConfig `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
+	Packetbeat              BeatRuntimeConfig `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
+	DynamicInputs           string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	Output                  map[string]string `yaml:"output" config:"output" json:"output"`
+	OtelPartialConfigReload bool              `yaml:"otel_partial_config_reload" config:"otel_partial_config_reload" json:"otel_partial_config_reload"`
 }
 
 type BeatRuntimeConfig struct {
@@ -56,8 +57,9 @@ type BeatRuntimeConfig struct {
 
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
-		Default:       string(DefaultRuntimeManager),
-		DynamicInputs: string(ProcessRuntimeManager),
+		Default:                 string(DefaultRuntimeManager),
+		DynamicInputs:           "",
+		OtelPartialConfigReload: true,
 		Auditbeat: BeatRuntimeConfig{
 			Default: string(OtelRuntimeManager),
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier
@@ -78,6 +80,7 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 			InputType: map[string]string{},
 		},
 		Osquerybeat: BeatRuntimeConfig{
+			Default: string(OtelRuntimeManager),
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier
 			InputType: make(map[string]string),
 		},
@@ -1170,6 +1173,33 @@ func getLogLevel(val map[string]interface{}, ll logp.Level) (client.UnitLogLevel
 		delete(val, logLevelKey)
 	}
 	return logLevel, nil
+}
+
+// MinLogLevel returns the most verbose log level across agentLevel and all units in comps.
+func MinLogLevel(agentLevel logp.Level, comps []Component) logp.Level {
+	min := agentLevel
+	for _, comp := range comps {
+		for _, unit := range comp.Units {
+			if ll := unitToLogpLevel(unit.LogLevel); ll < min {
+				min = ll
+			}
+		}
+	}
+	return min
+}
+
+func unitToLogpLevel(l client.UnitLogLevel) logp.Level {
+	switch l {
+	case client.UnitLogLevelError:
+		return logp.ErrorLevel
+	case client.UnitLogLevelWarn:
+		return logp.WarnLevel
+	case client.UnitLogLevelInfo:
+		return logp.InfoLevel
+	case client.UnitLogLevelDebug, client.UnitLogLevelTrace:
+		return logp.DebugLevel
+	}
+	return logp.InfoLevel
 }
 
 func stringToLogLevel(val string) (client.UnitLogLevel, error) {

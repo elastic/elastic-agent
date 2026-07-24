@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -43,7 +44,32 @@ const (
 	outputOtelOverrideExporterFieldName   = "exporter"
 	outputOtelOverrideExtensionsFieldName = "extensions"
 	elasticsearchStateStoreExtensionName  = "elasticsearch_storage"
+	// singleReceiverStreamID is the placeholder stream ID used in receiver names for
+	// components with single_receiver: true, so that all receiver names uniformly have
+	// the form "<comp.ID>/<streamID>" regardless of how many receivers a component has.
+	singleReceiverStreamID = "single"
 )
+
+// ComponentIDFromReceiverName extracts the elastic-agent component ID from an
+// OTel receiver/component name of the form
+// "<receiverType>/OtelNamePrefix<comp.ID>/<streamID>". All "/" characters are
+// literal string delimiters, not filesystem path separators, so this is
+// consistent across platforms including Windows. It returns false if name
+// does not contain OtelNamePrefix.
+//
+// comp.ID is extracted as the segment between OtelNamePrefix and the next
+// "/". This is exact and unambiguous for normal IDs. Both comp.ID and
+// streamID are user-supplied (from the policy input "id" field), so either
+// could contain "/" — making the result ambiguous in that case. Callers
+// should treat such IDs as a known limitation.
+func ComponentIDFromReceiverName(name string) (string, bool) {
+	parts := strings.SplitN(name, OtelNamePrefix, 2)
+	if len(parts) != 2 {
+		return "", false
+	}
+	compID, _, _ := strings.Cut(parts[1], "/")
+	return compID, true
+}
 
 type (
 	// exporter translation logic takes output config, output name, logger
@@ -75,12 +101,8 @@ func GetOtelConfig(
 	otelConfig := confmap.New()     // base config, nothing here for now
 	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
-	// Evaluate the FQDN feature flag once, so every component in this render sees a consistent
-	// value even if the global flag changes (via a concurrent policy update) while we iterate.
-	fqdnEnabled := features.FQDN()
-
 	for _, comp := range components {
-		componentConfig, compErr := getCollectorConfigForComponent(comp, info, fqdnEnabled, logger)
+		componentConfig, compErr := getCollectorConfigForComponent(comp, info, logger)
 		if compErr != nil {
 			return nil, compErr
 		}
@@ -159,7 +181,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 
 	// check if the actual configuration is supported. We need to actually generate the config and look for
 	// the right kind of error
-	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, features.FQDN(), logp.NewNopLogger())
+	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, logp.NewNopLogger())
 	if errors.Is(compErr, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
 	}
@@ -257,7 +279,6 @@ func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
 func getCollectorConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
-	fqdnEnabled bool,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	exporterType, err := OutputTypeToExporterType(comp.OutputType)
@@ -269,7 +290,7 @@ func getCollectorConfigForComponent(
 	if err != nil {
 		return nil, err
 	}
-	receiversConfig, err := getReceiversConfigForComponent(comp, info, fqdnEnabled, outputQueueConfig)
+	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -367,11 +388,11 @@ func getCollectorConfigForComponent(
 
 // getReceiversConfigForComponent returns the receivers configuration for a component.
 // By default each input stream produces its own receiver. When the component's InputSpec has
-// SingleReceiver set, all streams are merged into one receiver keyed by component ID alone.
+// SingleReceiver set, all streams are merged into one receiver keyed by the component ID with
+// the placeholder singleReceiverStreamID as the stream suffix.
 func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
-	fqdnEnabled bool,
 	outputQueueConfig map[string]any,
 ) (map[string]any, error) {
 	receiverType, err := getReceiverTypeForComponent(comp)
@@ -446,22 +467,20 @@ func getReceiversConfigForComponent(
 	// indicate that beat receivers are managed by the elastic-agent
 	sharedConfig["management.otel.enabled"] = true
 
-	// propagate the FQDN feature flag into the receiver config
-	sharedConfig["features"] = map[string]any{
-		"fqdn": map[string]any{
-			"enabled": fqdnEnabled,
-		},
+	if receiverFeatures := beatReceiverFeatures(comp); len(receiverFeatures) > 0 {
+		sharedConfig["features"] = receiverFeatures
 	}
 
-	// When SingleReceiver is set, merge all stream inputs into one receiver keyed by
-	// component ID instead of creating one receiver per stream. Some components have
-	// shared state that cannot easily be split across receivers.
+	// When SingleReceiver is set, merge all stream inputs into one receiver instead of
+	// creating one receiver per stream. Some components have shared state that cannot
+	// easily be split across receivers. The receiver still gets a placeholder stream ID
+	// suffix so that all receiver names uniformly contain a stream segment.
 	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
 		allInputConfigs := make([]map[string]any, 0, len(inputs))
 		for _, ri := range inputs {
 			allInputConfigs = append(allInputConfigs, ri.config)
 		}
-		receiverID := GetReceiverID(receiverType, comp.ID)
+		receiverID := GetReceiverID(receiverType, comp.ID+"/"+singleReceiverStreamID)
 		receiverConfig := maps.Clone(sharedConfig)
 		receiverConfig[beatName] = map[string]any{
 			beatInputsKey(beatName): allInputConfigs,
@@ -490,6 +509,21 @@ func getReceiversConfigForComponent(
 	return receiversConfig, nil
 }
 
+// beatReceiverFeatures unwraps agent.features from the component's feature
+// source into the top-level features block expected by Beats.
+func beatReceiverFeatures(comp *component.Component) map[string]any {
+	if comp.Features == nil || comp.Features.Source == nil {
+		return nil
+	}
+
+	agentConfig, ok := comp.Features.Source.AsMap()["agent"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	receiverFeatures, _ := agentConfig["features"].(map[string]any)
+	return receiverFeatures
+}
+
 // beatInputsKey returns the config key used to pass inputs/modules/monitors/protocols
 // to each beat type inside its receiver config. Each beat nests its stream configuration
 // under a beat-specific key (e.g. filebeat.inputs, metricbeat.modules, heartbeat.monitors).
@@ -511,18 +545,68 @@ func beatInputsKey(beatName string) string {
 // These mirror the fleetDefaultProcessors that each beat sets for process mode.
 // Heartbeat sets fleetDefaultProcessors=nil, so it gets no default processors.
 func GetDefaultProcessors(beatName string) []map[string]any {
-	if beatName == "heartbeat" {
+	switch beatName {
+	case "heartbeat":
 		return nil
-	}
-	return []map[string]any{
-		{
-			"add_host_metadata": map[string]any{
-				"when.not.contains.tags": "forwarded",
+	case "metricbeat": // From https://github.com/elastic/beats/blob/1d17cc1b860da252d3cf6f29033609f1ec86dfdc/x-pack/metricbeat/cmd/root.go#L60
+		return []map[string]any{
+			{"add_host_metadata": nil},
+			{"add_cloud_metadata": nil},
+			{"add_docker_metadata": nil},
+			{"add_kubernetes_metadata": nil},
+		}
+	case "auditbeat": // From https://github.com/elastic/beats/blob/1d17cc1b860da252d3cf6f29033609f1ec86dfdc/x-pack/auditbeat/cmd/root.go#L76
+		return []map[string]any{
+			{"add_host_metadata": nil},
+			{"add_cloud_metadata": nil},
+			{"add_docker_metadata": nil},
+		}
+	case "osquerybeat": // From https://github.com/elastic/beats/blob/1d17cc1b860da252d3cf6f29033609f1ec86dfdc/x-pack/osquerybeat/cmd/root.go#L211
+		return []map[string]any{
+			{"add_host_metadata": nil},
+			{"add_cloud_metadata": nil},
+		}
+	case "packetbeat": // From https://github.com/elastic/beats/blob/1d17cc1b860da252d3cf6f29033609f1ec86dfdc/x-pack/packetbeat/cmd/root.go#L74
+		// Equivalent to the if/then/else in process mode but expressed using
+		// when conditions so the beatprocessor can handle each step independently.
+		return []map[string]any{
+			{
+				"drop_fields": map[string]any{
+					"when.contains.tags": "forwarded",
+					"fields":             []string{"host"},
+				},
 			},
-		},
-		{"add_cloud_metadata": nil},
-		{"add_docker_metadata": nil},
-		{"add_kubernetes_metadata": nil},
+			{
+				"add_host_metadata": map[string]any{
+					"when.not.contains.tags": "forwarded",
+				},
+			},
+			{"add_cloud_metadata": nil},
+			{"add_docker_metadata": nil},
+			{
+				"detect_mime_type": map[string]any{
+					"field":  "http.request.body.content",
+					"target": "http.request.mime_type",
+				},
+			},
+			{
+				"detect_mime_type": map[string]any{
+					"field":  "http.response.body.content",
+					"target": "http.response.mime_type",
+				},
+			},
+		}
+	default: // filebeat and all other beats including internal monitoring ("") from https://github.com/elastic/beats/blob/1d17cc1b860da252d3cf6f29033609f1ec86dfdc/x-pack/filebeat/cmd/root.go#L46
+		return []map[string]any{
+			{
+				"add_host_metadata": map[string]any{
+					"when.not.contains.tags": "forwarded",
+				},
+			},
+			{"add_cloud_metadata": nil},
+			{"add_docker_metadata": nil},
+			{"add_kubernetes_metadata": nil},
+		}
 	}
 }
 
@@ -751,6 +835,13 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 			}
 		}
 
+		// Strip per-input copies of default processors already run by the beatprocessor.
+		if features.DefaultProcessors() {
+			if _, ok := input["processors"]; ok {
+				input["processors"] = stripDefaultProcessors(comp.BeatName(), input["processors"])
+			}
+		}
+
 		var protoStreamID string
 		if i < len(streams) {
 			protoStreamID = streams[i].GetId()
@@ -766,6 +857,41 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 	return result, nil
 }
 
+// stripDefaultProcessors removes per-input processor entries that exactly match
+// (same name and config) a default processor handled by the beatprocessor, so
+// they don't run twice. Entries with a matching name but different config are
+// kept so user customisations are not silently discarded.
+func stripDefaultProcessors(beatName string, raw any) []any {
+	list, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	defaults := GetDefaultProcessors(beatName)
+	if len(defaults) == 0 {
+		return list
+	}
+	defaultsByName := make(map[string]any, len(defaults))
+	for _, p := range defaults {
+		for k, v := range p {
+			defaultsByName[k] = v
+		}
+	}
+	filtered := make([]any, 0, len(list))
+	for _, item := range list {
+		p, ok := item.(map[string]any)
+		if !ok || len(p) != 1 {
+			filtered = append(filtered, item)
+			continue
+		}
+		key := maps.Keys(p)[0]
+		if defaultVal, isDefault := defaultsByName[key]; isDefault && reflect.DeepEqual(p[key], defaultVal) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
+}
+
 // injectOsqueryConfig replicates what osquerybeatCfgFromStreams does in process
 // mode: it attaches the input-level "osquery" field (schedule, packs, decorators,
 // etc.) to the osquery_manager.result stream and moves that stream to position 0
@@ -773,10 +899,12 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 // beat startup.
 func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiverInput {
 	// Mirror the implementation from https://github.com/elastic/beats/blob/7764586737b76758db262a06fb3c594c52185c48/x-pack/osquerybeat/cmd/root.go#L92
-	osqMap, ok := unit.Config.GetSource().AsMap()["osquery"].(map[string]any)
-	if !ok {
-		return result
-	}
+	//
+	// The osquery object may be nil when the integration has no scheduled queries (live-query-only policy).
+	// In that case we still need to reorder streams so that osquery_manager.result is at
+	// inputs[0] — osquerybeat wires its client to inputs[0] and live-query result rows must
+	// land in the result stream, not action.responses.
+	osqMap, _ := unit.Config.GetSource().AsMap()["osquery"].(map[string]any)
 	for i, ri := range result {
 		// "osquery_manager.result" is the dataset of the stream that carries osquery
 		// scheduled query results and must receive the input-level osquery configuration.
@@ -788,12 +916,14 @@ func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiver
 		if dataset != "osquery_manager.result" {
 			continue
 		}
-		if _, exists := result[i].config["osquery"]; !exists {
-			// Clone before mutating so we don't modify the map returned by CreateInputsFromStreamsForReceiver.
-			result[i].config = maps.Clone(result[i].config)
-			result[i].config["osquery"] = osqMap
+		if osqMap != nil {
+			if _, exists := result[i].config["osquery"]; !exists {
+				// Clone before mutating so we don't modify the map returned by CreateInputsFromStreamsForReceiver.
+				result[i].config = maps.Clone(result[i].config)
+				result[i].config["osquery"] = osqMap
+			}
 		}
-		// Place the result stream first so inputs[0].Osquery is set.
+		// Place the result stream first as osquerybeat requires the result data stream to be first.
 		result[0], result[i] = result[i], result[0]
 		break
 	}

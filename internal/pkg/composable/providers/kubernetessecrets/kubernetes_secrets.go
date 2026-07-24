@@ -13,9 +13,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
 
-	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/beats/v7/pkg/autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -27,10 +26,6 @@ var (
 )
 
 const k8sSecretsProviderName = "kubernetes_secrets" //nolint:gosec // G101: False positive on Potential hardcoded credentials
-
-func init() {
-	composable.Providers.MustAddContextProvider(k8sSecretsProviderName, ContextProviderBuilder)
-}
 
 type store interface {
 	// AddConditionally adds the given secret to the store if the given condition returns true. If there is no existing

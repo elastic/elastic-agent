@@ -264,10 +264,8 @@ spec:
         # required by "build_pull_requests: true" when used with buildkite-pr-bot
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
-      cancel_intermediate_builds: true
-      cancel_intermediate_builds_branch_filter: "!main !7.* !8.* !9.*"
-      skip_intermediate_builds: true
-      skip_intermediate_builds_branch_filter: "!main !7.* !8.* !9.*"
+      cancel_intermediate_builds: false
+      skip_intermediate_builds: false
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ

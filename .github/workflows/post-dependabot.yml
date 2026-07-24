@@ -23,7 +23,7 @@ jobs:
         with:
           submodules: true
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: .go-version
 
@@ -56,6 +56,24 @@ jobs:
         run: |
           git add internal/edot/go.mod internal/edot/go.sum
           git commit -m "Update EDOT go.mod"
+
+      - name: Update archive-proxy go.mod if necessary
+        run: cd wrapper/windows/archive-proxy && go mod tidy
+
+      - name: check for modified archive-proxy go.mod
+        id: archive-proxy-check
+        run: |
+          if git diff --quiet HEAD -- wrapper/windows/archive-proxy/go.mod; then
+            echo "modified=false" >> $GITHUB_OUTPUT
+          else
+            echo "modified=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: commit archive-proxy changed files
+        if: steps.archive-proxy-check.outputs.modified == 'true'
+        run: |
+          git add wrapper/windows/archive-proxy/go.mod wrapper/windows/archive-proxy/go.sum
+          git commit -m "Update archive-proxy go.mod"
 
       - name: update NOTICE.txt and NOTICE-fips.txt
         run: make notice
@@ -92,6 +110,27 @@ jobs:
         run: |
           git add internal/edot/README.md
           git commit -m "Update otel README.md"
+
+      - name: regenerate mocks
+        run: go tool mockery
+
+      - name: format regenerated mocks
+        run: mage fmt
+
+      - name: check for modified mocks
+        id: mocks-check
+        run: |
+          if git diff --quiet HEAD -- '*/mocks.go'; then
+            echo "modified=false" >> $GITHUB_OUTPUT
+          else
+            echo "modified=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: commit regenerated mocks
+        if: steps.mocks-check.outputs.modified == 'true'
+        run: |
+          git add '*/mocks.go'
+          git commit -m "Regenerate mocks"
 
       - name: Push added commits
         run: git push
