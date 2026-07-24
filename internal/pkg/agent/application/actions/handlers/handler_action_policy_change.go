@@ -37,6 +37,7 @@ type PolicyChangeHandler struct {
 	log                   *logger.Logger
 	agentInfo             info.Agent
 	config                *configuration.Configuration
+	baseSettings          *configuration.SettingsConfig
 	store                 storage.Store
 	stateStore            stateStore
 	ch                    chan coordinator.ConfigChange
@@ -54,6 +55,7 @@ func NewPolicyChangeHandler(
 	log *logger.Logger,
 	agentInfo info.Agent,
 	config *configuration.Configuration,
+	baseSettings *configuration.SettingsConfig,
 	store storage.Store,
 	stateStore stateStore,
 	ch chan coordinator.ConfigChange,
@@ -64,6 +66,7 @@ func NewPolicyChangeHandler(
 		log:                   log,
 		agentInfo:             agentInfo,
 		config:                config,
+		baseSettings:          baseSettings,
 		store:                 store,
 		stateStore:            stateStore,
 		ch:                    ch,
@@ -257,7 +260,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	}
 
 	// Step 2: Parse the incoming policy configuration.
-	cfg, err := configuration.NewFromConfig(c)
+	cfg, err := h.parsePolicyConfiguration(c)
 	if err != nil {
 		return fmt.Errorf("failed to parse policy configuration: %w", err)
 	}
@@ -296,7 +299,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	// The caches are updated here, not earlier, because they are the baseline we
 	// compare the next policy against. If we updated them before a failure, the
 	// resent policy would look unchanged and we would skip re-applying it.
-	hasEventLoggingChanged := h.applyEventLoggingOutputChange(partialCfg)
+	hasEventLoggingChanged := h.applyEventLoggingOutputChange(cfg, partialCfg)
 	hasLoggingChanged := h.applyLoggingConfigChange(cfg, loggingConfig)
 
 	if validatedFleetConfig != nil {
@@ -325,7 +328,33 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	return nil
 }
 
-func (h *PolicyChangeHandler) applyEventLoggingOutputChange(new *configuration.Configuration) bool {
+func (h *PolicyChangeHandler) parsePolicyConfiguration(c *config.Config) (*configuration.Configuration, error) {
+	if h.baseSettings == nil {
+		return configuration.NewFromConfig(c)
+	}
+
+	cfg := configuration.DefaultConfiguration()
+	if h.baseSettings.LoggingConfig != nil {
+		loggingConfig := *h.baseSettings.LoggingConfig
+		cfg.Settings.LoggingConfig = &loggingConfig
+	}
+	if h.baseSettings.EventLoggingConfig != nil {
+		eventLoggingConfig := *h.baseSettings.EventLoggingConfig
+		cfg.Settings.EventLoggingConfig = &eventLoggingConfig
+	}
+
+	if err := c.UnpackTo(cfg); err != nil {
+		return nil, errors.New(err, errors.TypeConfig)
+	}
+	cfg.UCfg = c
+
+	return cfg, nil
+}
+
+func (h *PolicyChangeHandler) applyEventLoggingOutputChange(new, partial *configuration.Configuration) bool {
+	if h.baseSettings == nil && (partial == nil || partial.Settings == nil || partial.Settings.EventLoggingConfig == nil) {
+		return false
+	}
 	if new == nil || new.Settings == nil || new.Settings.EventLoggingConfig == nil {
 		return false
 	}
@@ -363,7 +392,7 @@ func (h *PolicyChangeHandler) applyMonitoringConfigChange(partialCfg *configurat
 }
 
 func (h *PolicyChangeHandler) applyLoggingConfigChange(new *configuration.Configuration, loggingConfig *logger.Config) bool {
-	if loggingConfig == nil {
+	if h.baseSettings == nil && loggingConfig == nil {
 		return false
 	}
 	current := h.config.Settings.LoggingConfig

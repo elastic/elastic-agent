@@ -62,7 +62,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, newStateStoreMock(), ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nil, nullStore, newStateStoreMock(), ch, defaultLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -87,7 +87,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, newStateStoreMock(), ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nil, nullStore, newStateStoreMock(), ch, defaultLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestPolicyAcked(t *testing.T) {
 		mockSaver := newStateStoreMock()
 		// Test default FF value
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nil, nullStore, mockSaver, ch, defaultLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, tacker)
 		require.NoError(t, err)
@@ -151,7 +151,7 @@ func TestPolicyAcked(t *testing.T) {
 		mockSaver := newStateStoreMock()
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nil, nullStore, mockSaver, ch, defaultLogLevelSet(t))
 		handler.disableAckFn = func() bool { return false }
 
 		err := handler.Handle(context.Background(), action, tacker)
@@ -181,7 +181,7 @@ func TestPolicyAcked(t *testing.T) {
 		mockSaver := newStateStoreMock()
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nil, nullStore, mockSaver, ch, defaultLogLevelSet(t))
 		handler.disableAckFn = func() bool { return true }
 
 		err := handler.Handle(context.Background(), action, tacker)
@@ -1307,6 +1307,244 @@ func (c *captureStore) Save(r io.Reader) error {
 	}
 	c.saved = b
 	return nil
+}
+
+func TestPolicyChangeHandler_handlePolicyChange_LoggingOutputChanges(t *testing.T) {
+	tests := []struct {
+		name string
+		// startup is the value used when Fleet does not set the field.
+		startup map[string]interface{}
+		// current is the value the agent is using before the policy change.
+		current map[string]interface{}
+		// policy is the value sent by Fleet.
+		policy map[string]interface{}
+		// want is the value expected after applying the policy.
+		want map[string]interface{}
+		// wantReExec says whether the change requires an agent restart.
+		wantReExec bool
+		// replay runs the same policy again using the persisted configuration.
+		replay bool
+	}{
+		{
+			name: "level-only policy preserves startup to_files",
+			startup: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			policy: map[string]interface{}{
+				"agent.logging.level": "debug",
+			},
+			want: map[string]interface{}{
+				"agent.logging.level": "debug",
+			},
+			wantReExec: false,
+		},
+		{
+			name: "changing agent to_files triggers re-exec",
+			startup: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			policy: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			want: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			wantReExec: true,
+		},
+		{
+			name: "explicit agent to_files=false triggers re-exec",
+			startup: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			policy: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			want: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			wantReExec: true,
+		},
+		{
+			name: "changing agent files.path triggers re-exec",
+			startup: map[string]interface{}{
+				"agent.logging.files.path": "/baseline",
+			},
+			current: map[string]interface{}{
+				"agent.logging.files.path": "/baseline",
+			},
+			policy: map[string]interface{}{
+				"agent.logging.files.path": "/fleet",
+			},
+			want: map[string]interface{}{
+				"agent.logging.files.path": "/fleet",
+			},
+			wantReExec: true,
+		},
+		{
+			name: "replaying agent to_files policy does not re-exec",
+			startup: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			policy: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			want: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			wantReExec: false,
+			replay:     true,
+		},
+		{
+			name: "removing agent to_files restores startup value",
+			startup: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			policy: map[string]interface{}{}, // empty policy
+			want: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			wantReExec: true,
+		},
+		{
+			name: "changing event_data.to_files triggers re-exec",
+			startup: map[string]interface{}{
+				"agent.logging.event_data.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.event_data.to_files": false,
+			},
+			policy: map[string]interface{}{
+				"agent.logging.event_data.to_files": true,
+			},
+			want: map[string]interface{}{
+				"agent.logging.event_data.to_files": true,
+			},
+			wantReExec: true,
+		},
+		{
+			name: "replaying event_data.to_files policy does not re-exec",
+			startup: map[string]interface{}{
+				"agent.logging.event_data.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.event_data.to_files": true,
+			},
+			policy: map[string]interface{}{
+				"agent.logging.event_data.to_files": true,
+			},
+			want: map[string]interface{}{
+				"agent.logging.event_data.to_files": true,
+			},
+			wantReExec: false,
+			replay:     true,
+		},
+		{
+			name: "removing event_data.to_files restores startup value",
+			startup: map[string]interface{}{
+				"agent.logging.event_data.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.event_data.to_files": true,
+			},
+			policy: map[string]interface{}{},
+			want: map[string]interface{}{
+				"agent.logging.event_data.to_files": false,
+			},
+			wantReExec: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			log, _ := loggertest.New(t.Name())
+			baseConfig, err := configuration.NewFromConfig(config.MustNewConfigFrom(test.startup))
+			require.NoError(t, err)
+			baseSettings := baseConfig.Settings
+
+			currentConfig, err := configuration.NewFromConfig(config.MustNewConfigFrom(test.current))
+			require.NoError(t, err)
+
+			wantLevel := logp.InfoLevel
+			if level, ok := test.policy["agent.logging.level"].(string); ok {
+				require.NoError(t, wantLevel.Unpack(level))
+			}
+
+			runPolicyChange := func(currentConfig *configuration.Configuration, wantReExec bool) *configuration.Configuration {
+				t.Helper()
+
+				logLevelSetter := newMockLogLevelSetter(t)
+				logLevelSetter.EXPECT().SetLogLevel(mock.Anything, &wantLevel).Return(nil).Once()
+				if wantReExec {
+					logLevelSetter.EXPECT().ReExec(mock.Anything).Return().Once()
+				}
+
+				store := &captureStore{}
+				h := &PolicyChangeHandler{
+					log:                   log,
+					agentInfo:             &info.AgentInfo{},
+					config:                currentConfig,
+					baseSettings:          baseSettings,
+					store:                 store,
+					runtimeLogLevelSetter: logLevelSetter,
+				}
+
+				err := h.handlePolicyChange(t.Context(), config.MustNewConfigFrom(test.policy), nil)
+				require.NoError(t, err)
+				if wantReExec {
+					logLevelSetter.AssertNumberOfCalls(t, "ReExec", 1)
+				} else {
+					logLevelSetter.AssertNotCalled(t, "ReExec", mock.Anything)
+				}
+				assertLoggingOutputsEqual(t, h.config, test.want)
+
+				persistedRaw, err := config.NewConfigFrom(store.saved)
+				require.NoError(t, err)
+				persisted, err := configuration.NewFromConfig(persistedRaw)
+				require.NoError(t, err)
+				assertLoggingOutputsEqual(t, persisted, test.want)
+				return persisted
+			}
+
+			runs := 1
+			if test.replay {
+				runs = 2
+			}
+			for run := 0; run < runs; run++ {
+				wantReExec := test.wantReExec && run == 0
+				currentConfig = runPolicyChange(currentConfig, wantReExec)
+			}
+		})
+	}
+}
+
+func assertLoggingOutputsEqual(t *testing.T, cfg *configuration.Configuration, want map[string]interface{}) {
+	t.Helper()
+	got := map[string]interface{}{
+		"agent.logging.level":                cfg.Settings.LoggingConfig.Level.String(),
+		"agent.logging.to_files":             cfg.Settings.LoggingConfig.ToFiles,
+		"agent.logging.to_stderr":            cfg.Settings.LoggingConfig.ToStderr,
+		"agent.logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
+		"agent.logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
+		"agent.logging.files.path":           cfg.Settings.LoggingConfig.Files.Path,
+	}
+	for field, expected := range want {
+		assert.Equal(t, expected, got[field], field)
+	}
 }
 
 func TestFleetToReaderPersistsLoggingOutputFlags(t *testing.T) {

@@ -272,6 +272,66 @@ func TestConfigOTelNotNil(t *testing.T) {
 	assert.NotNil(t, c.OTel.Get("service"))
 }
 
+func TestConfigClone(t *testing.T) {
+	original, err := NewConfigFrom(map[string]interface{}{
+		"agent": map[string]interface{}{
+			"logging": map[string]interface{}{
+				"level":     "info",
+				"to_files":  false,
+				"to_stderr": true,
+			},
+		},
+		"receivers": map[string]interface{}{
+			"otlp": map[string]interface{}{},
+		},
+	})
+	require.NoError(t, err)
+
+	cloneConfig := func(t *testing.T) *Config {
+		t.Helper()
+		clone, err := original.Clone()
+		require.NoError(t, err)
+		assert.NotSame(t, original.Agent, clone.Agent)
+		assert.NotSame(t, original.OTel, clone.OTel)
+		return clone
+	}
+
+	t.Run("agent configuration", func(t *testing.T) {
+		clone := cloneConfig(t)
+		require.NoError(t, clone.Merge(map[string]interface{}{
+			"agent.logging.level":     "debug",
+			"agent.logging.to_files":  true,
+			"agent.logging.to_stderr": false,
+		}))
+
+		originalLevel, err := original.Agent.String("agent.logging.level", -1, ucfg.PathSep("."))
+		require.NoError(t, err)
+		clonedLevel, err := clone.Agent.String("agent.logging.level", -1, ucfg.PathSep("."))
+		require.NoError(t, err)
+		assert.Equal(t, "info", originalLevel)
+		assert.Equal(t, "debug", clonedLevel)
+
+		originalLogging, err := original.Agent.Bool("agent.logging.to_files", -1, ucfg.PathSep("."))
+		require.NoError(t, err)
+		clonedLogging, err := clone.Agent.Bool("agent.logging.to_files", -1, ucfg.PathSep("."))
+		require.NoError(t, err)
+		assert.False(t, originalLogging)
+		assert.True(t, clonedLogging)
+	})
+
+	t.Run("OTel configuration", func(t *testing.T) {
+		clone := cloneConfig(t)
+		require.NoError(t, clone.OTel.Merge(confmap.NewFromStringMap(map[string]interface{}{
+			"receivers": map[string]interface{}{
+				"filelog": map[string]interface{}{},
+			},
+		})))
+
+		assert.Nil(t, original.OTel.Get("receivers::filelog"))
+		assert.NotNil(t, clone.OTel.Get("receivers::filelog"))
+	})
+}
+
 func TestConfigMerge(t *testing.T) {
 	scenarios := []struct {
 		Name   string
