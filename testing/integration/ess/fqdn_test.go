@@ -36,7 +36,7 @@ import (
 
 func TestFQDN(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.FQDN,
+		Group: integration.Hostname,
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
@@ -95,8 +95,8 @@ func TestFQDN(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		// Use a separate context as the one in the test body will have been cancelled at this point.
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+		// context.Background is intentional: t.Context() is already cancelled when Cleanup runs.
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute) //nolint:forbidigo // t.Context() is cancelled at cleanup time
 		defer cleanupCancel()
 
 		t.Log("Un-enrolling Elastic Agent...")
@@ -376,7 +376,11 @@ func setHostname(ctx context.Context, hostname string, log func(args ...any)) er
 }
 
 func getExternalIP() (string, error) {
-	resp, err := http.Get("https://api.ipify.org")
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://api.ipify.org", nil) //nolint:forbidigo // no test context available here
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}
