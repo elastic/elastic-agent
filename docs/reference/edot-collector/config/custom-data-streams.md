@@ -101,7 +101,7 @@ Invalid names prevent data stream creation.
 
 This configuration diverges from the standard ingestion model. Be aware of the following:
 
-- Future {{agent}} versions may not support this configuration or may introduce breaking changes.
+- Future {{agent}} versions might not support this configuration or might introduce breaking changes.
 - Changes might lead to an increase in data streams and shard counts.
 - Dashboards and UIs may not recognize non-standard datasets.
 - OpenTelemetry content packs may not work with custom datasets. These content packs are required to visualize OpenTelemetry data stored natively as OpenTelemetry semantic conventions. Install content packs from the {{kib}} Integrations UI by searching for `otel`.

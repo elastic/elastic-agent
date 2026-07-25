@@ -24,7 +24,7 @@ The components are categorized into **[Core]** and **[Extended]**. The following
 Components marked as "Deprecated" in the table are retained in {{agent}} 9.x to maintain backwards compatibility during the official deprecation window. If you're running {{agent}} 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using these deprecated components as specified in the configuration for your Stack version. For more details, refer to [Configuration compatibility with {{product.elastic-stack}} versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions). To migrate your configuration to the new components, refer to [Migrate components](/reference/edot-collector/components/migrate-components.md).
 ::::
 
-% The following table is automatically generated from the EDOT Collector source code.
+% The following table is automatically generated from the Elastic Agent source code.
 % Automation is handled by /docs/scripts/update-docs/update-components-docs.py, which
 % reads the go.mod file, the components.yml file, and then generates the table.
 % Note that while this runs on `main`, the table is updated based on the latest released version.
