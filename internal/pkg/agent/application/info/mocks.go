@@ -123,7 +123,7 @@ type MockAgent_ECSMetadata_Call struct {
 
 // ECSMetadata is a helper method to define mock.On call
 //   - v *logger.Logger
-func (_e *MockAgent_Expecter) ECSMetadata(v interface{}) *MockAgent_ECSMetadata_Call {
+func (_e *MockAgent_Expecter) ECSMetadata(v any) *MockAgent_ECSMetadata_Call {
 	return &MockAgent_ECSMetadata_Call{Call: _e.mock.On("ECSMetadata", v)}
 }
 
@@ -396,7 +396,7 @@ type MockAgent_ReloadID_Call struct {
 
 // ReloadID is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockAgent_Expecter) ReloadID(ctx interface{}) *MockAgent_ReloadID_Call {
+func (_e *MockAgent_Expecter) ReloadID(ctx any) *MockAgent_ReloadID_Call {
 	return &MockAgent_ReloadID_Call{Call: _e.mock.On("ReloadID", ctx)}
 }
 
@@ -448,7 +448,7 @@ type MockAgent_SetLogLevelOverride_Call struct {
 // SetLogLevelOverride is a helper method to define mock.On call
 //   - ctx context.Context
 //   - level string
-func (_e *MockAgent_Expecter) SetLogLevelOverride(ctx interface{}, level interface{}) *MockAgent_SetLogLevelOverride_Call {
+func (_e *MockAgent_Expecter) SetLogLevelOverride(ctx any, level any) *MockAgent_SetLogLevelOverride_Call {
 	return &MockAgent_SetLogLevelOverride_Call{Call: _e.mock.On("SetLogLevelOverride", ctx, level)}
 }
 
@@ -493,7 +493,7 @@ type MockAgent_SetLogLevelPolicy_Call struct {
 
 // SetLogLevelPolicy is a helper method to define mock.On call
 //   - level string
-func (_e *MockAgent_Expecter) SetLogLevelPolicy(level interface{}) *MockAgent_SetLogLevelPolicy_Call {
+func (_e *MockAgent_Expecter) SetLogLevelPolicy(level any) *MockAgent_SetLogLevelPolicy_Call {
 	return &MockAgent_SetLogLevelPolicy_Call{Call: _e.mock.On("SetLogLevelPolicy", level)}
 }
 
