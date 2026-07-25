@@ -15,7 +15,7 @@ set -euo pipefail
 IAR_LATEST_BASE_URL="https://staging.elastic.co/independent-agent/latest"
 BASE_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
 
-IAR_JSON=$(curl --silent --fail "${IAR_LATEST_BASE_URL}/${BASE_BRANCH}.json" 2>/dev/null || true)
+IAR_JSON=$(curl -sf --retry 5 --retry-delay 5 --retry-all-errors "${IAR_LATEST_BASE_URL}/${BASE_BRANCH}.json" 2>/dev/null || true)
 
 if [[ -z "${IAR_JSON}" ]]; then
   echo "No IAR staging manifest for branch '${BASE_BRANCH}'; skipping IAR package test." >&2
