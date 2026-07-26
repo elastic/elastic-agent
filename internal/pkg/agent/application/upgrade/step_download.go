@@ -178,7 +178,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 			}
 
 			if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, sourceURI, targetPath, a.fileOps); err != nil {
-				if downloaderrors.IsDiskSpaceError(err) {
+				if downloaderrors.IsDiskSpaceFullError(err) {
 					return backoff.Permanent(err)
 				}
 				var agentErr errors.Error
@@ -205,7 +205,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 
 			if !skipVerifyOverride {
 				if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, download.AddHashExtension(sourceURI), download.AddHashExtension(targetPath), a.fileOps); err != nil {
-					if downloaderrors.IsDiskSpaceError(err) {
+					if downloaderrors.IsDiskSpaceFullError(err) {
 						return backoff.Permanent(err)
 					}
 					var agentErr errors.Error
