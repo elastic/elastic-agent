@@ -121,7 +121,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 			e := fmt.Errorf("could not fetch artifact from %s: %w", src, err)
 			a.log.Debugf("%v", e)
 			errs = append(errs, e)
-			if downloaderrors.IsDiskSpaceError(err) {
+			if downloaderrors.IsDiskSpaceFullError(err) {
 				break
 			}
 			continue
@@ -132,7 +132,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				e := fmt.Errorf("could not fetch artifact sha512 from %s: %w", src, err)
 				a.log.Debugf("%v", e)
 				errs = append(errs, e)
-				if downloaderrors.IsDiskSpaceError(err) {
+				if downloaderrors.IsDiskSpaceFullError(err) {
 					break
 				}
 				continue
