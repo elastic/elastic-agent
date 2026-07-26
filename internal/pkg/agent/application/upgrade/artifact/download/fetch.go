@@ -107,8 +107,8 @@ func download(ctx context.Context, log *logger.Logger, config *artifact.Config, 
 	_, err = ops.CopyFile(targetFile, io.TeeReader(resp.Body, dp))
 	if err != nil {
 		reportedErr := err
-		if upgradeErrors.IsDiskSpaceError(err) {
-			reportedErr = upgradeErrors.ErrInsufficientDiskSpace
+		if upgradeErrors.IsDiskSpaceFullError(err) {
+			reportedErr = upgradeErrors.ErrDiskSpaceFull
 		}
 		dp.ReportFailed(reportedErr)
 		return goerrors.Join(errors.New(fmt.Sprintf("copying %s to %s failed", sourceURI, targetPath), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)), err)
