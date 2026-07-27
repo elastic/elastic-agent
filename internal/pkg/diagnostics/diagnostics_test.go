@@ -1354,7 +1354,7 @@ func TestRedactEnv(t *testing.T) {
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
-			redacted, err := redactEnv()
+			redacted, err := RedactEnv()
 			require.NoError(t, err)
 
 			// redacted includes full env vars, we want to check if the expected k:v's are present

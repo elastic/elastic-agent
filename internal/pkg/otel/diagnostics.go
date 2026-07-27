@@ -17,26 +17,33 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
+// newExtensionHTTPClient returns an http.Client that dials the elasticdiagnostics
+// extension's Unix socket, shared by PerformDiagnosticsExt and PerformActionExt.
+func newExtensionHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return client.Dialer(ctx, paths.DiagnosticsExtensionSocket())
+			},
+		},
+	}
+}
+
 func PerformDiagnosticsExt(ctx context.Context, includeCpuProfile bool) (*elasticdiagnostics.Response, error) {
 	// PerformDiagnosticsExt connects to the diagnostics extension over a Unix socket,
 	// makes an HTTP request to fetch diagnostic info, and returns the parsed response.
 	// If includeCpuProfile is true, it also requests CPU profiling data.
 
-	tr := &http.Transport{
-		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-			return client.Dialer(ctx, paths.DiagnosticsExtensionSocket())
-		},
-	}
-	client := &http.Client{Transport: tr}
+	httpClient := newExtensionHTTPClient()
 	url := "http://localhost/diagnostics"
 	if includeCpuProfile {
 		url = "http://localhost/diagnostics?cpu=true"
 	}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return &elasticdiagnostics.Response{}, fmt.Errorf("failed to create request: %w", err)
 	}
-	resp, err := client.Do(req.WithContext(ctx))
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return &elasticdiagnostics.Response{}, fmt.Errorf("failed to perform request: %w", err)
 	}

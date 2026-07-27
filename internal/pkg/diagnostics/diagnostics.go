@@ -108,7 +108,7 @@ func GlobalHooks() Hooks {
 			Description: "Environment variables",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				redacted, err := redactEnv()
+				redacted, err := RedactEnv()
 				if err != nil {
 					return []byte(err.Error())
 				}
@@ -661,7 +661,7 @@ func addSecretMarkers(cfg *config.Config, secretPaths []string) error {
 	return aggregateError
 }
 
-func redactEnv() (map[string]any, error) {
+func RedactEnv() (map[string]any, error) {
 	envMap := map[string]any{}
 	for _, e := range os.Environ() {
 		pair := strings.SplitN(e, "=", 2)
