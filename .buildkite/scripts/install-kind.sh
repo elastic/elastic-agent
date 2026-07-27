@@ -34,7 +34,7 @@ fi
 
 mkdir -p "${HOME}/bin"
 
-if curl -sSLo "${KIND_CMD}" "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-${OS}-${ARCH_SUFFIX}" ; then
+if curl -sSfLo "${KIND_CMD}" --retry 5 --retry-delay 5 --retry-all-errors "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-${OS}-${ARCH_SUFFIX}" ; then
     chmod +x "${KIND_CMD}"
 else
     echo "Something bad with the download, let's delete the corrupted binary"

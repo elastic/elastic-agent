@@ -47,6 +47,9 @@ function install_fleet_packages() {
   resp=$(curl \
     -s \
     --fail-with-body \
+    --retry 5 \
+    --retry-delay 5 \
+    --retry-all-errors \
     -X "POST" \
     -u "${KIBANA_USERNAME}:${KIBANA_PASSWORD}" \
     -d @"${install_api_request_file}" \

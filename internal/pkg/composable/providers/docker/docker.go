@@ -22,10 +22,6 @@ import (
 // ContainerPriority is the priority that container mappings are added to the provider.
 const ContainerPriority = 0
 
-func init() {
-	composable.Providers.MustAddDynamicProvider("docker", DynamicProviderBuilder)
-}
-
 type dockerContainerData struct {
 	container  *docker.Container
 	mapping    map[string]interface{}

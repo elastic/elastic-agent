@@ -16,7 +16,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -70,8 +69,7 @@ func TestContextProvider_Config(t *testing.T) {
 			log, err := logger.New("filesource_test", false)
 			require.NoError(t, err)
 
-			builder, _ := composable.Providers.GetContextProvider("filesource")
-			_, err = builder(log, s.Config, true)
+			_, err = ContextProviderBuilder(log, s.Config, true)
 			if s.Err != nil {
 				require.Equal(t, s.Err, err)
 			} else {
@@ -117,8 +115,7 @@ func TestContextProvider(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	builder, _ := composable.Providers.GetContextProvider("filesource")
-	provider, err := builder(log, c, true)
+	provider, err := ContextProviderBuilder(log, c, true)
 	require.NoError(t, err)
 
 	ctx := t.Context()
@@ -246,8 +243,7 @@ func TestContextProvider_KubernetesSymlinks(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	builder, _ := composable.Providers.GetContextProvider("filesource")
-	provider, err := builder(log, c, true)
+	provider, err := ContextProviderBuilder(log, c, true)
 	require.NoError(t, err)
 
 	ctx := t.Context()

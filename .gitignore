@@ -1,4 +1,5 @@
 # Directories
+/.claude/worktrees
 /.agent-testing
 /.integration-cache
 /.ogc-cache

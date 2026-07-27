@@ -175,6 +175,13 @@ func WithAdditionalArgs(args []string) FixtureOpt {
 	}
 }
 
+// WithAppendAdditionalArgs appends to any additional args already set on the fixture.
+func WithAppendAdditionalArgs(args []string) FixtureOpt {
+	return func(f *Fixture) {
+		f.additionalArgs = append(f.additionalArgs, args...)
+	}
+}
+
 func WithFIPSArtifact() FixtureOpt {
 	return func(f *Fixture) {
 		f.fipsArtifact = true
@@ -1779,6 +1786,10 @@ type AgentInspectOutput struct {
 			Files    struct {
 				Path string `yaml:"path"`
 			} `yaml:"files"`
+			EventData struct {
+				ToFiles  bool `yaml:"to_files"`
+				ToStderr bool `yaml:"to_stderr"`
+			} `yaml:"event_data"`
 		} `yaml:"logging"`
 		Monitoring struct {
 			Enabled bool `yaml:"enabled"`

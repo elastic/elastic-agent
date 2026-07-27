@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
@@ -60,8 +59,7 @@ func TestContextProvider(t *testing.T) {
 		"items": mapping,
 	})
 	require.NoError(t, err)
-	builder, _ := composable.Providers.GetDynamicProvider("local_dynamic")
-	provider, err := builder(nil, cfg, true)
+	provider, err := DynamicProviderBuilder(nil, cfg, true)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)

@@ -17,10 +17,6 @@ import (
 // ItemPriority is the priority that item mappings are added to the provider.
 const ItemPriority = 0
 
-func init() {
-	composable.Providers.MustAddDynamicProvider("local_dynamic", DynamicProviderBuilder)
-}
-
 type dynamicItem struct {
 	Mapping    map[string]interface{}   `config:"vars"`
 	Processors []map[string]interface{} `config:"processors"`

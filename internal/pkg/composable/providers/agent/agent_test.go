@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 )
@@ -20,8 +19,7 @@ import (
 func TestContextProvider(t *testing.T) {
 	testutils.InitStorage(t)
 
-	builder, _ := composable.Providers.GetContextProvider("agent")
-	provider, err := builder(nil, nil, true)
+	provider, err := ContextProviderBuilder(nil, nil, true)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)

@@ -174,23 +174,41 @@ func StateWithMessage(current status.Event) (client.UnitState, string) {
 
 // updateStatus recursively updates each AggregateStatus.Event
 // based on the statuses of its child components.
+//
+// A pipeline is considered healthy either when all of its children are OK, or - working around
+// https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/49631 - when none of
+// its children report an error and at least one receiver is OK. The latter covers a receiver
+// removed by a partial reload: its last reported status is a terminal Stopped that never gets
+// pruned from the aggregator, and upstream's aggregation function maps any OK+Stopped mix of
+// children to Stopping forever, even though the pipeline itself is otherwise healthy.
 func updateStatus(status *status.AggregateStatus) {
 	if status == nil {
 		return
 	}
 
 	ok := true
+	hasError := false
+	hasOKReceiver := false
 
-	for _, child := range status.ComponentStatusMap {
+	for key, child := range status.ComponentStatusMap {
 		updateStatus(child)
 
-		if child.Status() != componentstatus.StatusOK {
+		childStatus := child.Status()
+		if childStatus != componentstatus.StatusOK {
 			ok = false
+		}
+		if componentstatus.StatusIsError(childStatus) {
+			hasError = true
+		}
+		if childStatus == componentstatus.StatusOK {
+			if kind, _, err := ParseEntityStatusId(key); err == nil && kind == "receiver" {
+				hasOKReceiver = true
+			}
 		}
 	}
 
 	if len(status.ComponentStatusMap) > 0 {
-		if ok {
+		if ok || (!hasError && hasOKReceiver) {
 			status.Event = componentstatus.NewEvent(componentstatus.StatusOK)
 		}
 	}
@@ -289,8 +307,8 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 	receiverByInputID := make(map[string]*status.AggregateStatus)
 	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
 		// single_receiver: true means all streams share one receiver named after the
-		// component ID only (no stream suffix). Map every stream's resolved ID to it.
-		singleReceiverName := OtelNamePrefix + comp.ID
+		// component ID with a placeholder stream suffix. Map every stream's resolved ID to it.
+		singleReceiverName := OtelNamePrefix + comp.ID + "/" + singleReceiverStreamID
 		for receiverOtelID, rs := range receiverStatuses {
 			if receiverOtelID.Name() != singleReceiverName {
 				continue
