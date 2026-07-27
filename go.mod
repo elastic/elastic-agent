@@ -54,6 +54,10 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
+<<<<<<< HEAD
+=======
+	github.com/testcontainers/testcontainers-go v0.43.0
+>>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	github.com/winlabs/gowin32 v0.0.0-20260308155911-6a6dc53430f0
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.12
 	go.elastic.co/apm/module/apmgrpc/v2 v2.7.12
@@ -132,6 +136,10 @@ require (
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/brunoga/deep v1.3.1 // indirect
+<<<<<<< HEAD
+=======
+	github.com/cenkalti/backoff/v7 v7.0.0 // indirect
+>>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/containerd/containerd v1.7.30 // indirect
@@ -139,6 +147,10 @@ require (
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v1.0.0-rc.4 // indirect
+<<<<<<< HEAD
+=======
+	github.com/cpuguy83/dockercfg v0.3.2 // indirect
+>>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -147,6 +159,14 @@ require (
 	github.com/docker/go-connections v0.7.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
+<<<<<<< HEAD
+=======
+	github.com/elastic/go-concert v0.3.1 // indirect
+	github.com/elastic/go-docappender/v2 v2.14.1 // indirect
+	github.com/elastic/go-freelru v0.16.0 // indirect
+	github.com/elastic/go-licenser v0.4.2 // indirect
+	github.com/elastic/go-lumber v0.2.0 // indirect
+>>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
@@ -157,6 +177,10 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+<<<<<<< HEAD
+=======
+	github.com/foxboron/go-tpm-keyfiles v0.0.0-20251226215517-609e4778396f // indirect
+>>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
@@ -179,6 +203,10 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gohugoio/hashstructure v0.6.0 // indirect
+<<<<<<< HEAD
+=======
+	github.com/golang/snappy v1.0.0 // indirect
+>>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/licenseclassifier v0.0.0-20250213175939-b5d1a3369749 // indirect
@@ -225,8 +253,18 @@ require (
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
+<<<<<<< HEAD
+=======
+	github.com/moby/go-archive v0.2.0 // indirect
+>>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	github.com/moby/moby/api v1.55.0 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect
+<<<<<<< HEAD
+=======
+	github.com/moby/sys/sequential v0.6.0 // indirect
+	github.com/moby/sys/user v0.4.0 // indirect
+	github.com/moby/sys/userns v0.1.0 // indirect
+>>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	github.com/moby/term v0.5.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
@@ -322,6 +360,10 @@ require (
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
+<<<<<<< HEAD
+=======
+	golang.org/x/exp v0.0.0-20260611194520-c48552f49976 // indirect
+>>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260625142307-59b4966ccb57 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
@@ -330,6 +372,10 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+<<<<<<< HEAD
+=======
+	gotest.tools/gotestsum v1.13.0 // indirect
+>>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	k8s.io/apiextensions-apiserver v0.35.1 // indirect
 	k8s.io/apiserver v0.35.1 // indirect
 	k8s.io/component-base v0.35.3 // indirect
