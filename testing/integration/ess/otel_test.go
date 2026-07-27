@@ -1759,7 +1759,7 @@ service:
 				"log.file.path": inputFilePath,
 			})
 			require.NoError(ct, err)
-			
+
 			got := docs.Hits.Total.Value
 			require.GreaterOrEqual(t, got, 10, "")
 		},
