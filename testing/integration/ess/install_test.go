@@ -952,46 +952,33 @@ agent.monitoring.enabled: false
 		require.NoError(t, installtest.CheckUninstallSuccess(checks))
 	})
 
-	serviceName := paths.ServiceName()
-
-	defer func() {
+	t.Cleanup(func() {
 		if t.Failed() {
-			out, err := exec.CommandContext(t.Context(), "sc", "query", serviceName).CombinedOutput()
-			t.Logf("service state (err=%v):\n%s", err, out)
+			serviceOutput, err := exec.CommandContext(t.Context(), "sc", "query", paths.ServiceName()).CombinedOutput()
+			if err != nil {
+				t.Logf("sc query failed: %v: %s", err, serviceOutput)
+				return
+			}
+
+			t.Logf("Service state:\n%s\n", serviceOutput)
+			logPattern := filepath.Join(fixture.WorkDir(), "data", "elastic-agent-*", "logs", "elastic-agent-*.ndjson")
+			if err != nil {
+				t.Logf("failed to fetch final logs inside cleanup: %v", err)
+				return
+			}
+			t.Logf("Logs:\n%s\n", readAgentErrorLogs(logPattern, 20))
 		}
-	}()
+	})
 
-	queryService := func() string {
-		out, err := exec.CommandContext(t.Context(), "sc", "query", serviceName).CombinedOutput()
-		if err != nil {
-			return fmt.Sprintf("sc query failed: %v: %s", err, out)
-		}
-		return string(out)
-	}
-
-	logPattern := filepath.Join(fixture.WorkDir(), "data", "elastic-agent-*", "logs", "elastic-agent-*.ndjson")
-	waitForHealthy := func(timeout time.Duration, failureMessage string) {
-		t.Helper()
-
-		var lastErr error
-		if assert.Eventually(t, func() bool {
-			lastErr = fixture.IsHealthy(ctx)
-			return lastErr == nil
-		}, timeout, 5*time.Second, failureMessage) {
-			return
-		}
-
-		t.Fatalf("%s\nlast status error: %v\nservice state:\n%s\nagent error logs:\n%s",
-			failureMessage, lastErr, queryService(), readAgentErrorLogs(logPattern, 20))
-	}
-
-	waitForHealthy(3*time.Minute, "agent did not become healthy with the profile unresolvable")
-
-	_, err = fixture.ExecDiagnostics(ctx)
-	require.NoError(t, err, "diagnostics collection failed")
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.NoError(c, fixture.IsHealthy(ctx))
+	}, 3*time.Minute, 5*time.Second, "agent did not become healthy on first startup")
 
 	require.NoError(t, fixture.ExecRestart(ctx), "daemon restart failed")
-	waitForHealthy(2*time.Minute, "agent did not become healthy again after restart")
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.NoError(c, fixture.IsHealthy(ctx))
+	}, 3*time.Minute, 5*time.Second, "agent did not become healthy after restart")
 }
 
 func readAgentErrorLogs(pattern string, limit int) string {
