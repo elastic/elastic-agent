@@ -25,91 +25,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
-
-func TestLoadConfig(t *testing.T) {
-	validFleetEnc := `fleet:
-  enabled: true
-  kibana:
-    host: demo
-  access_api_key: "123"
-agent:
-  grpc:
-    port: 6790`
-
-	cases := []struct {
-		name     string
-		baseCfg  string
-		fleetEnc string
-		assert   func(t *testing.T, cfg *configuration.Configuration)
-	}{
-		{
-			name:     "fleet enabled, fleet.enc merged",
-			baseCfg:  "fleet:\n  enabled: true\n",
-			fleetEnc: validFleetEnc,
-			assert: func(t *testing.T, cfg *configuration.Configuration) {
-				assert.True(t, cfg.Fleet.Enabled)
-				assert.Equal(t, "123", cfg.Fleet.AccessAPIKey)
-				assert.Equal(t, uint16(6790), cfg.Settings.GRPC.Port)
-			},
-		},
-		{
-			name:     "standalone ignores fleet.enc",
-			baseCfg:  "fleet:\n  enabled: false\n",
-			fleetEnc: validFleetEnc,
-			assert: func(t *testing.T, cfg *configuration.Configuration) {
-				assert.False(t, cfg.Fleet.Enabled)
-				assert.Empty(t, cfg.Fleet.AccessAPIKey)
-			},
-		},
-		{
-			name: "overlapping agent.logging.level",
-			baseCfg: `fleet:
-  enabled: true
-agent:
-  logging:
-    level: info
-`,
-			fleetEnc: `fleet:
-  enabled: true
-  kibana:
-    host: demo
-  access_api_key: "123"
-agent:
-  logging:
-    level: debug`,
-			assert: func(t *testing.T, cfg *configuration.Configuration) {
-				assert.True(t, cfg.Fleet.Enabled)
-				assert.Equal(t, logp.DebugLevel, cfg.Settings.LoggingConfig.Level)
-			},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			origCfg := paths.Config()
-			t.Cleanup(func() { paths.SetConfig(origCfg) })
-			paths.SetConfig(t.TempDir())
-			testutils.InitStorage(t)
-			require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte(tc.baseCfg), 0o644))
-
-			if tc.fleetEnc != "" {
-				store, err := storage.NewEncryptedDiskStore(t.Context(), paths.AgentConfigFile())
-				require.NoError(t, err)
-				require.NoError(t, store.Save(strings.NewReader(tc.fleetEnc)))
-			}
-
-			cfg, err := configuration.LoadConfig(t.Context(), nil)
-			require.NoError(t, err)
-			require.NotNil(t, cfg)
-			tc.assert(t, cfg)
-		})
-	}
-}
 
 func TestLimitsLog(t *testing.T) {
 	log, obs := loggertest.New("TestLimitsLog")
@@ -129,6 +48,7 @@ func TestLimitsLog(t *testing.T) {
 		true,              // testingMode
 		time.Millisecond,  // fleetInitTimeout
 		true,              // disable monitoring
+		nil,
 		configuration.DefaultConfiguration(),
 		nil,
 		rollbackSrc,
@@ -538,12 +458,256 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 	if runtime.GOOS == "windows" {
 		agentExecutableName += ".exe"
 	}
-	err = os.WriteFile(paths.BinaryPath(absVersionedHomePath, agentExecutableName), []byte(fmt.Sprintf("Placeholder for agent %s", version)), 0o750)
+	err = os.WriteFile(paths.BinaryPath(absVersionedHomePath, agentExecutableName), fmt.Appendf(nil, "Placeholder for agent %s", version), 0o750)
 	require.NoErrorf(t, err, "error writing elastic agent binary placeholder %q", agentExecutableName)
 	fakeLogPath := filepath.Join(absLogsDirPath, "fakelog.ndjson")
-	err = os.WriteFile(fakeLogPath, []byte(fmt.Sprintf("Sample logs for agent %s", version)), 0o750)
+	err = os.WriteFile(fakeLogPath, fmt.Appendf(nil, "Sample logs for agent %s", version), 0o750)
 	require.NoErrorf(t, err, "error writing fake log placeholder %q", fakeLogPath)
 
 	// return the path relative to top exactly like the step_unpack does
 	return relVersionedHomePath
 }
+<<<<<<< HEAD
+=======
+
+// createLink (copied from the upgrade package tests) creates the top-level elastic-agent symlink
+// pointing at the binary inside the given versioned home (relative to topDir).
+func createLink(t *testing.T, topDir string, relVersionedHomePath string) {
+	t.Helper()
+	linkName := upgrade.AgentName
+	linkTarget := paths.BinaryPath(relVersionedHomePath, upgrade.AgentName)
+	if runtime.GOOS == "windows" {
+		linkName += ".exe"
+		linkTarget += ".exe"
+	}
+	err := os.Symlink(linkTarget, filepath.Join(topDir, linkName))
+	require.NoError(t, err, "error creating symlink for fake agent install")
+}
+
+func TestApplicationStandaloneEncrypted(t *testing.T) {
+	log, _ := loggertest.New("TestApplicationStandaloneEncrypted")
+
+	cfgPath := paths.Config()
+	t.Cleanup(func() { paths.SetConfig(cfgPath) })
+
+	paths.SetConfig(t.TempDir())
+	err := os.WriteFile(paths.ConfigFile(), []byte(`agent:
+  features:
+    encrypted_config:
+      enabled: true
+  logging:
+    level: debug`), 0640)
+	require.NoError(t, err)
+
+	t.Log("Ensure New encrypts config")
+	startupCfg, cfg := loadTestConfig(t)
+	_, _, _, err = New(
+		t.Context(),
+		log,
+		log,
+		log,
+		logp.DebugLevel,
+		&info.AgentInfo{},
+		nil,
+		nil,
+		false, // not in testing mode - we are testing fs interactions
+		time.Second,
+		true,
+		startupCfg,
+		cfg,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	encBytes, err := os.ReadFile(paths.AgentConfigFile())
+	require.NoError(t, err)
+
+	ymlBytes, err := os.ReadFile(paths.ConfigFile())
+	require.NoError(t, err)
+	require.EqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
+
+	t.Log("Ensure New does not alter contents when no changes are made")
+	startupCfg, cfg = loadTestConfig(t)
+	_, _, _, err = New(
+		t.Context(),
+		log,
+		log,
+		log,
+		logp.DebugLevel,
+		&info.AgentInfo{},
+		nil,
+		nil,
+		false, // not in testing mode - we are testing fs interactions
+		time.Second,
+		true,
+		startupCfg,
+		cfg,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	encBytes2, err := os.ReadFile(paths.AgentConfigFile())
+	require.NoError(t, err)
+	require.EqualValues(t, encBytes, encBytes2, "fleet.enc contents have chagned")
+
+	ymlBytes, err = os.ReadFile(paths.ConfigFile())
+	require.NoError(t, err)
+	require.EqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
+
+	t.Log("Change elastic-agent.yml to have same contents with different structure, should not re-encrypt")
+	err = os.WriteFile(paths.ConfigFile(), []byte(`agent:
+  features:
+    encrypted_config:
+      enabled: true`), 0640)
+	require.NoError(t, err)
+
+	startupCfg, cfg = loadTestConfig(t)
+	_, _, _, err = New(
+		t.Context(),
+		log,
+		log,
+		log,
+		logp.DebugLevel,
+		&info.AgentInfo{},
+		nil,
+		nil,
+		false, // not in testing mode - we are testing fs interactions
+		time.Second,
+		true,
+		startupCfg,
+		cfg,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	encBytes3, err := os.ReadFile(paths.AgentConfigFile())
+	require.NoError(t, err)
+	require.EqualValues(t, encBytes, encBytes3, "fleet.enc contents have chagned")
+
+	ymlBytes, err = os.ReadFile(paths.ConfigFile())
+	require.NoError(t, err)
+	require.NotEqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
+
+	t.Log("Ensure that setting encrypted_config to false works")
+	err = os.WriteFile(paths.ConfigFile(), []byte(`agent:
+  features:
+    encrypted_config:
+      enabled: false
+  logging:
+    level: debug`), 0640)
+	require.NoError(t, err)
+
+	startupCfg, cfg = loadTestConfig(t)
+	_, _, _, err = New(
+		t.Context(),
+		log,
+		log,
+		log,
+		logp.DebugLevel,
+		&info.AgentInfo{},
+		nil,
+		nil,
+		false, // not in testing mode - we are testing fs interactions
+		time.Second,
+		true,
+		startupCfg,
+		cfg,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+}
+
+func TestHasEncryptedStandaloneConfigChanged(t *testing.T) {
+	log, _ := loggertest.New("TestHasEncryptedStandaloneConfigChanged")
+	tests := []struct {
+		name     string
+		contents []byte
+		expect   bool
+	}{{
+		name:     "no change",
+		contents: storage.DefaultAgentEncryptedStandaloneConfig,
+		expect:   false,
+	}, {
+		name: "contents change",
+		contents: []byte(`agent:
+  features:
+    encrypted_config:
+      enabled: true
+    fqdn:
+      enabled: true
+`),
+		expect: true,
+	}, {
+		name:     "no file contents",
+		contents: []byte{},
+		expect:   true,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "a.yml")
+			err := os.WriteFile(path, tt.contents, 0640)
+			require.NoError(t, err)
+			changed := hasEncryptedStandaloneConfigChanged(log, path)
+			require.Equal(t, tt.expect, changed)
+		})
+	}
+}
+
+func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
+	log, _ := loggertest.New("TestApplicationStandaloneEncryptedWithFleetEnabled")
+
+	cfgPath := paths.Config()
+	t.Cleanup(func() { paths.SetConfig(cfgPath) })
+	paths.SetConfig(t.TempDir())
+
+	err := os.WriteFile(paths.ConfigFile(), DefaultAgentFleetConfig, 0640)
+	require.NoError(t, err)
+
+	isRoot, err := utils.HasRoot()
+	require.NoError(t, err)
+	err = secret.CreateAgentSecret(t.Context(), vault.WithUnprivileged(!isRoot), vault.WithVaultPath(filepath.Join(paths.Config(), paths.DefaultAgentVaultPath)))
+	require.NoError(t, err)
+	encStore, err := storage.NewEncryptedDiskStore(t.Context(), filepath.Join(paths.Config(), paths.DefaultAgentFleetFile), storage.WithVaultPath(filepath.Join(paths.Config(), paths.DefaultAgentVaultPath)))
+	require.NoError(t, err)
+	err = encStore.Save(strings.NewReader(`fleet:
+  enabled: true
+  access_api_key: "exampleKey"
+  host: https://localhost:8220`))
+	require.NoError(t, err)
+
+	startupCfg, cfg := loadTestConfig(t)
+	_, _, _, err = New(
+		t.Context(),
+		log,
+		log,
+		log,
+		logp.DebugLevel,
+		&info.AgentInfo{},
+		nil,
+		nil,
+		false, // not in testing mode - we are testing fs interactions
+		time.Second,
+		true,
+		startupCfg,
+		cfg,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	ymlBytes, err := os.ReadFile(paths.ConfigFile())
+	require.NoError(t, err)
+	require.EqualValues(t, DefaultAgentFleetConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
+}
+
+func loadTestConfig(t *testing.T) (startupCfg, cfg *configuration.Configuration) {
+	t.Helper()
+
+	reloader, err := configuration.NewConfigReloader(t.Context(), nil, nil)
+	require.NoError(t, err)
+	return reloader.StartupConfiguration(), reloader.Configuration()
+}
+>>>>>>> 3ba93f101 (Fix continuous container restarts after Fleet policy updates (#15772))

@@ -1247,6 +1247,52 @@ func TestKibanaFetchToken(t *testing.T) {
 	})
 }
 
+func TestContainerLoggingCfgOverrides(t *testing.T) {
+	tests := []struct {
+		name              string
+		logsPath          string
+		eventsToStderr    string
+		wantToFiles       bool
+		wantToStderr      bool
+		wantEventToFiles  bool
+		wantEventToStderr bool
+	}{
+		{
+			name:              "without custom logs path",
+			eventsToStderr:    "true",
+			wantToFiles:       false,
+			wantToStderr:      true,
+			wantEventToFiles:  false,
+			wantEventToStderr: true,
+		},
+		{
+			name:              "with custom logs path",
+			logsPath:          t.TempDir(),
+			wantToFiles:       true,
+			wantToStderr:      false,
+			wantEventToFiles:  true,
+			wantEventToStderr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("LOGS_PATH", tt.logsPath)
+			t.Setenv("EVENTS_TO_STDERR", tt.eventsToStderr)
+
+			rawCfg := config.MustNewConfigFrom(map[string]any{})
+			require.NoError(t, containerLoggingCfgOverrides(rawCfg))
+
+			cfg, err := configuration.NewFromConfig(rawCfg)
+			require.NoError(t, err)
+			require.Equal(t, tt.wantToFiles, cfg.Settings.LoggingConfig.ToFiles)
+			require.Equal(t, tt.wantToStderr, cfg.Settings.LoggingConfig.ToStderr)
+			require.Equal(t, tt.wantEventToFiles, cfg.Settings.EventLoggingConfig.ToFiles)
+			require.Equal(t, tt.wantEventToStderr, cfg.Settings.EventLoggingConfig.ToStderr)
+		})
+	}
+}
+
 // Regression test for #13810: ensure env vars override fleet.enc for certs
 func TestContainerEnvOverridesFleetTLSPaths(t *testing.T) {
 	fipsutils.SkipIfFIPSOnly(t, "encrypted disk storage does not use NewGCMWithRandomNonce.")
@@ -1279,8 +1325,9 @@ func TestContainerEnvOverridesFleetTLSPaths(t *testing.T) {
 	_, err = shouldFleetEnroll(setupConfig{Fleet: fleetConfig{Enroll: true}})
 	require.NotErrorIs(t, err, fs.ErrNotExist, "unpack must not try to open stale stored TLS path")
 
-	loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+	reloader, err := configuration.NewConfigReloader(ctx, nil, containerCfgOverrides)
 	require.NoError(t, err)
+	loaded := reloader.Configuration()
 	require.Equal(t, envCertPath, loaded.Fleet.Client.Transport.TLS.Certificate.Certificate)
 	require.Equal(t, envKeyPath, loaded.Fleet.Client.Transport.TLS.Certificate.Key)
 }
@@ -1394,8 +1441,9 @@ func TestContainerEnvOverridesFleetCA(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				loaded, err := configuration.LoadConfig(ctx, containerCfgOverrides)
+				reloader, err := configuration.NewConfigReloader(ctx, nil, containerCfgOverrides)
 				require.NoError(t, err)
+				loaded := reloader.Configuration()
 				require.Equal(t, tc.wantCAs, loaded.Fleet.Client.Transport.TLS.CAs)
 			}
 		})
