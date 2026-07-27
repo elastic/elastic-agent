@@ -16,7 +16,8 @@ products:
 # {{agent}}
 
 :::{note}
-Starting with version 9.5, the **EDOT Collector** was renamed to **{{agent}}**. The configuration and components are the same across versions.
+:applies_to: stack: ga 9.5+
+In previous versions, the **EDOT Collector** was a standalone product. From this version onwards, this OpenTelemetry collector capability is built into **{{agent}}**.
 :::
 
 {{agent}} includes a built-in OpenTelemetry Collector: an open-source distribution of the [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/).
