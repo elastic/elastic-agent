@@ -68,9 +68,6 @@ steps:
       - WORKFLOW: ${WORKFLOW}
     key: block-get-dra-artifacts
     blocked_state: running
-    depends_on:
-      - bump-version-minor-major
-      - bump-version-patch
 
   - label: "Create branch for version bump"
     key: branch-for-version-bump
