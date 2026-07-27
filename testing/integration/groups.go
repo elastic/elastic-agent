@@ -18,6 +18,9 @@ const (
 	// Fleet group of tests. Used for testing Elastic Agent with Fleet.
 	Fleet = "fleet"
 
+	// Container group of tests. Used for testing Elastic Agent in container mode.
+	Container = "container"
+
 	// FleetPrivileged group of tests. Used for testing Elastic Agent with Fleet installed privileged.
 	FleetPrivileged = "fleet-privileged"
 
