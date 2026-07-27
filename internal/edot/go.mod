@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260722210645-9fd1f4c45fd0
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260724191718-8a654fcc5b61
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.46.2
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -100,7 +100,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.81.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticache v1.52.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/kafka v1.52.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.3.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.5.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bluekeyes/go-gitdiff v0.7.1 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
@@ -308,38 +308,37 @@ require (
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/aws/aws-lambda-go v1.54.0 // indirect
 	github.com/aws/aws-msk-iam-sasl-signer-go v1.0.4 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.42.1
+	github.com/aws/aws-sdk-go-v2 v1.43.0
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.14 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.32.28
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.27
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.30 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.21.0 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.30 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.30 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.31 // indirect
-	github.com/aws/aws-sdk-go-v2/service/apigateway v1.31.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/apigatewayv2 v1.28.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.58.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.74.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.51.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.312.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.45.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/health v1.30.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/iam v1.42.1
+	github.com/aws/aws-sdk-go-v2/config v1.32.31
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.30
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.32 // indirect
+	github.com/aws/aws-sdk-go-v2/service/apigateway v1.42.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/apigatewayv2 v1.37.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.65.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.80.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.67.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.317.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.58.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/health v1.40.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/iam v1.56.0
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.13 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.23 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.30 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.31 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.24 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.31 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.32 // indirect
 	github.com/aws/aws-sdk-go-v2/service/lightsail v1.54.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/organizations v1.38.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/rds v1.118.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.26.5 // indirect
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.105.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/organizations v1.53.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/rds v1.123.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.35.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.106.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/servicediscovery v1.41.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sqs v1.45.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.32.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.37.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.44.0
+	github.com/aws/aws-sdk-go-v2/service/sqs v1.46.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.33.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.38.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.45.0
 	github.com/aws/smithy-go v1.27.3
 	github.com/axiomhq/hyperloglog v0.2.6 // indirect
 	github.com/bboreham/go-loser v0.0.0-20230920113527-fcc2c21820a3 // indirect

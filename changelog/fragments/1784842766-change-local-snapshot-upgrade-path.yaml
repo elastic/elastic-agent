@@ -18,7 +18,7 @@ summary: Local snapshot upgrades now expect an artifact filename with no build I
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: When performing a local snapshot upgrade, the upgrade artifact is now expected to named without the build ID, e.g. elastic-agent-9.5.0-SNAPSHOT-linux-x86_64.tar.gz rather than elastic-agent-9.5.0-9.5.0-51bd4cc6-SNAPSHOT-linux-x86_64.tar.gz. This matches the naming convention of the snapshot registry and brings filename expectations in line with the remote upgrade path.
+description: When performing a local snapshot upgrade, the upgrade artifact is now expected to named without the build ID, e.g. elastic-agent-9.5.0-SNAPSHOT-linux-x86_64.tar.gz rather than elastic-agent-9.5.0-SNAPSHOT+51bd4cc6-linux-x86_64.tar.gz. This matches the naming convention of the snapshot registry and brings filename expectations in line with the remote upgrade path.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
