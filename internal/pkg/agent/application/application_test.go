@@ -33,22 +33,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-func loadTestConfig(t *testing.T) *configuration.Configuration {
-	t.Helper()
-
-	reloader, err := configuration.NewConfigReloader(t.Context(), nil, nil)
-	require.NoError(t, err)
-	return reloader.Configuration()
-}
-
-func loadBaseTestConfig(t *testing.T) *configuration.Configuration {
-	t.Helper()
-
-	reloader, err := configuration.NewConfigReloader(t.Context(), nil, nil)
-	require.NoError(t, err)
-	return reloader.Configuration()
-}
-
 func TestLimitsLog(t *testing.T) {
 	log, obs := loggertest.New("TestLimitsLog")
 	ctx, cn := context.WithCancel(context.Background())
@@ -517,7 +501,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Ensure New encrypts config")
-	cfg := loadBaseTestConfig(t)
+	startupCfg, cfg := loadTestConfig(t)
 	_, _, _, err = New(
 		t.Context(),
 		log,
@@ -530,7 +514,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
+		startupCfg,
 		cfg,
 		nil,
 		nil,
@@ -545,7 +529,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 	require.EqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
 
 	t.Log("Ensure New does not alter contents when no changes are made")
-	cfg = loadBaseTestConfig(t)
+	startupCfg, cfg = loadTestConfig(t)
 	_, _, _, err = New(
 		t.Context(),
 		log,
@@ -558,7 +542,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
+		startupCfg,
 		cfg,
 		nil,
 		nil,
@@ -579,7 +563,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
       enabled: true`), 0640)
 	require.NoError(t, err)
 
-	cfg = loadBaseTestConfig(t)
+	startupCfg, cfg = loadTestConfig(t)
 	_, _, _, err = New(
 		t.Context(),
 		log,
@@ -592,7 +576,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
+		startupCfg,
 		cfg,
 		nil,
 		nil,
@@ -615,7 +599,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
     level: debug`), 0640)
 	require.NoError(t, err)
 
-	cfg = loadBaseTestConfig(t)
+	startupCfg, cfg = loadTestConfig(t)
 	_, _, _, err = New(
 		t.Context(),
 		log,
@@ -628,7 +612,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
+		startupCfg,
 		cfg,
 		nil,
 		nil,
@@ -695,7 +679,7 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
   host: https://localhost:8220`))
 	require.NoError(t, err)
 
-	cfg := loadTestConfig(t)
+	startupCfg, cfg := loadTestConfig(t)
 	_, _, _, err = New(
 		t.Context(),
 		log,
@@ -708,7 +692,7 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
+		startupCfg,
 		cfg,
 		nil,
 		nil,
@@ -718,4 +702,12 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 	ymlBytes, err := os.ReadFile(paths.ConfigFile())
 	require.NoError(t, err)
 	require.EqualValues(t, DefaultAgentFleetConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
+}
+
+func loadTestConfig(t *testing.T) (startupCfg, cfg *configuration.Configuration) {
+	t.Helper()
+
+	reloader, err := configuration.NewConfigReloader(t.Context(), nil, nil)
+	require.NoError(t, err)
+	return reloader.StartupConfiguration(), reloader.Configuration()
 }

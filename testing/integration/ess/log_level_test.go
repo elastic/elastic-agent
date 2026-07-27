@@ -473,6 +473,7 @@ func updateAgentLogLevel(ctx context.Context, t *testing.T, kibanaClient *kibana
 	if err != nil {
 		return fmt.Errorf("error executing fleet request: %w", err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Logf("error updating agent-specific log level to %q", logLevel)
@@ -525,6 +526,7 @@ func updatePolicyLogLevel(ctx context.Context, t *testing.T, kibanaClient *kiban
 	if err != nil {
 		return fmt.Errorf("error executing fleet request: %w", err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Logf("error updating policy log level to %q", newPolicyLogLevel)
