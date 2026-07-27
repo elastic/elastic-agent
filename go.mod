@@ -159,11 +159,6 @@ require (
 	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
-<<<<<<< HEAD
-	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203 // indirect
-=======
-	github.com/elastic/go-concert v0.3.1 // indirect
->>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	github.com/elastic/go-docappender/v2 v2.14.1 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-lumber v0.2.0 // indirect
@@ -375,11 +370,6 @@ require (
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-<<<<<<< HEAD
-	go.yaml.in/yaml/v4 v4.0.0-rc.4 // indirect
-=======
-	golang.org/x/exp v0.0.0-20260611194520-c48552f49976 // indirect
->>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260625142307-59b4966ccb57 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
@@ -388,11 +378,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260622175928-b703f567277d // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-<<<<<<< HEAD
-	gotest.tools/v3 v3.5.2 // indirect
-=======
-	gotest.tools/gotestsum v1.13.0 // indirect
->>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	k8s.io/apiextensions-apiserver v0.35.1 // indirect
 	k8s.io/apiserver v0.35.1 // indirect
 	k8s.io/component-base v0.35.3 // indirect
