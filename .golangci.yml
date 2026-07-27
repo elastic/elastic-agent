@@ -10,7 +10,7 @@ linters:
     - errorlint
     - forbidigo
     - gomoddirectives
-    - gomodguard
+    - gomodguard_v2
     - gosec
     - govet
     - importas
@@ -67,18 +67,17 @@ linters:
         - go.opentelemetry.io/collector/service
         - github.com/elastic/elastic-agent-libs
       replace-local: true
-    gomodguard:
+    gomodguard_v2:
       blocked:
-        modules:
-          - github.com/pkg/errors:
-              recommendations:
-                - errors
-                - fmt
-              reason: This package is deprecated, use `fmt.Errorf` with `%w` instead
-          - github.com/google/uuid:
-              recommendations:
-                - github.com/gofrs/uuid/v5
-              reason: Use one uuid library consistently across the codebase
+        - module: github.com/pkg/errors
+          recommendations:
+            - errors
+            - fmt
+          reason: This package is deprecated, use `fmt.Errorf` with `%w` instead
+        - module: github.com/google/uuid
+          recommendations:
+            - github.com/gofrs/uuid/v5
+          reason: Use one uuid library consistently across the codebase
     gosec:
       excludes:
         - G306

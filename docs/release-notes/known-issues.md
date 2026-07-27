@@ -23,6 +23,19 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+::::{dropdown} {{agent}} restarts repeatedly in containers after a {{fleet}} policy update
+
+**Applies to: {{agent}} 9.3.7, 9.3.8, 9.4.3, 9.4.4**
+
+On July 9, 2026, a known issue was discovered where {{agent}} can restart repeatedly when it is deployed in a {{fleet}}-managed container. When it processes a policy update, the agent uses the default logging values instead of the configuration already active in the container. It incorrectly detects a logging change, restarts and repeats this process indefinitely.
+
+**Workaround**
+
+Make the policy's logging outputs match the container configuration. In the agent policy's **Advanced settings**, set `agent_logging_to_stderr` to `true` and `agent_logging_to_files` to `false`.
+
+For more information, check [Issue #15432](https://github.com/elastic/elastic-agent/issues/15432).
+::::
+
 :::{dropdown} {{agent}} logs a "failed to unmarshal checkin actions" error on almost every {{fleet}} check-in
 
 **Applies to: {{agent}} 8.19.17, 8.19.18, 9.3.6, 9.3.7, 9.4.3**
