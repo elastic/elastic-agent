@@ -1947,6 +1947,49 @@ func (f *fakeVarsManager) DefaultProvider() string {
 	return ""
 }
 
+// TestCoordinator_PerformAction_RoutesByRuntimeManager verifies that
+// Coordinator.PerformAction routes to the otel manager for components running
+// under the OTel runtime, and to the runtime (process) manager otherwise.
+func TestCoordinator_PerformAction_RoutesByRuntimeManager(t *testing.T) {
+	var runtimeCalled, otelCalled bool
+	runtimeMgr := &fakeRuntimeManager{
+		performActionCallback: func(_ context.Context, _ component.Component, _ component.Unit, _ string, _ map[string]interface{}) (map[string]interface{}, error) {
+			runtimeCalled = true
+			return map[string]interface{}{"via": "runtime"}, nil
+		},
+	}
+	otelMgr := &fakeOTelManager{
+		performActionCallback: func(_ context.Context, _ component.Component, _ component.Unit, _ string, _ map[string]interface{}) (map[string]interface{}, error) {
+			otelCalled = true
+			return map[string]interface{}{"via": "otel"}, nil
+		},
+	}
+	coord := &Coordinator{
+		runtimeMgr: runtimeMgr,
+		otelMgr:    otelMgr,
+	}
+
+	t.Run("process runtime routes to runtimeMgr", func(t *testing.T) {
+		runtimeCalled, otelCalled = false, false
+		comp := component.Component{ID: "osquery-default", RuntimeManager: component.ProcessRuntimeManager}
+		res, err := coord.PerformAction(context.Background(), comp, component.Unit{}, "osquery", nil)
+		require.NoError(t, err)
+		assert.Equal(t, map[string]interface{}{"via": "runtime"}, res)
+		assert.True(t, runtimeCalled, "runtimeMgr.PerformAction should have been called")
+		assert.False(t, otelCalled, "otelMgr.PerformAction should not have been called")
+	})
+
+	t.Run("otel runtime routes to otelMgr", func(t *testing.T) {
+		runtimeCalled, otelCalled = false, false
+		comp := component.Component{ID: "osquery-default", RuntimeManager: component.OtelRuntimeManager}
+		res, err := coord.PerformAction(context.Background(), comp, component.Unit{}, "osquery", nil)
+		require.NoError(t, err)
+		assert.Equal(t, map[string]interface{}{"via": "otel"}, res)
+		assert.True(t, otelCalled, "otelMgr.PerformAction should have been called")
+		assert.False(t, runtimeCalled, "runtimeMgr.PerformAction should not have been called")
+	})
+}
+
 var _ OTelManager = (*fakeOTelManager)(nil)
 
 type fakeOTelManager struct {
@@ -1954,6 +1997,7 @@ type fakeOTelManager struct {
 	updateComponentCallback             func([]component.Component) error
 	performDiagnosticsCallback          func(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
 	performComponentDiagnosticsCallback func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) ([]runtime.ComponentDiagnostic, error)
+	performActionCallback               func(context.Context, component.Component, component.Unit, string, map[string]interface{}) (map[string]interface{}, error)
 	errChan                             chan error
 	collectorStatusChan                 chan *status.AggregateStatus
 	componentStateChan                  chan []runtime.ComponentComponentState
@@ -2010,12 +2054,20 @@ func (f *fakeOTelManager) PerformComponentDiagnostics(ctx context.Context, addit
 	return nil, nil
 }
 
+func (f *fakeOTelManager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	if f.performActionCallback != nil {
+		return f.performActionCallback(ctx, comp, unit, name, params)
+	}
+	return nil, nil
+}
+
 // An implementation of the RuntimeManager interface for use in testing.
 type fakeRuntimeManager struct {
 	state                               []runtime.ComponentComponentState
 	updateCallback                      func([]component.Component) error
 	performDiagnosticsCallback          func(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
 	performComponentDiagnosticsCallback func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) ([]runtime.ComponentDiagnostic, error)
+	performActionCallback               func(context.Context, component.Component, component.Unit, string, map[string]interface{}) (map[string]interface{}, error)
 	result                              error
 	errChan                             chan error
 }
@@ -2044,7 +2096,10 @@ func (r *fakeRuntimeManager) State() []runtime.ComponentComponentState {
 }
 
 // PerformAction executes an action on a unit.
-func (r *fakeRuntimeManager) PerformAction(_ context.Context, _ component.Component, _ component.Unit, _ string, _ map[string]interface{}) (map[string]interface{}, error) {
+func (r *fakeRuntimeManager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	if r.performActionCallback != nil {
+		return r.performActionCallback(ctx, comp, unit, name, params)
+	}
 	return nil, nil
 }
 

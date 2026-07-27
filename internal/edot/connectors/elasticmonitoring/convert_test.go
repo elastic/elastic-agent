@@ -399,3 +399,83 @@ func TestAgentComponentID(t *testing.T) {
 		})
 	}
 }
+
+func TestReceiverMetricField(t *testing.T) {
+	tests := []struct {
+		beatType   string
+		metricName string
+		expected   string
+	}{
+		// libbeat.* names: no beat-type infix
+		{"filebeat", "libbeat.output.events.total", "beat.stats.libbeat.output.events.total"},
+		{"filebeat", "libbeat.output.events.acked", "beat.stats.libbeat.output.events.acked"},
+		// beat-type prefixed names: no double-prefix
+		{"filebeat", "filebeat.harvester.running", "beat.stats.filebeat.harvester.running"},
+		{"metricbeat", "metricbeat.some.metric", "beat.stats.metricbeat.some.metric"},
+		// unqualified names: get beat-type infix
+		{"filebeat", "pipeline.clients", "beat.stats.filebeat.pipeline.clients"},
+		{"filebeat", "harvester.running", "beat.stats.filebeat.harvester.running"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.beatType+"/"+tt.metricName, func(t *testing.T) {
+			assert.Equal(t, tt.expected, receiverMetricField(tt.beatType, tt.metricName))
+		})
+	}
+}
+
+func TestCollectReceiverPipelineMetrics_LibbeatPrefix(t *testing.T) {
+	// libbeat.* metric names should NOT get an extra beat-type infix.
+	const receiverID = "filebeatreceiver/_agent-component/filestream-default"
+	md, sm := newMetricsWithRegistryBridgeScope()
+	appendSumIntWithAttrs(sm, "libbeat.output.events.total", int64(200), registryBridgeReceiverKey, receiverID)
+	appendSumIntWithAttrs(sm, "libbeat.output.events.acked", int64(180), registryBridgeReceiverKey, receiverID)
+
+	result := collectReceiverMetrics(md)
+	require.Len(t, result, 1)
+	fields := result["filestream-default"]
+	assert.Equal(t, int64(200), fields["beat.stats.libbeat.output.events.total"])
+	assert.Equal(t, int64(180), fields["beat.stats.libbeat.output.events.acked"])
+	// Confirm the double-prefix form does NOT exist
+	assert.Nil(t, fields["beat.stats.filebeat.libbeat.output.events.total"])
+}
+
+func TestCollectReceiverPipelineMetrics_PerContainerAggregation(t *testing.T) {
+	// Two per-container receivers for the same base component should be aggregated.
+	const base = "filebeatreceiver/_agent-component/filestream-default"
+	const r1 = base + "/container-hash-aaa"
+	const r2 = base + "/container-hash-bbb"
+	md, sm := newMetricsWithRegistryBridgeScope()
+	appendSumIntWithAttrs(sm, "libbeat.output.events.acked", int64(100), registryBridgeReceiverKey, r1)
+	appendSumIntWithAttrs(sm, "libbeat.output.events.acked", int64(50), registryBridgeReceiverKey, r2)
+	appendGaugeIntWithAttrs(sm, "filebeat.harvester.running", int64(3), registryBridgeReceiverKey, r1)
+	appendGaugeIntWithAttrs(sm, "filebeat.harvester.running", int64(2), registryBridgeReceiverKey, r2)
+
+	result := collectReceiverMetrics(md)
+	// Only one base component entry
+	require.Len(t, result, 1)
+	fields, ok := result["filestream-default"]
+	require.True(t, ok)
+	// Values from both containers are summed
+	assert.Equal(t, int64(150), fields["beat.stats.libbeat.output.events.acked"])
+	assert.Equal(t, int64(5), fields["beat.stats.filebeat.harvester.running"])
+}
+
+func TestCollectReceiverPipelineMetrics_MonitoringComponentPreservesFullID(t *testing.T) {
+	// Monitoring components have "/" in their comp.ID (e.g. "http/metrics-monitoring").
+	// Per-container receivers append another "/" + streamID, so the full agent component
+	// ID after agentComponentID() is "http/metrics-monitoring/<streamID>".
+	// baseComponentID must cut at the LAST "/" to preserve "http/metrics-monitoring",
+	// not collapse it to "http".
+	const r1 = "metricbeatreceiver/_agent-component/http/metrics-monitoring/stream-aaa"
+	const r2 = "metricbeatreceiver/_agent-component/beat/metrics-monitoring/stream-bbb"
+	md, sm := newMetricsWithRegistryBridgeScope()
+	appendSumIntWithAttrs(sm, "libbeat.output.events.acked", int64(10), registryBridgeReceiverKey, r1)
+	appendSumIntWithAttrs(sm, "libbeat.output.events.acked", int64(20), registryBridgeReceiverKey, r2)
+
+	result := collectReceiverMetrics(md)
+	require.Len(t, result, 2)
+	assert.Contains(t, result, "http/metrics-monitoring")
+	assert.Contains(t, result, "beat/metrics-monitoring")
+	assert.NotContains(t, result, "http")
+	assert.NotContains(t, result, "beat")
+}
