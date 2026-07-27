@@ -28,7 +28,7 @@ steps:
     build:
       branch: "main"
       message: "Version bump elastic-agent to ${NEW_VERSION} (${WORKFLOW})"
-      meta_data:
+      env:
         REPOSITORY: "elastic-agent"
         RELEASE_TYPE: "${WORKFLOW}"
         CURRENT_RELEASE: "${NEW_VERSION}"
@@ -47,7 +47,7 @@ steps:
     build:
       branch: "main"
       message: "Version bump elastic-agent to ${NEW_VERSION} (patch)"
-      meta_data:
+      env:
         REPOSITORY: "elastic-agent"
         CURRENT_RELEASE: "${NEW_VERSION}"
         DRY_RUN: "false"
