@@ -1758,14 +1758,9 @@ service:
 			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]any{
 				"log.file.path": inputFilePath,
 			})
-<<<<<<< HEAD
-			require.NoError(t, err)
-			got := int(docs.Hits.Total.Value)
-=======
 			require.NoError(ct, err)
+			
 			got := docs.Hits.Total.Value
->>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
-
 			require.GreaterOrEqual(t, got, 10, "")
 		},
 		time.Minute,
@@ -2162,20 +2157,12 @@ outputs:
 `
 
 	var configBuffer bytes.Buffer
-<<<<<<< HEAD
-	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-		otelConfigOptions{
-			StatusReportingEnabled: true,
-		})
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-=======
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			otelConfigOptions{
 				StatusReportingEnabled: true,
 			}))
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
->>>>>>> 420e5e547 (Replace testcontainers compose module with docker CLI shell-outs (#15685))
 	defer cancel()
 
 	installOpts := aTesting.InstallOpts{
