@@ -63,6 +63,7 @@ func New(
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
+	startupCfg *configuration.Configuration,
 	cfg *configuration.Configuration,
 	initialUpdateMarker *upgrade.UpdateMarker,
 	availableRollbacksSource ttl.Source,
@@ -240,7 +241,7 @@ func New(
 				return nil, nil, nil, fmt.Errorf("failed to create encrypted disk store: %w", err)
 			}
 			// TODO: stop using global state
-			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, availableRollbacksSource, upgrader)
+			managed, err = newManagedConfigManager(log, agentInfo, startupCfg, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, availableRollbacksSource, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
