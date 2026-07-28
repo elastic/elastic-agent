@@ -385,7 +385,7 @@ steps:
       - label: "K8s tests: {{matrix.k8s_version}}"
         env:
           K8S_VERSION: "v{{matrix.k8s_version}}"
-          KIND_VERSION: "v0.27.0"
+          KIND_VERSION: "v0.32.0"
         command: ".buildkite/scripts/steps/k8s-tests.sh"
         agents:
           provider: "gcp"
@@ -393,6 +393,9 @@ steps:
         matrix:
           setup:
             k8s_version:
+              - "1.36.1"
+              - "1.35.0"
+              - "1.34.0"
               - "1.33.0"
               - "1.32.0"
               - "1.31.0"
@@ -496,6 +499,31 @@ steps:
         - .buildkite/pipeline.elastic-agent-package.yml
         - .buildkite/scripts/steps/package.sh
         - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
+        - magefile.go
+        - dev-tools/**/*
+
+  # NOTE: Tests the independent agent release (IAR) packaging workflow against a real
+  # staging manifest, to catch regressions before they reach the release pipeline.
+  # See https://buildkite.com/elastic/independent-agent-release-staging
+  - label: "Trigger Elastic Agent Package (IAR staging)"
+    if: build.pull_request.id != null
+    commands:
+      - .buildkite/scripts/steps/trigger-elastic-agent-package-iar.sh
+      - .buildkite/scripts/steps/trigger-elastic-agent-package-iar.sh | buildkite-agent pipeline upload
+    plugins:
+    - sparse-checkout#v1.6.0:
+        paths:
+        - .buildkite
+        - .go-version
+        - version/version.go
+        - .package-version
+        - magefile.go
+        - dev-tools
+    if_changed:
+      include:
+        - .buildkite/pipeline.elastic-agent-package.yml
+        - .buildkite/scripts/steps/package.sh
+        - .buildkite/scripts/steps/trigger-elastic-agent-package-iar.sh
         - magefile.go
         - dev-tools/**/*
 
