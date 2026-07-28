@@ -154,6 +154,10 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 
 	testStart := time.Now()
 
+	// The package installed for this test, defined in testing/integration/ess/testdata/auditd_package.json configures
+	// the auditd input to track execve events from the test binary itself. The test shells out to elastic-agent each
+	// time it collects the status, so we're guaranteed to have events in the monitored time window.
+
 	// Validate OTel mode (the default for auditbeat).
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
@@ -167,8 +171,9 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 			for _, comp := range status.Components {
 				if strings.HasPrefix(comp.ID, "audit/auditd") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
-					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected audit/auditd component to be healthy, got %s", cproto.State(comp.State))
+					compStateProto := cproto.State(comp.State) //nolint:gosec // guaranteed to be valid
+					assert.Equal(collect, cproto.State_HEALTHY, compStateProto,
+						"expected audit/auditd component to be healthy, got %s", compStateProto)
 					foundReceiver = true
 					break
 				}
@@ -197,8 +202,9 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 			for _, comp := range status.Components {
 				if strings.HasPrefix(comp.ID, "audit/auditd") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.ProcessRuntimeManager) {
-					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected audit/auditd component to be healthy, got %s", cproto.State(comp.State))
+					compStateProto := cproto.State(comp.State) //nolint:gosec // guaranteed to be valid
+					assert.Equal(collect, cproto.State_HEALTHY, compStateProto,
+						"expected audit/auditd component to be healthy, got %s", compStateProto)
 					foundProcess = true
 					break
 				}
