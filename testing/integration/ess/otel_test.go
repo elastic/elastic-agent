@@ -1751,7 +1751,7 @@ service:
 
 	require.EventuallyWithT(
 		t,
-		func(t *assert.CollectT) {
+		func(ct *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
@@ -1761,7 +1761,7 @@ service:
 			require.NoError(ct, err)
 
 			got := docs.Hits.Total.Value
-			require.GreaterOrEqual(t, got, 10, "")
+			require.GreaterOrEqual(ct, got, 10, "")
 		},
 		time.Minute,
 		time.Second,
