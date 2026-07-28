@@ -102,6 +102,13 @@
       "prConcurrentLimit": 10
     },
     {
+      "description": "GitHub Actions: keep macOS runner updates manual",
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["github-runner"],
+      "matchPackageNames": ["macos"],
+      "enabled": false
+    },
+    {
       "description": "pip (docs/scripts/update-docs): weekly Monday updates",
       "matchManagers": ["pip_requirements"],
       "schedule": ["on monday"],
