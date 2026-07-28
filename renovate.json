@@ -10,7 +10,7 @@
     "Team:Elastic-Agent-Control-Plane"
   ],
   "pip_requirements": {
-    "managerFilePatterns": ["/^docs/scripts/update-docs//"]
+    "managerFilePatterns": ["/^docs/scripts/update-docs/requirements\\.txt$/"]
   },
   "pre-commit": {
     "enabled": true
