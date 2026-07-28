@@ -154,6 +154,10 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 
 	testStart := time.Now()
 
+	// The package installed for this test, defined in testing/integration/ess/testdata/auditd_package.json configures
+	// the auditd input to track execve events from the test binary itself. The test shells out to elastic-agent each
+	// time it collects the status, so we're guaranteed to have events in the monitored time window.
+
 	// Validate OTel mode (the default for auditbeat).
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
