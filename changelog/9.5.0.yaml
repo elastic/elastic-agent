@@ -580,7 +580,8 @@ entries:
       summary: Add environment variables to collector diagnostics
       description: ""
       component: elastic-agent
-      pr: []
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15512
       issue: []
       impact: ""
       action: ""

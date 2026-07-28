@@ -33,7 +33,7 @@
 * Bump kube-stack to v0.16.0 and fix `ELASTIC_AGENT_OTEL` quoting for `otel` mode. [#15013](https://github.com/elastic/elastic-agent/pull/15013) 
 * Set OTel as the default runtime for Packetbeat. [#15151](https://github.com/elastic/elastic-agent/pull/15151) [#14554](https://github.com/elastic/elastic-agent/issues/14554)
 * Set OTel as the default runtime for Heartbeat. [#15325](https://github.com/elastic/elastic-agent/pull/15325) 
-* Add environment variables to collector diagnostics.  
+* Add environment variables to collector diagnostics. [#15512](https://github.com/elastic/elastic-agent/pull/15512)
 
 
 ### Fixes [elastic-agent-9.5.0-fixes]
