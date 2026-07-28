@@ -171,8 +171,9 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 			for _, comp := range status.Components {
 				if strings.HasPrefix(comp.ID, "audit/auditd") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
-					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected audit/auditd component to be healthy, got %s", cproto.State(comp.State))
+					compStateProto := cproto.State(comp.State) //nolint:gosec // guaranteed to be valid
+					assert.Equal(collect, cproto.State_HEALTHY, compStateProto,
+						"expected audit/auditd component to be healthy, got %s", compStateProto)
 					foundReceiver = true
 					break
 				}
@@ -201,8 +202,9 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 			for _, comp := range status.Components {
 				if strings.HasPrefix(comp.ID, "audit/auditd") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.ProcessRuntimeManager) {
-					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected audit/auditd component to be healthy, got %s", cproto.State(comp.State))
+					compStateProto := cproto.State(comp.State) //nolint:gosec // guaranteed to be valid
+					assert.Equal(collect, cproto.State_HEALTHY, compStateProto,
+						"expected audit/auditd component to be healthy, got %s", compStateProto)
 					foundProcess = true
 					break
 				}
