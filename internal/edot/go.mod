@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260724191718-8a654fcc5b61
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260727204530-90c9524e3136
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.46.2
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -89,7 +89,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/pubsub/v2 v2.6.0 // indirect
+	cloud.google.com/go/pubsub/v2 v2.6.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs/v2 v2.0.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/v4 v4.0.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions/v2 v2.0.0 // indirect
@@ -235,17 +235,17 @@ require (
 	aqwari.net/xml v0.0.0-20210331023308-d9421b293817 // indirect
 	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go v0.123.0 // indirect
-	cloud.google.com/go/auth v0.20.0 // indirect
+	cloud.google.com/go/auth v0.22.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
-	cloud.google.com/go/bigquery v1.77.0 // indirect
-	cloud.google.com/go/compute v1.64.0 // indirect
+	cloud.google.com/go/bigquery v1.79.0 // indirect
+	cloud.google.com/go/compute v1.65.0 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
-	cloud.google.com/go/iam v1.11.0 // indirect
-	cloud.google.com/go/longrunning v1.0.0 // indirect
-	cloud.google.com/go/monitoring v1.29.0 // indirect
-	cloud.google.com/go/pubsub v1.50.2 // indirect
-	cloud.google.com/go/redis v1.23.0 // indirect
-	cloud.google.com/go/storage v1.62.2 // indirect
+	cloud.google.com/go/iam v1.12.0 // indirect
+	cloud.google.com/go/longrunning v1.2.0 // indirect
+	cloud.google.com/go/monitoring v1.30.0 // indirect
+	cloud.google.com/go/pubsub v1.51.0 // indirect
+	cloud.google.com/go/redis v1.25.0 // indirect
+	cloud.google.com/go/storage v1.62.3 // indirect
 	code.cloudfoundry.org/go-diodes v0.0.0-20190809170250-f77fb823c7ee // indirect
 	code.cloudfoundry.org/go-loggregator v7.4.0+incompatible // indirect
 	code.cloudfoundry.org/gofileutils v0.0.0-20170111115228-4d0c80011a0f // indirect

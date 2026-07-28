@@ -368,7 +368,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		monitoringServer = nil
 	}
 
-	return run(containerCfgOverrides, false, initTimeout, isContainer)
+	return run(containerLoggingCfgOverrides, containerCfgOverrides, false, initTimeout, isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token
@@ -876,16 +876,13 @@ func runLegacyAPMServer(streams *cli.IOStreams) (*process.Info, error) {
 	return process.Start(spec.BinaryPath, options...)
 }
 
-func containerCfgOverrides(cfg *config.Config) error {
+// containerLoggingCfgOverrides applies container logging defaults before Fleet values can override them.
+func containerLoggingCfgOverrides(cfg *config.Config) error {
 	uCfg := map[string]any{}
 
 	if logsPath := envWithDefault("", "LOGS_PATH"); logsPath == "" {
 		uCfg["agent.logging.to_stderr"] = true
 		uCfg["agent.logging.to_files"] = false
-	}
-
-	if envBool("HTTPPROF") {
-		uCfg["agent.monitoring.pprof.enabled"] = true
 	}
 
 	eventsToStderrEnv := envWithDefault("false", "EVENTS_TO_STDERR")
@@ -896,6 +893,20 @@ func containerCfgOverrides(cfg *config.Config) error {
 	if eventsToStderr {
 		uCfg["agent.logging.event_data.to_files"] = false
 		uCfg["agent.logging.event_data.to_stderr"] = true
+	}
+
+	if err := cfg.Merge(uCfg); err != nil {
+		return err
+	}
+	return customLogsPathCfgOverride(cfg)
+}
+
+// containerCfgOverrides applies authoritative container settings after Fleet values are merged.
+func containerCfgOverrides(cfg *config.Config) error {
+	uCfg := map[string]any{}
+
+	if envBool("HTTPPROF") {
+		uCfg["agent.monitoring.pprof.enabled"] = true
 	}
 
 	uCfg["agent.grpc.port"] = configuration.GetContainerGRPCPort()
