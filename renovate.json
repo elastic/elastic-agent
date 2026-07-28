@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "baseBranches": ["main", "9.5", "9.4", "9.3", "8.19"],
+  "baseBranchPatterns": ["main", "9.5", "9.4", "9.3", "8.19"],
   "labels": [
     "automation",
     "skip-changelog",
@@ -9,7 +9,7 @@
     "Team:Elastic-Agent-Control-Plane"
   ],
   "pip_requirements": {
-    "fileMatch": ["^docs/scripts/update-docs/"]
+    "managerFilePatterns": ["/^docs/scripts/update-docs//"]
   },
   "packageRules": [
     {
@@ -27,66 +27,66 @@
     {
       "description": "elastic: all Elastic org and APM packages",
       "matchManagers": ["gomod"],
-      "matchPackagePatterns": [
-        "^github\\.com/elastic/",
-        "^go\\.elastic\\.co/"
+      "matchPackageNames": [
+        "/^github\\.com/elastic//",
+        "/^go\\.elastic\\.co//"
       ],
       "groupName": "elastic"
     },
     {
       "description": "golang-x: extended standard library",
       "matchManagers": ["gomod"],
-      "matchPackagePatterns": ["^golang\\.org/x/"],
+      "matchPackageNames": ["/^golang\\.org/x//"],
       "groupName": "golang-x"
     },
     {
       "description": "tooling-test: dependencies used only in tests or test infrastructure",
       "matchManagers": ["gomod"],
-      "matchPackagePatterns": [
-        "^github\\.com/stretchr/",
-        "^github\\.com/testcontainers/",
-        "^github\\.com/google/pprof$",
-        "^github\\.com/google/go-containerregistry$",
-        "^github\\.com/cavaliergopher/",
-        "^github\\.com/blakesmith/",
-        "^github\\.com/sajari/",
-        "^github\\.com/moby/"
+      "matchPackageNames": [
+        "/^github\\.com/stretchr//",
+        "/^github\\.com/testcontainers//",
+        "/^github\\.com/google/pprof$/",
+        "/^github\\.com/google/go-containerregistry$/",
+        "/^github\\.com/cavaliergopher//",
+        "/^github\\.com/blakesmith//",
+        "/^github\\.com/sajari//",
+        "/^github\\.com/moby//"
       ],
       "groupName": "tooling-test"
     },
     {
       "description": "packaging: dependencies used only in magefile.go, dev-tools/, or tools/tools.go",
       "matchManagers": ["gomod"],
-      "matchPackagePatterns": [
-        "^github\\.com/magefile/",
-        "^github\\.com/Jeffail/gabs",
-        "^github\\.com/josephspurrier/goversioninfo$",
-        "^github\\.com/rednafi/link-patrol$",
-        "^gotest\\.tools/",
-        "^github\\.com/vektra/mockery/"
+      "matchPackageNames": [
+        "/^github\\.com/magefile//",
+        "/^github\\.com/Jeffail/gabs/",
+        "/^github\\.com/josephspurrier/goversioninfo$/",
+        "/^github\\.com/rednafi/link-patrol$/",
+        "/^gotest\\.tools//",
+        "/^github\\.com/vektra/mockery//"
       ],
       "groupName": "packaging"
     },
     {
       "description": "k8s-ecosystem: k8s core libraries and all direct deps whose go.mod requires k8s.io/*, so breaking API changes are bumped in lockstep. Placed after elastic (last-match-wins) to pull cloud-on-k8s and elastic-agent-autodiscover into this group.",
       "matchManagers": ["gomod"],
-      "matchPackagePatterns": [
-        "^k8s\\.io/",
-        "^sigs\\.k8s\\.io/",
-        "^helm\\.sh/helm/",
-        "^github\\.com/elastic/cloud-on-k8s/"
+      "matchPackageNames": [
+        "/^k8s\\.io//",
+        "/^sigs\\.k8s\\.io//",
+        "/^helm\\.sh/helm//",
+        "/^github\\.com/elastic/cloud-on-k8s//"
       ],
       "groupName": "k8s-ecosystem"
     },
     {
       "description": "Disabled: beats (git submodule), sarama (manual path handling), OTel packages (own release cycle)",
       "matchManagers": ["gomod"],
-      "matchPackagePatterns": [
-        "^github\\.com/elastic/beats/",
-        "^github\\.com/elastic/sarama$",
-        "^go\\.opentelemetry\\.io/",
-        "^github\\.com/open-telemetry/",
-        "^github\\.com/elastic/opentelemetry-collector-components/"
+      "matchPackageNames": [
+        "/^github\\.com/elastic/beats//",
+        "/^github\\.com/elastic/sarama$/",
+        "/^go\\.opentelemetry\\.io//",
+        "/^github\\.com/open-telemetry//",
+        "/^github\\.com/elastic/opentelemetry-collector-components//"
       ],
       "enabled": false
     },
