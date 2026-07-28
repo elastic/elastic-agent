@@ -573,8 +573,8 @@ github.com/prometheus/client_golang v1.23.2 h1:Je96obch5RDVy3FDMndoUsjAhG5Edi49h
 github.com/prometheus/client_golang v1.23.2/go.mod h1:Tb1a6LWHB3/SPIzCoaDXI4I8UHKeFTEQ1YCr+0Gyqmg=
 github.com/prometheus/client_model v0.6.2 h1:oBsgwpGs7iVziMvrGhE53c/GrLUsZdHnqNwqPLxwZyk=
 github.com/prometheus/client_model v0.6.2/go.mod h1:y3m2F6Gdpfy6Ut/GBsUqTWZqCUvMVzSfMLjcu6wAwpE=
-github.com/prometheus/common v0.68.1 h1:omjRRl4QP4komogpXuhfeOiisQg7xdy8VM1UY+pStaY=
-github.com/prometheus/common v0.68.1/go.mod h1:ZzL3f6u94qUxh9p+tJTrF+FvBS1XXbbRAZCQkytAL0Y=
+github.com/prometheus/common v0.69.0 h1:OA85nJQS/T/MaYh/Q2CcgDKSGWqNIgrBDvDH85CuiNk=
+github.com/prometheus/common v0.69.0/go.mod h1:ZzL3f6u94qUxh9p+tJTrF+FvBS1XXbbRAZCQkytAL0Y=
 github.com/prometheus/otlptranslator v1.0.0 h1:s0LJW/iN9dkIH+EnhiD3BlkkP5QVIUVEoIwkU+A6qos=
 github.com/prometheus/otlptranslator v1.0.0/go.mod h1:vRYWnXvI6aWGpsdY/mOT/cbeVRBlPWtBNDb7kGR3uKM=
 github.com/prometheus/procfs v0.20.1 h1:XwbrGOIplXW/AU3YhIhLODXMJYyC1isLFfYCsTEycfc=
@@ -736,8 +736,8 @@ go.opentelemetry.io/collector/config/configtls v1.62.0 h1:C4WywYuIhIHMkAcWmK19gH
 go.opentelemetry.io/collector/config/configtls v1.62.0/go.mod h1:2r+Hlr7RXBs9u03HSd4eYJCLi6hukRQv7o36WrgzNkY=
 go.opentelemetry.io/collector/confmap v1.62.0 h1:JF1hNjXeZGDKKyK0QBa9yAtGUado+zj4hLHM0BCag40=
 go.opentelemetry.io/collector/confmap v1.62.0/go.mod h1:4rRpkbOkE/LvUSmrMX+jCr94i8P4JtYf93TBvfR5LUA=
-go.opentelemetry.io/collector/confmap/provider/fileprovider v1.61.0 h1:pC9NLKsQ3ii+/yjNB+SZOfSRmUTADOtEpnXBzcvZy6k=
-go.opentelemetry.io/collector/confmap/provider/fileprovider v1.61.0/go.mod h1:MQvu05qOpT4XKYzOXdeDdKPSn+NhUu4nsWsJNwvsKaI=
+go.opentelemetry.io/collector/confmap/provider/fileprovider v1.62.0 h1:1ug4zX8VLlHeID/hRdDDEoyIulRFvc9Uf/yuauzdDik=
+go.opentelemetry.io/collector/confmap/provider/fileprovider v1.62.0/go.mod h1:kdPzdfLn/122VmHdZPVsaWoDHWFOJpG/m8P76or56VE=
 go.opentelemetry.io/collector/confmap/xconfmap v0.156.0 h1:klJDLtd4+xeCttXAL0teEdnR8w1veNEOBvaP1YzAWm4=
 go.opentelemetry.io/collector/confmap/xconfmap v0.156.0/go.mod h1:SGEOhF001IBHO1CMw7lUjzpvRu3eH4T+aayeGSC6alo=
 go.opentelemetry.io/collector/connector v0.156.0 h1:3D1UIsyjqpbp6WhooNRAY8XDVPCwzB2WIKMm8iYKK/U=
