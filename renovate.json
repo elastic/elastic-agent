@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
+  "enabledManagers": ["gomod", "github-actions", "pip_requirements", "pre-commit"],
   "baseBranchPatterns": ["main", "9.5", "9.4", "9.3", "8.19"],
   "labels": [
     "automation",
@@ -10,6 +11,9 @@
   ],
   "pip_requirements": {
     "managerFilePatterns": ["/^docs/scripts/update-docs//"]
+  },
+  "pre-commit": {
+    "enabled": true
   },
   "packageRules": [
     {
