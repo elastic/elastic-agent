@@ -121,6 +121,14 @@ func New(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
+<<<<<<< HEAD
+=======
+	// prepare initialUpgradeDetails for injecting it in coordinator later on
+	var initialUpgradeDetails *details.Details
+	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil {
+		initialUpgradeDetails = initialUpdateMarker.Details
+	}
+>>>>>>> eb3502ff9 (Give service-runtime components more time to check in before failing an upgrade (#15423))
 
 	var configMgr coordinator.ConfigManager
 	var managed *managedConfigManager
