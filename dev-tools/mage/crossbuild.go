@@ -335,6 +335,14 @@ func (b GolangCrossBuilder) Build() error {
 		args = append(args, "-v", quarkHostPath+":"+quarkMountPath+":ro")
 	}
 
+	// Mount the go-quark sibling repo if present, so that the local replace
+	// directive in internal/edot/go.mod resolves inside the container.
+	goQuarkHostPath := filepath.Join(filepath.Dir(repoInfo.RootDir), "go-quark")
+	if _, err := os.Stat(goQuarkHostPath); err == nil {
+		goQuarkMountPath := filepath.ToSlash(filepath.Dir(mountPoint)) + "/go-quark"
+		args = append(args, "-v", goQuarkHostPath+":"+goQuarkMountPath+":ro")
+	}
+
 	// If in a git worktree, mount the main repo's .git directory into the
 	// container so git can resolve the worktree reference.
 	if commonDir, err := sh.Output("git", "-C", repoInfo.RootDir, "rev-parse", "--git-common-dir"); err == nil {
