@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -118,31 +119,72 @@ i4EFZLWrFRsAAAARYWxleGtAZ3JlbWluLm5lc3QBAg==
 		},
 	}
 
-	formatted, err := yaml.Marshal(exampleConfig)
-	require.NoError(t, err)
-	errOut := strings.Builder{}
-	outWriter := strings.Builder{}
-	res := client.DiagnosticFileResult{Content: formatted, ContentType: "application/yaml"}
+	tests := []struct {
+		name        string
+		contentType string
+		marshal     func(any) ([]byte, error)
+	}{
+		{
+			name:        "YAML top-level array",
+			contentType: "application/yaml",
+			marshal:     yaml.Marshal,
+		},
+		{
+			name:        "JSON top-level array",
+			contentType: "application/json",
+			marshal:     json.Marshal,
+		},
+	}
 
-	err = writeRedacted(&errOut, &outWriter, "test/path", res)
-	require.NoError(t, err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			formatted, err := tc.marshal([]any{exampleConfig})
+			require.NoError(t, err)
+			errOut := strings.Builder{}
+			outWriter := strings.Builder{}
+			res := client.DiagnosticFileResult{Content: formatted, ContentType: tc.contentType}
 
-	require.Empty(t, errOut.String())
-	require.NotContains(t, outWriter.String(), "unredacted")
-	require.NotContains(t, outWriter.String(), privKey)
+			err = writeRedacted(&errOut, &outWriter, "test/path", res)
+			require.NoError(t, err)
+
+			require.Empty(t, errOut.String())
+			require.NotContains(t, outWriter.String(), "unredacted")
+			require.NotContains(t, outWriter.String(), privKey)
+		})
+	}
 }
 
 func TestRedactPlainString(t *testing.T) {
-	errOut := strings.Builder{}
-	outWriter := strings.Builder{}
-	inputString := "Just a string"
-	res := client.DiagnosticFileResult{Content: []byte(inputString), ContentType: "application/yaml"}
+	tests := []struct {
+		name        string
+		input       string
+		contentType string
+	}{
+		{
+			name:        "YAML scalar is unchanged",
+			input:       "Just a string",
+			contentType: "application/yaml",
+		},
+		{
+			name:        "JSON scalar is unchanged",
+			input:       `"Just a string"`,
+			contentType: "application/json",
+		},
+	}
 
-	err := writeRedacted(&errOut, &outWriter, "test/path", res)
-	require.NoError(t, err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errOut := strings.Builder{}
+			outWriter := strings.Builder{}
+			res := client.DiagnosticFileResult{Content: []byte(tc.input), ContentType: tc.contentType}
 
-	require.Empty(t, errOut.String())
-	require.Equal(t, outWriter.String(), inputString)
+			err := writeRedacted(&errOut, &outWriter, "test/path", res)
+			require.NoError(t, err)
+
+			require.Empty(t, errOut.String())
+			require.Equal(t, tc.input, outWriter.String())
+		})
+	}
 }
 
 func TestRedactComplexKeys(t *testing.T) {
