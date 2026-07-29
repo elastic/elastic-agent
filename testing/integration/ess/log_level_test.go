@@ -82,6 +82,70 @@ func TestSetLogLevelFleetManaged(t *testing.T) {
 	testLogLevelSetViaFleet(ctx, f, agentID, t, info, policyResp)
 }
 
+func TestSetLogLevelFleetManagedContainer(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Container,
+		Stack: &define.Stack{},
+		Local: true,
+		Sudo:  false,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+
+	deadline := time.Now().Add(15 * time.Minute)
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), deadline)
+	defer cancel()
+
+	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err, "failed creating agent fixture")
+	require.NoError(t, f.Prepare(ctx), "failed preparing agent fixture")
+
+	policyResp, enrollmentTokenResp := createPolicyAndEnrollmentToken(
+		ctx, t, info.KibanaClient, createBasicPolicy())
+
+	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	require.NoError(t, err, "failed getting Fleet Server URL")
+
+	env := []string{
+		"FLEET_ENROLL=1",
+		"FLEET_URL=" + fleetServerURL,
+		"FLEET_ENROLLMENT_TOKEN=" + enrollmentTokenResp.APIKey,
+		"STATE_PATH=" + f.WorkDir(),
+	}
+	cmd, agentOutput := prepareAgentCMD(t, ctx, f, []string{"container"}, env)
+	require.NoError(t, cmd.Start(), "failed starting container agent")
+
+	require.Eventuallyf(t, func() bool {
+		return f.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env))) == nil
+	}, 5*time.Minute, time.Second,
+		"container agent did not become healthy; output:\n%s", agentOutput.String())
+
+	agentID, err := f.AgentID(ctx, atesting.WithCmdOptions(withEnv(env)))
+	require.NoError(t, err, "error getting the agent ID")
+
+	policyLogLevel := logp.DebugLevel
+
+	require.NoError(t,
+		updatePolicyLogLevel(ctx, t, info.KibanaClient, policyResp.AgentPolicy, policyLogLevel.String()),
+		"error updating policy log level")
+
+	require.Eventuallyf(t, func() bool {
+		fleetLevel, err := getLogLevelFromFleetMetadata(ctx, info.KibanaClient, agentID)
+		if err != nil {
+			t.Logf("error getting log level from Fleet metadata: %v", err)
+			return false
+		}
+		return fleetLevel == policyLogLevel.String()
+	}, 6*time.Minute, time.Second,
+		"container agent did not report policy log level %q to Fleet", policyLogLevel)
+
+	require.Never(t, func() bool {
+		return strings.Contains(agentOutput.String(), "reexec shutdown channel triggered")
+	}, 30*time.Second, time.Second,
+		"log-level-only policy change triggered an agent re-exec")
+}
+
 // TestSetLogLevelFleetManagedSurvivesRestart validates that a Fleet policy log
 // level on a managed agent survives a restart and is still reported to Fleet.
 // It then validates that a per-agent log level override can be applied after
@@ -409,6 +473,7 @@ func updateAgentLogLevel(ctx context.Context, t *testing.T, kibanaClient *kibana
 	if err != nil {
 		return fmt.Errorf("error executing fleet request: %w", err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Logf("error updating agent-specific log level to %q", logLevel)
@@ -461,6 +526,7 @@ func updatePolicyLogLevel(ctx context.Context, t *testing.T, kibanaClient *kiban
 	if err != nil {
 		return fmt.Errorf("error executing fleet request: %w", err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Logf("error updating policy log level to %q", newPolicyLogLevel)
