@@ -373,14 +373,6 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 	switch fileResult.ContentType {
 	case "application/yaml":
 		err = yaml.Unmarshal(fileResult.Content, &unmarshalled)
-		if err == nil {
-			switch unmarshalled.(type) {
-			case map[string]any, []any:
-			default:
-				_, err = resultWriter.Write(*out)
-				return err
-			}
-		}
 		marshal = yaml.Marshal
 	case "application/json":
 		decoder := json.NewDecoder(bytes.NewReader(fileResult.Content))
@@ -398,6 +390,14 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 		// Best effort, output a warning but still include the file
 		fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
 	} else {
+		// Only redact structured diagnostic content, leaving plain text unchanged.
+		switch unmarshalled.(type) {
+		case map[string]any, []any:
+		default:
+			_, err = resultWriter.Write(*out)
+			return err
+		}
+
 		// Redact accepts a map, so wrap the value to support top-level arrays.
 		wrapped := map[string]any{"content": unmarshalled}
 		redact.Redact(wrapped, RedactOpts(errOut)...)

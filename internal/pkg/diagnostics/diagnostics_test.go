@@ -155,16 +155,36 @@ i4EFZLWrFRsAAAARYWxleGtAZ3JlbWluLm5lc3QBAg==
 }
 
 func TestRedactPlainString(t *testing.T) {
-	errOut := strings.Builder{}
-	outWriter := strings.Builder{}
-	inputString := "Just a string"
-	res := client.DiagnosticFileResult{Content: []byte(inputString), ContentType: "application/yaml"}
+	tests := []struct {
+		name        string
+		input       string
+		contentType string
+	}{
+		{
+			name:        "YAML scalar is unchanged",
+			input:       "Just a string",
+			contentType: "application/yaml",
+		},
+		{
+			name:        "JSON scalar is unchanged",
+			input:       `"Just a string"`,
+			contentType: "application/json",
+		},
+	}
 
-	err := writeRedacted(&errOut, &outWriter, "test/path", res)
-	require.NoError(t, err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errOut := strings.Builder{}
+			outWriter := strings.Builder{}
+			res := client.DiagnosticFileResult{Content: []byte(tc.input), ContentType: tc.contentType}
 
-	require.Empty(t, errOut.String())
-	require.Equal(t, outWriter.String(), inputString)
+			err := writeRedacted(&errOut, &outWriter, "test/path", res)
+			require.NoError(t, err)
+
+			require.Empty(t, errOut.String())
+			require.Equal(t, tc.input, outWriter.String())
+		})
+	}
 }
 
 func TestRedactComplexKeys(t *testing.T) {
