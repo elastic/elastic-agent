@@ -59697,11 +59697,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go/redis@v1.25.0/
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/storage
-Version: v1.62.3
+Version: v1.64.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/storage@v1.62.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/storage@v1.64.0/LICENSE:
 
 
                                  Apache License
@@ -63002,11 +63002,11 @@ Contents of probable licence file $GOMODCACHE/github.com/!google!cloud!platform/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric
-Version: v0.55.0
+Version: v0.57.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/!google!cloud!platform/opentelemetry-operations-go/exporter/metric@v0.55.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/!google!cloud!platform/opentelemetry-operations-go/exporter/metric@v0.57.0/LICENSE:
 
 
                                  Apache License
@@ -63214,11 +63214,11 @@ Contents of probable licence file $GOMODCACHE/github.com/!google!cloud!platform/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping
-Version: v0.55.0
+Version: v0.57.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/!google!cloud!platform/opentelemetry-operations-go/internal/resourcemapping@v0.55.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/!google!cloud!platform/opentelemetry-operations-go/internal/resourcemapping@v0.57.0/LICENSE:
 
 
                                  Apache License
@@ -111029,11 +111029,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/genproto
-Version: v0.0.0-20260401024825-9d38bb4040a9
+Version: v0.0.0-20260519071638-aa98bba5eb94
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/genproto@v0.0.0-20260401024825-9d38bb4040a9/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/genproto@v0.0.0-20260519071638-aa98bba5eb94/LICENSE:
 
 
                                  Apache License
