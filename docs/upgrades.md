@@ -2,10 +2,8 @@
 
 ### Communications amongst components
 The following sequence diagram illustrates the process of upgrading a
-Fleet-managed Agent. The diagram focusses on the communications that occur
+Fleet-managed Agent. The diagram focuses on the communications that occur
 amongst the various components involved in the upgrade process.
-
-This diagram is accurate as of version `8.9.0` of every component shown.
 
 ```mermaid
 sequenceDiagram
@@ -15,7 +13,8 @@ sequenceDiagram
     participant FS as Fleet Server
     participant A as Agent
     participant UW as Upgrade Watcher
-    participant UM as Upgrader Marker
+    participant UM as .update-marker
+    participant WM as .watcher-marker
 
     U->>UI: Initiate upgrade
     UI->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_started_at`
@@ -30,37 +29,101 @@ sequenceDiagram
        FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = "failed"
        UI->>UI: Agent status remains as "updating" (bug)
     else
-       opt If previous upgrades found
-          A->>FS: Ack previous upgrades
-          A->>A: Remove previous upgrades from queue
-       end
        A->>A: Download new Agent artifact
+       A->>UM: Create (version, hash, versionedHome — protects new dir from cleanup)
        A->>A: Extract new Agent artifact
        A->>A: Change symlink from current Agent binary to new one
-       A->>UM: Create
+       A->>A: Register rollback candidate in TTL registry
+       A->>UM: Update (action ID, TTL rollbacks, timestamp)
        A->>A: Update active commit file
-       A->>UW: Start
-       A->>A: Rexec to start new Agent artifact
-       A->>FS: Ack successful upgrade
+       A->>UW: Start (`elastic-agent watch`)
+       UW->>UM: Update (state=watching)
+       A->>UM: Poll until state=watching (up to 30s)
+       A->>A: Rexec to start new Agent binary
+       A->>FS: Ack upgrade action
        FS->>ES: Write successful ack in `.fleet-actions-results`
-       FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = null<br />`upgraded_at` = <now><br />`upgrade_started_at` = null
+       FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = null<br />`upgraded_at` = now, `upgrade_started_at` = null
        UI->>UI: Show Agent status as "healthy"
-       UW->>UW: Start watching new Agent
-       alt New Agent is OK
-         UW->>UM: Remove
+       UW->>UW: Monitor new Agent (grace period or error)
+       alt New Agent is healthy
+         UW->>WM: Write (outcome=completed, versions, action ID)
+         UW->>UM: Remove (all platforms)
          UW->>UW: Cleanup old Agent files
-       else Rollback
-         UW->>UW: Change symlink from current Agent binary to new one
+       else Rollback (watch failed)
+         UW->>WM: Write (outcome=rollback, reason)
+         UW->>UW: Change symlink back to old Agent binary
          UW->>UW: Update active commit file
-         UW->>A: Rexec to start old Agent artifact
-         A->>FS: Ack failed upgrade
-         FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = null<br />`upgraded_at = <now>
+         UW->>A: Restart old Agent binary
+         A->>FS: Ack upgrade action
+         FS->>ES: Write successful ack in `.fleet-actions-results`
+         FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = null<br />`upgraded_at` = now, `upgrade_started_at` = null
          UI->>UI: Show Agent status as "healthy"
-         UW->>UM: Remove
+         UW->>UM: Remove (or keep for backward compat — see below)
          UW->>UW: Cleanup new Agent files
        end
     end
 ```
+
+### Marker file architecture
+
+The upgrade process uses two persistent files to track state. The split
+separates the upgrade marker (owned jointly by agent and watcher) from the
+watcher outcome record (watcher-only write, coordinator read-only).
+
+| File | Written by | Read by | Lifetime |
+|------|-----------|---------|---------|
+| `.update-marker` | Agent (create), Watcher (detail updates) | Coordinator, Watcher | Created at upgrade start; removed by Watcher on terminal outcome |
+| `.watcher-marker` | Watcher only | Coordinator (read-only) | Never deleted; overwritten at the start of each upgrade cycle |
+
+#### `.update-marker`
+
+Created by the agent when an upgrade begins. Contains the target and previous
+version/hash, the versioned home paths, the Fleet action ID, and the current
+upgrade details (state + metadata). The watcher updates the details field
+throughout the watch phase. Removed by the watcher on all platforms once a
+terminal outcome is reached.
+
+#### `.watcher-marker`
+
+Written by the watcher immediately before removing the upgrade marker. Records
+the terminal outcome (`completed`, `rollback`, or `failed`) along with version
+tuple, action ID, reason or error message, and a completion timestamp.
+
+The coordinator's file watcher fires on every upgrade marker change. While the
+upgrade marker exists, `marker.Details` is authoritative for Fleet reporting.
+When the marker is removed (nil details), the coordinator reads the watcher
+marker and re-reports any non-completed terminal state so Fleet receives the
+correct outcome even if the agent was offline between the watcher writing the
+file and the next check-in.
+
+A staleness guard prevents an old watcher marker from being mistaken for the
+current upgrade cycle by matching version tuple, completion timestamp, and action ID.
+
+#### Backward compatibility
+
+When rolling back to an older agent that reads the upgrade marker on startup to
+detect rollback, the upgrade marker is **kept on disk** after rollback. Those
+agents have no knowledge of the watcher marker.
+
+When rolling back to a recent agent, the upgrade marker is removed during
+rollback; the rolled-back agent relies on the watcher marker via the coordinator.
+
+### Manual rollback
+
+A manual rollback can be triggered by Fleet or the CLI after the upgrade grace
+period has elapsed.
+
+**When the upgrade marker is still present:** the upgrade marker is read to
+identify the agent installs involved and select the watcher executable. The
+existing watcher is gracefully stopped, rollback candidates are read from the
+TTL rollback files on disk, and a rollback watcher is started.
+
+**When the upgrade marker has already been removed** (the watcher finished its
+cleanup): the rollback path creates a temporary upgrade marker to drive the
+rollback watcher. Before starting the rollback watcher it checks whether a
+previous watcher is still in its cleanup phase by attempting to acquire
+`watcher.lock`. If the lock is held (lingering watcher), the rollback takes over
+the lingering watcher first, then starts the rollback watcher normally.
 
 ### Introducing package manifest
 
