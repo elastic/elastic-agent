@@ -3,9 +3,6 @@ config:
     dockerfile: Dockerfile.tmpl
     manifest: hardening_manifest.yaml.tmpl
 
-scm:
-  submodules: false
-
 pull_request:
   labels:
     - dependencies
