@@ -62,7 +62,7 @@ const (
 	agentName                  = "elastic-agent"
 	metricBeatName             = "metricbeat"
 	fileBeatName               = "filebeat"
-	collectorName              = "elastic-otel-collector"
+	collectorName              = "collector"
 
 	monitoringMetricsUnitID = "metrics-monitoring"
 	monitoringFilesUnitsID  = "filestream-monitoring"
@@ -530,7 +530,6 @@ func (b *BeatsMonitor) getAgentFilestreamStream(logsDrop string) any {
 		"paths": []any{
 			filepath.Join(logsDrop, agentName+"-*.ndjson"),
 			filepath.Join(logsDrop, agentName+"-watcher-*.ndjson"),
-			filepath.Join(logsDrop, collectorName+"-*.ndjson"),
 		},
 		"data_stream": map[string]any{
 			"type":      "logs",

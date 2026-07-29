@@ -60,7 +60,6 @@ func New(
 	ctx context.Context,
 	log *logger.Logger,
 	baseLogger *logger.Logger,
-	collectorLogger *logger.Logger,
 	logLevel logp.Level,
 	agentInfo info.Agent,
 	reexec coordinator.ReExecManager,
@@ -137,7 +136,6 @@ func New(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
-
 	// prepare initialUpgradeDetails for injecting it in coordinator later on
 	var initialUpgradeDetails *details.Details
 	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil {
@@ -261,7 +259,7 @@ func New(
 	otelManager, err := otelmanager.NewOTelManager(
 		log.Named("otel_manager"),
 		logLevel,
-		collectorLogger,
+		baseLogger,
 		agentInfo,
 		cfg.Settings.Collector,
 		monitor.ComponentMonitoringConfig,

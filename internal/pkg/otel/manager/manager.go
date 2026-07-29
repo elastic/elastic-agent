@@ -45,9 +45,6 @@ const (
 	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
 	CollectorStopTimeout = 3 * time.Second
 
-	// CollectorLogFileName is the base name of the collector subprocess's own log file.
-	CollectorLogFileName = "elastic-otel-collector"
-
 	// elasticMonitoringReceiverName is the component type name for the elastic monitoring receiver.
 	elasticMonitoringReceiverName = "elasticmonitoringreceiver"
 )
@@ -133,14 +130,14 @@ type OTelManager struct {
 	// stopTimeout is the timeout to wait for the collector to stop.
 	stopTimeout time.Duration
 
-	// collectorLogLevel is the log level the collector subprocess runs at.
+	// log level of the collector
 	collectorLogLevel logp.Level
 }
 
 // NewOTelManager returns a OTelManager.
 // If execFactory is nil, the default subprocess execution is used.
 func NewOTelManager(
-	managerLogger *logger.Logger,
+	logger *logger.Logger,
 	collectorLogLevel logp.Level,
 	collectorLogger *logger.Logger,
 	agentInfo info.Agent,
@@ -196,7 +193,6 @@ func NewOTelManager(
 	}
 
 	return &OTelManager{
-<<<<<<< HEAD
 		managerLogger:              logger,
 		collectorLogger:            collectorLogger,
 		agentInfo:                  agentInfo,
@@ -205,15 +201,6 @@ func NewOTelManager(
 		collectorMetricsPort:       collectorMetricsPort,
 		errCh:                      make(chan error, 1), // holds at most one error
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
-=======
-		managerLogger:             managerLogger,
-		collectorLogger:           collectorLogger,
-		agentInfo:                 agentInfo,
-		healthCheckExtComponentID: healthCheckExtComponentID,
-		collectorMetricsPort:      collectorMetricsPort,
-		errCh:                     make(chan error, 1), // holds at most one error
-		collectorStatusCh:         make(chan *status.AggregateStatus, 1),
->>>>>>> 61463e62f (Write OTel collector logs to its own log file (#15491))
 		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
 		// any possible case of deadlock, 5 is used just to give a small buffer.
 		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
@@ -411,8 +398,8 @@ func (m *OTelManager) startCollector(ctx context.Context,
 	if m.collectorRunning() {
 		return errors.New("tried to start otel collector, but it's already running")
 	}
-	proc, err := m.execution.startCollector(ctx, m.managerLogger, m.collectorLogger, m.collectorLogLevel,
-		m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+	proc, err := m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
+		m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 	if err != nil {
 		// failed to create the collector (this is different then
 		// it's failing to run). we do not retry creation on failure
@@ -501,9 +488,8 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
 
-	// if the otel log level is unset, use the most verbose level across agent and all units
-	minLogLevel := component.MinLogLevel(cfgUpdate.agentLogLevel, cfgUpdate.components)
-	if err := maybeInjectLogLevel(mergedOtelCfg, minLogLevel); err != nil {
+	// if the otel log level is unset, use the agent log level
+	if err := maybeInjectLogLevel(mergedOtelCfg, cfgUpdate.agentLogLevel); err != nil {
 		return nil, err
 	}
 

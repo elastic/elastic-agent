@@ -80,8 +80,9 @@ type subprocessExecution struct {
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
 func (r *subprocessExecution) startCollector(
 	_ context.Context,
-	agentLogger, collectorLogger *logger.Logger,
-	collectorLevel logp.Level,
+	lvl logp.Level,
+	collectorLogger *logger.Logger,
+	logger *logger.Logger,
 	cfg *confmap.Conf,
 	processErrCh chan error,
 	statusCh chan *otelstatus.AggregateStatus,
@@ -114,14 +115,15 @@ func (r *subprocessExecution) startCollector(
 	}
 
 	stdOutLast := newZapLast(collectorLogger.Core())
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(collectorLevel))
+	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
+	// info level for stdErr because by default collector writes to stderr
 	stdErrLast := newZapLast(collectorLogger.Core())
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(collectorLevel))
+	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
 
 	env := os.Environ()
 
 	// set collector args and add --config flag with the stdingob:stdin URI
-	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, collectorLevel))
+	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
 	if hasProfilesPipeline(cfg) {
 		collectorArgs = append(collectorArgs, fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelProfilingSupportFeature))
 	}
@@ -147,9 +149,9 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
 
-	agentLogger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
+	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
 
-	ctl := newProcHandle(processInfo, agentLogger, collectorLevel, r.healthCheckExtensionID, httpHealthCheckPort,
+	ctl := newProcHandle(processInfo, logger, lvl, r.healthCheckExtensionID, httpHealthCheckPort,
 		forceFetchStatusCh,
 		func(ctx context.Context, st *otelstatus.AggregateStatus) {
 			reportCollectorStatus(ctx, statusCh, cloneCollectorStatus(st))

@@ -54,32 +54,12 @@ inputs:
         data_stream:
           dataset: generic
         paths:
-<<<<<<< HEAD
-          - %s
-
-# Disable metrics monitoring so there are less beats running and less logs being generated.
-agent.monitoring:
-  enabled: true
-  logs: true
-  metrics: false
-  pprof.enabled: false
-  use_output: default
-  # Needed if you already have an Elastic-Agent running on your machine
-  # That's very helpful for running the tests locally
-  http:
-    enabled: false
-    port: 7002
-agent.grpc:
-  address: localhost
-  port: 7001
-=======
           - %[2]s
     log_level: %[3]s
 agent:
     monitoring.enabled: false
     internal.runtime.filebeat.default: %[4]s
     grpc.port: 0
->>>>>>> 61463e62f (Write OTel collector logs to its own log file (#15491))
 `
 
 func TestEventLogFile(t *testing.T) {
@@ -87,12 +67,6 @@ func TestEventLogFile(t *testing.T) {
 		Group: integration.Default,
 		Local: true,
 	})
-<<<<<<< HEAD
-	ctx, cancel := testcontext.WithDeadline(
-		t,
-		context.Background(),
-		time.Now().Add(10*time.Minute))
-=======
 
 	for _, runtime := range allRuntimes {
 		t.Run(runtime, func(t *testing.T) {
@@ -103,7 +77,6 @@ func TestEventLogFile(t *testing.T) {
 
 func runEventLogFile(t *testing.T, runtime string) {
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
->>>>>>> 61463e62f (Write OTel collector logs to its own log file (#15491))
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -147,7 +120,7 @@ func runEventLogFile(t *testing.T, runtime string) {
 	logsDirGlob := filepath.Join(agentFixture.WorkDir(), "data/elastic-agent-*/logs")
 
 	// Event logs should not be created at info level.
-	requireLogFilesForRuntime(t, logsDirGlob, runtime)
+	requireLogFilesForRuntime(t, logsDirGlob)
 	requireEventLogFileNeverExists(t, logsDirGlob)
 
 	// Switch to debug level to enable event log file creation.
@@ -159,8 +132,8 @@ func runEventLogFile(t *testing.T, runtime string) {
 	requireEventLogFileExistsWithData(t, logsDirGlob, "Publish event: ")
 	requireNoCopyProcessorError(t, logsDirGlob)
 
-	requireLogFilesForRuntime(t, logsDirGlob, runtime)
-	requireEventLogFilesForRuntime(t, logsDirGlob, runtime)
+	requireLogFilesForRuntime(t, logsDirGlob)
+	requireEventLogFilesForRuntime(t, logsDirGlob)
 	requireNoEventLeakage(t, logsDirGlob)
 
 	// Diagnostics command behavior is tested elsewhere, here we only
@@ -200,9 +173,6 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 			{Type: define.Linux},
 		},
 	})
-<<<<<<< HEAD
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-=======
 
 	for _, runtime := range allRuntimes {
 		t.Run(runtime, func(t *testing.T) {
@@ -213,7 +183,6 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 
 func runEventLogOutputConfiguredViaFleet(t *testing.T, info *define.Info, runtime string) {
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
->>>>>>> 61463e62f (Write OTel collector logs to its own log file (#15491))
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -316,68 +285,8 @@ func runEventLogOutputConfiguredViaFleet(t *testing.T, info *define.Info, runtim
 		}
 		return false
 	}, 3*time.Minute, 10*time.Second, "cannot find events on stderr")
-
 }
 
-<<<<<<< HEAD
-func addOverwriteToPolicy(t *testing.T, info *define.Info, policyName, policyID string) {
-	t.Helper()
-	body := fmt.Sprintf(`
-{
-  "name": "%s",
-  "namespace": "%s",
-  "overrides": {
-    "agent": {
-      "logging": {
-        "event_data": {
-          "to_stderr": true,
-          "to_files": false
-        }
-      },
-	  "internal": {
-		"runtime": {
-		  "default": "process",
-  		  "filebeat": {
-	  		"default": "process"
-		  }
-		}
-	  }
-    }
-  }
-}`, policyName, info.Namespace)
-	sendPolicyUpdate(t, info, policyID, body)
-}
-
-func readEventLogFile(t *testing.T, agentFixture *atesting.Fixture) string {
-	// Now the Elastic-Agent is running, so validate the Event log file.
-	// Because the path changes based on the Elastic-Agent version, we
-	// use glob to find the file
-	var logFileName string
-	require.Eventually(t, func() bool {
-		// We ignore this error because the folder might not be there.
-		// Once the folder and file are there, then this call should succeed
-		// and we can read the file.
-		glob := filepath.Join(
-			agentFixture.WorkDir(),
-			"data", "elastic-agent-*", "logs", "events", "*")
-		files, err := filepath.Glob(glob)
-		if err != nil {
-			t.Fatalf("could not scan for the events log file: %s", err)
-		}
-
-		if len(files) >= 1 {
-			logFileName = files[0]
-			return true
-		}
-
-		return false
-
-	}, time.Minute, time.Second, "could not find event log file")
-
-	logEntryBytes, err := os.ReadFile(logFileName)
-	if err != nil {
-		t.Fatalf("cannot read file '%s': %s", logFileName, err)
-=======
 func applyEventLogStderrPolicy(ctx context.Context, info *define.Info, policyName, policyID, runtime string) error {
 	req := kibana.AgentPolicyUpdateRequest{
 		Name:      policyName,
@@ -401,7 +310,6 @@ func applyEventLogStderrPolicy(ctx context.Context, info *define.Info, policyNam
 				},
 			},
 		},
->>>>>>> 61463e62f (Write OTel collector logs to its own log file (#15491))
 	}
 	_, err := info.KibanaClient.UpdatePolicy(ctx, policyID, req)
 	return err
@@ -482,39 +390,14 @@ func copyProcessorError(logsDirGlob string) error {
 	return nil
 }
 
-func requireLogFilesForRuntime(t *testing.T, logsDirGlob, runtime string) {
+func requireLogFilesForRuntime(t *testing.T, logsDirGlob string) {
 	t.Helper()
-
-	patternsByRuntime := map[string][]string{
-		runtimeProcess: {
-			"elastic-agent-*.ndjson",
-		},
-		runtimeOtel: {
-			"elastic-agent-*.ndjson",
-			"elastic-otel-collector-*.ndjson",
-		},
-	}
-	want, ok := patternsByRuntime[runtime]
-	require.Truef(t, ok, "unknown runtime %q", runtime)
-
-	requireFilesMatchExactly(t, logsDirGlob, want)
+	requireFilesMatchExactly(t, logsDirGlob, []string{"elastic-agent-*.ndjson"})
 }
 
-func requireEventLogFilesForRuntime(t *testing.T, logsDirGlob, runtime string) {
+func requireEventLogFilesForRuntime(t *testing.T, logsDirGlob string) {
 	t.Helper()
-
-	patternsByRuntime := map[string][]string{
-		runtimeProcess: {
-			"elastic-agent-event-log-*.ndjson",
-		},
-		runtimeOtel: {
-			"elastic-otel-collector-event-log-*.ndjson",
-		},
-	}
-	want, ok := patternsByRuntime[runtime]
-	require.Truef(t, ok, "unknown runtime %q", runtime)
-
-	requireFilesMatchExactly(t, filepath.Join(logsDirGlob, "events"), want)
+	requireFilesMatchExactly(t, filepath.Join(logsDirGlob, "events"), []string{"elastic-agent-event-log-*.ndjson"})
 }
 
 func requireNoEventLeakage(t *testing.T, logsDirGlob string) {
@@ -574,8 +457,8 @@ func collectDiagnosticsAndVeriflyLogs(
 	ctx context.Context,
 	agentFixture *atesting.Fixture,
 	cmd,
-	expectedFiles []string) {
-
+	expectedFiles []string,
+) {
 	diagPath, err := agentFixture.ExecDiagnostics(ctx, cmd...)
 	if err != nil {
 		t.Fatalf("could not execute diagnostics excluding events log: %s", err)
@@ -599,7 +482,6 @@ func getLogFilenames(
 	t *testing.T,
 	basepath string,
 ) (logFiles, eventLogFiles []string) {
-
 	logFilesGlob := filepath.Join(basepath, "*.ndjson")
 	logFilesPath, err := filepath.Glob(logFilesGlob)
 	if err != nil {

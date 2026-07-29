@@ -103,38 +103,6 @@ func NewInMemory(selector string, encCfg zapcore.EncoderConfig) (*Logger, *bytes
 	return logger, &buff
 }
 
-// NewNamedLogger creates a logger with typed output routing.
-func NewNamedLogger(name string, cfg, eventLogCfg *Config) (*Logger, error) {
-	namedCfg := *cfg
-	namedCfg.Beat = name
-	namedCfg.Files.Name = name
-	commonCfg, err := ToCommonConfig(&namedCfg)
-	if err != nil {
-		return nil, fmt.Errorf("could not convert log config: %w", err)
-	}
-
-	// Own level enabler to avoid touching the global one.
-	al := zap.NewAtomicLevelAt(namedCfg.Level.ZapLevel())
-	fileOutput, err := makeFileOutput(&namedCfg, &al)
-	if err != nil {
-		return nil, fmt.Errorf("could not create named logger file output: %w", err)
-	}
-
-	namedEventCfg := *eventLogCfg
-	namedEventCfg.Files.Name = name + "-event-log"
-	eventCommonCfg, err := ToCommonConfig(&namedEventCfg)
-	if err != nil {
-		return nil, fmt.Errorf("could not convert event log config: %w", err)
-	}
-
-	logger, err := configure.LoggingWithTypedOutputsNonGlobal(name, commonCfg, eventCommonCfg, logp.TypeKey, logp.EventType, fileOutput)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing named logger: %w", err)
-	}
-
-	return logger, nil
-}
-
 // AddCallerSkip returns new logger with incremented stack frames to skip.
 // This is needed in order to correctly report the log file lines when the logging statement
 // is wrapped in some convenience wrapping function for example.

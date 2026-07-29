@@ -8,10 +8,6 @@ package ess
 
 import (
 	"context"
-<<<<<<< HEAD
-	"fmt"
-=======
->>>>>>> 61463e62f (Write OTel collector logs to its own log file (#15491))
 	"os"
 	"path/filepath"
 	"testing"

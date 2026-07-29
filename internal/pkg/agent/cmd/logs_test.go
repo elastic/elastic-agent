@@ -133,29 +133,6 @@ func TestGetLogFilenames(t *testing.T) {
 		}
 		require.Equal(t, expected, names)
 	})
-
-	t.Run("returns agent and collector log and event log files", func(t *testing.T) {
-		dir := t.TempDir()
-
-		agentEventFile := "elastic-agent-event-log-20230531.ndjson"
-		collectorFile := "elastic-otel-collector-20230601.ndjson"
-		collectorEventFile := "elastic-otel-collector-event-log-20230602.ndjson"
-
-		createFileEmpty(t, dir, file)
-		createFileEmpty(t, dir, agentEventFile)
-		createFileEmpty(t, dir, collectorFile)
-		createFileEmpty(t, dir, collectorEventFile)
-
-		names, err := getLogFilenames(dir)
-		require.NoError(t, err)
-		expected := []string{
-			filepath.Join(dir, file),
-			filepath.Join(dir, agentEventFile),
-			filepath.Join(dir, collectorFile),
-			filepath.Join(dir, collectorEventFile),
-		}
-		require.Equal(t, expected, names)
-	})
 }
 
 func TestSortLogFilenames(t *testing.T) {
@@ -645,7 +622,7 @@ func TestCreateComponentFilter(t *testing.T) {
 func generateLines(prefix string, start, end int) string {
 	b := strings.Builder{}
 	for i := start; i <= end; i++ {
-		fmt.Fprintf(&b, "%s: %d\n", prefix, i)
+		b.WriteString(fmt.Sprintf("%s: %d\n", prefix, i))
 	}
 	return b.String()
 }
@@ -754,7 +731,6 @@ func TestCobraCmd(t *testing.T) {
 		lines = append(lines, s.Text())
 		count++
 	}
-	require.NoError(t, s.Err())
 
 	// The events log file might not be read, so if we get all the lines
 	// from the normal log file, we consider a success. Anything extra
