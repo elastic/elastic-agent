@@ -9,6 +9,8 @@ replace github.com/elastic/beats/v7 => ../../beats
 
 replace github.com/elastic/otel-quark-receiver/quarkreceiver => ./../../../otel-quark-receiver/quarkreceiver
 
+replace github.com/elastic/go-quark => ./../../../go-quark
+
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
