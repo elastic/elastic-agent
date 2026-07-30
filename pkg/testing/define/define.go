@@ -97,7 +97,11 @@ func NewFixtureWithBinary(t *testing.T, version string, binary string, buildsDir
 	binFetcher := atesting.LocalFetcher(buildsDir, localFetcherOpts...)
 
 	opts = append(opts, atesting.WithFetcher(binFetcher), atesting.WithLogOutput())
-	if binary != "elastic-agent" {
+	if binary == "elastic-agent" {
+		if os.Getenv("TEST_AGENT_DEVELOP") == "true" {
+			opts = append(opts, atesting.WithAppendAdditionalArgs([]string{"--develop"}))
+		}
+	} else {
 		opts = append(opts, atesting.WithBinaryName(binary))
 	}
 	return atesting.NewFixture(t, version, opts...)
