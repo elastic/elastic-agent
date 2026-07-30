@@ -7,7 +7,7 @@ on:
   push:
     branches:
       - "dependabot/go_modules/**"
-      - "renovate/golang/**"
+      - "renovate/*golang/**"
 
 permissions:
   contents: read
