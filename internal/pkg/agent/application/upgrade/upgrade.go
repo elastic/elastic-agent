@@ -66,6 +66,8 @@ var (
 	Version_9_3_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 3, 0, "SNAPSHOT", "")
 	// Version_9_4_0_SNAPSHOT is the minimum version that manages the Windows Add/Remove Programs registry entry
 	Version_9_4_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 4, 0, "SNAPSHOT", "")
+	// Version_9_6_0_SNAPSHOT is the minimum version that supports ack fallback via the watcher marker.
+	Version_9_6_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 6, 0, "SNAPSHOT", "")
 )
 
 type artifactDownloadHandler interface {
@@ -606,7 +608,9 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 		return err
 	}
 	if marker == nil {
-		return nil
+		// Upgrade marker removed by the watcher (>= 9.6.0 path): fall back to
+		// the watcher marker so we can still ack the Fleet action.
+		return u.ackFromWatcherMarker(ctx, acker)
 	}
 
 	if marker.Acked {
@@ -625,6 +629,39 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	marker.Acked = true
 
 	return SaveMarker(paths.Data(), marker, false)
+}
+
+// ackFromWatcherMarker acks the upgrade action recorded in the watcher marker.
+// It is called when the upgrade marker has already been removed by the watcher.
+// An ack marker is written to disk on success so that repeat calls (e.g. on
+// every agent restart) are idempotent and do not drift Fleet's upgraded_at.
+func (u *Upgrader) ackFromWatcherMarker(ctx context.Context, a acker.Acker) error {
+	wm, err := LoadWatcherMarker(paths.Data())
+	if err != nil {
+		return err
+	}
+	if wm == nil || wm.ActionID == "" {
+		return nil
+	}
+
+	am, err := LoadAckMarker(paths.Data())
+	if err != nil {
+		return err
+	}
+	if am != nil && am.ActionID == wm.ActionID {
+		// Already acked this action on a previous restart.
+		return nil
+	}
+
+	action := &fleetapi.ActionUpgrade{ActionID: wm.ActionID}
+	if err := u.AckAction(ctx, a, action); err != nil {
+		return err
+	}
+
+	return WriteAckMarker(paths.Data(), &AckMarker{
+		ActionID: wm.ActionID,
+		AckedAt:  time.Now(),
+	})
 }
 
 func (u *Upgrader) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {

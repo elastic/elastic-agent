@@ -276,9 +276,11 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		previousVersion, versionParseErr := semver.ParseVersion(marker.PrevVersion)
 		if versionParseErr != nil {
 			log.Errorf("could not parse previous version %s: %s", marker.PrevVersion, versionParseErr)
-		} else if !previousVersion.Less(*semver.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")) {
-			// leave the marker in place when rolling back to agent >= 9.2.0-SNAPSHOT as it will be used to determine
-			// that agent was rolled back and the reason
+		} else if !previousVersion.Less(*semver.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")) &&
+			previousVersion.Less(*upgrade.Version_9_6_0_SNAPSHOT) {
+			// agents in [9.2.0-SNAPSHOT, 9.6.0-SNAPSHOT) read the upgrade marker on
+			// startup to determine rollback outcome; keep it in place so they can do so.
+			// agents >= 9.6.0-SNAPSHOT fall back to the watcher marker instead.
 			removeMarker = false
 		}
 
