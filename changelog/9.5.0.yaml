@@ -601,3 +601,52 @@ entries:
       file:
         name: 1784643475-bump-heartbeat-npm-12.0.1.yaml
         checksum: 91b169245a4cbb9794a0bbb549da7fadc43053c3
+    - kind: bug-fix
+      summary: Stop upgrade rollback from being triggered by slow service component restarts
+      description: |
+        Elastic Defend restarting slowly after an upgrade could be mistaken for a
+        broken Agent build and trigger an unnecessary rollback. Agent now gives
+        service-managed components more time to check in before treating them as
+        failed, while keeping a safe margin below the upgrade watcher's grace
+        period so a truly failed component is still caught.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15423
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1783505837
+      file:
+        name: 1783505837-give-service-runtime-components-more-time-to-check-in-before-failing-an-upgrade.yaml
+        checksum: 770d79b9f38748a5db2e8a74d95dd7a5624122ca
+    - kind: bug-fix
+      summary: fix orphaned filelog receiver in edot collector helm charts
+      description: ""
+      component: edot-collector
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15687
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1784562105
+      file:
+        name: 1784562105-fix-orphaned-filelog-receiver-in-edot-collector-helm-charts.yaml
+        checksum: d2cb0eaaeb62010e972b97870edcc67398fffc7f
+    - kind: bug-fix
+      summary: Fix continuous container restarts after Fleet policy updates
+      description: |
+        In containers, Elastic Agent could restart indefinitely after a Fleet policy
+        changed the log level. Settings missing from the policy were reset to
+        defaults instead of keeping the startup values, causing the same mismatch
+        after each restart. Elastic Agent now uses startup logging as the baseline
+        and changes only settings included in the Fleet policy.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15772
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1784815776
+      file:
+        name: 1784815776-fleet-policy-preserves-base-logging-settings.yaml
+        checksum: 36110763a081d5ca338684e4cdda4dfa7d98f6aa
