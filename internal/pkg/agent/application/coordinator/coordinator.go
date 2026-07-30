@@ -1028,6 +1028,7 @@ func upgradeDetailsFromMarkerUpdate(log *logger.Logger, marker upgrade.UpdateMar
 		det.Metadata.Reason = wm.Reason
 	case details.StateFailed:
 		det.Metadata.ErrorMsg = wm.ErrorMsg
+		det.Metadata.FailedState = wm.FailedState
 	}
 	return det
 }

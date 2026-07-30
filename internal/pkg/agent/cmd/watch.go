@@ -222,6 +222,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			if marker.Details != nil && marker.Details.State == details.StateFailed {
 				outcome.Outcome = details.StateFailed
 				outcome.ErrorMsg = marker.Details.Metadata.ErrorMsg
+				outcome.FailedState = marker.Details.Metadata.FailedState
 			} else {
 				// No terminal state on record — treat the running version as good.
 				outcome.Outcome = details.StateCompleted
@@ -299,6 +300,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			// Rollback itself failed — escalate the outcome so the record is accurate.
 			outcome.Outcome = details.StateFailed
 			outcome.ErrorMsg = err.Error()
+			outcome.FailedState = upgradeDetails.Metadata.FailedState
 			if werr := upgrade.WriteWatcherMarker(log, dataDir, outcome); werr != nil {
 				log.Errorw("failed to update watcher marker after rollback failure", "error.message", werr)
 			}

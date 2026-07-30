@@ -94,7 +94,9 @@ upgrade marker exists, `marker.Details` is authoritative for Fleet reporting.
 When the marker is removed (nil details), the coordinator reads the watcher
 marker and re-reports any non-completed terminal state so Fleet receives the
 correct outcome even if the agent was offline between the watcher writing the
-file and the next check-in.
+file and the next check-in. On agent restart with no upgrade marker on disk,
+the coordinator likewise reads the watcher marker on startup to re-report any
+pending terminal state from the previous upgrade cycle.
 
 A staleness guard prevents an old watcher marker from being mistaken for the
 current upgrade cycle by matching version tuple, completion timestamp, and action ID.

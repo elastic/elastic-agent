@@ -28,11 +28,12 @@ func TestWriteAndLoadWatcherMarker_NoLoss(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	original := &WatcherMarker{
-		Outcome:         details.StateRollback,
+		Outcome:         details.StateFailed,
 		TargetVersion:   "8.5.0",
 		PreviousVersion: "8.4.0",
 		ActionID:        "action-123",
-		Reason:          "watch failed",
+		ErrorMsg:        "rollback failed: symlink error",
+		FailedState:     details.StateRollback,
 		CompletedAt:     time.Now().Truncate(time.Second),
 		WatcherVersion:  "8.5.0",
 	}
@@ -48,6 +49,7 @@ func TestWriteAndLoadWatcherMarker_NoLoss(t *testing.T) {
 	assert.Equal(t, original.ActionID, loaded.ActionID)
 	assert.Equal(t, original.Reason, loaded.Reason)
 	assert.Equal(t, original.ErrorMsg, loaded.ErrorMsg)
+	assert.Equal(t, original.FailedState, loaded.FailedState)
 	assert.True(t, original.CompletedAt.Equal(loaded.CompletedAt))
 	assert.Equal(t, original.WatcherVersion, loaded.WatcherVersion)
 }

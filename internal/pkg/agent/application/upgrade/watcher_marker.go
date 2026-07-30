@@ -38,6 +38,9 @@ type WatcherMarker struct {
 	Reason string `yaml:"reason,omitempty"`
 	// ErrorMsg is set when Outcome is StateFailed.
 	ErrorMsg string `yaml:"error_msg,omitempty"`
+	// FailedState is set when Outcome is StateFailed and records which state the
+	// upgrade was in when it failed (e.g. StateRollback when rollback itself fails).
+	FailedState details.State `yaml:"failed_state,omitempty"`
 
 	// CompletedAt is when the watcher reached this outcome.
 	CompletedAt time.Time `yaml:"completed_at"`

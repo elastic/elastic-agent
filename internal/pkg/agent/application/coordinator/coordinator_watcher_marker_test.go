@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	fleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -141,7 +141,7 @@ func TestUpgradeDetailsFromMarkerUpdate(t *testing.T) {
 			CompletedAt:     completedAt,
 		}
 		require.NoError(t, upgrade.WriteWatcherMarker(log, dataDir, wm))
-		marker := baseMarker // Details == nil (remove event)
+		marker := baseMarker // Details == nil
 		result := upgradeDetailsFromMarkerUpdate(log, marker, dataDir)
 		assert.Nil(t, result)
 	})
@@ -156,7 +156,7 @@ func TestUpgradeDetailsFromMarkerUpdate(t *testing.T) {
 			CompletedAt:     completedAt,
 		}
 		require.NoError(t, upgrade.WriteWatcherMarker(log, dataDir, wm))
-		marker := baseMarker // Details == nil (remove event)
+		marker := baseMarker // Details == nil
 		result := upgradeDetailsFromMarkerUpdate(log, marker, dataDir)
 		require.NotNil(t, result)
 		assert.Equal(t, details.StateRollback, result.State)
@@ -171,14 +171,16 @@ func TestUpgradeDetailsFromMarkerUpdate(t *testing.T) {
 			TargetVersion:   "8.5.0",
 			PreviousVersion: "8.4.0",
 			ErrorMsg:        "rollback mechanics failed",
+			FailedState:     details.StateRollback,
 			CompletedAt:     completedAt,
 		}
 		require.NoError(t, upgrade.WriteWatcherMarker(log, dataDir, wm))
-		marker := baseMarker // Details == nil (remove event)
+		marker := baseMarker // Details == nil
 		result := upgradeDetailsFromMarkerUpdate(log, marker, dataDir)
 		require.NotNil(t, result)
 		assert.Equal(t, details.StateFailed, result.State)
 		assert.Equal(t, "rollback mechanics failed", result.Metadata.ErrorMsg)
+		assert.Equal(t, details.StateRollback, result.Metadata.FailedState)
 	})
 
 	t.Run("returns nil when watcher marker is stale on remove event", func(t *testing.T) {
@@ -192,7 +194,7 @@ func TestUpgradeDetailsFromMarkerUpdate(t *testing.T) {
 			CompletedAt:     updatedOn.Add(-time.Second),
 		}
 		require.NoError(t, upgrade.WriteWatcherMarker(log, dataDir, wm))
-		marker := baseMarker // Details == nil (remove event)
+		marker := baseMarker // Details == nil
 		result := upgradeDetailsFromMarkerUpdate(log, marker, dataDir)
 		// stale watcher marker → no match → nil (upgrade cleared)
 		assert.Nil(t, result)
@@ -221,8 +223,72 @@ func TestUpgradeDetailsFromMarkerUpdate(t *testing.T) {
 		dataDir := t.TempDir()
 		wmPath := filepath.Join(dataDir, ".watcher-marker")
 		require.NoError(t, os.WriteFile(wmPath, []byte("not: valid: yaml: [[["), 0600))
-		marker := baseMarker // Details == nil (remove event)
+		marker := baseMarker // Details == nil
 		result := upgradeDetailsFromMarkerUpdate(log, marker, dataDir)
 		assert.Nil(t, result)
+	})
+
+	// --- Startup path: agent restarted, no upgrade marker on disk ---
+
+	t.Run("startup: returns rollback details from watcher marker when UpdatedOn is zero", func(t *testing.T) {
+		dataDir := t.TempDir()
+		wm := &upgrade.WatcherMarker{
+			Outcome:         details.StateRollback,
+			TargetVersion:   "8.5.0",
+			PreviousVersion: "8.4.0",
+			Reason:          "watch failed",
+			CompletedAt:     time.Now().Add(-30 * time.Minute),
+		}
+		require.NoError(t, upgrade.WriteWatcherMarker(log, dataDir, wm))
+
+		syntheticMarker := upgrade.UpdateMarker{
+			Version:     "8.5.0",
+			PrevVersion: "8.4.0",
+		}
+		result := upgradeDetailsFromMarkerUpdate(log, syntheticMarker, dataDir)
+		require.NotNil(t, result)
+		assert.Equal(t, details.StateRollback, result.State)
+		assert.Equal(t, "watch failed", result.Metadata.Reason)
+	})
+
+	t.Run("startup: returns nil for completed watcher marker when UpdatedOn is zero", func(t *testing.T) {
+		dataDir := t.TempDir()
+		wm := &upgrade.WatcherMarker{
+			Outcome:         details.StateCompleted,
+			TargetVersion:   "8.5.0",
+			PreviousVersion: "8.4.0",
+			CompletedAt:     time.Now().Add(-30 * time.Minute),
+		}
+		require.NoError(t, upgrade.WriteWatcherMarker(log, dataDir, wm))
+
+		syntheticMarker := upgrade.UpdateMarker{
+			Version:     "8.5.0",
+			PrevVersion: "8.4.0",
+		}
+		result := upgradeDetailsFromMarkerUpdate(log, syntheticMarker, dataDir)
+		assert.Nil(t, result)
+	})
+
+	t.Run("startup: returns failed details from watcher marker when UpdatedOn is zero", func(t *testing.T) {
+		dataDir := t.TempDir()
+		wm := &upgrade.WatcherMarker{
+			Outcome:         details.StateFailed,
+			TargetVersion:   "8.5.0",
+			PreviousVersion: "8.4.0",
+			ErrorMsg:        "rollback itself failed",
+			FailedState:     details.StateRollback,
+			CompletedAt:     time.Now().Add(-30 * time.Minute),
+		}
+		require.NoError(t, upgrade.WriteWatcherMarker(log, dataDir, wm))
+
+		syntheticMarker := upgrade.UpdateMarker{
+			Version:     "8.5.0",
+			PrevVersion: "8.4.0",
+		}
+		result := upgradeDetailsFromMarkerUpdate(log, syntheticMarker, dataDir)
+		require.NotNil(t, result)
+		assert.Equal(t, details.StateFailed, result.State)
+		assert.Equal(t, "rollback itself failed", result.Metadata.ErrorMsg)
+		assert.Equal(t, details.StateRollback, result.Metadata.FailedState)
 	})
 }
