@@ -120,7 +120,7 @@ func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Conte
 	}()
 
 	requiredFields := [][]string{
-		{"term", "auditd.data.key", "elastic-agent-test"},
+		{"term", "auditd.log.key", "elastic-agent-test"},
 	}
 
 	t.Logf("starting to query ES for auditd events at %s", now.Format(time.RFC3339Nano))
