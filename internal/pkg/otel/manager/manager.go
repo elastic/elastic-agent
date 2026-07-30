@@ -130,14 +130,14 @@ type OTelManager struct {
 	// stopTimeout is the timeout to wait for the collector to stop.
 	stopTimeout time.Duration
 
-	// log level of the collector
+	// collectorLogLevel is the log level the collector subprocess runs at.
 	collectorLogLevel logp.Level
 }
 
 // NewOTelManager returns a OTelManager.
 // If execFactory is nil, the default subprocess execution is used.
 func NewOTelManager(
-	logger *logger.Logger,
+	managerLogger *logger.Logger,
 	collectorLogLevel logp.Level,
 	collectorLogger *logger.Logger,
 	agentInfo info.Agent,
@@ -193,7 +193,7 @@ func NewOTelManager(
 	}
 
 	return &OTelManager{
-		managerLogger:              logger,
+		managerLogger:              managerLogger,
 		collectorLogger:            collectorLogger,
 		agentInfo:                  agentInfo,
 		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
@@ -488,8 +488,9 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
 
-	// if the otel log level is unset, use the agent log level
-	if err := maybeInjectLogLevel(mergedOtelCfg, cfgUpdate.agentLogLevel); err != nil {
+	// if the otel log level is unset, use the most verbose level across agent and all units
+	minLogLevel := component.MinLogLevel(cfgUpdate.agentLogLevel, cfgUpdate.components)
+	if err := maybeInjectLogLevel(mergedOtelCfg, minLogLevel); err != nil {
 		return nil, err
 	}
 
