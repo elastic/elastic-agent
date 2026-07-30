@@ -163,13 +163,14 @@ func validateFileTree(dir string, uid uint32, gid uint32) error {
 		if fs.Gid != gid {
 			return fmt.Errorf("%s doesn't have correct gid: has %d (expected %d)", file, fs.Gid, gid)
 		}
-		if filepath.Base(file) == otelMetricsFileName {
-			if info.Mode().Perm() != 0o644 {
-				return fmt.Errorf("%s has unexpected permissions: has %04o (expected 0644)", file, info.Mode().Perm())
-			}
-			return nil
-		}
 		if fs.Mode&0007 != 0 {
+			// TL;DR: The fileexporter extension fixed a bug that changed the
+			// mode from 0640 to 0644 in some cases, this only seems to affect
+			// the metrics file, so we allow this file to be world writable.
+			// See https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/49677/
+			if filepath.Base(file) == otelMetricsFileName {
+				return nil
+			}
 			return fmt.Errorf("%s has world access", file)
 		}
 		return nil
