@@ -1982,3 +1982,71 @@ func TestSetClient(t *testing.T) {
 	upgrader.SetClient(&mockSender{})
 	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
 }
+
+func TestAckFromWatcherMarker(t *testing.T) {
+	log, _ := loggertest.New("")
+
+	setupDataDir := func(t *testing.T) string {
+		t.Helper()
+		baseDir := t.TempDir()
+		origTop := paths.Top()
+		t.Cleanup(func() { paths.SetTop(origTop) })
+		paths.SetTop(baseDir)
+		require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
+		return paths.Data()
+	}
+
+	t.Run("no watcher marker returns nil", func(t *testing.T) {
+		setupDataDir(t)
+		u := &Upgrader{log: log, settings: artifact.DefaultConfig()}
+		require.NoError(t, u.ackFromWatcherMarker(t.Context(), nil))
+	})
+
+	t.Run("watcher marker without action ID returns nil", func(t *testing.T) {
+		dataDir := setupDataDir(t)
+		require.NoError(t, WriteWatcherMarker(log, dataDir, &WatcherMarker{
+			Outcome:       details.StateCompleted,
+			TargetVersion: "9.6.0",
+		}))
+
+		u := &Upgrader{log: log, settings: artifact.DefaultConfig()}
+		require.NoError(t, u.ackFromWatcherMarker(t.Context(), nil))
+	})
+
+	t.Run("watcher marker with action ID acks and writes ack marker", func(t *testing.T) {
+		dataDir := setupDataDir(t)
+		require.NoError(t, WriteWatcherMarker(log, dataDir, &WatcherMarker{
+			Outcome:       details.StateCompleted,
+			TargetVersion: "9.6.0",
+			ActionID:      "test-action-id",
+		}))
+
+		mockAck := acker.NewMockAcker(t)
+		mockAck.EXPECT().Ack(mock.Anything, mock.MatchedBy(func(a fleetapi.Action) bool {
+			return a.ID() == "test-action-id"
+		})).Return(nil)
+		mockAck.EXPECT().Commit(mock.Anything).Return(nil)
+
+		u := &Upgrader{log: log, settings: artifact.DefaultConfig()}
+		require.NoError(t, u.ackFromWatcherMarker(t.Context(), mockAck))
+
+		am, err := LoadAckMarker(dataDir)
+		require.NoError(t, err)
+		require.NotNil(t, am)
+		assert.Equal(t, "test-action-id", am.ActionID)
+	})
+
+	t.Run("already acked skips AckAction", func(t *testing.T) {
+		dataDir := setupDataDir(t)
+		require.NoError(t, WriteWatcherMarker(log, dataDir, &WatcherMarker{
+			Outcome:       details.StateCompleted,
+			TargetVersion: "9.6.0",
+			ActionID:      "test-action-id",
+		}))
+		require.NoError(t, WriteAckMarker(dataDir, &AckMarker{ActionID: "test-action-id"}))
+
+		// no mock acker expectations: AckAction must not be called
+		u := &Upgrader{log: log, settings: artifact.DefaultConfig()}
+		require.NoError(t, u.ackFromWatcherMarker(t.Context(), nil))
+	})
+}
