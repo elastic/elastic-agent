@@ -1266,6 +1266,17 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			expectedLogLevel: configUpdateLevel,
 		},
 		{
+			name:         "unit log level overrides agent log level",
+			collectorCfg: nil,
+			components: func() []component.Component {
+				c := testComponent("debug-comp")
+				c.Units[0].LogLevel = client.UnitLogLevelDebug
+				return []component.Component{c}
+			}(),
+			expectedKeys:     []string{"receivers", "exporters", "service"},
+			expectedLogLevel: logp.DebugLevel,
+		},
+		{
 			name:         "component config generation error",
 			collectorCfg: nil,
 			components: []component.Component{{

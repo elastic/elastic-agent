@@ -8,7 +8,6 @@ package ess
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -94,7 +93,8 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 
 	// Apply the logging path override and wait for the agent to pick it up.
 	t.Logf("Applying policy override: agent.logging.files.path=%s", customLogDir)
-	applyLoggingFilePathPolicy(t, info, policyResp.AgentPolicy, customLogDir)
+	err = applyLoggingFilePathPolicy(ctx, info, policyResp.AgentPolicy, customLogDir)
+	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
 		inspectOutput, inspectErr := f.ExecInspect(ctx)
@@ -180,25 +180,22 @@ func TestContainerLoggingFilePathChangedViaFleet(t *testing.T) {
 	requireLogFileInDir(t, customLogDir, "logs in custom log directory")
 }
 
-func applyLoggingFilePathPolicy(t *testing.T, info *define.Info, policy kibana.AgentPolicy, logPath string) {
-	t.Helper()
-
-	body := fmt.Sprintf(`
-{
-  "name": %q,
-  "namespace": %q,
-  "overrides": {
-    "agent": {
-      "logging": {
-        "to_stderr": false,
-        "to_files": true,
-        "files": {
-          "path": %q
-        }
-      }
-    }
-  }
-}`, policy.Name, policy.Namespace, logPath)
-
-	sendPolicyUpdate(t, info, policy.ID, body)
+func applyLoggingFilePathPolicy(ctx context.Context, info *define.Info, policy kibana.AgentPolicy, logPath string) error {
+	req := kibana.AgentPolicyUpdateRequest{
+		Name:      policy.Name,
+		Namespace: policy.Namespace,
+		Overrides: map[string]any{
+			"agent": map[string]any{
+				"logging": map[string]any{
+					"to_stderr": false,
+					"to_files":  true,
+					"files": map[string]any{
+						"path": logPath,
+					},
+				},
+			},
+		},
+	}
+	_, err := info.KibanaClient.UpdatePolicy(ctx, policy.ID, req)
+	return err
 }
