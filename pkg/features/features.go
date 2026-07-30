@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"sync"
 
+	ucfg "github.com/elastic/go-ucfg"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 
@@ -24,8 +26,6 @@ const defaultTamperProtection = true
 // 9.2 - disabled (acks are sent)
 const defaultDisablePolicyChangeAcks = false
 
-const defaultDefaultProcessors = true
-
 // The default value for standalone encrypted config.
 // 9.4 - disabled (plaintext config)
 const defaultEncryptedConfig = false
@@ -33,9 +33,81 @@ const defaultEncryptedConfig = false
 var (
 	current = Flags{
 		tamperProtection:  defaultTamperProtection,
-		defaultProcessors: defaultDefaultProcessors,
+		defaultProcessors: defaultProcessors(),
 	}
 )
+
+// DefaultProcessors holds per-processor enable/disable flags for the
+// by default enabled Beat add_x_metadata processors.
+type DefaultProcessors struct {
+	AddHostMetadata       bool `config:"add_host_metadata" yaml:"add_host_metadata"`
+	AddCloudMetadata      bool `config:"add_cloud_metadata" yaml:"add_cloud_metadata"`
+	AddDockerMetadata     bool `config:"add_docker_metadata" yaml:"add_docker_metadata"`
+	AddKubernetesMetadata bool `config:"add_kubernetes_metadata" yaml:"add_kubernetes_metadata"`
+}
+
+// Unpack implements ucfg.ConfigUnpacker. It initialises all flags to true
+// before overlaying values from c, so absent fields remain enabled.
+// As a convenience, setting enabled: false sets all processors
+// disabled.
+func (dp *DefaultProcessors) Unpack(c *ucfg.Config) error {
+	var rootEnabledFlag struct {
+		Enabled *bool `config:"enabled"`
+	}
+	if err := c.Unpack(&rootEnabledFlag); err != nil {
+		return err
+	}
+	// "enabled:" sets the default for any unspecified individual flag.
+	// Absent or true → default all on; false → default all off.
+	// Individual flags always override enabled:.
+	if rootEnabledFlag.Enabled == nil || *rootEnabledFlag.Enabled {
+		*dp = defaultProcessors()
+	}
+	// noUnpack is a local type alias for DefaultProcessors that does not
+	// inherit the Unpack method, preventing infinite recursion when ucfg
+	// unpacks the struct fields.
+	type noUnpack DefaultProcessors
+	return c.Unpack((*noUnpack)(dp))
+}
+
+func defaultProcessors() DefaultProcessors {
+	return DefaultProcessors{
+		AddHostMetadata:       true,
+		AddCloudMetadata:      true,
+		AddDockerMetadata:     true,
+		AddKubernetesMetadata: true,
+	}
+}
+
+// IsEnabled reports whether the named processor is enabled. Non-metadata
+// processor names (those not tracked by a dedicated flag) always return true.
+func (dp DefaultProcessors) IsEnabled(name string) bool {
+	switch name {
+	case "add_host_metadata":
+		return dp.AddHostMetadata
+	case "add_cloud_metadata":
+		return dp.AddCloudMetadata
+	case "add_docker_metadata":
+		return dp.AddDockerMetadata
+	case "add_kubernetes_metadata":
+		return dp.AddKubernetesMetadata
+	default:
+		return true
+	}
+}
+
+// Restrict returns new flags where each field is true only if it is true in
+// both f and other. This implements the per-output restriction model: per-output
+// settings can only disable processors that are globally enabled, not re-enable
+// globally disabled ones.
+func (dp DefaultProcessors) Restrict(other DefaultProcessors) DefaultProcessors {
+	return DefaultProcessors{
+		AddHostMetadata:       dp.AddHostMetadata && other.AddHostMetadata,
+		AddCloudMetadata:      dp.AddCloudMetadata && other.AddCloudMetadata,
+		AddDockerMetadata:     dp.AddDockerMetadata && other.AddDockerMetadata,
+		AddKubernetesMetadata: dp.AddKubernetesMetadata && other.AddKubernetesMetadata,
+	}
+}
 
 type BoolValueOnChangeCallback func(new, old bool)
 
@@ -48,7 +120,7 @@ type Flags struct {
 
 	tamperProtection        bool
 	disablePolicyChangeAcks bool
-	defaultProcessors       bool
+	defaultProcessors       DefaultProcessors
 	encryptedConfig         bool
 }
 
@@ -64,10 +136,8 @@ type cfg struct {
 			DisablePolicyChangeAcks *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"disable_policy_change_acks" yaml:"disable_policy_change_acks" config:"disable_policy_change_acks"`
-			DefaultProcessors *struct {
-				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
-			} `json:"default_processors,omitempty" yaml:"default_processors,omitempty" config:"default_processors,omitempty"`
-			EncryptedConfig *struct {
+			DefaultProcessors *DefaultProcessors `json:"default_processors,omitempty" yaml:"default_processors,omitempty" config:"default_processors,omitempty"`
+			EncryptedConfig   *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"encrypted_config" yaml:"encrypted_config" config:"encrypted_config"`
 		} `json:"features" yaml:"features" config:"features"`
@@ -95,7 +165,7 @@ func (f *Flags) DisablePolicyChangeAcks() bool {
 	return f.disablePolicyChangeAcks
 }
 
-func (f *Flags) DefaultProcessors() bool {
+func (f *Flags) DefaultProcessors() DefaultProcessors {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
@@ -171,7 +241,7 @@ func (f *Flags) setDisablePolicyChangeAcks(newValue bool) {
 	f.disablePolicyChangeAcks = newValue
 }
 
-func (f *Flags) setDefaultProcessors(newValue bool) {
+func (f *Flags) setDefaultProcessors(newValue DefaultProcessors) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -267,11 +337,11 @@ func Parse(policy any) (*Flags, error) {
 		flags.setDisablePolicyChangeAcks(defaultDisablePolicyChangeAcks)
 	}
 
+	dp := defaultProcessors()
 	if parsedFlags.Agent.Features.DefaultProcessors != nil {
-		flags.setDefaultProcessors(parsedFlags.Agent.Features.DefaultProcessors.Enabled)
-	} else {
-		flags.setDefaultProcessors(defaultDefaultProcessors)
+		dp = *parsedFlags.Agent.Features.DefaultProcessors
 	}
+	flags.setDefaultProcessors(dp)
 
 	if parsedFlags.Agent.Features.EncryptedConfig != nil {
 		flags.setEncryptedConfig(parsedFlags.Agent.Features.EncryptedConfig.Enabled)
@@ -322,8 +392,9 @@ func DisablePolicyChangeAcks() bool {
 	return current.DisablePolicyChangeAcks()
 }
 
-// DefaultProcessors reports if default processors should be applied.
-func DefaultProcessors() bool {
+// GetDefaultProcessors returns the default processor flags controlling which
+// default beat metadata processors are applied.
+func GetDefaultProcessors() DefaultProcessors {
 	return current.DefaultProcessors()
 }
 

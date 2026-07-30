@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -33,13 +34,16 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	internalConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/version"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -2817,30 +2821,171 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	// Processors are injected on the logs pipeline (connector → ES), which is only
 	// created when an OTel-based monitoring exporter is present.
 	logsPipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
-	baseConfig := map[string]any{
-		"exporters": map[string]any{
-			exporterName: nil,
-		},
-	}
-	cfg := confmap.NewFromStringMap(baseConfig)
-	monitoringConfig := &config.MonitoringConfig{}
-	agentInfo := &info.AgentInfo{}
-	components := []component.Component{}
-	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components, logp.NewNopLogger())
-	require.NoError(t, err, "injectMonitoringReceiver should succeed")
-	result := mapstr.M(cfg.ToStringMap()).Flatten()
 
-	expectedBeatsProcessors := translate.GetDefaultProcessors("")
-	actualBeatsProcessors := result["processors."+procName+".processors"]
-	assert.NotNil(t, actualBeatsProcessors, "monitoring receiver processors should not be nil")
-	if actualBeatsProcessors != nil {
-		assert.ElementsMatch(t, expectedBeatsProcessors, actualBeatsProcessors, "monitoring processors don't match expected value")
+	newCfg := func() *confmap.Conf {
+		return confmap.NewFromStringMap(map[string]any{
+			"exporters": map[string]any{exporterName: nil},
+		})
 	}
 
-	expectedPipelineProcessors := []string{procName}
-	actualPipelineProcessors := result["service.pipelines."+logsPipelineName+".processors"]
-	assert.NotNil(t, actualPipelineProcessors, "processors for monitoring logs pipeline should not be nil")
-	assert.ElementsMatch(t, expectedPipelineProcessors, actualPipelineProcessors, "monitoring logs pipeline processors should match default")
+	// monitoringOutputComp builds a component routed to the monitoring output,
+	// optionally merging extra fields into the output unit config.
+	monitoringOutputComp := func(outputExtra ...map[string]any) component.Component {
+		outputCfg := map[string]any{
+			"type":  "elasticsearch",
+			"hosts": []any{"localhost:9200"},
+		}
+		for _, extra := range outputExtra {
+			maps.Copy(outputCfg, extra)
+		}
+		return component.Component{
+			ID:         "filestream-monitoring",
+			OutputType: "elasticsearch",
+			OutputName: componentmonitoring.MonitoringOutput,
+			Units: []component.Unit{
+				{
+					ID:     "filestream-monitoring-output",
+					Type:   client.UnitTypeOutput,
+					Config: component.MustExpectedConfig(outputCfg),
+				},
+			},
+		}
+	}
+
+	// monitoringProcessorNames extracts the processor names from the monitoring
+	// beatprocessor config, returning nil if no beatprocessor was injected.
+	monitoringProcessorNames := func(t *testing.T, cfg *confmap.Conf) []string {
+		t.Helper()
+		m := cfg.ToStringMap()
+		procsAny, ok := m["processors"]
+		if !ok {
+			return nil
+		}
+		procs, ok := procsAny.(map[string]any)
+		if !ok {
+			return nil
+		}
+		beatProcAny, ok := procs[procName]
+		if !ok {
+			return nil
+		}
+		beatProc, ok := beatProcAny.(map[string]any)
+		if !ok {
+			return nil
+		}
+		listAny, ok := beatProc["processors"]
+		if !ok {
+			return nil
+		}
+		list, ok := listAny.([]map[string]any)
+		if !ok {
+			return nil
+		}
+		names := make([]string, 0, len(list))
+		for _, p := range list {
+			for k := range p {
+				names = append(names, k)
+			}
+		}
+		return names
+	}
+
+	// applyGlobalFlags applies default processor flags via features.Apply and
+	// registers a cleanup to restore the original state when the sub-test ends.
+	applyGlobalFlags := func(t *testing.T, f features.DefaultProcessors) {
+		t.Helper()
+		orig := features.GetDefaultProcessors()
+		t.Cleanup(func() {
+			_ = features.Apply(internalConfig.MustNewConfigFrom(map[string]any{
+				"agent.features.default_processors.add_host_metadata":       orig.AddHostMetadata,
+				"agent.features.default_processors.add_cloud_metadata":      orig.AddCloudMetadata,
+				"agent.features.default_processors.add_docker_metadata":     orig.AddDockerMetadata,
+				"agent.features.default_processors.add_kubernetes_metadata": orig.AddKubernetesMetadata,
+			}))
+		})
+		require.NoError(t, features.Apply(internalConfig.MustNewConfigFrom(map[string]any{
+			"agent.features.default_processors.add_host_metadata":       f.AddHostMetadata,
+			"agent.features.default_processors.add_cloud_metadata":      f.AddCloudMetadata,
+			"agent.features.default_processors.add_docker_metadata":     f.AddDockerMetadata,
+			"agent.features.default_processors.add_kubernetes_metadata": f.AddKubernetesMetadata,
+		})))
+	}
+
+	t.Run("default processors applied", func(t *testing.T) {
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		names := monitoringProcessorNames(t, cfg)
+		assert.ElementsMatch(t,
+			[]string{"add_host_metadata", "add_cloud_metadata", "add_docker_metadata", "add_kubernetes_metadata"},
+			names,
+			"all four default processors should be present",
+		)
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+		assert.ElementsMatch(t, []string{procName}, result["service.pipelines."+logsPipelineName+".processors"])
+	})
+
+	t.Run("globally disabled processor omitted from monitoring pipeline", func(t *testing.T) {
+		applyGlobalFlags(t, features.DefaultProcessors{
+			AddHostMetadata: true, AddCloudMetadata: false,
+			AddDockerMetadata: true, AddKubernetesMetadata: true,
+		})
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		names := monitoringProcessorNames(t, cfg)
+		require.NotNil(t, names)
+		assert.NotContains(t, names, "add_cloud_metadata")
+		assert.Contains(t, names, "add_host_metadata")
+		assert.Contains(t, names, "add_docker_metadata")
+		assert.Contains(t, names, "add_kubernetes_metadata")
+	})
+
+	t.Run("all processors disabled globally leaves no beatprocessor", func(t *testing.T) {
+		applyGlobalFlags(t, features.DefaultProcessors{
+			AddHostMetadata: false, AddCloudMetadata: false,
+			AddDockerMetadata: false, AddKubernetesMetadata: false,
+		})
+
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		assert.Nil(t, monitoringProcessorNames(t, cfg), "no beatprocessor should be injected when all processors disabled")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+		assert.Nil(t, result["service.pipelines."+logsPipelineName+".processors"], "logs pipeline should have no processors")
+	})
+
+	t.Run("per-output monitoring config disables a processor", func(t *testing.T) {
+		comp := monitoringOutputComp(map[string]any{
+			"default_processors": map[string]any{"add_host_metadata": false},
+		})
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{comp}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		names := monitoringProcessorNames(t, cfg)
+		require.NotNil(t, names)
+		assert.NotContains(t, names, "add_host_metadata")
+		assert.Contains(t, names, "add_cloud_metadata")
+		assert.Contains(t, names, "add_docker_metadata")
+		assert.Contains(t, names, "add_kubernetes_metadata")
+	})
+
+	t.Run("per-output monitoring enabled:false leaves no beatprocessor", func(t *testing.T) {
+		comp := monitoringOutputComp(map[string]any{
+			"default_processors": map[string]any{"enabled": false},
+		})
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{comp}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		assert.Nil(t, monitoringProcessorNames(t, cfg), "no beatprocessor should be injected when all processors disabled per-output")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+		assert.Nil(t, result["service.pipelines."+logsPipelineName+".processors"], "logs pipeline should have no processors")
+	})
 }
 
 func TestMonitoringReceiverFileExporter(t *testing.T) {
