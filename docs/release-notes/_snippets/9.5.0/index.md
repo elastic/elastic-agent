@@ -26,7 +26,7 @@
 * Write Elastic Agent self-monitoring metrics to a dedicated diagnostics file in the OTLP metrics format. [#14506](https://github.com/elastic/elastic-agent/pull/14506) [#14446](https://github.com/elastic/elastic-agent/issues/14446)
 * Read manual rollback targets from on-disk TTL files instead of the upgrade marker. [#14543](https://github.com/elastic/elastic-agent/pull/14543)
 * Update OTel Collector components to v0.155.0. [#15333](https://github.com/elastic/elastic-agent/pull/15333)
-* Use native Go for Linux FIPS builds. [#14953](https://github.com/elastic/elastic-agent/pull/14953)
+* Use the FIPS 140-3 certified Go crypto module for Linux FIPS builds, removing runtime dependency on OpenSSL. [#14953](https://github.com/elastic/elastic-agent/pull/14953)
 * Bump kube-stack to v0.16.0 and fix `ELASTIC_AGENT_OTEL` quoting for `otel` mode. [#15013](https://github.com/elastic/elastic-agent/pull/15013)
 * Set OTel as the default runtime for Packetbeat. [#15151](https://github.com/elastic/elastic-agent/pull/15151) [#14554](https://github.com/elastic/elastic-agent/issues/14554)
 * Set OTel as the default runtime for Heartbeat. [#15325](https://github.com/elastic/elastic-agent/pull/15325)
