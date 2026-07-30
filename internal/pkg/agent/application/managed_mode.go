@@ -60,11 +60,7 @@ type managedConfigManager struct {
 	errCh chan error
 }
 
-<<<<<<< HEAD
-func newManagedConfigManager(ctx context.Context, log *logger.Logger, agentInfo info.Agent, cfg *configuration.Configuration, storeSaver storage.Store, runtime *runtime.Manager, fleetInitTimeout time.Duration, topPath string, client *remote.Client, fleetAcker *fleet.Acker, actionAcker acker.Acker, retrier *retrier.Retrier, stateStore *store.StateStore, actionQueue *queue.ActionQueue, source rollbacksSource, clientSetters ...actions.ClientSetter) (*managedConfigManager, error) {
-=======
-func newManagedConfigManager(log *logger.Logger, agentInfo info.Agent, startupCfg, cfg *configuration.Configuration, storeSaver storage.Store, runtime *runtime.Manager, fleetInitTimeout time.Duration, topPath string, client *remote.Client, fleetAcker *fleet.Acker, actionAcker acker.Acker, retrier *retrier.Retrier, stateStore *store.StateStore, actionQueue *queue.ActionQueue, source ttl.ReadOnlySource, clientSetters ...actions.ClientSetter) (*managedConfigManager, error) {
->>>>>>> 3ba93f101 (Fix continuous container restarts after Fleet policy updates (#15772))
+func newManagedConfigManager(log *logger.Logger, agentInfo info.Agent, startupCfg, cfg *configuration.Configuration, storeSaver storage.Store, runtime *runtime.Manager, fleetInitTimeout time.Duration, topPath string, client *remote.Client, fleetAcker *fleet.Acker, actionAcker acker.Acker, retrier *retrier.Retrier, stateStore *store.StateStore, actionQueue *queue.ActionQueue, source rollbacksSource, clientSetters ...actions.ClientSetter) (*managedConfigManager, error) {
 	actionDispatcher, err := dispatcher.New(log, topPath, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)

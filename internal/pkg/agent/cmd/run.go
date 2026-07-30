@@ -420,25 +420,8 @@ func runElasticAgent(
 	// create an availableRollbackSource
 	availableRollbacksSource := ttl.NewTTLMarkerRegistry(l, paths.Top())
 
-<<<<<<< HEAD
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, cfg, initialUpgradeMarker, availableRollbacksSource, modifiers...)
-=======
-	collectorLogger, err := logger.NewNamedLogger(
-		otelmanager.CollectorLogFileName, cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig)
-	if err != nil {
-		l.Warnf("failed to create collector logger, falling back to base logger: %v", err)
-		collectorLogger = baseLogger
-	} else {
-		defer func() {
-			collectorLogger.Sync() //nolint:errcheck // flushing buffered logs is best effort
-			collectorLogger.Close()
-		}()
-	}
-
-	coord, configMgr, _, err := application.New(ctx, l, baseLogger, collectorLogger, logLvl, agentInfo, rex, tracer, testingMode,
 		fleetInitTimeout, isBootstrap, configReloader.StartupConfiguration(), cfg, initialUpgradeMarker, availableRollbacksSource, modifiers...)
->>>>>>> 3ba93f101 (Fix continuous container restarts after Fleet policy updates (#15772))
 	if err != nil {
 		return err
 	}
