@@ -23,8 +23,6 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
-const otelMetricsFileName = "elastic-agent-metrics.ndjson"
-
 func checkUninstallPlatform(_ *CheckOpts) error {
 	return nil
 }
@@ -168,7 +166,7 @@ func validateFileTree(dir string, uid uint32, gid uint32) error {
 			// mode from 0640 to 0644 in some cases, this only seems to affect
 			// the metrics file, so we allow this file to be world writable.
 			// See https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/49677/
-			if filepath.Base(file) == otelMetricsFileName {
+			if filepath.Base(file) == "elastic-agent-metrics.ndjson" {
 				return nil
 			}
 			return fmt.Errorf("%s has world access", file)
