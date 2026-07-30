@@ -23,6 +23,8 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
+const otelMetricsFileName = "elastic-agent-metrics.ndjson"
+
 func checkUninstallPlatform(_ *CheckOpts) error {
 	return nil
 }
@@ -160,6 +162,12 @@ func validateFileTree(dir string, uid uint32, gid uint32) error {
 		}
 		if fs.Gid != gid {
 			return fmt.Errorf("%s doesn't have correct gid: has %d (expected %d)", file, fs.Gid, gid)
+		}
+		if filepath.Base(file) == otelMetricsFileName {
+			if info.Mode().Perm() != 0o644 {
+				return fmt.Errorf("%s has unexpected permissions: has %04o (expected 0644)", file, info.Mode().Perm())
+			}
+			return nil
 		}
 		if fs.Mode&0007 != 0 {
 			return fmt.Errorf("%s has world access", file)
