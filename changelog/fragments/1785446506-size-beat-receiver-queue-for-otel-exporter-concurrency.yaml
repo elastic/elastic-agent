@@ -1,0 +1,29 @@
+kind: bug-fix
+
+summary: Size the beat receiver in-flight event budget for the Elasticsearch exporter's concurrency
+
+description: |
+  When a Beat runs as an OTel receiver, the Elasticsearch output translation now runs two
+  exporter consumers per connection and sizes `queue.mem.events` against that consumer
+  count instead of the Beats worker count.
+
+  The performance presets provision `queue.mem.events = 2 * flush.min_events * worker`,
+  which is two bulk batches per output worker: one in flight and one staging. That is
+  correct for the classic Beats output, where an admitted event sits in the memory queue,
+  an output worker, or an in-flight HTTP request. A Beat receiver spreads the same budget
+  over more stages -- the receiver queue, the per-batch goroutines converting events to
+  pdata, the exporter's sending queue, and the batcher accumulating toward `min_size` --
+  and slots are not released until Elasticsearch acknowledges the bulk request, so
+  in-flight events compete with staging events for the same budget. The result was that
+  less than one full batch was ever ready when the connection freed: producers blocked on
+  the queue cap while the connection sat idle and CPU went unused.
+
+  On the `balanced` and `scale` presets this raised throughput from roughly 15% below the
+  classic process-mode output to roughly 38% above it, at an unchanged connection count
+  and with lower CPU per event. The `throughput` preset gains about 7% relative to the
+  classic output, and `latency` keeps its larger existing budget.
+
+  The budget is bounded so that long host lists cannot grow it without limit, and the
+  consumer count is reduced alongside it when that bound applies.
+
+component: elastic-agent

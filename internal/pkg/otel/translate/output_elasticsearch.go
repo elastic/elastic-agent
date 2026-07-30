@@ -30,6 +30,15 @@ type esToOTelOptions struct {
 	RetryOnStatus []int  `config:"retry_on_status"`
 }
 
+// maxQueueEvents bounds the in-flight event budget the beat receiver's queue is sized
+// to. See the sizing comment in ESToOTelConfig.
+//
+// 25600 is what the formula produces for the throughput preset (4 connections), which is
+// the highest-concurrency preset shipped and the most concurrency this has been measured
+// at. The bound therefore only binds beyond 4 connections, where it keeps a long host
+// list from asking for an unbounded number of resident events.
+const maxQueueEvents = 25600
+
 var defaultOptions = esToOTelOptions{
 	ElasticsearchConfig: elasticsearch.DefaultConfig(),
 
@@ -109,6 +118,67 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating hosts:%w", err)
 	}
+	maxConns := getTotalNumWorkers(output)
+
+	// batchSize is what the exporter's batcher will actually emit per bulk request.
+	batchSize := min(getFlushMinEvents(logger, output), escfg.BulkMaxSize)
+
+	// Run two consumers per connection. The exporter runs with wait_for_result, so a
+	// consumer blocks for a whole bulk round trip; a second one keeps a request formed
+	// and ready for the moment a connection frees, instead of assembling it only after
+	// the previous response lands. Connection count is deliberately unchanged so
+	// Elasticsearch-side load is identical to the classic output.
+	numConsumers := 2 * maxConns
+
+	// Size the in-flight event budget for two batches per consumer: one in flight, one
+	// staging.
+	//
+	// The beats presets provision queue.mem.events = 2 * flush.min_events * worker,
+	// which is two batches per output worker. That is right for the classic output,
+	// where an admitted event sits in the memqueue, an output worker, or in-flight HTTP.
+	// A beat receiver spreads the same budget over more stages -- the slabqueue FIFO,
+	// the per-batch Publish goroutines converting events to pdata, the exporter's
+	// sending queue, and the batcher accumulating toward min_size -- so less than one
+	// full batch is ever actually on the wire. Producers then block in the slabqueue's
+	// reserve() while the connection sits idle.
+	//
+	// Slots are only released once a batch is acknowledged by Elasticsearch (the queue
+	// batch ACKs after ConsumeLogs returns, and wait_for_result makes that wait for the
+	// bulk response), so in-flight events compete for the same budget as staging ones.
+	//
+	// Sizing against num_consumers rather than worker also keeps the budget clear of
+	// (num_consumers + 1) * batchSize. Below that threshold every consumer can hold a
+	// full request while the remainder sits under min_size, which the batcher will not
+	// flush and which producers cannot top up because the budget is exhausted -- the
+	// pipeline then stalls until flush_timeout fires. 2 * num_consumers is >= that
+	// threshold for any consumer count >= 1.
+	queueSize := 2 * batchSize * numConsumers
+
+	// Bound the budget. It counts events held in memory and would otherwise grow
+	// linearly with hosts * workers -- a 60-host output would ask for 384,000 events.
+	//
+	// When the ceiling binds, num_consumers comes down with it. Capping the budget on
+	// its own would leave consumers sized for a budget they no longer have, which is the
+	// direction that risks the stall described above.
+	if queueSize > maxQueueEvents {
+		queueSize = maxQueueEvents
+		numConsumers = max(1, queueSize/(2*batchSize))
+	}
+
+	// Never shrink a larger budget that a preset or the user already asked for. The
+	// latency preset is the case that matters: it pairs bulk_max_size 50 with
+	// queue.mem.events 4100, so the formula alone would cut it to 200.
+	if existing := getQueueSize(logger, output); existing > queueSize {
+		queueSize = existing
+	}
+
+	// Write the budget back so both consumers of queue.mem.events pick it up: the
+	// exporter's queue_size below, and the queue block that gets promoted into the beat
+	// receiver's own config, which becomes the queue's live-event cap.
+	if err := output.SetInt("queue.mem.events", -1, int64(queueSize)); err != nil {
+		return nil, nil, fmt.Errorf("failed setting queue.mem.events: %w", err)
+	}
+
 	otelYAMLCfg := map[string]any{
 		"endpoints": hosts, // hosts, protocol, path, port
 
@@ -117,20 +187,20 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 		// where it could spin as many goroutines as it liked.
 		// Given that batcher implementation can change and it has a history of such changes,
 		// let's keep max_conns_per_host setting for now and remove it once exporterhelper is stable.
-		"max_conns_per_host": getTotalNumWorkers(output), // num_workers * len(hosts) if loadbalance is true
+		"max_conns_per_host": maxConns, // num_workers * len(hosts) if loadbalance is true
 
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
 				"flush_timeout": getFlushTimeout(logger, output),
-				"max_size":      escfg.BulkMaxSize,                                         // bulk_max_size
-				"min_size":      min(getFlushMinEvents(logger, output), escfg.BulkMaxSize), // queue.mem.flush.min_events, capped at max_size
+				"max_size":      escfg.BulkMaxSize, // bulk_max_size
+				"min_size":      batchSize,         // queue.mem.flush.min_events, capped at max_size
 				"sizer":         "items",
 			},
 			"enabled":           true,
-			"queue_size":        getQueueSize(logger, output),
+			"queue_size":        queueSize,
 			"block_on_overflow": true,
 			"wait_for_result":   true,
-			"num_consumers":     getTotalNumWorkers(output), // num_workers * len(hosts) if loadbalance is true
+			"num_consumers":     numConsumers, // two per connection
 		},
 
 		"logs_dynamic_pipeline": map[string]any{
