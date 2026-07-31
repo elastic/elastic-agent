@@ -1052,7 +1052,10 @@ type k8sKustomizeOverrides struct {
 // to further adjust the k8s objects
 func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverrides, forEachObject func(object k8s.Object)) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		kustomizeYaml, err := os.ReadFile(AgentKustomizePath)
+		kustomizePath, err := k8sKustomizePath(kCtx.clientSet)
+		require.NoError(t, err, "failed to select kustomize manifest")
+
+		kustomizeYaml, err := os.ReadFile(kustomizePath)
 		require.NoError(t, err, "failed to read kustomize manifest")
 
 		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(kustomizeYaml)))
@@ -1125,7 +1128,7 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 					// to match the test namespace
 					if volume.Name == "elastic-agent-state" {
 						hostPathType := corev1.HostPathDirectoryOrCreate
-						pod.Volumes[volumeIdx].VolumeSource.HostPath = &corev1.HostPathVolumeSource{
+						pod.Volumes[volumeIdx].HostPath = &corev1.HostPathVolumeSource{
 							Type: &hostPathType,
 							Path: fmt.Sprintf("/var/lib/elastic-agent-standalone/%s/state", namespace),
 						}
@@ -1148,6 +1151,21 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, namespace: namespace}, objects...)
 		require.NoError(t, err, "failed to create objects")
 	}
+}
+
+func k8sKustomizePath(clientSet kubernetes.Interface) (string, error) {
+	groups, err := clientSet.Discovery().ServerGroups()
+	if err != nil {
+		return "", fmt.Errorf("discovering Kubernetes API groups: %w", err)
+	}
+
+	for _, group := range groups.Groups {
+		if group.Name == "security.openshift.io" {
+			return AgentOpenShiftKustomizePath, nil
+		}
+	}
+
+	return AgentKustomizePath, nil
 }
 
 // k8sStepCheckAgentStatus checks the status of the agent inside the pods returned by the selector
@@ -1547,7 +1565,7 @@ func k8sStepHintsRedisCheckAgentStatus(agentPodLabelSelector string, hintDeploye
 			require.NotEmpty(t, redisPodList.Items, "no redis pods found with selector ", redisPodSelector)
 			// check that redis pods have the correct annotations
 			for _, redisPod := range redisPodList.Items {
-				hintPackage, ok := redisPod.ObjectMeta.Annotations["co.elastic.hints/package"]
+				hintPackage, ok := redisPod.Annotations["co.elastic.hints/package"]
 				require.True(t, ok, "missing hints annotation")
 				require.Equal(t, "redis", hintPackage, "hints annotation package wrong value")
 			}
