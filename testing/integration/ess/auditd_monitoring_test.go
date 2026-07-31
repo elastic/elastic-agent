@@ -98,11 +98,12 @@ func (runner *AuditDRunner) SetupSuite() {
 
 }
 
-// validateAuditdEvents waits for an ambient auditd event to appear in ES from
-// the given agent since the given time. If eventAction is non-empty, only
-// events with that event.action value are returned so that the caller can
-// compare documents of the same audit event type across runtime modes.
-func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Context, agentID string, since time.Time, eventAction string) mapstr.M {
+// validateAuditdEvents waits for an auditd execve event tagged with
+// "elastic-agent-test" (the -k key on the test's audit rules) to appear in ES
+// from the given agent since the given time. The auditbeat module maps rule
+// keys to the top-level tags field. Using execve events from a known tag
+// ensures both runtime modes see documents with the same predictable field set.
+func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) mapstr.M {
 	now := time.Now()
 	var query map[string]any
 	var doc mapstr.M
@@ -120,10 +121,7 @@ func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Conte
 	}()
 
 	requiredFields := [][]string{
-		{"exists", "field", "auditd.summary.actor.primary"},
-	}
-	if eventAction != "" {
-		requiredFields = append(requiredFields, []string{"match", "event.action", eventAction})
+		{"term", "tags", "elastic-agent-test"},
 	}
 
 	t.Logf("starting to query ES for auditd events at %s", now.Format(time.RFC3339Nano))
@@ -181,7 +179,7 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 			assert.True(collect, foundReceiver, "expected an audit/auditd component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
-		otelDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, testStart, "")
+		otelDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, testStart)
 	})
 
 	// Switch to process runtime and validate the same data.
@@ -212,23 +210,12 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 			assert.True(collect, foundProcess, "expected an audit/auditd component to be running as a process")
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as a process")
 
-		// Use the same event.action as the OTel document to ensure we compare
-		// semantically equivalent events across runtime modes. auditd.data fields
-		// are excluded from the key comparison because they are audit event type-
-		// specific and vary even within the same event.action depending on kernel
-		// version and PAM configuration (e.g. grantors may or may not be present).
-		var processEventAction string
-		if otelDoc != nil {
-			if v, err := otelDoc.GetValue("event.action"); err == nil {
-				processEventAction, _ = v.(string)
-			}
-		}
-		processDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, processSince, processEventAction)
+		processDoc = runner.validateAuditdEvents(t, ctx, agentStatus.Info.ID, processSince)
 	})
 
 	// Compare documents from otel and process modes have the same keys.
-	// auditd.data fields are excluded because they are audit event type-specific
-	// and can legitimately differ even for the same event.action.
+	// auditd.data fields are excluded because their subkeys can vary across
+	// individual execve events depending on kernel version and PAM configuration.
 	t.Run("compare", func(t *testing.T) {
 		if otelDoc == nil || processDoc == nil {
 			t.Skip("skipping comparison because a previous subtest failed")
