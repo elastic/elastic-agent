@@ -51,6 +51,77 @@ func TestNewFromConfig_RuntimeConfigFromFile(t *testing.T) {
 	assert.Equal(t, string(component.OtelRuntimeManager), runtime.Metricbeat.InputType["system/metrics"])
 }
 
+// TestNewFromConfig_DynamicInputsConfig verifies that both the legacy scalar form and the
+// richer map form of agent.internal.runtime.dynamic_inputs are unpacked correctly through the
+// regular configuration loading path.
+func TestNewFromConfig_DynamicInputsConfig(t *testing.T) {
+	t.Run("legacy scalar form", func(t *testing.T) {
+		c, err := NewFromConfig(config.MustNewConfigFrom(`
+agent.internal.runtime.dynamic_inputs: process
+`))
+		require.NoError(t, err)
+
+		dynamicInputs := c.Settings.Internal.Runtime.DynamicInputs
+		assert.Equal(t, string(component.ProcessRuntimeManager), dynamicInputs.Default)
+		assert.Empty(t, dynamicInputs.StaticVariables)
+		assert.Equal(t, component.ProcessRuntimeManager,
+			dynamicInputs.RuntimeManagerForDynamicInput("filebeat", "filestream"))
+	})
+
+	t.Run("map form", func(t *testing.T) {
+		c, err := NewFromConfig(config.MustNewConfigFrom(`
+agent:
+  internal:
+    runtime:
+      dynamic_inputs:
+        default: process
+        filebeat:
+          default: process
+          filestream: otel
+        metricbeat:
+          default: otel
+        static_variables:
+          - local_dynamic.group
+          - kubernetes.node
+`))
+		require.NoError(t, err)
+
+		dynamicInputs := c.Settings.Internal.Runtime.DynamicInputs
+		assert.Equal(t, "process", dynamicInputs.Default)
+		assert.Equal(t, "process", dynamicInputs.Filebeat.Default)
+		assert.Equal(t, map[string]string{"filestream": "otel"}, dynamicInputs.Filebeat.InputType)
+		assert.Equal(t, "otel", dynamicInputs.Metricbeat.Default)
+		assert.Equal(t, []string{"local_dynamic.group", "kubernetes.node"}, dynamicInputs.StaticVariables)
+
+		// per input type wins over the beat default, which wins over the global default
+		assert.Equal(t, component.OtelRuntimeManager,
+			dynamicInputs.RuntimeManagerForDynamicInput("filebeat", "filestream"))
+		assert.Equal(t, component.ProcessRuntimeManager,
+			dynamicInputs.RuntimeManagerForDynamicInput("filebeat", "log"))
+		assert.Equal(t, component.OtelRuntimeManager,
+			dynamicInputs.RuntimeManagerForDynamicInput("metricbeat", "system/metrics"))
+		assert.Equal(t, component.ProcessRuntimeManager,
+			dynamicInputs.RuntimeManagerForDynamicInput("packetbeat", "packet"))
+	})
+
+	t.Run("unset leaves the feature disabled", func(t *testing.T) {
+		c, err := NewFromConfig(config.MustNewConfigFrom(`agent.internal.runtime.default: otel`))
+		require.NoError(t, err)
+
+		dynamicInputs := c.Settings.Internal.Runtime.DynamicInputs
+		assert.Equal(t, "", dynamicInputs.Default)
+		assert.Equal(t, component.RuntimeManager(""),
+			dynamicInputs.RuntimeManagerForDynamicInput("filebeat", "filestream"))
+	})
+
+	t.Run("invalid runtime manager is rejected", func(t *testing.T) {
+		_, err := NewFromConfig(config.MustNewConfigFrom(`
+agent.internal.runtime.dynamic_inputs.default: nonsense
+`))
+		require.Error(t, err)
+	})
+}
+
 func TestNewConfigReloader_StandaloneConfig(t *testing.T) {
 	setupConfigReloaderTest(t)
 
