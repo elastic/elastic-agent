@@ -18,8 +18,6 @@ jobs:
       packages: read
     steps:
       - uses: actions/checkout@v7
-        with:
-          submodules: true
 
       - name: Get token
         id: get_token

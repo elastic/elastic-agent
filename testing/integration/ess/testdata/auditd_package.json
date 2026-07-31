@@ -43,6 +43,7 @@
                   "type": "text"
                 },
                 "audit_rules": {
+                  "value": "-a always,exit -S execve -k elastic-agent-test\n-a always,exit -S execveat -k elastic-agent-test",
                   "type": "textarea"
                 },
                 "audit_rule_files": {
@@ -89,6 +90,7 @@
                 "type": "audit/auditd",
                 "include_raw_message": true,
                 "socket_type": "",
+                "audit_rules": "-a always,exit -S execve -k elastic-agent-test\n-a always,exit -S execveat -k elastic-agent-test",
                 "immutable": false,
                 "resolve_ids": true,
                 "failure_mode": "silent",

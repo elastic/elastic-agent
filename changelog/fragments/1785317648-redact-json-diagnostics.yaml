@@ -6,19 +6,23 @@
 # - enhancement: extends functionality but does not break or fix existing behavior
 # - feature: new functionality
 # - known-issue: problems that we are aware of in a given version
-# - security: impacts on the security of a product or a user’s deployment.
+# - security: impacts on the security of a product or a user's deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: upgrade
+kind: security
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Local snapshot upgrades now expect an artifact filename with no build ID, matching remote snapshot artifact filename convention.
+summary: Sensitive values in JSON diagnostic files are now redacted
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: When performing a local snapshot upgrade, the upgrade artifact is now expected to named without the build ID, e.g. elastic-agent-9.5.0-SNAPSHOT-linux-x86_64.tar.gz rather than elastic-agent-9.5.0-SNAPSHOT+51bd4cc6-linux-x86_64.tar.gz. This matches the naming convention of the snapshot registry and brings filename expectations in line with the remote upgrade path.
+description: |
+  When collecting diagnostics, files with a JSON content type were not having
+  sensitive values (such as passwords and private keys) redacted before being
+  included in the diagnostic bundle. Only YAML files were redacted. JSON files
+  are now redacted in the same way as YAML files.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
@@ -37,7 +41,6 @@ component: elastic-agent
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
 # pr: https://github.com/owner/repo/1234
-pr: https://github.com/elastic/elastic-agent/pull/15587
 
 # AUTOMATED
 # OPTIONAL to manually add other issue URLs

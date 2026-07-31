@@ -220,6 +220,24 @@ func (c *Config) Merge(from interface{}, opts ...interface{}) error {
 	return c.access().Merge(from, ucfgOpts...)
 }
 
+// Clone returns an independent copy of the configuration.
+func (c *Config) Clone() (*Config, error) {
+	raw, err := c.ToMapStr()
+	if err != nil {
+		return nil, err
+	}
+
+	clone, err := NewConfigFrom(raw)
+	if err != nil {
+		return nil, err
+	}
+	if c.OTel != nil {
+		clone.OTel = confmap.NewFromStringMap(c.OTel.ToStringMap())
+	}
+
+	return clone, nil
+}
+
 // ToMapStr takes the config and transform it into a map[string]interface{}
 func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
 	if len(opts) == 0 {
