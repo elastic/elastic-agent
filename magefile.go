@@ -59,6 +59,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/gcloud"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/microshift"
 	"github.com/elastic/elastic-agent/pkg/testing/local"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
@@ -2288,7 +2289,7 @@ func (i Integration) testServerless(ctx context.Context, matrix bool, testName s
 	return integRunner(ctx, "testing/integration/serverless", matrix, testName)
 }
 
-// TestKubernetes runs the integration tests defined in testing/integration/k8s
+// TestKubernetes runs the integration tests defined in testing/integration/k8s.
 func (i Integration) TestKubernetes(ctx context.Context) error {
 	return i.testKubernetes(ctx, false, "")
 }
@@ -2340,6 +2341,15 @@ func (Integration) BuildKubernetesTestData(ctx context.Context) error {
 	}
 	if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", k8s.AgentKustomizePath), kustomizeYaml, 0o644); err != nil {
 		return fmt.Errorf("failed to write kustomize.yaml: %w", err)
+	}
+
+	// render elastic-agent-standalone OpenShift kustomize
+	openShiftKustomizeYaml, err := kubernetes.RenderKustomize(ctx, filepath.Join("deploy", "kubernetes", "elastic-agent-kustomize", "openshift", "elastic-agent-standalone"))
+	if err != nil {
+		return fmt.Errorf("failed to render OpenShift kustomize: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", k8s.AgentOpenShiftKustomizePath), openShiftKustomizeYaml, 0o644); err != nil {
+		return fmt.Errorf("failed to write OpenShift kustomize.yaml: %w", err)
 	}
 
 	return nil
@@ -3204,6 +3214,9 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	case kind.Name:
 		instanceProvisioner = kind.NewProvisioner()
 		identifier = localIdentifier()
+	case microshift.Name:
+		instanceProvisioner = microshift.NewProvisioner()
+		identifier = localIdentifier()
 	case dockerprov.Name:
 		instanceProvisioner = dockerprov.NewProvisioner()
 		identifier = localIdentifier()
@@ -3211,7 +3224,16 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		instanceProvisioner = local.NewProvisioner()
 		identifier = localIdentifier()
 	default:
-		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
+		return nil, fmt.Errorf(
+			"INSTANCE_PROVISIONER environment variable must be one of %q, %q, %q, %q, %q, or %q, not %s",
+			gcloud.Name,
+			multipass.Name,
+			kind.Name,
+			microshift.Name,
+			dockerprov.Name,
+			local.Name,
+			instanceProvisionerMode,
+		)
 	}
 
 	// The local stack provisioner runs elastic-package locally and needs no ESS
