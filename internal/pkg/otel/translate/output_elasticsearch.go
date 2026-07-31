@@ -30,6 +30,20 @@ type esToOTelOptions struct {
 	RetryOnStatus []int  `config:"retry_on_status"`
 }
 
+// maxQueueEvents is a memory limiter, not a performance tuning value.
+//
+// The sizing below scales with the connection count, which is hosts * workers, and the
+// budget is events held in memory. Left unbounded a large host list would ask for an
+// unbounded amount of memory: a 60-host output would want 384,000 resident events, on the
+// order of gigabytes. This ceiling exists purely to put a roof on that.
+//
+// It is deliberately set well above any concurrency the presets reach on a single host
+// (the throughput preset asks for 25,600), so it does not interfere with normal sizing --
+// it only engages on large host lists, where it trades some connection utilisation for a
+// bounded footprint. Raising it costs memory roughly linearly; at typical event sizes this
+// value corresponds to on the order of a gigabyte of in-flight events.
+const maxQueueEvents = 64000
+
 var defaultOptions = esToOTelOptions{
 	ElasticsearchConfig: elasticsearch.DefaultConfig(),
 
@@ -109,28 +123,72 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating hosts:%w", err)
 	}
+	maxConns := getTotalNumConnections(output)
+
+	// batchSize is what the exporter's batcher will actually emit per bulk request.
+	batchSize := min(getFlushMinEvents(logger, output), escfg.BulkMaxSize)
+
+	// Run two consumers per connection. The exporter runs with wait_for_result, so a
+	// consumer blocks for a whole bulk round trip; a second one keeps a request formed
+	// and ready for the moment a connection frees, instead of assembling it only after
+	// the previous response lands.
+	numConsumers := 2 * maxConns
+
+	// Size the in-flight event budget for two batches per consumer: one in flight, one
+	// staging.
+	//
+	// Sized against num_consumers keeps the budget clear. Below that threshold every
+	// consumer can hold a full request while the remainder sits under min_size, which the
+	// batcher will not flush and which producers cannot top up because the budget
+	// is exhausted -- the pipeline then stalls until flush_timeout fires.
+	queueSize := 2 * batchSize * numConsumers
+
+	// Apply the memory limiter. When it engages, num_consumers comes down with it:
+	// capping the budget on its own would leave consumers sized for a budget they no
+	// longer have, which is the direction that risks the stall described above.
+	if queueSize > maxQueueEvents {
+		queueSize = maxQueueEvents
+		numConsumers = max(1, queueSize/(2*batchSize))
+	}
+
+	// Never shrink a larger budget that a preset or the user already asked for.
+	if existing := getQueueSize(logger, output); existing > queueSize {
+		queueSize = existing
+	}
+
+	// Write the budget back so both consumers of queue.mem.events pick it up: the
+	// exporter's queue_size below, and the queue block that gets promoted into the beat
+	// receiver's own config, which becomes the queue's live-event cap.
+	if err := output.SetInt("queue.mem.events", -1, int64(queueSize)); err != nil {
+		return nil, nil, fmt.Errorf("failed setting queue.mem.events: %w", err)
+	}
+
 	otelYAMLCfg := map[string]any{
 		"endpoints": hosts, // hosts, protocol, path, port
 
-		// max_conns_per_host is a "hard" limit on number of open connections.
-		// Ideally, escfg.NumWorkers() should map to num_consumer, but we had a bug in upstream
-		// where it could spin as many goroutines as it liked.
-		// Given that batcher implementation can change and it has a history of such changes,
-		// let's keep max_conns_per_host setting for now and remove it once exporterhelper is stable.
-		"max_conns_per_host": getTotalNumWorkers(output), // num_workers * len(hosts) if loadbalance is true
+		// max_conns_per_host is a "hard" limit on number of open connections. It was added
+		// because an upstream bug let the exporter spin up as many sending goroutines as it
+		// liked, and the batcher implementation has a history of such changes.
+		//
+		// It is now load-bearing for a second reason: num_consumers is deliberately set
+		// above it (see the sizing above), so this is what actually bounds the connection
+		// count. Removing it would let the extra consumers open extra connections and
+		// change Elasticsearch-side load, which the sizing above is specifically written
+		// to avoid.
+		"max_conns_per_host": maxConns, // num_workers * len(hosts) if loadbalance is true
 
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
 				"flush_timeout": getFlushTimeout(logger, output),
-				"max_size":      escfg.BulkMaxSize,                                         // bulk_max_size
-				"min_size":      min(getFlushMinEvents(logger, output), escfg.BulkMaxSize), // queue.mem.flush.min_events, capped at max_size
+				"max_size":      escfg.BulkMaxSize, // bulk_max_size
+				"min_size":      batchSize,         // queue.mem.flush.min_events, capped at max_size
 				"sizer":         "items",
 			},
 			"enabled":           true,
-			"queue_size":        getQueueSize(logger, output),
+			"queue_size":        queueSize,
 			"block_on_overflow": true,
 			"wait_for_result":   true,
-			"num_consumers":     getTotalNumWorkers(output), // num_workers * len(hosts) if loadbalance is true
+			"num_consumers":     numConsumers, // two per connection
 		},
 
 		"logs_dynamic_pipeline": map[string]any{
@@ -168,9 +226,9 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 	return otelYAMLCfg, nil, nil
 }
 
-// getTotalNumWorkers returns the number of hosts that beats would
+// getTotalNumConnections returns the number of connections that beats would
 // have used taking into account hosts, loadbalance and worker
-func getTotalNumWorkers(cfg *config.C) int {
+func getTotalNumConnections(cfg *config.C) int {
 	hostList, err := outputs.ReadHostList(cfg)
 	if err != nil {
 		return 1
