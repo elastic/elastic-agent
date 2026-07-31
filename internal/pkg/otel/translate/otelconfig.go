@@ -7,6 +7,7 @@ package translate
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -21,7 +22,6 @@ import (
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/pipeline"
-	"golang.org/x/exp/maps"
 
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
@@ -125,8 +125,7 @@ func GetOtelConfig(
 
 	if len(extensions) != 0 {
 		// create a deduplicated extensions lists in a deterministic order
-		extensionsSlice := maps.Keys(extensions)
-		slices.Sort(extensionsSlice)
+		extensionsSlice := slices.Sorted(maps.Keys(extensions))
 		// for consistency, we set this back as a slice of any
 		untypedExtensions := make([]any, len(extensionsSlice))
 		for i, ext := range extensionsSlice {
@@ -299,8 +298,7 @@ func getCollectorConfigForComponent(
 		return nil, err
 	}
 
-	receiverKeys := maps.Keys(receiversConfig)
-	slices.Sort(receiverKeys)
+	receiverKeys := slices.Sorted(maps.Keys(receiversConfig))
 	pipelineConfig := map[string][]string{
 		"exporters": {exporterID.String()},
 		"receivers": receiverKeys,
@@ -335,7 +333,7 @@ func getCollectorConfigForComponent(
 			return nil, fmt.Errorf("found more than one processor config")
 		}
 
-		pipelineProcessors = append(pipelineProcessors, maps.Keys(processorConfig)...)
+		pipelineProcessors = slices.AppendSeq(pipelineProcessors, maps.Keys(processorConfig))
 	}
 
 	if len(pipelineProcessors) > 0 {
@@ -347,9 +345,9 @@ func getCollectorConfigForComponent(
 	}
 
 	// we need to convert []string to []interface for this to work
-	extensionKey := make([]any, len(maps.Keys(extensionConfig)))
-	for i, v := range maps.Keys(extensionConfig) {
-		extensionKey[i] = v
+	extensionKey := make([]any, 0, len(extensionConfig))
+	for k := range extensionConfig {
+		extensionKey = append(extensionKey, k)
 	}
 
 	fullConfig := map[string]any{
@@ -371,9 +369,7 @@ func getCollectorConfigForComponent(
 	}
 
 	allProcessorsConfig := map[string]any{}
-	for k, v := range processorConfig {
-		allProcessorsConfig[k] = v
-	}
+	maps.Copy(allProcessorsConfig, processorConfig)
 	if features.DefaultProcessors() && len(beatDefaultProcessors) > 0 {
 		allProcessorsConfig[beatProcessorID] = map[string]any{
 			"processors": beatDefaultProcessors,
@@ -872,9 +868,7 @@ func stripDefaultProcessors(beatName string, raw any) []any {
 	}
 	defaultsByName := make(map[string]any, len(defaults))
 	for _, p := range defaults {
-		for k, v := range p {
-			defaultsByName[k] = v
-		}
+		maps.Copy(defaultsByName, p)
 	}
 	filtered := make([]any, 0, len(list))
 	for _, item := range list {
@@ -883,7 +877,10 @@ func stripDefaultProcessors(beatName string, raw any) []any {
 			filtered = append(filtered, item)
 			continue
 		}
-		key := maps.Keys(p)[0]
+		var key string
+		for k := range p {
+			key = k
+		}
 		if defaultVal, isDefault := defaultsByName[key]; isDefault && reflect.DeepEqual(p[key], defaultVal) {
 			continue
 		}
