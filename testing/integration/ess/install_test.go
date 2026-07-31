@@ -961,12 +961,12 @@ agent.monitoring.enabled: false
 			}
 
 			t.Logf("Service state:\n%s\n", serviceOutput)
-			logPattern := filepath.Join(fixture.WorkDir(), "data", "elastic-agent-*", "logs", "elastic-agent-*.ndjson")
+			logs, err := fixture.Exec(context.Background(), []string{"logs", "-n", "20", "--exclude-events"})
 			if err != nil {
 				t.Logf("failed to fetch final logs inside cleanup: %v", err)
 				return
 			}
-			t.Logf("Logs:\n%s\n", readAgentErrorLogs(logPattern, 20))
+			t.Logf("Logs:\n%s\n", string(logs))
 		}
 	})
 
@@ -979,36 +979,4 @@ agent.monitoring.enabled: false
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		assert.NoError(c, fixture.IsHealthy(ctx))
 	}, 3*time.Minute, 5*time.Second, "agent did not become healthy after restart")
-}
-
-func readAgentErrorLogs(pattern string, limit int) string {
-	matches, _ := filepath.Glob(pattern)
-	var lines []string
-	for _, match := range matches {
-		b, err := os.ReadFile(match)
-		if err != nil {
-			continue
-		}
-		for _, line := range strings.Split(string(b), "\n") {
-			if line == "" {
-				continue
-			}
-			var entry struct {
-				Timestamp string `json:"@timestamp"`
-				LogLevel  string `json:"log.level"`
-				Message   string `json:"message"`
-			}
-			if err := json.Unmarshal([]byte(line), &entry); err != nil || entry.LogLevel != "error" {
-				continue
-			}
-			lines = append(lines, fmt.Sprintf("%s %s", entry.Timestamp, entry.Message))
-			if len(lines) > limit {
-				lines = lines[len(lines)-limit:]
-			}
-		}
-	}
-	if len(lines) == 0 {
-		return "(no agent error logs found)"
-	}
-	return strings.Join(lines, "\n")
 }
