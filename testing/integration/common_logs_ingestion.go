@@ -228,9 +228,9 @@ func TestMonitoringLogsAreShipped(
 	// Stage 2: make sure all components are healthy
 	t.Log("Making sure all components are healthy")
 	for _, c := range status.Components {
-		assert.Equalf(t, client.Healthy, client.State(c.State),
+		assert.Equalf(t, client.Healthy, client.State(c.State), //nolint:gosec // G115 component state is less than int32 max
 			"component %s: want %s, got %s",
-			c.Name, client.Healthy, client.State(c.State))
+			c.Name, client.Healthy, client.State(c.State)) //nolint:gosec // G115 component state is less than int32 max
 	}
 
 	// Stage 3: Make sure we have message confirming central management is running
@@ -325,7 +325,7 @@ func TestFlattenedDatastreamFleetPolicy(
 
 	// 2. Call Kibana to create the policy.
 	// Docs: https://www.elastic.co/guide/en/fleet/current/fleet-api-docs.html#create-integration-policy-api
-	resp, err := info.KibanaClient.Connection.Send(
+	resp, err := info.KibanaClient.Send(
 		http.MethodPost,
 		"/api/fleet/package_policies",
 		nil,
@@ -334,6 +334,8 @@ func TestFlattenedDatastreamFleetPolicy(
 	if err != nil {
 		t.Fatalf("could not execute request to Kibana/Fleet: %s", err)
 	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		// On error dump the whole request response so we can easily spot
 		// what went wrong.
