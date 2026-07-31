@@ -166,7 +166,7 @@ func extractPRCheckboxes(body string) map[string]bool {
 
 func buildReleaseIssueBody(version string, majorMinor bool, prURLs []string, checked map[string]bool) string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Global tracker: %s\n\n", globalReleaseTrackerURL))
+	fmt.Fprintf(&b, "Global tracker: %s\n\n", globalReleaseTrackerURL)
 	b.WriteString("# Release Checklist\n\n")
 	b.WriteString("Checklist for the Elastic Agent release process. The Elastic Agent and Beats release documentation can be reviewed ")
 	b.WriteString("[here](https://github.com/elastic/ingest-dev/blob/main/fleet-platform/releases.md).\n\n")
@@ -209,7 +209,7 @@ func formatPRChecklist(prURLs []string, checked map[string]bool) string {
 		if checked != nil && checked[u] {
 			mark = "x"
 		}
-		b.WriteString(fmt.Sprintf("- [%s] %s\n", mark, u))
+		fmt.Fprintf(&b, "- [%s] %s\n", mark, u)
 	}
 	return b.String()
 }
