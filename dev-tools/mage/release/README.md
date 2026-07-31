@@ -9,12 +9,10 @@ targets.
 
 ## Overview
 
-This package provides release automation for Elastic Agent via mage.
-
-It lives in a **nested Go module** (`dev-tools/mage/release/go.mod`) so tooling
-dependencies (`go-git`, `go-github`, and their transitive tree) stay out of the
-root `go.mod` and `NOTICE.txt`. Root mage targets invoke
-`go run -C ./dev-tools/mage/release ./cmd/agent-release …`.
+This package provides release automation for Elastic Agent via mage. It is part
+of the root Go module; configuration is loaded through
+[`dev-tools/mage` Settings](../settings.go) (`ReleaseSettings`) alongside other
+mage env settings. Root mage targets call package functions directly.
 
 **Workflows supported:**
 1. **Major/Minor Release (feature-freeze)** — Creates release branch + 3 grouped PRs
@@ -66,6 +64,10 @@ mage -l | grep release
 
 ## Configuration
 
+Release env vars are loaded in `LoadSettings()` into `Settings.Release`
+(`ReleaseSettings` in `dev-tools/mage/release_settings.go`). `CURRENT_RELEASE`
+is optional for general mage targets; release workflows call `RequireRelease()`.
+
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `CURRENT_RELEASE` | Version to release | `9.5.0` |
@@ -110,30 +112,18 @@ dry-run).
 ## Testing
 
 ```bash
-cd dev-tools/mage/release
-go test ./... -count=1
+go test ./dev-tools/mage/ ./dev-tools/mage/release/ -count=1
 ```
-
-## CLI (optional)
-
-For local debugging from the repo root:
-
-```bash
-go run -C ./dev-tools/mage/release ./cmd/agent-release help
-ELASTIC_AGENT_REPO_ROOT=$PWD go run -C ./dev-tools/mage/release ./cmd/agent-release run-major-minor
-```
-
-`ELASTIC_AGENT_REPO_ROOT` is set automatically by mage when using `mage release:*`.
 
 ## Package layout
 
 | File | Purpose |
 |------|---------|
-| `config.go` | Environment-based `ReleaseConfig` and version inference |
+| `../release_settings.go` | `ReleaseSettings` and env loading via `LoadSettings` |
+| `config.go` | GitHub latest-release resolution and validation helpers |
 | `release.go` | File updates (`UpdateVersion`, `UpdateDocs`, `ReadAgentVersion`, …) |
 | `mergify.go` | `.mergify.yml` backport rule updates |
 | `workflows.go` | Orchestration (`RunMajorMinorRelease`, `RunPatchRelease`) |
 | `issue.go` | Release checklist issue tracker |
 | `git.go` | Git operations (includes submodule sync for agent) |
 | `github.go` | Pull request creation, label ensure, related-PR lookup |
-| `cmd/agent-release/` | Nested-module CLI invoked by root mage |

@@ -50,6 +50,7 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
+	"github.com/elastic/elastic-agent/dev-tools/mage/release"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
@@ -4412,53 +4413,65 @@ func getMacOSMajorVersion() (int, error) {
 	return majorVer, nil
 }
 
-const releaseToolDir = "dev-tools/mage/release"
-
-// runReleaseTool invokes the nested-module CLI with the Elastic Agent repo as cwd.
-func runReleaseTool(args ...string) error {
-	root, err := os.Getwd()
+// loadReleaseConfig loads mage Settings and requires CURRENT_RELEASE for workflows.
+func loadReleaseConfig() (*release.ReleaseConfig, error) {
+	settings, err := devtools.LoadSettings()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	env := map[string]string{"ELASTIC_AGENT_REPO_ROOT": root}
-	cmdArgs := append([]string{"run", "-C", releaseToolDir, "./cmd/agent-release"}, args...)
-	return sh.RunWithV(env, "go", cmdArgs...)
+	if err := settings.RequireRelease(); err != nil {
+		return nil, err
+	}
+	cfg := settings.Release
+	return &cfg, nil
 }
 
 // UpdateVersion updates the version in version/version.go
 func (Release) UpdateVersion(version string) error {
-	return runReleaseTool("update-version", version)
+	return release.UpdateVersion(version)
 }
 
 // UpdateDocs updates version references in documentation and K8s manifests
 func (Release) UpdateDocs(version string) error {
-	return runReleaseTool("update-docs", version)
+	return release.UpdateDocs(version)
 }
 
 // UpdatePatchDocs updates :stack-version: in version/docs/version.asciidoc
 func (Release) UpdatePatchDocs(version string) error {
-	return runReleaseTool("update-patch-docs", version)
+	return release.UpdatePatchDocs(version)
 }
 
 // UpdateMergify adds a new backport rule to .mergify.yml
 func (Release) UpdateMergify(version string) error {
-	return runReleaseTool("update-mergify", version)
+	return release.UpdateMergify(version)
 }
 
 // RunMajorMinor orchestrates the complete major/minor release workflow
 // Set DRY_RUN=true to preview changes without pushing
 func (Release) RunMajorMinor() error {
-	return runReleaseTool("run-major-minor")
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunMajorMinorRelease(cfg)
 }
 
 // RunPatch orchestrates the complete patch release workflow
 // Set DRY_RUN=true to preview changes without pushing
 func (Release) RunPatch() error {
-	return runReleaseTool("run-patch")
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunPatchRelease(cfg)
 }
 
 // EnsureIssueTracker creates or updates the Elastic Agent release checklist issue for
 // CURRENT_RELEASE, linking related Elastic Agent PRs labeled "release".
 func (Release) EnsureIssueTracker() error {
-	return runReleaseTool("ensure-issue-tracker")
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.EnsureReleaseIssueTracker(cfg, nil)
 }

@@ -7,9 +7,9 @@ Feature-freeze and patch workflows are aligned with the former
 / vault-bot outputs, using the same grouped-PR and merge-timing label style as
 [elastic/beats#51831](https://github.com/elastic/beats/pull/51831).
 
-Release tooling lives in a **nested Go module** (`dev-tools/mage/release/`). Root
-mage targets invoke `go run -C dev-tools/mage/release ./cmd/agent-release …` so
-`go-git` / `go-github` stay out of the root `go.mod` and `NOTICE.txt`.
+Release tooling lives under `dev-tools/mage/release/` in the root Go module.
+Configuration is loaded through mage `Settings` (`ReleaseSettings`). Use the
+`mage release:*` targets from the repository root.
 
 ## Prerequisites
 

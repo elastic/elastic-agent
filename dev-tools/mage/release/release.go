@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"golang.org/x/sys/execabs"
+
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 var defaultBeatVersionPattern = regexp.MustCompile(`const defaultBeatVersion = "([^"]+)"`)
@@ -139,7 +141,7 @@ func UpdatePatchDocs(newVersion string) error {
 
 // UpdateDocs updates version references using release-branch defaults.
 func UpdateDocs(newVersion string) error {
-	releaseBranch := inferReleaseBranch(newVersion)
+	releaseBranch := devtools.InferReleaseBranch(newVersion)
 	return UpdateDocsWithOptions(DocsUpdateOptions{
 		BaseBranch:     releaseBranch,
 		CurrentVersion: newVersion,
@@ -154,7 +156,7 @@ func UpdateDocsWithOptions(opts DocsUpdateOptions) error {
 		return fmt.Errorf("CurrentVersion is required")
 	}
 	if opts.ReleaseBranch == "" {
-		opts.ReleaseBranch = inferReleaseBranch(opts.CurrentVersion)
+		opts.ReleaseBranch = devtools.InferReleaseBranch(opts.CurrentVersion)
 	}
 	if opts.BaseBranch == "" {
 		opts.BaseBranch = opts.ReleaseBranch

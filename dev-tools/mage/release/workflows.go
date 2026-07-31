@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v68/github"
+
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 // PR label sets match elastic-vault-github-plugin-prod release PRs.
@@ -105,11 +107,11 @@ type workflowPRResult struct {
 func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Major/Minor Release Workflow ===")
 
-	if err := cfg.EnsureLatestRelease(); err != nil {
+	if err := EnsureLatestRelease(cfg); err != nil {
 		return err
 	}
 
-	if err := cfg.Validate(); err != nil {
+	if err := ValidateReleaseConfig(cfg); err != nil {
 		return err
 	}
 
@@ -367,11 +369,11 @@ func ensureMajorMinorCurrentReleaseMatchesBase(repo *GitRepo, cfg *ReleaseConfig
 func RunPatchRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Patch Release Workflow ===")
 
-	if err := cfg.EnsureLatestRelease(); err != nil {
+	if err := EnsureLatestRelease(cfg); err != nil {
 		return err
 	}
 
-	if err := cfg.Validate(); err != nil {
+	if err := ValidateReleaseConfig(cfg); err != nil {
 		return err
 	}
 
@@ -385,7 +387,7 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 	}
 
 	if cfg.ReleaseBranch == "" {
-		cfg.ReleaseBranch = inferReleaseBranch(cfg.CurrentRelease)
+		cfg.ReleaseBranch = devtools.InferReleaseBranch(cfg.CurrentRelease)
 	}
 
 	if err := ensurePatchCurrentReleaseMatchesBranch(repo, cfg); err != nil {

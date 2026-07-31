@@ -4,7 +4,11 @@
 
 package release
 
-import "testing"
+import (
+	"testing"
+
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
+)
 
 func TestSelectLatestReleaseBefore(t *testing.T) {
 	versions := []string{"9.4.0", "9.4.3", "9.5.0", "v9.3.2", "8.19.1", "not-a-version"}
@@ -18,11 +22,11 @@ func TestSelectLatestReleaseBefore(t *testing.T) {
 }
 
 func TestInferNextProjectMinorVersion(t *testing.T) {
-	got, err := inferNextProjectMinorVersion("9.5.0")
+	got, err := devtools.InferNextProjectMinorVersion("9.5.0")
 	if err != nil {
-		t.Fatalf("inferNextProjectMinorVersion() error = %v", err)
+		t.Fatalf("InferNextProjectMinorVersion() error = %v", err)
 	}
 	if got != "9.6.0" {
-		t.Errorf("inferNextProjectMinorVersion() = %s, want 9.6.0", got)
+		t.Errorf("InferNextProjectMinorVersion() = %s, want 9.6.0", got)
 	}
 }
