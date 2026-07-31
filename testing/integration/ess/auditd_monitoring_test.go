@@ -98,10 +98,11 @@ func (runner *AuditDRunner) SetupSuite() {
 
 }
 
-// validateAuditdEvents waits for an auditd execve event from the test's own
-// audit rules (key "elastic-agent-test") to appear in ES from the given agent
-// since the given time. Using execve events from a known rule key ensures both
-// runtime modes see documents with the same predictable field set.
+// validateAuditdEvents waits for an auditd execve event tagged with
+// "elastic-agent-test" (the -k key on the test's audit rules) to appear in ES
+// from the given agent since the given time. The auditbeat module maps rule
+// keys to the top-level tags field. Using execve events from a known tag
+// ensures both runtime modes see documents with the same predictable field set.
 func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) mapstr.M {
 	now := time.Now()
 	var query map[string]any
@@ -120,7 +121,7 @@ func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Conte
 	}()
 
 	requiredFields := [][]string{
-		{"term", "auditd.log.key", "elastic-agent-test"},
+		{"term", "tags", "elastic-agent-test"},
 	}
 
 	t.Logf("starting to query ES for auditd events at %s", now.Format(time.RFC3339Nano))
