@@ -1860,6 +1860,179 @@ processors:
 
 // AssertMapsEqual and AssertMapstrKeysEqual are defined in assert_tools.go
 
+// TestOtelDefaultProcessors verifies that the automatic beat metadata processors
+// injected by the OTel runtime can be disabled both per-output (via
+// default_processors in the output config) and globally (via
+// agent.features.default_processors).  A baseline sub-test confirms host.architecture
+// is present by default; the remaining sub-tests confirm disabling removes it.
+func TestOtelDefaultProcessors(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey := createESApiKey(t, info.ESClient)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
+
+	type configOptions struct {
+		InputPath        string
+		Dataset          string
+		ESEndpoint       string
+		ESApiKey         string
+		DisablePerOutput bool
+		DisableGlobal    bool
+	}
+
+	// DisablePerOutput adds default_processors under the output (4-space indent).
+	// DisableGlobal adds a features block under the top-level agent: key.
+	const configTemplate = `
+inputs:
+  - type: filestream
+    id: filestream-dp-test
+    use_output: default
+    streams:
+      - id: dp-test
+        data_stream:
+          dataset: {{.Dataset}}
+        paths:
+          - {{.InputPath}}
+        prospector.scanner.fingerprint.enabled: false
+        file_identity.native: ~
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: latency
+    ssl.enabled: true
+    ssl.verification_mode: full{{if .DisablePerOutput}}
+    default_processors:
+      add_host_metadata: false{{end}}
+agent:{{if .DisableGlobal}}
+  features:
+    default_processors:
+      add_host_metadata: false{{end}}
+  monitoring:
+    metrics: false
+    logs: false
+agent.internal.runtime.filebeat.filestream: otel
+`
+
+	cases := []struct {
+		name             string
+		dataset          string
+		disablePerOutput bool
+		disableGlobal    bool
+		wantHostArch     bool
+	}{
+		{
+			name:         "add_host_metadata_present_by_default",
+			dataset:      "dp.default",
+			wantHostArch: true,
+		},
+		{
+			name:             "per_output_add_host_metadata_disabled",
+			dataset:          "dp.peroutput",
+			disablePerOutput: true,
+			wantHostArch:     false,
+		},
+		{
+			name:          "agent_features_add_host_metadata_disabled",
+			dataset:       "dp.agentfeatures",
+			disableGlobal: true,
+			wantHostArch:  false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			inputFilePath := filepath.Join(tmpDir, "input.log")
+			require.NoError(t, os.WriteFile(inputFilePath, []byte("test line\n"), 0o600))
+
+			var configBuffer bytes.Buffer
+			require.NoError(t,
+				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+					configOptions{
+						InputPath:        inputFilePath,
+						Dataset:          tc.dataset,
+						ESEndpoint:       esEndpoint,
+						ESApiKey:         decodedApiKey,
+						DisablePerOutput: tc.disablePerOutput,
+						DisableGlobal:    tc.disableGlobal,
+					}))
+
+			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+			require.NoError(t, err)
+
+			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+			defer cancel()
+
+			require.NoError(t, fixture.Prepare(ctx))
+			require.NoError(t, fixture.Configure(ctx, configBuffer.Bytes()))
+
+			cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+			require.NoError(t, err)
+			cmd.WaitDelay = time.Second
+			var agentOutput strings.Builder
+			cmd.Stderr = &agentOutput
+			cmd.Stdout = &agentOutput
+			require.NoError(t, cmd.Start())
+
+			t.Cleanup(func() {
+				_ = cmd.Wait()
+				if t.Failed() {
+					t.Logf("agent config:\n%s", configBuffer.String())
+					t.Logf("agent output:\n%s", agentOutput.String())
+				}
+			})
+
+			require.Eventually(t, func() bool {
+				if err := fixture.IsHealthy(ctx); err != nil {
+					t.Logf("waiting for agent healthy: %s", err)
+					return false
+				}
+				return true
+			}, 1*time.Minute, 1*time.Second)
+
+			index := ".ds-logs-" + tc.dataset + "-*"
+			var docs estools.Documents
+			require.EventuallyWithT(t,
+				func(collect *assert.CollectT) {
+					findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+					defer findCancel()
+
+					docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, index, map[string]interface{}{
+						"log.file.path": inputFilePath,
+					})
+					require.NoError(collect, err)
+					assert.Equal(collect, 1, docs.Hits.Total.Value)
+				},
+				2*time.Minute, 5*time.Second,
+				"expected 1 log in index %s", index)
+
+			require.Len(t, docs.Hits.Hits, 1)
+			doc := mapstr.M(docs.Hits.Hits[0].Source)
+
+			_, archErr := doc.GetValue("host.architecture")
+			if tc.wantHostArch {
+				require.NoError(t, archErr, "host.architecture should be present when add_host_metadata is enabled by default")
+			} else {
+				require.Error(t, archErr, "host.architecture should be absent when add_host_metadata is disabled")
+			}
+		})
+	}
+}
+
 func TestFBOtelRestartE2E(t *testing.T) {
 	// This test ensures that filebeatreceiver is able to deliver logs even
 	// in advent of a collector restart.
