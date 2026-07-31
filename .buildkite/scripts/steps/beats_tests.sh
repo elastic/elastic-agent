@@ -20,6 +20,7 @@ run_test_for_beat(){
     pushd $WORKSPACE
     whoami
     ls -la
+    unset BEAT_VERSION # prevent EA workspace version from leaking into the Beats build
     SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz,zip mage package
     popd
 
