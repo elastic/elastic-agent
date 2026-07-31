@@ -27,9 +27,9 @@ The following `values.yaml` files are used depending on the ingest scenario:
 * [Managed OTLP Endpoint](https://github.com/elastic/elastic-agent/blob/main/deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml)
 
 ::::{important}
-**Configuration compatibility with {{product.elastic-stack}} versions**
+**Configuration compatibility with {{stack}} versions**
 
-If you're running {{agent}} 9.x with {{product.elastic-stack}} 8.18 or 8.19, use the Helm `values.yaml` files and configuration aligned with your Stack version to ensure proper functionality with {{product.kibana}} Observability UIs. For more details, refer to [Configuration compatibility with {{stack}} versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions).
+If you're running {{agent}} 9.x with {{stack}} 8.18 or 8.19, use the Helm `values.yaml` files and configuration aligned with your Stack version to ensure proper functionality with {{product.kibana}} Observability UIs. For more details, refer to [Configuration compatibility with {{stack}} versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions).
 ::::
 
 The following sections describe the default pipelines for the different roles of {{agent}} in a Kubernetes setup.

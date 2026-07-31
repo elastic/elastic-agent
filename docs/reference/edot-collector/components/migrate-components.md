@@ -18,7 +18,7 @@ This guide explains how to migrate from deprecated {{agent}} components to their
 
 ## Before you begin
 
-- Make sure your {{product.elastic-stack}} is running version {{version.stack.base}}. If you're using {{product.elastic-stack}} version 8.18 or 8.19, continue using the deprecated components as specified in the configuration for your Stack version.
+- Make sure your {{stack}} is running version {{version.stack.base}}. If you're using {{stack}} version 8.18 or 8.19, continue using the deprecated components as specified in the configuration for your Stack version.
 - Have access to a staging environment where you can test the new configuration before deploying to production.
 
 ## Migrate your configuration
@@ -30,7 +30,7 @@ Follow these steps to migrate your existing {{agent}} configuration.
 ::::{step} Download the latest default configuration
 Download the configuration sample that matches your use case from the [default configuration samples](/reference/edot-collector/config/default-config-standalone.md#agent-mode). For Gateway mode, refer to the [Gateway mode section](/reference/edot-collector/config/default-config-standalone.md#gateway-mode).
 
-The latest configurations for {{product.elastic-stack}} 9.x use the latest components instead of the deprecated ones.
+The latest configurations for {{stack}} 9.x use the latest components instead of the deprecated ones.
 ::::
 
 ::::{step} Test the new configuration in staging
@@ -58,7 +58,7 @@ After validating the configuration in staging:
 :::::
 
 ::::{important}
-If you're upgrading {{agent}} to 9.x but keeping your {{product.elastic-stack}} on 8.18 or 8.19:
+If you're upgrading {{agent}} to 9.x but keeping your {{stack}} on 8.18 or 8.19:
 
 - Use the configuration examples for your Stack version (8.18 or 8.19), not the latest 9.x configuration.
 - Continue using deprecated components that are included in the configuration for your Stack version.

@@ -108,7 +108,7 @@ The [`resourcedetection`] processor enriches the metrics with meta information a
 :::{note}
 :applies_to: edot_collector: ga 9.2
 
-The `elasticinframetrics` processor is deprecated in {{agent}} 9.2 but is retained for backwards compatibility. If you're running {{agent}} 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using this processor as specified in the configuration for your Stack version.
+The `elasticinframetrics` processor is deprecated in {{agent}} 9.2 but is retained for backwards compatibility. If you're running {{agent}} 9.x with {{stack}} 8.18 or 8.19, continue using this processor as specified in the configuration for your Stack version.
 :::
 
 ::::{important}
@@ -481,10 +481,10 @@ For {{ecloud}} and {{serverless-full}} deployments, mTLS is not required. TLS an
 
 ## Configuration compatibility with Elastic Stack versions
 
-While {{agent}} 9.x is compatible with {{product.elastic-stack}} 8.18 and 8.19, users running these Stack versions should use the {{agent}} configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs. Refer to [Migrate components](/reference/edot-collector/components/migrate-components.md) to migrate your configuration to the new components.
+While {{agent}} 9.x is compatible with {{stack}} 8.18 and 8.19, users running these Stack versions should use the {{agent}} configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs. Refer to [Migrate components](/reference/edot-collector/components/migrate-components.md) to migrate your configuration to the new components.
 
 ::::{important}
-If you're upgrading {{agent}} to 9.x but keeping your {{product.elastic-stack}} on 8.18 or 8.19:
+If you're upgrading {{agent}} to 9.x but keeping your {{stack}} on 8.18 or 8.19:
 
 - Use the configuration examples for your Stack version (8.18 or 8.19), not the latest 9.x configuration.
 - Continue using deprecated components (such as `elasticinframetrics` and `elastictrace` processors) that are included in the configuration for your Stack version.
