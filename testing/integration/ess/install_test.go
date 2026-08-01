@@ -954,16 +954,19 @@ agent.monitoring.enabled: false
 
 	t.Cleanup(func() {
 		if t.Failed() {
-			serviceOutput, err := exec.CommandContext(t.Context(), "sc", "query", paths.ServiceName()).CombinedOutput()
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute) //nolint:forbidigo // t.Context() is cancelled by cleanup time
+			defer cleanupCancel()
+
+			serviceOutput, err := exec.CommandContext(cleanupCtx, "sc", "query", paths.ServiceName()).CombinedOutput() //nolint:gosec // G204: service name is not user input
 			if err != nil {
 				t.Logf("sc query failed: %v: %s", err, serviceOutput)
-				return
+			} else {
+				t.Logf("Service state:\n%s\n", serviceOutput)
 			}
 
-			t.Logf("Service state:\n%s\n", serviceOutput)
-			logs, err := fixture.Exec(context.Background(), []string{"logs", "-n", "20", "--exclude-events"})
+			logs, err := fixture.Exec(cleanupCtx, []string{"logs", "-n", "20", "--exclude-events"})
 			if err != nil {
-				t.Logf("failed to fetch final logs inside cleanup: %v", err)
+				t.Logf("failed to fetch final logs inside cleanup: %v: %s", err, logs)
 				return
 			}
 			t.Logf("Logs:\n%s\n", string(logs))
