@@ -300,23 +300,26 @@ func Test_CheckRemote(t *testing.T) {
 		name          string
 		serverStatus  int
 		expectedError bool
+		expectedLog   bool
 	}{
-		{"ok", http.StatusOK, false},
-		{"4xx", http.StatusNotFound, true},
-		{"5xx", http.StatusInternalServerError, true},
+		{"ok", http.StatusOK, false, false},
+		{"too many requests", http.StatusTooManyRequests, false, true},
+		{"service unavailable", http.StatusServiceUnavailable, false, true},
+		{"not found", http.StatusNotFound, true, false},
+		{"internal server error", http.StatusInternalServerError, true, false},
 	}
-
-	testLogger, _ := loggertest.New("test_CheckRemote")
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			reportedStatus = tc.serverStatus
+			testLogger, observedLogs := loggertest.New("Test_CheckRemote")
 			c, err := NewWithConfig(testLogger, remote.Config{
 				Host: statusServer.URL,
 			})
 
 			require.NoError(t, err)
-			require.Equal(t, tc.expectedError, CheckRemote(t.Context(), c) != nil)
+			require.Equal(t, tc.expectedError, CheckRemote(testLogger, t.Context(), c) != nil)
+			require.Equal(t, tc.expectedLog, observedLogs.FilterMessageSnippet("fleet server ping returned temporary bad status code").Len() > 0)
 		})
 	}
 }

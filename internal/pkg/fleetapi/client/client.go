@@ -129,7 +129,7 @@ func ExtractError(resp io.Reader) error {
 	return fmt.Errorf("could not decode the response, raw response: %s", string(data))
 }
 
-func CheckRemote(ctx context.Context, c Sender) error {
+func CheckRemote(log *logger.Logger, ctx context.Context, c Sender) error {
 	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
 	defer cancel()
 
@@ -138,13 +138,23 @@ func CheckRemote(ctx context.Context, c Sender) error {
 		return fmt.Errorf("fail to communicate with Fleet Server API client hosts: %w", err)
 	}
 
+	// discard body for proper cancellation and connection reuse.
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
 	if resp.StatusCode != http.StatusOK {
+		switch resp.StatusCode {
+		case http.StatusTooManyRequests, http.StatusServiceUnavailable:
+			// Bad Gateway and Gateway Timeout might be a misconfiguration
+			// issue so don't treat them as temporary here
+			log.Errorf("fleet server ping returned temporary bad status code: %d", resp.StatusCode)
+			return nil
+		}
+
 		return fmt.Errorf("fleet server ping returned a bad status code: %d", resp.StatusCode)
 	}
-
-	// discard body for proper cancellation and connection reuse
-	_, _ = io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
 
 	return nil
 }
