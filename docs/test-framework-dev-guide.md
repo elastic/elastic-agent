@@ -240,9 +240,9 @@ between, and it can be very specific or not very specific.
 
 - `TEST_PLATFORMS="linux" mage integration:test` to execute tests only on Linux using both AMD64 and ARM64.
 - `TEST_PLATFORMS="linux/amd64" mage integration:test` to execute tests only on Linux AMD64.
-- `TEST_PLATFORMS="linux/arm64/ubuntu mage integration:test` to execute tests only on Ubuntu ARM64.
-- `TEST_PLATFORMS="linux/amd64/ubuntu/20.04 mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
-- `TEST_PLATFORMS="windows/amd64/2022 mage integration:test` to execute tests only on Windows Server 2022.
+- `TEST_PLATFORMS="linux/arm64/ubuntu" mage integration:test` to execute tests only on Ubuntu ARM64.
+- `TEST_PLATFORMS="linux/amd64/ubuntu/20.04" mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
+- `TEST_PLATFORMS="windows/amd64/2022" mage integration:test` to execute tests only on Windows Server 2022.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
 - `INSTANCE_PROVISIONER="kind" TEST_PLATFORMS="kubernetes/arm64/1.36.1/wolfi" mage integration:testKubernetes` to execute kubernetes tests on Kubernetes version 1.36.1 with wolfi docker variant under kind cluster.
 
