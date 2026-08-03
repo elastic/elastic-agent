@@ -5,6 +5,14 @@
 ### Features and enhancements [elastic-agent-9.5.0-features-enhancements]
 
 
+* Rename EDOT Collector to Elastic Agent and EDOT Cloud Forwarder to Elastic Cloud Forwarder.
+
+  The EDOT Collector is now built into Elastic Agent as its OpenTelemetry mode. Deploy
+  Elastic Agent and run it in OpenTelemetry mode to collect and forward traces, metrics,
+  and logs to Elastic Observability. Configuration and components are unchanged.
+
+  The EDOT Cloud Forwarder has been renamed to the Elastic Cloud Forwarder.
+
 * Enable AWS CloudWatch metrics ingestion through `awscloudwatchreceiver` in the EDOT Collector. [#14870](https://github.com/elastic/elastic-agent/pull/14870)
 * Add Azure Event Hub receiver to EDOT Collector. [#13418](https://github.com/elastic/elastic-agent/pull/13418)
 * Run Filebeat based inputs as collector receivers by default, reducing steady state memory usage [#13991](https://github.com/elastic/elastic-agent/pull/13991)
