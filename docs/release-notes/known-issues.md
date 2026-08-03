@@ -23,7 +23,7 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
-::::{dropdown} {{agent}} restarts repeatedly in containers after a {{fleet}} policy update
+::::{dropdown} {{agent}} Synthetic browser monitors fail to start when Heartbeat uses OTel runtime
 
 **Applies to: {{agent}} 9.5.0**
 
