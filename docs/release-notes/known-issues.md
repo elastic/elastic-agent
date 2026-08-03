@@ -23,16 +23,15 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
-::::{dropdown} {{agent}} Synthetic browser monitors fail to start when Heartbeat uses OTel runtime
+::::{dropdown} {{agent}} Synthetics browser monitors fail to start on private locations when Heartbeat uses the OTel runtime
 
 **Applies to: {{agent}} 9.5.0**
 
-On August 3, 2026, a known issue was discovered where {{agent}} reports the browser component as permanently failed for all Synthetics monitoring on Fleet-managed private locations. The monitor
-will never start.
+On August 3, 2026, a known issue was discovered where browser (journey) monitors assigned to a {{fleet}}-managed private location never start. {{agent}} reports the Synthetics browser component as permanently failed with `missing required field accessing 'heartbeat.monitors.0.schedule'`. Lightweight monitors (HTTP, TCP, and ICMP) are not affected. This happens because Heartbeat runs under the OTel runtime by default in this version, which rejects the schedule-less data-routing sub-streams (`browser.network` and `browser.screenshot`) that a browser monitor emits.
 
 **Workaround**
 
-Force Heartbeat back to the process runtime mode via a Fleet agent policy override: `{ "agent": { "internal": { "runtime": { "heartbeat": { "default": "process" } } } } }`
+Pin Heartbeat back to the process runtime by adding an override to the {{fleet}} agent policy that backs the private location: `{ "agent": { "internal": { "runtime": { "heartbeat": { "default": "process" } } } } }`. The change takes effect on the next policy revision and is fully reversible.
 
 For more information, check [Issue #15968](https://github.com/elastic/elastic-agent/issues/15968).
 ::::
