@@ -221,11 +221,7 @@ service:
         - nop
         - elasticapmintake
         - elasticmonitoringreceiver
-<<<<<<< HEAD
-=======
-        - azure_event_hub
         - awscloudwatch
->>>>>>> cfd76549e (Add awscloudwatchreceiver to EDOT (#14774))
         - verifier
 
     logs/forward_receive:

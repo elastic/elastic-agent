@@ -187,11 +187,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			vcenterreceiver.NewFactory(),
 			zookeeperreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
-<<<<<<< HEAD
-=======
-			azureeventhubreceiver.NewFactory(),
 			awscloudwatchreceiver.NewFactory(),
->>>>>>> cfd76549e (Add awscloudwatchreceiver to EDOT (#14774))
 			awss3receiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
 			prometheusremotewritereceiver.NewFactory(),
