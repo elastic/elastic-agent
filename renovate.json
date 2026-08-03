@@ -1,10 +1,23 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended"
+  ],
   "cloneSubmodules": true,
   "dependencyDashboard": true,
-  "enabledManagers": ["gomod", "github-actions", "pip_requirements", "pre-commit"],
-  "baseBranchPatterns": ["main", "9.5", "9.4", "9.3", "8.19"],
+  "enabledManagers": [
+    "gomod",
+    "github-actions",
+    "pip_requirements",
+    "pre-commit"
+  ],
+  "baseBranchPatterns": [
+    "main",
+    "9.5",
+    "9.4",
+    "9.3",
+    "8.19"
+  ],
   "labels": [
     "automation",
     "skip-changelog",
@@ -12,7 +25,9 @@
     "Team:Elastic-Agent-Control-Plane"
   ],
   "pip_requirements": {
-    "managerFilePatterns": ["/^docs/scripts/update-docs/requirements\\.txt$/"]
+    "managerFilePatterns": [
+      "/^docs/scripts/update-docs/requirements\\.txt$/"
+    ]
   },
   "pre-commit": {
     "enabled": true
@@ -20,19 +35,27 @@
   "packageRules": [
     {
       "description": "Go modules: schedule, labels, PR limit, and branch prefix",
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "additionalBranchPrefix": "golang/",
-      "schedule": ["on monday"],
+      "schedule": [
+        "on monday"
+      ],
       "prConcurrentLimit": 10
     },
     {
       "description": "misc: catch-all group for Go modules not claimed by a more specific group",
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "groupName": "misc"
     },
     {
       "description": "elastic: all Elastic org and APM packages",
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "matchPackageNames": [
         "/^github\\.com/elastic//",
         "/^go\\.elastic\\.co//"
@@ -41,13 +64,19 @@
     },
     {
       "description": "golang-x: extended standard library",
-      "matchManagers": ["gomod"],
-      "matchPackageNames": ["/^golang\\.org/x//"],
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^golang\\.org/x//"
+      ],
       "groupName": "golang-x"
     },
     {
       "description": "tooling-test: dependencies used only in tests or test infrastructure",
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "matchPackageNames": [
         "/^github\\.com/stretchr//",
         "/^github\\.com/testcontainers//",
@@ -62,7 +91,9 @@
     },
     {
       "description": "packaging: dependencies used only in magefile.go, dev-tools/, or tools/tools.go",
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "matchPackageNames": [
         "/^github\\.com/magefile//",
         "/^github\\.com/Jeffail/gabs/",
@@ -75,7 +106,9 @@
     },
     {
       "description": "k8s-ecosystem: k8s core libraries and all direct deps whose go.mod requires k8s.io/*, so breaking API changes are bumped in lockstep. Placed after elastic (last-match-wins) to pull cloud-on-k8s and elastic-agent-autodiscover into this group.",
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "matchPackageNames": [
         "/^k8s\\.io//",
         "/^sigs\\.k8s\\.io//",
@@ -86,7 +119,9 @@
     },
     {
       "description": "Disabled: beats (git submodule), sarama (manual path handling), OTel packages (own release cycle)",
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "matchPackageNames": [
         "/^github\\.com/elastic/beats//",
         "/^github\\.com/elastic/sarama$/",
@@ -98,30 +133,60 @@
     },
     {
       "description": "GitHub Actions: weekly Sunday updates",
-      "matchManagers": ["github-actions"],
-      "schedule": ["on sunday"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "schedule": [
+        "on sunday"
+      ],
       "prConcurrentLimit": 10
     },
     {
       "description": "GitHub Actions: keep macOS runner updates manual",
-      "matchManagers": ["github-actions"],
-      "matchDepTypes": ["github-runner"],
-      "matchPackageNames": ["macos"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepTypes": [
+        "github-runner"
+      ],
+      "matchPackageNames": [
+        "macos"
+      ],
       "enabled": false
     },
     {
       "description": "pip (docs/scripts/update-docs): weekly Monday updates",
-      "matchManagers": ["pip_requirements"],
-      "schedule": ["on monday"],
-      "addLabels": ["Team:Docs", "documentation"],
+      "matchManagers": [
+        "pip_requirements"
+      ],
+      "schedule": [
+        "on monday"
+      ],
+      "addLabels": [
+        "Team:Docs",
+        "documentation"
+      ],
       "prConcurrentLimit": 5
     },
     {
       "description": "pre-commit: weekly Sunday updates",
-      "matchManagers": ["pre-commit"],
-      "schedule": ["on sunday"],
-      "addLabels": ["changelog:dependencies"],
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "schedule": [
+        "on sunday"
+      ],
+      "addLabels": [
+        "changelog:dependencies"
+      ],
       "prConcurrentLimit": 5
     }
+  ],
+  "baseBranches": [
+    "main",
+    "9.5",
+    "9.4",
+    "9.3",
+    "8.19"
   ]
 }
