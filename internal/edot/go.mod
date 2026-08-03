@@ -14,7 +14,7 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260727204530-90c9524e3136
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.46.2
-	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
+	github.com/elastic/mock-es 3276c233eeeb
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.62.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.62.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.62.0
@@ -810,18 +810,18 @@ replace (
 // service.partialReloadReceivers). Fork: https://github.com/elastic/opentelemetry-collector
 // commit 86a6a75a9057 on branch v01550/partial-reload on top of v0.155.0.
 replace (
-	go.opentelemetry.io/collector/otelcol => github.com/elastic/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057
-	go.opentelemetry.io/collector/service => github.com/elastic/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057
+	go.opentelemetry.io/collector/otelcol => github.com/elastic/opentelemetry-collector/otelcol 346b0657a8e8
+	go.opentelemetry.io/collector/service => github.com/elastic/opentelemetry-collector/service 346b0657a8e8
 )
 
 // Replace statements carried forward from Beats https://github.com/elastic/beats/blob/0678f4d96212ac968fc90596e60475ed2f3979e1/go.mod#L503
 replace (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption => github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic
 	github.com/apoydence/eachers => github.com/poy/eachers v0.0.0-20181020210610-23942921fe77 //indirect, see https://github.com/elastic/beats/pull/29780 for details.
-	github.com/dop251/goja => github.com/elastic/goja v0.0.0-20190128172624-dd2ac4456e20
+	github.com/dop251/goja => github.com/elastic/goja 241b342198c2
 	github.com/fsnotify/fsevents => github.com/elastic/fsevents v0.0.0-20181029231046-e1d381a4d270
-	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
-	github.com/google/gopacket => github.com/elastic/gopacket v1.1.20-0.20241002174017-e8c5fda595e6
+	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify c1467c02fba5
+	github.com/google/gopacket => github.com/elastic/gopacket 3eaba0894325
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260623161606-914313578a72
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.157.0
 )
