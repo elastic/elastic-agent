@@ -25,6 +25,20 @@ Known issues are significant defects or limitations that may impact your impleme
 
 ::::{dropdown} {{agent}} restarts repeatedly in containers after a {{fleet}} policy update
 
+**Applies to: {{agent}} 9.5.0**
+
+On August 3, 2026, a known issue was discovered where {{agent}} reports the browser component as permanently failed for all Synthetics monitoring on Fleet-managed private locations. The monitor
+will never start.
+
+**Workaround**
+
+Force Heartbeat back to the process runtime mode via a Fleet agent policy override: `{ "agent": { "internal": { "runtime": { "heartbeat": { "default": "process" } } } } }`
+
+For more information, check [Issue #15968](https://github.com/elastic/elastic-agent/issues/15968).
+::::
+
+::::{dropdown} {{agent}} restarts repeatedly in containers after a {{fleet}} policy update
+
 **Applies to: {{agent}} 9.3.7, 9.3.8, 9.4.3, 9.4.4**
 
 On July 9, 2026, a known issue was discovered where {{agent}} can restart repeatedly when it is deployed in a {{fleet}}-managed container. When it processes a policy update, the agent uses the default logging values instead of the configuration already active in the container. It incorrectly detects a logging change, restarts and repeats this process indefinitely.
