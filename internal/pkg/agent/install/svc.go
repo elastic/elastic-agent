@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/kardianos/service"
 	"gopkg.in/ini.v1"
@@ -90,9 +91,6 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 	}
 
 	option := map[string]interface{}{
-		// GroupName
-		"GroupName": opts.Group,
-
 		// Linux (systemd) always restart on failure
 		"Restart": "always",
 
@@ -116,17 +114,17 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 	}
 
 	if runtime.GOOS == "linux" {
-		// The github.com/kardianos/service library doesn't support KillMode in their prebuilt template.
-		// This option allows to pass our own template for the systemd unit configuration, which is a copy
-		// of the prebuilt template with added KillMode option
-		cfg.Option["SystemdScript"] = linuxSystemdScript
-
-		// By setting KillMode=process in Elastic Agent's systemd unit configuration file, we ensure
-		// that in a scenario where the upgraded Agent's process is repeatedly crashing, systemd keeps
-		// the Upgrade Watcher process running so it can monitor the Agent process for long enough to
-		// initiate a rollback.
-		// See also https://github.com/elastic/elastic-agent/pull/3220#issuecomment-1673935694.
-		cfg.Option["KillMode"] = "process"
+		// kardianos/service v1.3.0 switched to a mini template engine that does not expose
+		// Config.Option in the template data map, so KillMode and GroupName must be injected
+		// as literals before the template is handed to the library.
+		// KillMode=process ensures the Upgrade Watcher process survives an Agent crash loop
+		// long enough to initiate a rollback.
+		// See https://github.com/elastic/elastic-agent/pull/3220#issuecomment-1673935694.
+		groupLine := ""
+		if opts.Group != "" {
+			groupLine = "Group=" + opts.Group + "\n"
+		}
+		cfg.Option["SystemdScript"] = strings.ReplaceAll(linuxSystemdScript, "@GROUP_LINE@", groupLine)
 	}
 
 	if runtime.GOOS == "darwin" {
@@ -284,36 +282,33 @@ const darwinLaunchdConfig = `<?xml version='1.0' encoding='UTF-8'?>
 </plist>
 `
 
-// A copy of the systemd config template from github.com/kardianos/service
-// with added .Config.Option.KillMode option
+// A copy of the systemd config template from github.com/kardianos/service using the
+// v1.3.0 mini template engine syntax, with hardcoded KillMode=process and an @GROUP_LINE@
+// placeholder that newService() replaces with a literal "Group=<name>\n" or "".
+// kardianos/service v1.3.0 no longer exposes Config.Option in the template data map,
+// so KillMode and GroupName cannot be referenced as template variables.
 const linuxSystemdScript = `[Unit]
-Description={{.Description}}
-ConditionFileIsExecutable={{.Path|cmdEscape}}
-{{range $i, $dep := .Dependencies}}
-{{$dep}} {{end}}
-
+Description={{Description}}
+ConditionFileIsExecutable={{Path | cmdEscape}}
+{{range Dependencies}}{{.}}
+{{end}}
 [Service]
 StartLimitInterval=5
 StartLimitBurst=10
-ExecStart={{.Path|cmdEscape}}{{range .Arguments}} {{.|cmd}}{{end}}
-{{if .ChRoot}}RootDirectory={{.ChRoot|cmd}}{{end}}
-{{if .WorkingDirectory}}WorkingDirectory={{.WorkingDirectory|cmdEscape}}{{end}}
-{{if .UserName}}User={{.UserName}}{{end}}
-{{if .Config.Option.GroupName -}}
-Group={{.Config.Option.GroupName}}
-{{- end}}
-{{if .ReloadSignal}}ExecReload=/bin/kill -{{.ReloadSignal}} "$MAINPID"{{end}}
-{{if .PIDFile}}PIDFile={{.PIDFile|cmd}}{{end}}
-{{if and .LogOutput .HasOutputFileSupport -}}
-StandardOutput=file:/var/log/{{.Name}}.out
-StandardError=file:/var/log/{{.Name}}.err
-{{- end}}
-{{if gt .LimitNOFILE -1 }}LimitNOFILE={{.LimitNOFILE}}{{end}}
-{{if .Restart}}Restart={{.Restart}}{{end}}
-{{if .SuccessExitStatus}}SuccessExitStatus={{.SuccessExitStatus}}{{end}}
-{{if .Config.Option.KillMode}}KillMode={{.Config.Option.KillMode}}{{end}}
+ExecStart={{Path | cmdEscape}}{{range Arguments}} {{. | cmd}}{{end}}
+{{if ChRoot}}RootDirectory={{ChRoot | cmd}}
+{{end}}{{if WorkingDirectory}}WorkingDirectory={{WorkingDirectory | cmdEscape}}
+{{end}}{{if UserName}}User={{UserName}}
+{{end}}@GROUP_LINE@{{if ReloadSignal}}ExecReload=/bin/kill -{{ReloadSignal}} "$MAINPID"
+{{end}}{{if PIDFile}}PIDFile={{PIDFile | cmd}}
+{{end}}{{if OutputFileSupport}}StandardOutput=file:{{LogDirectory}}/{{Name}}.out
+StandardError=file:{{LogDirectory}}/{{Name}}.err
+{{end}}{{if LimitNOFILE}}LimitNOFILE={{LimitNOFILE}}
+{{end}}{{if Restart}}Restart={{Restart}}
+{{end}}{{if SuccessExitStatus}}SuccessExitStatus={{SuccessExitStatus}}
+{{end}}KillMode=process
 RestartSec=120
-EnvironmentFile=-/etc/sysconfig/{{.Name}}
+EnvironmentFile=-/etc/sysconfig/{{Name}}
 
 [Install]
 WantedBy=multi-user.target
