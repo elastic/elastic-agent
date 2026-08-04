@@ -270,7 +270,7 @@ func kibanaListAgentsByPolicy(ctx context.Context, kc *kibana.Client, policyID s
 	params.Set("showInactive", "true")
 	params.Set("perPage", "100")
 
-	r, err := kc.Connection.SendWithContext(ctx, http.MethodGet, "/api/fleet/agents", params, nil, nil)
+	r, err := kc.SendWithContext(ctx, http.MethodGet, "/api/fleet/agents", params, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error calling list agents API: %w", err)
 	}
