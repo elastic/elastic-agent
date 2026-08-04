@@ -2903,11 +2903,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
-// TestGetReceiversConfigForComponentFQDN verifies that the agent's FQDN feature flag is
-// propagated into the generated beat receiver config.
-func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
-=======
 // TestGetReceiversConfigForComponentBrowserMonitor verifies that a Synthetics browser
 // monitor, which compiles into a single synthetics/browser input with a scheduled
 // "browser" stream plus schedule-less "browser.network" and "browser.screenshot"
@@ -3010,10 +3005,10 @@ func TestKeepScheduledMonitors(t *testing.T) {
 	})
 }
 
-// TestGetReceiversConfigForComponentFeatures verifies that all agent feature flags
-// are propagated into the generated Beat receiver config.
-func TestGetReceiversConfigForComponentFeatures(t *testing.T) {
->>>>>>> a656b65aa (fix: drop schedule-less browser sub-streams in OTel heartbeat translation (#15969))
+
+// TestGetReceiversConfigForComponentFQDN verifies that the agent's FQDN feature flag is
+// propagated into the generated beat receiver config.
+func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
 	comp := &component.Component{
 		ID:        "filestream-fqdn",
 		InputType: "filestream",
