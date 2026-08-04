@@ -49,12 +49,12 @@ The following example, `builder-config.yml`, contains the components needed to s
 % Note that while this runs on `main`, the OCB configuration is updated based on the latest released version.
 
 % start:edot-collector-components-ocb
-This OCB configuration is for EDOT Collector version 9.4.4.
+This OCB configuration is for {{agent}} version 9.4.4.
 
 ```yaml
 dist:
   otelcol_edot:
-    description: "Elastic Distribution of OpenTelemetry Collector"
+    description: "Elastic OpenTelemetry Collector"
     output_path: ./dist/otelcol_edot
     builds:
       - name: otelcol_edot
