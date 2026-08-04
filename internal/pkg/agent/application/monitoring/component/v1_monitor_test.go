@@ -148,6 +148,61 @@ func TestMonitoringFull(t *testing.T) {
 	}
 }
 
+// TestGetAgentFilestreamStream pins the exact set of log-file glob
+// patterns produced by getAgentFilestreamStream. The patterns are
+// load-bearing: a too-broad glob (e.g.  agentName+"-*.ndjson") would
+// also match watcher logs, which have their own dedicated pattern and
+// must not be double-ingested.  Also we don't want to ingest the
+// elastic-agent-metrics log files either.
+func TestGetAgentFilestreamStream(t *testing.T) {
+	logsDrop := t.TempDir()
+
+	tcs := []struct {
+		name      string
+		namespace string
+	}{
+		{name: "default namespace", namespace: ""},
+		{name: "custom namespace", namespace: "prod"},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := monitoringcfg.DefaultConfig()
+			cfg.Namespace = tc.namespace
+			mon := &BeatsMonitor{
+				enabled: true,
+				config:  &monitoringConfig{C: cfg},
+				logger:  logp.NewNopLogger(),
+			}
+
+			stream, ok := mon.getAgentFilestreamStream(logsDrop).(map[string]any)
+			require.True(t, ok, "getAgentFilestreamStream must return a map[string]any")
+
+			assert.Equal(t, fmt.Sprintf("%s-agent", monitoringFilesUnitsID), stream[idKey], "stream id")
+			assert.Equal(t, "filestream", stream["type"], "stream type")
+
+			wantPaths := []any{
+				filepath.Join(logsDrop, agentName+"-[0-9]*.ndjson"),
+				filepath.Join(logsDrop, agentName+"-watcher-*.ndjson"),
+				filepath.Join(logsDrop, collectorName+"-*.ndjson"),
+			}
+			assert.Equal(t, wantPaths, stream["paths"],
+				"paths must be exactly these three globs; the agent pattern uses [0-9]* "+
+					"so it does not match watcher logs already covered by the watcher pattern")
+
+			wantNamespace := tc.namespace
+			if wantNamespace == "" {
+				wantNamespace = defaultMonitoringNamespace
+			}
+			ds, ok := stream["data_stream"].(map[string]any)
+			require.True(t, ok, "data_stream must be a map[string]any")
+			assert.Equal(t, "logs", ds["type"], "data_stream.type")
+			assert.Equal(t, "elastic_agent", ds["dataset"], "data_stream.dataset")
+			assert.Equal(t, wantNamespace, ds["namespace"], "data_stream.namespace")
+		})
+	}
+}
+
 func TestMonitoringConfigWatchesCollectorLog(t *testing.T) {
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")

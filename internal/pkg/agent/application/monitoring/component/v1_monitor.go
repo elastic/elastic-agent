@@ -507,7 +507,8 @@ func (b *BeatsMonitor) injectMetricsInput(
 
 	// add system/process metrics for services that can't be monitored via json/beats metrics
 	inputs = append(inputs, b.getServiceComponentProcessMetricInputs(
-		componentInfos)...)
+		componentInfos,
+	)...)
 
 	inputsNode, found := cfg[inputsKey]
 	if !found {
@@ -531,7 +532,7 @@ func (b *BeatsMonitor) getAgentFilestreamStream(logsDrop string) any {
 		idKey:  fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
 		"type": "filestream",
 		"paths": []any{
-			filepath.Join(logsDrop, agentName+"-*.ndjson"),
+			filepath.Join(logsDrop, agentName+"-[0-9]*.ndjson"),
 			filepath.Join(logsDrop, agentName+"-watcher-*.ndjson"),
 			filepath.Join(logsDrop, collectorName+"-*.ndjson"),
 		},
@@ -837,7 +838,8 @@ func processorsForAgentFilestream() []any {
 	}
 	// if the event is from a component, use the component's dataset
 	processors = append(processors, useComponentDatasetProcessors()...)
-	processors = append(processors,
+	processors = append(
+		processors,
 		// coming from logger, added by agent (drop)
 		dropEcsVersionFieldProcessor(),
 		// adjust destination data_stream based on the data_stream fields
