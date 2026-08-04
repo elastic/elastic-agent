@@ -50,10 +50,11 @@ func TestOsqueryManager(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Fleet,
 		Stack: &define.Stack{},
-		Local: false, // requires Agent installation
-		Sudo:  true,  // requires Agent installation
+		Local: true, // requires Agent installation
+		Sudo:  true, // requires Agent installation
 		OS: []define.OS{
 			{Type: define.Linux},
+			{Type: define.Darwin},
 		},
 	})
 
@@ -80,6 +81,7 @@ func (runner *OsqueryManagerRunner) SetupSuite() {
 		NonInteractive: true,
 		Force:          true,
 		Privileged:     true,
+		Develop:        true,
 	}
 
 	ctx, cancel := context.WithTimeout(runner.T().Context(), 3*time.Minute)
@@ -92,79 +94,104 @@ func (runner *OsqueryManagerRunner) SetupSuite() {
 	runner.agentID = agentID
 	runner.policyID = policyResp.ID
 	runner.policyName = policyResp.Name
-
-	packageFile := filepath.Join("testdata", "osquery_package.json")
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "osquery_manager",
-		integration.PreinstalledPackages["osquery_manager"], packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
-	require.NoError(runner.T(), err)
-
 }
 
-func (runner *OsqueryManagerRunner) validateOsqueryEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) mapstr.M {
-	now := time.Now()
-	var query map[string]any
-	var doc mapstr.M
+// TestLiveQueryRoutingNoSchedule is a regression test for
+// https://github.com/elastic/elastic-agent/issues/15601.
+//
+// When an osquery integration has no scheduled queries the Fleet policy
+// contains no "config.osquery" section. This bypassed the configuration
+// translation logic to reorder the streams causing live-query result rows
+// to be written to logs-osquery_manager.action.responses instead of
+// logs-osquery_manager.result.
+func (runner *OsqueryManagerRunner) TestLiveQueryRoutingNoSchedule() {
+	t := runner.T()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
+	defer cancel()
+
+	// Create a package with no schedule actions so only live queries can be processed.
+	noScheduleFile := filepath.Join("testdata", "osquery_package_no_schedule.json")
+	pkgResp, err := tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "osquery_manager",
+		integration.PreinstalledPackages["osquery_manager"], noScheduleFile, uuid.Must(uuid.NewV4()).String(), runner.policyID)
+	require.NoError(t, err, "failed to install no-schedule osquery package policy")
+	packagePolicyID := pkgResp.Item.ID
 	defer func() {
-		if t.Failed() {
-			bs, err := json.Marshal(query)
-			if err != nil {
-				t.Errorf("executed at %s: %v",
-					now.Format(time.RFC3339Nano), query)
-				return
-			}
-			t.Errorf("executed at %s: query: %s",
-				now.Format(time.RFC3339Nano), string(bs))
+		if _, err := runner.info.KibanaClient.DeleteFleetPackage(t.Context(), packagePolicyID); err != nil {
+			t.Logf("failed to delete no-schedule osquery package policy %s: %v", packagePolicyID, err)
 		}
 	}()
 
-	t.Logf("starting to query ES for osquery events at %s", now.Format(time.RFC3339Nano))
-	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		query = genESQuery(agentID,
-			[][]string{
-				{"exists", "field", "osquery.physical_memory"},
-			})
-		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
-			"range": map[string]any{
-				"@timestamp": map[string]any{"gte": since.UTC().Format("2006-01-02T15:04:05.000Z")},
-			},
-		}
-		now = time.Now()
-		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-osquery_manager.result*", runner.info.ESClient)
-		require.NoError(collect, err)
-		require.NotEmpty(collect, res.Hits.Hits)
-		doc = res.Hits.Hits[0].Source
-	}, time.Minute*5, time.Second*10, "could not fetch events for osquery_manager")
-	return doc
-}
+	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
+	require.NoError(t, err, "could not get agent status")
 
-// validateOsqueryLiveQuery submits an osquery live query for agentID via
-// Kibana's osquery plugin, waits for it to complete, and confirms the result
-// document landed in Elasticsearch tagged with this query's action ID.
-func (runner *OsqueryManagerRunner) validateOsqueryLiveQuery(t *testing.T, ctx context.Context, agentID string) {
-	liveQuery, err := submitOsqueryLiveQuery(ctx, runner.info.KibanaClient, agentID, "SELECT * FROM os_version;")
-	require.NoError(t, err, "failed to submit osquery live query")
+	// Wait for the osquery component to become healthy in OTel mode.
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		status, statusErr := runner.agentFixture.ExecStatus(ctx)
+		require.NoError(collect, statusErr)
+		var foundHealthy bool
+		for _, comp := range status.Components {
+			if strings.HasPrefix(comp.ID, "osquery") &&
+				comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) &&
+				comp.State == int(cproto.State_HEALTHY) {
+				foundHealthy = true
+				break
+			}
+		}
+		assert.True(collect, foundHealthy, "expected a healthy OTel osquery component")
+	}, 3*time.Minute, 5*time.Second, "osquery OTel component did not become healthy")
+
+	// Dispatch a live query.
+	liveQuery, err := submitOsqueryLiveQuery(ctx, runner.info.KibanaClient, agentStatus.Info.ID, "SELECT * FROM os_version;")
+	require.NoError(t, err, "failed to submit live query")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		status, statusErr := getOsqueryLiveQueryStatus(ctx, runner.info.KibanaClient, liveQuery.ActionID)
 		require.NoError(collect, statusErr)
 		assert.Equal(collect, "completed", status)
-	}, 2*time.Minute, 5*time.Second, "osquery live query did not complete")
+	}, 2*time.Minute, 5*time.Second, "live query did not complete")
 
+	// Positive: result rows must appear in logs-osquery_manager.result*.
+	// We require the "osquery" field so the assertion only matches actual result
+	// rows, not the action-response summary (which also carries action_id but
+	// has no osquery data).
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		query := genESQuery(agentID, [][]string{
+		query := genESQuery(agentStatus.Info.ID, [][]string{
 			{"term", "action_id", liveQuery.QueryActionID},
+			{"exists", "field", "osquery"},
 		})
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-osquery_manager.result*", runner.info.ESClient)
 		require.NoError(collect, err)
-		require.NotEmpty(collect, res.Hits.Hits, "expected a result document for the live query")
-	}, time.Minute*5, time.Second*10, "could not fetch osquery live query result from ES")
+		require.NotEmpty(collect, res.Hits.Hits, "live-query result rows must appear in logs-osquery_manager.result*")
+	}, 5*time.Minute, 10*time.Second, "live-query result rows not found in logs-osquery_manager.result*")
+
+	// Negative: every document in action.responses for this action must be an
+	// action-response summary (has action_response field). Before the fix, result
+	// rows from the no-schedule component were misrouted here.
+	misroutedQuery := genESQuery(agentStatus.Info.ID, [][]string{
+		{"term", "action_id", liveQuery.QueryActionID},
+	})
+	misroutedRes, err := estools.PerformQueryForRawQuery(ctx, misroutedQuery, "logs-osquery_manager.action.responses*", runner.info.ESClient)
+	require.NoError(t, err)
+	for _, hit := range misroutedRes.Hits.Hits {
+		_, hasActionResponse := hit.Source["action_response"]
+		assert.True(t, hasActionResponse,
+			"logs-osquery_manager.action.responses* must contain an action-response; found a misrouted result row: %v", hit.Source)
+	}
+
 }
 
-func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
+func (runner *OsqueryManagerRunner) TestOtelAndProcessMode() {
 	t := runner.T()
 
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute*20)
 	defer cancel()
+
+	// Install a package with a scheduled query.
+	packageFile := filepath.Join("testdata", "osquery_package.json")
+	_, err := tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "osquery_manager",
+		integration.PreinstalledPackages["osquery_manager"], packageFile, uuid.Must(uuid.NewV4()).String(), runner.policyID)
+	require.NoError(t, err, "failed to install scheduled osquery package policy")
 
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(t, err, "could not get agent status")
@@ -194,14 +221,6 @@ func (runner *OsqueryManagerRunner) TestBeatsMetrics() {
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
 		otelDoc = runner.validateOsqueryEvents(t, ctx, agentStatus.Info.ID, testStart)
-
-		// Regression test for https://github.com/elastic/elastic-agent/issues/15410:
-		// osquery live queries dispatched by Fleet must reach osquerybeat even
-		// though it is running as a beats receiver inside the collector rather than as a
-		// standalone process with a gRPC control connection to elastic-agent.
-		t.Run("live query", func(t *testing.T) {
-			runner.validateOsqueryLiveQuery(t, ctx, agentStatus.Info.ID)
-		})
 	})
 
 	// Switch to process runtime and validate the same data.
@@ -265,6 +284,43 @@ func switchOsquerybeatToProcessRuntime(ctx context.Context, t testing.TB, kibana
 	policyResp, err := kibanaClient.UpdatePolicy(ctx, policyID, updateReq)
 	require.NoError(t, err)
 	return policyResp.Revision
+}
+
+func (runner *OsqueryManagerRunner) validateOsqueryEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) mapstr.M {
+	now := time.Now()
+	var query map[string]any
+	var doc mapstr.M
+	defer func() {
+		if t.Failed() {
+			bs, err := json.Marshal(query)
+			if err != nil {
+				t.Errorf("executed at %s: %v",
+					now.Format(time.RFC3339Nano), query)
+				return
+			}
+			t.Errorf("executed at %s: query: %s",
+				now.Format(time.RFC3339Nano), string(bs))
+		}
+	}()
+
+	t.Logf("starting to query ES for osquery events at %s", now.Format(time.RFC3339Nano))
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		query = genESQuery(agentID,
+			[][]string{
+				{"exists", "field", "osquery.physical_memory"},
+			})
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
+			"range": map[string]any{
+				"@timestamp": map[string]any{"gte": since.UTC().Format("2006-01-02T15:04:05.000Z")},
+			},
+		}
+		now = time.Now()
+		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-osquery_manager.result*", runner.info.ESClient)
+		require.NoError(collect, err)
+		require.NotEmpty(collect, res.Hits.Hits)
+		doc = res.Hits.Hits[0].Source
+	}, time.Minute*5, time.Second*10, "could not fetch events for osquery_manager")
+	return doc
 }
 
 // osqueryLiveQuery identifies a submitted live query: ActionID is the parent

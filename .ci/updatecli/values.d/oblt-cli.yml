@@ -1,0 +1,6 @@
+path: .oblt-cli-version
+pull_request:
+  labels:
+    - backport-active-all
+    - dependencies
+    - skip-changelog

@@ -41,6 +41,7 @@ const dispatchFlushInterval = time.Minute * 5
 type managedConfigManager struct {
 	log                      *logger.Logger
 	agentInfo                info.Agent
+	startupCfg               *configuration.Configuration
 	cfg                      *configuration.Configuration
 	client                   *remote.Client
 	store                    storage.Store
@@ -60,7 +61,7 @@ type managedConfigManager struct {
 	errCh chan error
 }
 
-func newManagedConfigManager(ctx context.Context, log *logger.Logger, agentInfo info.Agent, cfg *configuration.Configuration, storeSaver storage.Store, runtime *runtime.Manager, fleetInitTimeout time.Duration, topPath string, client *remote.Client, fleetAcker *fleet.Acker, actionAcker acker.Acker, retrier *retrier.Retrier, stateStore *store.StateStore, actionQueue *queue.ActionQueue, source ttl.ReadOnlySource, clientSetters ...actions.ClientSetter) (*managedConfigManager, error) {
+func newManagedConfigManager(log *logger.Logger, agentInfo info.Agent, startupCfg, cfg *configuration.Configuration, storeSaver storage.Store, runtime *runtime.Manager, fleetInitTimeout time.Duration, topPath string, client *remote.Client, fleetAcker *fleet.Acker, actionAcker acker.Acker, retrier *retrier.Retrier, stateStore *store.StateStore, actionQueue *queue.ActionQueue, source ttl.ReadOnlySource, clientSetters ...actions.ClientSetter) (*managedConfigManager, error) {
 	actionDispatcher, err := dispatcher.New(log, topPath, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)
@@ -69,6 +70,7 @@ func newManagedConfigManager(ctx context.Context, log *logger.Logger, agentInfo 
 	return &managedConfigManager{
 		log:                      log,
 		agentInfo:                agentInfo,
+		startupCfg:               startupCfg,
 		cfg:                      cfg,
 		client:                   client,
 		store:                    storeSaver,
@@ -148,7 +150,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
 		} else {
-			err := m.initFleetServer(ctx, m.cfg.Fleet.Server)
+			err := m.initFleetServer(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
@@ -258,7 +260,7 @@ func (m *managedConfigManager) wasUnenrolled() bool {
 		m.stateStore.Action().Type() == fleetapi.ActionTypeUnenroll
 }
 
-func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {
+func (m *managedConfigManager) initFleetServer(ctx context.Context) error {
 	if m.fleetInitTimeout == 0 {
 		m.fleetInitTimeout = 30 * time.Second
 	}
@@ -323,6 +325,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 	policyChanger := handlers.NewPolicyChangeHandler(
 		m.log,
 		m.agentInfo,
+		m.startupCfg,
 		m.cfg,
 		m.store,
 		m.stateStore,
