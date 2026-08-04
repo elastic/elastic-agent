@@ -490,9 +490,7 @@ func getReceiversConfigForComponent(
 			allInputConfigs = append(allInputConfigs, ri.config)
 		}
 		receiverID := GetReceiverID(receiverType, comp.ID+"/"+singleReceiverStreamID)
-		// Explicit type parameter works around a govet inline-analyzer limitation:
-		// the analyzer does not support generic type parameter inference (golang.org/x/tools issue).
-		receiverConfig := maps.Clone[map[string]any](sharedConfig)
+		receiverConfig := maps.Clone(sharedConfig)
 		receiverConfig[beatName] = map[string]any{
 			beatInputsKey(beatName): allInputConfigs,
 		}
@@ -510,9 +508,7 @@ func getReceiversConfigForComponent(
 		// Create a new config map for this receiver, copying shared config entries.
 		// This is a shallow copy — nested map values (path, logging, http) are shared
 		// across receivers. This is safe because nothing mutates them after construction.
-		// Explicit type parameter works around a govet inline-analyzer limitation:
-		// the analyzer does not support generic type parameter inference (golang.org/x/tools issue).
-		receiverConfig := maps.Clone[map[string]any](sharedConfig)
+		receiverConfig := maps.Clone(sharedConfig)
 		receiverConfig[beatName] = map[string]any{
 			beatInputsKey(beatName): []map[string]any{ri.config},
 		}
