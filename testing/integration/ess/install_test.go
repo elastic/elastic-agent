@@ -920,9 +920,7 @@ agent.monitoring.enabled: false
 	require.NoError(t, err, "failed to export ProfileList key: %s", out)
 	defer func() {
 		out, err := exec.CommandContext(t.Context(), "reg", "import", backup).CombinedOutput()
-		if err != nil {
-			t.Errorf("failed to restore ProfileList key: %v: %s", err, out)
-		}
+		require.NoError(t, err, "failed to restore ProfileList, key : %s", out)
 	}()
 
 	// Remove profile path value so LocalSystem has no resolvable profile.
