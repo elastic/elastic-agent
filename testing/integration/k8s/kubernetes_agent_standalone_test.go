@@ -79,6 +79,9 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 				k8sStepCreateNamespace(),
 				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
+				// Complete-image only: guards elastic-agent#15993 (Playwright
+				// browsers must be baked so browser journeys can launch Chromium).
+				k8sStepCheckSyntheticsBrowsers("app=elastic-agent-standalone", "elastic-agent-standalone"),
 			},
 		},
 		{
@@ -1218,6 +1221,65 @@ func k8sStepRunInnerTests(agentPodLabelSelector string, expectedPodNumber int, c
 				t.Log(stderr.String())
 			}
 			require.NoError(t, err, "error at k8s inner tests execution")
+		}
+	}
+}
+
+// k8sStepCheckSyntheticsBrowsers verifies that the Synthetics browser stack is
+// actually usable on the complete image: the Playwright browser cache is baked
+// in and a real inline browser journey launches Chromium and passes.
+//
+// This is the regression guard for elastic-agent#15993, where the complete
+// image shipped with an empty $HOME/.cache/ms-playwright (npm 12 stopped
+// running the playwright-chromium dependency's install script), so the
+// synthetics/browser component started but every journey failed with
+// "browserType.launch: Executable doesn't exist". A plain agent-status /
+// component-health check does not catch this — the component is HEALTHY; only
+// running a journey exercises the missing browser binary.
+//
+// It is a no-op on non-complete variants, which do not bundle Synthetics.
+func k8sStepCheckSyntheticsBrowsers(agentPodLabelSelector string, containerName string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		if !strings.Contains(kCtx.agentImage, "complete") {
+			t.Logf("skipping synthetics browser check: %q is not a complete image", kCtx.agentImage)
+			return
+		}
+
+		perNodePodList := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, perNodePodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = agentPodLabelSelector
+		})
+		require.NoError(t, err, "failed to list pods with selector ", agentPodLabelSelector)
+		require.NotEmpty(t, perNodePodList.Items, "no pods found with selector ", agentPodLabelSelector)
+
+		// The browsers are baked at build time with HOME=<beatHome>, so the cache
+		// always lives here regardless of the container's runtime user. Setting
+		// HOME points elastic-synthetics/Playwright at that same baked cache.
+		const beatHome = "/usr/share/elastic-agent"
+		// A minimal journey: launching Chromium at all is what proves #15993 is
+		// fixed; about:blank keeps it deterministic and offline.
+		script := `printf 'step("open blank", async () => { await page.goto("about:blank"); });\n'`
+		command := []string{"sh", "-c", strings.Join([]string{
+			"set -e",
+			`CACHE="` + beatHome + `/.cache/ms-playwright"`,
+			`echo "== ms-playwright cache ($CACHE) =="`,
+			`ls -1 "$CACHE" 2>/dev/null || true`,
+			`[ -n "$(ls -A "$CACHE" 2>/dev/null)" ] || { echo "FATAL: ms-playwright cache is empty (elastic-agent#15993)"; exit 3; }`,
+			`export HOME="` + beatHome + `"`,
+			`echo "== running inline browser journey =="`,
+			script + " | elastic-synthetics --inline",
+		}, "\n")}
+
+		for _, pod := range perNodePodList.Items {
+			var stdout, stderr bytes.Buffer
+			execCtx, cancel := context.WithTimeout(ctx, 4*time.Minute)
+			err = kCtx.client.Resources().ExecInPod(execCtx, namespace, pod.Name, containerName, command, &stdout, &stderr)
+			cancel()
+			t.Logf("%s synthetics browser journey stdout:\n%s", pod.Name, stdout.String())
+			if err != nil {
+				t.Logf("%s synthetics browser journey stderr:\n%s", pod.Name, stderr.String())
+			}
+			require.NoErrorf(t, err, "inline browser journey failed on %s; Playwright could not launch Chromium (elastic-agent#15993)", pod.Name)
 		}
 	}
 }
