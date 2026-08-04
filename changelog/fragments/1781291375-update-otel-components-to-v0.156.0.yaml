@@ -1,3 +1,0 @@
-kind: enhancement
-summary: Update OTel dependencies to v0.156.0/v1.62.0
-component: elastic-agent
