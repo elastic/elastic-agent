@@ -23,6 +23,35 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+::::{dropdown} {{agent}} Synthetics browser monitors fail to start on private locations when Heartbeat uses the OTel runtime
+
+**Applies to: {{agent}} 9.5.0**
+
+On August 3, 2026, a known issue was discovered where browser (journey) monitors assigned to a {{fleet}}-managed private location never start. {{agent}} reports the Synthetics browser component as permanently failed with `missing required field accessing 'heartbeat.monitors.0.schedule'`. Lightweight monitors (HTTP, TCP, and ICMP) are not affected. This happens because Heartbeat runs under the OTel runtime by default in this version, which rejects the schedule-less data-routing sub-streams (`browser.network` and `browser.screenshot`) that a browser monitor emits.
+
+**Workaround**
+
+Pin Heartbeat back to the process runtime on the {{fleet}} agent policy that backs the affected private location:
+
+1. In {{kib}}, go to **Fleet > Agent policies** and open the agent policy for the private location.
+
+2. On the **Settings** tab, expand **Advanced settings** and locate **Advanced internal YAML settings**.
+
+3. Enter the following, then select **Save changes**:
+
+    ```yaml
+    runtime:
+      heartbeat:
+        default: process
+    ```
+
+This is equivalent to the agent policy override `{ "agent": { "internal": { "runtime": { "heartbeat": { "default": "process" } } } } }` ({{fleet}} stores the field as `advanced_settings.agent_internal`). The change takes effect on the next policy revision and is fully reversible: remove the setting to return Heartbeat to its default runtime.
+
+To avoid downtime when upgrading from 9.3.x or 9.4.x, apply this override **before** you upgrade. It has no effect on those versions (Heartbeat already runs in the process runtime there), and because the setting lives on the agent policy it is already in effect the moment the agent upgrades to 9.5.0 — so browser monitors keep running through the upgrade.
+
+For more information, check [Issue #15968](https://github.com/elastic/elastic-agent/issues/15968).
+::::
+
 ::::{dropdown} {{agent}} restarts repeatedly in containers after a {{fleet}} policy update
 
 **Applies to: {{agent}} 9.3.7, 9.3.8, 9.4.3, 9.4.4**
