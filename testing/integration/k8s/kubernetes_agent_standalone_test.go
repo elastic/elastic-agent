@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v3/pkg/cli/values"
 
@@ -38,10 +40,14 @@ import (
 	"helm.sh/helm/v3/pkg/cli"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	testK8s "github.com/elastic/elastic-agent/pkg/testing/kubernetes"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/testing/integration"
 )
 
 func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
@@ -842,6 +848,84 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepLogstashCheckStatus("app.kubernetes.io/name=logstash-agent", false),
 			},
 		},
+		{
+			// Verifies that ELASTIC_AGENT_HOSTNAME env var (injected via the Kubernetes downward API)
+			// takes precedence over the OS hostname. This is the recommended approach for AKS clusters
+			// with Cilium where hostNetwork: true is forbidden and the OS hostname is not the node name.
+			name: "helm managed agent hostname override via ELASTIC_AGENT_HOSTNAME env var",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+					"agent": map[string]any{
+						"unprivileged": false,
+						"image": map[string]any{
+							"repository": kCtx.agentImageRepo,
+							"tag":        kCtx.agentImageTag,
+							"pullPolicy": "Never",
+						},
+						"fleet": map[string]any{
+							"enabled": true,
+							"url":     kCtx.enrollParams.FleetURL,
+							"token":   kCtx.enrollParams.EnrollmentToken,
+							"preset":  "perNode",
+						},
+						"presets": map[string]any{
+							"perNode": map[string]any{
+								// Disable host networking so the pod hostname is not the node name,
+								// simulating restricted environments (e.g. AKS + Cilium).
+								"hostNetwork": false,
+								// Inject the node name as ELASTIC_AGENT_HOSTNAME via the downward API.
+								"extraEnvs": []any{
+									map[string]any{
+										"name":  "ELASTIC_NETINFO",
+										"value": "false",
+									},
+									map[string]any{
+										"name": "ELASTIC_AGENT_HOSTNAME",
+										"valueFrom": map[string]any{
+											"fieldRef": map[string]any{
+												"fieldPath": "spec.nodeName",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+					// For each agent pod, verify that the Fleet-reported hostname matches
+					// the Kubernetes node the pod is running on.
+					podList := &corev1.PodList{}
+					err := kCtx.client.Resources(namespace).List(ctx, podList, func(opt *metav1.ListOptions) {
+						opt.LabelSelector = "name=agent-pernode-helm-agent"
+					})
+					require.NoError(t, err, "failed to list perNode agent pods")
+					require.NotEmpty(t, podList.Items)
+					require.Equal(t, schedulableNodeCount, len(podList.Items), "unexpected pod count")
+
+					var stdout, stderr bytes.Buffer
+					for _, pod := range podList.Items {
+						nodeName := pod.Spec.NodeName
+						require.NotEmpty(t, nodeName, "pod %s has no node assigned", pod.Name)
+
+						id, err := k8sGetAgentID(ctx, kCtx.client, &stdout, &stderr, namespace, pod.Name, "agent")
+						require.NoError(t, err, "failed to get agent ID for pod %s", pod.Name)
+						require.NotEmpty(t, id)
+
+						require.EventuallyWithT(t, func(collect *assert.CollectT) {
+							resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
+							assert.NoError(collect, err)
+							if resp != nil {
+								assert.Equal(collect, nodeName, resp.LocalMetadata.Host.Hostname,
+									"agent %s on node %s reported wrong hostname", id, nodeName)
+							}
+						}, 2*time.Minute, 5*time.Second, "agent %s hostname did not match node %s", id, nodeName)
+					}
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -857,6 +941,152 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				step(t, ctx, kCtx, testNamespace)
 			}
 		})
+	}
+}
+
+func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  false,
+		OS: []define.OS{
+			// Slim images do not contain the Metricbeat process exercised by this test.
+			{Type: define.Kubernetes, DockerVariant: "basic"},
+			{Type: define.Kubernetes, DockerVariant: "wolfi"},
+		},
+		Group: define.Kubernetes,
+	})
+
+	ctx := context.Background() //nolint:forbidigo // ctx is captured by step cleanups and must outlive the test
+	kCtx := k8sGetContext(t, info)
+
+	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
+	require.NoError(t, err, "error at getting schedulable node count")
+	require.NotZero(t, schedulableNodeCount, "no schedulable Kubernetes nodes found")
+
+	policyID := kCtx.enrollParams.PolicyID
+	policy, err := info.KibanaClient.GetPolicy(ctx, policyID)
+	require.NoError(t, err, "failed to get agent policy")
+	_, err = info.KibanaClient.UpdatePolicy(ctx, policyID, kibana.AgentPolicyUpdateRequest{
+		Name:      policy.Name,
+		Namespace: policy.Namespace,
+		// Force System metrics onto the process runtime so this test exercises
+		// hostname override handling in Metricbeat, not the OTel receiver.
+		Overrides: map[string]interface{}{
+			"agent": map[string]interface{}{
+				"internal": map[string]interface{}{
+					"runtime": map[string]interface{}{
+						"metricbeat": map[string]interface{}{
+							"system/metrics": string(component.ProcessRuntimeManager),
+						},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err, "failed to force system metrics onto the process runtime")
+
+	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "system",
+		integration.PreinstalledPackages["system"],
+		filepath.Join("..", "ess", "testdata", "system_integration_setup.json"),
+		uuid.Must(uuid.NewV4()).String(), policyID)
+	require.NoError(t, err, "failed to install System integration")
+
+	namespace := kCtx.getNamespace(t)
+	k8sStepCreateNamespace()(t, ctx, kCtx, namespace)
+	k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+		"agent": map[string]any{
+			"unprivileged": false,
+			"image": map[string]any{
+				"repository": kCtx.agentImageRepo,
+				"tag":        kCtx.agentImageTag,
+				"pullPolicy": "Never",
+			},
+			"fleet": map[string]any{
+				"enabled": true,
+				"url":     kCtx.enrollParams.FleetURL,
+				"token":   kCtx.enrollParams.EnrollmentToken,
+				"preset":  "perNode",
+			},
+			"presets": map[string]any{
+				"perNode": map[string]any{
+					// Disable host networking so the pod hostname is not the node name,
+					// simulating restricted environments such as AKS with Cilium.
+					"hostNetwork": false,
+					// Inject the node name as ELASTIC_AGENT_HOSTNAME via the downward API.
+					"extraEnvs": []any{
+						map[string]any{
+							"name":  "ELASTIC_NETINFO",
+							"value": "false",
+						},
+						map[string]any{
+							"name": "ELASTIC_AGENT_HOSTNAME",
+							"valueFrom": map[string]any{
+								"fieldRef": map[string]any{
+									"fieldPath": "spec.nodeName",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})(t, ctx, kCtx, namespace)
+	k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", map[string]bool{
+		"system/metrics": true,
+	})(t, ctx, kCtx, namespace)
+
+	// For each agent pod, verify that both Fleet metadata and Beats-produced
+	// System metrics use the Kubernetes node name.
+	podList := &corev1.PodList{}
+	err = kCtx.client.Resources(namespace).List(ctx, podList, func(opt *metav1.ListOptions) {
+		opt.LabelSelector = "name=agent-pernode-helm-agent"
+	})
+	require.NoError(t, err, "failed to list perNode agent pods")
+	require.NotEmpty(t, podList.Items)
+	require.Equal(t, schedulableNodeCount, len(podList.Items), "unexpected pod count")
+
+	var stdout, stderr bytes.Buffer
+	for _, pod := range podList.Items {
+		nodeName := pod.Spec.NodeName
+		require.NotEmpty(t, nodeName, "pod %s has no node assigned", pod.Name)
+
+		status, err := k8sGetAgentStatus(ctx, kCtx.client, &stdout, &stderr, namespace, pod.Name, "agent")
+		require.NoError(t, err, "failed to get agent status for pod %s", pod.Name)
+		id := status.Info.ID
+		require.NotEmpty(t, id)
+
+		var foundSystemMetrics bool
+		for _, comp := range status.Components {
+			if comp.ID == "system/metrics-default" {
+				foundSystemMetrics = true
+				require.Equal(t, "beat-v2-client", comp.VersionInfo.Name,
+					"System metrics component in pod %s is not running as a Metricbeat process", pod.Name)
+				break
+			}
+		}
+		require.True(t, foundSystemMetrics, "System metrics component not found in pod %s", pod.Name)
+
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
+			assert.NoError(collect, err)
+			if resp != nil {
+				assert.Equal(collect, nodeName, resp.LocalMetadata.Host.Hostname,
+					"agent %s on node %s reported wrong hostname", id, nodeName)
+			}
+		}, 2*time.Minute, 5*time.Second, "agent %s hostname did not match node %s", id, nodeName)
+
+		docs := integration.FindESDocs(t, func() (estools.Documents, error) {
+			return estools.GetResultsForAgentAndDatastream(ctx, info.ESClient, "system.cpu", id)
+		})
+		for _, doc := range docs.Hits.Hits {
+			host, ok := doc.Source["host"].(map[string]interface{})
+			require.True(t, ok, "system.cpu document for agent %s has no host object", id)
+			hostname, ok := host["name"].(string)
+			require.True(t, ok, "system.cpu document for agent %s has no host.name", id)
+			require.Equal(t, nodeName, hostname,
+				"system.cpu document for agent %s reported the wrong host.name", id)
+		}
 	}
 }
 
@@ -1125,7 +1355,7 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 					// to match the test namespace
 					if volume.Name == "elastic-agent-state" {
 						hostPathType := corev1.HostPathDirectoryOrCreate
-						pod.Volumes[volumeIdx].VolumeSource.HostPath = &corev1.HostPathVolumeSource{
+						pod.Volumes[volumeIdx].HostPath = &corev1.HostPathVolumeSource{
 							Type: &hostPathType,
 							Path: fmt.Sprintf("/var/lib/elastic-agent-standalone/%s/state", namespace),
 						}
@@ -1547,7 +1777,7 @@ func k8sStepHintsRedisCheckAgentStatus(agentPodLabelSelector string, hintDeploye
 			require.NotEmpty(t, redisPodList.Items, "no redis pods found with selector ", redisPodSelector)
 			// check that redis pods have the correct annotations
 			for _, redisPod := range redisPodList.Items {
-				hintPackage, ok := redisPod.ObjectMeta.Annotations["co.elastic.hints/package"]
+				hintPackage, ok := redisPod.Annotations["co.elastic.hints/package"]
 				require.True(t, ok, "missing hints annotation")
 				require.Equal(t, "redis", hintPackage, "hints annotation package wrong value")
 			}
