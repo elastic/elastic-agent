@@ -1,6 +1,6 @@
 ---
 navigation_title: Use the contrib Collector
-description: Learn how to send data to Elastic Observability using the contrib OpenTelemetry Collector instead of EDOT.
+description: Learn how to send data to Elastic Observability using the contrib OpenTelemetry Collector instead of Elastic Agent.
 applies_to:
   stack:
   serverless:
@@ -15,11 +15,11 @@ products:
 
 # Send data to {{serverless-full}} using the contrib Collector
 
-While the {{edot}} (EDOT) Collector provides a streamlined experience with pre-selected components, you can also use the contrib OpenTelemetry Collector or a custom distribution to send data to Elastic Observability. This approach requires more configuration but gives you more control over your OpenTelemetry setup.
+While {{agent}} provides a streamlined experience with pre-selected components, you can also use the contrib OpenTelemetry Collector or a custom distribution to send data to {{product.observability}}. This approach requires more configuration but gives you more control over your OpenTelemetry setup.
 
 ## Overview
 
-The contrib OpenTelemetry Collector is the community-maintained version that provides the foundation for all OpenTelemetry distributions. To configure it to work with Elastic Observability, you need to:
+The contrib OpenTelemetry Collector is the community-maintained version that provides the foundation for all OpenTelemetry distributions. To configure it to work with {{product.observability}}, you need to:
 
 - Manually select and configure components.
 - Set up proper data processing pipelines.
@@ -30,7 +30,7 @@ The contrib OpenTelemetry Collector is the community-maintained version that pro
 
 The configuration requirements vary depending on your use case and the Elastic deployment model you want to send data to. The following sections outline what you need for each scenario.
 
-### Elastic Cloud Serverless
+### {{serverless-full}} [elastic-cloud-serverless]
 
 {{serverless-full}} provides a [Managed OTLP Endpoint](opentelemetry://reference/motlp.md) that accepts OpenTelemetry data in its native format. This makes it the simplest scenario for using contrib components because scaling and signal processing (for example producing metrics from events) is handled by Elastic.
 
@@ -53,24 +53,24 @@ service:
       exporters: [otlp]
 ```
 
-### Elastic Cloud Hosted (ECH)
+### {{ech}} [elastic-cloud-hosted-ech]
 
-Because {{motlp}} is not yet available for {{ech}}, you need to setup an instance of EDOT that works as a gateway, handling processing required for some use cases, like deriving metrics from events in APM, and writing data directly to Elasticsearch. 
+Because {{motlp}} is not yet available for {{ech}}, you need to set up {{agent}} as a gateway, handling processing required for some use cases, like deriving metrics from events in {{product.apm}}, and writing data directly to {{es}}.
 
-Point your contrib Collector OTLP exporter to the EDOT gateway. Refer to [Gateway configuration](/reference/edot-collector/config/default-config-standalone.md#gateway-mode) for more information.
+Point your contrib Collector OTLP exporter to the {{agent}} gateway. Refer to [Gateway configuration](/reference/edot-collector/config/default-config-standalone.md#gateway-mode) for more information.
 
-### Self-managed Elastic Stack
+### {{product.self}} [self-managed-elastic-stack]
 
-Self-managed deployments have similar requirements to ECH but with your own Elasticsearch instance. The configuration is similar to ECH. You also need to:
+Self-managed deployments have similar requirements to {{ech}} but with your own {{es}} instance. The configuration is similar to {{ech}}. You also need to:
 
-- Point to your self-managed Elasticsearch instance.
+- Point to your self-managed {{es}} instance.
 - Configure appropriate security settings.
-- Ensure your Elasticsearch version is compatible.
+- Ensure your {{es}} version is compatible.
 - Set up proper index templates and mappings.
 
 ## Configuration best practices
 
-When using the contrib OpenTelemetry Collector with Elastic Observability, follow these best practices:
+When using the contrib OpenTelemetry Collector with {{product.observability}}, follow these best practices:
 
 ### Resource detection
 
@@ -128,11 +128,11 @@ exporters:
 
 ## Limitations and considerations
 
-Using the contrib OpenTelemetry Collector instead of EDOT comes with some trade-offs. Refer to [EDOT compared to contrib Collector](opentelemetry://reference/compatibility/edot-vs-upstream.md) for more information.
+Using the contrib OpenTelemetry Collector instead of {{agent}} comes with some trade-offs. Refer to [Elastic Agent compared to the contrib Collector](opentelemetry://reference/compatibility/edot-vs-upstream.md) for more information.
 
 ## Next steps
 
-- [Build a custom EDOT-like collector](/reference/edot-collector/custom-collector.md) for more control.
-- [Configure the EDOT Collector](/reference/edot-collector/config/index.md) for optimal Elastic integration.
-- [Learn about EDOT components](/reference/edot-collector/components.md) to understand what's included.
+- [Build a custom Collector](/reference/edot-collector/custom-collector.md) for more control.
+- [Configure {{agent}}](/reference/edot-collector/config/index.md) for optimal Elastic integration.
+- [Learn about {{agent}} components](/reference/edot-collector/components.md) to understand what's included.
 - [Explore deployment architectures](opentelemetry://reference/architecture/index.md) for different environments.
