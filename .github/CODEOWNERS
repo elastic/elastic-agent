@@ -29,7 +29,7 @@ changelog/fragments/
 /dev-tools/kubernetes @elastic/elastic-agent-control-plane
 /docs/release-notes @elastic/ski-docs
 /docs/docset.yml @elastic/ski-docs
-/.github/workflows/update-docs.yml @elastic/docs-engineering
+/.github/workflows/update-docs.yml @elastic/ski-docs @elastic/docs-engineering
 /.github/workflows/validate-docs-structure.yml @elastic/ski-docs @elastic/docs-engineering
 /docs/reference/edot-collector @elastic/ski-docs
 /docs/scripts/update-docs @elastic/ski-docs
