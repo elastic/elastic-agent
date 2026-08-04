@@ -1037,7 +1037,7 @@ func Test_EnrollCmd_PrepareFleetServerTLS(t *testing.T) {
 			err := c.prepareFleetTLS()
 			require.NoError(t, err)
 			require.Equal(t, tt.url, c.options.URL)
-			require.Equal(t, c.options.URL, setupFleetServerURL(tt.containerCfg),
+			require.Equal(t, c.options.URL, getBootstrapFleetServerURL(tt.containerCfg),
 				"the URL predicted by shouldFleetEnroll no longer matches the one enrollment uses")
 		})
 	}

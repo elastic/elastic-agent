@@ -1174,7 +1174,7 @@ agent:
 	}
 }
 
-func TestSetupFleetServerURL(t *testing.T) {
+func TestGetBootstrapFleetServerURL(t *testing.T) {
 	for name, tc := range map[string]struct {
 		cfg      fleetServerConfig
 		expected string
@@ -1198,7 +1198,7 @@ func TestSetupFleetServerURL(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tc.expected, setupFleetServerURL(tc.cfg))
+			require.Equal(t, tc.expected, getBootstrapFleetServerURL(tc.cfg))
 		})
 	}
 }

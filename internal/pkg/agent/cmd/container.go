@@ -1245,7 +1245,7 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	// what ends up persisted in fleet.enc.
 	expectedFleetURL := setupCfg.Fleet.URL
 	if setupCfg.FleetServer.Enable {
-		expectedFleetURL = setupFleetServerURL(setupCfg.FleetServer)
+		expectedFleetURL = getBootstrapFleetServerURL(setupCfg.FleetServer)
 	}
 	// Parse the setup Fleet URL to extract the host portion for comparison.
 	// Stored hosts can be in one of two forms depending on when the config was last saved:
@@ -1403,7 +1403,7 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	return false, nil
 }
 
-// setupFleetServerURL returns the URL the agent uses to reach the Fleet Server it runs
+// getBootstrapFleetServerURL returns the URL the agent uses to reach the Fleet Server it runs
 // itself, as derived from the container setup configuration.
 //
 // A bootstrapped Fleet Server exposes an internal endpoint on localhost:8221 in addition to
@@ -1411,7 +1411,7 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 // enrollment at that internal endpoint, so it is the URL that gets persisted in fleet.enc
 // and the one the agent keeps using afterwards. The container command does not expose the
 // internal port, so it is always the default one.
-func setupFleetServerURL(cfg fleetServerConfig) string {
+func getBootstrapFleetServerURL(cfg fleetServerConfig) string {
 	// prepareFleetTLS only runs Fleet Server insecure when no certificate is given.
 	insecure := cfg.InsecureHTTP && cfg.Cert == "" && cfg.CertKey == ""
 	return fleetServerInternalURL(fleetServerInternalHostPort(defaultFleetServerInternalPort), insecure)
