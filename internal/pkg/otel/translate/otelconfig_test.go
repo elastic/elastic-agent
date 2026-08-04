@@ -2962,7 +2962,7 @@ func TestGetReceiversConfigForComponentBrowserMonitor(t *testing.T) {
 		},
 	}
 
-	result, err := getReceiversConfigForComponent(browserComponent, testAgentInfo, nil)
+	result, err := getReceiversConfigForComponent(browserComponent, testAgentInfo, false, nil)
 	require.NoError(t, err)
 
 	// Only the scheduled "browser" stream must become a receiver/monitor; the
@@ -3004,7 +3004,6 @@ func TestKeepScheduledMonitors(t *testing.T) {
 		assert.Equal(t, in, got)
 	})
 }
-
 
 // TestGetReceiversConfigForComponentFQDN verifies that the agent's FQDN feature flag is
 // propagated into the generated beat receiver config.
