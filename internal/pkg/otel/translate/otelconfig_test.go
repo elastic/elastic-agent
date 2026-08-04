@@ -2903,6 +2903,108 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 }
 
+// TestGetReceiversConfigForComponentBrowserMonitor verifies that a Synthetics browser
+// monitor, which compiles into a single synthetics/browser input with a scheduled
+// "browser" stream plus schedule-less "browser.network" and "browser.screenshot"
+// auxiliary streams, produces exactly one heartbeat monitor. The auxiliary streams
+// must be dropped so the heartbeatreceiver does not reject them for missing a schedule.
+// Regression test for https://github.com/elastic/elastic-agent/issues/15968.
+func TestGetReceiversConfigForComponentBrowserMonitor(t *testing.T) {
+	testAgentInfo := &info.AgentInfo{}
+
+	browserComponent := &component.Component{
+		ID:        "heartbeat-browser-test-id",
+		InputType: "synthetics/browser",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "synthetics/browser",
+				Command: &component.CommandSpec{
+					Args: []string{"heartbeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "heartbeat-browser-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "synthetics/browser",
+					"streams": []any{
+						map[string]any{
+							"id":   "browser-1",
+							"type": "browser",
+							"data_stream": map[string]any{
+								"dataset": "browser",
+								"type":    "synthetics",
+							},
+							"schedule": "@every 3m",
+						},
+						map[string]any{
+							"id": "browser-network-1",
+							"data_stream": map[string]any{
+								"dataset": "browser.network",
+								"type":    "synthetics",
+							},
+						},
+						map[string]any{
+							"id": "browser-screenshot-1",
+							"data_stream": map[string]any{
+								"dataset": "browser.screenshot",
+								"type":    "synthetics",
+							},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	result, err := getReceiversConfigForComponent(browserComponent, testAgentInfo, false, nil)
+	require.NoError(t, err)
+
+	// Only the scheduled "browser" stream must become a receiver/monitor; the
+	// schedule-less auxiliary streams must be dropped.
+	require.Len(t, result, 1, "only the scheduled browser stream should produce a receiver")
+
+	scheduledReceiverID := "heartbeatreceiver/_agent-component/heartbeat-browser-test-id/browser-1"
+	require.Contains(t, result, scheduledReceiverID)
+	assert.NotContains(t, result, "heartbeatreceiver/_agent-component/heartbeat-browser-test-id/browser-network-1")
+	assert.NotContains(t, result, "heartbeatreceiver/_agent-component/heartbeat-browser-test-id/browser-screenshot-1")
+
+	receiverConfig, ok := result[scheduledReceiverID].(map[string]any)
+	require.True(t, ok, "receiver config should be a map")
+	heartbeatConfig, ok := receiverConfig["heartbeat"].(map[string]any)
+	require.True(t, ok, "heartbeat config should be a map")
+	monitors, ok := heartbeatConfig["monitors"].([]map[string]any)
+	require.True(t, ok, "heartbeat monitors should be a slice of maps")
+	require.Len(t, monitors, 1, "exactly one monitor should be emitted")
+	assert.Equal(t, "@every 3m", monitors[0]["schedule"], "the emitted monitor must carry the schedule")
+	assert.Equal(t, "browser", monitors[0]["type"], "the emitted monitor must be the browser stream")
+}
+
+// TestKeepScheduledMonitors verifies the schedule-based filtering used to drop
+// auxiliary Synthetics browser sub-streams, including the malformed-config fallback.
+func TestKeepScheduledMonitors(t *testing.T) {
+	scheduled := receiverInput{streamID: "browser-1", config: map[string]any{"schedule": "@every 3m"}}
+	network := receiverInput{streamID: "browser-network-1", config: map[string]any{}}
+	screenshot := receiverInput{streamID: "browser-screenshot-1", config: map[string]any{"schedule": nil}}
+
+	t.Run("drops schedule-less streams", func(t *testing.T) {
+		got := keepScheduledMonitors([]receiverInput{scheduled, network, screenshot})
+		require.Len(t, got, 1)
+		assert.Equal(t, "browser-1", got[0].streamID)
+	})
+
+	t.Run("returns inputs unchanged when none are scheduled", func(t *testing.T) {
+		in := []receiverInput{network, screenshot}
+		got := keepScheduledMonitors(in)
+		assert.Equal(t, in, got)
+	})
+}
+
 // TestGetReceiversConfigForComponentFQDN verifies that the agent's FQDN feature flag is
 // propagated into the generated beat receiver config.
 func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
