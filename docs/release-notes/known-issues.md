@@ -47,7 +47,7 @@ Pin Heartbeat back to the process runtime on the {{fleet}} agent policy that bac
 
 This is equivalent to the agent policy override `{ "agent": { "internal": { "runtime": { "heartbeat": { "default": "process" } } } } }` ({{fleet}} stores the field as `advanced_settings.agent_internal`). The change takes effect on the next policy revision and is fully reversible: remove the setting to return Heartbeat to its default runtime.
 
-To avoid downtime when upgrading from 9.4.x, apply this override **before** you upgrade. It has no effect on 9.4.x (Heartbeat already runs in the process runtime there), and because the setting lives on the agent policy it is already in effect the moment the agent upgrades to 9.5.0 — so browser monitors keep running through the upgrade.
+To avoid downtime when upgrading from 9.3.x or 9.4.x, apply this override **before** you upgrade. It has no effect on those versions (Heartbeat already runs in the process runtime there), and because the setting lives on the agent policy it is already in effect the moment the agent upgrades to 9.5.0 — so browser monitors keep running through the upgrade.
 
 For more information, check [Issue #15968](https://github.com/elastic/elastic-agent/issues/15968).
 ::::
