@@ -14,7 +14,9 @@ import (
 
 // currentEffectiveIDs returns the SID of the current user and primary group,
 // matching the SID strings that install.FindUID and install.FindGID return on
-// Windows.
+// Windows. The pitfall described in the Unix variant does not apply on Windows
+// - the process token is the source of truth and utils.CurrentFileOwner reads
+// it correctly.
 func currentEffectiveIDs() (string, string, error) {
 	u, err := utils.CurrentFileOwner()
 	if err != nil {
