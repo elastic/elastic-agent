@@ -60,9 +60,12 @@ const (
 	MonitoringOutput           = "monitoring"
 	defaultMonitoringNamespace = "default"
 	agentName                  = "elastic-agent"
+	agentLogsGlob              = agentName + "-[0-9]*.ndjson"    // example match: elastic-agent-20260804-1.ndjson
+	watcherLogsGlob            = agentName + "-watcher-*.ndjson" // example match: elastic-agent-watcher-20260122-2.ndjson
 	metricBeatName             = "metricbeat"
 	fileBeatName               = "filebeat"
 	collectorName              = "elastic-otel-collector"
+	collectorLogsGlob          = collectorName + "-*.ndjson" // example match: elastic-otel-collector-20261222-2.ndjson
 
 	monitoringMetricsUnitID = "metrics-monitoring"
 	monitoringFilesUnitsID  = "filestream-monitoring"
@@ -532,9 +535,9 @@ func (b *BeatsMonitor) getAgentFilestreamStream(logsDrop string) any {
 		idKey:  fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
 		"type": "filestream",
 		"paths": []any{
-			filepath.Join(logsDrop, agentName+"-[0-9]*.ndjson"),
-			filepath.Join(logsDrop, agentName+"-watcher-*.ndjson"),
-			filepath.Join(logsDrop, collectorName+"-*.ndjson"),
+			filepath.Join(logsDrop, agentLogsGlob),
+			filepath.Join(logsDrop, watcherLogsGlob),
+			filepath.Join(logsDrop, collectorLogsGlob),
 		},
 		"data_stream": map[string]any{
 			"type":      "logs",

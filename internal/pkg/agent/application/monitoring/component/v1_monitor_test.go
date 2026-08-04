@@ -1178,3 +1178,67 @@ func TestMonitoringConfigParameterParsing(t *testing.T) {
 		})
 	}
 }
+
+func TestLogsGlobs(t *testing.T) {
+	tests := []struct {
+		glob       string
+		matches    []string
+		nonMatches []string
+	}{
+		{
+			glob: agentLogsGlob,
+			matches: []string{
+				"elastic-agent-20260804.ndjson",
+				"elastic-agent-20260804-1.ndjson",
+			},
+			nonMatches: []string{
+				"elastic-agent-watcher-20260122.ndjson",
+				"elastic-agent-watcher-20260122-2.ndjson",
+				"elastic-agent-metrics.ndjson",
+				"elastic-otel-collector-20261222.ndjson",
+				"elastic-otel-collector-20261222-2.ndjson",
+			},
+		},
+		{
+			glob: watcherLogsGlob,
+			matches: []string{
+				"elastic-agent-watcher-20260122.ndjson",
+				"elastic-agent-watcher-20260122-2.ndjson",
+			},
+			nonMatches: []string{
+				"elastic-agent-20260804.ndjson",
+				"elastic-agent-20260804-1.ndjson",
+				"elastic-agent-metrics.ndjson",
+				"elastic-otel-collector-20261222.ndjson",
+				"elastic-otel-collector-20261222-2.ndjson",
+			},
+		},
+		{
+			glob: collectorLogsGlob,
+			matches: []string{
+				"elastic-otel-collector-20261222.ndjson",
+				"elastic-otel-collector-20261222-2.ndjson",
+			},
+			nonMatches: []string{
+				"elastic-agent-watcher-20260122.ndjson",
+				"elastic-agent-watcher-20260122-2.ndjson",
+				"elastic-agent-20260804.ndjson",
+				"elastic-agent-20260804-1.ndjson",
+				"elastic-agent-metrics.ndjson",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		for _, name := range tc.matches {
+			matched, err := filepath.Match(tc.glob, name)
+			require.NoError(t, err)
+			assert.Truef(t, matched, "expected %q to match glob %q", name, tc.glob)
+		}
+		for _, name := range tc.nonMatches {
+			matched, err := filepath.Match(tc.glob, name)
+			require.NoError(t, err)
+			assert.Falsef(t, matched, "expected %q to NOT match glob %q", name, tc.glob)
+		}
+	}
+}
