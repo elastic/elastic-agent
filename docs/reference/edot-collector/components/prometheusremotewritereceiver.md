@@ -59,7 +59,7 @@ remote_write:
     protobuf_message: io.prometheus.write.v2.Request
 ```
 
-Replace `<collector-host>` with the address where your EDOT Collector is running.
+Replace `<collector-host>` with the address where your {{agent}} is running.
 
 For more details on configuring Prometheus, refer to the [upstream receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusremotewritereceiver#configuring-your-prometheus).
 
@@ -73,7 +73,7 @@ The remote write 2.0 protocol specification is still evolving, and compatibility
 | v0.142.0 and later | Prometheus 3.8.0 and later |
 
 :::{important}
-EDOT Collector uses `prometheusremotewritereceiver` v0.141.0 and later, which is compatible with Prometheus 3.7.x and earlier. If you're using Prometheus 3.8.0 or later, you might experience compatibility issues due to breaking changes in the remote write 2.0 protocol.
+{{agent}} uses `prometheusremotewritereceiver` v0.141.0 and later, which is compatible with Prometheus 3.7.x and earlier. If you're using Prometheus 3.8.0 or later, you might experience compatibility issues due to breaking changes in the remote write 2.0 protocol.
 :::
 
 ## Limitations
@@ -91,5 +91,5 @@ The Prometheus remote write receiver has some behaviors to be aware of:
 
 * [Upstream component: prometheusremotewritereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/prometheusremotewritereceiver/README.md)
 * [Prometheus Remote Write 2.0 specification](https://prometheus.io/docs/specs/prw/remote_write_spec_2_0/)
-* [Configure metrics collection in EDOT](../config/configure-metrics-collection.md)
+* [Configure metrics collection in {{agent}}](../config/configure-metrics-collection.md)
 
