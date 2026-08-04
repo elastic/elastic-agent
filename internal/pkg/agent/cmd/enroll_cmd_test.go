@@ -1067,6 +1067,10 @@ func Test_EnrollCmd_PrepareFleetServerTLS(t *testing.T) {
 		name string
 		cfg  enroll.EnrollCmdFleetServerOption
 		url  string
+		// containerCfg is the container setup configuration that produces cfg, see
+		// buildEnrollArgs. shouldFleetEnroll has to predict the URL derived here from it,
+		// so both are asserted together to keep them from drifting apart.
+		containerCfg fleetServerConfig
 	}{{
 		name: "with cert",
 		cfg: enroll.EnrollCmdFleetServerOption{
@@ -1075,7 +1079,8 @@ func Test_EnrollCmd_PrepareFleetServerTLS(t *testing.T) {
 			Cert:         "exmple-cert",
 			CertKey:      "example-key",
 		},
-		url: "https://localhost:8221",
+		url:          "https://localhost:8221",
+		containerCfg: fleetServerConfig{Enable: true, Cert: "exmple-cert", CertKey: "example-key"},
 	}, {
 		name: "insecure",
 		cfg: enroll.EnrollCmdFleetServerOption{
@@ -1083,7 +1088,19 @@ func Test_EnrollCmd_PrepareFleetServerTLS(t *testing.T) {
 			ConnStr:      "http://elastic.internal:9220",
 			InternalPort: defaultFleetServerInternalPort,
 		},
-		url: "http://localhost:8221",
+		url:          "http://localhost:8221",
+		containerCfg: fleetServerConfig{Enable: true, InsecureHTTP: true},
+	}, {
+		// the default for a container that only sets FLEET_SERVER_ENABLE: no certificate
+		// is given, so one is self-signed, and the enrollment URL is still rewritten to
+		// the internal endpoint.
+		name: "self-signed",
+		cfg: enroll.EnrollCmdFleetServerOption{
+			ConnStr:      "http://elastic.internal:9220",
+			InternalPort: defaultFleetServerInternalPort,
+		},
+		url:          "https://localhost:8221",
+		containerCfg: fleetServerConfig{Enable: true},
 	}}
 	log, _ := loggertest.New("Test_EnrollCmd_PrepareFleetServerTLS")
 	for _, tt := range tests {
@@ -1098,6 +1115,8 @@ func Test_EnrollCmd_PrepareFleetServerTLS(t *testing.T) {
 			err := c.prepareFleetTLS()
 			require.NoError(t, err)
 			require.Equal(t, tt.url, c.options.URL)
+			require.Equal(t, c.options.URL, setupFleetServerURL(tt.containerCfg),
+				"the URL predicted by shouldFleetEnroll no longer matches the one enrollment uses")
 		})
 	}
 }
