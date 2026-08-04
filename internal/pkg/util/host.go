@@ -6,15 +6,23 @@ package util
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/go-sysinfo/types"
 )
 
-// GetHostName returns the host's FQDN if the FDQN feature flag is enabled; otherwise, it
-// returns the OS-provided hostname.
+// EnvHostName overrides the hostname reported by Elastic Agent when set.
+const EnvHostName = "ELASTIC_AGENT_HOSTNAME"
+
+// GetHostName returns the hostname for this agent. ELASTIC_AGENT_HOSTNAME takes precedence;
+// otherwise falls back to FQDN (when enabled) or the OS hostname.
 func GetHostName(isFqdnFeatureEnabled bool, hostInfo types.HostInfo, host types.Host, log *logger.Logger) string {
+	if override := os.Getenv(EnvHostName); override != "" {
+		return override
+	}
+
 	if !isFqdnFeatureEnabled {
 		return hostInfo.Hostname
 	}
