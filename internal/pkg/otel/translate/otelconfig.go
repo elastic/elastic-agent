@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -30,6 +31,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/features"
@@ -465,6 +467,11 @@ func getReceiversConfigForComponent(
 
 	if receiverFeatures := beatReceiverFeatures(comp); len(receiverFeatures) > 0 {
 		sharedConfig["features"] = receiverFeatures
+	}
+
+	// Receivers never see CLI flags, so inject hostname via config when the override is set.
+	if hostname := os.Getenv(util.EnvHostName); hostname != "" {
+		sharedConfig["hostname"] = hostname
 	}
 
 	// When SingleReceiver is set, merge all stream inputs into one receiver instead of
