@@ -134,7 +134,10 @@ func TestHostnameEnvOverride(t *testing.T) {
 			// Fresh install: the component needs to start, run its first collection cycle,
 			// send data to ES, and have it indexed. Use a longer timeout than the default 2m.
 			t.Log("Verify that host.name in beats-collected system metrics matches ELASTIC_AGENT_HOSTNAME")
-			verifyHostNameInIndices(t, "metrics-system.*-*", customHostname, since, info.Namespace, info.ESClient, 5*time.Minute)
+			// System integration is always installed in the "default" namespace
+			// (InstallPackageFromDefaultFile hardcodes it), so system metrics land in
+			// data_stream.namespace=default regardless of the test's own namespace.
+			verifyHostNameInIndices(t, "metrics-system.*-*", customHostname, since, "default", info.ESClient, 5*time.Minute)
 
 			t.Log("Verify that host.name in logs-* and metrics-* matches ELASTIC_AGENT_HOSTNAME")
 			verifyHostNameInIndices(t, "logs-*", customHostname, since, info.Namespace, info.ESClient, 5*time.Minute)
