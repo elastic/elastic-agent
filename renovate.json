@@ -19,11 +19,12 @@
   },
   "packageRules": [
     {
-      "description": "Go modules: schedule, labels, PR limit, and branch prefix",
+      "description": "Go modules: schedule, labels, PR limit, branch prefix, and post-update tidy",
       "matchManagers": ["gomod"],
       "additionalBranchPrefix": "golang/",
       "schedule": ["on monday"],
-      "prConcurrentLimit": 10
+      "prConcurrentLimit": 10,
+      "postUpdateOptions": ["gomodTidy"]
     },
     {
       "description": "misc: catch-all group for Go modules not claimed by a more specific group",
