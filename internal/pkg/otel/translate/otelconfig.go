@@ -954,8 +954,13 @@ func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiver
 				result[i].config["osquery"] = osqMap
 			}
 		}
-		// Place the result stream first as osquerybeat requires the result data stream to be first.
-		result[0], result[i] = result[i], result[0]
+		// Move the result stream to position 0, shifting preceding streams right by one.
+		// This mirrors osquerybeatCfgFromStreams which prepends the result stream so that
+		// all other streams follow in their original relative order. A simple swap would
+		// displace whichever stream was at index 0 to index i, corrupting that order.
+		resultStream := result[i]
+		copy(result[1:i+1], result[0:i])
+		result[0] = resultStream
 		break
 	}
 	return result
