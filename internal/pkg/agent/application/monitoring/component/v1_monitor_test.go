@@ -188,7 +188,7 @@ func TestGetAgentFilestreamStream(t *testing.T) {
 			}
 			assert.Equal(t, wantPaths, stream["paths"],
 				"paths must be exactly these three globs; the agent pattern uses [0-9]* "+
-					"so it does not match watcher logs already covered by the watcher pattern")
+					"so it does not match the metrics file")
 
 			wantNamespace := tc.namespace
 			if wantNamespace == "" {
