@@ -151,9 +151,8 @@ func TestMonitoringFull(t *testing.T) {
 // TestGetAgentFilestreamStream pins the exact set of log-file glob
 // patterns produced by getAgentFilestreamStream. The patterns are
 // load-bearing: a too-broad glob (e.g.  agentName+"-*.ndjson") would
-// also match watcher logs, which have their own dedicated pattern and
-// must not be double-ingested.  Also we don't want to ingest the
-// elastic-agent-metrics log files either.
+// also match watcher logs, which have their own dedicated pa
+// Also we don't want to ingest the elastic-agent-metrics log files either.
 func TestGetAgentFilestreamStream(t *testing.T) {
 	logsDrop := t.TempDir()
 
