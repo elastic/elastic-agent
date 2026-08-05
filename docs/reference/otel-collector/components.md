@@ -21,7 +21,7 @@ products:
 The components are categorized into **[Core]** and **[Extended]**. The following table describes the current components, their source, and support status.
 
 ::::{note}
-Components marked as "Deprecated" in the table are retained in {{agent}} 9.x to maintain backwards compatibility during the official deprecation window. If you're running {{agent}} 9.x with {{stack}} 8.18 or 8.19, continue using these deprecated components as specified in the configuration for your Stack version. For more details, refer to [Configuration compatibility with {{stack}} versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions). To migrate your configuration to the new components, refer to [Migrate components](/reference/edot-collector/components/migrate-components.md).
+Components marked as "Deprecated" in the table are retained in {{agent}} 9.x to maintain backwards compatibility during the official deprecation window. If you're running {{agent}} 9.x with {{stack}} 8.18 or 8.19, continue using these deprecated components as specified in the configuration for your Stack version. For more details, refer to [Configuration compatibility with {{stack}} versions](/reference/otel-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions). To migrate your configuration to the new components, refer to [Migrate components](/reference/otel-collector/components/migrate-components.md).
 ::::
 
 % The following table is automatically generated from the Elastic Agent source code.
@@ -45,10 +45,10 @@ These components are included in {{agent}} version 9.5.1.
 | [azuremonitorreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/azuremonitorreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.3.5 |
 | [couchdbreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/couchdbreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.4.0 |
 | [dockerstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/dockerstatsreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.1.4 |
-| [elasticapmintakereceiver](/reference/edot-collector/components/elasticapmintakereceiver.md) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Core] | v0.65.0 | v9.2.0 |
-| [filelogreceiver](/reference/edot-collector/components/filelogreceiver.md) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.156.0 | v9.0.0 |
+| [elasticapmintakereceiver](/reference/otel-collector/components/elasticapmintakereceiver.md) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Core] | v0.65.0 | v9.2.0 |
+| [filelogreceiver](/reference/otel-collector/components/filelogreceiver.md) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.156.0 | v9.0.0 |
 | [haproxyreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/haproxyreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.4.0 |
-| [hostmetricsreceiver](/reference/edot-collector/components/hostmetricsreceiver.md) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.156.0 | v9.0.0 |
+| [hostmetricsreceiver](/reference/otel-collector/components/hostmetricsreceiver.md) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.156.0 | v9.0.0 |
 | [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/httpcheckreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.0.0 |
 | [iisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/iisreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.2.0 |
 | [jaegerreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/jaegerreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.0.0 |
@@ -68,7 +68,7 @@ These components are included in {{agent}} version 9.5.1.
 | [postgresqlreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/postgresqlreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.2.0 |
 | [profiling](https://github.com/open-telemetry/opentelemetry-ebpf-profiler) | [OTel eBPF Profiler Repo](https://github.com/open-telemetry/opentelemetry-ebpf-profiler) | [Extended] | v0.0.202623 | v9.2.0 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.0.0 |
-| [prometheusremotewritereceiver](/reference/edot-collector/components/prometheusremotewritereceiver.md) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.3.0 |
+| [prometheusremotewritereceiver](/reference/otel-collector/components/prometheusremotewritereceiver.md) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.3.0 |
 | [rabbitmqreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/rabbitmqreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.4.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/receivercreator) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.0.0 |
 | [receivertest](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/receivertest) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Extended] | v0.156.0 | v9.4.0 |
@@ -83,7 +83,7 @@ These components are included in {{agent}} version 9.5.1.
 | [zookeeperreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/zookeeperreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.4.0 |
 |***Exporters***|||||
 | [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/debugexporter) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Extended] | v0.156.0 | v9.0.0 |
-| [elasticsearchexporter](/reference/edot-collector/components/elasticsearchexporter.md) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.156.0 | v9.0.0 |
+| [elasticsearchexporter](/reference/otel-collector/components/elasticsearchexporter.md) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.156.0 | v9.0.0 |
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/fileexporter) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.0.0 |
 | [kafkaexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/kafkaexporter) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] [^3] | v0.156.0 | v9.0.0 |
 | [loadbalancingexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/loadbalancingexporter) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.0.0 |
@@ -94,7 +94,7 @@ These components are included in {{agent}} version 9.5.1.
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/attributesprocessor) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.156.0 | v9.0.0 |
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/batchprocessor) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Core] | v0.156.0 | v9.0.0 |
 | [cumulativetodeltaprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/cumulativetodeltaprocessor) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.0.3 |
-| [elasticapmprocessor](/reference/edot-collector/components/elasticapmprocessor.md) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Core] | v0.64.0 | v9.2.0 |
+| [elasticapmprocessor](/reference/otel-collector/components/elasticapmprocessor.md) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Core] | v0.64.0 | v9.2.0 |
 | [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | Deprecated [^1] | v0.62.0 | v9.0.0 |
 | [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elastictraceprocessor) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | Deprecated [^2] | v0.62.0 | v9.0.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/filterprocessor) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.0.0 |
@@ -108,20 +108,20 @@ These components are included in {{agent}} version 9.5.1.
 | [tailsamplingprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.2.0 |
 | [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.156.0 | v9.0.0 |
 |***Connectors***|||||
-| [elasticapmconnector](/reference/edot-collector/components/elasticapmconnector.md) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Core] | v0.62.0 | v9.0.0 |
+| [elasticapmconnector](/reference/otel-collector/components/elasticapmconnector.md) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Core] | v0.62.0 | v9.0.0 |
 | [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Extended] | v0.156.0 | v9.1.0 |
 | [otlpjsonconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/otlpjsonconnector) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.156.0 | v9.4.0 |
 | [profilingmetricsconnector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/profilingmetricsconnector) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Extended] | v0.62.0 | v9.2.0 |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/routingconnector) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.156.0 | v9.0.0 |
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/spanmetricsconnector) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.0.0 |
 |***Extensions***|||||
-| [apikeyauthextension](/reference/edot-collector/config/authentication-methods.md) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Extended] | v0.62.0 | v9.1.0 |
+| [apikeyauthextension](/reference/otel-collector/config/authentication-methods.md) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Extended] | v0.62.0 | v9.1.0 |
 | [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/apmconfigextension) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Extended] | v0.62.0 | v9.1.0 |
 | [awscredentialsproviderextension](https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/awscredentialsproviderextension) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Extended] | v0.62.0 | v9.5.0 |
 | [awslogsencodingextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/encoding/awslogsencodingextension) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.3.0 |
 | [azureauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/azureauthextension) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.3.6 |
 | [azureencodingextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/encoding/azureencodingextension) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.3.5 |
-| [bearertokenauthextension](/reference/edot-collector/config/authentication-methods.md) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.1.0 |
+| [bearertokenauthextension](/reference/otel-collector/config/authentication-methods.md) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.1.0 |
 | [cgroupruntimeextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/cgroupruntimeextension) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.4.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/storage/filestorage) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.156.0 | v9.0.0 |
 | [headerssetterextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/headerssetterextension) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.156.0 | v9.1.5 |
@@ -142,9 +142,9 @@ These components are included in {{agent}} version 9.5.1.
 
 
 
-[^1]: Deprecated in 9.2.0. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
+[^1]: Deprecated in 9.2.0. Refer to [Migrate from deprecated components](/reference/otel-collector/components/migrate-components.md) for migration instructions.
 
-[^2]: Deprecated in 9.2.0. Replaced by the `elasticapm` processor. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
+[^2]: Deprecated in 9.2.0. Replaced by the `elasticapm` processor. Refer to [Migrate from deprecated components](/reference/otel-collector/components/migrate-components.md) for migration instructions.
 
 [^3]: The following features and configuration options are **NOT** officially supported in {{agent}} with the Kafka receiver:
 - Encoding options other than `otlp_proto` or `otlp_json`

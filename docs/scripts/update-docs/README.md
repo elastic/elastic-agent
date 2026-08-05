@@ -126,12 +126,12 @@ annotations:
 
 ### `component-docs.yml`
 
-Located at `docs/reference/edot-collector/component-docs.yml`, maps components to documentation pages:
+Located at `docs/reference/otel-collector/component-docs.yml`, maps components to documentation pages:
 
 ```yaml
 components:
   filelogreceiver:
-    doc_path: /reference/edot-collector/components/filelogreceiver.md
+    doc_path: /reference/otel-collector/components/filelogreceiver.md
 ```
 
 ## Adding a new path migration

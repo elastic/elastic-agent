@@ -37,7 +37,7 @@ After you've downloaded and uncompressed the file, you can start {{agent}} with 
 sudo ./otelcol --config otel.yml
 ```
 
-For specific configuration, refer to the [Quickstart guides](docs-content://solutions/observability/get-started/opentelemetry/quickstart/index.md) or refer to [Configuration](/reference/edot-collector/config/index.md).
+For specific configuration, refer to the [Quickstart guides](docs-content://solutions/observability/get-started/opentelemetry/quickstart/index.md) or refer to [Configuration](/reference/otel-collector/config/index.md).
 
 :::{tip}
 To download a specific version, replace {{version.edot_collector}} with the version you want to download.

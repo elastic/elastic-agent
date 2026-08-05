@@ -17,7 +17,7 @@ products:
 
 You can build and configure a [custom Collector](https://opentelemetry.io/docs/collector/custom-collector/) or extend the [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-contrib) distribution to collect logs and metrics and send them to {{product.observability}}.
 
-For a more seamless experience, use {{agent}}. Refer to the [configuration](/reference/edot-collector/config/index.md) docs for more information.
+For a more seamless experience, use {{agent}}. Refer to the [configuration](/reference/otel-collector/config/index.md) docs for more information.
 
 ## Build a custom collector
 
@@ -41,7 +41,7 @@ Make sure to install the version of OpenTelemetry Collector Builder that matches
 
 Create a builder configuration file,`builder-config.yml`, to define the custom Collector. This file specifies the components, such as extensions, exporters, processors, receivers, and connectors, included in your custom Collector.
 
-The following example, `builder-config.yml`, contains the components needed to send your telemetry data to {{product.observability}}. For more information on these components, refer to the [components](/reference/edot-collector/components.md) documentation. Keep or remove components from the example configuration file to fit your needs.
+The following example, `builder-config.yml`, contains the components needed to send your telemetry data to {{product.observability}}. For more information on these components, refer to the [components](/reference/otel-collector/components.md) documentation. Keep or remove components from the example configuration file to fit your needs.
 
 % The following OCB configuration is automatically generated from the Elastic Agent source code.
 % Automation is handled by /docs/scripts/update-docs/update-components-docs.py, which

@@ -9,7 +9,7 @@ receivers:
 #   start_at: beginning
   # Uncomment the following lines only for Linux systems and OTel collector running with
   # --feature-gates=service.profilesSupport and elevated privileges like CAP_SYS_ADMIN or using sudo.
-  # For more details check out https://www.elastic.co/docs/reference/edot-collector/config/configure-profiles-collection
+  # For more details check out https://www.elastic.co/docs/reference/otel-collector/config/configure-profiles-collection
 #  profiling:
 
   # Receiver for CPU, Disk, Memory, and Filesystem metrics
