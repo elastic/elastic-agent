@@ -3954,3 +3954,90 @@ func TestStripDefaultProcessors(t *testing.T) {
 		})
 	}
 }
+
+// TestInjectOsqueryConfig verifies that injectOsqueryConfig mirrors the stream ordering
+// produced by osquerybeatCfgFromStreams: the osquery_manager.result stream is always moved
+// to position 0, and all other streams follow in their original relative order.
+func TestInjectOsqueryConfig(t *testing.T) {
+	makeStream := func(id string, isResult bool) receiverInput {
+		dataset := "osquery_manager.action.responses"
+		if isResult {
+			dataset = "osquery_manager.result"
+		}
+		return receiverInput{
+			streamID: id,
+			config: map[string]any{
+				"data_stream": map[string]any{
+					"dataset": dataset,
+				},
+			},
+		}
+	}
+
+	// unit carries the input-level osquery config, mirroring what osquerybeatCfgFromStreams
+	// receives as rawIn.Source when the integration has scheduled queries.
+	unit := component.Unit{
+		Config: component.MustExpectedConfig(map[string]interface{}{
+			"osquery": map[string]interface{}{
+				"queries": map[string]interface{}{},
+			},
+		}),
+	}
+
+	tests := []struct {
+		name          string
+		inputs        []receiverInput
+		wantStreamIDs []string
+	}{
+		{
+			name:          "1 stream: result only",
+			inputs:        []receiverInput{makeStream("result", true)},
+			wantStreamIDs: []string{"result"},
+		},
+		{
+			name:          "2 streams: result first",
+			inputs:        []receiverInput{makeStream("result", true), makeStream("action", false)},
+			wantStreamIDs: []string{"result", "action"},
+		},
+		{
+			name:          "2 streams: result second",
+			inputs:        []receiverInput{makeStream("action", false), makeStream("result", true)},
+			wantStreamIDs: []string{"result", "action"},
+		},
+		{
+			// swap(0,2) gives [result, other, action] — wrong relative order of non-result streams
+			name: "3 streams: result last",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStream("other", false),
+				makeStream("result", true),
+			},
+			wantStreamIDs: []string{"result", "action", "other"},
+		},
+		{
+			// swap(0,3) gives [result, other1, other2, action] — wrong
+			name: "4 streams: result last",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStream("other1", false),
+				makeStream("other2", false),
+				makeStream("result", true),
+			},
+			wantStreamIDs: []string{"result", "action", "other1", "other2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := injectOsqueryConfig(tt.inputs, unit)
+			require.Len(t, got, len(tt.wantStreamIDs))
+			gotIDs := make([]string, len(got))
+			for i, ri := range got {
+				gotIDs[i] = ri.streamID
+			}
+			assert.Equal(t, tt.wantStreamIDs, gotIDs,
+				"stream ordering must match osquerybeatCfgFromStreams: result stream first, others in original relative order")
+			assert.NotNil(t, got[0].config["osquery"], "result stream must have osquery config injected")
+		})
+	}
+}
