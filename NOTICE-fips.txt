@@ -10345,11 +10345,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2
-Version: v1.42.1
+Version: v1.43.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2@v1.42.1/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2@v1.43.0/LICENSE.txt:
 
 
                                  Apache License
@@ -10557,11 +10557,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2@v1.42
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/config
-Version: v1.32.29
+Version: v1.32.31
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/config@v1.32.29/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/config@v1.32.31/LICENSE.txt:
 
 
                                  Apache License
@@ -10769,11 +10769,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/confi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/credentials
-Version: v1.19.28
+Version: v1.19.30
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/credentials@v1.19.28/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/credentials@v1.19.30/LICENSE.txt:
 
 
                                  Apache License
@@ -10981,11 +10981,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/crede
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/iam
-Version: v1.42.1
+Version: v1.56.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/iam@v1.42.1/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/iam@v1.56.0/LICENSE.txt:
 
 
                                  Apache License
@@ -11193,11 +11193,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/sts
-Version: v1.44.0
+Version: v1.45.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/sts@v1.44.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/sts@v1.45.0/LICENSE.txt:
 
 
                                  Apache License
@@ -58000,11 +58000,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go@v0.123.0/LICEN
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/auth
-Version: v0.20.0
+Version: v0.22.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/auth@v0.20.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/auth@v0.22.0/LICENSE:
 
 
                                  Apache License
@@ -58424,11 +58424,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go/auth/oauth2ada
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/bigquery
-Version: v1.77.0
+Version: v1.79.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/bigquery@v1.77.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/bigquery@v1.79.0/LICENSE:
 
 
                                  Apache License
@@ -58636,11 +58636,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go/bigquery@v1.77
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/compute
-Version: v1.64.0
+Version: v1.65.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/compute@v1.64.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/compute@v1.65.0/LICENSE:
 
 
                                  Apache License
@@ -59060,11 +59060,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go/compute/metada
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/iam
-Version: v1.11.0
+Version: v1.12.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/iam@v1.11.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/iam@v1.12.0/LICENSE:
 
 
                                  Apache License
@@ -59272,11 +59272,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go/iam@v1.11.0/LI
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/longrunning
-Version: v1.0.0
+Version: v1.2.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/longrunning@v1.0.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/longrunning@v1.2.0/LICENSE:
 
 
                                  Apache License
@@ -59484,11 +59484,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go/longrunning@v1
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/monitoring
-Version: v1.29.0
+Version: v1.30.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/monitoring@v1.29.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/monitoring@v1.30.0/LICENSE:
 
 
                                  Apache License
@@ -59696,11 +59696,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go/monitoring@v1.
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/redis
-Version: v1.23.0
+Version: v1.25.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/redis@v1.23.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/redis@v1.25.0/LICENSE:
 
 
                                  Apache License
@@ -59908,11 +59908,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go/redis@v1.23.0/
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/storage
-Version: v1.62.2
+Version: v1.64.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/storage@v1.62.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/storage@v1.64.0/LICENSE:
 
 
                                  Apache License
@@ -63213,11 +63213,11 @@ Contents of probable licence file $GOMODCACHE/github.com/!google!cloud!platform/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric
-Version: v0.55.0
+Version: v0.57.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/!google!cloud!platform/opentelemetry-operations-go/exporter/metric@v0.55.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/!google!cloud!platform/opentelemetry-operations-go/exporter/metric@v0.57.0/LICENSE:
 
 
                                  Apache License
@@ -63425,11 +63425,11 @@ Contents of probable licence file $GOMODCACHE/github.com/!google!cloud!platform/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping
-Version: v0.55.0
+Version: v0.57.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/!google!cloud!platform/opentelemetry-operations-go/internal/resourcemapping@v0.55.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/!google!cloud!platform/opentelemetry-operations-go/internal/resourcemapping@v0.57.0/LICENSE:
 
 
                                  Apache License
@@ -67408,11 +67408,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/aws/p
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/feature/ec2/imds
-Version: v1.18.30
+Version: v1.18.31
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/feature/ec2/imds@v1.18.30/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/feature/ec2/imds@v1.18.31/LICENSE.txt:
 
 
                                  Apache License
@@ -67620,11 +67620,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/featu
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/internal/configsources
-Version: v1.4.30
+Version: v1.4.31
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/internal/configsources@v1.4.30/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/internal/configsources@v1.4.31/LICENSE.txt:
 
 
                                  Apache License
@@ -67832,11 +67832,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/inter
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/internal/endpoints/v2
-Version: v2.7.30
+Version: v2.7.31
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/internal/endpoints/v2@v2.7.30/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/internal/endpoints/v2@v2.7.31/LICENSE.txt:
 
 
                                  Apache License
@@ -68044,11 +68044,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/inter
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/internal/v4a
-Version: v1.4.31
+Version: v1.4.32
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/internal/v4a@v1.4.31/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/internal/v4a@v1.4.32/LICENSE.txt:
 
 
                                  Apache License
@@ -68256,11 +68256,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/inter
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/apigateway
-Version: v1.31.3
+Version: v1.42.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/apigateway@v1.31.3/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/apigateway@v1.42.0/LICENSE.txt:
 
 
                                  Apache License
@@ -68468,11 +68468,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/apigatewayv2
-Version: v1.28.3
+Version: v1.37.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/apigatewayv2@v1.28.3/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/apigatewayv2@v1.37.0/LICENSE.txt:
 
 
                                  Apache License
@@ -68680,11 +68680,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/cloudwatch
-Version: v1.58.0
+Version: v1.65.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/cloudwatch@v1.58.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/cloudwatch@v1.65.0/LICENSE.txt:
 
 
                                  Apache License
@@ -68892,11 +68892,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs
-Version: v1.74.3
+Version: v1.80.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs@v1.74.3/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs@v1.80.0/LICENSE.txt:
 
 
                                  Apache License
@@ -69104,11 +69104,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/costexplorer
-Version: v1.51.1
+Version: v1.67.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/costexplorer@v1.51.1/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/costexplorer@v1.67.0/LICENSE.txt:
 
 
                                  Apache License
@@ -69316,11 +69316,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/ec2
-Version: v1.316.0
+Version: v1.317.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/ec2@v1.316.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/ec2@v1.317.0/LICENSE.txt:
 
 
                                  Apache License
@@ -69528,11 +69528,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2
-Version: v1.45.4
+Version: v1.58.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2@v1.45.4/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2@v1.58.1/LICENSE.txt:
 
 
                                  Apache License
@@ -69740,11 +69740,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/health
-Version: v1.30.3
+Version: v1.40.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/health@v1.30.3/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/health@v1.40.0/LICENSE.txt:
 
 
                                  Apache License
@@ -70164,11 +70164,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/internal/checksum
-Version: v1.9.23
+Version: v1.9.24
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/internal/checksum@v1.9.23/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/internal/checksum@v1.9.24/LICENSE.txt:
 
 
                                  Apache License
@@ -70376,11 +70376,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/internal/presigned-url
-Version: v1.13.30
+Version: v1.13.31
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/internal/presigned-url@v1.13.30/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/internal/presigned-url@v1.13.31/LICENSE.txt:
 
 
                                  Apache License
@@ -70588,11 +70588,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/internal/s3shared
-Version: v1.19.31
+Version: v1.19.32
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/internal/s3shared@v1.19.31/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/internal/s3shared@v1.19.32/LICENSE.txt:
 
 
                                  Apache License
@@ -70800,11 +70800,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/organizations
-Version: v1.38.4
+Version: v1.53.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/organizations@v1.38.4/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/organizations@v1.53.0/LICENSE.txt:
 
 
                                  Apache License
@@ -71012,11 +71012,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/rds
-Version: v1.118.2
+Version: v1.123.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/rds@v1.118.2/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/rds@v1.123.0/LICENSE.txt:
 
 
                                  Apache License
@@ -71224,11 +71224,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi
-Version: v1.26.5
+Version: v1.35.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi@v1.26.5/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi@v1.35.0/LICENSE.txt:
 
 
                                  Apache License
@@ -71436,11 +71436,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/s3
-Version: v1.105.0
+Version: v1.106.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/s3@v1.105.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/s3@v1.106.0/LICENSE.txt:
 
 
                                  Apache License
@@ -71860,11 +71860,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/signin
-Version: v1.4.0
+Version: v1.5.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/signin@v1.4.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/signin@v1.5.0/LICENSE.txt:
 
 
                                  Apache License
@@ -72072,11 +72072,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/sqs
-Version: v1.45.0
+Version: v1.46.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/sqs@v1.45.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/sqs@v1.46.0/LICENSE.txt:
 
 
                                  Apache License
@@ -72284,11 +72284,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/sso
-Version: v1.32.0
+Version: v1.33.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/sso@v1.32.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/sso@v1.33.0/LICENSE.txt:
 
 
                                  Apache License
@@ -72496,11 +72496,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go-v2/service/ssooidc
-Version: v1.37.0
+Version: v1.38.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/ssooidc@v1.37.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/service/ssooidc@v1.38.0/LICENSE.txt:
 
 
                                  Apache License
@@ -76434,11 +76434,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/ebpfevents
-Version: v0.9.0
+Version: v0.9.1-0.20260727124511-05b78de333fd
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/ebpfevents@v0.9.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/ebpfevents@v0.9.1-0.20260727124511-05b78de333fd/LICENSE.txt:
 
 The https://github.com/elastic/ebpfevents repository contains source code under
 various licenses:
@@ -111240,11 +111240,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/genproto
-Version: v0.0.0-20260401024825-9d38bb4040a9
+Version: v0.0.0-20260519071638-aa98bba5eb94
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/genproto@v0.0.0-20260401024825-9d38bb4040a9/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/genproto@v0.0.0-20260519071638-aa98bba5eb94/LICENSE:
 
 
                                  Apache License
