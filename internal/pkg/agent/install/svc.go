@@ -128,16 +128,24 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 	}
 
 	if runtime.GOOS == "darwin" {
-		// The github.com/kardianos/service library doesn't support ExitTimeOut in their prebuilt template.
-		// This option allows to pass our own template for the launch daemon plist, which is a copy
-		// of the prebuilt template with added ExitTimeOut option
-		cfg.Option["LaunchdConfig"] = darwinLaunchdConfig
-		cfg.Option["ExitTimeOut"] = darwinServiceExitTimeout
+		// kardianos/service v1.3.0 switched to a mini template engine that does not expose
+		// Config.Option in the template data map, so ExitTimeOut and GroupName must be injected
+		// as literals before the template is handed to the library.
+		// ExitTimeOut prevents launchd from force-killing the agent before it can shut down.
+		exitTimeoutEntry := fmt.Sprintf("<key>ExitTimeOut</key>\n    <integer>%d</integer>", darwinServiceExitTimeout)
+		groupNameEntry := ""
+		if opts.Group != "" {
+			groupNameEntry = "<key>GroupName</key>\n    <string>" + opts.Group + "</string>"
+		}
+		launchdCfg := strings.ReplaceAll(darwinLaunchdConfig, "@EXIT_TIMEOUT_ENTRY@", exitTimeoutEntry)
+		launchdCfg = strings.ReplaceAll(launchdCfg, "@GROUP_NAME_ENTRY@", groupNameEntry)
+		cfg.Option["LaunchdConfig"] = launchdCfg
 
-		// Set the stdout and stderr logs to be inside the installation directory, ensures that the
-		// executing user for the service can write to the directory for the logs.
-		cfg.Option["StandardOutPath"] = filepath.Join(topPath, fmt.Sprintf("%s.out.log", paths.ServiceName()))
-		cfg.Option["StandardErrorPath"] = filepath.Join(topPath, fmt.Sprintf("%s.err.log", paths.ServiceName()))
+		// LogDirectory is used by v1.3.0 to compute StandardOutPath/StandardErrorPath from
+		// <LogDirectory>/<Name>.out.log and <LogDirectory>/<Name>.err.log. Setting it to
+		// topPath ensures log files land inside the installation directory where the service
+		// user has write access.
+		cfg.Option["LogDirectory"] = topPath
 	}
 
 	return service.New(nil, cfg)
@@ -236,47 +244,46 @@ func changeLaunchdServiceFile(serviceName string, plistPath string, username str
 	return nil
 }
 
-// A copy of the launchd plist template from github.com/kardianos/service
-// with added .Config.Option.ExitTimeOut option
+// A copy of the launchd plist template from github.com/kardianos/service using the
+// v1.3.0 mini template engine syntax, with @EXIT_TIMEOUT_ENTRY@ and @GROUP_NAME_ENTRY@
+// placeholders that newService() replaces with literal plist entries (or empty strings).
+// kardianos/service v1.3.0 no longer exposes Config.Option in the template data map,
+// so ExitTimeOut and GroupName cannot be referenced as template variables.
 const darwinLaunchdConfig = `<?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
 "http://www.apple.com/DTDs/PropertyList-1.0.dtd" >
 <plist version='1.0'>
   <dict>
     <key>Label</key>
-    <string>{{html .Name}}</string>
+    <string>{{Name | html}}</string>
     <key>ProgramArguments</key>
     <array>
-      <string>{{html .Path}}</string>
-    {{range .Config.Arguments}}
-      <string>{{html .}}</string>
+      <string>{{Path | html}}</string>
+    {{range Arguments}}
+      <string>{{. | html}}</string>
     {{end}}
     </array>
-    {{if .UserName}}<key>UserName</key>
-    <string>{{html .UserName}}</string>{{end}}
-	{{if .Config.Option.GroupName -}}
-	<key>GroupName</key>
-    <string>{{html .Config.Option.GroupName}}</string>
-	{{- end}}
-    {{if .ChRoot}}<key>RootDirectory</key>
-    <string>{{html .ChRoot}}</string>{{end}}
-    {{if .Config.Option.ExitTimeOut}}<key>ExitTimeOut</key>
-    <integer>{{html .Config.Option.ExitTimeOut}}</integer>{{end}}
-    {{if .WorkingDirectory}}<key>WorkingDirectory</key>
-    <string>{{html .WorkingDirectory}}</string>{{end}}
+    {{if UserName}}<key>UserName</key>
+    <string>{{UserName | html}}</string>{{end}}
+    @GROUP_NAME_ENTRY@
+    {{if ChRoot}}<key>RootDirectory</key>
+    <string>{{ChRoot | html}}</string>{{end}}
+    @EXIT_TIMEOUT_ENTRY@
+    {{if WorkingDirectory}}<key>WorkingDirectory</key>
+    <string>{{WorkingDirectory | html}}</string>{{end}}
     <key>SessionCreate</key>
-    <{{bool .SessionCreate}}/>
+    <{{SessionCreate}}/>
     <key>KeepAlive</key>
-    <{{bool .KeepAlive}}/>
+    <{{KeepAlive}}/>
     <key>RunAtLoad</key>
-    <{{bool .RunAtLoad}}/>
+    <{{RunAtLoad}}/>
     <key>Disabled</key>
     <false/>
 
     <key>StandardOutPath</key>
-    <string>{{html .Config.Option.StandardOutPath}}</string>
+    <string>{{StandardOutPath | html}}</string>
     <key>StandardErrorPath</key>
-    <string>{{html .Config.Option.StandardErrorPath}}</string>
+    <string>{{StandardErrorPath | html}}</string>
 
   </dict>
 </plist>
