@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	logFilePattern  = regexp.MustCompile(`elastic-agent(-event-log)?-(\d+)(-\d+)?\.ndjson$`)
+	logFilePattern  = regexp.MustCompile(`(?:elastic-agent|elastic-otel-collector)(-event-log)?-(\d+)(-\d+)?\.ndjson$`)
 	errLineFiltered = errors.New("this line was filtered out")
 )
 

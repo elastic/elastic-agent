@@ -23,9 +23,9 @@ subs:
   es:             "Elasticsearch"
   fleet:          "Fleet"
   motlp: Elastic Cloud Managed OTLP Endpoint
-  edot: Elastic Distribution of OpenTelemetry
+  edot: Elastic OpenTelemetry
   ecloud:   "Elastic Cloud"
-  edot-cf:   "EDOT Cloud Forwarder"
+  edot-cf:   "Elastic Cloud Forwarder"
   ech:   "Elastic Cloud Hosted"
   ess:   "Elasticsearch Service"
   ece:   "Elastic Cloud Enterprise"

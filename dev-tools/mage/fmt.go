@@ -13,6 +13,7 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 
+	"github.com/elastic/elastic-agent/dev-tools/licenses"
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
@@ -79,8 +80,8 @@ func AddLicenseHeaders(cfg *Settings) error {
 
 	var license string
 	switch cfg.Beat.License {
-	case "Elasticv2", "Elastic License 2.0":
-		license = "Elasticv2"
+	case licenses.Elasticv2LicenseName, "Elastic License 2.0":
+		license = licenses.Elasticv2LicenseName
 	default:
 		return fmt.Errorf("unknown license type %s", cfg.Beat.License)
 	}

@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/util"
@@ -28,10 +27,6 @@ const (
 
 	fqdnFeatureFlagCallbackID = "host_provider"
 )
-
-func init() {
-	composable.Providers.MustAddContextProvider("host", ContextProviderBuilder)
-}
 
 type infoFetcher func() (map[string]interface{}, error)
 
