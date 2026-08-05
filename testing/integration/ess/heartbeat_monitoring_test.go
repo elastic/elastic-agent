@@ -192,7 +192,7 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 				if strings.HasPrefix(comp.ID, "synthetics/http") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.ProcessRuntimeManager) {
 					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected synthetics/http component to be healthy, got %s", cproto.State(comp.State))
+						"expected synthetics/http component to be healthy, got %s", cproto.State(comp.State)) //nolint:gosec // G115 always under 32-bit
 					foundProcess = true
 					break
 				}
@@ -224,7 +224,7 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 				if strings.HasPrefix(comp.ID, "synthetics/http") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
 					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected synthetics/http component to be healthy, got %s", cproto.State(comp.State))
+						"expected synthetics/http component to be healthy, got %s", cproto.State(comp.State)) //nolint:gosec // G115 always under 32-bit
 					foundReceiver = true
 					break
 				}
@@ -285,6 +285,13 @@ func switchHeartbeatToOtelRuntime(ctx context.Context, t testing.TB, kibanaClien
 // (which have no schedule) are treated as monitors. See elastic-agent#15968.
 const scheduleMissingErr = "missing required field accessing 'heartbeat.monitors"
 
+// browserOutsideDockerErr is heartbeat's hard gate for browser monitors on
+// non-complete installs (ESS Fleet integration uses a tarball, not the
+// complete docker image). With #15968 fixed the component still lands here —
+// proving schedule translation worked — rather than the schedule-missing
+// Permanent failure.
+const browserOutsideDockerErr = "browser monitors cannot be created outside the official elastic docker image"
+
 type HeartbeatOTelRunner struct {
 	suite.Suite
 	info         *define.Info
@@ -296,13 +303,14 @@ type HeartbeatOTelRunner struct {
 }
 
 // TestHeartbeatOTelMonitors verifies that Synthetics monitors on a Fleet
-// private location stay HEALTHY under the OTel heartbeat runtime for every
-// monitor type Kibana can push via Fleet (http, tcp, icmp, browser).
+// private location stay under the OTel heartbeat runtime for every monitor
+// type Kibana can push via Fleet (http, tcp, icmp, browser).
 //
 // Browser is the #15968 regression case: it compiles to three Fleet streams
 // (browser + browser.network + browser.screenshot), and only the primary
-// stream carries schedule. Lightweight types are included so OTel coverage
-// stays aligned across the full synthetics/heartbeat surface.
+// stream carries schedule. On ESS Fleet (tarball install) browser cannot be
+// HEALTHY — we assert it fails on the docker-image gate instead of the
+// schedule-missing Permanent failure. Lightweight types must be HEALTHY.
 func TestHeartbeatOTelMonitors(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Fleet,
@@ -395,8 +403,10 @@ func (runner *HeartbeatOTelRunner) SetupSuite() {
 			"name":              fmt.Sprintf("browser-otel-%s", policyUUID),
 			"private_locations": []string{locationID},
 			"schedule":          10,
-			// Minimal noop journey — assert agent/component health for the
-			// schedule translation bug, not journey success / Chromium.
+			// Minimal noop journey — assert #15968 schedule translation under
+			// OTel. ESS Fleet uses a tarball (not complete docker), so the
+			// component will not stay HEALTHY; we assert it fails on the
+			// docker-image gate instead of the schedule-missing error.
 			"inline_script": `step("noop", async () => {});`,
 		},
 	}
@@ -442,9 +452,21 @@ func (runner *HeartbeatOTelRunner) TestOTelComponentsHealthy() {
 							"unit %s must not fail for missing schedule (#15968); message=%q",
 							unit.UnitID, unit.Message)
 					}
-					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected %s component to be healthy under OTel, got %s; message=%q",
-						componentPrefix, cproto.State(comp.State), comp.Message) //nolint:gosec // G115 always under 32-bit
+					if monitorType == "browser" {
+						// ESS Fleet installs a tarball, so browser cannot be HEALTHY
+						// here; accept the docker-image gate as success for #15968.
+						if comp.State != int(cproto.State_HEALTHY) {
+							assert.Equal(collect, int(cproto.State_FAILED), comp.State,
+								"expected browser component HEALTHY or FAILED (docker gate), got %s; message=%q",
+								cproto.State(comp.State), comp.Message) //nolint:gosec // G115 always under 32-bit
+							assert.Contains(collect, comp.Message, browserOutsideDockerErr,
+								"browser FAILED for an unexpected reason; message=%q", comp.Message)
+						}
+					} else {
+						assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
+							"expected %s component to be healthy under OTel, got %s; message=%q",
+							componentPrefix, cproto.State(comp.State), comp.Message) //nolint:gosec // G115 always under 32-bit
+					}
 					break
 				}
 				assert.True(collect, found,

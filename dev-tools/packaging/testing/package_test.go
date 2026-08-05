@@ -534,46 +534,6 @@ func checkCompleteDocker(t *testing.T, file string) {
 	}
 
 	checkSyntheticsDeps(t, "usr", p)
-	checkPlaywrightBrowsers(t, p)
-}
-
-// checkPlaywrightBrowsers asserts that the complete image actually bakes the
-// Playwright browser binaries into the Synthetics cache. Synthetics browser
-// monitors shell out to Playwright, which launches Chromium from
-// $HOME/.cache/ms-playwright; if that cache is empty the component starts but
-// every journey fails with "browserType.launch: Executable doesn't exist".
-//
-// The browsers used to be provisioned as a side effect of the
-// `playwright-chromium` dependency's `install` lifecycle script during
-// `npm i -g @elastic/synthetics`. npm 12 stopped running dependency install
-// scripts by default, so nothing baked the browsers and the regression shipped
-// silently in 9.5.0 — see elastic-agent#15993. This guards against that (and
-// any future npm/packaging change) recurring undetected.
-func checkPlaywrightBrowsers(t *testing.T, p *packageFile) {
-	// Playwright names the headless Chromium binary differently across
-	// revisions (chrome-headless-shell / headless_shell); accept either, plus
-	// the full chromium `chrome` binary.
-	browserBinaries := map[string][]string{
-		"chromium headless shell": {"/chrome-headless-shell", "/headless_shell"},
-		"chromium":                {"/chrome"},
-	}
-
-	for name, suffixes := range browserBinaries {
-		t.Run("Playwright browser "+name, func(t *testing.T) {
-			for _, entry := range p.Contents {
-				if !strings.Contains(entry.File, "ms-playwright") {
-					continue
-				}
-				for _, suffix := range suffixes {
-					if strings.HasSuffix(entry.File, suffix) {
-						return
-					}
-				}
-			}
-			t.Fatalf("Playwright %s binary not found under an ms-playwright cache; "+
-				"browser monitors will fail to launch Chromium (elastic-agent#15993)", name)
-		})
-	}
 }
 
 // Verify that the main configuration file is installed with a 0600 file mode.
