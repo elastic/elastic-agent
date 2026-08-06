@@ -44,7 +44,8 @@ mage -l
 mkdir -p /tmp/beats-build
 pushd /tmp/beats-build
 
-git clone --depth=1 git@github.com:elastic/beats.git
+BEATS_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-${BUILDKITE_BRANCH}}"
+git clone --depth=1 --branch "${BEATS_BRANCH}" git@github.com:elastic/beats.git
 popd
 
 # export WORKSPACE=beats/x-pack/metricbeat
