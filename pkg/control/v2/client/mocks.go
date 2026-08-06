@@ -695,14 +695,14 @@ func (_c *MockClient_StateWatch_Call) RunAndReturn(run func(ctx context.Context,
 }
 
 // Upgrade provides a mock function for the type MockClient
-func (_mock *MockClient) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error) {
+func (_mock *MockClient) Upgrade(ctx context.Context, version string, rollback bool, sources []string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error) {
 	// string
 	_va := make([]any, len(pgpBytes))
 	for _i := range pgpBytes {
 		_va[_i] = pgpBytes[_i]
 	}
 	var _ca []any
-	_ca = append(_ca, ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp)
+	_ca = append(_ca, ctx, version, rollback, sources, skipVerify, skipDefaultPgp)
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -712,16 +712,16 @@ func (_mock *MockClient) Upgrade(ctx context.Context, version string, rollback b
 
 	var r0 string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, string, bool, bool, ...string) (string, error)); ok {
-		return returnFunc(ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp, pgpBytes...)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, []string, bool, bool, ...string) (string, error)); ok {
+		return returnFunc(ctx, version, rollback, sources, skipVerify, skipDefaultPgp, pgpBytes...)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, string, bool, bool, ...string) string); ok {
-		r0 = returnFunc(ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp, pgpBytes...)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, []string, bool, bool, ...string) string); ok {
+		r0 = returnFunc(ctx, version, rollback, sources, skipVerify, skipDefaultPgp, pgpBytes...)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, string, bool, bool, ...string) error); ok {
-		r1 = returnFunc(ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp, pgpBytes...)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, []string, bool, bool, ...string) error); ok {
+		r1 = returnFunc(ctx, version, rollback, sources, skipVerify, skipDefaultPgp, pgpBytes...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -737,16 +737,16 @@ type MockClient_Upgrade_Call struct {
 //   - ctx context.Context
 //   - version string
 //   - rollback bool
-//   - sourceURI string
+//   - sources []string
 //   - skipVerify bool
 //   - skipDefaultPgp bool
 //   - pgpBytes ...string
-func (_e *MockClient_Expecter) Upgrade(ctx any, version any, rollback any, sourceURI any, skipVerify any, skipDefaultPgp any, pgpBytes ...any) *MockClient_Upgrade_Call {
+func (_e *MockClient_Expecter) Upgrade(ctx any, version any, rollback any, sources any, skipVerify any, skipDefaultPgp any, pgpBytes ...any) *MockClient_Upgrade_Call {
 	return &MockClient_Upgrade_Call{Call: _e.mock.On("Upgrade",
-		append([]any{ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp}, pgpBytes...)...)}
+		append([]any{ctx, version, rollback, sources, skipVerify, skipDefaultPgp}, pgpBytes...)...)}
 }
 
-func (_c *MockClient_Upgrade_Call) Run(run func(ctx context.Context, version string, rollback bool, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string)) *MockClient_Upgrade_Call {
+func (_c *MockClient_Upgrade_Call) Run(run func(ctx context.Context, version string, rollback bool, sources []string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string)) *MockClient_Upgrade_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -760,9 +760,9 @@ func (_c *MockClient_Upgrade_Call) Run(run func(ctx context.Context, version str
 		if args[2] != nil {
 			arg2 = args[2].(bool)
 		}
-		var arg3 string
+		var arg3 []string
 		if args[3] != nil {
-			arg3 = args[3].(string)
+			arg3 = args[3].([]string)
 		}
 		var arg4 bool
 		if args[4] != nil {
@@ -798,7 +798,7 @@ func (_c *MockClient_Upgrade_Call) Return(s string, err error) *MockClient_Upgra
 	return _c
 }
 
-func (_c *MockClient_Upgrade_Call) RunAndReturn(run func(ctx context.Context, version string, rollback bool, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error)) *MockClient_Upgrade_Call {
+func (_c *MockClient_Upgrade_Call) RunAndReturn(run func(ctx context.Context, version string, rollback bool, sources []string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error)) *MockClient_Upgrade_Call {
 	_c.Call.Return(run)
 	return _c
 }
