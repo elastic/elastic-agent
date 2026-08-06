@@ -98,11 +98,14 @@ func (runner *AuditDRunner) SetupSuite() {
 
 }
 
-// validateAuditdEvents waits for an auditd execve event from the elastic-agent
-// binary, tagged with "elastic-agent-test" (the -k key on the test's audit
-// rules), to appear in ES from the given agent since the given time. Filtering
-// by both the tag and process.name ensures both runtime modes compare events
-// from the same binary, which has a consistent kernel audit session state.
+// validateAuditdEvents waits for an auditd execve event for the elastic-agent
+// binary to appear in ES from the given agent since the given time. The
+// elastic-agent binary is exec'd on every ExecStatus call, so calling
+// ExecStatus inside the retry loop guarantees events are generated even if
+// audit rules became active after the health-check loop exited. Filtering by
+// process.name ensures we compare apples to apples: both OTel and process mode
+// will see events from the same binary, which always runs inside the test's
+// SSH login session (auid set, kernel audit session populated).
 func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) mapstr.M {
 	now := time.Now()
 	var query map[string]any
@@ -120,11 +123,6 @@ func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Conte
 		}
 	}()
 
-	// Filter to execve events from the elastic-agent binary only. The audit
-	// rules track all execve syscalls system-wide, so without this filter the
-	// query may return events from arbitrary processes (cron, systemd, etc.)
-	// that have a different kernel audit session state than elastic-agent,
-	// causing spurious key-set differences between the two runtime modes.
 	requiredFields := [][]string{
 		{"term", "tags", "elastic-agent-test"},
 		{"term", "process.name", "elastic-agent"},
@@ -132,6 +130,10 @@ func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Conte
 
 	t.Logf("starting to query ES for auditd events at %s", now.Format(time.RFC3339Nano))
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		// Exec elastic-agent on every retry tick to keep generating tagged audit events.
+		// This covers the window between audit rules becoming active and the first ES hit.
+		_, _ = runner.agentFixture.ExecStatus(ctx)
+
 		query = genESQuery(agentID, requiredFields)
 		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
 			"range": map[string]any{
