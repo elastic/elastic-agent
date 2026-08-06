@@ -92,13 +92,36 @@ capabilities:
 
 	caps, err := Load(strings.NewReader(yml), logger.NewWithoutConfig("testing"))
 	require.NoError(t, err, "Loading capabilities should succeed")
-	assert.True(t, caps.AllowUpgrade("8.8.0", ""))
-	assert.True(t, caps.AllowUpgrade("8.8.1", ""))
-	assert.True(t, caps.AllowUpgrade("8.9.2", ""))
-	assert.False(t, caps.AllowUpgrade("8.9.1", ""))
-	assert.False(t, caps.AllowUpgrade("8.7.0", ""))
-	assert.False(t, caps.AllowUpgrade("8.10.0", ""))
+	assert.True(t, caps.AllowUpgrade("8.8.0", nil))
+	assert.True(t, caps.AllowUpgrade("8.8.1", nil))
+	assert.True(t, caps.AllowUpgrade("8.9.2", nil))
+	assert.False(t, caps.AllowUpgrade("8.9.1", nil))
+	assert.False(t, caps.AllowUpgrade("8.7.0", nil))
+	assert.False(t, caps.AllowUpgrade("8.10.0", nil))
 
+}
+
+func TestUpgradeSources(t *testing.T) {
+	// Allow upgrades only from sources starting with "https://good"
+	yml := `
+capabilities:
+- upgrade: "startsWith(${sourceURI}, 'https://good')"
+  rule: allow
+- upgrade:
+  rule: deny
+`
+	caps, err := Load(strings.NewReader(yml), logger.NewWithoutConfig("testing"))
+	require.NoError(t, err, "Loading capabilities should succeed")
+
+	assert.Equal(t, []string{"https://good1.abc.com", "https://good2.abc.com"}, caps.FilterUpgradeSources("8.8.0", []string{"https://good1.abc.com", "https://bad.abc.com", "https://good2.abc.com"}))
+	assert.Empty(t, caps.FilterUpgradeSources("8.8.0", []string{"https://bad1.abc.com", "https://bad2.abc.com"}))
+	assert.Empty(t, caps.FilterUpgradeSources("8.8.0", nil))
+
+	assert.True(t, caps.AllowUpgrade("8.8.0", []string{"https://good.abc.com"}))
+	assert.True(t, caps.AllowUpgrade("8.8.0", []string{"https://bad.abc.com", "https://good.abc.com"}),
+		"AllowUpgrade should allow if any one of the sources is allowed")
+	assert.False(t, caps.AllowUpgrade("8.8.0", []string{"https://bad.abc.com"}))
+	assert.False(t, caps.AllowUpgrade("8.8.0", []string{"https://bad1.abc.com", "https://bad2.abc.com"}))
 }
 
 func TestNoCaps(t *testing.T) {
