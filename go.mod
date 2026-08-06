@@ -35,8 +35,8 @@ require (
 	github.com/gofrs/flock v0.13.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/google/go-cmp v0.7.0
-	github.com/google/go-containerregistry v0.21.7
-	github.com/google/pprof v0.0.0-20260604005048-7023385849c0
+	github.com/google/go-containerregistry v0.21.9
+	github.com/google/pprof v0.0.0-20260802141513-ef3492d7dac3
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.24.0
 	github.com/jedib0t/go-pretty/v6 v6.8.2
@@ -44,7 +44,7 @@ require (
 	github.com/kardianos/service v1.2.4
 	github.com/knadh/koanf/maps v0.1.2
 	github.com/magefile/mage v1.17.2
-	github.com/moby/moby/client v0.4.1
+	github.com/moby/moby/client v0.5.1
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.156.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.156.0
@@ -222,7 +222,7 @@ require (
 	github.com/jcmturner/goidentity/v6 v6.0.1 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
-	github.com/klauspost/compress v1.18.7 // indirect
+	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/parsers/yaml v1.1.0 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
