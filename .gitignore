@@ -62,5 +62,11 @@ fleet.yml.old
 pkg/component/fake/component/component
 pkg/core/process/testsignal/testsignal
 internal/pkg/agent/install/testblocking/testblocking
+<<<<<<< HEAD
 internal/pkg/otel/manager/testing/testing
 pkg/core/process/testsignal/testsignal
+=======
+internal/edot/testing/testing
+pkg/core/process/testsignal/testsignal
+.claude/settings.local.json
+>>>>>>> 1eb983741 (bump github.com/kardianos/service v1.2.4 -> v1.3.0 and fix systemd template (#15976))

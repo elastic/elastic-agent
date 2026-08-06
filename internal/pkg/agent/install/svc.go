@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/kardianos/service"
 
@@ -56,9 +57,6 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 	}
 
 	option := map[string]interface{}{
-		// GroupName
-		"GroupName": opts.Group,
-
 		// Linux (systemd) always restart on failure
 		"Restart": "always",
 
@@ -82,111 +80,213 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 	}
 
 	if runtime.GOOS == "linux" {
-		// The github.com/kardianos/service library doesn't support KillMode in their prebuilt template.
-		// This option allows to pass our own template for the systemd unit configuration, which is a copy
-		// of the prebuilt template with added KillMode option
-		cfg.Option["SystemdScript"] = linuxSystemdScript
-
-		// By setting KillMode=process in Elastic Agent's systemd unit configuration file, we ensure
-		// that in a scenario where the upgraded Agent's process is repeatedly crashing, systemd keeps
-		// the Upgrade Watcher process running so it can monitor the Agent process for long enough to
-		// initiate a rollback.
-		// See also https://github.com/elastic/elastic-agent/pull/3220#issuecomment-1673935694.
-		cfg.Option["KillMode"] = "process"
+		// kardianos/service v1.3.0 switched to a mini template engine that does not expose
+		// Config.Option in the template data map, so KillMode and GroupName must be injected
+		// as literals before the template is handed to the library.
+		// KillMode=process ensures the Upgrade Watcher process survives an Agent crash loop
+		// long enough to initiate a rollback.
+		// See https://github.com/elastic/elastic-agent/pull/3220#issuecomment-1673935694.
+		groupLine := ""
+		if opts.Group != "" {
+			groupLine = "Group=" + opts.Group + "\n"
+		}
+		cfg.Option["SystemdScript"] = strings.ReplaceAll(linuxSystemdScript, "@GROUP_LINE@", groupLine)
 	}
 
 	if runtime.GOOS == "darwin" {
-		// The github.com/kardianos/service library doesn't support ExitTimeOut in their prebuilt template.
-		// This option allows to pass our own template for the launch daemon plist, which is a copy
-		// of the prebuilt template with added ExitTimeOut option
-		cfg.Option["LaunchdConfig"] = darwinLaunchdConfig
-		cfg.Option["ExitTimeOut"] = darwinServiceExitTimeout
+		// kardianos/service v1.3.0 switched to a mini template engine that does not expose
+		// Config.Option in the template data map, so ExitTimeOut and GroupName must be injected
+		// as literals before the template is handed to the library.
+		// ExitTimeOut prevents launchd from force-killing the agent before it can shut down.
+		exitTimeoutEntry := fmt.Sprintf("<key>ExitTimeOut</key>\n    <integer>%d</integer>", darwinServiceExitTimeout)
+		groupNameEntry := ""
+		if opts.Group != "" {
+			groupNameEntry = "<key>GroupName</key>\n    <string>" + opts.Group + "</string>"
+		}
+		launchdCfg := strings.ReplaceAll(darwinLaunchdConfig, "@EXIT_TIMEOUT_ENTRY@", exitTimeoutEntry)
+		launchdCfg = strings.ReplaceAll(launchdCfg, "@GROUP_NAME_ENTRY@", groupNameEntry)
+		cfg.Option["LaunchdConfig"] = launchdCfg
 
-		// Set the stdout and stderr logs to be inside the installation directory, ensures that the
-		// executing user for the service can write to the directory for the logs.
-		cfg.Option["StandardOutPath"] = filepath.Join(topPath, fmt.Sprintf("%s.out.log", paths.ServiceName()))
-		cfg.Option["StandardErrorPath"] = filepath.Join(topPath, fmt.Sprintf("%s.err.log", paths.ServiceName()))
+		// LogDirectory is used by v1.3.0 to compute StandardOutPath/StandardErrorPath from
+		// <LogDirectory>/<Name>.out.log and <LogDirectory>/<Name>.err.log. Setting it to
+		// topPath ensures log files land inside the installation directory where the service
+		// user has write access.
+		cfg.Option["LogDirectory"] = topPath
 	}
 
 	return service.New(nil, cfg)
 }
 
+<<<<<<< HEAD
 // A copy of the launchd plist template from github.com/kardianos/service
 // with added .Config.Option.ExitTimeOut option
+=======
+func changeSystemdServiceFile(serviceName string, serviceFilePath string, username string, groupName string) error {
+	svcCfg, err := ini.Load(serviceFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read service file %s: %w", serviceFilePath, err)
+	}
+
+	ini.PrettyFormat = false
+	serviceSection := svcCfg.Section("Service")
+	if username != "" {
+		if serviceSection.HasKey(SystemdUserNameKey) {
+			serviceSection.Key(SystemdUserNameKey).SetValue(username)
+		} else {
+			_, err := serviceSection.NewKey(SystemdUserNameKey, username)
+			if err != nil {
+				return fmt.Errorf("failed to update username: %w", err)
+			}
+		}
+	} else if serviceSection.HasKey(SystemdUserNameKey) {
+		serviceSection.DeleteKey(SystemdUserNameKey)
+	}
+
+	if groupName != "" {
+		if serviceSection.HasKey(SystemdGroupNameKey) {
+			serviceSection.Key(SystemdGroupNameKey).SetValue(groupName)
+		} else {
+			_, err := serviceSection.NewKey(SystemdGroupNameKey, groupName)
+			if err != nil {
+				return fmt.Errorf("failed to update groupName: %w", err)
+			}
+		}
+	} else if serviceSection.HasKey(SystemdGroupNameKey) {
+		serviceSection.DeleteKey(SystemdGroupNameKey)
+	}
+
+	fileWriter, err := os.OpenFile(serviceFilePath, os.O_RDWR|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to access service file for write at %q: %w", serviceFilePath, err)
+	}
+	defer func() { _ = fileWriter.Close() }()
+
+	if _, err := svcCfg.WriteTo(fileWriter); err != nil {
+		return fmt.Errorf("failed to write service file %s: %w", serviceFilePath, err)
+	}
+
+	return nil
+}
+
+func changeLaunchdServiceFile(serviceName string, plistPath string, username string, groupName string) error {
+
+	// Read the existing plist file
+	content, err := os.ReadFile(plistPath)
+	if err != nil {
+		return fmt.Errorf("failed to read plist file %s: %w", plistPath, err)
+	}
+
+	// parser implementation
+	dec := plist.NewDecoder(bytes.NewReader(content))
+	plistMap := make(map[string]interface{})
+
+	err = dec.Decode(&plistMap)
+	if err != nil {
+		return fmt.Errorf("failed to decode service file: %w", err)
+	}
+
+	if username != "" {
+		plistMap[LaunchdUserNameKey] = username
+	} else {
+		delete(plistMap, LaunchdUserNameKey)
+	}
+
+	if groupName != "" {
+		plistMap[LaunchdGroupNameKey] = groupName
+	} else {
+		delete(plistMap, LaunchdGroupNameKey)
+	}
+
+	fileWriter, err := os.OpenFile(plistPath, os.O_RDWR|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to access service file for write at %q: %w", plistPath, err)
+	}
+	defer func() {
+		_ = fileWriter.Sync()
+		_ = fileWriter.Close()
+	}()
+
+	enc := plist.NewEncoder(fileWriter)
+	if err := enc.Encode(plistMap); err != nil {
+		return fmt.Errorf("failed to encode service file: %w", err)
+	}
+
+	return nil
+}
+
+// A copy of the launchd plist template from github.com/kardianos/service using the
+// v1.3.0 mini template engine syntax, with @EXIT_TIMEOUT_ENTRY@ and @GROUP_NAME_ENTRY@
+// placeholders that newService() replaces with literal plist entries (or empty strings).
+// kardianos/service v1.3.0 no longer exposes Config.Option in the template data map,
+// so ExitTimeOut and GroupName cannot be referenced as template variables.
+>>>>>>> 1eb983741 (bump github.com/kardianos/service v1.2.4 -> v1.3.0 and fix systemd template (#15976))
 const darwinLaunchdConfig = `<?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
 "http://www.apple.com/DTDs/PropertyList-1.0.dtd" >
 <plist version='1.0'>
   <dict>
     <key>Label</key>
-    <string>{{html .Name}}</string>
+    <string>{{Name | html}}</string>
     <key>ProgramArguments</key>
     <array>
-      <string>{{html .Path}}</string>
-    {{range .Config.Arguments}}
-      <string>{{html .}}</string>
+      <string>{{Path | html}}</string>
+    {{range Arguments}}
+      <string>{{. | html}}</string>
     {{end}}
     </array>
-    {{if .UserName}}<key>UserName</key>
-    <string>{{html .UserName}}</string>{{end}}
-	{{if .Config.Option.GroupName -}}
-	<key>GroupName</key>
-    <string>{{html .Config.Option.GroupName}}</string>
-	{{- end}}
-    {{if .ChRoot}}<key>RootDirectory</key>
-    <string>{{html .ChRoot}}</string>{{end}}
-    {{if .Config.Option.ExitTimeOut}}<key>ExitTimeOut</key>
-    <integer>{{html .Config.Option.ExitTimeOut}}</integer>{{end}}
-    {{if .WorkingDirectory}}<key>WorkingDirectory</key>
-    <string>{{html .WorkingDirectory}}</string>{{end}}
+    {{if UserName}}<key>UserName</key>
+    <string>{{UserName | html}}</string>{{end}}
+    @GROUP_NAME_ENTRY@
+    {{if ChRoot}}<key>RootDirectory</key>
+    <string>{{ChRoot | html}}</string>{{end}}
+    @EXIT_TIMEOUT_ENTRY@
+    {{if WorkingDirectory}}<key>WorkingDirectory</key>
+    <string>{{WorkingDirectory | html}}</string>{{end}}
     <key>SessionCreate</key>
-    <{{bool .SessionCreate}}/>
+    <{{SessionCreate}}/>
     <key>KeepAlive</key>
-    <{{bool .KeepAlive}}/>
+    <{{KeepAlive}}/>
     <key>RunAtLoad</key>
-    <{{bool .RunAtLoad}}/>
+    <{{RunAtLoad}}/>
     <key>Disabled</key>
     <false/>
 
     <key>StandardOutPath</key>
-    <string>{{html .Config.Option.StandardOutPath}}</string>
+    <string>{{StandardOutPath | html}}</string>
     <key>StandardErrorPath</key>
-    <string>{{html .Config.Option.StandardErrorPath}}</string>
+    <string>{{StandardErrorPath | html}}</string>
 
   </dict>
 </plist>
 `
 
-// A copy of the systemd config template from github.com/kardianos/service
-// with added .Config.Option.KillMode option
+// A copy of the systemd config template from github.com/kardianos/service using the
+// v1.3.0 mini template engine syntax, with hardcoded KillMode=process and an @GROUP_LINE@
+// placeholder that newService() replaces with a literal "Group=<name>\n" or "".
+// kardianos/service v1.3.0 no longer exposes Config.Option in the template data map,
+// so KillMode and GroupName cannot be referenced as template variables.
 const linuxSystemdScript = `[Unit]
-Description={{.Description}}
-ConditionFileIsExecutable={{.Path|cmdEscape}}
-{{range $i, $dep := .Dependencies}}
-{{$dep}} {{end}}
-
+Description={{Description}}
+ConditionFileIsExecutable={{Path | cmdEscape}}
+{{range Dependencies}}{{.}}
+{{end}}
 [Service]
 StartLimitInterval=5
 StartLimitBurst=10
-ExecStart={{.Path|cmdEscape}}{{range .Arguments}} {{.|cmd}}{{end}}
-{{if .ChRoot}}RootDirectory={{.ChRoot|cmd}}{{end}}
-{{if .WorkingDirectory}}WorkingDirectory={{.WorkingDirectory|cmdEscape}}{{end}}
-{{if .UserName}}User={{.UserName}}{{end}}
-{{if .Config.Option.GroupName -}}
-Group={{.Config.Option.GroupName}}
-{{- end}}
-{{if .ReloadSignal}}ExecReload=/bin/kill -{{.ReloadSignal}} "$MAINPID"{{end}}
-{{if .PIDFile}}PIDFile={{.PIDFile|cmd}}{{end}}
-{{if and .LogOutput .HasOutputFileSupport -}}
-StandardOutput=file:/var/log/{{.Name}}.out
-StandardError=file:/var/log/{{.Name}}.err
-{{- end}}
-{{if gt .LimitNOFILE -1 }}LimitNOFILE={{.LimitNOFILE}}{{end}}
-{{if .Restart}}Restart={{.Restart}}{{end}}
-{{if .SuccessExitStatus}}SuccessExitStatus={{.SuccessExitStatus}}{{end}}
-{{if .Config.Option.KillMode}}KillMode={{.Config.Option.KillMode}}{{end}}
+ExecStart={{Path | cmdEscape}}{{range Arguments}} {{. | cmd}}{{end}}
+{{if ChRoot}}RootDirectory={{ChRoot | cmd}}
+{{end}}{{if WorkingDirectory}}WorkingDirectory={{WorkingDirectory | cmdEscape}}
+{{end}}{{if UserName}}User={{UserName}}
+{{end}}@GROUP_LINE@{{if ReloadSignal}}ExecReload=/bin/kill -{{ReloadSignal}} "$MAINPID"
+{{end}}{{if PIDFile}}PIDFile={{PIDFile | cmd}}
+{{end}}{{if OutputFileSupport}}StandardOutput=file:{{LogDirectory}}/{{Name}}.out
+StandardError=file:{{LogDirectory}}/{{Name}}.err
+{{end}}{{if LimitNOFILE}}LimitNOFILE={{LimitNOFILE}}
+{{end}}{{if Restart}}Restart={{Restart}}
+{{end}}{{if SuccessExitStatus}}SuccessExitStatus={{SuccessExitStatus}}
+{{end}}KillMode=process
 RestartSec=120
-EnvironmentFile=-/etc/sysconfig/{{.Name}}
+EnvironmentFile=-/etc/sysconfig/{{Name}}
 
 [Install]
 WantedBy=multi-user.target
