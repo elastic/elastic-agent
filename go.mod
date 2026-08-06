@@ -42,12 +42,12 @@ require (
 	github.com/josephspurrier/goversioninfo v1.7.0
 	github.com/kardianos/service v1.2.4
 	github.com/knadh/koanf/maps v0.1.2
-	github.com/magefile/mage v1.15.0
-	github.com/moby/moby/client v0.5.1
+	github.com/magefile/mage v1.17.2
+	github.com/moby/moby/client v0.4.1
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.156.0
 	github.com/otiai10/copy v1.14.1
-	github.com/rednafi/link-patrol v0.0.0-20260330172412-4756d3323a08
+	github.com/rednafi/link-patrol v0.0.0-20260803155324-a551bb9894fc
 	github.com/rs/zerolog v1.35.1
 	github.com/sajari/regression v1.0.1
 	github.com/schollz/progressbar/v3 v3.19.1
@@ -261,7 +261,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/urfave/cli/v2 v2.27.7 // indirect
-	github.com/vektra/mockery/v3 v3.7.1 // indirect
+	github.com/vektra/mockery/v3 v3.7.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
@@ -269,7 +269,7 @@ require (
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	github.com/yuin/goldmark v1.8.2 // indirect
+	github.com/yuin/goldmark v1.8.5 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.6 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.12 // indirect
