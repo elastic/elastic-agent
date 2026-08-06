@@ -98,11 +98,11 @@ func (runner *AuditDRunner) SetupSuite() {
 
 }
 
-// validateAuditdEvents waits for an auditd execve event tagged with
-// "elastic-agent-test" (the -k key on the test's audit rules) to appear in ES
-// from the given agent since the given time. The auditbeat module maps rule
-// keys to the top-level tags field. Using execve events from a known tag
-// ensures both runtime modes see documents with the same predictable field set.
+// validateAuditdEvents waits for an auditd execve event from the elastic-agent
+// binary, tagged with "elastic-agent-test" (the -k key on the test's audit
+// rules), to appear in ES from the given agent since the given time. Filtering
+// by both the tag and process.name ensures both runtime modes compare events
+// from the same binary, which has a consistent kernel audit session state.
 func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) mapstr.M {
 	now := time.Now()
 	var query map[string]any
@@ -120,8 +120,14 @@ func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Conte
 		}
 	}()
 
+	// Filter to execve events from the elastic-agent binary only. The audit
+	// rules track all execve syscalls system-wide, so without this filter the
+	// query may return events from arbitrary processes (cron, systemd, etc.)
+	// that have a different kernel audit session state than elastic-agent,
+	// causing spurious key-set differences between the two runtime modes.
 	requiredFields := [][]string{
 		{"term", "tags", "elastic-agent-test"},
+		{"term", "process.name", "elastic-agent"},
 	}
 
 	t.Logf("starting to query ES for auditd events at %s", now.Format(time.RFC3339Nano))
