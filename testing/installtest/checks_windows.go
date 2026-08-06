@@ -96,12 +96,15 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		if !hasSID(sids, gidSID) {
 			return fmt.Errorf("path %s should have ACE for %s group", topPath, group)
 		}
-		// administrators should have access as well
+		// administrators and SYSTEM should have access as well
 		if !hasWellKnownSID(sids, windows.WinBuiltinAdministratorsSid) {
 			return fmt.Errorf("path %s should have ACE for Administrators", topPath)
 		}
-		// that is 4 unique SID's, it should not have anymore
-		if len(sids) > 4 {
+		if !hasWellKnownSID(sids, windows.WinLocalSystemSid) {
+			return fmt.Errorf("path %s should have ACE for SYSTEM", topPath)
+		}
+		// that is 5 unique SID's: elastic-agent-user, elastic-agent group, Administrators, SYSTEM, Interactive
+		if len(sids) > 5 {
 			return fmt.Errorf("DACL has more than allowed ACE for %s (unprivileged): %v", topPath, sids)
 		}
 	} else {
