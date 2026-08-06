@@ -180,6 +180,10 @@ require (
 	go.opentelemetry.io/collector/config/confighttp v0.157.0 // indirect
 	go.opentelemetry.io/collector/internal/componentalias v0.157.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper v0.157.0 // indirect
+	go.opentelemetry.io/contrib/propagators/autoprop v0.69.0 // indirect
+	go.opentelemetry.io/contrib/propagators/aws v1.44.0 // indirect
+	go.opentelemetry.io/contrib/propagators/jaeger v1.44.0 // indirect
+	go.opentelemetry.io/contrib/propagators/ot v1.44.0 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.4 // indirect
 	mvdan.cc/garble v0.12.1 // indirect
@@ -803,15 +807,6 @@ replace (
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
 	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
 	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
-)
-
-// Use a fork of the OTel Collector otelcol and service modules that adds partial
-// receiver reload on config change (feature gates service.partialReload and
-// service.partialReloadReceivers). Fork: https://github.com/elastic/opentelemetry-collector
-// commit 86a6a75a9057 on branch v01550/partial-reload on top of v0.155.0.
-replace (
-	go.opentelemetry.io/collector/otelcol => github.com/elastic/opentelemetry-collector/otelcol v0.0.0-20260709135846-86a6a75a9057
-	go.opentelemetry.io/collector/service => github.com/elastic/opentelemetry-collector/service v0.0.0-20260709135846-86a6a75a9057
 )
 
 // Replace statements carried forward from Beats https://github.com/elastic/beats/blob/0678f4d96212ac968fc90596e60475ed2f3979e1/go.mod#L503
