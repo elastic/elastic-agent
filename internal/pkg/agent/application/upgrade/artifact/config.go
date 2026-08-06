@@ -24,8 +24,8 @@ const (
 // httpcommon.HTTPTransportSettings so we can handle the  HTTPTransportSettings
 // config separately during *Config.Unpack
 type configWithoutHTTPTransportSettings struct {
-	// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
-	SourceURI string `json:"sourceURI" config:"sourceURI"`
+	// Sources: an ordered list of source URIs for retrieving upgrade artifacts
+	Sources []string `json:"sources" config:"sources"`
 
 	// TargetDirectory: path to the directory containing downloaded packages
 	TargetDirectory string `json:"targetDirectory" config:"target_directory"`
@@ -48,8 +48,8 @@ type configWithoutHTTPTransportSettings struct {
 
 // Config is a configuration used for verifier and downloader
 type Config struct {
-	// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
-	SourceURI string `json:"sourceURI" config:"sourceURI"`
+	// Sources: an ordered list of source URIs for retrieving upgrade artifacts
+	Sources []string `json:"sources" config:"sources"`
 
 	// TargetDirectory: path to the directory containing downloaded packages
 	TargetDirectory string `json:"targetDirectory" config:"target_directory"`
@@ -81,7 +81,7 @@ func DefaultConfig() *Config {
 	transport.Timeout = 120 * time.Minute
 
 	return &Config{
-		SourceURI:              DefaultSourceURI,
+		Sources:                []string{DefaultSourceURI},
 		TargetDirectory:        paths.Downloads(),
 		InstallPath:            paths.Install(),
 		RetrySleepInitDuration: 30 * time.Second,
@@ -119,6 +119,17 @@ func (c *Config) Unpack(cfg *c.C) error {
 
 	if err := cfg.Unpack(&tmp); err != nil {
 		return err
+	}
+
+	if !cfg.HasField("sources") && cfg.HasField("sourceURI") {
+		// Older configs may still have a deprecated sourceURI.
+		sourceURI, err := cfg.String("sourceURI", -1)
+		if err != nil {
+			return err
+		}
+		if sourceURI != "" {
+			tmp.Sources = []string{sourceURI}
+		}
 	}
 
 	// A non-positive RetrySleepInitDuration would be passed straight to
