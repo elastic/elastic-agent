@@ -117,109 +117,11 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 	return service.New(nil, cfg)
 }
 
-<<<<<<< HEAD
-// A copy of the launchd plist template from github.com/kardianos/service
-// with added .Config.Option.ExitTimeOut option
-=======
-func changeSystemdServiceFile(serviceName string, serviceFilePath string, username string, groupName string) error {
-	svcCfg, err := ini.Load(serviceFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to read service file %s: %w", serviceFilePath, err)
-	}
-
-	ini.PrettyFormat = false
-	serviceSection := svcCfg.Section("Service")
-	if username != "" {
-		if serviceSection.HasKey(SystemdUserNameKey) {
-			serviceSection.Key(SystemdUserNameKey).SetValue(username)
-		} else {
-			_, err := serviceSection.NewKey(SystemdUserNameKey, username)
-			if err != nil {
-				return fmt.Errorf("failed to update username: %w", err)
-			}
-		}
-	} else if serviceSection.HasKey(SystemdUserNameKey) {
-		serviceSection.DeleteKey(SystemdUserNameKey)
-	}
-
-	if groupName != "" {
-		if serviceSection.HasKey(SystemdGroupNameKey) {
-			serviceSection.Key(SystemdGroupNameKey).SetValue(groupName)
-		} else {
-			_, err := serviceSection.NewKey(SystemdGroupNameKey, groupName)
-			if err != nil {
-				return fmt.Errorf("failed to update groupName: %w", err)
-			}
-		}
-	} else if serviceSection.HasKey(SystemdGroupNameKey) {
-		serviceSection.DeleteKey(SystemdGroupNameKey)
-	}
-
-	fileWriter, err := os.OpenFile(serviceFilePath, os.O_RDWR|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to access service file for write at %q: %w", serviceFilePath, err)
-	}
-	defer func() { _ = fileWriter.Close() }()
-
-	if _, err := svcCfg.WriteTo(fileWriter); err != nil {
-		return fmt.Errorf("failed to write service file %s: %w", serviceFilePath, err)
-	}
-
-	return nil
-}
-
-func changeLaunchdServiceFile(serviceName string, plistPath string, username string, groupName string) error {
-
-	// Read the existing plist file
-	content, err := os.ReadFile(plistPath)
-	if err != nil {
-		return fmt.Errorf("failed to read plist file %s: %w", plistPath, err)
-	}
-
-	// parser implementation
-	dec := plist.NewDecoder(bytes.NewReader(content))
-	plistMap := make(map[string]interface{})
-
-	err = dec.Decode(&plistMap)
-	if err != nil {
-		return fmt.Errorf("failed to decode service file: %w", err)
-	}
-
-	if username != "" {
-		plistMap[LaunchdUserNameKey] = username
-	} else {
-		delete(plistMap, LaunchdUserNameKey)
-	}
-
-	if groupName != "" {
-		plistMap[LaunchdGroupNameKey] = groupName
-	} else {
-		delete(plistMap, LaunchdGroupNameKey)
-	}
-
-	fileWriter, err := os.OpenFile(plistPath, os.O_RDWR|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to access service file for write at %q: %w", plistPath, err)
-	}
-	defer func() {
-		_ = fileWriter.Sync()
-		_ = fileWriter.Close()
-	}()
-
-	enc := plist.NewEncoder(fileWriter)
-	if err := enc.Encode(plistMap); err != nil {
-		return fmt.Errorf("failed to encode service file: %w", err)
-	}
-
-	return nil
-}
-
 // A copy of the launchd plist template from github.com/kardianos/service using the
 // v1.3.0 mini template engine syntax, with @EXIT_TIMEOUT_ENTRY@ and @GROUP_NAME_ENTRY@
 // placeholders that newService() replaces with literal plist entries (or empty strings).
 // kardianos/service v1.3.0 no longer exposes Config.Option in the template data map,
 // so ExitTimeOut and GroupName cannot be referenced as template variables.
->>>>>>> 1eb983741 (bump github.com/kardianos/service v1.2.4 -> v1.3.0 and fix systemd template (#15976))
 const darwinLaunchdConfig = `<?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
 "http://www.apple.com/DTDs/PropertyList-1.0.dtd" >
