@@ -8,6 +8,7 @@ package utils
 
 import (
 	"fmt"
+	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -132,6 +133,10 @@ func HasStrictExecPerms(path string) error {
 		}
 	}
 
+	// Keep sd alive through the loop so that dacl/ace/sid interior pointers
+	// remain valid even if a future x/sys version backs the SD with Windows-heap
+	// memory subject to a GC finalizer.
+	runtime.KeepAlive(sd)
 	return nil
 }
 
