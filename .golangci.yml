@@ -25,6 +25,12 @@ linters:
     - unused
     - wastedassign
   settings:
+    govet:
+      disable:
+        # The inline pass errors on generic stdlib calls (e.g. maps.Clone) that use
+        # type parameter inference, instead of skipping gracefully. This is a known
+        # x/tools bug tracked in https://github.com/golang/go/issues/68236.
+        - inline
     depguard:
       rules:
         main:
