@@ -25,6 +25,21 @@ updates:
       - dependency-name: "k8s.io/*"
       - dependency-name: "sigs.k8s.io/*"
     groups:
+<<<<<<< HEAD
+=======
+      # k8s-ecosystem must come before the elastic group: Dependabot assigns a dependency to
+      # the first matching group, and elastic/cloud-on-k8s would otherwise match the elastic
+      # group's wildcard pattern first.
+      k8s-ecosystem:
+        patterns:
+          # k8s core libraries
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
+          # Direct dependencies whose own go.mod requires k8s.io/* and must be bumped
+          # in lockstep when k8s has a breaking API change
+          - "helm.sh/helm/*"
+          - "github.com/elastic/cloud-on-k8s/*"
+>>>>>>> 893784d73 (refactor: use `beats/pkg/autodiscover` instead of `elastic-agent-autodiscover` (#15767))
       elastic:
         patterns:
           # github.com/elastic/* and go.elastic.co/* cover all Elastic and APM Go packages
