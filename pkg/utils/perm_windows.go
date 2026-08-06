@@ -128,8 +128,7 @@ func HasStrictExecPerms(path string) error {
 		}
 
 		if ace.Mask&writeMask != 0 {
-			sidStr, _ := sid.String()
-			return fmt.Errorf("non-privileged SID %s has write access to %s", sidStr, path)
+			return fmt.Errorf("non-privileged SID %s has write access to %s", sid.String(), path)
 		}
 	}
 
