@@ -15,7 +15,7 @@ const (
 	// AdministratorSID is the SID for the Administrator user.
 	AdministratorSID = "S-1-5-32-544"
 	// SystemSID is the SID for the SYSTEM user.
-	SystemSID = "S-1-5-32-544"
+	SystemSID = "S-1-5-18"
 	// EveryoneSID is the SID for Everyone.
 	EveryoneSID = "S-1-1-0"
 	// InteractiveSID is the SID for Interactive users.
