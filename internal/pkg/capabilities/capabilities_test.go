@@ -92,12 +92,12 @@ capabilities:
 
 	caps, err := Load(strings.NewReader(yml), logger.NewWithoutConfig("testing"))
 	require.NoError(t, err, "Loading capabilities should succeed")
-	assert.True(t, caps.AllowUpgrade("8.8.0", ""))
-	assert.True(t, caps.AllowUpgrade("8.8.1", ""))
-	assert.True(t, caps.AllowUpgrade("8.9.2", ""))
-	assert.False(t, caps.AllowUpgrade("8.9.1", ""))
-	assert.False(t, caps.AllowUpgrade("8.7.0", ""))
-	assert.False(t, caps.AllowUpgrade("8.10.0", ""))
+	assert.True(t, caps.AllowUpgrade("8.8.0", nil))
+	assert.True(t, caps.AllowUpgrade("8.8.1", nil))
+	assert.True(t, caps.AllowUpgrade("8.9.2", nil))
+	assert.False(t, caps.AllowUpgrade("8.9.1", nil))
+	assert.False(t, caps.AllowUpgrade("8.7.0", nil))
+	assert.False(t, caps.AllowUpgrade("8.10.0", nil))
 
 }
 

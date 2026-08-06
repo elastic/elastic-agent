@@ -85,7 +85,7 @@ func mapRawMessageVal(m map[string]interface{}, key string) json.RawMessage {
 
 func TestActionsUnmarshalJSON(t *testing.T) {
 	t.Run("ActionUpgrade no start time", func(t *testing.T) {
-		p := []byte(`[{"id":"testid","type":"UPGRADE","data":{"version":"1.2.3","source_uri":"http://example.com"}}]`)
+		p := []byte(`[{"id":"testid","type":"UPGRADE","data":{"version":"1.2.3","sources":["http://example.com"]}}]`)
 		a := &Actions{}
 		err := a.UnmarshalJSON(p)
 		require.Nil(t, err)
@@ -96,11 +96,31 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		assert.Empty(t, action.ActionStartTime)
 		assert.Empty(t, action.ActionExpiration)
 		assert.Equal(t, "1.2.3", action.Data.Version)
-		assert.Equal(t, "http://example.com", action.Data.SourceURI)
+		assert.Equal(t, []string{"http://example.com"}, action.Data.Sources)
 		assert.Equal(t, 0, action.Data.Retry)
 	})
+	t.Run("ActionUpgrade converts legacy source URI", func(t *testing.T) {
+		p := []byte(`[{"id":"testid","type":"UPGRADE","data":{"version":"1.2.3","source_uri":"https://example.com"}}]`)
+		a := &Actions{}
+		err := a.UnmarshalJSON(p)
+		require.NoError(t, err)
+		action, ok := (*a)[0].(*ActionUpgrade)
+		require.True(t, ok, "unable to cast action to specific type")
+
+		assert.Equal(t, []string{"https://example.com"}, action.Data.Sources)
+	})
+	t.Run("ActionUpgrade sources take precedence over legacy source URI", func(t *testing.T) {
+		p := []byte(`[{"id":"testid","type":"UPGRADE","data":{"version":"1.2.3","sources":["https://primary.example.com"],"source_uri":"https://legacy.example.com"}}]`)
+		a := &Actions{}
+		err := a.UnmarshalJSON(p)
+		require.NoError(t, err)
+		action, ok := (*a)[0].(*ActionUpgrade)
+		require.True(t, ok, "unable to cast action to specific type")
+
+		assert.Equal(t, []string{"https://primary.example.com"}, action.Data.Sources)
+	})
 	t.Run("ActionUpgrade with start time", func(t *testing.T) {
-		p := []byte(`[{"id":"testid","type":"UPGRADE","start_time":"2022-01-02T12:00:00Z","expiration":"2022-01-02T13:00:00Z","data":{"version":"1.2.3","source_uri":"http://example.com"}}]`)
+		p := []byte(`[{"id":"testid","type":"UPGRADE","start_time":"2022-01-02T12:00:00Z","expiration":"2022-01-02T13:00:00Z","data":{"version":"1.2.3","sources":["http://example.com"]}}]`)
 		a := &Actions{}
 		err := a.UnmarshalJSON(p)
 		require.Nil(t, err)
@@ -111,7 +131,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		assert.Equal(t, "2022-01-02T12:00:00Z", action.ActionStartTime)
 		assert.Equal(t, "2022-01-02T13:00:00Z", action.ActionExpiration)
 		assert.Equal(t, "1.2.3", action.Data.Version)
-		assert.Equal(t, "http://example.com", action.Data.SourceURI)
+		assert.Equal(t, []string{"http://example.com"}, action.Data.Sources)
 		assert.Equal(t, 0, action.Data.Retry)
 	})
 	t.Run("ActionPolicyChange no start time", func(t *testing.T) {
@@ -137,7 +157,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		assert.NotNil(t, action.Data.Policy)
 	})
 	t.Run("ActionUpgrade with retry_attempt", func(t *testing.T) {
-		p := []byte(`[{"id":"testid","type":"UPGRADE","data":{"version":"1.2.3","source_uri":"http://example.com","retry_attempt":1}}]`)
+		p := []byte(`[{"id":"testid","type":"UPGRADE","data":{"version":"1.2.3","sources":["http://example.com"],"retry_attempt":1}}]`)
 		a := &Actions{}
 		err := a.UnmarshalJSON(p)
 		require.Nil(t, err)
@@ -148,7 +168,7 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		assert.Empty(t, action.ActionStartTime)
 		assert.Empty(t, action.ActionExpiration)
 		assert.Equal(t, "1.2.3", action.Data.Version)
-		assert.Equal(t, "http://example.com", action.Data.SourceURI)
+		assert.Equal(t, []string{"http://example.com"}, action.Data.Sources)
 		assert.Equal(t, 1, action.Data.Retry)
 	})
 	t.Run("ActionDiagnostics with no additional metrics", func(t *testing.T) {
