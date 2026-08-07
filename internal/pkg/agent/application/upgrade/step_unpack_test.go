@@ -770,6 +770,14 @@ func TestGetFileNamePrefix(t *testing.T) {
 			archivePath:    "/foo/bar/elastic-agent-9.1.0-SNAPSHOT-linux-arm64.tar.gz",
 			expectedPrefix: "elastic-agent-9.1.0-SNAPSHOT-linux-arm64/",
 		},
+		"fips_zip": {
+			archivePath:    "/foo/bar/elastic-agent-fips-9.1.0-SNAPSHOT-windows-x86_64.zip",
+			expectedPrefix: "elastic-agent-9.1.0-SNAPSHOT-windows-x86_64/",
+		},
+		"no_fips_zip": {
+			archivePath:    "/foo/bar/elastic-agent-9.1.0-SNAPSHOT-windows-x86_64.zip",
+			expectedPrefix: "elastic-agent-9.1.0-SNAPSHOT-windows-x86_64/",
+		},
 	}
 
 	for name, test := range tests {
