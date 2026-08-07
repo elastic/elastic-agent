@@ -11,6 +11,9 @@ set -euo pipefail
 source .buildkite/scripts/common.sh
 STACK_PROVISIONER="${1:-"serverless"}"
 
+# We don't want any metadata from .package-version in these tests
+export USE_PACKAGE_VERSION=false
+
 run_test_for_beat(){
     export GOFLAGS='-buildvcs=false'
     local beat_name=$1
