@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Retry OTel Elasticsearch request authentication failures without retrying rejected documents
+component: elastic-agent
+issue: https://github.com/elastic/elastic-agent/issues/14531

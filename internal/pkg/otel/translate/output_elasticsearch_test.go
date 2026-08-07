@@ -8,6 +8,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"net/http"
 	"testing"
 	"text/template"
 
@@ -20,6 +21,19 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 )
+
+func TestGetRetryConfig(t *testing.T) {
+	escfg := defaultOptions
+
+	retryConfig := getRetryConfig(escfg)
+	expectedRequestStatuses := append(
+		[]int{http.StatusUnauthorized, http.StatusForbidden},
+		escfg.RetryOnDocumentStatus...,
+	)
+
+	assert.Equal(t, expectedRequestStatuses, retryConfig["retry_on_status"])
+	assert.Equal(t, escfg.RetryOnDocumentStatus, retryConfig["retry_on_document_status"])
+}
 
 func TestToOtelConfig(t *testing.T) {
 	logger := logptest.NewTestingLogger(t, "")
@@ -57,6 +71,21 @@ retry:
   max_interval: 7m0s
   max_retries: 3
   retry_on_status:
+  - 401
+  - 403
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -122,6 +151,21 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+  - 401
+  - 403
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -186,6 +230,21 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+  - 401
+  - 403
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -252,6 +311,21 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+  - 401
+  - 403
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -319,6 +393,21 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+  - 401
+  - 403
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -398,6 +487,21 @@ retry:
   max_interval: 5m0s
   max_retries: 3
   retry_on_status:
+  - 401
+  - 403
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -520,6 +624,21 @@ retry:
   max_interval: 7m0s
   max_retries: 5
   retry_on_status:
+  - 401
+  - 403
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -655,6 +774,21 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+  - 401
+  - 403
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
+  retry_on_document_status:
   - 429
   - 500
   - 501
