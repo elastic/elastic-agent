@@ -2490,11 +2490,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/kardianos/service
-Version: v1.2.4
+Version: v1.3.0
 Licence type (autodetected): Zlib
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/kardianos/service@v1.2.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/kardianos/service@v1.3.0/LICENSE:
 
 Copyright (c) 2015 Daniel Theophanes
 
