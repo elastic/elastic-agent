@@ -17,7 +17,7 @@ The {{es}} exporter is an OpenTelemetry Collector component that sends logs, met
 
 ## Get started
 
-To use the {{es}} exporter, include it in the exporter definitions of the [Collector configuration](/reference/edot-collector/config/index.md). The exporter is already included in the [default configuration](/reference/edot-collector/config/default-config-standalone.md).
+To use the {{es}} exporter, include it in the exporter definitions of the [Collector configuration](/reference/otel-collector/config/index.md). The exporter is already included in the [default configuration](/reference/otel-collector/config/default-config-standalone.md).
 
 ## Configuration
 

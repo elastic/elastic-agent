@@ -111,10 +111,10 @@ annotations:
 #      Some Elasticsearch modes, such as `raw`, are not covered by Elastic Support.
   elasticinframetricsprocessor:
     comment: |
-      Deprecated in 9.2.0. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
+      Deprecated in 9.2.0. Refer to [Migrate from deprecated components](/reference/otel-collector/components/migrate-components.md) for migration instructions.
   elastictraceprocessor:
     comment: |
-      Deprecated in 9.2.0. Replaced by the `elasticapm` processor. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
+      Deprecated in 9.2.0. Replaced by the `elasticapm` processor. Refer to [Migrate from deprecated components](/reference/otel-collector/components/migrate-components.md) for migration instructions.
   kafkareceiver:
     comment: |
       The following features and configuration options are **NOT** officially supported in {{agent}} with the Kafka receiver:
@@ -128,4 +128,4 @@ annotations:
       - Partitioning configuration (i.e. `partition_*` options).
   jmxreceiver:
     comment: |
-      Deprecated in 9.3.1. JMX Scraper is recommended to run as a standalone Java program. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
+      Deprecated in 9.3.1. JMX Scraper is recommended to run as a standalone Java program. Refer to [Migrate from deprecated components](/reference/otel-collector/components/migrate-components.md) for migration instructions.

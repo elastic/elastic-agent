@@ -17,7 +17,7 @@ The Prometheus remote write receiver gets metrics from Prometheus instances usin
 
 ## Get started
 
-To use the Prometheus remote write receiver, include it in the receiver definitions of the [Collector configuration](/reference/edot-collector/config/index.md):
+To use the Prometheus remote write receiver, include it in the receiver definitions of the [Collector configuration](/reference/otel-collector/config/index.md):
 
 ```yaml
 receivers:

@@ -13,7 +13,7 @@ cross_links:
   - integration-docs
 toc:
   - toc: release-notes
-  - toc: reference/edot-collector
+  - toc: reference/otel-collector
 subs:
   agent:          "Elastic Agent"
   agent-issue:    "https://github.com/elastic/elastic-agent/issues/"
