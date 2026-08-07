@@ -9,18 +9,7 @@ entries:
         are now redacted in the same way as YAML files.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15924
-        - https://github.com/elastic/elastic-agent/pull/15989
-        - https://github.com/elastic/elastic-agent/pull/16012
-        - https://github.com/elastic/elastic-agent/pull/16033
-        - https://github.com/elastic/elastic-agent/pull/16032
-        - https://github.com/elastic/elastic-agent/pull/15976
-        - https://github.com/elastic/elastic-agent/pull/16053
-        - https://github.com/elastic/elastic-agent/pull/16061
-        - https://github.com/elastic/elastic-agent/pull/16069
-        - https://github.com/elastic/elastic-agent/pull/16072
-        - https://github.com/elastic/elastic-agent/pull/16080
-        - https://github.com/elastic/elastic-agent/pull/16081
+        - https://github.com/elastic/elastic-agent/pull/15899
       issue:
         - https://github.com/elastic/elastic-agent/issues/15964
       impact: ""
@@ -39,20 +28,8 @@ entries:
         The EDOT Cloud Forwarder has been renamed to the Elastic Cloud Forwarder.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15924
-        - https://github.com/elastic/elastic-agent/pull/15989
-        - https://github.com/elastic/elastic-agent/pull/16012
-        - https://github.com/elastic/elastic-agent/pull/16033
-        - https://github.com/elastic/elastic-agent/pull/16032
-        - https://github.com/elastic/elastic-agent/pull/15976
-        - https://github.com/elastic/elastic-agent/pull/16053
-        - https://github.com/elastic/elastic-agent/pull/16061
-        - https://github.com/elastic/elastic-agent/pull/16069
-        - https://github.com/elastic/elastic-agent/pull/16072
-        - https://github.com/elastic/elastic-agent/pull/16080
-        - https://github.com/elastic/elastic-agent/pull/16081
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/15964
+        - https://github.com/elastic/elastic-agent/pull/15826
+      issue: []
       impact: ""
       action: ""
       timestamp: 1785769574
@@ -72,18 +49,7 @@ entries:
         translation, matching classic process-runtime heartbeat behavior.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15924
-        - https://github.com/elastic/elastic-agent/pull/15989
-        - https://github.com/elastic/elastic-agent/pull/16012
-        - https://github.com/elastic/elastic-agent/pull/16033
-        - https://github.com/elastic/elastic-agent/pull/16032
-        - https://github.com/elastic/elastic-agent/pull/15976
-        - https://github.com/elastic/elastic-agent/pull/16053
-        - https://github.com/elastic/elastic-agent/pull/16061
-        - https://github.com/elastic/elastic-agent/pull/16069
-        - https://github.com/elastic/elastic-agent/pull/16072
-        - https://github.com/elastic/elastic-agent/pull/16080
-        - https://github.com/elastic/elastic-agent/pull/16081
+        - https://github.com/elastic/elastic-agent/pull/15969
       issue:
         - https://github.com/elastic/elastic-agent/issues/15968
       impact: ""
@@ -97,20 +63,8 @@ entries:
       description: ""
       component: osquerybeat
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15924
         - https://github.com/elastic/elastic-agent/pull/15989
-        - https://github.com/elastic/elastic-agent/pull/16012
-        - https://github.com/elastic/elastic-agent/pull/16033
-        - https://github.com/elastic/elastic-agent/pull/16032
-        - https://github.com/elastic/elastic-agent/pull/15976
-        - https://github.com/elastic/elastic-agent/pull/16053
-        - https://github.com/elastic/elastic-agent/pull/16061
-        - https://github.com/elastic/elastic-agent/pull/16069
-        - https://github.com/elastic/elastic-agent/pull/16072
-        - https://github.com/elastic/elastic-agent/pull/16080
-        - https://github.com/elastic/elastic-agent/pull/16081
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/15964
+      issue: []
       impact: ""
       action: ""
       timestamp: 1785860674
@@ -130,18 +84,7 @@ entries:
         after `npm i`, independent of npm's install-script policy.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15924
-        - https://github.com/elastic/elastic-agent/pull/15989
-        - https://github.com/elastic/elastic-agent/pull/16012
-        - https://github.com/elastic/elastic-agent/pull/16033
-        - https://github.com/elastic/elastic-agent/pull/16032
-        - https://github.com/elastic/elastic-agent/pull/15976
-        - https://github.com/elastic/elastic-agent/pull/16053
-        - https://github.com/elastic/elastic-agent/pull/16061
-        - https://github.com/elastic/elastic-agent/pull/16069
-        - https://github.com/elastic/elastic-agent/pull/16072
-        - https://github.com/elastic/elastic-agent/pull/16080
-        - https://github.com/elastic/elastic-agent/pull/16081
+        - https://github.com/elastic/elastic-agent/pull/15994
       issue:
         - https://github.com/elastic/elastic-agent/issues/15993
       impact: ""
