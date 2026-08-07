@@ -1,0 +1,50 @@
+// begin 8.19.20 relnotes
+
+[[release-notes-8.19.20]]
+==  8.19.20
+
+Review important information about the  8.19.20 release.
+
+[discrete]
+[[security-updates-8.19.20]]
+=== Security updates
+
+
+
+
+* Sensitive values in JSON diagnostic files are now redacted. https://github.com/elastic/elastic-agent/pull/16028[#16028] https://github.com/elastic/elastic-agent/pull/16066[#16066] https://github.com/elastic/elastic-agent/pull/16074[#16074] https://github.com/elastic/elastic-agent/pull/16076[#16076] https://github.com/elastic/elastic-agent/pull/16072[#16072] 
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.19.20]]
+=== Enhancements
+
+
+
+
+* Add environment variables to collector diagnostics. https://github.com/elastic/elastic-agent/pull/16028[#16028] https://github.com/elastic/elastic-agent/pull/16066[#16066] https://github.com/elastic/elastic-agent/pull/16074[#16074] https://github.com/elastic/elastic-agent/pull/16076[#16076] https://github.com/elastic/elastic-agent/pull/16072[#16072] 
+* Update OTel Collector components to v0.156.0. https://github.com/elastic/elastic-agent/pull/16028[#16028] https://github.com/elastic/elastic-agent/pull/16066[#16066] https://github.com/elastic/elastic-agent/pull/16074[#16074] https://github.com/elastic/elastic-agent/pull/16076[#16076] https://github.com/elastic/elastic-agent/pull/16072[#16072] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.20]]
+=== Bug fixes
+
+
+
+
+* Stop upgrade rollback from being triggered by slow service component restarts. https://github.com/elastic/elastic-agent/pull/16028[#16028] https://github.com/elastic/elastic-agent/pull/16066[#16066] https://github.com/elastic/elastic-agent/pull/16074[#16074] https://github.com/elastic/elastic-agent/pull/16076[#16076] https://github.com/elastic/elastic-agent/pull/16072[#16072] 
+* Fix getting current user failing on Windows when no profile directory is present. https://github.com/elastic/elastic-agent/pull/16028[#16028] https://github.com/elastic/elastic-agent/pull/16066[#16066] https://github.com/elastic/elastic-agent/pull/16074[#16074] https://github.com/elastic/elastic-agent/pull/16076[#16076] https://github.com/elastic/elastic-agent/pull/16072[#16072] 
+* Bake Synthetics browser binaries into the elastic-agent-complete image. https://github.com/elastic/elastic-agent/pull/16028[#16028] https://github.com/elastic/elastic-agent/pull/16066[#16066] https://github.com/elastic/elastic-agent/pull/16074[#16074] https://github.com/elastic/elastic-agent/pull/16076[#16076] https://github.com/elastic/elastic-agent/pull/16072[#16072] https://github.com/elastic/elastic-agent/issues/15993[#15993]
+
+// end 8.19.20 relnotes
