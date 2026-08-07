@@ -20,6 +20,7 @@ Agent Scenario | Description
 ---- | ----
 [Elastic Agent managed - Default ](./elastic-agent-kustomize/default/elastic-agent-managed/) | Default Elastic Agent managed by Fleet setup. Kube-state-metrics (KSM) is installed automatically.
 [Elastic Agent standalone Default ](./elastic-agent-kustomize/default/elastic-agent-standalone/) | Default Standalone Elastic Agent setup. Kube-state-metrics (KSM) is installed automatically.
+[Elastic Agent standalone - OpenShift](./elastic-agent-kustomize/openshift/elastic-agent-standalone/) | Standalone Elastic Agent setup for OpenShift. Grants the required Security Context Constraints (SCCs) to Elastic Agent and KSM.
 [Elastic Agent managed - With KSM in autosharding configuration ](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-managed/) | Elastic Agent managed by Fleet setup with KMS in [autosharding configuration](https://github.com/kubernetes/kube-state-metrics#automated-sharding)
 [Elastic Agent standalone - With KSM in autosharding configuration](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-standalone/) | Standalone Elastic Agent setup with KSM in [autosharding configuration](https://github.com/kubernetes/kube-state-metrics#automated-sharding)
 
@@ -40,6 +41,15 @@ E.g. we want to install the default Elastic Agent Scenario with kustomize.
 cd elastic-agent-kustomize/default/elastic-agent-standalone
 kubectl apply -k .
 ```
+
+For OpenShift, use the OpenShift overlay:
+
+```bash
+cd elastic-agent-kustomize/openshift/elastic-agent-standalone
+kubectl apply -k .
+```
+
+This grants the `privileged` SCC to Elastic Agent, which requires host access, and the narrower `nonroot-v2` SCC to KSM.
 
 > Since Kubernetes version 1.14, Kubectl supports the usage of kustomize
 
