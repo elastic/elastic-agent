@@ -10,11 +10,7 @@ entries:
         period so a truly failed component is still caught.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16028
-        - https://github.com/elastic/elastic-agent/pull/16066
-        - https://github.com/elastic/elastic-agent/pull/16074
-        - https://github.com/elastic/elastic-agent/pull/16076
-        - https://github.com/elastic/elastic-agent/pull/16072
+        - https://github.com/elastic/elastic-agent/pull/15865
       issue: []
       impact: ""
       action: ""
@@ -27,11 +23,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16028
-        - https://github.com/elastic/elastic-agent/pull/16066
-        - https://github.com/elastic/elastic-agent/pull/16074
-        - https://github.com/elastic/elastic-agent/pull/16076
-        - https://github.com/elastic/elastic-agent/pull/16072
+        - https://github.com/elastic/elastic-agent/pull/15661
       issue: []
       impact: ""
       action: ""
@@ -44,11 +36,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16028
-        - https://github.com/elastic/elastic-agent/pull/16066
-        - https://github.com/elastic/elastic-agent/pull/16074
-        - https://github.com/elastic/elastic-agent/pull/16076
-        - https://github.com/elastic/elastic-agent/pull/16072
+        - https://github.com/elastic/elastic-agent/pull/16007
       issue: []
       impact: ""
       action: ""
@@ -61,11 +49,7 @@ entries:
       description: ""
       component: heartbeat
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16028
-        - https://github.com/elastic/elastic-agent/pull/16066
-        - https://github.com/elastic/elastic-agent/pull/16074
-        - https://github.com/elastic/elastic-agent/pull/16076
-        - https://github.com/elastic/elastic-agent/pull/16072
+        - https://github.com/elastic/elastic-agent/pull/15746
       issue: []
       impact: ""
       action: ""
@@ -78,11 +62,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16028
-        - https://github.com/elastic/elastic-agent/pull/16066
-        - https://github.com/elastic/elastic-agent/pull/16074
-        - https://github.com/elastic/elastic-agent/pull/16076
-        - https://github.com/elastic/elastic-agent/pull/16072
+        - https://github.com/elastic/elastic-agent/pull/15812
       issue: []
       impact: ""
       action: ""
@@ -99,11 +79,7 @@ entries:
         are now redacted in the same way as YAML files.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16028
-        - https://github.com/elastic/elastic-agent/pull/16066
-        - https://github.com/elastic/elastic-agent/pull/16074
-        - https://github.com/elastic/elastic-agent/pull/16076
-        - https://github.com/elastic/elastic-agent/pull/16072
+        - https://github.com/elastic/elastic-agent/pull/15904
       issue: []
       impact: ""
       action: ""
@@ -117,10 +93,6 @@ entries:
       component: elastic-agent
       pr:
         - https://github.com/elastic/elastic-agent/pull/16028
-        - https://github.com/elastic/elastic-agent/pull/16066
-        - https://github.com/elastic/elastic-agent/pull/16074
-        - https://github.com/elastic/elastic-agent/pull/16076
-        - https://github.com/elastic/elastic-agent/pull/16072
       issue: []
       impact: ""
       action: ""
@@ -141,11 +113,7 @@ entries:
         after `npm i`, independent of npm's install-script policy.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16028
-        - https://github.com/elastic/elastic-agent/pull/16066
-        - https://github.com/elastic/elastic-agent/pull/16074
-        - https://github.com/elastic/elastic-agent/pull/16076
-        - https://github.com/elastic/elastic-agent/pull/16072
+        - https://github.com/elastic/elastic-agent/pull/16017
       issue:
         - https://github.com/elastic/elastic-agent/issues/15993
       impact: ""
