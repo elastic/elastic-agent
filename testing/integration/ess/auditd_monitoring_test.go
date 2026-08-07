@@ -144,7 +144,7 @@ func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Conte
 			},
 		}
 		now = time.Now()
-		res, err = estools.PerformQueryForRawQuery(ctx, query, "logs-auditd_manager.auditd*", runner.info.ESClient)
+		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-auditd_manager.auditd*", runner.info.ESClient)
 		require.NoError(collect, err)
 		require.NotEmpty(collect, res.Hits.Hits)
 		doc = res.Hits.Hits[0].Source
