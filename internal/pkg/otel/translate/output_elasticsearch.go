@@ -25,32 +25,41 @@ import (
 type esToOTelOptions struct {
 	elasticsearch.ElasticsearchConfig `config:",inline"`
 
-	Index         string `config:"index"`
-	Preset        string `config:"preset"`
-	RetryOnStatus []int  `config:"retry_on_status"`
+	Index                 string `config:"index"`
+	Preset                string `config:"preset"`
+	RetryOnStatus         []int  `config:"retry_on_status"`
+	RetryOnDocumentStatus []int  `config:"retry_on_document_status"`
+}
+
+// defaultRetryOnStatus is the shared defaults for retries at request and
+// document level
+var defaultRetryOnStatus = []int{
+	// 429
+	http.StatusTooManyRequests,
+	// 5xx
+	http.StatusInternalServerError,
+	http.StatusNotImplemented,
+	http.StatusBadGateway,
+	http.StatusServiceUnavailable,
+	http.StatusGatewayTimeout,
+	http.StatusHTTPVersionNotSupported,
+	http.StatusVariantAlsoNegotiates,
+	http.StatusInsufficientStorage,
+	http.StatusLoopDetected,
+	http.StatusNotExtended,
+	http.StatusNetworkAuthenticationRequired,
 }
 
 var defaultOptions = esToOTelOptions{
 	ElasticsearchConfig: elasticsearch.DefaultConfig(),
 
-	Index:  "",       // Dynamic routing is disabled if index is set
-	Preset: "custom", // default is custom if not set
-	RetryOnStatus: []int{
-		// 429
-		http.StatusTooManyRequests,
-		// 5xx
-		http.StatusInternalServerError,
-		http.StatusNotImplemented,
-		http.StatusBadGateway,
-		http.StatusServiceUnavailable,
-		http.StatusGatewayTimeout,
-		http.StatusHTTPVersionNotSupported,
-		http.StatusVariantAlsoNegotiates,
-		http.StatusInsufficientStorage,
-		http.StatusLoopDetected,
-		http.StatusNotExtended,
-		http.StatusNetworkAuthenticationRequired,
-	},
+	Index:                 "",       // Dynamic routing is disabled if index is set
+	Preset:                "custom", // default is custom if not set
+	RetryOnDocumentStatus: append([]int(nil), defaultRetryOnStatus...),
+	RetryOnStatus: append(
+		[]int{http.StatusUnauthorized, http.StatusForbidden},
+		defaultRetryOnStatus...,
+	),
 }
 
 // ESToOTelConfig converts a Beat config into OTel elasticsearch exporter config
@@ -181,11 +190,12 @@ func getTotalNumWorkers(cfg *config.C) int {
 func getRetryConfig(escfg esToOTelOptions) map[string]any {
 	// Retries
 	retryCfg := map[string]any{
-		"enabled":          true,
-		"max_retries":      escfg.MaxRetries,
-		"initial_interval": escfg.Backoff.Init, // backoff.init
-		"max_interval":     escfg.Backoff.Max,  // backoff.max
-		"retry_on_status":  escfg.RetryOnStatus,
+		"enabled":                  true,
+		"max_retries":              escfg.MaxRetries,
+		"initial_interval":         escfg.Backoff.Init, // backoff.init
+		"max_interval":             escfg.Backoff.Max,  // backoff.max
+		"retry_on_status":          escfg.RetryOnStatus,
+		"retry_on_document_status": escfg.RetryOnDocumentStatus,
 	}
 
 	if escfg.MaxRetries == 0 {
