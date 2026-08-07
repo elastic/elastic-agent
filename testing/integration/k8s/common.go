@@ -226,27 +226,46 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 	}
 }
 
-// k8sGetAgentID returns the agent ID for the given agent pod
+// k8sGetAgentID returns the agent ID for the given agent pod, polling until the ID
+// is non-empty or the context deadline is reached. The agent status is populated
+// asynchronously after enrollment so a single-shot read can race the startup path.
 func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
 	namespace string, agentPodName string, containerName string,
 ) (string, error) {
 	command := []string{"elastic-agent", "status", "--output=json"}
 
-	status := atesting.AgentStatusOutput{} // clear status output
-	stdout.Reset()
-	stderr.Reset()
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr)
-	cancel()
-	if err != nil {
-		return "", err
-	}
+	defer cancel()
 
-	if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
-		return "", err
-	}
+	for {
+		status := atesting.AgentStatusOutput{}
+		stdout.Reset()
+		stderr.Reset()
+		if err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr); err != nil {
+			if ctx.Err() != nil {
+				return "", fmt.Errorf("timeout waiting for agent ID: %w", err)
+			}
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
 
-	return status.Info.ID, nil
+		if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
+			if ctx.Err() != nil {
+				return "", fmt.Errorf("timeout waiting for agent ID: %w", err)
+			}
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		if status.Info.ID != "" {
+			return status.Info.ID, nil
+		}
+
+		if ctx.Err() != nil {
+			return "", errors.New("timeout waiting for agent ID to be non-empty")
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 // getAgentComponentState returns the component state for the given component name and a bool indicating if it exists.
