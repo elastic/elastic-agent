@@ -1,0 +1,13 @@
+kind: bug-fix
+
+summary: Size the in-flight event budget for the Elasticsearch exporter's concurrency in OTel mode
+
+description: |
+  In OTel mode, the Elasticsearch output now runs two exporter consumers per connection and
+  sizes `queue.mem.events` against that consumer count rather than the output's configured
+  worker count. The performance preset budgets are sized for process mode, which holds
+  un-acknowledged events in fewer places, so OTel mode ran short of in-flight events and
+  left the connection idle waiting on Elasticsearch. The `balanced`, `scale` and `latency`
+  presets roughly double their event rate as a result, at an unchanged connection count.
+
+component: elastic-agent
