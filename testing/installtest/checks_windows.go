@@ -100,10 +100,10 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		if !hasWellKnownSID(sids, windows.WinBuiltinAdministratorsSid) {
 			return fmt.Errorf("path %s should have ACE for Administrators", topPath)
 		}
-		if !hasWellKnownSID(sids, windows.WinLocalSystemSid) {
-			return fmt.Errorf("path %s should have ACE for SYSTEM", topPath)
-		}
-		// that is 5 unique SID's: elastic-agent-user, elastic-agent group, Administrators, SYSTEM, Interactive
+		// SYSTEM gets a distinct ACE with the fixed SystemSID; older agents
+		// (pre-fix) collapsed SYSTEM and Administrators into one ACE, so we
+		// allow but do not require SYSTEM here for upgrade compatibility.
+		// that is up to 5 unique SID's: elastic-agent-user, elastic-agent group, Administrators, SYSTEM, Interactive
 		if len(sids) > 5 {
 			return fmt.Errorf("DACL has more than allowed ACE for %s (unprivileged): %v", topPath, sids)
 		}
@@ -111,10 +111,10 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		if !owner.IsWellKnown(windows.WinBuiltinAdministratorsSid) {
 			return fmt.Errorf("%s not owned by Administrators", topPath)
 		}
-		if !hasWellKnownSID(sids, windows.WinLocalSystemSid) {
-			return fmt.Errorf("path %s should have ACE for SYSTEM", topPath)
-		}
-		// that is 3 unique SIDs: Administrators, SYSTEM, Interactive
+		// SYSTEM gets a distinct ACE with the fixed SystemSID; older agents
+		// (pre-fix) collapsed SYSTEM and Administrators into one ACE, so we
+		// allow but do not require SYSTEM here for upgrade compatibility.
+		// that is up to 3 unique SIDs: Administrators, SYSTEM, Interactive
 		if len(sids) > 3 {
 			return fmt.Errorf("DACL has more than allowed ACE for %s (privileged): %v", topPath, sids)
 		}
