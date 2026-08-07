@@ -827,7 +827,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 		}
 		for _, c := range state.Components {
 			if strings.Contains(c.Message,
-				"Elastic Defend requires Elastic Agent be installed at the default installation path") {
+				"Elastic Defend requires Elastic Agent to be installed at the default installation path") {
 				return true
 			}
 		}
@@ -886,9 +886,9 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 
 	c := fixture.Client()
 
-	errMsg := "Elastic Defend requires Elastic Agent be running as root"
+	errMsg := "Elastic Defend requires Elastic Agent to be running as root"
 	if runtime.GOOS == define.Windows {
-		errMsg = "Elastic Defend requires Elastic Agent be running as Administrator or SYSTEM"
+		errMsg = "Elastic Defend requires Elastic Agent to be running as Administrator or SYSTEM"
 	}
 	require.Eventually(t, func() bool {
 		err := c.Connect(ctx)
