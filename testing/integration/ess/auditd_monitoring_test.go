@@ -132,7 +132,10 @@ func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Conte
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		// Exec elastic-agent on every retry tick to keep generating tagged audit events.
 		// This covers the window between audit rules becoming active and the first ES hit.
-		_, _ = runner.agentFixture.ExecStatus(ctx)
+		_, err := runner.agentFixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("error getting agent status: %v", err)
+		}
 
 		query = genESQuery(agentID, requiredFields)
 		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
@@ -141,7 +144,7 @@ func (runner *AuditDRunner) validateAuditdEvents(t *testing.T, ctx context.Conte
 			},
 		}
 		now = time.Now()
-		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-auditd_manager.auditd*", runner.info.ESClient)
+		res, err = estools.PerformQueryForRawQuery(ctx, query, "logs-auditd_manager.auditd*", runner.info.ESClient)
 		require.NoError(collect, err)
 		require.NotEmpty(collect, res.Hits.Hits)
 		doc = res.Hits.Hits[0].Source
