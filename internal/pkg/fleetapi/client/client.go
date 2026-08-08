@@ -129,7 +129,7 @@ func ExtractError(resp io.Reader) error {
 	return fmt.Errorf("could not decode the response, raw response: %s", string(data))
 }
 
-func CheckRemote(ctx context.Context, c Sender) error {
+func CheckRemote(ctx context.Context, log *logger.Logger, c Sender) error {
 	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
 	defer cancel()
 
@@ -138,13 +138,25 @@ func CheckRemote(ctx context.Context, c Sender) error {
 		return fmt.Errorf("fail to communicate with Fleet Server API client hosts: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("fleet server ping returned a bad status code: %d", resp.StatusCode)
-	}
+	// discard body for proper cancellation and connection reuse.
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
-	// discard body for proper cancellation and connection reuse
-	_, _ = io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		switch resp.StatusCode {
+		case http.StatusTooManyRequests, http.StatusServiceUnavailable: // 429, 503
+			// 502 (Bad Gateway) and 504 (Gateway Timeout) are intentionally
+			// not included for this check as they may indicate a
+			// misconfiguration issue despite being considered retryable
+			// elsewhere
+			log.Warnf("fleet server ping succeeded but received bad status code: %d", resp.StatusCode)
+			return nil
+		}
+
+		return fmt.Errorf("fleet server ping failed with bad status code: %d", resp.StatusCode)
+	}
 
 	return nil
 }
