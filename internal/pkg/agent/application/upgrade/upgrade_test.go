@@ -427,7 +427,7 @@ agent.download:
 
 	enabled := true
 	want := artifact.Config{
-		SourceURI:              "https://tardis.elastic.co/downloads/",
+		Sources:                []string{"https://tardis.elastic.co/downloads/"},
 		TargetDirectory:        "/tardis",
 		InstallPath:            "/sonic_screwdriver",
 		DropPath:               "/gallifrey",
@@ -584,7 +584,7 @@ agent.download:
 			err = u.Reload(cfg)
 			require.NoError(t, err, "error reloading config")
 
-			assert.Equal(t, tc.sourceURL, u.settings.SourceURI)
+			assert.Equal(t, []string{tc.sourceURL}, u.settings.Sources)
 			if tc.proxyURL != "" {
 				require.NotNilf(t, u.settings.Proxy.URL,
 					"ProxyURI should not be nil, want %s", tc.proxyURL)
@@ -1047,7 +1047,7 @@ type mockArtifactDownloader struct {
 	fleetServerURI    string
 }
 
-func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, target artifact.Artifact, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, target artifact.Artifact, sources []string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	return m.returnArchivePath, m.returnError
 }
 
@@ -1467,7 +1467,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				return tc.isDiskSpaceErrorResult
 			}
 
-			_, err = upgrader.Upgrade(context.Background(), "9.0.0", false, "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true, nil, tc.upgradeOpts...)
+			_, err = upgrader.Upgrade(context.Background(), "9.0.0", false, nil, nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true, nil, tc.upgradeOpts...)
 			require.ErrorIs(t, err, tc.expectedError)
 
 			// If the downloaded archive needs to be cleaned up assert that it is indeed cleaned up, if not assert that it still exists. The downloaded archive is a mock file that is created for all tests cases.
@@ -1557,7 +1557,7 @@ func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
 		return nil
 	}
 
-	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil, details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, nil, nil, details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
 	require.NoError(t, err, "upgrade must self-heal the corrupt live .ttl and complete")
 
 	markers, malformed, getAllErr := realRegistry.GetAll()
@@ -1637,7 +1637,7 @@ func TestUpgrade_RestoresActiveCommitAfterPostSymlinkFailure(t *testing.T) {
 		return err
 	}
 
-	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil,
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, nil, nil,
 		details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
 	require.Error(t, err, "InvokeWatcher failure must cause Upgrade to return error")
 
@@ -1709,7 +1709,7 @@ func TestUpgrade_CleansMarkerOnPreSymlinkFailure(t *testing.T) {
 	}
 	upgrader.rollbackInstall = func(_ context.Context, _ *logger.Logger, _, _, _ string, _ ttl.Source) error { return nil }
 
-	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil,
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, nil, nil,
 		details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
 	require.Error(t, err, "changeSymlink failure must cause Upgrade to return error")
 
@@ -1766,7 +1766,7 @@ func TestUpgrade_MismatchedUnpackDestination(t *testing.T) {
 		returnUnpackResult: UnpackResult{Hash: "aabbcc", VersionedHome: actualVersionedHome},
 	}
 
-	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil,
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, nil, nil,
 		details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
 	require.Error(t, err, "mismatch between predicted and actual unpack destination must return an error")
 	assert.Contains(t, err.Error(), "unpack placed files at", "error must identify the destination mismatch")

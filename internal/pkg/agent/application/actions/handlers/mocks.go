@@ -525,14 +525,14 @@ func (_c *mockUpgradeCoordinator_State_Call) RunAndReturn(run func() coordinator
 }
 
 // Upgrade provides a mock function for the type mockUpgradeCoordinator
-func (_mock *mockUpgradeCoordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, opts ...coordinator.UpgradeOpt) error {
+func (_mock *mockUpgradeCoordinator) Upgrade(ctx context.Context, version string, sources []string, action *fleetapi.ActionUpgrade, opts ...coordinator.UpgradeOpt) error {
 	// coordinator.UpgradeOpt
 	_va := make([]any, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
 	}
 	var _ca []any
-	_ca = append(_ca, ctx, version, sourceURI, action)
+	_ca = append(_ca, ctx, version, sources, action)
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -541,8 +541,8 @@ func (_mock *mockUpgradeCoordinator) Upgrade(ctx context.Context, version string
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, *fleetapi.ActionUpgrade, ...coordinator.UpgradeOpt) error); ok {
-		r0 = returnFunc(ctx, version, sourceURI, action, opts...)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, *fleetapi.ActionUpgrade, ...coordinator.UpgradeOpt) error); ok {
+		r0 = returnFunc(ctx, version, sources, action, opts...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -557,15 +557,15 @@ type mockUpgradeCoordinator_Upgrade_Call struct {
 // Upgrade is a helper method to define mock.On call
 //   - ctx context.Context
 //   - version string
-//   - sourceURI string
+//   - sources []string
 //   - action *fleetapi.ActionUpgrade
 //   - opts ...coordinator.UpgradeOpt
-func (_e *mockUpgradeCoordinator_Expecter) Upgrade(ctx any, version any, sourceURI any, action any, opts ...any) *mockUpgradeCoordinator_Upgrade_Call {
+func (_e *mockUpgradeCoordinator_Expecter) Upgrade(ctx any, version any, sources any, action any, opts ...any) *mockUpgradeCoordinator_Upgrade_Call {
 	return &mockUpgradeCoordinator_Upgrade_Call{Call: _e.mock.On("Upgrade",
-		append([]any{ctx, version, sourceURI, action}, opts...)...)}
+		append([]any{ctx, version, sources, action}, opts...)...)}
 }
 
-func (_c *mockUpgradeCoordinator_Upgrade_Call) Run(run func(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, opts ...coordinator.UpgradeOpt)) *mockUpgradeCoordinator_Upgrade_Call {
+func (_c *mockUpgradeCoordinator_Upgrade_Call) Run(run func(ctx context.Context, version string, sources []string, action *fleetapi.ActionUpgrade, opts ...coordinator.UpgradeOpt)) *mockUpgradeCoordinator_Upgrade_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -575,9 +575,9 @@ func (_c *mockUpgradeCoordinator_Upgrade_Call) Run(run func(ctx context.Context,
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		var arg2 string
+		var arg2 []string
 		if args[2] != nil {
-			arg2 = args[2].(string)
+			arg2 = args[2].([]string)
 		}
 		var arg3 *fleetapi.ActionUpgrade
 		if args[3] != nil {
@@ -607,7 +607,7 @@ func (_c *mockUpgradeCoordinator_Upgrade_Call) Return(err error) *mockUpgradeCoo
 	return _c
 }
 
-func (_c *mockUpgradeCoordinator_Upgrade_Call) RunAndReturn(run func(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, opts ...coordinator.UpgradeOpt) error) *mockUpgradeCoordinator_Upgrade_Call {
+func (_c *mockUpgradeCoordinator_Upgrade_Call) RunAndReturn(run func(ctx context.Context, version string, sources []string, action *fleetapi.ActionUpgrade, opts ...coordinator.UpgradeOpt) error) *mockUpgradeCoordinator_Upgrade_Call {
 	_c.Call.Return(run)
 	return _c
 }

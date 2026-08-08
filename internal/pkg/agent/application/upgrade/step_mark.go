@@ -75,11 +75,17 @@ func convertToMarkerAction(a *fleetapi.ActionUpgrade) *MarkerActionUpgrade {
 	if a == nil {
 		return nil
 	}
+
+	sourceURI := ""
+	if len(a.Data.Sources) > 0 {
+		sourceURI = a.Data.Sources[0]
+	}
+
 	return &MarkerActionUpgrade{
 		ActionID:   a.ActionID,
 		ActionType: a.ActionType,
 		Version:    a.Data.Version,
-		SourceURI:  a.Data.SourceURI,
+		SourceURI:  sourceURI,
 	}
 }
 
@@ -87,12 +93,18 @@ func convertToActionUpgrade(a *MarkerActionUpgrade) *fleetapi.ActionUpgrade {
 	if a == nil {
 		return nil
 	}
+
+	var sources []string
+	if a.SourceURI != "" {
+		sources = []string{a.SourceURI}
+	}
+
 	return &fleetapi.ActionUpgrade{
 		ActionID:   a.ActionID,
 		ActionType: a.ActionType,
 		Data: fleetapi.ActionUpgradeData{
-			Version:   a.Version,
-			SourceURI: a.SourceURI,
+			Version: a.Version,
+			Sources: sources,
 		},
 	}
 }

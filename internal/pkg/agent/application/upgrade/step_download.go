@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -55,7 +56,7 @@ func (a *artifactDownloader) withFleetServerURI(fleetServerURI string) {
 	a.fleetServerURI = fleetServerURI
 }
 
-func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifact.Artifact, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifact.Artifact, sources []string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -67,20 +68,30 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 	// do not update source config
 	settings := *a.settings
 
-	if sourceURI == "" {
-		if settings.SourceURI != "" {
-			sourceURI = settings.SourceURI
+	// clone to avoid mutating
+	// remove all "" sources. this shouldn't happen, but just in case
+	sources = slices.DeleteFunc(slices.Clone(sources), func(source string) bool { return source == "" })
+
+	if len(sources) == 0 {
+		if len(settings.Sources) > 0 {
+			sources = slices.Clone(settings.Sources)
 		} else {
-			sourceURI = artifact.DefaultSourceURI
+			sources = []string{artifact.DefaultSourceURI}
 		}
 	}
 
-	sources := make([]string, 0, 2)
-	if !download.IsLocal(sourceURI) {
-		// remote download should check drop path first
-		sources = append(sources, "file://"+settings.GetDropPath())
+	checkDropPath := false
+	for _, source := range sources {
+		if !download.IsLocal(source) {
+			// Remote download should check the drop path exactly once.
+			checkDropPath = true
+			break
+		}
 	}
-	sources = append(sources, sourceURI)
+
+	if checkDropPath {
+		sources = slices.Insert(sources, 0, "file://"+settings.GetDropPath())
+	}
 
 	fileName := target.FileName()
 	if target.Version.IsSnapshot() {

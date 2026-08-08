@@ -178,7 +178,7 @@ func TestDownloadBodyError(t *testing.T) {
 	targetDir := t.TempDir()
 
 	config := &artifact.Config{
-		SourceURI:       srv.URL,
+		Sources:         []string{srv.URL},
 		TargetDirectory: targetDir,
 	}
 
@@ -485,7 +485,7 @@ func TestDownloadLogProgress(t *testing.T) {
 			targetDir := t.TempDir()
 
 			config := &artifact.Config{
-				SourceURI:       srv.URL,
+				Sources:         []string{srv.URL},
 				TargetDirectory: targetDir,
 				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 					Timeout: totalTime,
