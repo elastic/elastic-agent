@@ -146,14 +146,16 @@ func CheckRemote(ctx context.Context, log *logger.Logger, c Sender) error {
 
 	if resp.StatusCode != http.StatusOK {
 		switch resp.StatusCode {
-		case http.StatusTooManyRequests, http.StatusServiceUnavailable:
-			// Bad Gateway and Gateway Timeout might be a misconfiguration
-			// issue so don't treat them as temporary here
-			log.Errorf("fleet server ping returned temporary bad status code: %d", resp.StatusCode)
+		case http.StatusTooManyRequests, http.StatusServiceUnavailable: // 429, 503
+			// 502 (Bad Gateway) and 504 (Gateway Timeout) are intentionally
+			// not included for this check as they may indicate a
+			// misconfiguration issue despite being considered retryable
+			// elsewhere
+			log.Warnf("fleet server ping succeeded but received bad status code: %d", resp.StatusCode)
 			return nil
 		}
 
-		return fmt.Errorf("fleet server ping returned a bad status code: %d", resp.StatusCode)
+		return fmt.Errorf("fleet server ping failed with bad status code: %d", resp.StatusCode)
 	}
 
 	return nil
