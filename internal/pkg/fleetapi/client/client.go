@@ -129,7 +129,7 @@ func ExtractError(resp io.Reader) error {
 	return fmt.Errorf("could not decode the response, raw response: %s", string(data))
 }
 
-func CheckRemote(log *logger.Logger, ctx context.Context, c Sender) error {
+func CheckRemote(ctx context.Context, log *logger.Logger, c Sender) error {
 	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
 	defer cancel()
 

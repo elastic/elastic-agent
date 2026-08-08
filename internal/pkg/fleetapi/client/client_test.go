@@ -318,7 +318,7 @@ func Test_CheckRemote(t *testing.T) {
 			})
 
 			require.NoError(t, err)
-			require.Equal(t, tc.expectedError, CheckRemote(testLogger, t.Context(), c) != nil)
+			require.Equal(t, tc.expectedError, CheckRemote(t.Context(), testLogger, c) != nil)
 			require.Equal(t, tc.expectedLog, observedLogs.FilterMessageSnippet("fleet server ping returned temporary bad status code").Len() > 0)
 		})
 	}
