@@ -146,12 +146,12 @@ These components are included in {{agent}} version 9.5.0.
 
 [^2]: Deprecated in 9.2.0. Replaced by the `elasticapm` processor. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
 
-[^3]: The following features and configuration options are **NOT** officially supported in {{agent}} with the Kafka receiver:
+[^3]: The following features and configuration options are **NOT** officially supported in the EDOT Collector with the Kafka receiver:
 - Encoding options other than `otlp_proto` or `otlp_json`
 - Using the Sarama client (i.e. opting out of the `exporter.kafkaexporter.UseFranzGo` feature gate is not supported)
 - Partitioning configuration (i.e. `partition_*` options).
 
-[^4]: The following features and configuration options are **NOT** officially supported in {{agent}} with the Kafka receiver:
+[^4]: The following features and configuration options are **NOT** officially supported in the EDOT Collector with the Kafka receiver:
 - Encoding options other than `otlp_proto` or `otlp_json`
 - Using the Sarama client (i.e. opting out of the `exporter.kafkaexporter.UseFranzGo` feature gate is not supported)
 
