@@ -69,24 +69,24 @@ type AgentInfo struct {
 	ID string `json:"id" yaml:"id" config:"id"`
 }
 
-func LoadConfig(ctx context.Context, override CfgOverrider) (*Configuration, error) {
-	uCfg, err := loadBaseFileConfig()
+// ConfigReloader reloads the applied configuration while preserving the startup configuration.
+type ConfigReloader struct {
+	startupConfig  *Configuration
+	config         *Configuration
+	configOverride CfgOverrider
+}
+
+// NewConfigReloader loads the startup and applied configurations.
+func NewConfigReloader(ctx context.Context, startupOverride, configOverride CfgOverrider) (*ConfigReloader, error) {
+	uCfg, err := loadLocalConfig()
 	if err != nil {
 		return nil, err
 	}
+	managed, _ := uCfg.Agent.Bool("fleet.enabled", -1, ucfg.PathSep("."))
 
-	loadFleet, _ := uCfg.Agent.Bool("fleet.enabled", -1, ucfg.PathSep("."))
-	if loadFleet {
-		fleetCfg, err := loadFleetFileConfig(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if fleetCfg != nil {
-			if err := uCfg.Merge(fleetCfg); err != nil {
-				return nil, errors.New(err, "could not merge fleet configuration",
-					errors.TypeConfig,
-					errors.M(errors.MetaKeyPath, paths.AgentConfigFile()))
-			}
+	if startupOverride != nil {
+		if err := startupOverride(uCfg); err != nil {
+			return nil, errors.New(err, "could not apply startup config override")
 		}
 	}
 
@@ -94,33 +94,63 @@ func LoadConfig(ctx context.Context, override CfgOverrider) (*Configuration, err
 		return nil, errors.New(err, "could not inject agent path/host/runtime config")
 	}
 
-	if override != nil {
-		if err := override(uCfg); err != nil {
-			return nil, errors.New(err, "could not apply config override")
-		}
-	}
-
-	cfg, err := NewFromConfig(uCfg)
+	startupConfig, err := NewFromConfig(uCfg)
 	if err != nil {
-		return nil, errors.New(err, "could not parse agent configuration")
+		return nil, errors.New(err, "could not parse startup agent configuration")
 	}
 
-	return cfg, nil
+	config, err := mergeAppliedConfiguration(ctx, startupConfig, managed, configOverride)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ConfigReloader{
+		startupConfig:  startupConfig,
+		config:         config,
+		configOverride: configOverride,
+	}, nil
 }
 
-func loadBaseFileConfig() (*config.Config, error) {
-	pathConfigFile := paths.ConfigFile()
-	uCfg, err := config.LoadFile(pathConfigFile)
+// Reload updates the applied configuration.
+func (r *ConfigReloader) Reload(ctx context.Context) error {
+	current, err := loadLocalConfig()
+	if err != nil {
+		return err
+	}
+
+	managed, _ := current.Agent.Bool("fleet.enabled", -1, ucfg.PathSep("."))
+
+	cfg, err := mergeAppliedConfiguration(ctx, r.startupConfig, managed, r.configOverride)
+	if err != nil {
+		return err
+	}
+	r.config = cfg
+	return nil
+}
+
+// StartupConfiguration returns the configuration captured at startup.
+func (r *ConfigReloader) StartupConfiguration() *Configuration {
+	return r.startupConfig
+}
+
+// Configuration returns the applied configuration.
+func (r *ConfigReloader) Configuration() *Configuration {
+	return r.config
+}
+
+func loadLocalConfig() (*config.Config, error) {
+	path := paths.ConfigFile()
+	uCfg, err := config.LoadFile(path)
 	if err != nil {
 		return nil, errors.New(err,
-			fmt.Sprintf("could not read configuration file %s", pathConfigFile),
+			fmt.Sprintf("could not read configuration file %s", path),
 			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, pathConfigFile))
+			errors.M(errors.MetaKeyPath, path))
 	}
 	return uCfg, nil
 }
 
-func loadFleetFileConfig(ctx context.Context) (*config.Config, error) {
+func loadFleetConfig(ctx context.Context) (*config.Config, error) {
 	path := paths.AgentConfigFile()
 	store, err := storage.NewEncryptedDiskStore(ctx, path)
 	if err != nil {
@@ -152,4 +182,42 @@ func loadFleetFileConfig(ctx context.Context) (*config.Config, error) {
 	}
 
 	return fleetCfg, nil
+}
+
+func mergeAppliedConfiguration(ctx context.Context, startupConfig *Configuration, managed bool, configOverride CfgOverrider) (*Configuration, error) {
+	uCfg, err := startupConfig.GetUCfg().Clone()
+	if err != nil {
+		return nil, errors.New(err, "could not clone startup configuration")
+	}
+
+	if managed {
+		fleetCfg, err := loadFleetConfig(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if fleetCfg != nil {
+			if err := uCfg.Merge(fleetCfg); err != nil {
+				return nil, errors.New(err, "could not merge fleet configuration",
+					errors.TypeConfig,
+					errors.M(errors.MetaKeyPath, paths.AgentConfigFile()))
+			}
+		}
+	}
+
+	if err := uCfg.Agent.SetBool("fleet.enabled", -1, managed, ucfg.PathSep(".")); err != nil {
+		return nil, errors.New(err, "could not apply agent mode")
+	}
+
+	if configOverride != nil {
+		if err := configOverride(uCfg); err != nil {
+			return nil, errors.New(err, "could not apply config override")
+		}
+	}
+
+	cfg, err := NewFromConfig(uCfg)
+	if err != nil {
+		return nil, errors.New(err, "could not parse agent configuration")
+	}
+
+	return cfg, nil
 }

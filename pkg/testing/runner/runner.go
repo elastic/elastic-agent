@@ -97,6 +97,12 @@ func NewRunner(cfg common.Config, ip common.InstanceProvisioner, sp common.Stack
 	if ip.Type() == common.ProvisionerTypeLocal {
 		for i := range osBatches {
 			osBatches[i].OS.Runner = local.Runner{}
+			// The Skip flag is set when an OS isn't in the known VM infrastructure.
+			// For local mode the provisioner runs directly on the host, so if it
+			// reports the OS as supported we can clear the flag and run the tests.
+			if osBatches[i].Skip && ip.Supported(osBatches[i].OS.OS) {
+				osBatches[i].Skip = false
+			}
 		}
 	}
 

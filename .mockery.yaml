@@ -39,3 +39,10 @@ packages:
   github.com/elastic/elastic-agent/pkg/control/v2/client:
     interfaces:
       Client: {}
+  github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator:
+    config:
+      pkgname: mocks
+      dir: "{{.InterfaceDir}}/mocks"
+      filename: runtime_manager.go
+    interfaces:
+      RuntimeManager: {}

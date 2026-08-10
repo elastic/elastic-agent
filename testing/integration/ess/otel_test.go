@@ -38,8 +38,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/compose"
-	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -294,10 +292,10 @@ service:
 			return found == numEvents
 		},
 		3*time.Minute, 500*time.Millisecond,
-		fmt.Sprintf("there should be exported logs by now"))
+		"there should be exported logs by now")
 	cancel()
 	fixtureWg.Wait()
-	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
+	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
 }
 
 func TestOtelHybridFileProcessing(t *testing.T) {
@@ -411,7 +409,7 @@ service:
 			return found == numEvents
 		},
 		3*time.Minute, 500*time.Millisecond,
-		fmt.Sprintf("there should be exported logs by now"))
+		"there should be exported logs by now")
 
 	statusCtx, statusCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer statusCancel()
@@ -428,7 +426,6 @@ service:
 		otelCollectorStatus := status.Collector
 		require.NotNil(collect, otelCollectorStatus)
 		assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
-		return
 	}, 1*time.Minute, 1*time.Second)
 
 	cancel()
@@ -452,7 +449,7 @@ service:
         - file
 `)
 	cfgFilePath := filepath.Join(tempDir, "otel-valid.yml")
-	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileProcessingConfig), 0o600))
+	require.NoError(t, os.WriteFile(cfgFilePath, fileProcessingConfig, 0o600))
 
 	// check `elastic-agent otel validate` command works for otel config
 	cmd, err := fixture.PrepareAgentCommand(ctx, []string{"otel", "validate", "--config", cfgFilePath})
@@ -484,7 +481,7 @@ service:
       exporters:
         - file
 `)
-	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileInvalidOtelConfig), 0o600))
+	require.NoError(t, os.WriteFile(cfgFilePath, fileInvalidOtelConfig, 0o600))
 
 	out, err = fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath})
 	require.Error(t, err)
@@ -648,7 +645,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 
 	cancel()
 	fixtureWg.Wait()
-	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
+	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
 }
 
 func TestOtelAPMIngestion(t *testing.T) {
@@ -717,8 +714,9 @@ func TestOtelAPMIngestion(t *testing.T) {
 	apmFixtureWg.Add(1)
 	apmContext, apmCancel := context.WithCancel(ctx)
 	defer apmCancel()
+	var apmRunErr error
 	go func() {
-		aTesting.RunProcess(t,
+		apmRunErr = aTesting.RunProcess(t,
 			logWatcher,
 			apmContext, 0,
 			true, true,
@@ -729,8 +727,9 @@ func TestOtelAPMIngestion(t *testing.T) {
 	// start agent
 	var fixtureWg sync.WaitGroup
 	fixtureWg.Add(1)
+	var otelRunErr error
 	go func() {
-		fixture.RunOtelWithClient(ctx)
+		otelRunErr = fixture.RunOtelWithClient(ctx)
 		fixtureWg.Done()
 	}()
 
@@ -808,6 +807,8 @@ func TestOtelAPMIngestion(t *testing.T) {
 	apmCancel()
 	fixtureWg.Wait()
 	apmFixtureWg.Wait()
+	require.True(t, otelRunErr == nil || errors.Is(otelRunErr, context.Canceled) || errors.Is(otelRunErr, context.DeadlineExceeded), "unexpected otel runner error: %s", otelRunErr)
+	require.True(t, apmRunErr == nil || errors.Is(apmRunErr, context.Canceled) || errors.Is(apmRunErr, context.DeadlineExceeded), "unexpected apm runner error: %s", apmRunErr)
 }
 
 func createESApiKey(t *testing.T, esClient *elasticsearch.Client) estools.APIKeyResponse {
@@ -852,16 +853,6 @@ func mapAllTrue(mm map[string]bool) bool {
 	}
 
 	return true
-}
-
-func mapAtLeastOneTrue(mm map[string]bool) bool {
-	for _, v := range mm {
-		if v {
-			return true
-		}
-	}
-
-	return false
 }
 
 func TestOtelFilestreamInput(t *testing.T) {
@@ -959,6 +950,7 @@ agent.internal.runtime.filebeat.filestream: otel
 	require.NoError(t, err)
 
 	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
 
 	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
 	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
@@ -1084,11 +1076,12 @@ agent.monitoring:
 	index := ".ds-metrics-e2e-*"
 	var configBuffer bytes.Buffer
 
-	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-		otelConfigOptions{
-			ESEndpoint: esEndpoint,
-			ESApiKey:   decodedApiKey,
-		})
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			otelConfigOptions{
+				ESEndpoint: esEndpoint,
+				ESApiKey:   decodedApiKey,
+			}))
 
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
@@ -1096,6 +1089,7 @@ agent.monitoring:
 	require.NoError(t, err)
 
 	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
 
 	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
 	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
@@ -1149,7 +1143,7 @@ agent.monitoring:
 		"Expected at least %d logs, got %v", 1, actualHits.Hits)
 
 	cancel()
-	cmd.Wait()
+	_ = cmd.Wait()
 }
 
 func TestHybridAgentE2E(t *testing.T) {
@@ -1292,7 +1286,7 @@ service:
 				HomeDir:         tmpDir,
 				ESEndpoint:      esEndpoint,
 				ESApiKey:        esApiKey.Encoded,
-				BeatsESApiKey:   string(beatsApiKey),
+				BeatsESApiKey:   beatsApiKey,
 				FBReceiverIndex: fbReceiverIndex,
 			}))
 	configContents := configBuffer.Bytes()
@@ -1372,7 +1366,7 @@ service:
 
 	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
 	cancel()
-	cmd.Wait()
+	_ = cmd.Wait()
 }
 
 func TestHybridAgentGlobalProcessors(t *testing.T) {
@@ -1471,7 +1465,7 @@ processors:
 				InputPath:     inputFilePath,
 				HomeDir:       tmpDir,
 				ESEndpoint:    esEndpoint,
-				BeatsESApiKey: string(beatsApiKey),
+				BeatsESApiKey: beatsApiKey,
 			}))
 	configContents := configBuffer.Bytes()
 	t.Cleanup(func() {
@@ -1680,7 +1674,7 @@ service:
 				break
 			}
 
-			_, err = inputFile.Write([]byte(fmt.Sprintf(`{"id": "%d", "message": "%d"}`, i, i)))
+			_, err = fmt.Fprintf(inputFile, `{"id": "%d", "message": "%d"}`, i, i)
 			assert.NoErrorf(t, err, "failed to write line %d to temp file", i)
 			_, err = inputFile.Write([]byte("\n"))
 			assert.NoError(t, err, "failed to write newline to temp file")
@@ -1713,7 +1707,7 @@ service:
 				"log.file.path": inputFilePath,
 			})
 			require.NoError(ct, err)
-			got := int(docs.Hits.Total.Value)
+			got := docs.Hits.Total.Value
 
 			require.GreaterOrEqual(ct, got, 10, "")
 		},
@@ -1813,9 +1807,9 @@ func TestOtelBeatsAuthExtension(t *testing.T) {
 	}
 
 	caFilePath := filepath.Join(t.TempDir(), "ca.pem")
-	os.WriteFile(caFilePath, pem.EncodeToMemory(&pem.Block{
+	require.NoError(t, os.WriteFile(caFilePath, pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
-		Bytes: caCert.Leaf.Raw}), 0o777)
+		Bytes: caCert.Leaf.Raw}), 0o777))
 
 	// we pass an incorrect CA to es-exporter
 	// but we expect beatsauthextension to replace the exporter's
@@ -1880,6 +1874,7 @@ service:
 
 	// configure elastic-agent.yml
 	err = fixture.Configure(ctx, otelConfigBuffer.Bytes())
+	require.NoError(t, err)
 
 	// prepare agent command
 	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
@@ -2022,6 +2017,7 @@ service:
 
 	// configure elastic-agent.yml
 	err = fixture.Configure(ctx, otelConfigBuffer.Bytes())
+	require.NoError(t, err)
 
 	// prepare agent command
 	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
@@ -2109,10 +2105,11 @@ outputs:
 `
 
 	var configBuffer bytes.Buffer
-	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-		otelConfigOptions{
-			StatusReportingEnabled: true,
-		})
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			otelConfigOptions{
+				StatusReportingEnabled: true,
+			}))
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
@@ -2127,6 +2124,7 @@ outputs:
 	require.NoError(t, err)
 
 	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
 
 	output, err := fixture.InstallWithoutEnroll(ctx, &installOpts)
 	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
@@ -2143,10 +2141,11 @@ outputs:
 	// Disable status reporting.
 	// This should result in HEALTHY state
 	configBuffer.Reset()
-	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-		otelConfigOptions{
-			StatusReportingEnabled: false,
-		})
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			otelConfigOptions{
+				StatusReportingEnabled: false,
+			}))
 	err = fixture.Configure(ctx, configBuffer.Bytes())
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
@@ -2161,10 +2160,11 @@ outputs:
 	// Enabled status reporting and keep using localhost.
 	// This should result in DEGRADED state
 	configBuffer.Reset()
-	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-		otelConfigOptions{
-			StatusReportingEnabled: true,
-		})
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			otelConfigOptions{
+				StatusReportingEnabled: true,
+			}))
 	err = fixture.Configure(ctx, configBuffer.Bytes())
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
@@ -2194,14 +2194,6 @@ func TestLogReloading(t *testing.T) {
 	// 3. Ensure no debug logs are printed
 	// 4. Set service::telemetry::logs::level: debug
 	// 5. Ensure service::telemetry::logs::level is given precedence even when agent logs are set to info
-
-	// Create the otel configuration file
-	type otelConfigOptions struct {
-		ESEndpoint string
-		ESApiKey   string
-		Index      string
-		CAFile     string
-	}
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -2489,9 +2481,9 @@ service:
 	ev = ev.Flatten()
 
 	require.NotEmpty(t, ev["@timestamp"], "expected @timestamp to be set")
-	ev.Delete("@timestamp")
+	require.NoError(t, ev.Delete("@timestamp"))
 	require.Greater(t, ev["beat.stats.libbeat.output.write.bytes"], float64(0))
-	ev.Delete("beat.stats.libbeat.output.write.bytes")
+	require.NoError(t, ev.Delete("beat.stats.libbeat.output.write.bytes"))
 
 	expected := mapstr.M{
 		"beat.stats.libbeat.pipeline.queue.max_events":    float64(3200),
@@ -2511,7 +2503,7 @@ service:
 }
 
 func TestOtelElasticsearchStateStore_Agentless(t *testing.T) {
-	info := define.Require(t, define.Requirements{
+	info := define.Require(t, define.Requirements{ //nolint:staticcheck // This needs to be the first statement in the test body
 		Group: integration.Default,
 		Local: true,
 		OS: []define.OS{
@@ -2650,7 +2642,7 @@ agent.grpc:
 	// Stop the first agent
 	requestCountBeforeRestart := mock.RequestCount()
 	cancel()
-	cmd.Wait()
+	_ = cmd.Wait()
 
 	mock.MarkRestart()
 
@@ -2740,8 +2732,12 @@ func newHTTPJSONCursorMockServer(t *testing.T) *httpJSONCursorMockServer {
 		fmt.Fprintf(w, `{"message":"hello","published":"%s"}`, published.Format(time.RFC3339))
 	})
 
-	mock.server = &http.Server{Handler: mux}
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	mock.server = &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	lc := net.ListenConfig{}
+	listener, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	go func() { _ = mock.server.Serve(listener) }()
@@ -2775,6 +2771,7 @@ func (m *httpJSONCursorMockServer) FirstSinceAfterRestart() time.Time {
 }
 
 func (m *httpJSONCursorMockServer) Close() {
+	//nolint:forbidigo // no test context available in this method; t.Context() is not accessible here
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = m.server.Shutdown(ctx)
@@ -2789,7 +2786,7 @@ func (w *ZapWriter) Write(p []byte) (n int, err error) {
 	msg := strings.TrimSpace(string(p))
 	if msg != "" {
 		w.logger.Check(w.level, msg).Write()
-		w.logger.Sync()
+		_ = w.logger.Sync()
 	}
 	return len(p), nil
 }
@@ -2822,20 +2819,9 @@ services:
       - KAFKA_ADVERTISED_HOST=localhost
 `, kafkaPath)
 
-	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = stack.Down(
-			context.Background(),
-			compose.RemoveOrphans(true),
-			compose.RemoveVolumes(true),
-			compose.RemoveImagesLocal,
-		)
-	})
-
-	err = stack.
-		Up(t.Context(), compose.Wait(true))
+	stack := newDockerCompose(t, composeContent)
+	t.Cleanup(func() { _ = stack.down(context.Background()) }) //nolint:forbidigo // t.Context() is cancelled by cleanup time
+	err := stack.up(t.Context())
 	require.NoError(t, err)
 
 	kafkaDocs := make(map[string]mapstr.M, 0)
@@ -2902,12 +2888,13 @@ agent.monitoring:
     port: 6790
 `
 		var configBuffer bytes.Buffer
-		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-			otelConfigOptions{
-				RuntimeExperimental: tt.runtimeExperimental,
-				Broker:              "localhost:9093",
-				CaCert:              filepath.Join(kafkaPath, "certs", "ca-cert"),
-			})
+		require.NoError(t,
+			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+				otelConfigOptions{
+					RuntimeExperimental: tt.runtimeExperimental,
+					Broker:              "localhost:9093",
+					CaCert:              filepath.Join(kafkaPath, "certs", "ca-cert"),
+				}))
 
 		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 		defer cancel()
@@ -2972,7 +2959,7 @@ agent.monitoring:
 			"Expected at least 1 document")
 
 		cancel()
-		cmd.Wait()
+		_ = cmd.Wait()
 	}
 
 	t.Run("compare documents", func(t *testing.T) {
@@ -3030,19 +3017,9 @@ services:
       - KAFKA_ADVERTISED_HOST=localhost
 `, kafkaPath)
 
-	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = stack.Down(
-			context.Background(),
-			compose.RemoveOrphans(true),
-			compose.RemoveVolumes(true),
-			compose.RemoveImagesLocal,
-		)
-	})
-
-	err = stack.Up(t.Context(), compose.Wait(true))
+	stack := newDockerCompose(t, composeContent)
+	t.Cleanup(func() { _ = stack.down(context.Background()) }) //nolint:forbidigo // t.Context() is cancelled by cleanup time
+	err := stack.up(t.Context())
 	require.NoError(t, err)
 
 	// Each strategy gets its own topic.
@@ -3182,11 +3159,12 @@ agent.monitoring:
 `
 
 			var configBuffer bytes.Buffer
-			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, configOptions{
-				Topic:           tt.topic,
-				PartitionConfig: tt.partitionConfig,
-				CaCert:          filepath.Join(kafkaPath, "certs", "ca-cert"),
-			})
+			require.NoError(t,
+				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, configOptions{
+					Topic:           tt.topic,
+					PartitionConfig: tt.partitionConfig,
+					CaCert:          filepath.Join(kafkaPath, "certs", "ca-cert"),
+				}))
 
 			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 			require.NoError(t, err)
@@ -3264,7 +3242,7 @@ agent.monitoring:
 			tt.validate(t, partitionConsumers, make(map[int32]int))
 
 			cancel()
-			cmd.Wait()
+			_ = cmd.Wait()
 		})
 	}
 }
@@ -3325,21 +3303,10 @@ services:
       - 5055:5055
 `, logstash_testdata, pipeline, logstash_testdata)
 
-	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(composeContent)))
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = stack.Down(
-			context.Background(),
-			compose.RemoveOrphans(true),
-			compose.RemoveVolumes(true),
-			compose.RemoveImagesLocal,
-		)
-	})
-
-	err = stack.
-		WaitForService("logstash", wait.NewHTTPStrategy("/_node/stats").WithPort("9600/tcp").WithStartupTimeout(5*time.Minute)).
-		Up(t.Context(), compose.Wait(true))
+	stack := newDockerCompose(t, composeContent)
+	t.Cleanup(func() { _ = stack.down(context.Background()) }) //nolint:forbidigo // t.Context() is cancelled by cleanup time
+	// The logstash service has a healthcheck in the compose file; --wait handles readiness.
+	err := stack.up(t.Context())
 	require.NoError(t, err)
 
 	// baseURL := "http://localhost:8082"
@@ -3402,12 +3369,13 @@ agent.monitoring:
 
 		testCaseName := uuid.Must(uuid.NewV4()).String()
 		var configBuffer bytes.Buffer
-		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-			otelConfigOptions{
-				RuntimeExperimental: tt.runtimeExperimental,
-				TestCaseName:        testCaseName,
-				Host:                tt.host,
-			})
+		require.NoError(t,
+			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+				otelConfigOptions{
+					RuntimeExperimental: tt.runtimeExperimental,
+					TestCaseName:        testCaseName,
+					Host:                tt.host,
+				}))
 
 		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 		defer cancel()
@@ -3432,14 +3400,10 @@ agent.monitoring:
 				t.Log("Elastic-Agent output:")
 				t.Log(output.String())
 
-				logCtx, logCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				logCtx, logCancel := context.WithTimeout(context.Background(), 30*time.Second) //nolint:forbidigo // t.Context() is cancelled by cleanup time
 				defer logCancel()
 
-				lsContainer, err := stack.ServiceContainer(logCtx, "logstash")
-				if err != nil {
-					t.Logf("could not read logs from logstash container: %s", err.Error())
-				}
-				rc, err := lsContainer.Logs(logCtx)
+				rc, err := stack.serviceLogs(logCtx, "logstash")
 				if err != nil {
 					t.Logf("could not read logs from logstash container: %s", err.Error())
 					return
@@ -3478,7 +3442,7 @@ agent.monitoring:
 		logstash[tt.name] = downloadData(t, outFileURL)
 
 		cancel()
-		cmd.Wait()
+		_ = cmd.Wait()
 	}
 
 	agentDoc, agentOk := logstash["agent"]

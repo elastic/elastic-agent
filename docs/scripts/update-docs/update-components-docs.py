@@ -1,7 +1,7 @@
 """
-EDOT Collector Documentation Generation Tools
+Elastic Agent Documentation Generation Tools
 
-This module provides tools for automatically generating and updating EDOT Collector documentation
+This module provides tools for automatically generating and updating Elastic Agent documentation
 based on local data sources. It includes functionality for:
 
 - Component table generation from local Elastic Agent go.mod files

@@ -13,14 +13,12 @@ kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Ensure current runtime stops before new runtime starts
+summary: Fix getting current user failing on Windows when no profile directory is present
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: |
-  Ensures that the current runtime stops before the new runtime starts, otherwise registry
-  state will not be consistent before the start of the new runtime.
+# description:
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:

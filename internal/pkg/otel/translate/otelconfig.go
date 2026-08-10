@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -828,6 +829,13 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 			}
 		}
 
+		// Strip per-input copies of default processors already run by the beatprocessor.
+		if features.DefaultProcessors() {
+			if _, ok := input["processors"]; ok {
+				input["processors"] = stripDefaultProcessors(comp.BeatName(), input["processors"])
+			}
+		}
+
 		var protoStreamID string
 		if i < len(streams) {
 			protoStreamID = streams[i].GetId()
@@ -836,11 +844,80 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 		result[i] = receiverInput{streamID: streamID, config: input}
 	}
 
+	// A Synthetics browser monitor compiles into a single synthetics/browser input
+	// with three streams: the "browser" monitor stream, which carries the schedule,
+	// plus schedule-less "browser.network" and "browser.screenshot" auxiliary streams
+	// used only for data-stream routing. Classic (process) heartbeat collapses these
+	// into a single monitor via stdfields.UnnestStream, keeping only the base stream
+	// and dropping the auxiliary ones. The beat-receiver path emits one monitor per
+	// stream instead, so the schedule-less streams have to be filtered out here — the
+	// heartbeatreceiver otherwise rejects them ("missing required field accessing
+	// 'heartbeat.monitors.0.schedule'") and the whole component fails to start.
+	// See https://github.com/elastic/elastic-agent/issues/15968.
+	if comp.InputType == "synthetics/browser" {
+		result = keepScheduledMonitors(result)
+	}
+
 	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver && comp.InputType == "osquery" {
 		result = injectOsqueryConfig(result, unit)
 	}
 
 	return result, nil
+}
+
+// keepScheduledMonitors filters beat-receiver inputs down to those that represent an
+// actual heartbeat monitor, i.e. streams that define a schedule. Auxiliary Synthetics
+// browser sub-streams (browser.network, browser.screenshot) carry no schedule and exist
+// only for data-stream routing, mirroring what stdfields.UnnestStream drops in classic
+// heartbeat. If no stream defines a schedule the config is malformed, so the inputs are
+// returned unchanged to let the heartbeatreceiver surface the real validation error
+// rather than silently producing a monitor-less component.
+func keepScheduledMonitors(inputs []receiverInput) []receiverInput {
+	scheduled := make([]receiverInput, 0, len(inputs))
+	for _, ri := range inputs {
+		if sched, ok := ri.config["schedule"]; ok && sched != nil && sched != "" {
+			scheduled = append(scheduled, ri)
+		}
+	}
+	if len(scheduled) == 0 {
+		return inputs
+	}
+	return scheduled
+}
+
+// stripDefaultProcessors removes per-input processor entries that exactly match
+// (same name and config) a default processor handled by the beatprocessor, so
+// they don't run twice. Entries with a matching name but different config are
+// kept so user customisations are not silently discarded.
+func stripDefaultProcessors(beatName string, raw any) []any {
+	list, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	defaults := GetDefaultProcessors(beatName)
+	if len(defaults) == 0 {
+		return list
+	}
+	defaultsByName := make(map[string]any, len(defaults))
+	for _, p := range defaults {
+		for k, v := range p {
+			defaultsByName[k] = v
+		}
+	}
+	filtered := make([]any, 0, len(list))
+	for _, item := range list {
+		p, ok := item.(map[string]any)
+		if !ok || len(p) != 1 {
+			filtered = append(filtered, item)
+			continue
+		}
+		key := maps.Keys(p)[0]
+		if defaultVal, isDefault := defaultsByName[key]; isDefault && reflect.DeepEqual(p[key], defaultVal) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
 }
 
 // injectOsqueryConfig replicates what osquerybeatCfgFromStreams does in process
@@ -874,8 +951,13 @@ func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiver
 				result[i].config["osquery"] = osqMap
 			}
 		}
-		// Place the result stream first as osquerybeat requires the result data stream to be first.
-		result[0], result[i] = result[i], result[0]
+		// Move the result stream to position 0, shifting preceding streams right by one.
+		// This mirrors osquerybeatCfgFromStreams which prepends the result stream so that
+		// all other streams follow in their original relative order. A simple swap would
+		// displace whichever stream was at index 0 to index i, corrupting that order.
+		resultStream := result[i]
+		copy(result[1:i+1], result[0:i])
+		result[0] = resultStream
 		break
 	}
 	return result

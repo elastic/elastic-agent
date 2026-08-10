@@ -43,7 +43,10 @@ func (Runner) Run(ctx context.Context, verbose bool, sshClient ssh.SSHClient, lo
 
 	maxDuration := 2 * time.Hour
 	var result []common.OSRunnerPackageResult
-	for _, pkg := range batch.Tests {
+	// Combine Tests and SudoTests: integration:local is already invoked with sudo,
+	// so both sets run the same way on the local host.
+	allTests := append(batch.Tests, batch.SudoTests...)
+	for _, pkg := range allTests {
 		packageTestsStrBuilder := strings.Builder{}
 		packageTestsStrBuilder.WriteString("^(")
 		for idx, test := range pkg.Tests {
