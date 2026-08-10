@@ -167,12 +167,8 @@ share similar leavers as the packaging process.
        in Docker. This needs to be set if running Kubernetes integration
        tests.
      - `docker`: Runs each test batch in a local, systemd-enabled Docker
-       container (with sshd) instead of a VM, so the privileged ("sudo")
-       tests can run locally. It builds an Ubuntu image on first use and the
-       runner drives the container over SSH exactly like a VM. Linux hosts
-       only for now (the container's bridge IP must be reachable, which isn't
-       the case on macOS Docker Desktop). Requires Docker; does not require
-       GCE credentials.
+       container (with sshd) instead of a VM. It builds an Ubuntu image on first use and the
+       runner drives the container over SSH exactly like a VM. Requires Docker.
 
 When running local mode integration tests, `BUILD_AGENT=true` will build the agent for the current platform before running.
 
@@ -640,16 +636,6 @@ Notes:
   `/var/lib/containerd` are backed by volumes (removed with the container via
   `docker rm -fv`) because the nested daemon's overlay storage cannot stack on the
   container's own overlay rootfs.
-- The containers run `--privileged` (required for systemd, and for the nested daemon).
-- **Linux hosts only** for now: the runner reaches the container over its bridge IP
-  on port 22, which isn't routable on macOS Docker Desktop (that would require
-  publishing the SSH port, which the framework's SSH client doesn't support yet).
-- Unlike `gcloud`, this does **not** require GCE credentials (`integration:auth`).
-  ESS credentials are still needed for any tests that require a stack.
-- Containers are left running after a run (like VMs) so they can be reused. Remove
-  them with `mage integration:clean`, which deletes both the containers recorded in
-  state and any leftovers from a cancelled run (matched by the `eat-it-` name prefix
-  and the `elastic-agent-integration-test` label).
 
 ## Troubleshooting Tips
 
