@@ -452,14 +452,11 @@ func TestGetOtelConfig(t *testing.T) {
 			"user":               "elastic",
 			"max_conns_per_host": 1,
 			"retry": map[string]any{
-				"enabled":          true,
-				"initial_interval": 1 * time.Second,
-				"max_interval":     1 * time.Minute,
-				"max_retries":      3,
-				"retry_on_status": []int{
-					401, 403,
-					429, 500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511,
-				},
+				"enabled":                  true,
+				"initial_interval":         1 * time.Second,
+				"max_interval":             1 * time.Minute,
+				"max_retries":              3,
+				"retry_on_status":          defaultRetryOnStatus(),
 				"retry_on_document_status": []int{429, 500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511},
 			},
 			"sending_queue": map[string]any{

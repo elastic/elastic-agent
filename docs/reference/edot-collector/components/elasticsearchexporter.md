@@ -190,7 +190,7 @@ The {{es}} exporter uses the [{{es}} Bulk API](https://www.elastic.co/docs/api/d
 | `retry::retry_on_status` | `[429]` | Status codes that trigger request-level retries. |
 | `retry::retry_on_document_status` | `retry::retry_on_status` | Status codes that trigger document-level retries. If unset, uses `retry::retry_on_status`. |
 
-When Elastic Agent translates an Elasticsearch output for the OTel runtime, request-level retries include `401` and `403`. Document-level retries continue to use the configured document status list, so document-level authorization failures do not block unrelated documents.
+When Elastic Agent translates an Elasticsearch output for the OTel runtime, request-level retries include every `3xx` through `5xx` status except `413`, matching Beats Elasticsearch output behavior. Document-level retries include `429` and `5xx` statuses, so document-level authorization failures do not block unrelated documents.
 
 :::{note}
 The `flush::interval` config is ignored when using `sending_queue` ({applies_to}`stack: ga 9.3`) or when the `batcher::enabled` config ({applies_to}`stack: removed 9.3`) is explicitly set.

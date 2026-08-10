@@ -8,7 +8,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"net/http"
+	"strings"
 	"testing"
 	"text/template"
 
@@ -24,15 +24,22 @@ import (
 
 func TestGetRetryConfig(t *testing.T) {
 	escfg := defaultOptions
+	expectedRequestStatuses := defaultRetryOnStatus()
+	expectedDocumentStatuses := defaultRetryOnDocumentStatus
 
 	retryConfig := getRetryConfig(escfg)
-	expectedRequestStatuses := append(
-		[]int{http.StatusUnauthorized, http.StatusForbidden},
-		escfg.RetryOnDocumentStatus...,
-	)
 
-	assert.Equal(t, expectedRequestStatuses, retryConfig["retry_on_status"])
-	assert.Equal(t, escfg.RetryOnDocumentStatus, retryConfig["retry_on_document_status"])
+	assert.Equal(t,
+		expectedRequestStatuses,
+		retryConfig["retry_on_status"],
+		"the defaults for 'retry_on_status' must be preserved",
+	)
+	assert.Equal(
+		t,
+		expectedDocumentStatuses,
+		retryConfig["retry_on_document_status"],
+		"the defaults for 'retry_on_document_status' must be preserved",
+	)
 }
 
 func TestToOtelConfig(t *testing.T) {
@@ -71,20 +78,7 @@ retry:
   max_interval: 7m0s
   max_retries: 3
   retry_on_status:
-  - 401
-  - 403
-  - 429
-  - 500
-  - 501
-  - 502
-  - 503
-  - 504
-  - 505
-  - 506
-  - 507
-  - 508
-  - 510
-  - 511
+__REQUEST_RETRY_STATUSES__
   retry_on_document_status:
   - 429
   - 500
@@ -151,20 +145,7 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
-  - 401
-  - 403
-  - 429
-  - 500
-  - 501
-  - 502
-  - 503
-  - 504
-  - 505
-  - 506
-  - 507
-  - 508
-  - 510
-  - 511
+__REQUEST_RETRY_STATUSES__
   retry_on_document_status:
   - 429
   - 500
@@ -230,20 +211,7 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
-  - 401
-  - 403
-  - 429
-  - 500
-  - 501
-  - 502
-  - 503
-  - 504
-  - 505
-  - 506
-  - 507
-  - 508
-  - 510
-  - 511
+__REQUEST_RETRY_STATUSES__
   retry_on_document_status:
   - 429
   - 500
@@ -311,20 +279,7 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
-  - 401
-  - 403
-  - 429
-  - 500
-  - 501
-  - 502
-  - 503
-  - 504
-  - 505
-  - 506
-  - 507
-  - 508
-  - 510
-  - 511
+__REQUEST_RETRY_STATUSES__
   retry_on_document_status:
   - 429
   - 500
@@ -393,20 +348,7 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
-  - 401
-  - 403
-  - 429
-  - 500
-  - 501
-  - 502
-  - 503
-  - 504
-  - 505
-  - 506
-  - 507
-  - 508
-  - 510
-  - 511
+__REQUEST_RETRY_STATUSES__
   retry_on_document_status:
   - 429
   - 500
@@ -487,20 +429,7 @@ retry:
   max_interval: 5m0s
   max_retries: 3
   retry_on_status:
-  - 401
-  - 403
-  - 429
-  - 500
-  - 501
-  - 502
-  - 503
-  - 504
-  - 505
-  - 506
-  - 507
-  - 508
-  - 510
-  - 511
+__REQUEST_RETRY_STATUSES__
   retry_on_document_status:
   - 429
   - 500
@@ -624,20 +553,7 @@ retry:
   max_interval: 7m0s
   max_retries: 5
   retry_on_status:
-  - 401
-  - 403
-  - 429
-  - 500
-  - 501
-  - 502
-  - 503
-  - 504
-  - 505
-  - 506
-  - 507
-  - 508
-  - 510
-  - 511
+__REQUEST_RETRY_STATUSES__
   retry_on_document_status:
   - 429
   - 500
@@ -774,20 +690,7 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
-  - 401
-  - 403
-  - 429
-  - 500
-  - 501
-  - 502
-  - 503
-  - 504
-  - 505
-  - 506
-  - 507
-  - 508
-  - 510
-  - 511
+__REQUEST_RETRY_STATUSES__
   retry_on_document_status:
   - 429
   - 500
@@ -871,11 +774,22 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 
 func newFromYamlString(t *testing.T, input string) *confmap.Conf {
 	t.Helper()
+	input = strings.ReplaceAll(input, "__REQUEST_RETRY_STATUSES__", requestRetryStatusesYAML())
 	var rawConf map[string]any
 	err := yaml.Unmarshal([]byte(input), &rawConf)
 	require.NoError(t, err)
 
 	return confmap.NewFromStringMap(rawConf)
+}
+
+func requestRetryStatusesYAML() string {
+	statuses := defaultRetryOnStatus()
+	lines := make([]string, len(statuses))
+	for i, status := range statuses {
+		lines[i] = fmt.Sprintf("  - %d", status)
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func compareAndAssert(t *testing.T, expectedOutput *confmap.Conf, gotOutput *confmap.Conf) {

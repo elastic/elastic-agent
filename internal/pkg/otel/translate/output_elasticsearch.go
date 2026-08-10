@@ -31,9 +31,9 @@ type esToOTelOptions struct {
 	RetryOnDocumentStatus []int  `config:"retry_on_document_status"`
 }
 
-// defaultRetryOnStatus is the shared defaults for retries at request and
-// document level
-var defaultRetryOnStatus = []int{
+// defaultRetryOnDocumentStatus matches Beats' retry behavior for individual
+// bulk response items.
+var defaultRetryOnDocumentStatus = []int{
 	// 429
 	http.StatusTooManyRequests,
 	// 5xx
@@ -50,16 +50,31 @@ var defaultRetryOnStatus = []int{
 	http.StatusNetworkAuthenticationRequired,
 }
 
+func defaultRetryOnStatus() []int {
+	// Beats retries every failed bulk request except 413, which it handles by
+	// splitting the batch or dropping it when it cannot be split.
+	const (
+		firstErrorStatus = 300
+		lastErrorStatus  = 599
+	)
+
+	statuses := make([]int, 0, lastErrorStatus-firstErrorStatus)
+	for status := firstErrorStatus; status <= lastErrorStatus; status++ {
+		if status != http.StatusRequestEntityTooLarge {
+			statuses = append(statuses, status)
+		}
+	}
+
+	return statuses
+}
+
 var defaultOptions = esToOTelOptions{
 	ElasticsearchConfig: elasticsearch.DefaultConfig(),
 
 	Index:                 "",       // Dynamic routing is disabled if index is set
 	Preset:                "custom", // default is custom if not set
-	RetryOnDocumentStatus: append([]int(nil), defaultRetryOnStatus...),
-	RetryOnStatus: append(
-		[]int{http.StatusUnauthorized, http.StatusForbidden},
-		defaultRetryOnStatus...,
-	),
+	RetryOnDocumentStatus: append([]int(nil), defaultRetryOnDocumentStatus...),
+	RetryOnStatus:         defaultRetryOnStatus(),
 }
 
 // ESToOTelConfig converts a Beat config into OTel elasticsearch exporter config
