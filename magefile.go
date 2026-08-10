@@ -1104,13 +1104,6 @@ func runAgent(ctx context.Context, env map[string]string) error {
 
 	// docker does not exists for this commit, build it
 	if !strings.Contains(dockerImageOut, tag) {
-		var dependenciesVersion string
-		if cfg.AgentPackageVersion() != "" {
-			dependenciesVersion = cfg.AgentPackageVersion()
-		} else {
-			dependenciesVersion = bversion.GetDefaultVersion()
-		}
-
 		// produce docker package
 		pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 		if err != nil {
@@ -1196,9 +1189,10 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 	}
 
 	keepArchive := os.Getenv("KEEP_ARCHIVE") != ""
+	platforms := cfg.GetPlatforms().Names()
 
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath, dependencies := collectPackageDependencies(cfg, platforms.Names(), dependenciesVersion, dependencies)
+	archivePath, dropPath, dependencies := collectPackageDependencies(cfg, platforms, dependenciesVersion, dependencies)
 
 	// Update cfg with the resolved drop path
 	cfg = cfg.WithAgentDropPath(dropPath)
