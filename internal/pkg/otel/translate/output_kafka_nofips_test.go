@@ -101,14 +101,14 @@ kerberos:
 			gotMap, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating kafka to kafka exporter")
 
-			gotKerberos, ok := gotMap["kerberos"]
+			gotKerberos, ok := gotMap["auth"]
 			if !tc.expectKerberos {
 				require.False(t, ok, "kerberos should be omitted from exporter config")
 				return
 			}
 
 			require.True(t, ok, "kerberos should be present in exporter config")
-			require.Equal(t, tc.expectedKerberos, gotKerberos)
+			require.Equal(t, tc.expectedKerberos, gotKerberos.(map[string]any)["kerberos"])
 		})
 	}
 }

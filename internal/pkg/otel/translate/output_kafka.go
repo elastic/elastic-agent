@@ -84,6 +84,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		},
 	}
 
+	// Enables SASL authentication
 	if kConfig.Username != "" {
 		if kConfig.Sasl.SaslMechanism == "" {
 			kConfig.Sasl.SaslMechanism = "PLAIN"
@@ -97,6 +98,13 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		}
 	}
 
+	// Enables Kerberos authentication
+	if kConfig.Kerberos.IsEnabled() {
+		kafkaExporter["auth"] = map[string]any{
+			"kerberos": getKerberosConfig(kConfig),
+		}
+	}
+
 	tlsCfg, err := TLSToOTel(kConfig.TLS, logger)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error translating tls config :%w", err)
@@ -104,7 +112,6 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 
 	setIfNotNil(kafkaExporter, "tls", tlsCfg)
 	setIfNotNil(kafkaExporter, "record_headers", headers)
-	setIfNotNil(kafkaExporter, "kerberos", getKerberosConfig(kConfig))
 
 	// compiles topic and validates against any malformed strings
 	fmtstr, err := fmtstr.CompileEvent(kConfig.Topic)
