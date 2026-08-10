@@ -312,6 +312,7 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("SNAPSHOT=%v", cfg.Build.Snapshot),
 		"--env", fmt.Sprintf("DEV=%v", cfg.Build.DevBuild),
 		"--env", fmt.Sprintf("FIPS=%v", cfg.Build.FIPSBuild),
+		"--env", fmt.Sprintf("USE_PACKAGE_VERSION=%v", cfg.Packaging.UsePackageVersion),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 	)
 

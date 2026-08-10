@@ -173,9 +173,6 @@ func k8sStepHelmDeployWithValueOptions(chartPath string, releaseName string, val
 }
 
 func mergeValues(t *testing.T, namespace string, values values.Options) map[string]any {
-	// Initialize a map to hold the parsed data
-	helmValues := make(map[string]any)
-
 	settings := cli.New()
 	settings.SetNamespace(namespace)
 	providers := getter.All(settings)
@@ -248,11 +245,14 @@ func k8sStepDeployApp(manifest string) func(t *testing.T, ctx context.Context, k
 // are created and documents being written
 func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		require.Eventually(t, func() bool {
+		dsName := fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)
+		// Check errors against the CollectT so a transient query failure is
+		// retried on the next tick instead of aborting the test.
+		require.EventuallyWithT(t, func(collectT *assert.CollectT) {
 			query := queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, namespace)
 			docs, err := estools.PerformQueryForRawQuery(ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
-			require.NoError(t, err, "failed to get %s datastream documents", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace))
-			return docs.Hits.Total.Value > 0
-		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
+			require.NoError(collectT, err, "failed to get %s datastream documents", dsName)
+			require.Greater(collectT, docs.Hits.Total.Value, 0)
+		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", dsName))
 	}
 }

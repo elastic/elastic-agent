@@ -74,7 +74,7 @@ type mockAgentWatcher_Watch_Call struct {
 //   - tilGrace time.Duration
 //   - errorCheckInterval time.Duration
 //   - log *logp.Logger
-func (_e *mockAgentWatcher_Expecter) Watch(ctx interface{}, tilGrace interface{}, errorCheckInterval interface{}, log interface{}) *mockAgentWatcher_Watch_Call {
+func (_e *mockAgentWatcher_Expecter) Watch(ctx any, tilGrace any, errorCheckInterval any, log any) *mockAgentWatcher_Watch_Call {
 	return &mockAgentWatcher_Watch_Call{Call: _e.mock.On("Watch", ctx, tilGrace, errorCheckInterval, log)}
 }
 
@@ -146,11 +146,11 @@ func (_m *mockInstallationModifier) EXPECT() *mockInstallationModifier_Expecter 
 // Cleanup provides a mock function for the type mockInstallationModifier
 func (_mock *mockInstallationModifier) Cleanup(log *logger.Logger, topDirPath string, removeMarker bool, keepLogs bool, versionedHomesToKeep ...string) error {
 	// string
-	_va := make([]interface{}, len(versionedHomesToKeep))
+	_va := make([]any, len(versionedHomesToKeep))
 	for _i := range versionedHomesToKeep {
 		_va[_i] = versionedHomesToKeep[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, log, topDirPath, removeMarker, keepLogs)
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
@@ -179,9 +179,9 @@ type mockInstallationModifier_Cleanup_Call struct {
 //   - removeMarker bool
 //   - keepLogs bool
 //   - versionedHomesToKeep ...string
-func (_e *mockInstallationModifier_Expecter) Cleanup(log interface{}, topDirPath interface{}, removeMarker interface{}, keepLogs interface{}, versionedHomesToKeep ...interface{}) *mockInstallationModifier_Cleanup_Call {
+func (_e *mockInstallationModifier_Expecter) Cleanup(log any, topDirPath any, removeMarker any, keepLogs any, versionedHomesToKeep ...any) *mockInstallationModifier_Cleanup_Call {
 	return &mockInstallationModifier_Cleanup_Call{Call: _e.mock.On("Cleanup",
-		append([]interface{}{log, topDirPath, removeMarker, keepLogs}, versionedHomesToKeep...)...)}
+		append([]any{log, topDirPath, removeMarker, keepLogs}, versionedHomesToKeep...)...)}
 }
 
 func (_c *mockInstallationModifier_Cleanup_Call) Run(run func(log *logger.Logger, topDirPath string, removeMarker bool, keepLogs bool, versionedHomesToKeep ...string)) *mockInstallationModifier_Cleanup_Call {
@@ -234,11 +234,11 @@ func (_c *mockInstallationModifier_Cleanup_Call) RunAndReturn(run func(log *logg
 // Rollback provides a mock function for the type mockInstallationModifier
 func (_mock *mockInstallationModifier) Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string, opts ...upgrade.RollbackOption) error {
 	// upgrade.RollbackOption
-	_va := make([]interface{}, len(opts))
+	_va := make([]any, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, ctx, log, c, topDirPath, prevVersionedHome, prevHash)
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
@@ -269,9 +269,9 @@ type mockInstallationModifier_Rollback_Call struct {
 //   - prevVersionedHome string
 //   - prevHash string
 //   - opts ...upgrade.RollbackOption
-func (_e *mockInstallationModifier_Expecter) Rollback(ctx interface{}, log interface{}, c interface{}, topDirPath interface{}, prevVersionedHome interface{}, prevHash interface{}, opts ...interface{}) *mockInstallationModifier_Rollback_Call {
+func (_e *mockInstallationModifier_Expecter) Rollback(ctx any, log any, c any, topDirPath any, prevVersionedHome any, prevHash any, opts ...any) *mockInstallationModifier_Rollback_Call {
 	return &mockInstallationModifier_Rollback_Call{Call: _e.mock.On("Rollback",
-		append([]interface{}{ctx, log, c, topDirPath, prevVersionedHome, prevHash}, opts...)...)}
+		append([]any{ctx, log, c, topDirPath, prevVersionedHome, prevHash}, opts...)...)}
 }
 
 func (_c *mockInstallationModifier_Rollback_Call) Run(run func(ctx context.Context, log *logger.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string, opts ...upgrade.RollbackOption)) *mockInstallationModifier_Rollback_Call {
