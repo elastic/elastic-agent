@@ -18,12 +18,8 @@ if [[ "$DRA_WORKFLOW" == "staging" ]] && [[ -n "$VERSION_QUALIFIER" ]]; then
     BEAT_VERSION_FULL="${BEAT_VERSION_FULL}-${VERSION_QUALIFIER}"
 fi
 
-<<<<<<< HEAD
-SNAPSHOT=$SNAPSHOT mage packageAgentCore
-=======
 # USE_PACKAGE_VERSION=false: binary-DRA stamps version.go's version, not .package-version's.
 SNAPSHOT=$SNAPSHOT WINDOWS_NPCAP="true" USE_PACKAGE_VERSION=false mage packageAgentCore
->>>>>>> dce51a67b ([mage] Unify packaging targets (#14871))
 chmod -R 777 build/distributions
 
 echo "+++ Generate dependencies report"
