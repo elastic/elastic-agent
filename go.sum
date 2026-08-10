@@ -186,8 +186,8 @@ github.com/elastic/elastic-agent-autodiscover v0.10.3 h1:3pGm0wOVOK5dNdqAypZzQCI
 github.com/elastic/elastic-agent-autodiscover v0.10.3/go.mod h1:HyjdiEVP/A7iMN0jeac2EoUohpHKAZIFRDQsvPDg2Dw=
 github.com/elastic/elastic-agent-client/v7 v7.18.1 h1:WnM53JjaukeysrAuiTyrhDPmFxJG07ZAByc2TrkcKcs=
 github.com/elastic/elastic-agent-client/v7 v7.18.1/go.mod h1:uDpSGZ+YCKgqgtkwCA0qjwX0gU/wmixDsVbPjY3GkPs=
-github.com/elastic/elastic-agent-libs v0.46.2 h1:FiqvPIjX+h+v7Odo2S6TpZIwn9jYzsmYzjqtxw7BQB0=
-github.com/elastic/elastic-agent-libs v0.46.2/go.mod h1:axkpqDCCzAky6G4D/cklgtZQa3jTNGAMVHVkU0u6YbU=
+github.com/elastic/elastic-agent-libs v0.46.3 h1:TaD1qPDWgokwODbgayIeiQ1+vkONFbolKPzq4DbAzho=
+github.com/elastic/elastic-agent-libs v0.46.3/go.mod h1:axkpqDCCzAky6G4D/cklgtZQa3jTNGAMVHVkU0u6YbU=
 github.com/elastic/elastic-agent-system-metrics v0.14.4 h1:XGGepNVOxhtfJmanQsgqCAZESIJtyDIFOKErOaVzFEw=
 github.com/elastic/elastic-agent-system-metrics v0.14.4/go.mod h1:NyNMrdqMfznb/Zy8EmIAHlJpX6HuRlNW+bBL9UN7WQY=
 github.com/elastic/elastic-transport-go/v8 v8.11.0 h1:taYmqC2M6+fZt/+W+ENYh/W5L9+KrlJGOSbEJs8egWc=
@@ -416,8 +416,8 @@ github.com/josephspurrier/goversioninfo v1.7.0/go.mod h1:z9y0r2G6g5jwSJaFE0cxW9t
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
 github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d/go.mod h1:2PavIy+JPciBPrBUjwbNvtwB6RQlve+hkpll6QSNmOE=
-github.com/kardianos/service v1.2.4 h1:XNlGtZOYNx2u91urOdg/Kfmc+gfmuIo1Dd3rEi2OgBk=
-github.com/kardianos/service v1.2.4/go.mod h1:E4V9ufUuY82F7Ztlu1eN9VXWIQxg8NoLQlmFe0MtrXc=
+github.com/kardianos/service v1.3.0 h1:/LGy+xPP2TM+GLTiCZ2di7cy0Jd/qrawlTUfqKYFdTI=
+github.com/kardianos/service v1.3.0/go.mod h1:E4V9ufUuY82F7Ztlu1eN9VXWIQxg8NoLQlmFe0MtrXc=
 github.com/klauspost/compress v1.19.0 h1:sXLILfc9jV2QYWkzFOPWStmcUVH2RHEB1JCdY2oVvCQ=
 github.com/klauspost/compress v1.19.0/go.mod h1:cwPg85FWrGar70rWktvGQj8/hthj3wpl0PGDogxkrSQ=
 github.com/klauspost/cpuid/v2 v2.3.0 h1:S4CRMLnYUhGeDFDqkGriYKdfoFlDnMtqTiI/sFzhA9Y=
