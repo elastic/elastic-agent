@@ -25,23 +25,18 @@ jobs:
         with:
           go-version-file: .go-version
 
-<<<<<<< HEAD:.github/workflows/post-dependabot.yml
-=======
       - name: set up git user
         uses: elastic/oblt-actions/git/setup@v1
         with:
           username: 'github-actions[bot]'
           email: 'github-actions[bot]@users.noreply.github.com'
 
->>>>>>> 842f96ef4 ([9.5] Replace post-dependabot.yml with post-dependency-update.yml from main (#16100)):.github/workflows/post-dependency-update.yml
       - name: Install mage
         uses: magefile/mage-action@a662bd8c29d8106879588cfff83b2faf6e6f59db # v4.0.0
         with:
           version: v1.14.0
           install-only: true
 
-<<<<<<< HEAD:.github/workflows/post-dependabot.yml
-=======
       - name: Update EDOT go.mod if necessary
         run: cd internal/edot && go mod tidy
 
@@ -78,7 +73,6 @@ jobs:
           git add wrapper/windows/archive-proxy/go.mod wrapper/windows/archive-proxy/go.sum
           git commit -m "Update archive-proxy go.mod"
 
->>>>>>> 842f96ef4 ([9.5] Replace post-dependabot.yml with post-dependency-update.yml from main (#16100)):.github/workflows/post-dependency-update.yml
       - name: update NOTICE.txt and NOTICE-fips.txt
         run: mage notice
 
