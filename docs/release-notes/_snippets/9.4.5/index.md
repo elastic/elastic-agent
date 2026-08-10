@@ -38,7 +38,7 @@
   after each restart. Elastic Agent now uses startup logging as the baseline
   and changes only settings included in the Fleet policy.
   
-* Bake Synthetics browser binaries into the elastic-agent-complete image. [#16016](https://github.com/elastic/elastic-agent/pull/16016) [#15993](https://github.com/elastic/elastic-agent/issues/15993)
+* Add Synthetics browser binaries to the elastic-agent-complete image. [#16016](https://github.com/elastic/elastic-agent/pull/16016) [#15993](https://github.com/elastic/elastic-agent/issues/15993)
 
   npm 12 no longer runs a dependency&#39;s `install` lifecycle script during `npm i` by
   default, so the transitive playwright-chromium `install` hook that used to download
