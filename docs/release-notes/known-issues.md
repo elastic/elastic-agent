@@ -23,6 +23,26 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+::::{dropdown} Kafka Kerberos authentication is dropped when using the OTel runtime
+
+**Applies to: {{agent}} 9.4.0 to 9.5.x**
+
+On August 10, 2026, a known issue was discovered where Kafka outputs configured with Kerberos authentication do not fall back to the process runtime. The OTel runtime starts successfully but silently drops Kerberos settings during config translation, so Kafka authentication fails. This affects Elastic Agent 9.4.0 through 9.5.x until fixed.
+
+**Workaround**
+
+Force the process runtime for Kafka outputs:
+
+```yaml
+agent.internal.runtime.output:
+  kafka: process
+```
+
+Alternatively, set `_runtime_experimental: process` on the affected inputs.
+
+For more information, check [Issue #16118](https://github.com/elastic/elastic-agent/issues/16118).
+::::
+
 ::::{dropdown} {{agent}} Synthetics browser monitors fail on private locations on 9.5.0
 
 **Applies to: {{agent}} 9.5.0**
