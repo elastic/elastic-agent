@@ -84,7 +84,7 @@ type MockSender_Send_Call struct {
 //   - params url.Values
 //   - headers http.Header
 //   - body io.ReadSeeker
-func (_e *MockSender_Expecter) Send(ctx interface{}, method interface{}, path interface{}, params interface{}, headers interface{}, body interface{}) *MockSender_Send_Call {
+func (_e *MockSender_Expecter) Send(ctx any, method any, path any, params any, headers any, body any) *MockSender_Send_Call {
 	return &MockSender_Send_Call{Call: _e.mock.On("Send", ctx, method, path, params, headers, body)}
 }
 

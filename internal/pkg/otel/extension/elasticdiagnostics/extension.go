@@ -126,6 +126,23 @@ func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 		},
 	}
 
+	d.globalHooks["environment"] = &diagHook{
+		description: "environment variables of the collector process",
+		filename:    "edot/environment.yaml",
+		contentType: "application/yaml",
+		hook: func() []byte {
+			redacted, err := diagnostics.RedactEnv()
+			if err != nil {
+				return fmt.Appendf(nil, "error: %v", err)
+			}
+			b, err := yaml.Marshal(redacted)
+			if err != nil {
+				return fmt.Appendf(nil, "error: failed to convert to yaml: %v", err)
+			}
+			return b
+		},
+	}
+
 	// register basic profiles.
 	for _, profile := range []string{"goroutine", "heap", "allocs", "mutex", "threadcreate", "block"} {
 		d.globalHooks[profile] = &diagHook{

@@ -121,7 +121,6 @@ func New(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
-
 	var configMgr coordinator.ConfigManager
 	var managed *managedConfigManager
 	var compModifiers = []component.ComponentsModifier{InjectAPMConfig}

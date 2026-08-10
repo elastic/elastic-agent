@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-
 GROUP_NAME=$1
 TEST_SUDO=$2
 
@@ -17,11 +16,6 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
-if [ "${FIPS:-false}" == "true" ]; then
-  echo "~~~FIPS: Checking msft-go is installed"
-  GOEXPERIMENT=systemcrypto go version
-fi
-
 if [ "$TEST_SUDO" == "true" ]; then
   echo "Re-initializing ASDF. The user is changed to root..."
   export ASDF_DATA_DIR="/opt/buildkite-agent/.asdf"
@@ -30,12 +24,20 @@ if [ "$TEST_SUDO" == "true" ]; then
   source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 fi
 
+# shellcheck source=.buildkite/scripts/retry.sh
+source "$(dirname "$0")/retry.sh"
+
 # Make sure that all tools are installed
-asdf install
+retry 3 asdf install
+
+if [ "${FIPS:-false}" == "true" ]; then
+  echo "~~~FIPS: Checking msft-go is installed"
+  GOEXPERIMENT=systemcrypto go version
+fi
 
 echo "~~~ Running integration tests as $USER"
 
-make install-gotestsum
+retry 3 make install-gotestsum
 
 if [[ -z "${AGENT_VERSION:-}" ]]; then
   if [[ -f "${WORKSPACE}/.package-version" ]]; then
@@ -84,7 +86,7 @@ if [[ $TESTS_EXIT_STATUS -ne 0 ]]; then
 fi
 
 if [ -f "$outputXML" ]; then
-  go install github.com/kitproj/junit2html@latest
+  retry 3 go install github.com/kitproj/junit2html@latest
   junit2html < "$outputXML" > build/TEST-report.html
 else
     echo "Cannot generate HTML test report: $outputXML not found"
