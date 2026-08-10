@@ -13,11 +13,11 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260805204759-7f3edc8b2dd8
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260807201100-b8533a193599
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-autodiscover v0.10.3
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-	github.com/elastic/elastic-agent-libs v0.46.1
+	github.com/elastic/elastic-agent-libs v0.46.3
 	github.com/elastic/elastic-agent-system-metrics v0.14.4
 	github.com/elastic/elastic-agent/internal/edot v0.0.0-20251114132921-c463803c5568
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
@@ -39,7 +39,7 @@ require (
 	github.com/jaypipes/ghw v0.24.0
 	github.com/jedib0t/go-pretty/v6 v6.8.2
 	github.com/josephspurrier/goversioninfo v1.7.0
-	github.com/kardianos/service v1.2.4
+	github.com/kardianos/service v1.3.0
 	github.com/knadh/koanf/maps v0.1.2
 	github.com/magefile/mage v1.17.2
 	github.com/moby/moby/client v0.5.0
@@ -780,10 +780,10 @@ require (
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
-	google.golang.org/api v0.287.0 // indirect
+	google.golang.org/api v0.287.1 // indirect
 	google.golang.org/genproto v0.0.0-20260401024825-9d38bb4040a9 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260622175928-b703f567277d // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260630182238-925bb5da69e7 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260630182238-925bb5da69e7 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9 // indirect
