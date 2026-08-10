@@ -28,7 +28,7 @@ summary: Adds support for Kerberos in Kafka outputs using OTel runtime.
 
 # REQUIRED for all kinds
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
-component:
+component: elastic-agent
 
 # AUTOMATED
 # OPTIONAL to manually add other PR URLs
