@@ -104,6 +104,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 
 	setIfNotNil(kafkaExporter, "tls", tlsCfg)
 	setIfNotNil(kafkaExporter, "record_headers", headers)
+	setIfNotNil(kafkaExporter, "kerberos", getKerberosConfig(kConfig))
 
 	// compiles topic and validates against any malformed strings
 	fmtstr, err := fmtstr.CompileEvent(kConfig.Topic)
@@ -122,6 +123,25 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		return kafkaExporter, processor, nil
 	}
 	return kafkaExporter, nil, nil
+}
+
+func getKerberosConfig(kConfig *kafka.KafkaConfig) map[string]any {
+	if !kConfig.Kerberos.IsEnabled() {
+		return nil
+	}
+
+	useKeyTab := kConfig.Kerberos.AuthType.String() == "keytab"
+
+	return map[string]any{
+		"service_name":             kConfig.Kerberos.ServiceName,
+		"realm":                    kConfig.Kerberos.Realm,
+		"username":                 kConfig.Kerberos.Username,
+		"password":                 kConfig.Kerberos.Password,
+		"config_file":              kConfig.Kerberos.ConfigPath,
+		"disable_fast_negotiation": !kConfig.Kerberos.EnableFAST,
+		"keytab_file":              kConfig.Kerberos.KeyTabPath,
+		"use_keytab":               useKeyTab,
+	}
 }
 
 // dynamicTopicSetterProcessor parses topic field with dynamic values such as %{[data_stream.type]}
