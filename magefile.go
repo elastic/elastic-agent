@@ -1769,7 +1769,12 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, ver
 	extractDir := filepath.Join(downloadDir, extractionSubdir)
 	_ = os.RemoveAll(extractDir) // ignore error
 
-	// place the artifacts where the package.yml expects them (in 'build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}')
+	// packages.yml references binaries via build/golang-crossbuild/<name>-<goos>-<goarch>[.exe]
+	crossbuildDir := filepath.Join(repositoryRoot, "build", "golang-crossbuild")
+	if err := os.MkdirAll(crossbuildDir, 0o770); err != nil {
+		return fmt.Errorf("creating golang-crossbuild dir: %w", err)
+	}
+
 	for _, platform := range platforms {
 		if !elasticAgentCoreComponent.SupportsPlatform(platform) {
 			continue
@@ -1793,6 +1798,22 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, ver
 		log.Printf("renaming %q to %q", srcDir, dstDir)
 		if err := os.Rename(srcDir, dstDir); err != nil {
 			return fmt.Errorf("failed renaming %q to %q: %w", srcDir, dstDir, err)
+		}
+
+		// packages.yml specs reference build/golang-crossbuild/<binary>-<goos>-<goarch>[.exe],
+		// so create a symlink there pointing into the extracted directory.
+		platformParts := strings.SplitN(platform, "/", 2)
+		goos, goarch := platformParts[0], platformParts[1]
+		binaryExt := ""
+		if goos == "windows" {
+			binaryExt = ".exe"
+		}
+		beatBin := filepath.Join(dstDir, elasticAgentCoreComponent.BinaryName+binaryExt)
+		crossbuildLink := filepath.Join(crossbuildDir, elasticAgentCoreComponent.BinaryName+"-"+goos+"-"+goarch+binaryExt)
+		_ = os.Remove(crossbuildLink)
+		log.Printf("linking %q -> %q", crossbuildLink, beatBin)
+		if err := os.Symlink(beatBin, crossbuildLink); err != nil {
+			return fmt.Errorf("creating symlink %s -> %s: %w", crossbuildLink, beatBin, err)
 		}
 	}
 

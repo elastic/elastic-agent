@@ -303,7 +303,7 @@ shared:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl'
         mode: 0644
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}:
-        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+        source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
         mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/package.version:
         content: >
@@ -370,10 +370,10 @@ shared:
 
   - &agent_binary_files
     '{{.BeatName}}{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
     'data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
     'data/{{.BeatName}}-{{ core_commit_short }}/elastic-otel-collector{{.BinaryExt}}':
       source: build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -395,10 +395,10 @@ shared:
 
   - &agent_darwin_binary_files
     '{{.BeatName}}{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
     'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
     'data/{{.BeatName}}-{{ core_commit_short }}/elastic-otel-collector{{.BinaryExt}}':
       source: build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -1239,7 +1239,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     - os: linux
       arch: amd64
       types: [docker]
@@ -1251,7 +1251,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     - os: linux
       arch: arm64
       types: [docker]
@@ -1263,7 +1263,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     - os: linux
       arch: arm64
       types: [docker]
@@ -1275,7 +1275,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     - os: linux
       arch: amd64
       types: [docker]
@@ -1287,7 +1287,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     - os: linux
       arch: arm64
       types: [docker]
@@ -1299,7 +1299,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     #### ubi-based ####
     - os: linux
       arch: amd64
@@ -1312,7 +1312,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     - os: linux
       arch: arm64
       types: [docker]
@@ -1324,7 +1324,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     #### wolfi-based ####
     #### Cloud specific docker images ####
     - os: linux
@@ -1339,7 +1339,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     - os: linux
       arch: arm64
       types: [docker]
@@ -1352,7 +1352,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     #### Service specific docker images ####
     - os: linux
       arch: amd64
@@ -1367,7 +1367,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     - os: linux
       arch: arm64
       types: [ docker ]
@@ -1381,7 +1381,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     - os: linux
       arch: amd64
       types: [docker]
@@ -1393,7 +1393,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     - os: linux
       arch: arm64
       types: [docker]
@@ -1405,7 +1405,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     ######## End Docker images ########
 
     - os: aix
@@ -1441,7 +1441,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
 
     - os: linux
       arch: arm64
@@ -1454,7 +1454,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
 
     - os: linux
       arch: amd64
@@ -1470,7 +1470,7 @@ specs:
         docker_image_name_template: "{{.BeatName}}-cloud-fips"
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
 
     - os: linux
       arch: arm64
@@ -1486,7 +1486,7 @@ specs:
         docker_image_name_template: "{{.BeatName}}-cloud-fips"
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     ######## End FIPS Specs ########
 
   # Elastic Beat with Elastic License and binary taken from the x-pack dir.
