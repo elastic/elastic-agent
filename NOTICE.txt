@@ -2551,11 +2551,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/moby/moby/client
-Version: v0.4.1
+Version: v0.5.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/moby/moby/client@v0.4.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/moby/moby/client@v0.5.1/LICENSE:
 
 
                                  Apache License
@@ -32810,11 +32810,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/ebitengine/purego
-Version: v0.10.0
+Version: v0.10.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/ebitengine/purego@v0.10.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/ebitengine/purego@v0.10.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -34320,11 +34320,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/felixge/httpsnoop
-Version: v1.0.4
+Version: v1.1.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/felixge/httpsnoop@v1.0.4/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/felixge/httpsnoop@v1.1.0/LICENSE.txt:
 
 Copyright (c) 2016 Felix Geisendörfer (felix@debuggable.com)
 
@@ -40477,11 +40477,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/klauspost/compress
-Version: v1.19.0
+Version: v1.19.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/klauspost/compress@v1.19.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/klauspost/compress@v1.19.1/LICENSE:
 
 Copyright (c) 2012 The Go Authors. All rights reserved.
 Copyright (c) 2019 Klaus Post. All rights reserved.
@@ -43879,11 +43879,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/tklauser/go-sysconf
-Version: v0.3.16
+Version: v0.4.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/tklauser/go-sysconf@v0.3.16/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/tklauser/go-sysconf@v0.4.0/LICENSE:
 
 BSD 3-Clause License
 
@@ -43918,11 +43918,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/tklauser/numcpus
-Version: v0.11.0
+Version: v0.12.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/tklauser/numcpus@v0.11.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/tklauser/numcpus@v0.12.0/LICENSE:
 
 
                                  Apache License
@@ -88231,11 +88231,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/google/pprof
-Version: v0.0.0-20260604005048-7023385849c0
+Version: v0.0.0-20260802141513-ef3492d7dac3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/google/pprof@v0.0.0-20260604005048-7023385849c0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/google/pprof@v0.0.0-20260802141513-ef3492d7dac3/LICENSE:
 
 
                                  Apache License
