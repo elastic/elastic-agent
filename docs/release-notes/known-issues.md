@@ -42,6 +42,34 @@ Alternatively, set `_runtime_experimental: process` on the affected inputs.
 
 For more information, check [Issue #16118](https://github.com/elastic/elastic-agent/issues/16118).
 ::::
+:::{dropdown} Osquery live and scheduled query results are missing in Kibana on {{agent}} 9.5.0
+
+**Applies to: {{agent}} 9.5.0**
+
+On August 3, 2026, a known issue was confirmed where {{agent}} 9.5.0 running the `osquery_manager` integration (version 1.30 or later) with default settings causes live and scheduled query results to not appear in the Kibana Osquery UI. Queries appear stuck in "pending" status and the Results column shows 0.
+
+The issue occurs because the OTel runtime, which is the default runtime for Osquerybeat in {{agent}} 9.5, incorrectly routes action response documents to the `osquery_manager.query_profile` data stream instead of `osquery_manager.action.responses`. This only affects agents using a three-stream `osquery_manager` policy, which is the default for newly created policies with `osquery_manager` 1.30 or later.
+
+Agents using policies created before osquery_manager 1.30 added the `query_profile` data stream are not affected.
+
+**Workaround**
+
+Pin Osquerybeat back to the process runtime on the {{fleet}} agent policy using the `osquery_manager` integration:
+
+1. In {{kib}}, go to **Fleet > Agent policies** and open the agent policy.
+
+2. On the **Settings** tab, expand **Advanced settings** and locate **Advanced internal YAML settings**.
+
+3. Enter the following, then select **Save changes**:
+
+    ```yaml
+    runtime:
+      osquerybeat:
+        default: process
+    ```
+
+For more information, check [Issue #15964](https://github.com/elastic/elastic-agent/issues/15964).
+:::
 
 ::::{dropdown} {{agent}} Synthetics browser monitors fail on private locations on 9.5.0
 
