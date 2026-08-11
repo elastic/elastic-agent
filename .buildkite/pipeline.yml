@@ -481,6 +481,31 @@ steps:
         - magefile.go
         - dev-tools/**/*
 
+  # NOTE: Tests the unified-release staging packaging workflow against the latest
+  # staging manifest, to catch regressions before they reach the release pipeline.
+  # See https://buildkite.com/elastic/unified-release-staging
+  - label: "Trigger Elastic Agent Package (unified-release staging)"
+    if: build.pull_request.id != null
+    commands:
+      - .buildkite/scripts/steps/trigger-elastic-agent-package-staging.sh
+      - .buildkite/scripts/steps/trigger-elastic-agent-package-staging.sh | buildkite-agent pipeline upload
+    plugins:
+    - sparse-checkout#v1.6.0:
+        paths:
+        - .buildkite
+        - .go-version
+        - version/version.go
+        - .package-version
+        - magefile.go
+        - dev-tools
+    if_changed:
+      include:
+        - .buildkite/pipeline.elastic-agent-package.yml
+        - .buildkite/scripts/steps/package.sh
+        - .buildkite/scripts/steps/trigger-elastic-agent-package-staging.sh
+        - magefile.go
+        - dev-tools/**/*
+
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/pull/11725
   - label: "DRY RUN publish to serverless"
