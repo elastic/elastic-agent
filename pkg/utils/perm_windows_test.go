@@ -24,12 +24,12 @@ func TestHasStrictExecPerms_OwnerWriteAllowed(t *testing.T) {
 	path := filepath.Join(tmp, "exec.exe")
 	require.NoError(t, os.WriteFile(path, []byte("dummy"), 0600))
 
-	err := HasStrictExecPerms(path)
+	err := HasStrictExecPerms(path, 0)
 	assert.NoError(t, err)
 }
 
 func TestHasStrictExecPerms_NonExistentFile(t *testing.T) {
-	err := HasStrictExecPerms(`C:\does\not\exist\binary.exe`)
+	err := HasStrictExecPerms(`C:\does\not\exist\binary.exe`, 0)
 	assert.Error(t, err)
 }
 
@@ -48,16 +48,14 @@ func TestHasStrictExecPerms_GroupWriteRejected(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = HasStrictExecPerms(path)
+	err = HasStrictExecPerms(path, 0)
 	assert.Error(t, err, "expected error: Everyone has write access")
 }
 
-func TestHasStrictExecPermsAndOwnership_DelegatesToHasStrictExecPerms(t *testing.T) {
+func TestHasStrictExecPerms_UIDIgnored(t *testing.T) {
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "exec.exe")
 	require.NoError(t, os.WriteFile(path, []byte("dummy"), 0600))
 
-	// uid is ignored on Windows; result must match HasStrictExecPerms.
-	assert.Equal(t, HasStrictExecPerms(path), HasStrictExecPermsAndOwnership(path, 0))
-	assert.Equal(t, HasStrictExecPerms(path), HasStrictExecPermsAndOwnership(path, 1000))
+	assert.Equal(t, HasStrictExecPerms(path, 0), HasStrictExecPerms(path, 1000))
 }

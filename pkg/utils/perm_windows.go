@@ -67,13 +67,6 @@ func CurrentFileOwner() (FileOwner, error) {
 	}, nil
 }
 
-<<<<<<< HEAD
-// HasStrictExecPerms ensures that the path is executable by the owner and that the owner of the file
-// is the same as the UID or root.
-func HasStrictExecPerms(path string, uid int) error {
-	// TODO: Need to add check on Windows to ensure that the ACL are correct for the binary before execution.
-	return nil
-=======
 // writeMask covers all access-mask bits that allow a file's content or
 // metadata to be modified, or the file to be deleted/replaced.
 const writeMask = windows.ACCESS_MASK(
@@ -86,7 +79,9 @@ const writeMask = windows.ACCESS_MASK(
 // HasStrictExecPerms ensures that no non-privileged SID has write access to
 // the file at path. Privileged SIDs (SYSTEM, Administrators, and the file
 // owner) may have any access; all other SIDs must not hold write-capable bits.
-func HasStrictExecPerms(path string) error {
+// The uid parameter is unused on Windows; ownership is determined from the
+// file's security descriptor.
+func HasStrictExecPerms(path string, _ int) error {
 	sd, err := windows.GetNamedSecurityInfo(
 		path,
 		windows.SE_FILE_OBJECT,
@@ -145,13 +140,4 @@ func HasStrictExecPerms(path string) error {
 	// memory subject to a GC finalizer.
 	runtime.KeepAlive(sd)
 	return nil
-}
-
-// HasStrictExecPermsAndOwnership ensures that the path is executable by the
-// owner and that the ACLs do not grant write access to non-privileged accounts.
-// The uid parameter is unused on Windows; ownership is determined from the
-// file's security descriptor.
-func HasStrictExecPermsAndOwnership(path string, _ int) error {
-	return HasStrictExecPerms(path)
->>>>>>> eb324b0b2 (fix(windows): local privilege escalation via binary tampering on unprivileged installs (#16058))
 }
