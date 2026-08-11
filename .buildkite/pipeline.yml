@@ -455,8 +455,6 @@ steps:
         - magefile.go
         - dev-tools/**/*
 
-<<<<<<< HEAD
-=======
   # NOTE: Tests the unified-release staging packaging workflow against the latest
   # staging manifest, to catch regressions before they reach the release pipeline.
   # See https://buildkite.com/elastic/unified-release-staging
