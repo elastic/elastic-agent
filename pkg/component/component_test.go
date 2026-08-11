@@ -3357,7 +3357,7 @@ func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {
 		}
 		return gatheredPaths
 
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if rv.IsNil() {
 			// Nil pointer, nothing more to do
 			return gatheredPaths
