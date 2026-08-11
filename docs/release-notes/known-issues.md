@@ -25,9 +25,9 @@ Known issues are significant defects or limitations that may impact your impleme
 
 ::::{dropdown} Kafka Kerberos authentication is dropped when using the OTel runtime
 
-**Applies to: {{agent}} 9.4.0 to 9.5.x**
+**Applies to: {{agent}} 9.4.0 to 9.4.5, 9.5.0 to 9.5.1**
 
-On August 10, 2026, a known issue was discovered where Kafka outputs configured with Kerberos authentication do not fall back to the process runtime. The OTel runtime starts successfully but silently drops Kerberos settings during config translation, so Kafka authentication fails. This affects Elastic Agent 9.4.0 through 9.5.x until fixed.
+On August 10, 2026, a known issue was discovered where Kafka outputs configured with Kerberos authentication do not fall back to the process runtime. The OTel runtime starts successfully but silently drops Kerberos settings during config translation, so Kafka authentication fails. A fix will be included in {{agent}} 9.4.6 and 9.5.2.
 
 **Workaround**
 
