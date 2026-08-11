@@ -77,8 +77,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 20
-  queue_size: 64000
+  num_consumers: 60
+  queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
 user: elastic
@@ -142,8 +142,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 2
-  queue_size: 6400
+  num_consumers: 1
+  queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
 max_conns_per_host: 1
@@ -206,8 +206,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 2
-  queue_size: 6400
+  num_consumers: 1
+  queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
 max_conns_per_host: 1
@@ -272,8 +272,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 2
-  queue_size: 6400
+  num_consumers: 1
+  queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
 max_conns_per_host: 1
@@ -467,8 +467,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 2
-  queue_size: 6400
+  num_consumers: 1
+  queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
  `,
@@ -540,8 +540,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 20
-  queue_size: 64000
+  num_consumers: 60
+  queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
 user: elastic
@@ -603,8 +603,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 20
-  queue_size: 64000
+  num_consumers: 60
+  queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
 user: elastic
@@ -677,8 +677,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 4
-  queue_size: 12800
+  num_consumers: 2
+  queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store

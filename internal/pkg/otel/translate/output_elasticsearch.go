@@ -68,7 +68,6 @@ var defaultOptions = esToOTelOptions{
 }
 
 // ESToOTelConfig converts a Beat config into OTel elasticsearch exporter config
-// Note: This method may override output queue settings defined by user.
 func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string]any, map[string]any, error) {
 	escfg := defaultOptions
 
@@ -80,6 +79,11 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 
 	// apply preset here
 	// It is important to apply preset before unpacking the config, as preset can override output fields
+	//
+	// isNamedPreset tracks whether a named preset (balanced/throughput/scale/latency) was
+	// applied. For "custom" or no preset the user owns every queue field, so the OTel
+	// consumer/queue sizing below must not override them.
+	var isNamedPreset bool
 	preset, err := output.String("preset", -1)
 	if err == nil {
 		// Performance preset is present, apply it and log any fields that
@@ -92,6 +96,7 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 			preset, config.DebugString(presetConfig, false))
 		logger.Warnf("Performance preset '%v' overrides user setting for field(s): %s",
 			preset, strings.Join(overriddenFields, ","))
+		isNamedPreset = preset != "" && preset != "custom"
 	}
 
 	unpackedMap := make(map[string]any)
@@ -128,39 +133,49 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 	// batchSize is what the exporter's batcher will actually emit per bulk request.
 	batchSize := min(getFlushMinEvents(logger, output), escfg.BulkMaxSize)
 
-	// Run two consumers per connection. The exporter runs with wait_for_result, so a
-	// consumer blocks for a whole bulk round trip; a second one keeps a request formed
-	// and ready for the moment a connection frees, instead of assembling it only after
-	// the previous response lands.
-	numConsumers := 2 * maxConns
+	var queueSize, numConsumers int
 
-	// Size the in-flight event budget for two batches per consumer: one in flight, one
-	// staging.
-	//
-	// Sized against num_consumers keeps the budget clear. Below that threshold every
-	// consumer can hold a full request while the remainder sits under min_size, which the
-	// batcher will not flush and which producers cannot top up because the budget
-	// is exhausted -- the pipeline then stalls until flush_timeout fires.
-	queueSize := 2 * batchSize * numConsumers
+	if isNamedPreset {
+		// Run two consumers per connection. The exporter runs with wait_for_result, so a
+		// consumer blocks for a whole bulk round trip; a second one keeps a request formed
+		// and ready for the moment a connection frees, instead of assembling it only after
+		// the previous response lands.
+		numConsumers = 2 * maxConns
 
-	// Apply the memory limiter. When it engages, num_consumers comes down with it:
-	// capping the budget on its own would leave consumers sized for a budget they no
-	// longer have, which is the direction that risks the stall described above.
-	if queueSize > maxQueueEvents {
-		queueSize = maxQueueEvents
-		numConsumers = max(1, queueSize/(2*batchSize))
-	}
+		// Size the in-flight event budget for two batches per consumer: one in flight, one
+		// staging.
+		//
+		// Sized against num_consumers keeps the budget clear. Below that threshold every
+		// consumer can hold a full request while the remainder sits under min_size, which the
+		// batcher will not flush and which producers cannot top up because the budget
+		// is exhausted -- the pipeline then stalls until flush_timeout fires.
+		queueSize = 2 * batchSize * numConsumers
 
-	// Never shrink a larger budget that a preset or the user already asked for.
-	if existing := getQueueSize(logger, output); existing > queueSize {
-		queueSize = existing
-	}
+		// Apply the memory limiter. When it engages, num_consumers comes down with it:
+		// capping the budget on its own would leave consumers sized for a budget they no
+		// longer have, which is the direction that risks the stall described above.
+		if queueSize > maxQueueEvents {
+			queueSize = maxQueueEvents
+			numConsumers = max(1, queueSize/(2*batchSize))
+		}
 
-	// Write the budget back so both consumers of queue.mem.events pick it up: the
-	// exporter's queue_size below, and the queue block that gets promoted into the beat
-	// receiver's own config, which becomes the queue's live-event cap.
-	if err := output.SetInt("queue.mem.events", -1, int64(queueSize)); err != nil {
-		return nil, nil, fmt.Errorf("failed setting queue.mem.events: %w", err)
+		// Never shrink a larger budget that the preset already asked for.
+		if existing := getQueueSize(logger, output); existing > queueSize {
+			queueSize = existing
+		}
+
+		// Write the budget back so both consumers of queue.mem.events pick it up: the
+		// exporter's queue_size below, and the queue block that gets promoted into the beat
+		// receiver's own config, which becomes the queue's live-event cap.
+		if err := output.SetInt("queue.mem.events", -1, int64(queueSize)); err != nil {
+			return nil, nil, fmt.Errorf("failed setting queue.mem.events: %w", err)
+		}
+	} else {
+		// User owns their queue settings (custom preset or no preset). Use their
+		// queue.mem.events as-is and match the one-consumer-per-connection behaviour
+		// from before this change, so the budget they sized for is not exceeded.
+		numConsumers = maxConns
+		queueSize = getQueueSize(logger, output)
 	}
 
 	otelYAMLCfg := map[string]any{
