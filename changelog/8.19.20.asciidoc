@@ -12,7 +12,7 @@ Review important information about the  8.19.20 release.
 
 
 
-* Sensitive values in JSON diagnostic files are now redacted. https://github.com/elastic/elastic-agent/pull/15904[#15904] 
+* Redact sensitive values in JSON diagnostic files. https://github.com/elastic/elastic-agent/pull/15904[#15904] 
 
 
 
@@ -45,6 +45,6 @@ Review important information about the  8.19.20 release.
 
 * Stop upgrade rollback from being triggered by slow service component restarts. https://github.com/elastic/elastic-agent/pull/15865[#15865] 
 * Fix getting current user failing on Windows when no profile directory is present. https://github.com/elastic/elastic-agent/pull/16007[#16007] 
-* Bake Synthetics browser binaries into the elastic-agent-complete image. https://github.com/elastic/elastic-agent/pull/16017[#16017] https://github.com/elastic/elastic-agent/issues/15993[#15993]
+* Bake Synthetics browser binaries into the `elastic-agent-complete` image. https://github.com/elastic/elastic-agent/pull/16017[#16017] https://github.com/elastic/elastic-agent/issues/15993[#15993]
 
 // end 8.19.20 relnotes
