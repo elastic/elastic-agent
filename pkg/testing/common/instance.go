@@ -37,6 +37,11 @@ type Instance struct {
 	Username string `yaml:"username"`
 	// RemotePath is the based path used for performing work on the instance.
 	RemotePath string `yaml:"remote_path"`
+	// Prepared indicates the instance is already prepared for running tests
+	// (e.g. the build toolchain is baked into the image), so the runner can
+	// skip the Prepare step. Provisioners that ship a ready-to-use image set
+	// this to true.
+	Prepared bool `yaml:"prepared"`
 	// Internal holds internal information used by the provisioner.
 	// Best to not touch the contents of this, and leave it be for
 	// the provisioner.

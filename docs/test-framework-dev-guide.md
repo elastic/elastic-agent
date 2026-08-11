@@ -129,6 +129,9 @@ share similar leavers as the packaging process.
      - `kind`: Uses [Kind](https://kind.sigs.k8s.io/) to run Kubernetes
        in Docker. This needs to be set if running Kubernetes integration
        tests.
+     - `docker`: Runs each test batch in a local, systemd-enabled Docker
+       container (with sshd) instead of a VM. It builds an Ubuntu image on first use and the
+       runner drives the container over SSH exactly like a VM. Requires Docker.
 
 An example for running a single test, including packaging the artifacts for it is:
 ```
@@ -263,6 +266,24 @@ The test itself can be run via the `integration:TestForResourceLeaks` mage targe
 ##### Limitations
 Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
 is split on space, so not all combination of flags and their values may be correctly split.
+
+#### Test output / live progress (`GOTESTSUM_FORMAT`)
+
+Tests are driven by [`gotestsum`](https://github.com/gotestyourself/gotestsum). By
+default remote runs use its quiet format, which prints nothing until a package
+finishes — so a long-running test appears to hang with no feedback. Set
+`GOTESTSUM_FORMAT` to change the output format (see `gotestsum --help` for the full
+list); the most useful values are:
+
+- `standard-verbose` — streams the full `go test -v` output live, including each
+  test's `t.Log` progress. Best for watching a single long test.
+- `testname` — prints one line per test as it finishes. Less noisy for large batches.
+
+`GOTESTSUM_FORMAT` is honored locally and propagated to the remote host, so it works
+for `integration:test`/`integration:single` as well. For the local provisioners
+(`multipass`/`kind`/`docker`) and `mage integration:local`, `standard-verbose` is the
+default (a human is watching); set `GOTESTSUM_FORMAT` explicitly to override. CI
+(`gcloud`) keeps the quiet default unless the variable is set.
 
 ### Cleaning up resources
 
@@ -532,6 +553,38 @@ not cause already provisioned resources to be replaced with an instance created 
 Use only when running Kubernetes tests. Uses local installed kind to create Kubernetes clusters on the fly.
 
 - `INSTANCE_PROVISIONER="kind" mage integration:testKubernetes`
+
+### Docker Instance Provisioner
+Runs each test batch in a local, systemd-enabled Docker container (running `sshd`)
+instead of a VM. Because the container runs systemd as PID 1, the privileged
+("sudo") tests that install the Elastic Agent as a systemd service work locally
+without provisioning a cloud VM. The existing Linux runner drives the container over
+SSH exactly like a VM.
+
+- `INSTANCE_PROVISIONER="docker" mage integration:test`
+
+Notes:
+- Requires a running Docker daemon. An Ubuntu image (`elastic-agent-test-systemd`)
+  is built on first use and reused afterwards. The image bakes in the build toolchain
+  (`build-essential`, `unzip`) and the exact Go version from `.go-version`, so the
+  runner's per-instance `Prepare` step is skipped — containers start ready to build.
+  It also pre-installs `mage` and `gotestsum` (at the versions pinned in `go.mod`)
+  with warm Go module/build caches, so the per-run `make mage && mage
+  integration:prepareOnRemote` resolves from cache instead of downloading and
+  compiling. The Go/mage/gotestsum versions and a hash of the `Dockerfile` are part of
+  the image tag, so bumping any of them (`.go-version` or `go.mod`) or editing the
+  `Dockerfile` rebuilds the image.
+- The image also installs Docker Engine and runs a **nested daemon** (docker-in-docker)
+  so tests that start helper containers via testcontainers' docker-compose (e.g. the
+  Kafka and Logstash output tests in `testing/integration/ess/otel_test.go`) work. Those
+  helper containers publish their ports on the test container's own `localhost`, which
+  is what the test code and agent expect (e.g. `KAFKA_ADVERTISED_HOST=localhost`); a
+  mounted host socket could not provide that. The provisioner waits for the nested
+  daemon to be ready before starting tests. The non-root test user (`ubuntu`) is in the
+  `docker` group, so non-sudo tests reach the daemon too. `/var/lib/docker` and
+  `/var/lib/containerd` are backed by volumes (removed with the container via
+  `docker rm -fv`) because the nested daemon's overlay storage cannot stack on the
+  container's own overlay rootfs.
 
 ## Troubleshooting Tips
 
