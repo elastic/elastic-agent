@@ -207,7 +207,7 @@ service:
 ## OTel Mode
 
 The elastic agent can also be executed in "Otel mode" by executing the `elastic-agent otel` command. This immediately invokes
-the entrypoint of the EDOT OpenTelemetry collector bypassing all other Elastic Agent functionality. In this mode Fleet management is
+the {{agent}} OTel entry point, bypassing all other {{agent}} functionality. In this mode {{fleet}} management is
 not available and elastic-agent.yml configurations cannot be executed. Beat receivers are still usable in this mode, but they must be
 configured manually like any other receiver.
 
@@ -279,7 +279,7 @@ service:
 ### Beats receivers delivery guarantees in OTel mode
 
 When Beat receivers are used in OTel mode, event delivery guarantees depend on the configuration of the OpenTelemetry Collector `sending_queue` and retry settings.
-Unlike standalone Beats, the EDOT pipeline allows users to customize queue behavior through the Collector configuration.
+Unlike standalone Beats, the {{agent}} OTel pipeline allows users to customize queue behavior through the Collector configuration.
 This flexibility is useful, but it also means that not every option combination is compatible with reliable delivery.
 
 Elastic Agent in OTel mode provides an **at least once** delivery guarantee for Beat receivers **only when using the supported `sending_queue` settings described below**.

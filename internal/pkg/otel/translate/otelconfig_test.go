@@ -2867,6 +2867,108 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 }
 
+// TestGetReceiversConfigForComponentBrowserMonitor verifies that a Synthetics browser
+// monitor, which compiles into a single synthetics/browser input with a scheduled
+// "browser" stream plus schedule-less "browser.network" and "browser.screenshot"
+// auxiliary streams, produces exactly one heartbeat monitor. The auxiliary streams
+// must be dropped so the heartbeatreceiver does not reject them for missing a schedule.
+// Regression test for https://github.com/elastic/elastic-agent/issues/15968.
+func TestGetReceiversConfigForComponentBrowserMonitor(t *testing.T) {
+	testAgentInfo := &info.AgentInfo{}
+
+	browserComponent := &component.Component{
+		ID:        "heartbeat-browser-test-id",
+		InputType: "synthetics/browser",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "synthetics/browser",
+				Command: &component.CommandSpec{
+					Args: []string{"heartbeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "heartbeat-browser-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "synthetics/browser",
+					"streams": []any{
+						map[string]any{
+							"id":   "browser-1",
+							"type": "browser",
+							"data_stream": map[string]any{
+								"dataset": "browser",
+								"type":    "synthetics",
+							},
+							"schedule": "@every 3m",
+						},
+						map[string]any{
+							"id": "browser-network-1",
+							"data_stream": map[string]any{
+								"dataset": "browser.network",
+								"type":    "synthetics",
+							},
+						},
+						map[string]any{
+							"id": "browser-screenshot-1",
+							"data_stream": map[string]any{
+								"dataset": "browser.screenshot",
+								"type":    "synthetics",
+							},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	result, err := getReceiversConfigForComponent(browserComponent, testAgentInfo, nil)
+	require.NoError(t, err)
+
+	// Only the scheduled "browser" stream must become a receiver/monitor; the
+	// schedule-less auxiliary streams must be dropped.
+	require.Len(t, result, 1, "only the scheduled browser stream should produce a receiver")
+
+	scheduledReceiverID := "heartbeatreceiver/_agent-component/heartbeat-browser-test-id/browser-1"
+	require.Contains(t, result, scheduledReceiverID)
+	assert.NotContains(t, result, "heartbeatreceiver/_agent-component/heartbeat-browser-test-id/browser-network-1")
+	assert.NotContains(t, result, "heartbeatreceiver/_agent-component/heartbeat-browser-test-id/browser-screenshot-1")
+
+	receiverConfig, ok := result[scheduledReceiverID].(map[string]any)
+	require.True(t, ok, "receiver config should be a map")
+	heartbeatConfig, ok := receiverConfig["heartbeat"].(map[string]any)
+	require.True(t, ok, "heartbeat config should be a map")
+	monitors, ok := heartbeatConfig["monitors"].([]map[string]any)
+	require.True(t, ok, "heartbeat monitors should be a slice of maps")
+	require.Len(t, monitors, 1, "exactly one monitor should be emitted")
+	assert.Equal(t, "@every 3m", monitors[0]["schedule"], "the emitted monitor must carry the schedule")
+	assert.Equal(t, "browser", monitors[0]["type"], "the emitted monitor must be the browser stream")
+}
+
+// TestKeepScheduledMonitors verifies the schedule-based filtering used to drop
+// auxiliary Synthetics browser sub-streams, including the malformed-config fallback.
+func TestKeepScheduledMonitors(t *testing.T) {
+	scheduled := receiverInput{streamID: "browser-1", config: map[string]any{"schedule": "@every 3m"}}
+	network := receiverInput{streamID: "browser-network-1", config: map[string]any{}}
+	screenshot := receiverInput{streamID: "browser-screenshot-1", config: map[string]any{"schedule": nil}}
+
+	t.Run("drops schedule-less streams", func(t *testing.T) {
+		got := keepScheduledMonitors([]receiverInput{scheduled, network, screenshot})
+		require.Len(t, got, 1)
+		assert.Equal(t, "browser-1", got[0].streamID)
+	})
+
+	t.Run("returns inputs unchanged when none are scheduled", func(t *testing.T) {
+		in := []receiverInput{network, screenshot}
+		got := keepScheduledMonitors(in)
+		assert.Equal(t, in, got)
+	})
+}
+
 // TestGetReceiversConfigForComponentFeatures verifies that all agent feature flags
 // are propagated into the generated Beat receiver config.
 func TestGetReceiversConfigForComponentFeatures(t *testing.T) {
@@ -3867,6 +3969,93 @@ func TestStripDefaultProcessors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := stripDefaultProcessors(tt.beatName, tt.raw)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestInjectOsqueryConfig verifies that injectOsqueryConfig mirrors the stream ordering
+// produced by osquerybeatCfgFromStreams: the osquery_manager.result stream is always moved
+// to position 0, and all other streams follow in their original relative order.
+func TestInjectOsqueryConfig(t *testing.T) {
+	makeStream := func(id string, isResult bool) receiverInput {
+		dataset := "osquery_manager.action.responses"
+		if isResult {
+			dataset = "osquery_manager.result"
+		}
+		return receiverInput{
+			streamID: id,
+			config: map[string]any{
+				"data_stream": map[string]any{
+					"dataset": dataset,
+				},
+			},
+		}
+	}
+
+	// unit carries the input-level osquery config, mirroring what osquerybeatCfgFromStreams
+	// receives as rawIn.Source when the integration has scheduled queries.
+	unit := component.Unit{
+		Config: component.MustExpectedConfig(map[string]interface{}{
+			"osquery": map[string]interface{}{
+				"queries": map[string]interface{}{},
+			},
+		}),
+	}
+
+	tests := []struct {
+		name          string
+		inputs        []receiverInput
+		wantStreamIDs []string
+	}{
+		{
+			name:          "1 stream: result only",
+			inputs:        []receiverInput{makeStream("result", true)},
+			wantStreamIDs: []string{"result"},
+		},
+		{
+			name:          "2 streams: result first",
+			inputs:        []receiverInput{makeStream("result", true), makeStream("action", false)},
+			wantStreamIDs: []string{"result", "action"},
+		},
+		{
+			name:          "2 streams: result second",
+			inputs:        []receiverInput{makeStream("action", false), makeStream("result", true)},
+			wantStreamIDs: []string{"result", "action"},
+		},
+		{
+			// swap(0,2) gives [result, other, action] — wrong relative order of non-result streams
+			name: "3 streams: result last",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStream("other", false),
+				makeStream("result", true),
+			},
+			wantStreamIDs: []string{"result", "action", "other"},
+		},
+		{
+			// swap(0,3) gives [result, other1, other2, action] — wrong
+			name: "4 streams: result last",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStream("other1", false),
+				makeStream("other2", false),
+				makeStream("result", true),
+			},
+			wantStreamIDs: []string{"result", "action", "other1", "other2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := injectOsqueryConfig(tt.inputs, unit)
+			require.Len(t, got, len(tt.wantStreamIDs))
+			gotIDs := make([]string, len(got))
+			for i, ri := range got {
+				gotIDs[i] = ri.streamID
+			}
+			assert.Equal(t, tt.wantStreamIDs, gotIDs,
+				"stream ordering must match osquerybeatCfgFromStreams: result stream first, others in original relative order")
+			assert.NotNil(t, got[0].config["osquery"], "result stream must have osquery config injected")
 		})
 	}
 }
