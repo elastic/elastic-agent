@@ -821,6 +821,13 @@ func (s *Settings) WithPlatformFilter(filter string) *Settings {
 	return clone
 }
 
+// WithInstanceProvisioner returns a copy of the settings with the specified instance provisioner.
+func (s *Settings) WithInstanceProvisioner(provisioner string) *Settings {
+	clone := s.Clone()
+	clone.IntegrationTest.InstanceProvisioner = provisioner
+	return clone
+}
+
 // WithPackageTypes returns a copy of the settings with the specified package types.
 func (s *Settings) WithPackageTypes(types []PackageType) *Settings {
 	clone := s.Clone()

@@ -53,6 +53,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/gcloud"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
+	"github.com/elastic/elastic-agent/pkg/testing/local"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/git"
@@ -2304,14 +2305,6 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	// clean the .agent-testing/local so this run will use the latest build
 	_ = os.RemoveAll(".agent-testing/local")
 
-<<<<<<< HEAD
-	// run the integration tests but only run test that can run locally
-	params := devtools.DefaultGoTestIntegrationArgs(cfg)
-	params.Tags = append(params.Tags, "local")
-	params.Packages = []string{
-		"github.com/elastic/elastic-agent/testing/integration/...",
-	}
-=======
 	// These tests run in-process on this host where a human is watching, so default
 	// to streaming each test's progress live instead of gotestsum's quiet mode
 	// (which prints nothing until a package finishes). A host-set value wins.
@@ -2321,7 +2314,13 @@ func (Integration) Local(ctx context.Context, testName string) error {
 
 	cfg = cfg.WithInstanceProvisioner(local.Name)
 	ctx = devtools.ContextWithSettings(ctx, cfg)
->>>>>>> 47e5917b9 ([mage] Add docker instance provisioner for integration tests (#15909))
+
+	// run the integration tests but only run test that can run locally
+	params := devtools.DefaultGoTestIntegrationArgs(cfg)
+	params.Tags = append(params.Tags, "local")
+	params.Packages = []string{
+		"github.com/elastic/elastic-agent/testing/integration/...",
+	}
 
 	var goTestFlags []string
 	if cfg.IntegrationTest.GoTestFlags != "" {
@@ -3267,10 +3266,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	var identifier string
 	switch instanceProvisionerMode {
 	case "", gcloud.Name:
-<<<<<<< HEAD
-		instanceProvisionerMode = gcloud.Name
-		instanceProvisioner, err = gcloud.NewProvisioner(gcloudCfg)
-=======
 		serviceTokenPath, ok, err := getGCEServiceTokenPath(cfg)
 		if err != nil {
 			return nil, err
@@ -3297,14 +3292,11 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 			return nil, err
 		}
 		identifier = fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-"))
->>>>>>> 47e5917b9 ([mage] Add docker instance provisioner for integration tests (#15909))
 	case multipass.Name:
 		instanceProvisioner = multipass.NewProvisioner()
 		identifier = localIdentifier()
 	case kind.Name:
 		instanceProvisioner = kind.NewProvisioner()
-<<<<<<< HEAD
-=======
 		identifier = localIdentifier()
 	case dockerprov.Name:
 		instanceProvisioner = dockerprov.NewProvisioner()
@@ -3312,7 +3304,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	case local.Name:
 		instanceProvisioner = local.NewProvisioner()
 		identifier = localIdentifier()
->>>>>>> 47e5917b9 ([mage] Add docker instance provisioner for integration tests (#15909))
 	default:
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
 	}
