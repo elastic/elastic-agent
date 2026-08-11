@@ -56,6 +56,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	dockerprov "github.com/elastic/elastic-agent/pkg/testing/docker"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/gcloud"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
@@ -2084,6 +2085,17 @@ func (Integration) Clean(ctx context.Context) error {
 	fmt.Println(">>> Found .integration-cache; running runner.Clean")
 
 	cfg := devtools.SettingsFromContext(ctx)
+
+	// If INSTANCE_PROVISIONER is not explicitly set, detect it from the saved state
+	// so that the right provisioner's Clean method is called instead of defaulting to gcloud.
+	if cfg.IntegrationTest.InstanceProvisioner == "" {
+		if state, stateErr := readFrameworkState(); stateErr == nil && len(state.Instances) > 0 {
+			detected := state.Instances[0].Provisioner
+			fmt.Printf(">>> Detected instance provisioner from state: %s\n", detected)
+			cfg = cfg.WithInstanceProvisioner(detected)
+		}
+	}
+
 	r, err := createTestRunner(cfg, false, "", "")
 	if err != nil {
 		return fmt.Errorf("error creating test runner: %w", err)
@@ -2123,12 +2135,24 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	// clean the .agent-testing/local so this run will use the latest build
 	_ = os.RemoveAll(".agent-testing/local")
 
+<<<<<<< HEAD
 	// run the integration tests but only run test that can run locally
 	params := devtools.DefaultGoTestIntegrationArgs(cfg)
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{
 		"github.com/elastic/elastic-agent/testing/integration/...",
 	}
+=======
+	// These tests run in-process on this host where a human is watching, so default
+	// to streaming each test's progress live instead of gotestsum's quiet mode
+	// (which prints nothing until a package finishes). A host-set value wins.
+	if os.Getenv("GOTESTSUM_FORMAT") == "" {
+		os.Setenv("GOTESTSUM_FORMAT", "standard-verbose")
+	}
+
+	cfg = cfg.WithInstanceProvisioner(local.Name)
+	ctx = devtools.ContextWithSettings(ctx, cfg)
+>>>>>>> 47e5917b9 ([mage] Add docker instance provisioner for integration tests (#15909))
 
 	var goTestFlags []string
 	if cfg.IntegrationTest.GoTestFlags != "" {
@@ -3067,46 +3091,63 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		essRegion = "gcp-us-west2"
 	}
 
-	serviceTokenPath, ok, err := getGCEServiceTokenPath(cfg)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, fmt.Errorf("GCE service token missing; run 'mage integration:auth'")
-	}
-	datacenter := cfg.IntegrationTest.GCPDatacenter
-	if datacenter == "" {
-		// us-central1-a is used because T2A instances required for ARM64 testing are only
-		// available in the central regions
-		datacenter = "us-central1-a"
-	}
-
-	gcloudCfg := gcloud.Config{
-		ServiceTokenPath: serviceTokenPath,
-		Datacenter:       datacenter,
-	}
-
 	var instanceProvisioner tcommon.InstanceProvisioner
 	instanceProvisionerMode := cfg.IntegrationTest.InstanceProvisioner
+	var identifier string
 	switch instanceProvisionerMode {
 	case "", gcloud.Name:
+<<<<<<< HEAD
 		instanceProvisionerMode = gcloud.Name
 		instanceProvisioner, err = gcloud.NewProvisioner(gcloudCfg)
+=======
+		serviceTokenPath, ok, err := getGCEServiceTokenPath(cfg)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, fmt.Errorf("GCE service token missing; run 'mage integration:auth'")
+		}
+		datacenter := cfg.IntegrationTest.GCPDatacenter
+		if datacenter == "" {
+			// us-central1-a is used because T2A instances required for ARM64 testing are only
+			// available in the central regions
+			datacenter = "us-central1-a"
+		}
+		gcloudCfg := gcloud.Config{
+			ServiceTokenPath: serviceTokenPath,
+			Datacenter:       datacenter,
+		}
+		instanceProvisioner, err = gcloud.NewProvisioner(gcloudCfg)
+		if err != nil {
+			return nil, err
+		}
+		email, err := gcloudCfg.ClientEmail()
+		if err != nil {
+			return nil, err
+		}
+		identifier = fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-"))
+>>>>>>> 47e5917b9 ([mage] Add docker instance provisioner for integration tests (#15909))
 	case multipass.Name:
 		instanceProvisioner = multipass.NewProvisioner()
+		identifier = localIdentifier()
 	case kind.Name:
 		instanceProvisioner = kind.NewProvisioner()
+<<<<<<< HEAD
+=======
+		identifier = localIdentifier()
+	case dockerprov.Name:
+		instanceProvisioner = dockerprov.NewProvisioner()
+		identifier = localIdentifier()
+	case local.Name:
+		instanceProvisioner = local.NewProvisioner()
+		identifier = localIdentifier()
+>>>>>>> 47e5917b9 ([mage] Add docker instance provisioner for integration tests (#15909))
 	default:
-		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud' or 'multipass', not %s", instanceProvisionerMode)
-	}
-
-	email, err := gcloudCfg.ClientEmail()
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
 	}
 
 	provisionCfg := ess.ProvisionerConfig{
-		Identifier: fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-")),
+		Identifier: identifier,
 		APIKey:     essToken,
 		Region:     essRegion,
 	}
@@ -3150,6 +3191,17 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	extraEnv["TEST_LONG_RUNNING"] = cfg.IntegrationTest.LongRunning
 	extraEnv["LONG_TEST_RUNTIME"] = cfg.IntegrationTest.LongTestRuntime
 	extraEnv["TEST_UPGRADE_VERSIONS"] = cfg.IntegrationTest.UpgradeVersions
+
+	// Control the gotestsum output format on the remote host. The remote test
+	// process otherwise runs in quiet mode and prints nothing until a package
+	// finishes. A host-set GOTESTSUM_FORMAT always wins; for the local provisioners
+	// (multipass/kind/docker), where a human is watching, default to streaming each
+	// test's progress live. CI (gcloud) is left untouched unless explicitly set.
+	if format := os.Getenv("GOTESTSUM_FORMAT"); format != "" {
+		extraEnv["GOTESTSUM_FORMAT"] = format
+	} else if instanceProvisionerMode != gcloud.Name {
+		extraEnv["GOTESTSUM_FORMAT"] = "standard-verbose"
+	}
 
 	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
 	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
@@ -3403,6 +3455,18 @@ func gceFindMissingRoles(actual []string, expected []string) []string {
 		}
 	}
 	return missing
+}
+
+// localIdentifier returns a short identifier derived from the current OS user,
+// used as the ESS stack name prefix when not using the gcloud provisioner.
+func localIdentifier() string {
+	if u := os.Getenv("USER"); u != "" {
+		return fmt.Sprintf("at-%s", strings.ReplaceAll(u, ".", "-"))
+	}
+	if hostname, err := os.Hostname(); err == nil {
+		return fmt.Sprintf("at-%s", strings.ReplaceAll(hostname, ".", "-"))
+	}
+	return "at-dev"
 }
 
 func getGCEServiceTokenPath(cfg *devtools.Settings) (string, bool, error) {
