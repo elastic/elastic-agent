@@ -1733,8 +1733,6 @@ func (c *Coordinator) processConfigChange(ctx context.Context, change ConfigChan
 	}
 
 	if err := change.Ack(); err != nil {
-		// This currently only happens if we fail to save the action to the state store.
-		// Not a transient failure, so return error instead of just logging.
 		return fmt.Errorf("failed to ack new policy change: %w", err)
 	}
 

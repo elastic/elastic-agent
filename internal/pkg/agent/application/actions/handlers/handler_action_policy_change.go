@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
@@ -293,12 +294,25 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return runtimeErr
 	}
 
-	// Step 5: Commit. Nothing below can fail so we update the caches, persist the
-	// config and the action and then re-exec.
+	// Step 5: Commit. Both disk writes must succeed before we return nil so
+	// that Fleet re-delivers the action if either write fails. Disk failures
+	// must not propagate as ACK failures — see
+	// https://github.com/elastic/elastic-agent/issues/13677.
 	//
-	// The caches are updated here, not earlier, because they are the baseline we
-	// compare the next policy against. If we updated them before a failure, the
-	// resent policy would look unchanged and we would skip re-applying it.
+	// Write order: saveConfig first, stateStore second.
+	//
+	// If saveConfig fails, stateStore is untouched. On restart the agent
+	// loads the old stateStore action and reports the old policy_revision_idx
+	// to Fleet, which re-delivers the policy — clean recovery.
+	//
+	// If stateStore fails after saveConfig succeeded, we restore the
+	// in-memory stateStore action so the fleet gateway continues to report
+	// the old policy_revision_idx via the checkin heartbeat (Fleet Server
+	// advances agent.policy_revision from that field without waiting for an
+	// explicit ACK). On restart the agent loads the old stateStore action
+	// from disk and Fleet re-delivers; saveConfig is idempotently
+	// overwritten on the second delivery.
+	snap := h.snapshotConfig()
 	hasEventLoggingChanged := h.applyEventLoggingOutputChange(cfg, partialCfg)
 	hasLoggingChanged := h.applyLoggingConfigChange(cfg, loggingConfig)
 
@@ -311,12 +325,21 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	h.applyMonitoringConfigChange(partialCfg)
 
 	if err := saveConfig(h.agentInfo, h.config, h.store, h.log); err != nil {
+		h.restoreConfig(snap)
 		return fmt.Errorf("failed to persist policy config: %w", err)
 	}
 	if h.stateStore != nil && action != nil {
+		prevAction := h.stateStore.Action()
 		h.stateStore.SetAction(action)
 		if err := h.stateStore.Save(); err != nil {
-			h.log.Warnf("failed to persist policy action to state store: %v", err)
+			// Restore so the fleet gateway does not report the new revision to
+			// Fleet Server before it is on disk; Fleet Server advances
+			// agent.policy_revision from the checkin's policy_revision_idx
+			// without waiting for an explicit ACK. Restore unconditionally
+			// (even when prevAction is nil) so the in-memory action always
+			// mirrors what is on disk.
+			h.stateStore.SetAction(prevAction)
+			return fmt.Errorf("failed to persist policy action to state store: %w", err)
 		}
 	}
 
@@ -349,6 +372,36 @@ func (h *PolicyChangeHandler) parsePolicyConfiguration(c *config.Config) (*confi
 	cfg.UCfg = c
 
 	return cfg, nil
+}
+
+// handlerConfigSnapshot captures the h.config fields that handlePolicyChange
+// mutates before calling saveConfig, so they can be restored atomically if
+// saveConfig fails. Add a field here whenever a new mutation is introduced
+// before the saveConfig call.
+type handlerConfigSnapshot struct {
+	eventLogging    logger.Config
+	logging         logger.Config
+	fleetClient     remote.Config
+	monitoringHTTP  *monitoringCfg.MonitoringHTTPConfig
+	monitoringPprof *monitoringCfg.PprofConfig
+}
+
+func (h *PolicyChangeHandler) snapshotConfig() handlerConfigSnapshot {
+	return handlerConfigSnapshot{
+		eventLogging:    *h.config.Settings.EventLoggingConfig,
+		logging:         *h.config.Settings.LoggingConfig,
+		fleetClient:     h.config.Fleet.Client,
+		monitoringHTTP:  h.config.Settings.MonitoringConfig.HTTP,
+		monitoringPprof: h.config.Settings.MonitoringConfig.Pprof,
+	}
+}
+
+func (h *PolicyChangeHandler) restoreConfig(snap handlerConfigSnapshot) {
+	*h.config.Settings.EventLoggingConfig = snap.eventLogging
+	*h.config.Settings.LoggingConfig = snap.logging
+	h.config.Fleet.Client = snap.fleetClient
+	h.config.Settings.MonitoringConfig.HTTP = snap.monitoringHTTP
+	h.config.Settings.MonitoringConfig.Pprof = snap.monitoringPprof
 }
 
 func (h *PolicyChangeHandler) applyEventLoggingOutputChange(new, partial *configuration.Configuration) bool {
@@ -576,17 +629,13 @@ func (l *policyChange) Config() *config.Config {
 
 // Ack is the post-apply hook called by the coordinator's ack chain.
 //
-// The work happens in three steps so that the error returned by Ack reflects
-// only Fleet-side ack failures, not local persistence failures (see
+// Disk persistence happens in Handle() so that the error returned by Ack
+// reflects only Fleet-side ack failures, not local persistence failures (see
 // https://github.com/elastic/elastic-agent/issues/13677):
 //
-//  1. Persist the POLICY_CHANGE action to the state store and broadcast the
-//     policy id and revision to live consumers. Persistence failures are
-//     logged at warn level but do not propagate, so a transient disk hiccup
-//     does not masquerade as a Fleet ack failure.
-//  2. Send the network ack (unless explicitly disabled). A failure here
+//  1. Send the network ack (unless explicitly disabled). A failure here
 //     propagates so the coordinator can retry.
-//  3. Commit the ack batch. Failures propagate.
+//  2. Commit the ack batch. Failures propagate.
 func (l *policyChange) Ack() error {
 	if !l.disableAck && l.action != nil {
 		if err := l.acker.Ack(l.ctx, l.action); err != nil {
