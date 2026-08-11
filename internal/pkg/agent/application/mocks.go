@@ -120,7 +120,7 @@ type mockRollbacksSource_Remove_Call struct {
 
 // Remove is a helper method to define mock.On call
 //   - s string
-func (_e *mockRollbacksSource_Expecter) Remove(s interface{}) *mockRollbacksSource_Remove_Call {
+func (_e *mockRollbacksSource_Expecter) Remove(s any) *mockRollbacksSource_Remove_Call {
 	return &mockRollbacksSource_Remove_Call{Call: _e.mock.On("Remove", s)}
 }
 
@@ -171,7 +171,7 @@ type mockRollbacksSource_Set_Call struct {
 
 // Set is a helper method to define mock.On call
 //   - stringToTTLMarker map[string]ttl.TTLMarker
-func (_e *mockRollbacksSource_Expecter) Set(stringToTTLMarker interface{}) *mockRollbacksSource_Set_Call {
+func (_e *mockRollbacksSource_Expecter) Set(stringToTTLMarker any) *mockRollbacksSource_Set_Call {
 	return &mockRollbacksSource_Set_Call{Call: _e.mock.On("Set", stringToTTLMarker)}
 }
 
