@@ -86,10 +86,6 @@ func (runner *HeartbeatRunner) SetupSuite() {
 			kibana.MonitoringEnabledLogs,
 			kibana.MonitoringEnabledMetrics,
 		},
-		// Heartbeat defaults to the OTel runtime; start with an override forcing
-		// process mode so process mode can be validated first, then remove the
-		// override to fall back to the (OTel) default.
-		Overrides: heartbeatProcessRuntimeOverride(),
 	}
 
 	installOpts := atesting.InstallOpts{
@@ -180,8 +176,7 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 
 	testStart := time.Now()
 
-	// The policy was created with an override forcing heartbeat to process mode,
-	// so validate that first.
+	// Validate process mode
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -203,11 +198,11 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 		processDoc = runner.validateHeartbeatEvents(t, ctx, agentStatus.Info.ID, testStart)
 	})
 
-	// Switch to an explicit OTel override and validate the same data.
+	// Switch to OTel runtime and validate the same data
 	var otelDoc mapstr.M
 	t.Run("otel", func(t *testing.T) {
 		otelSince := time.Now()
-		policyRevision := switchHeartbeatToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
+		policyRevision := switchPolicyToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
 
 		// Wait for the agent to apply the new policy revision
 		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
@@ -242,42 +237,6 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields,
 			"expected heartbeat document keys to be equal between process and otel modes")
 	})
-}
-
-// heartbeatProcessRuntimeOverride returns a policy override that forces
-// heartbeat to run in process mode, overriding its OTel default.
-func heartbeatProcessRuntimeOverride() map[string]interface{} {
-	return map[string]interface{}{
-		"agent": map[string]interface{}{
-			"internal": map[string]interface{}{
-				"runtime": map[string]interface{}{
-					"heartbeat": map[string]interface{}{
-						"default": "process",
-					},
-				},
-			},
-		},
-	}
-}
-
-// switchHeartbeatToOtelRuntime updates the given policy to override the
-// heartbeat runtime to otel and returns the new policy revision.
-//
-// This uses an explicit override rather than clearing the process-mode
-// override set in SetupSuite: kibana.AgentPolicyUpdateRequest.Overrides has an
-// `omitempty` JSON tag, so an empty/nil map is dropped from the request body
-// entirely, and Fleet's update API treats a missing "overrides" field as
-// "leave unchanged" rather than "clear it".
-func switchHeartbeatToOtelRuntime(ctx context.Context, t testing.TB, kibanaClient *kibana.Client, policyID, policyName, namespace string) int {
-	t.Helper()
-	updateReq := kibana.AgentPolicyUpdateRequest{
-		Name:      policyName,
-		Namespace: namespace,
-		Overrides: heartbeatOtelRuntimeOverride(),
-	}
-	policyResp, err := kibanaClient.UpdatePolicy(ctx, policyID, updateReq)
-	require.NoError(t, err)
-	return policyResp.Revision
 }
 
 // scheduleMissingErr is the Permanent failure message emitted by the OTel
@@ -477,7 +436,7 @@ func (runner *HeartbeatOTelRunner) TestOTelComponentsHealthy() {
 }
 
 // heartbeatOtelRuntimeOverride forces heartbeat into the OTel beats-receiver
-// runtime (the product default since elastic-agent#15325).
+// runtime, regardless of the product default.
 func heartbeatOtelRuntimeOverride() map[string]interface{} {
 	return map[string]interface{}{
 		"agent": map[string]interface{}{
