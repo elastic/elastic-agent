@@ -107,21 +107,17 @@ SNAPSHOT=false PLATFORMS=linux/arm64 PACKAGES=docker DOCKER_VARIANTS=complete ma
 
 #### Choosing dependencies and metadata
 
-By default, packaging will build the binaries defined in this repository:
-
-- `elastic-agent`
-- `otel-collector` (includes agentbeat)
-- `osquery-extension`
-
-It will pull the remaining dependencies from a manifest specified in [.package-version](/.package-version).
+By default, packaging will build the `elastic-agent` binary from this repository
+and pull the remaining dependencies (beats, osquery, endpoint, ...) from a
+manifest specified in [.package-version](/.package-version).
 This process can be controlled through the following environment variables:
 
-- `AGENT_CORE_SOURCE=local|manifest`: Build the aforementioned binaries locally or pull from the manifest. Default is `local`. Manifest is defined either by [.package-version](/.package-version) or the `MANIFEST_URL` environment variable.
+- `AGENT_CORE_SOURCE=local|manifest`: Build the `elastic-agent` binary locally or take it from the pre-built `elastic-agent-core` package in the manifest. Default is `local`. Manifest is defined either by [.package-version](/.package-version) or the `MANIFEST_URL` environment variable.
 - `USE_PACKAGE_VERSION=true|false`: Use the content of [.package-version](/.package-version) for configuring the package, most importantly the manifest url, but the version is effective as well. Mutually exclusive with `MANIFEST_URL`. Default is `true`.
 - `MANIFEST_URL`: The manifest url from which to pull the dependencies. Mutually exclusive with `USE_PACKAGE_VERSION=true`. Default is empty.
 - `SNAPSHOT=true|false`: Create a snapshot build. This is just versioning metadata indicating that the
   package doesn't contain a release build. Read from the manifest if present, otherwise defaults to `true`.
-- `EXTERNAL=true|false`: If you want to build with dependencies you've provided locally (you have a custom build of endpoint, for example), then set this to `false` and `USE_PACKAGE_VERSION=false`. Default is `true`.
+- `EXTERNAL=true|false`: If `false`, don't download any components; `agentbeat` is instead built from a `beats` repository checked out next to this one. Default is `true`.
 
 For example, if you want to create a package the same way as the unified release job, you'd run:
 
@@ -136,7 +132,7 @@ share similar leavers as the packaging process.
 
  - `AGENT_VERSION`: The version to test, in the format
    `9.2.0-SNAPSHOT`. It is **REQUIRED** to be set when packages were
-   built with `SNAPSHOT=true` (the default on `main`). Currently there is no way
+   built with `SNAPSHOT=true` (the default). Currently there is no way
    to tell the integration tests framework to use snapshot versions if
    testing on VMs.
 
@@ -161,7 +157,7 @@ INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:s
 ### TL;DR: Packaging and running tests
 **Package the Elastic Agent**
 ```
-# SNAPSHOT state comes from .package-version (true on main, false on release branches); pass SNAPSHOT=false to override.
+# SNAPSHOT state comes from the manifest in .package-version (a snapshot build); pass SNAPSHOT=false to override.
 DEV=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
 
 # If running Kubernetes tests. Adjust the variants according to your tests

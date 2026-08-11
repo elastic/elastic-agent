@@ -101,8 +101,8 @@ To build a local version of the agent for development, run the command below. Th
 
 ```sh
 # EXTERNAL defaults to true (downloads external components such as Beats and osquery).
-# SNAPSHOT state comes from .package-version (snapshot on main, non-snapshot on release branches);
-# override explicitly with SNAPSHOT=true or SNAPSHOT=false if needed.
+# SNAPSHOT state comes from the manifest in .package-version (a snapshot build);
+# override explicitly with SNAPSHOT=false if needed.
 # PLATFORMS=linux/amd64 builds an agent that will run on 64 bit X86 Linux systems.
 # PACKAGES selects package types; if unset, defaults to tar.gz for non-Windows platforms and zip for Windows.
 # Use PACKAGES=all to build all package types, or specify types (e.g. tar.gz,rpm,deb,zip,docker).

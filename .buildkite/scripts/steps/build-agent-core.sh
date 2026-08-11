@@ -19,7 +19,7 @@ if [[ "$DRA_WORKFLOW" == "staging" ]] && [[ -n "$VERSION_QUALIFIER" ]]; then
 fi
 
 # USE_PACKAGE_VERSION=false: binary-DRA stamps version.go's version, not .package-version's.
-SNAPSHOT=$SNAPSHOT WINDOWS_NPCAP="true" USE_PACKAGE_VERSION=false mage packageAgentCore
+SNAPSHOT=$SNAPSHOT USE_PACKAGE_VERSION=false mage packageAgentCore
 chmod -R 777 build/distributions
 
 echo "+++ Generate dependencies report"
