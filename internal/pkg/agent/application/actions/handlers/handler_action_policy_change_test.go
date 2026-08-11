@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -1632,12 +1633,114 @@ func (m *mockStateStore) SetAckToken(s string) {
 
 func (m *mockStateStore) Action() fleetapi.Action {
 	args := m.Called()
-	return args.Get(0).(fleetapi.Action)
+	a, _ := args.Get(0).(fleetapi.Action)
+	return a
 }
 
 func newStateStoreMock() *mockStateStore {
 	s := &mockStateStore{}
+	s.On("Action").Return(nil).Once()
 	s.On("SetAction", mock.Anything).Return().Once()
 	s.On("Save").Return(nil).Once()
 	return s
+}
+
+// errorStore is a storage.Store that always returns an error from Save.
+type errorStore struct{ err error }
+
+func (e *errorStore) Save(_ io.Reader) error { return e.err }
+
+func TestPolicyChangeStateStoreSaveFail(t *testing.T) {
+	log, _ := logger.New("", false)
+	agentInfo := &info.AgentInfo{}
+
+	prevAction := &fleetapi.ActionPolicyChange{
+		ActionID:   "prev-action",
+		ActionType: "POLICY_CHANGE",
+		Data:       fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{"revision": int64(1)}},
+	}
+	action := &fleetapi.ActionPolicyChange{
+		ActionID:   "abc123",
+		ActionType: "POLICY_CHANGE",
+		Data:       fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{"hello": "world"}},
+	}
+
+	// Save() fails. The in-memory stateStore is restored unconditionally
+	// (even when prevAction is nil) so the in-memory action always mirrors
+	// disk and the fleet gateway does not report a stale policy_revision_idx.
+	for _, tc := range []struct {
+		name       string
+		prevAction fleetapi.Action
+	}{
+		{"with prior action", prevAction},
+		{"first delivery (nil prevAction)", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ch := make(chan coordinator.ConfigChange, 1)
+			tacker := &testAcker{}
+
+			failStore := &mockStateStore{}
+			failStore.On("Action").Return(tc.prevAction).Once()
+			failStore.On("SetAction", action).Return().Once()
+			failStore.On("Save").Return(errors.New("injected disk error")).Once()
+			failStore.On("SetAction", tc.prevAction).Return().Once()
+
+			cfg := configuration.DefaultConfiguration()
+			handler := NewPolicyChangeHandler(log, agentInfo, nil, cfg, &storage.NullStore{}, failStore, ch, defaultLogLevelSet(t))
+
+			err := handler.Handle(context.Background(), action, tacker)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "failed to persist policy action to state store")
+			assert.Empty(t, ch, "policyChange must not be queued when state store write fails")
+			assert.Empty(t, tacker.Items(), "Fleet must not be ACKed when state store write fails")
+			failStore.AssertExpectations(t)
+		})
+	}
+}
+
+func TestPolicyChangeSaveConfigFail(t *testing.T) {
+	log, _ := logger.New("", false)
+	agentInfo := &info.AgentInfo{}
+
+	ch := make(chan coordinator.ConfigChange, 1)
+	tacker := &testAcker{}
+
+	action := &fleetapi.ActionPolicyChange{
+		ActionID:   "def456",
+		ActionType: "POLICY_CHANGE",
+		Data:       fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{"hello": "world"}},
+	}
+
+	// saveConfig is written before stateStore, so when saveConfig fails the
+	// stateStore is never touched — no Action/SetAction/Save calls expected.
+	untouchedStore := &mockStateStore{}
+	failFleetStore := &errorStore{err: errors.New("injected fleet.enc write error")}
+
+	cfg := configuration.DefaultConfiguration()
+	handler := NewPolicyChangeHandler(log, agentInfo, nil, cfg, failFleetStore, untouchedStore, ch, defaultLogLevelSet(t))
+
+	err := handler.Handle(context.Background(), action, tacker)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to persist policy config")
+	assert.Empty(t, ch, "policyChange must not be queued when fleet.enc write fails")
+	assert.Empty(t, tacker.Items(), "Fleet must not be ACKed when fleet.enc write fails")
+	untouchedStore.AssertExpectations(t)
+}
+
+func TestPolicyChangeNilStateStore(t *testing.T) {
+	log, _ := logger.New("", false)
+	agentInfo := &info.AgentInfo{}
+
+	ch := make(chan coordinator.ConfigChange, 1)
+	action := &fleetapi.ActionPolicyChange{
+		ActionID:   "nil-store",
+		ActionType: "POLICY_CHANGE",
+		Data:       fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{"k": "v"}},
+	}
+	cfg := configuration.DefaultConfiguration()
+	handler := NewPolicyChangeHandler(log, agentInfo, nil, cfg, &storage.NullStore{}, nil, ch, defaultLogLevelSet(t))
+	require.NoError(t, handler.Handle(context.Background(), action, noopacker.New()))
+	assert.Len(t, ch, 1, "policyChange must be queued when stateStore is nil")
 }
