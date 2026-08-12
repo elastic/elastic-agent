@@ -83,58 +83,59 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 	// from "custom" and no preset. Only named presets drive OTel queue sizing; for custom/none
 	// the user owns every queue field and those values must not be overridden.
 	var isNamedPreset bool
-	var precomputedQueueSize, precomputedNumConsumers int
+	var presetQueueSize, presetNumConsumers int
 	preset, err := output.String("preset", -1)
 	if err == nil {
 		isNamedPreset = preset != "" && preset != "custom"
-		if isNamedPreset {
-			if presetQueueEvents, presetFlushMinEvents, presetBulkMaxSize, presetWorker, ok := elasticsearch.PresetQueueConfig(preset); ok {
-				// getTotalNumConnections cannot be used here because the preset's worker
-				// count hasn't been written to output yet (ApplyPreset hasn't run).
-				// Read the raw host list and apply the preset's own worker value instead.
-				var hwc outputs.HostWorkerCfg
-				_ = output.Unpack(&hwc)
-				numHosts := max(1, len(hwc.Hosts))
-				maxConns := numHosts * max(1, presetWorker)
-				batchSize := min(presetFlushMinEvents, presetBulkMaxSize)
-				// Two consumers per connection: one sends while the other stages the next
-				// batch, keeping each connection continuously fed without stalling.
-				precomputedNumConsumers = 2 * maxConns
-				// Two batches per consumer in the queue at any moment so no consumer ever
-				// stalls waiting for the queue to produce the next batch.
-				precomputedQueueSize = 2 * batchSize * precomputedNumConsumers
-				if precomputedQueueSize > maxQueueEvents {
-					// Large host lists would otherwise demand unbounded in-flight events.
-					// Scale back proportionally: halving numConsumers also halves connections,
-					// keeping the queue-to-batch ratio constant at the memory ceiling.
-					precomputedQueueSize = maxQueueEvents
-					precomputedNumConsumers = max(1, precomputedQueueSize/(2*batchSize))
-				}
-				// The preset's queue.mem.events is the throughput floor the user implicitly
-				// accepted when choosing that preset; never deliver fewer events than that.
-				if presetQueueEvents > precomputedQueueSize {
-					precomputedQueueSize = presetQueueEvents
-				}
-			}
-		}
 
-		// ApplyPreset returns a mutable copy of the preset config. For named presets,
-		// overwrite queue.mem.events on both output and the copy before logging so
-		// the log shows the OTel-effective value, not the raw beats preset value.
 		overriddenFields, presetConfig, err := elasticsearch.ApplyPreset(preset, output)
 		if err != nil {
 			return nil, nil, err
 		}
+		// output now has all preset values applied (including worker count), so
+		// getTotalNumConnections reads the correct connection count for sizing.
 
-		if isNamedPreset && precomputedQueueSize > 0 {
-			if err := output.SetInt("queue.mem.events", -1, int64(precomputedQueueSize)); err != nil {
+		if isNamedPreset {
+			maxConnsForPreset := getTotalNumConnections(output)
+			flushMinEvents, _ := output.Int("queue.mem.flush.min_events", -1)
+			bulkMaxSize, _ := output.Int("bulk_max_size", -1)
+			batchSizeForPreset := min(int(flushMinEvents), int(bulkMaxSize))
+			// Two consumers per connection: one sends while the other stages the next
+			// batch, keeping each connection continuously fed without stalling.
+			presetNumConsumers = 2 * maxConnsForPreset
+			// Two batches per consumer in the queue at any moment so no consumer ever
+			// stalls waiting for the queue to produce the next batch.
+			presetQueueSize = 2 * batchSizeForPreset * presetNumConsumers
+			if presetQueueSize > maxQueueEvents {
+				// Large host lists would otherwise demand unbounded in-flight events.
+				// Scale back proportionally: halving numConsumers also halves connections,
+				// keeping the queue-to-batch ratio constant at the memory ceiling.
+				presetQueueSize = maxQueueEvents
+				presetNumConsumers = max(1, presetQueueSize/(2*batchSizeForPreset))
+			}
+			// ApplyPreset wrote the preset's queue.mem.events into output; that is the
+			// throughput floor the user implicitly accepted by choosing this preset —
+			// never deliver fewer events than it promises.
+			if floor, err2 := output.Int("queue.mem.events", -1); err2 == nil && int(floor) > presetQueueSize {
+				presetQueueSize = int(floor)
+			}
+
+			// Write the OTel-adjusted queue size back into output so later decode
+			// and the exporter both see the correct value.
+			if err := output.SetInt("queue.mem.events", -1, int64(presetQueueSize)); err != nil {
 				return nil, nil, fmt.Errorf("failed setting queue.mem.events: %w", err)
 			}
-			_ = presetConfig.SetInt("queue.mem.events", -1, int64(precomputedQueueSize))
+
+			// Build a log copy with the OTel-effective queue.mem.events. presetConfig
+			// is the global preset table entry, must not mutate it directly.
+			logCopy := config.MustNewConfigFrom(map[string]any{})
+			_ = logCopy.Merge(presetConfig)
+			_ = logCopy.SetInt("queue.mem.events", -1, int64(presetQueueSize))
+			logger.Infof("Applying performance preset '%v': %v", preset, config.DebugString(logCopy, false))
+		} else {
+			logger.Infof("Applying performance preset '%v': %v", preset, config.DebugString(presetConfig, false))
 		}
 
-		logger.Infof("Applying performance preset '%v': %v",
-			preset, config.DebugString(presetConfig, false))
 		logger.Warnf("Performance preset '%v' overrides user setting for field(s): %s",
 			preset, strings.Join(overriddenFields, ","))
 	}
@@ -176,14 +177,13 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 	var queueSize, numConsumers int
 
 	if isNamedPreset {
-		// Already computed above (before ApplyPreset) and written into output.
-		queueSize = precomputedQueueSize
-		numConsumers = precomputedNumConsumers
+		queueSize = presetQueueSize
+		numConsumers = presetNumConsumers
 	} else {
-		// queue.mem.events is user-configurable in beats and must not be overridden.
 		// num_consumers has no beats equivalent (users never set it) so apply the
 		// same two-per-connection staging model regardless of preset.
 		numConsumers = 2 * maxConns
+		// queue.mem.events is user-configurable in beats and must not be overridden.
 		queueSize = getQueueSize(logger, output)
 		if suggested := min(2*batchSize*numConsumers, maxQueueEvents); queueSize < suggested {
 			logger.Infof("queue.mem.events (%d) is below the suggested minimum for %d connection(s); consider setting queue.mem.events: %d", queueSize, maxConns, suggested)
