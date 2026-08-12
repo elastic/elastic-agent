@@ -1209,6 +1209,14 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 		// No stored Fleet hosts, enrollment is required.
 		return true, nil
 	}
+	// When the agent bootstraps its own Fleet Server (FLEET_SERVER_ENABLE=1), enrollment
+	// does not use FLEET_URL. enrollCmd.prepareFleetTLS() rewrites the enrollment URL to
+	// the Fleet Server internal endpoint (https://localhost:8221 by default) and that is
+	// what ends up persisted in fleet.enc.
+	expectedFleetURL := setupCfg.Fleet.URL
+	if setupCfg.FleetServer.Enable {
+		expectedFleetURL = getBootstrapFleetServerURL(setupCfg.FleetServer)
+	}
 	// Parse the setup Fleet URL to extract the host portion for comparison.
 	// Stored hosts can be in one of two forms depending on when the config was last saved:
 	//  - Full URL "https://host:port" — after a fleet policy update (handler_action_policy_change
@@ -1216,9 +1224,9 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	//  - Host-only "host:port" — right after enrollment, before the first policy update
 	//    (remote.NewConfigFromURL stores Protocol and Host as separate fields).
 	// We must match against both forms so that neither case triggers a spurious re-enrollment.
-	setupFleetURL, err := url.Parse(setupCfg.Fleet.URL)
+	setupFleetURL, err := url.Parse(expectedFleetURL)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse fleet URL %q: %w", setupCfg.Fleet.URL, err)
+		return false, fmt.Errorf("failed to parse fleet URL %q: %w", expectedFleetURL, err)
 	}
 	setupFleetHost := setupFleetURL.Host
 	if setupFleetHost == "" {
@@ -1226,12 +1234,12 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 		// or misinterpret "host:port" as scheme:opaque. Fall back to the raw URL
 		// for the host comparison, and skip the protocol check since there is no
 		// reliable scheme.
-		setupFleetHost = setupCfg.Fleet.URL
+		setupFleetHost = expectedFleetURL
 	}
 	// Check for a match against the full URL (post-policy-update form) or
 	// the host-only form (post-enrollment, pre-policy-update form).
 	// Track which form matched so we can decide whether to do the protocol check below.
-	matchedFullURL := slices.Contains(storedFleetHosts, setupCfg.Fleet.URL)
+	matchedFullURL := slices.Contains(storedFleetHosts, expectedFleetURL)
 	matchedHostOnly := slices.Contains(storedFleetHosts, setupFleetHost)
 	if !matchedFullURL && !matchedHostOnly {
 		// The Fleet URL in the setup does not exist in the stored configuration, so enrollment is required.
@@ -1311,6 +1319,16 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	case errors.Is(err, fleetclient.ErrInvalidAPIKey):
 		// The API key is invalid, so enrollment is required.
 		return true, nil
+	case errors.IsNetworkError(err):
+		// Fleet Server could not be reached, so the API key could not be validated.
+		//
+		// This is expected when the agent runs its own Fleet Server: this check runs before
+		// Fleet Server is started, so nothing is listening on the internal endpoint yet.
+		// It is also possible when a remote Fleet Server is temporarily unavailable.
+		//
+		// Either way the stored credentials have not been proven invalid, so keep the
+		// existing enrollment instead of discarding it and creating a duplicate agent.
+		log.Warnf("failed to validate api token against Fleet Server, keeping existing enrollment: %v", err)
 	case err != nil:
 		return false, fmt.Errorf("failed to validate api token: %w", err)
 	}
@@ -1353,6 +1371,20 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// getBootstrapFleetServerURL returns the URL the agent uses to reach the Fleet Server it runs
+// itself, as derived from the container setup configuration.
+//
+// A bootstrapped Fleet Server exposes an internal endpoint on localhost:8221 in addition to
+// its external endpoint (0.0.0.0:8220 by default). enrollCmd.prepareFleetTLS() points
+// enrollment at that internal endpoint, so it is the URL that gets persisted in fleet.enc
+// and the one the agent keeps using afterwards. The container command does not expose the
+// internal port, so it is always the default one.
+func getBootstrapFleetServerURL(cfg fleetServerConfig) string {
+	// prepareFleetTLS only runs Fleet Server insecure when no certificate is given.
+	insecure := cfg.InsecureHTTP && cfg.Cert == "" && cfg.CertKey == ""
+	return fleetServerInternalURL(fleetServerInternalHostPort(defaultFleetServerInternalPort), insecure)
 }
 
 // ackFleet performs an ACK request to the fleet server with **empty events**.
