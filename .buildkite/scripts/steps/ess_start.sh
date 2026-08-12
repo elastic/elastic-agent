@@ -47,18 +47,30 @@ metadata_values=(
   "$ELASTIC_APM_SERVER_URL"
 )
 
+function set_buildkite_metadata() {
+  local key="$1"
+  local value="$2"
+  local max_attempts=3
+  local delay=5
+
+  local attempt
+  for attempt in $(seq 1 "$max_attempts"); do
+    if buildkite-agent meta-data set --redacted-vars='' "$key" "$value"; then
+      local stored
+      stored=$(buildkite-agent meta-data get "$key" 2>/dev/null) && [[ -n "$stored" ]] && return 0
+    fi
+    if [[ $attempt -lt $max_attempts ]]; then
+      echo "Attempt $attempt/$max_attempts failed for '$key', retrying in ${delay}s..." >&2
+      sleep "$delay"
+    fi
+  done
+
+  echo "ERROR: failed to set/verify metadata key '$key' after $max_attempts attempts" >&2
+  return 1
+}
+
 echo "~~~ Publishing and verifying ESS stack metadata"
 for i in "${!metadata_keys[@]}"; do
-  key="${metadata_keys[$i]}"
-  value="${metadata_values[$i]}"
-  buildkite-agent meta-data set --redacted-vars='' "$key" "$value"
-  stored=$(buildkite-agent meta-data get "$key") || {
-    echo "ERROR: failed to read back metadata key '$key' after setting it" >&2
-    exit 1
-  }
-  if [[ -z "$stored" ]]; then
-    echo "ERROR: metadata key '$key' was set but reads back as empty" >&2
-    exit 1
-  fi
-  echo "✓ $key"
+  set_buildkite_metadata "${metadata_keys[$i]}" "${metadata_values[$i]}"
+  echo "✓ ${metadata_keys[$i]}"
 done
