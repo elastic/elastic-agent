@@ -2212,6 +2212,94 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	}
 }
 
+// TestOTelManager_StaleExitErrorIgnoredAfterRestart verifies that an error arriving on
+// collectorRunErr after a log-level-change restart is not mistakenly treated as a failure
+// of the newly-started collector. In production the old process can be SIGKILLed (shutdown
+// timeout) and its last log line ends up as the error; here we simulate that by
+// pre-filling collectorRunErr before the log-level change is applied.
+func TestOTelManager_StaleExitErrorIgnoredAfterRestart(t *testing.T) {
+	testLogger, _ := loggertest.New("test")
+	collectorStarted := make(chan struct{}, 5)
+
+	execution := &mockExecution{
+		collectorStarted: collectorStarted,
+	}
+
+	mockFactory := func(string) (collectorExecution, error) {
+		return execution, nil
+	}
+	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, time.Second, mockFactory, true)
+	require.NoError(t, err)
+	mgr.recoveryTimer = newRestarterNoop()
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+
+	// Track errors and component states reported by the manager.
+	var gotErr error
+	errReceived := make(chan struct{}, 1)
+	go func() {
+		err := mgr.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	}()
+
+	// Drain status channels to prevent blocking the run loop.
+	go func() {
+		for {
+			select {
+			case <-mgr.WatchCollector():
+			case <-mgr.WatchComponents():
+			case e := <-mgr.Errors():
+				if e != nil {
+					gotErr = e
+					select {
+					case errReceived <- struct{}{}:
+					default:
+					}
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Start the collector with InfoLevel.
+	cfg := confmap.NewFromStringMap(testConfigNoLogLevel)
+	mgr.Update(cfg, nil, logp.InfoLevel, nil)
+
+	select {
+	case <-collectorStarted:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for initial collector start")
+	}
+
+	// Pre-fill collectorRunErr with a stale error. This simulates a SIGKILLed old process
+	// whose last log line (e.g. "add_cloud_metadata: hosting provider detected as gcp...")
+	// arrives in the channel just before or during the restart.
+	staleErr := errors.New("add_cloud_metadata: hosting provider type detected as gcp, metadata={}")
+	mgr.collectorRunErr <- staleErr
+
+	// Trigger a log-level change restart. applyMergedConfig must drain the stale error
+	// before starting the new collector.
+	mgr.Update(cfg, nil, logp.DebugLevel, nil)
+
+	select {
+	case <-collectorStarted:
+		// New collector started — restart succeeded.
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected collector to be restarted after log level change, but it was not")
+	}
+
+	// Give the run loop a moment to process the (now-drained) collectorRunErr or any
+	// follow-up messages.
+	select {
+	case <-errReceived:
+		t.Fatalf("unexpected error from manager after log-level restart: %v", gotErr)
+	case <-time.After(500 * time.Millisecond):
+		// No error received — stale exit error was correctly discarded.
+	}
+}
+
 // TestOTelManager_CollectorRunErrWithNilConfig verifies that the manager does not panic when a
 // non-nil error arrives on collectorRunErr while mergedCollectorCfg is nil. This can happen when
 // the collector process reports an error after its configuration has been cleared.

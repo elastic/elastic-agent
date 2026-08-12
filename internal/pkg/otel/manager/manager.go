@@ -874,6 +874,15 @@ func (m *OTelManager) applyMergedConfig(
 	// stdout and stderr.
 	if m.proc.LogLevel() != m.collectorLogLevel {
 		m.stopCollector()
+		// stopCollector() waits for the old process to be reaped. If the process was
+		// SIGKILLed (shutdown timeout exceeded), reportProcessExitErr sends the last
+		// log line as an error to collectorRunErr. Drain it here so the run loop does
+		// not misinterpret the stale exit error as a failure of the new process we're
+		// about to start.
+		select {
+		case <-collectorRunErr:
+		default:
+		}
 		err := m.startCollector(ctx, statusFn, collectorRunErr)
 		if err != nil {
 			// this is a new configuration, so reset the recovery timer
