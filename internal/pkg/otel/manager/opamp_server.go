@@ -51,14 +51,14 @@ func generateOpAMPSecret() (string, error) {
 	return hex.EncodeToString(b[:]), nil
 }
 
-// opampServer is an embedded OpAMP HTTP server that the supervised collector's
+// OpAMPServer is an embedded OpAMP HTTP server that the supervised collector's
 // opamp extension polls to upload its health.
 //
-// Lifetime is tied to the OTelManager (one server per manager, started in
-// NewOTelManager). A single collectorSession at a time consumes incoming
-// Health messages — the manager opens a session when starting a collector and
-// closes it when stopping.
-type opampServer struct {
+// Its lifetime is managed externally (typically by the agent's run loop). A
+// single collectorSession at a time consumes incoming Health messages — the
+// OTelManager opens a session when starting a collector and closes it when
+// stopping.
+type OpAMPServer struct {
 	log    *logger.Logger
 	secret string
 
@@ -69,10 +69,29 @@ type opampServer struct {
 	session *opampSession
 }
 
+// NewOpAMPServer constructs and starts an OpAMP server bound to bindAddr
+// (e.g. "127.0.0.1:0" for a random port). The caller is responsible for
+// calling Stop when done.
+func NewOpAMPServer(log *logger.Logger, bindAddr string) (*OpAMPServer, error) {
+	secret, err := generateOpAMPSecret()
+	if err != nil {
+		return nil, err
+	}
+	s := &OpAMPServer{
+		log:    log,
+		secret: secret,
+	}
+	s.srv = server.New(opampLoggerAdapter{log: log})
+	if err := s.Start(bindAddr); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
 // newOpAMPServer constructs an OpAMP server with the given logger and secret.
-// Call Start to bind it to a local port.
-func newOpAMPServer(log *logger.Logger, secret string) *opampServer {
-	s := &opampServer{
+// Call Start to bind it to a local port. Used in tests.
+func newOpAMPServer(log *logger.Logger, secret string) *OpAMPServer {
+	s := &OpAMPServer{
 		log:    log,
 		secret: secret,
 	}
@@ -80,10 +99,15 @@ func newOpAMPServer(log *logger.Logger, secret string) *opampServer {
 	return s
 }
 
+// Secret returns the shared secret used to authenticate collector connections.
+func (s *OpAMPServer) Secret() string {
+	return s.secret
+}
+
 // Start binds the server to bindAddr (e.g. "127.0.0.1:0" for a random port).
 // Returns an error if binding fails. The endpoint URL is available via
 // Endpoint() after a successful Start.
-func (s *opampServer) Start(bindAddr string) error {
+func (s *OpAMPServer) Start(bindAddr string) error {
 	if bindAddr == "" {
 		bindAddr = "127.0.0.1:0"
 	}
@@ -108,7 +132,7 @@ func (s *opampServer) Start(bindAddr string) error {
 }
 
 // Stop closes any active session and stops the underlying http server.
-func (s *opampServer) Stop(ctx context.Context) error {
+func (s *OpAMPServer) Stop(ctx context.Context) error {
 	s.CloseSession()
 	if s.srv != nil {
 		return s.srv.Stop(ctx)
@@ -118,7 +142,7 @@ func (s *opampServer) Stop(ctx context.Context) error {
 
 // Endpoint returns the URL the opamp extension should use to reach the server,
 // e.g. "http://127.0.0.1:1234/v1/opamp". Empty until Start succeeds.
-func (s *opampServer) Endpoint() string {
+func (s *OpAMPServer) Endpoint() string {
 	return s.endpoint
 }
 
@@ -126,7 +150,7 @@ func (s *opampServer) Endpoint() string {
 // returns the new one. statusFn receives translated status updates: an
 // initial StatusStarting is emitted synchronously, then changes derived from
 // incoming Health messages, plus watchdog/force-resend events.
-func (s *opampServer) StartSession(ctx context.Context, statusFn func(context.Context, *otelstatus.AggregateStatus)) *opampSession {
+func (s *OpAMPServer) StartSession(ctx context.Context, statusFn func(context.Context, *otelstatus.AggregateStatus)) *opampSession {
 	sess := &opampSession{
 		log:      s.log,
 		statusFn: statusFn,
@@ -153,7 +177,7 @@ func (s *opampServer) StartSession(ctx context.Context, statusFn func(context.Co
 
 // CloseSession terminates the active session, if any. Safe to call multiple
 // times. Blocks until the session goroutine exits.
-func (s *opampServer) CloseSession() {
+func (s *OpAMPServer) CloseSession() {
 	s.mx.Lock()
 	sess := s.session
 	s.session = nil
@@ -166,7 +190,7 @@ func (s *opampServer) CloseSession() {
 // onConnecting is called once per HTTP request. We validate the shared secret
 // here so unauthenticated requests are rejected before the OpAMP message
 // loop runs.
-func (s *opampServer) onConnecting(req *http.Request) types.ConnectionResponse {
+func (s *OpAMPServer) onConnecting(req *http.Request) types.ConnectionResponse {
 	if !s.checkAuth(req) {
 		return types.ConnectionResponse{
 			Accept:         false,
@@ -181,7 +205,7 @@ func (s *opampServer) onConnecting(req *http.Request) types.ConnectionResponse {
 	}
 }
 
-func (s *opampServer) checkAuth(req *http.Request) bool {
+func (s *OpAMPServer) checkAuth(req *http.Request) bool {
 	got := req.Header.Get(opampAuthorizationHeader)
 	want := "Bearer " + s.secret
 	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
@@ -189,7 +213,7 @@ func (s *opampServer) checkAuth(req *http.Request) bool {
 
 // onMessage forwards Health messages from the collector to the active session.
 // Messages received without an active session are dropped.
-func (s *opampServer) onMessage(ctx context.Context, _ types.Connection, msg *protobufs.AgentToServer) *protobufs.ServerToAgent {
+func (s *OpAMPServer) onMessage(ctx context.Context, _ types.Connection, msg *protobufs.AgentToServer) *protobufs.ServerToAgent {
 	if msg != nil && msg.Health != nil {
 		s.mx.Lock()
 		sess := s.session

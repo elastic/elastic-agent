@@ -97,9 +97,9 @@ type OTelManager struct {
 	// instance ID. It is stable for the lifetime of the manager so collector
 	// restarts present as the same OpAMP agent.
 	opampInstanceUID string
-	// opampServer is the embedded OpAMP HTTP server the supervised collector
-	// polls for status reporting. Lifetime equals the OTelManager's.
-	opampServer *opampServer
+	// opampServer is the OpAMP HTTP server the supervised collector polls for
+	// status reporting. Its lifetime is managed by the caller.
+	opampServer *OpAMPServer
 
 	collectorMetricsPort int
 	collectorCfg         *confmap.Conf
@@ -171,6 +171,7 @@ func NewOTelManager(
 	stopTimeout time.Duration,
 	execFactory ExecutionFactory,
 	enablePartialReload bool,
+	opampSrv *OpAMPServer,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
@@ -182,17 +183,9 @@ func NewOTelManager(
 	}
 	opampInstanceUID := opampUUID.String()
 
-	// determine the otel collector metrics port and the opamp server bind address
+	// determine the otel collector metrics port
 	collectorMetricsPort := 0
-	opampBindAddr := "127.0.0.1:0"
 	if agentCollectorConfig != nil {
-		if agentCollectorConfig.HealthCheckConfig.Endpoint != "" {
-			port, portErr := agentCollectorConfig.HealthCheckConfig.Port()
-			if portErr != nil {
-				return nil, fmt.Errorf("invalid collector health check port: %w", portErr)
-			}
-			opampBindAddr = fmt.Sprintf("127.0.0.1:%d", port)
-		}
 		if agentCollectorConfig.TelemetryConfig.Endpoint != "" {
 			collectorMetricsPort, err = agentCollectorConfig.TelemetryConfig.Port()
 			if err != nil {
@@ -206,15 +199,6 @@ func NewOTelManager(
 		return nil, fmt.Errorf("cannot create component type: %w", err)
 	}
 	opampExtComponentID := otelcomponent.NewIDWithName(componentType, opampInstanceUID).String()
-
-	secret, err := generateOpAMPSecret()
-	if err != nil {
-		return nil, err
-	}
-	opampSrv := newOpAMPServer(managerLogger, secret)
-	if err := opampSrv.Start(opampBindAddr); err != nil {
-		return nil, fmt.Errorf("failed to start opamp server: %w", err)
-	}
 
 	executable := filepath.Join(paths.Components(), collectorBinaryName)
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
@@ -271,12 +255,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			m.recoveryTimer.Stop()
 			// our caller context is cancelled so stop the collector and return
-			// has exited.
 			m.stopCollector()
-			// stop the embedded opamp server
-			stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-			_ = m.opampServer.Stop(stopCtx)
-			cancel()
 			return ctx.Err()
 		case <-m.recoveryTimer.C():
 			m.recoveryTimer.Stop()
