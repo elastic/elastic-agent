@@ -237,6 +237,8 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 		} else if value.HasField("ca_sha_256") {
 			return fmt.Errorf("ca_sha_256 is currently not supported: %w", errors.ErrUnsupported)
 		}
+	} else if cfg.HasField("kerberos") {
+		return fmt.Errorf("kerberos is currently not supported: %w", errors.ErrUnsupported)
 	}
 
 	if cfg.HasField("bulk_flush_frequency") {
