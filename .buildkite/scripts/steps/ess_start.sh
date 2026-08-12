@@ -53,6 +53,11 @@ function set_buildkite_metadata() {
   local max_attempts=3
   local delay=5
 
+  if [[ -z "$value" ]]; then
+    echo "ERROR: value for '$key' is empty — ESS provisioning may have failed" >&2
+    return 1
+  fi
+
   local attempt
   for attempt in $(seq 1 "$max_attempts"); do
     if buildkite-agent meta-data set --redacted-vars='' "$key" "$value"; then
