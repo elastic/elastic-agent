@@ -56,10 +56,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	dockerprov "github.com/elastic/elastic-agent/pkg/testing/docker"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/gcloud"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
+	"github.com/elastic/elastic-agent/pkg/testing/local"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/git"
@@ -598,47 +600,71 @@ func (Format) License() error {
 	return sh.RunV("go-licenser", "-license", "Elastic", "-exclude", "beats")
 }
 
-// Package packages the Beat for distribution.
-// Snapshot builds are the default; use SNAPSHOT=false to build a release package.
-// Use PLATFORMS to control the target platforms.
-// Use VERSION_QUALIFIER to control the version qualifier.
-// Use PACKAGES to override the package types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker).
-// If PACKAGES is not set, defaults to tar.gz for non-Windows platforms and zip for Windows.
+// Package packages the Elastic Agent for distribution.
+//
+// With no env vars set, `mage package` on a fresh checkout produces a
+// single host-native artifact (tar.gz on Unix, zip on Windows) built for
+// the host platform, pulling external components from the manifest URL in
+// .package-version. Override with PACKAGES=rpm,deb or PLATFORMS=linux/arm64
+// etc.
+//
+// AGENT_CORE_SOURCE selects where elastic-agent-core comes from:
+//   - "local" (default): compile from the current checkout via PackageAgentCore.
+//   - "manifest":        download the pre-built core from MANIFEST_URL.
+//
+// MANIFEST_URL, when set, is the source of truth for version and snapshot.
+// In "local" mode it also supplies external components (beats, osquery, ...);
+// the manifest's elastic-agent-core entry is skipped because we are
+// compiling it locally.
+//
+// The commit stamped into the resulting artifact follows the core source:
+// local compiles stamp git HEAD (the commit actually baked into the binary);
+// manifest downloads stamp the manifest's elastic-agent-core commit (the
+// commit the downloaded binary was built at). Mixing the two produces
+// packages whose metadata disagrees with their binary contents.
+//
+// SNAPSHOT, FIPS, VERSION_QUALIFIER, DOCKER_VARIANTS, AGENT_DROP_PATH, and
+// KEEP_ARCHIVE apply as documented on their respective settings.
 func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
 	if len(cfg.GetPlatforms()) == 0 {
-		panic("elastic-agent package is expected to build at least one platform package")
+		return errors.New("elastic-agent package is expected to build at least one platform package")
 	}
 
-	// needs elastic-agent-core built first
-	mg.CtxDeps(ctx, PackageAgentCore)
-
-	// switch to the main package target
-	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
-	if err != nil {
-		return err
-	}
-
-	// manifest is not passed into packageAgent below because we want packageAgent to go through the
-	// flow using the elastic-agent-core that was built above. if it was passed in, it would download
-	// elastic-agent-core from the manifest and it would not be the code from this repository in the package
-	cfgWithManifest, err := cfg.WithManifestInfo(ctx)
+	cfg, err := cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
-	// only take the snapshot and version from the manifest, we don't want the commit hash or dependency version
-	cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithAgentCoreVersion(cfgWithManifest.AgentCoreVersion())
 
-	if cfg.Packaging.ManifestURL != "" {
-		// don't download the elastic-agent-core components; built above
-		if err := downloadManifest(ctx, cfg, pkgSpec, packaging.WithoutProjectName(devtools.AgentCoreProjectName)); err != nil {
+	if cfg.Packaging.CoreSource == devtools.CoreSourceManifest && cfg.Packaging.Manifest == nil {
+		return errors.New("AGENT_CORE_SOURCE=manifest requires MANIFEST_URL to be set")
+	}
+
+	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
+	if err != nil {
+		return fmt.Errorf("error loading agent package spec: %w", err)
+	}
+
+	if cfg.Packaging.CoreSource == devtools.CoreSourceLocal {
+		mg.CtxDeps(ctx, PackageAgentCore)
+	}
+
+	if cfg.Packaging.Manifest != nil {
+		var filters []packaging.ComponentFilter
+		if cfg.Packaging.CoreSource == devtools.CoreSourceLocal {
+			// Skip the manifest's elastic-agent-core; we compiled it above.
+			filters = append(filters, packaging.WithoutProjectName(devtools.AgentCoreProjectName))
+		}
+
+		if err := downloadManifest(ctx, cfg, pkgSpec, filters...); err != nil {
 			return fmt.Errorf("failed downloading manifest components: %w", err)
 		}
 	}
-	return packageAgent(ctx, cfg, pkgSpec, "", nil)
+
+	return packageAgent(ctx, cfg, pkgSpec)
 }
 
 // DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
@@ -861,6 +887,12 @@ func CrossBuild(ctx context.Context) error {
 
 // PackageAgentCore cross-builds and packages distribution artifacts containing
 // only elastic-agent binaries with no extra files or dependencies.
+//
+// The commit stamped into both the binary (where applicable, e.g. the Windows
+// .syso metadata) and the package metadata is always git HEAD: this is the
+// commit the compiler bakes into the binary. AgentCoreCommitHash() delegates
+// to git HEAD when Build.AgentCoreCommitHash is unset, so Package's
+// CoreSourceLocal case (which never sets that field) is always correct here.
 func PackageAgentCore(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
@@ -1102,7 +1134,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		if err != nil {
 			return err
 		}
-		err = packageAgent(ctx, cfg, pkgSpec, "", nil)
+		err = packageAgent(ctx, cfg, pkgSpec)
 		if err != nil {
 			return fmt.Errorf("failed to package elastic-agent: %w", err)
 		}
@@ -1152,9 +1184,16 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs, dependenciesVersion string, manifestResponse *manifest.Build) error {
+func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs) error {
 	fmt.Println("--- Package elastic-agent")
 
+	// DependenciesVersion is populated by WithManifestInfo when MANIFEST_URL
+	// is set; otherwise derive it from the beat version. The CoreSource
+	// decision (whether to read core from build/distributions or DRA, and
+	// whether to resolve component checksums via the manifest) is made
+	// inside the functions that care, reading cfg.Packaging.CoreSource
+	// directly.
+	dependenciesVersion := cfg.Build.DependenciesVersion
 	if dependenciesVersion == "" {
 		agentCoreVersion := cfg.AgentQualifiedCoreVersion()
 		if agentCoreVersion == "" {
@@ -1199,10 +1238,10 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
-	flattenDependencies(cfg, platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
+	flattenDependencies(cfg, platforms, dependenciesVersion, archivePath, dropPath, flatPath, dependencies)
 
 	// extract elastic-agent-core to be used for packaging
-	err = extractAgentCoreForPackage(ctx, cfg, manifestResponse, dependenciesVersion)
+	err = extractAgentCoreForPackage(ctx, cfg, dependenciesVersion)
 	if err != nil {
 		return err
 	}
@@ -1354,8 +1393,10 @@ func removePythonWheels(cfg *devtools.Settings, matches []string, version string
 }
 
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
-// regenerate checksums
-func flattenDependencies(cfg *devtools.Settings, platforms []string, dependenciesVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build, dependencies []packaging.BinarySpec) {
+// regenerate checksums. When CoreSource is manifest, manifest-declared SHAs
+// are used for component checksums; otherwise checksums are computed from
+// the local files.
+func flattenDependencies(cfg *devtools.Settings, platforms []string, dependenciesVersion, archivePath, dropPath, flatPath string, dependencies []packaging.BinarySpec) {
 	for _, pltf := range platforms {
 
 		rp := manifest.PlatformPackages[pltf]
@@ -1411,10 +1452,13 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 			}
 		}
 
-		checksums := make(map[string]string)
-		// Operate on the files depending on if we're packaging from a manifest or not
-		if manifestResponse != nil {
-			checksums = devtools.ChecksumsWithManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, manifestResponse, dependencies)
+		var checksums map[string]string
+		// Manifest-declared SHAs are only correct when every binary being
+		// checksummed came from the manifest — i.e. CoreSource=manifest. When
+		// the core was compiled locally, its on-disk SHA wouldn't match the
+		// manifest's entry, so compute everything from the files on disk.
+		if cfg.Packaging.CoreSource == devtools.CoreSourceManifest {
+			checksums = devtools.ChecksumsWithManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, cfg.Packaging.Manifest, dependencies)
 		} else {
 			checksums = devtools.ChecksumsWithoutManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, dependencies)
 		}
@@ -1483,36 +1527,6 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 		fmt.Println(filepath.Join(coreDownloadDir, k))
 	}
 	return nil
-}
-
-// PackageUsingDRA packages elastic-agent for distribution using Daily Released Artifacts specified in manifest.
-func PackageUsingDRA(ctx context.Context) error {
-	cfg := devtools.SettingsFromContext(ctx)
-	start := time.Now()
-	defer func() { fmt.Println("package ran for", time.Since(start)) }()
-
-	if len(cfg.GetPlatforms()) == 0 {
-		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
-	}
-
-	// final package build
-	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
-	if err != nil {
-		return err
-	}
-
-	// When MANIFEST_URL is not provided in the environment elastic-agent-core packages from build/distributions
-	// will be used instead of pulling from the manifest.
-	if cfg.Packaging.ManifestURL == "" {
-		fmt.Println("NOTICE: No MANIFEST_URL was provided, using elastic-agent-core packages from build/distributions.")
-	}
-	cfg, err = cfg.WithManifestInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed downloading manifest: %w", err)
-	}
-	ctx = devtools.ContextWithSettings(ctx, cfg)
-
-	return packageAgent(ctx, cfg, pkgSpec, cfg.Build.DependenciesVersion, cfg.Packaging.Manifest)
 }
 
 func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string) (*branchInfo, error) {
@@ -1644,7 +1658,7 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 	return downloadedArtifacts, errGrp.Wait()
 }
 
-func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, manifestResponse *manifest.Build, version string) error {
+func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, version string) error {
 	components, err := packaging.Components()
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
@@ -1665,16 +1679,19 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, man
 	downloadDir := filepath.Join(repositoryRoot, "build", "core")
 
 	var coreDownloadDir string
-	if manifestResponse == nil {
-		// Use the build elastic-agent-core packages from the build/distributions
-		coreDownloadDir = filepath.Join(repositoryRoot, "build", "distributions")
-	} else {
+	switch cfg.Packaging.CoreSource {
+	case devtools.CoreSourceManifest:
 		// Download the artifacts from the manifest response with the buildID at <downloadDir>/<buildID>
-		coreDownloadDir = filepath.Join(downloadDir, manifestResponse.BuildID)
-		_, err = downloadDRAArtifacts(ctx, manifestResponse, version, coreDownloadDir, platforms, elasticAgentCoreComponent)
+		coreDownloadDir = filepath.Join(downloadDir, cfg.Packaging.Manifest.BuildID)
+		_, err = downloadDRAArtifacts(ctx, cfg.Packaging.Manifest, version, coreDownloadDir, platforms, elasticAgentCoreComponent)
 		if err != nil {
 			return fmt.Errorf("downloading elastic-agent-core artifacts: %w", err)
 		}
+	default:
+		// CoreSourceLocal (and the empty zero value, which callers outside
+		// Package may leave unset): use the packages written by
+		// PackageAgentCore into build/distributions.
+		coreDownloadDir = filepath.Join(repositoryRoot, "build", "distributions")
 	}
 
 	// Create extracted director, ensure it doesn't exist.
@@ -2084,6 +2101,17 @@ func (Integration) Clean(ctx context.Context) error {
 	fmt.Println(">>> Found .integration-cache; running runner.Clean")
 
 	cfg := devtools.SettingsFromContext(ctx)
+
+	// If INSTANCE_PROVISIONER is not explicitly set, detect it from the saved state
+	// so that the right provisioner's Clean method is called instead of defaulting to gcloud.
+	if cfg.IntegrationTest.InstanceProvisioner == "" {
+		if state, stateErr := readFrameworkState(); stateErr == nil && len(state.Instances) > 0 {
+			detected := state.Instances[0].Provisioner
+			fmt.Printf(">>> Detected instance provisioner from state: %s\n", detected)
+			cfg = cfg.WithInstanceProvisioner(detected)
+		}
+	}
+
 	r, err := createTestRunner(cfg, false, "", "")
 	if err != nil {
 		return fmt.Errorf("error creating test runner: %w", err)
@@ -2122,6 +2150,16 @@ func (Integration) Local(ctx context.Context, testName string) error {
 
 	// clean the .agent-testing/local so this run will use the latest build
 	_ = os.RemoveAll(".agent-testing/local")
+
+	// These tests run in-process on this host where a human is watching, so default
+	// to streaming each test's progress live instead of gotestsum's quiet mode
+	// (which prints nothing until a package finishes). A host-set value wins.
+	if os.Getenv("GOTESTSUM_FORMAT") == "" {
+		os.Setenv("GOTESTSUM_FORMAT", "standard-verbose")
+	}
+
+	cfg = cfg.WithInstanceProvisioner(local.Name)
+	ctx = devtools.ContextWithSettings(ctx, cfg)
 
 	// run the integration tests but only run test that can run locally
 	params := devtools.DefaultGoTestIntegrationArgs(cfg)
@@ -3067,46 +3105,55 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		essRegion = "gcp-us-west2"
 	}
 
-	serviceTokenPath, ok, err := getGCEServiceTokenPath(cfg)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, fmt.Errorf("GCE service token missing; run 'mage integration:auth'")
-	}
-	datacenter := cfg.IntegrationTest.GCPDatacenter
-	if datacenter == "" {
-		// us-central1-a is used because T2A instances required for ARM64 testing are only
-		// available in the central regions
-		datacenter = "us-central1-a"
-	}
-
-	gcloudCfg := gcloud.Config{
-		ServiceTokenPath: serviceTokenPath,
-		Datacenter:       datacenter,
-	}
-
 	var instanceProvisioner tcommon.InstanceProvisioner
 	instanceProvisionerMode := cfg.IntegrationTest.InstanceProvisioner
+	var identifier string
 	switch instanceProvisionerMode {
 	case "", gcloud.Name:
-		instanceProvisionerMode = gcloud.Name
+		serviceTokenPath, ok, err := getGCEServiceTokenPath(cfg)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, fmt.Errorf("GCE service token missing; run 'mage integration:auth'")
+		}
+		datacenter := cfg.IntegrationTest.GCPDatacenter
+		if datacenter == "" {
+			// us-central1-a is used because T2A instances required for ARM64 testing are only
+			// available in the central regions
+			datacenter = "us-central1-a"
+		}
+		gcloudCfg := gcloud.Config{
+			ServiceTokenPath: serviceTokenPath,
+			Datacenter:       datacenter,
+		}
 		instanceProvisioner, err = gcloud.NewProvisioner(gcloudCfg)
+		if err != nil {
+			return nil, err
+		}
+		email, err := gcloudCfg.ClientEmail()
+		if err != nil {
+			return nil, err
+		}
+		identifier = fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-"))
 	case multipass.Name:
 		instanceProvisioner = multipass.NewProvisioner()
+		identifier = localIdentifier()
 	case kind.Name:
 		instanceProvisioner = kind.NewProvisioner()
+		identifier = localIdentifier()
+	case dockerprov.Name:
+		instanceProvisioner = dockerprov.NewProvisioner()
+		identifier = localIdentifier()
+	case local.Name:
+		instanceProvisioner = local.NewProvisioner()
+		identifier = localIdentifier()
 	default:
-		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud' or 'multipass', not %s", instanceProvisionerMode)
-	}
-
-	email, err := gcloudCfg.ClientEmail()
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
 	}
 
 	provisionCfg := ess.ProvisionerConfig{
-		Identifier: fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-")),
+		Identifier: identifier,
 		APIKey:     essToken,
 		Region:     essRegion,
 	}
@@ -3137,6 +3184,9 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	timestamp := cfg.IntegrationTest.TimestampEnabled
 
 	extraEnv := map[string]string{}
+	if cfg.IntegrationTest.AgentDevelop != "" {
+		extraEnv["TEST_AGENT_DEVELOP"] = cfg.IntegrationTest.AgentDevelop
+	}
 	if cfg.IntegrationTest.CollectDiag != "" {
 		extraEnv["AGENT_COLLECT_DIAG"] = cfg.IntegrationTest.CollectDiag
 	}
@@ -3147,6 +3197,17 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	extraEnv["TEST_LONG_RUNNING"] = cfg.IntegrationTest.LongRunning
 	extraEnv["LONG_TEST_RUNTIME"] = cfg.IntegrationTest.LongTestRuntime
 	extraEnv["TEST_UPGRADE_VERSIONS"] = cfg.IntegrationTest.UpgradeVersions
+
+	// Control the gotestsum output format on the remote host. The remote test
+	// process otherwise runs in quiet mode and prints nothing until a package
+	// finishes. A host-set GOTESTSUM_FORMAT always wins; for the local provisioners
+	// (multipass/kind/docker), where a human is watching, default to streaming each
+	// test's progress live. CI (gcloud) is left untouched unless explicitly set.
+	if format := os.Getenv("GOTESTSUM_FORMAT"); format != "" {
+		extraEnv["GOTESTSUM_FORMAT"] = format
+	} else if instanceProvisionerMode != gcloud.Name {
+		extraEnv["GOTESTSUM_FORMAT"] = "standard-verbose"
+	}
 
 	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
 	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
@@ -3400,6 +3461,18 @@ func gceFindMissingRoles(actual []string, expected []string) []string {
 		}
 	}
 	return missing
+}
+
+// localIdentifier returns a short identifier derived from the current OS user,
+// used as the ESS stack name prefix when not using the gcloud provisioner.
+func localIdentifier() string {
+	if u := os.Getenv("USER"); u != "" {
+		return fmt.Sprintf("at-%s", strings.ReplaceAll(u, ".", "-"))
+	}
+	if hostname, err := os.Hostname(); err == nil {
+		return fmt.Sprintf("at-%s", strings.ReplaceAll(hostname, ".", "-"))
+	}
+	return "at-dev"
 }
 
 func getGCEServiceTokenPath(cfg *devtools.Settings) (string, bool, error) {
