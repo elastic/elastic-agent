@@ -50,7 +50,7 @@ $envMap = @{
 foreach ($name in $envMap.Keys) {
     $value = & buildkite-agent meta-data get $envMap[$name]
     if ($LASTEXITCODE -ne 0 -or -not $value) {
-        Write-Error "Failed to read meta-data key $($envMap[$name])"
+        Write-Error "ESS provisioning incomplete: metadata key '$($envMap[$name])' not found. Check the 'Start ESS stack for FIPS integration tests' step."
         exit 1
     }
     [System.Environment]::SetEnvironmentVariable($name, $value)

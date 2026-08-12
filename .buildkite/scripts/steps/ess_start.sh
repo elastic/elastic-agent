@@ -28,10 +28,37 @@ if [[ "${FIPS:-false}" == "true" ]]; then
   echo "Using FIPS metadata prefix: ${METADATA_PREFIX}"
 fi
 
-buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}es.host" $ELASTICSEARCH_HOST
-buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}es.username" $ELASTICSEARCH_USERNAME
-buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}es.pwd" $ELASTICSEARCH_PASSWORD
-buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}kibana.host" $KIBANA_HOST
-buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}kibana.username" $KIBANA_USERNAME
-buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}kibana.pwd" $KIBANA_PASSWORD
-buildkite-agent meta-data set --redacted-vars='' "${METADATA_PREFIX}integrations_server.host" $ELASTIC_APM_SERVER_URL
+metadata_keys=(
+  "${METADATA_PREFIX}es.host"
+  "${METADATA_PREFIX}es.username"
+  "${METADATA_PREFIX}es.pwd"
+  "${METADATA_PREFIX}kibana.host"
+  "${METADATA_PREFIX}kibana.username"
+  "${METADATA_PREFIX}kibana.pwd"
+  "${METADATA_PREFIX}integrations_server.host"
+)
+metadata_values=(
+  "$ELASTICSEARCH_HOST"
+  "$ELASTICSEARCH_USERNAME"
+  "$ELASTICSEARCH_PASSWORD"
+  "$KIBANA_HOST"
+  "$KIBANA_USERNAME"
+  "$KIBANA_PASSWORD"
+  "$ELASTIC_APM_SERVER_URL"
+)
+
+echo "~~~ Publishing and verifying ESS stack metadata"
+for i in "${!metadata_keys[@]}"; do
+  key="${metadata_keys[$i]}"
+  value="${metadata_values[$i]}"
+  buildkite-agent meta-data set --redacted-vars='' "$key" "$value"
+  stored=$(buildkite-agent meta-data get "$key") || {
+    echo "ERROR: failed to read back metadata key '$key' after setting it" >&2
+    exit 1
+  }
+  if [[ -z "$stored" ]]; then
+    echo "ERROR: metadata key '$key' was set but reads back as empty" >&2
+    exit 1
+  fi
+  echo "✓ $key"
+done
