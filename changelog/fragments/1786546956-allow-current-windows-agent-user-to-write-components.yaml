@@ -1,0 +1,5 @@
+kind: bug-fix
+
+summary: Allow the current Windows Agent user to write component executables
+
+component: elastic-agent

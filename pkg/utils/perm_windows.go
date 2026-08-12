@@ -79,9 +79,13 @@ const writeMask = windows.ACCESS_MASK(
 // HasStrictExecPerms ensures that no untrusted SID has write access to the file
 // at path. SYSTEM, Administrators, the file owner, and the user running Elastic
 // Agent may have any access; all other SIDs must not hold write-capable bits.
+<<<<<<< HEAD
 // The uid parameter is unused on Windows; ownership is determined from the
 // file's security descriptor.
 func HasStrictExecPerms(path string, _ int) error {
+=======
+func HasStrictExecPerms(path string) error {
+>>>>>>> 7cc37b7 (fix(windows): trust current Agent process user SID in HasStrictExecPerms (#16173))
 	currentOwner, err := CurrentFileOwner()
 	if err != nil {
 		return fmt.Errorf("failed to get current process owner: %w", err)
@@ -163,4 +167,15 @@ func isTrustedExecWriter(sid, systemSID, adminsSID, ownerSID, currentUserSID *wi
 		sid.Equals(adminsSID) ||
 		(ownerSID != nil && sid.Equals(ownerSID)) ||
 		sid.Equals(currentUserSID)
+<<<<<<< HEAD
+=======
+}
+
+// HasStrictExecPermsAndOwnership ensures that the path is executable by the
+// owner and that the ACLs do not grant write access to non-privileged accounts.
+// The uid parameter is unused on Windows; ownership is determined from the
+// file's security descriptor.
+func HasStrictExecPermsAndOwnership(path string, _ int) error {
+	return HasStrictExecPerms(path)
+>>>>>>> 7cc37b7 (fix(windows): trust current Agent process user SID in HasStrictExecPerms (#16173))
 }
