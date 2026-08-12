@@ -52,6 +52,23 @@ func TestHasStrictExecPerms_GroupWriteRejected(t *testing.T) {
 	assert.Error(t, err, "expected error: Everyone has write access")
 }
 
+func TestHasStrictExecPerms_CurrentProcessWriteAllowed(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "exec.exe")
+	require.NoError(t, os.WriteFile(path, []byte("dummy"), 0600))
+
+	// Use Everyone as the injected current process user so the test exercises
+	// the distinction between a trusted writer and the file owner.
+	currentUserSID, err := windows.StringToSid(EveryoneSID)
+	require.NoError(t, err)
+	err = acl.Apply(path, false, false,
+		acl.GrantSid(windows.FILE_WRITE_DATA, currentUserSID),
+	)
+	require.NoError(t, err)
+
+	assert.NoError(t, hasStrictExecPerms(path, currentUserSID))
+}
+
 func TestHasStrictExecPerms_UIDIgnored(t *testing.T) {
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "exec.exe")
