@@ -41,7 +41,7 @@ func TestFixPermissions_MasksWorldPermissions(t *testing.T) {
 	fileInfo, err := os.Stat(filePath)
 	require.NoError(t, err)
 
-	// Default mask is 0770; ensure "other" bits are removed.
+	// Default mask is 0750; ensure "other" bits are removed.
 	require.Equal(t, os.FileMode(0), dirInfo.Mode().Perm()&0007)
 	require.Equal(t, os.FileMode(0), fileInfo.Mode().Perm()&0007)
 }

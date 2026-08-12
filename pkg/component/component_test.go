@@ -3357,7 +3357,7 @@ func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {
 		}
 		return gatheredPaths
 
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if rv.IsNil() {
 			// Nil pointer, nothing more to do
 			return gatheredPaths
@@ -4283,7 +4283,7 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	assert.Empty(t, config.Auditbeat.InputType)
 	assert.Equal(t, "otel", config.Filebeat.Default)
 	assert.Empty(t, config.Filebeat.InputType)
-	assert.Equal(t, "otel", config.Heartbeat.Default)
+	assert.Equal(t, "", config.Heartbeat.Default)
 	assert.Empty(t, config.Heartbeat.InputType)
 	assert.Equal(t, string(OtelRuntimeManager), config.Metricbeat.Default)
 	assert.Equal(t, map[string]string{}, config.Metricbeat.InputType)

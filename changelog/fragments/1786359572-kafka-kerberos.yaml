@@ -9,11 +9,11 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: bug-fix
+kind: enhancement
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: fix ordering of streams for osquerybeat receiver
+summary: Add Kerberos authentication support for Kafka outputs in the OTel runtime
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
@@ -28,7 +28,7 @@ summary: fix ordering of streams for osquerybeat receiver
 
 # REQUIRED for all kinds
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
-component: osquerybeat
+component: elastic-agent
 
 # AUTOMATED
 # OPTIONAL to manually add other PR URLs
