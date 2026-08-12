@@ -171,7 +171,7 @@ func (runner *HeartbeatRunner) validateHeartbeatEvents(t *testing.T, ctx context
 func (runner *HeartbeatRunner) TestBeatsMetrics() {
 	t := runner.T()
 
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Minute)
 	defer cancel()
 
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
