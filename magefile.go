@@ -571,12 +571,26 @@ func AssembleDarwinUniversal(ctx context.Context) error {
 	return lipo(lipoArgs...)
 }
 
-// Package packages the Beat for distribution.
-// Snapshot builds are the default; use SNAPSHOT=false to build a release package.
-// Use PLATFORMS to control the target platforms.
-// Use VERSION_QUALIFIER to control the version qualifier.
-// Use PACKAGES to override the package types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker).
-// If PACKAGES is not set, defaults to tar.gz for non-Windows platforms and zip for Windows.
+// Package packages the Elastic Agent for distribution.
+//
+// With no env vars set, `mage package` on a fresh checkout produces a
+// single host-native artifact (tar.gz on Unix, zip on Windows) built for
+// the host platform, pulling external components from the manifest URL in
+// .package-version. Override with PACKAGES=rpm,deb or PLATFORMS=linux/arm64
+// etc.
+//
+// AGENT_CORE_SOURCE selects where the elastic-agent binary comes from:
+//   - "local" (default): cross-build it from the current checkout.
+//   - "manifest":        download the pre-built elastic-agent-core package
+//     from MANIFEST_URL and use the binary it contains.
+//
+// MANIFEST_URL, when set, is the source of truth for version and snapshot,
+// and supplies the external components (beats, osquery, ...). In "local"
+// mode the manifest's elastic-agent-core commit hash is ignored because the
+// binary is compiled from this repository.
+//
+// SNAPSHOT, FIPS, VERSION_QUALIFIER, DOCKER_VARIANTS, AGENT_DROP_PATH, and
+// KEEP_ARCHIVE apply as documented on their respective settings.
 func Package(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
@@ -584,43 +598,67 @@ func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 
 	if len(cfg.GetPlatforms()) == 0 {
-		panic("elastic-agent package is expected to build at least one platform package")
+		return errors.New("elastic-agent package is expected to build at least one platform package")
 	}
 
 	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("error loading agent package spec: %w", err)
 	}
 
-	// manifest is not passed into packageAgent below because we want packageAgent to go through the
-	// flow using the elastic-agent-core that was built above. if it was passed in, it would download
-	// elastic-agent-core from the manifest and it would not be the code from this repository in the package
 	cfgWithManifest, err := cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
-	// only take the snapshot and version from the manifest, we don't want the commit hash or dependency version
-	cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithAgentCoreVersion(cfgWithManifest.AgentCoreVersion())
+
+	var dependenciesVersion string
+	var agentBinaryTargets []interface{}
+	switch cfg.Packaging.CoreSource {
+	case devtools.CoreSourceManifest:
+		if cfgWithManifest.Packaging.Manifest == nil {
+			return errors.New("AGENT_CORE_SOURCE=manifest requires MANIFEST_URL to be set")
+		}
+		if len(cfg.GetPackageTypes()) == 0 {
+			return errors.New("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
+		}
+
+		// the manifest is the source of truth for version, snapshot state and the
+		// elastic-agent-core commit hash
+		cfg = cfgWithManifest
+		dependenciesVersion = cfg.Build.DependenciesVersion
+
+		// download the elastic-agent binary from the manifest's elastic-agent-core
+		// package instead of building it from this checkout
+		agentBinaryTargets = []interface{}{mg.F(useDRAAgentBinaryForPackage, cfg.Packaging.ManifestURL, cfg.Build.DependenciesVersion)}
+	default:
+		// devtools.CoreSourceLocal: build the elastic-agent binary from this checkout.
+		// Only take the snapshot and version from the manifest, we don't want the
+		// commit hash or dependency version.
+		cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithAgentCoreVersion(cfgWithManifest.AgentCoreVersion())
+
+		if cfg.AgentPackageVersion() != "" {
+			dependenciesVersion = cfg.AgentPackageVersion()
+		} else {
+			dependenciesVersion = bversion.GetDefaultVersion()
+		}
+
+		// add the snapshot suffix if needed
+		dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
+
+		agentBinaryTargets = getAgentBuildTargets(cfg)
+	}
+
+	ctx = devtools.ContextWithSettings(ctx, cfg)
 
 	if cfg.Packaging.ManifestURL != "" {
-		// don't download the elastic-agent-core components; built above
+		// download the external components from the manifest; the elastic-agent
+		// binary is not among them, it is provided by the agent binary targets above
 		if err := downloadManifest(ctx, cfg, pkgSpec); err != nil {
 			return fmt.Errorf("failed downloading manifest components: %w", err)
 		}
 	}
 
-	var dependenciesVersion string
-	if cfg.AgentPackageVersion() != "" {
-		dependenciesVersion = cfg.AgentPackageVersion()
-	} else {
-		dependenciesVersion = bversion.GetDefaultVersion()
-	}
-
-	// add the snapshot suffix if needed
-	dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
-
-	packageAgent(ctx, cfg, pkgSpec, dependenciesVersion, cfgWithManifest.Packaging.Manifest, getAgentBuildTargets(cfg)...)
-	return nil
+	return packageAgent(ctx, cfg, pkgSpec, dependenciesVersion, cfgWithManifest.Packaging.Manifest, agentBinaryTargets...)
 }
 
 // DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
@@ -1543,47 +1581,6 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 		fmt.Println(filepath.Join(draDownloadDir, k))
 	}
 	return nil
-}
-
-// PackageUsingDRA packages elastic-agent for distribution using Daily Released Artifacts specified in manifest.
-func PackageUsingDRA(ctx context.Context) error {
-	start := time.Now()
-	defer func() { fmt.Println("package ran for", time.Since(start)) }()
-
-	cfg := devtools.SettingsFromContext(ctx)
-
-	if len(cfg.GetPackageTypes()) == 0 {
-		return fmt.Errorf("PACKAGES env var is required. Set PACKAGES=all to build all package types, or specify types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker)")
-	}
-
-	if len(cfg.GetPlatforms()) == 0 {
-		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
-	}
-
-	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
-	if err != nil {
-		return err
-	}
-
-	if cfg.Packaging.ManifestURL == "" {
-		return fmt.Errorf("elastic-agent PackageUsingDRA is expected to build from a manifest. Check that %s is set to a manifest URL", devtools.ManifestUrlEnvVar)
-	}
-
-	cfg, err = cfg.WithManifestInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed downloading manifest: %w", err)
-	}
-
-	ctx = devtools.ContextWithSettings(ctx, cfg)
-
-	return packageAgent(
-		ctx,
-		cfg,
-		pkgSpec,
-		cfg.Build.DependenciesVersion,
-		cfg.Packaging.Manifest,
-		mg.F(useDRAAgentBinaryForPackage, cfg.Packaging.ManifestURL, cfg.Build.DependenciesVersion),
-	)
 }
 
 // downloadManifestAndParseVersion downloads the manifest and returns the build info and parsed version.
