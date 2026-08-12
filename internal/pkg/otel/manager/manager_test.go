@@ -1121,8 +1121,8 @@ func TestOTelManager_FullReloadWhenPartialReloadDisabled(t *testing.T) {
 	l, _ := loggertest.New("otel-manager")
 
 	// Use an inner factory that explicitly disables partial reload.
-	innerFactory := func(collectorPath, healthCheckExtID string, healthCheckPort int) (collectorExecution, error) {
-		return newSubprocessExecution(collectorPath, healthCheckExtID, healthCheckPort, false)
+	innerFactory := func(collectorPath string) (collectorExecution, error) {
+		return newSubprocessExecution(collectorPath, false)
 	}
 	factory, _ := testExecutionFactory(testBinary, innerFactory)
 	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, false)
@@ -2498,6 +2498,7 @@ func TestManagerEmitsStoppedOnClearConfig(t *testing.T) {
 		nil,
 		time.Second,
 		mockFactory,
+		false,
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()

@@ -211,7 +211,7 @@ func NewOTelManager(
 	if err != nil {
 		return nil, err
 	}
-	opampSrv := newOpAMPServer(logger, secret)
+	opampSrv := newOpAMPServer(managerLogger, secret)
 	if err := opampSrv.Start(opampBindAddr); err != nil {
 		return nil, fmt.Errorf("failed to start opamp server: %w", err)
 	}
