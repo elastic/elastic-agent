@@ -118,12 +118,14 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithExternalBuild", func(t *testing.T) {
+		// DefaultSettings now has ExternalBuild=true so local `mage package`
+		// works without ceremony; verify the setter can still flip it off.
 		original := DefaultSettings()
 
-		modified := original.WithExternalBuild(true)
+		modified := original.WithExternalBuild(false)
 
-		assert.True(t, modified.Build.ExternalBuild)
-		assert.False(t, original.Build.ExternalBuild)
+		assert.False(t, modified.Build.ExternalBuild)
+		assert.True(t, original.Build.ExternalBuild)
 	})
 
 	t.Run("WithFIPSBuild", func(t *testing.T) {
@@ -744,6 +746,9 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads build settings from env vars", func(t *testing.T) {
+		// Disable the USE_PACKAGE_VERSION default so .package-version does
+		// not override BEAT_VERSION etc. during this test.
+		t.Setenv("USE_PACKAGE_VERSION", "false")
 		t.Setenv("SNAPSHOT", "true")
 		t.Setenv("DEV", "true")
 		t.Setenv("EXTERNAL", "true")
@@ -828,6 +833,9 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads packaging settings from env vars", func(t *testing.T) {
+		// Disable the USE_PACKAGE_VERSION default so .package-version does
+		// not override AGENT_PACKAGE_VERSION / MANIFEST_URL during this test.
+		t.Setenv("USE_PACKAGE_VERSION", "false")
 		t.Setenv("AGENT_PACKAGE_VERSION", "2.0.0")
 		t.Setenv("MANIFEST_URL", "https://manifest.url")
 		t.Setenv("AGENT_DROP_PATH", "/drop/path")
@@ -1075,6 +1083,7 @@ func TestWithManifestInfo(t *testing.T) {
 
 		s := DefaultSettings()
 		s.Packaging.ManifestURL = manifestURL
+		s.Packaging.CoreSource = CoreSourceManifest
 
 		result, err := s.WithManifestInfo(t.Context())
 
@@ -1098,6 +1107,7 @@ func TestWithManifestInfo(t *testing.T) {
 
 		s := DefaultSettings()
 		s.Packaging.ManifestURL = manifestURL
+		s.Packaging.CoreSource = CoreSourceManifest
 
 		result, err := s.WithManifestInfo(t.Context())
 
@@ -1127,6 +1137,7 @@ func TestWithManifestInfo(t *testing.T) {
 
 		s := DefaultSettings()
 		s.Packaging.ManifestURL = manifestURL
+		s.Packaging.CoreSource = CoreSourceManifest
 
 		result, err := s.WithManifestInfo(t.Context())
 
