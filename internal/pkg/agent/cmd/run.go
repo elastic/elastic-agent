@@ -442,8 +442,26 @@ func runElasticAgent(
 		}()
 	}
 
+	opampBindAddr := "127.0.0.1:0"
+	if cfg.Settings.Collector != nil && cfg.Settings.Collector.HealthCheckConfig.Endpoint != "" {
+		port, portErr := cfg.Settings.Collector.HealthCheckConfig.Port()
+		if portErr != nil {
+			return fmt.Errorf("invalid collector health check port: %w", portErr)
+		}
+		opampBindAddr = fmt.Sprintf("127.0.0.1:%d", port)
+	}
+	opampSrv, err := otelmanager.NewOpAMPServer(l.Named("opamp_server"), opampBindAddr)
+	if err != nil {
+		return fmt.Errorf("failed to start opamp server: %w", err)
+	}
+	defer func() {
+		stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		_ = opampSrv.Stop(stopCtx)
+		cancel()
+	}()
+
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, collectorLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, configReloader.StartupConfiguration(), cfg, initialUpgradeMarker, availableRollbacksSource, modifiers...)
+		fleetInitTimeout, isBootstrap, configReloader.StartupConfiguration(), cfg, initialUpgradeMarker, availableRollbacksSource, opampSrv, modifiers...)
 	if err != nil {
 		return err
 	}
