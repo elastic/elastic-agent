@@ -124,8 +124,9 @@ func (s *OpAMPServer) serveOn(lis net.Listener) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc(opampListenPath, handler)
 	s.httpSrv = &http.Server{
-		Handler:     mux,
-		ConnContext: connContext,
+		Handler:           mux,
+		ConnContext:       connContext,
+		ReadHeaderTimeout: 60 * time.Second,
 	}
 	s.endpoint = fmt.Sprintf("http://%s%s", lis.Addr().String(), opampListenPath)
 	go func() {
