@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -64,6 +65,9 @@ type OpAMPServer struct {
 
 	srv      server.OpAMPServer
 	endpoint string
+	// httpSrv is set when the server is started via serveOn (Attach path).
+	// nil when started via srv.Start.
+	httpSrv *http.Server
 
 	mx      sync.Mutex
 	session *opampSession
@@ -86,6 +90,50 @@ func NewOpAMPServer(log *logger.Logger, bindAddr string) (*OpAMPServer, error) {
 		return nil, err
 	}
 	return s, nil
+}
+
+// NewOpAMPServerOnListener constructs and starts an OpAMP server that serves
+// on the provided listener via the Attach API. The caller is responsible for
+// calling Stop when done.
+func NewOpAMPServerOnListener(log *logger.Logger, lis net.Listener) (*OpAMPServer, error) {
+	secret, err := generateOpAMPSecret()
+	if err != nil {
+		return nil, err
+	}
+	s := &OpAMPServer{
+		log:    log,
+		secret: secret,
+	}
+	s.srv = server.New(opampLoggerAdapter{log: log})
+	if err := s.serveOn(lis); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// serveOn mounts the OpAMP handler on a pre-created listener using Attach.
+func (s *OpAMPServer) serveOn(lis net.Listener) error {
+	handler, connContext, err := s.srv.Attach(server.Settings{
+		Callbacks: types.Callbacks{
+			OnConnecting: s.onConnecting,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("attaching opamp handler: %w", err)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc(opampListenPath, handler)
+	s.httpSrv = &http.Server{
+		Handler:     mux,
+		ConnContext: connContext,
+	}
+	s.endpoint = fmt.Sprintf("http://%s%s", lis.Addr().String(), opampListenPath)
+	go func() {
+		if serveErr := s.httpSrv.Serve(lis); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+			s.log.Errorf("opamp http server: %v", serveErr)
+		}
+	}()
+	return nil
 }
 
 // newOpAMPServer constructs an OpAMP server with the given logger and secret.
@@ -134,6 +182,10 @@ func (s *OpAMPServer) Start(bindAddr string) error {
 // Stop closes any active session and stops the underlying http server.
 func (s *OpAMPServer) Stop(ctx context.Context) error {
 	s.CloseSession()
+	if s.httpSrv != nil {
+		// Listener-based (Attach) path: shut down our own http.Server.
+		return s.httpSrv.Shutdown(ctx)
+	}
 	if s.srv != nil {
 		return s.srv.Stop(ctx)
 	}
