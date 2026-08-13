@@ -38,6 +38,7 @@ jobs:
           env-vars: |
             SNAPSHOT=${{ inputs.repo-env == 'dev' }}
             HELM_REPO_ENV=${{ inputs.repo-env }}
+            USE_PACKAGE_VERSION=false
 
       - uses: elastic/oblt-actions/slack/send@v1
         if: ${{ failure()  }}

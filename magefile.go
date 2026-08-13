@@ -4226,7 +4226,16 @@ func (h Helm) Package(ctx context.Context) error {
 
 	cfg := devtools.SettingsFromContext(ctx)
 
-	cfg, err := cfg.WithManifestInfo(ctx)
+	// Use package-version overrides so the Helm chart version matches the
+	// other snapshot artifacts built in the same DRA run. Use
+	// USE_PACKAGE_VERSION=false to disable this (e.g. during a GHA-triggered
+	// Helm chart release, where the chart version comes from the release tag).
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
+
+	cfg, err = cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
