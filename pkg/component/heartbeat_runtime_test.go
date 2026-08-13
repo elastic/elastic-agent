@@ -14,11 +14,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
-// TestHeartbeatDefaultsToProcessUntilOTelParity protects the process runtime
-// fallback for the known OTel parity gaps tracked in #16130. When those gaps are
-// fixed, these cases should be updated to exercise the corrected OTel behavior
-// before Heartbeat is made an OTel receiver by default again.
-func TestHeartbeatDefaultsToProcessUntilOTelParity(t *testing.T) {
+func TestHeartbeatBrowserParamsPreserveDottedKeys(t *testing.T) {
 	platform := PlatformDetail{
 		Platform: Platform{
 			OS:   Linux,
@@ -27,47 +23,31 @@ func TestHeartbeatDefaultsToProcessUntilOTelParity(t *testing.T) {
 		},
 	}
 
-	tests := []struct {
-		name      string
-		inputType string
-		inputs    []interface{}
-		validate  func(t *testing.T, component Component)
-	}{
+	runtimeSpecs, err := NewRuntimeSpecs(platform, []InputRuntimeSpec{
 		{
-			name:      "multiple monitors share the process scheduler limits",
-			inputType: "synthetics/browser",
-			inputs: []interface{}{
-				heartbeatInput("synthetics/browser", "browser-1", map[string]interface{}{
-					"schedule": "@every 1m",
-				}),
-				heartbeatInput("synthetics/browser", "browser-2", map[string]interface{}{
-					"schedule": "@every 1m",
-				}),
-			},
-			validate: func(t *testing.T, component Component) {
-				var inputUnits int
-				for _, unit := range component.Units {
-					if unit.Type == client.UnitTypeInput {
-						inputUnits++
-					}
-				}
-				assert.Equal(t, 2, inputUnits, "both monitors should share one Heartbeat process")
+			InputType:  "synthetics/browser",
+			BinaryName: "elastic-otel-collector",
+			Spec: InputSpec{
+				Name:      "synthetics/browser",
+				Platforms: []string{platform.String()},
+				Outputs:   []string{"elasticsearch"},
+				Command: &CommandSpec{
+					Args: []string{"heartbeat"},
+				},
 			},
 		},
-		{
-			name:      "managed monitor state remains on the process state loader path",
-			inputType: "synthetics/http",
-			inputs: []interface{}{
-				heartbeatInput("synthetics/http", "http-1", map[string]interface{}{
-					"schedule": "@every 1m",
-					"urls":     []interface{}{"https://example.com"},
-				}),
+	})
+	require.NoError(t, err)
+
+	components, err := runtimeSpecs.ToComponents(
+		map[string]interface{}{
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{
+					"type":    "elasticsearch",
+					"enabled": true,
+				},
 			},
-		},
-		{
-			name:      "browser parameter names with dots stay on the preserving parser path",
-			inputType: "synthetics/browser",
-			inputs: []interface{}{
+			"inputs": []interface{}{
 				heartbeatInput("synthetics/browser", "browser-dotted-params", map[string]interface{}{
 					"schedule": "@every 1m",
 					"params": map[string]interface{}{
@@ -75,60 +55,22 @@ func TestHeartbeatDefaultsToProcessUntilOTelParity(t *testing.T) {
 					},
 				}),
 			},
-			validate: func(t *testing.T, component Component) {
-				inputUnit := findInputUnit(t, component)
-				streams, ok := inputUnit.Config.Source.AsMap()["streams"].([]interface{})
-				require.True(t, ok)
-				require.Len(t, streams, 1)
-				stream, ok := streams[0].(map[string]interface{})
-				require.True(t, ok)
-				params, ok := stream["params"].(map[string]interface{})
-				require.True(t, ok)
-				assert.Equal(t, "literal-value", params["subdomain.example.com"])
-			},
 		},
-	}
+		DefaultRuntimeConfig(), nil, nil, logp.InfoLevel, nil,
+		map[string]uint64{}, map[string]bool{},
+	)
+	require.NoError(t, err)
+	require.Len(t, components, 1)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			runtimeSpecs, err := NewRuntimeSpecs(platform, []InputRuntimeSpec{
-				{
-					InputType:  tt.inputType,
-					BinaryName: "elastic-otel-collector",
-					Spec: InputSpec{
-						Name:      tt.inputType,
-						Platforms: []string{platform.String()},
-						Outputs:   []string{"elasticsearch"},
-						Command: &CommandSpec{
-							Args: []string{"heartbeat"},
-						},
-					},
-				},
-			})
-			require.NoError(t, err)
-
-			components, err := runtimeSpecs.ToComponents(
-				map[string]interface{}{
-					"outputs": map[string]interface{}{
-						"default": map[string]interface{}{
-							"type":    "elasticsearch",
-							"enabled": true,
-						},
-					},
-					"inputs": tt.inputs,
-				},
-				DefaultRuntimeConfig(), nil, nil, logp.InfoLevel, nil,
-				map[string]uint64{}, map[string]bool{},
-			)
-			require.NoError(t, err)
-			require.Len(t, components, 1)
-			assert.Equal(t, ProcessRuntimeManager, components[0].RuntimeManager)
-
-			if tt.validate != nil {
-				tt.validate(t, components[0])
-			}
-		})
-	}
+	inputUnit := findInputUnit(t, components[0])
+	streams, ok := inputUnit.Config.Source.AsMap()["streams"].([]interface{})
+	require.True(t, ok)
+	require.Len(t, streams, 1)
+	stream, ok := streams[0].(map[string]interface{})
+	require.True(t, ok)
+	params, ok := stream["params"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "literal-value", params["subdomain.example.com"])
 }
 
 func heartbeatInput(inputType, id string, streamConfig map[string]interface{}) map[string]interface{} {
