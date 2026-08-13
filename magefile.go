@@ -3044,6 +3044,9 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 	// Default the agent version from .package-version (the repo copy is
 	// present on the remote host); an explicit AGENT_VERSION env var wins.
 	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 
 	version := cfg.IntegrationTest.AgentVersion
 	if version == "" {
