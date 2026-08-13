@@ -18,10 +18,6 @@ if [[ "${SNAPSHOT}" == "true" && "${HELM_REPO_ENV}" == "prod" ]]; then
   exit 1
 fi
 
-# The Helm Chart package doesn't care about what's in the manifest for a prod build
-# Workaround for https://github.com/elastic/elastic-agent/issues/16026
-export USE_PACKAGE_VERSION=${SNAPSHOT}
-
 echo "--- mage helm:package"
 mage helm:package
 
