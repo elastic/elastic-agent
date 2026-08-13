@@ -445,7 +445,7 @@ func runElasticAgent(
 	}
 
 	grpcAddr := cfg.Settings.GRPC.String()
-	lis, err := net.Listen("tcp", grpcAddr)
+	lis, err := (&net.ListenConfig{}).Listen(ctx, "tcp", grpcAddr)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", grpcAddr, err)
 	}
