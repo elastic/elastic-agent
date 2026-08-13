@@ -2116,8 +2116,11 @@ func (Integration) Clean(ctx context.Context) error {
 
 	_, err := os.Stat(".integration-cache")
 	if err != nil {
-		fmt.Println(">>> No .integration-cache found; nothing to clean via the runner (orphaned VMs or stacks will not be touched)")
-		return nil
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Println(">>> No .integration-cache found; nothing to clean via the runner (orphaned VMs or stacks will not be touched)")
+			return nil
+		}
+		return err
 	}
 	fmt.Println(">>> Found .integration-cache; running runner.Clean")
 
