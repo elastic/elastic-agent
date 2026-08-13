@@ -8,6 +8,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"os/signal"
@@ -18,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/soheilhy/cmux"
 	"go.opentelemetry.io/collector/featuregate"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
@@ -442,15 +444,23 @@ func runElasticAgent(
 		}()
 	}
 
-	opampBindAddr := "127.0.0.1:0"
-	if cfg.Settings.Collector != nil && cfg.Settings.Collector.HealthCheckConfig.Endpoint != "" {
-		port, portErr := cfg.Settings.Collector.HealthCheckConfig.Port()
-		if portErr != nil {
-			return fmt.Errorf("invalid collector health check port: %w", portErr)
-		}
-		opampBindAddr = fmt.Sprintf("127.0.0.1:%d", port)
+	grpcAddr := cfg.Settings.GRPC.String()
+	lis, err := net.Listen("tcp", grpcAddr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", grpcAddr, err)
 	}
-	opampSrv, err := otelmanager.NewOpAMPServer(l.Named("opamp_server"), opampBindAddr)
+	defer lis.Close()
+
+	mux := cmux.New(lis)
+	grpcLis := mux.Match(cmux.TLS())
+	httpLis := mux.Match(cmux.Any())
+	go func() {
+		if serveErr := mux.Serve(); serveErr != nil && !goerrors.Is(serveErr, net.ErrClosed) {
+			l.Errorf("cmux serve error: %v", serveErr)
+		}
+	}()
+
+	opampSrv, err := otelmanager.NewOpAMPServerOnListener(l.Named("opamp_server"), httpLis)
 	if err != nil {
 		return fmt.Errorf("failed to start opamp server: %w", err)
 	}
@@ -461,7 +471,7 @@ func runElasticAgent(
 	}()
 
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, collectorLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, configReloader.StartupConfiguration(), cfg, initialUpgradeMarker, availableRollbacksSource, opampSrv, modifiers...)
+		fleetInitTimeout, isBootstrap, configReloader.StartupConfiguration(), cfg, initialUpgradeMarker, availableRollbacksSource, opampSrv, grpcLis, modifiers...)
 	if err != nil {
 		return err
 	}

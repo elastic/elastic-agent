@@ -51,6 +51,7 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/sajari/regression v1.0.1
 	github.com/schollz/progressbar/v3 v3.19.1
+	github.com/soheilhy/cmux v0.1.5
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
