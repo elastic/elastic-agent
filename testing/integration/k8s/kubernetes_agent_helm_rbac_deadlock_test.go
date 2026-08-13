@@ -45,6 +45,7 @@ import (
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
 const (
@@ -84,7 +85,11 @@ func TestKubernetesAgentHelmRBACDeadlock(t *testing.T) {
 	// across parallel runs.
 	restrictedRoleName := "test-restricted-k8s-" + testNamespace
 
-	var kubernetesPackagePolicyID string
+	var (
+		kubernetesPackagePolicyID string
+		fleetAgentID              string
+		fleetAgentPolicyRevision  int
+	)
 
 	steps := []k8sTestStep{
 		k8sStepCreateNamespace(),
@@ -117,11 +122,17 @@ func TestKubernetesAgentHelmRBACDeadlock(t *testing.T) {
 		}),
 		k8sStepWaitForComponentState(rbacDeadlockAgentPodSelector, schedulableNodeCount, rbacDeadlockAgentContainer,
 			rbacDeadlockKubernetesComponentName, aclient.Healthy, 3*time.Minute),
+		// Snapshot the Fleet agent ID and current policy revision before the
+		// update so we can wait deterministically for the agent to acknowledge
+		// the new policy (rather than sleeping a fixed amount of time).
+		k8sStepSnapshotFleetAgent(info.KibanaClient, kCtx.enrollParams.PolicyID, &fleetAgentID, &fleetAgentPolicyRevision),
 		// Changing the period triggers a partial OTel reload that calls
-		// Shutdown() on kubernetes/metrics. Fleet takes ~30 s to propagate;
-		// the deployment watcher is guaranteed to be running (and holding the
-		// lock) by then.
+		// Shutdown() on kubernetes/metrics.
 		k8sStepUpdateKubernetesIntegration(info.KibanaClient, kCtx.enrollParams.PolicyID, &kubernetesPackagePolicyID),
+		// Wait until Fleet confirms the agent has acknowledged the new policy
+		// revision. At that point the new config has been sent to the OTel
+		// subprocess and the partial reload is in progress.
+		k8sStepWaitForPolicyRevision(info.KibanaClient, &fleetAgentID, &fleetAgentPolicyRevision),
 		// kubernetes/metrics must return to HEALTHY after the reload.
 		// Without the fix: enricher.Stop() deadlocks on resourceWatchers.lock
 		// and the component stays STOPPING permanently.
@@ -313,6 +324,42 @@ func k8sStepUpdateKubernetesIntegration(kc *kibana.Client, agentPolicyID string,
 		respBody, _ := io.ReadAll(resp.Body)
 		require.Equal(t, http.StatusOK, resp.StatusCode,
 			"Fleet package policy update returned unexpected status: %s", respBody)
+	}
+}
+
+// k8sStepSnapshotFleetAgent finds the agent enrolled in agentPolicyID and
+// records its Fleet ID and current policy revision. Call this before making a
+// Fleet policy change so that k8sStepWaitForPolicyRevision can detect when the
+// agent has acknowledged the update.
+func k8sStepSnapshotFleetAgent(kc *kibana.Client, agentPolicyID string, agentIDOut *string, revisionOut *int) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		resp, err := kc.ListAgents(ctx, kibana.ListAgentsRequest{})
+		require.NoError(t, err, "failed to list Fleet agents")
+
+		for _, agent := range resp.Items {
+			if agent.PolicyID == agentPolicyID {
+				*agentIDOut = agent.ID
+				*revisionOut = agent.PolicyRevision
+				return
+			}
+		}
+		require.Failf(t, "fleet agent not found", "no agent enrolled in policy %s", agentPolicyID)
+	}
+}
+
+// k8sStepWaitForPolicyRevision waits until the Fleet agent has acknowledged a
+// policy revision strictly greater than the snapshot captured by
+// k8sStepSnapshotFleetAgent. This is the deterministic signal that the agent
+// has received the updated policy and sent the new config to the OTel
+// subprocess, triggering the partial reload.
+func k8sStepWaitForPolicyRevision(kc *kibana.Client, agentID *string, snapshotRevision *int) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		require.NotEmpty(t, *agentID, "agent ID must be set before waiting for policy revision")
+		require.Eventually(t,
+			tools.IsMinPolicyRevision(ctx, t, kc, *agentID, *snapshotRevision+1),
+			3*time.Minute, 5*time.Second,
+			"agent %s did not acknowledge policy revision > %d within 3 minutes",
+			*agentID, *snapshotRevision)
 	}
 }
 
