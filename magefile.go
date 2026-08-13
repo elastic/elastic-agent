@@ -3694,7 +3694,10 @@ func npcapImageSelector(windowsNpcap bool) devtools.ImageSelectorFunc {
 
 // CrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
 func (Otel) CrossBuild(ctx context.Context) error {
-	mg.Deps(EnsureCrossBuildOutputDir)
+	// Otel.Prepare runs PrepareBeats (converts beats/.git to a directory for Docker)
+	// and later restores it via restoreBeatsSubmodule. Ensure Prepare completes before
+	// launching Docker containers so the restore does not race with the build.
+	mg.Deps(Otel.Prepare, EnsureCrossBuildOutputDir)
 
 	cfg := devtools.SettingsFromContext(ctx)
 
