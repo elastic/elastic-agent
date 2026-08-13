@@ -8,25 +8,21 @@ package k8s
 
 // Regression test for https://github.com/elastic/elastic-agent/issues/15666.
 //
-// By default, elastic-agent routes all metricbeat-based inputs (including
-// system/metrics and kubernetes/metrics) to the OtelRuntimeManager. Both
-// integrations therefore run as OTel receivers inside a single
-// elastic-otel-collector subprocess managed by elastic-agent.
+// The kubernetes integration is installed with a restricted ClusterRole that
+// omits deployments.apps. The state_deployment metricset starts a deployment
+// watcher; because LIST deployments.apps is denied, WaitForCacheSync blocks
+// indefinitely inside watcher.Start(). enricher.Start() holds
+// resourceWatchers.lock for the entire duration of that call.
 //
-// When Fleet pushes a policy update (e.g. system integration removed),
-// the coordinator calls applyOTelUpdate, which shuts down ALL OTel-managed
-// receivers and rebuilds the pipeline. During Shutdown() of the
-// kubernetes/metrics receiver, enricher.Stop() tries to acquire
-// resourceWatchers.lock. That lock is permanently held by enricher.Start()
-// blocked inside watcher.Start() → cache.WaitForCacheSync(), which retries
-// forever when the service account lacks LIST permission for deployments.apps.
-// The elastic-otel-collector subprocess is still alive but internally
-// deadlocked, so elastic-agent never applies a kill timeout — the component
-// stays in STOPPING permanently.
+// Updating the kubernetes Fleet policy (period change) triggers the
+// elastic-otel-collector partial reload, which calls Shutdown() on the
+// kubernetes/metrics receiver. Shutdown() → enricher.Stop() tries to acquire
+// resourceWatchers.lock — which is permanently held by the blocked
+// enricher.Start() → deadlock → component stays in STOPPING permanently.
 //
 // Fix (beats): release resourceWatchers.lock before calling watcher.Start(),
-// so enricher.Stop() can acquire the lock, cancel the watcher context, and
-// unblock WaitForCacheSync.
+// so a concurrent enricher.Stop() can acquire the lock, cancel the watcher
+// context, and unblock WaitForCacheSync.
 
 import (
 	"bytes"
@@ -55,16 +51,15 @@ const (
 	rbacDeadlockAgentPodSelector        = "name=agent-pernode-helm-agent"
 	rbacDeadlockAgentContainer          = "agent"
 	rbacDeadlockKubernetesComponentName = "kubernetes/metrics"
-	rbacDeadlockSystemComponentName     = "system/metrics"
 )
 
 // TestKubernetesAgentHelmRBACDeadlock replicates the scenario from
 // https://github.com/elastic/elastic-agent/issues/15666.
 //
-// Both integrations are installed before enrollment so the agent starts with
-// both as OTel-managed receivers in one elastic-otel-collector subprocess.
-// Removing system triggers applyOTelUpdate, which shuts down all receivers
-// including kubernetes/metrics while its deployment watcher holds the lock.
+// The kubernetes integration is installed with a restricted ClusterRole that
+// omits deployments.apps. Once the agent is healthy, a Fleet policy update
+// (period change) triggers the partial OTel reload that calls Shutdown() on
+// the kubernetes/metrics receiver — the exact path where the deadlock lives.
 func TestKubernetesAgentHelmRBACDeadlock(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack: &define.Stack{},
@@ -90,14 +85,10 @@ func TestKubernetesAgentHelmRBACDeadlock(t *testing.T) {
 	restrictedRoleName := "test-restricted-k8s-" + testNamespace
 
 	var kubernetesPackagePolicyID string
-	var systemPackagePolicyID string
 
 	steps := []k8sTestStep{
 		k8sStepCreateNamespace(),
 		k8sStepCreateRestrictedK8sClusterRole(restrictedRoleName),
-		// Populate the full policy before enrolling so the agent starts with
-		// both integrations and elastic-otel-collector loads both receivers.
-		k8sStepInstallSystemIntegration(info.KibanaClient, kCtx.enrollParams.PolicyID, &systemPackagePolicyID),
 		k8sStepInstallKubernetesIntegration(info.KibanaClient, kCtx.enrollParams.PolicyID, &kubernetesPackagePolicyID),
 		k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 			"agent": map[string]any{
@@ -124,18 +115,18 @@ func TestKubernetesAgentHelmRBACDeadlock(t *testing.T) {
 				},
 			},
 		}),
-		// Both components must be healthy before changing the policy.
 		k8sStepWaitForComponentState(rbacDeadlockAgentPodSelector, schedulableNodeCount, rbacDeadlockAgentContainer,
 			rbacDeadlockKubernetesComponentName, aclient.Healthy, 3*time.Minute),
+		// Changing the period triggers a partial OTel reload that calls
+		// Shutdown() on kubernetes/metrics. Fleet takes ~30 s to propagate;
+		// the deployment watcher is guaranteed to be running (and holding the
+		// lock) by then.
+		k8sStepUpdateKubernetesIntegration(info.KibanaClient, kCtx.enrollParams.PolicyID, &kubernetesPackagePolicyID),
+		// kubernetes/metrics must return to HEALTHY after the reload.
+		// Without the fix: enricher.Stop() deadlocks on resourceWatchers.lock
+		// and the component stays STOPPING permanently.
 		k8sStepWaitForComponentState(rbacDeadlockAgentPodSelector, schedulableNodeCount, rbacDeadlockAgentContainer,
-			rbacDeadlockSystemComponentName, aclient.Healthy, 3*time.Minute),
-		// Removing system triggers applyOTelUpdate, which calls Shutdown() on
-		// all receivers including kubernetes/metrics. Fleet takes ~30 s to
-		// propagate; the collection interval is 10 s, so the deployment watcher
-		// is guaranteed to be running (and holding the lock) by then.
-		k8sStepDeleteFleetPackage(info.KibanaClient, &systemPackagePolicyID),
-		k8sStepWaitForReload(rbacDeadlockAgentPodSelector, schedulableNodeCount, rbacDeadlockAgentContainer,
-			rbacDeadlockSystemComponentName, rbacDeadlockKubernetesComponentName, 2*time.Minute),
+			rbacDeadlockKubernetesComponentName, aclient.Healthy, 2*time.Minute),
 	}
 
 	for _, step := range steps {
@@ -261,28 +252,30 @@ func k8sStepInstallKubernetesIntegration(kc *kibana.Client, agentPolicyID string
 	}
 }
 
-// k8sStepInstallSystemIntegration installs a minimal system/cpu policy; removing
-// it later triggers applyOTelUpdate, which shuts down all receivers including
-// kubernetes/metrics.
-func k8sStepInstallSystemIntegration(kc *kibana.Client, agentPolicyID string, policyIDOut *string) k8sTestStep {
+// k8sStepUpdateKubernetesIntegration updates the kubernetes package policy to
+// change the collection period. This triggers a partial OTel reload that calls
+// Shutdown() on the kubernetes/metrics receiver while the deployment watcher
+// goroutine holds resourceWatchers.lock inside watcher.Start().
+func k8sStepUpdateKubernetesIntegration(kc *kibana.Client, agentPolicyID string, policyID *string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		version, err := getFleetPackageVersion(ctx, kc, "system")
-		require.NoError(t, err, "failed to resolve system package version")
+		require.NotEmpty(t, *policyID, "package policy ID must be set before update")
 
-		policyUUID := uuid.Must(uuid.NewV4()).String()
-		resp, err := kc.InstallFleetPackage(ctx, kibana.PackagePolicyRequest{
-			Name:      "system-" + policyUUID,
-			Namespace: "default",
-			PolicyID:  agentPolicyID,
-			Package: kibana.PackagePolicyRequestPackage{
-				Name:    "system",
-				Version: version,
+		version, err := getFleetPackageVersion(ctx, kc, "kubernetes")
+		require.NoError(t, err, "failed to resolve kubernetes package version")
+
+		reqBody := map[string]interface{}{
+			"name":      "kubernetes-" + uuid.Must(uuid.NewV4()).String(),
+			"namespace": "default",
+			"policy_id": agentPolicyID,
+			"package": map[string]interface{}{
+				"name":    "kubernetes",
+				"version": version,
 			},
-			Vars: map[string]interface{}{},
-			Inputs: []map[string]interface{}{
+			"vars": map[string]interface{}{},
+			"inputs": []map[string]interface{}{
 				{
-					"type":            "system/metrics",
-					"policy_template": "system",
+					"type":            "kubernetes/metrics",
+					"policy_template": "kube-state-metrics",
 					"enabled":         true,
 					"vars":            map[string]interface{}{},
 					"streams": []map[string]interface{}{
@@ -290,41 +283,36 @@ func k8sStepInstallSystemIntegration(kc *kibana.Client, agentPolicyID string, po
 							"enabled": true,
 							"data_stream": map[string]interface{}{
 								"type":    "metrics",
-								"dataset": "system.cpu",
+								"dataset": "kubernetes.state_deployment",
 							},
 							"vars": map[string]interface{}{
-								"period": map[string]interface{}{"type": "text", "value": "10s"},
-								"cpu.metrics": map[string]interface{}{
+								"add_metadata": map[string]interface{}{"type": "bool", "value": true},
+								"hosts": map[string]interface{}{
 									"type":  "text",
-									"value": []string{"percentages", "normalized_percentages"},
+									"value": []string{"kube-state-metrics:8080"},
 								},
+								"leaderelection":    map[string]interface{}{"type": "bool", "value": false},
+								"period":            map[string]interface{}{"type": "text", "value": "20s"},
+								"bearer_token_file": map[string]interface{}{"type": "text", "value": "/var/run/secrets/kubernetes.io/serviceaccount/token"},
 							},
 						},
 					},
 				},
 			},
-		})
-		require.NoError(t, err, "failed to install system Fleet package")
-		*policyIDOut = resp.Item.ID
-		t.Cleanup(func() {
-			if *policyIDOut == "" {
-				return
-			}
-			if _, err := kc.DeleteFleetPackage(ctx, *policyIDOut); err != nil {
-				t.Logf("failed to delete Fleet package policy %s: %v", *policyIDOut, err)
-			}
-		})
-	}
-}
+		}
 
-// k8sStepDeleteFleetPackage deletes the package policy stored in *policyID,
-// triggering a policy reload on enrolled agents.
-func k8sStepDeleteFleetPackage(kc *kibana.Client, policyID *string) k8sTestStep {
-	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		require.NotEmpty(t, *policyID, "package policy ID must be set before deletion")
-		_, err := kc.DeleteFleetPackage(ctx, *policyID)
-		require.NoError(t, err, "failed to delete Fleet package policy %s", *policyID)
-		*policyID = ""
+		bodyBytes, err := json.Marshal(reqBody)
+		require.NoError(t, err, "failed to marshal update request body")
+
+		resp, err := kc.SendWithContext(ctx, http.MethodPut,
+			"/api/fleet/package_policies/"+*policyID,
+			nil, http.Header{"Content-Type": []string{"application/json"}}, bytes.NewReader(bodyBytes))
+		require.NoError(t, err, "failed to send kubernetes Fleet package policy update")
+		defer resp.Body.Close()
+
+		respBody, _ := io.ReadAll(resp.Body)
+		require.Equal(t, http.StatusOK, resp.StatusCode,
+			"Fleet package policy update returned unexpected status: %s", respBody)
 	}
 }
 
@@ -350,39 +338,6 @@ func k8sStepWaitForComponentState(
 			}, timeout, 2*time.Second,
 				"component %s did not reach %s in pod %s within %s",
 				componentName, expectedState, pod.Name, timeout)
-		}
-	}
-}
-
-// k8sStepWaitForReload waits until the removed component disappears and the
-// retained component returns to HEALTHY.
-func k8sStepWaitForReload(
-	agentPodLabelSelector string, expectedPodNumber int, containerName string,
-	removedComponentName, retainedComponentName string, timeout time.Duration,
-) k8sTestStep {
-	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		podList := listAgentPods(t, ctx, kCtx, namespace, agentPodLabelSelector, expectedPodNumber)
-
-		for _, pod := range podList.Items {
-			require.EventuallyWithT(t, func(c *assert.CollectT) {
-				status, err := execAgentStatus(ctx, kCtx, namespace, pod.Name, containerName)
-				if !assert.NoError(c, err, "failed to get agent status in pod %s", pod.Name) {
-					return
-				}
-				_, removedFound := getAgentComponentState(status, removedComponentName)
-				assert.False(c, removedFound,
-					"removed component %s is still present in pod %s", removedComponentName, pod.Name)
-
-				retainedState, retainedFound := getAgentComponentState(status, retainedComponentName)
-				if assert.True(c, retainedFound,
-					"retained component %s is missing from pod %s", retainedComponentName, pod.Name) {
-					assert.Equal(c, int(aclient.Healthy), retainedState,
-						"retained component %s in pod %s has state %d, want HEALTHY",
-						retainedComponentName, pod.Name, retainedState)
-				}
-			}, timeout, 2*time.Second,
-				"reload did not complete in pod %s within %s — %s likely deadlocked in STOPPING",
-				pod.Name, timeout, retainedComponentName)
 		}
 	}
 }
