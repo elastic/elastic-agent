@@ -601,43 +601,19 @@ func Package(ctx context.Context) error {
 		return errors.New("elastic-agent package is expected to build at least one platform package")
 	}
 
-<<<<<<< HEAD
-=======
 	cfg, err := cfg.WithPackageVersionOverrides()
 	if err != nil {
 		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
 	}
 
-	cfg, err = cfg.WithManifestInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed downloading manifest: %w", err)
-	}
-
-	if cfg.Packaging.CoreSource == devtools.CoreSourceManifest && cfg.Packaging.Manifest == nil {
-		return errors.New("AGENT_CORE_SOURCE=manifest requires MANIFEST_URL to be set")
-	}
-
->>>>>>> d1db1dfc9 ([mage] Load .package-version by default only for select targets (#16169))
 	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return fmt.Errorf("error loading agent package spec: %w", err)
 	}
 
-<<<<<<< HEAD
 	cfgWithManifest, err := cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
-=======
-	// Pass the resolved settings to dependency targets. Without this,
-	// PackageAgentCore would re-load settings from the environment and — not
-	// being a .package-version opt-in target — name the core archive with
-	// version/version.go's version instead of the one used for the package,
-	// breaking the lookup in extractAgentCoreForPackage.
-	ctx = devtools.ContextWithSettings(ctx, cfg)
-
-	if cfg.Packaging.CoreSource == devtools.CoreSourceLocal {
-		mg.CtxDeps(ctx, PackageAgentCore)
->>>>>>> d1db1dfc9 ([mage] Load .package-version by default only for select targets (#16169))
 	}
 
 	var dependenciesVersion string
@@ -3064,17 +3040,11 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
 	cfg := devtools.SettingsFromContextWithOptions(ctx, devtools.LoadOptions{SkipVCS: true})
-<<<<<<< HEAD
 	mg.Deps(Build.TestBinaries)
-=======
 	// Default the agent version from .package-version (the repo copy is
 	// present on the remote host); an explicit AGENT_VERSION env var wins.
 	cfg, err := cfg.WithPackageVersionOverrides()
-	if err != nil {
-		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
-	}
-	mg.Deps(Build.TestFakeComponent)
->>>>>>> d1db1dfc9 ([mage] Load .package-version by default only for select targets (#16169))
+
 	version := cfg.IntegrationTest.AgentVersion
 	if version == "" {
 		return errors.New("AGENT_VERSION environment variable must be set")
