@@ -601,14 +601,43 @@ func Package(ctx context.Context) error {
 		return errors.New("elastic-agent package is expected to build at least one platform package")
 	}
 
+<<<<<<< HEAD
+=======
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
+
+	cfg, err = cfg.WithManifestInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed downloading manifest: %w", err)
+	}
+
+	if cfg.Packaging.CoreSource == devtools.CoreSourceManifest && cfg.Packaging.Manifest == nil {
+		return errors.New("AGENT_CORE_SOURCE=manifest requires MANIFEST_URL to be set")
+	}
+
+>>>>>>> d1db1dfc9 ([mage] Load .package-version by default only for select targets (#16169))
 	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return fmt.Errorf("error loading agent package spec: %w", err)
 	}
 
+<<<<<<< HEAD
 	cfgWithManifest, err := cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
+=======
+	// Pass the resolved settings to dependency targets. Without this,
+	// PackageAgentCore would re-load settings from the environment and — not
+	// being a .package-version opt-in target — name the core archive with
+	// version/version.go's version instead of the one used for the package,
+	// breaking the lookup in extractAgentCoreForPackage.
+	ctx = devtools.ContextWithSettings(ctx, cfg)
+
+	if cfg.Packaging.CoreSource == devtools.CoreSourceLocal {
+		mg.CtxDeps(ctx, PackageAgentCore)
+>>>>>>> d1db1dfc9 ([mage] Load .package-version by default only for select targets (#16169))
 	}
 
 	var dependenciesVersion string
@@ -665,6 +694,10 @@ func Package(ctx context.Context) error {
 func DownloadManifest(ctx context.Context) error {
 	// Load elastic-agent packaging specs to correctly load component dependencies
 	cfg := devtools.SettingsFromContext(ctx)
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return err
@@ -1029,6 +1062,11 @@ func (Cloud) Image(ctx context.Context) {
 // DOCKER_IMPORT_SOURCE - override source for import
 func (Cloud) Load(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
+	// Resolve the version the same way Package does so the artifact filename matches.
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	agentVersion := cfg.AgentPackageVersion()
 
 	source := devtools.DistributionsDir + "/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
@@ -1046,6 +1084,11 @@ func (Cloud) Load(ctx context.Context) error {
 // Previous login to elastic registry is required!
 func (Cloud) Push(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
+	// Resolve the version the same way Package does so the source image tag matches.
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	agentVersion := cfg.AgentPackageVersion()
 
 	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s-SNAPSHOT", agentVersion)
@@ -1066,7 +1109,7 @@ func (Cloud) Push(ctx context.Context) error {
 	}
 
 	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
-	err := sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
+	err = sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
 	if err != nil {
 		return fmt.Errorf("failed setting a docker image tag: %w", err)
 	}
@@ -2131,7 +2174,11 @@ func Ironbank(ctx context.Context) error {
 		return nil
 	}
 	cfg := devtools.SettingsFromContext(ctx)
-	cfg, err := cfg.WithManifestInfo(ctx)
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
+	cfg, err = cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
@@ -3017,7 +3064,17 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
 	cfg := devtools.SettingsFromContextWithOptions(ctx, devtools.LoadOptions{SkipVCS: true})
+<<<<<<< HEAD
 	mg.Deps(Build.TestBinaries)
+=======
+	// Default the agent version from .package-version (the repo copy is
+	// present on the remote host); an explicit AGENT_VERSION env var wins.
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
+	mg.Deps(Build.TestFakeComponent)
+>>>>>>> d1db1dfc9 ([mage] Load .package-version by default only for select targets (#16169))
 	version := cfg.IntegrationTest.AgentVersion
 	if version == "" {
 		return errors.New("AGENT_VERSION environment variable must be set")
@@ -3089,6 +3146,12 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 
 func (Integration) Buildkite(ctx context.Context) error {
 	envCfg := devtools.SettingsFromContext(ctx)
+	// Default the agent and stack versions from .package-version; explicit
+	// AGENT_VERSION / AGENT_STACK_VERSION env vars win.
+	envCfg, err := envCfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	goTestFlags := envCfg.IntegrationTest.GoTestFlags
 	batches, err := define.DetermineBatches("testing/integration/ess", goTestFlags, "integration")
 	if err != nil {
@@ -3167,6 +3230,13 @@ func integRunner(ctx context.Context, testDir string, matrix bool, singleTest st
 
 func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTest string) (int, error) {
 	cfg := devtools.SettingsFromContext(ctx)
+	// Default the agent and stack versions from .package-version so tests run
+	// against the published snapshot build; explicit AGENT_VERSION /
+	// AGENT_STACK_VERSION env vars win.
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return 0, fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	goTestFlags := cfg.IntegrationTest.GoTestFlags
 
 	batches, err := define.DetermineBatches(testDir, goTestFlags, "integration")
