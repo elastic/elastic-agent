@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260810193937-93c013fa19da
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260812180445-5c2f0187978f
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.46.3
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -239,12 +239,12 @@ require (
 	aqwari.net/xml v0.0.0-20210331023308-d9421b293817 // indirect
 	cel.dev/expr v0.25.2 // indirect
 	cloud.google.com/go v0.123.0 // indirect
-	cloud.google.com/go/auth v0.22.0 // indirect
+	cloud.google.com/go/auth v0.23.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
-	cloud.google.com/go/bigquery v1.79.0 // indirect
-	cloud.google.com/go/compute v1.65.0 // indirect
+	cloud.google.com/go/bigquery v1.79.1 // indirect
+	cloud.google.com/go/compute v1.66.0 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
-	cloud.google.com/go/iam v1.12.0 // indirect
+	cloud.google.com/go/iam v1.13.0 // indirect
 	cloud.google.com/go/longrunning v1.2.0 // indirect
 	cloud.google.com/go/monitoring v1.30.0 // indirect
 	cloud.google.com/go/pubsub v1.51.0 // indirect
@@ -325,7 +325,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.66.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.82.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.67.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.320.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.321.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.58.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/health v1.40.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/iam v1.58.1
