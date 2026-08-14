@@ -460,14 +460,17 @@ def get_otel_components(version='main', component_docs_mapping=None, auto_stamp=
         else:
             comp['annotation_number'] = None
 
-        # Add since version; stamp new components with the current release version
-        if comp_name in component_since:
-            comp['since'] = component_since[comp_name]
+        # Add since version; stamp new components with the current release version.
+        # Use 'profiling' as the key for the ebpf-profiler dep to match the
+        # backfill script convention (the name is renamed to 'profiling' later).
+        since_key = 'profiling' if 'ebpf-profiler' in comp.get('dep', '') else comp_name
+        if since_key in component_since:
+            comp['since'] = component_since[since_key]
         elif auto_stamp:
             stamped = f'v{latest_version}'
             comp['since'] = stamped
-            component_since[comp_name] = stamped
-            print(f"  Stamped new component '{comp_name}' with since={stamped}")
+            component_since[since_key] = stamped
+            print(f"  Stamped new component '{since_key}' with since={stamped}")
         else:
             comp['since'] = ''
 
