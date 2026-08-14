@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/soheilhy/cmux"
+
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/open-telemetry/opamp-go/server"
 	"github.com/open-telemetry/opamp-go/server/types"
@@ -130,7 +132,10 @@ func (s *OpAMPServer) serveOn(lis net.Listener) error {
 	}
 	s.endpoint = fmt.Sprintf("http://%s%s", lis.Addr().String(), opampListenPath)
 	go func() {
-		if serveErr := s.httpSrv.Serve(lis); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+		if serveErr := s.httpSrv.Serve(lis); serveErr != nil &&
+			!errors.Is(serveErr, http.ErrServerClosed) &&
+			!errors.Is(serveErr, cmux.ErrServerClosed) &&
+			!errors.Is(serveErr, cmux.ErrListenerClosed) {
 			s.log.Errorf("opamp http server: %v", serveErr)
 		}
 	}()

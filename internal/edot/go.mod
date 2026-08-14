@@ -171,6 +171,7 @@ require (
 	github.com/samuel/go-parser v0.0.0-20130731160455-ca8abbf65d0e // indirect
 	github.com/samuel/go-thrift v0.0.0-20140522043831-2187045faa54 // indirect
 	github.com/sijms/go-ora/v2 v2.9.0 // indirect
+	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/teambition/rrule-go v1.8.2 // indirect
 	github.com/twpayne/go-geom v1.6.1 // indirect
 	github.com/u-root/uio v0.0.0-20230220225925-ffce2a382923 // indirect
