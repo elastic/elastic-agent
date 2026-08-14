@@ -83,61 +83,68 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 	// from "custom" and no preset. Only named presets drive OTel queue sizing; for custom/none
 	// the user owns every queue field and those values must not be overridden.
 	var isNamedPreset bool
-	var presetQueueSize, presetNumConsumers int
-	preset, err := output.String("preset", -1)
-	if err == nil {
+	var presetFloor int
+	var storedPreset string
+	var storedPresetConfig *config.C
+	if preset, presetErr := output.String("preset", -1); presetErr == nil {
+		storedPreset = preset
 		isNamedPreset = preset != "" && preset != "custom"
 
-		overriddenFields, presetConfig, err := elasticsearch.ApplyPreset(preset, output)
-		if err != nil {
-			return nil, nil, err
+		overriddenFields, presetConfig, applyErr := elasticsearch.ApplyPreset(preset, output)
+		if applyErr != nil {
+			return nil, nil, applyErr
 		}
 		// output now has all preset values applied (including worker count), so
 		// getTotalNumConnections reads the correct connection count for sizing.
+		storedPresetConfig = presetConfig
 
 		if isNamedPreset {
-			maxConnsForPreset := getTotalNumConnections(output)
-			flushMinEvents, _ := output.Int("queue.mem.flush.min_events", -1)
-			bulkMaxSize, _ := output.Int("bulk_max_size", -1)
-			batchSizeForPreset := min(int(flushMinEvents), int(bulkMaxSize))
-			// Two consumers per connection: one sends while the other stages the next
-			// batch, keeping each connection continuously fed without stalling.
-			presetNumConsumers = 2 * maxConnsForPreset
-			// Two batches per consumer in the queue at any moment so no consumer ever
-			// stalls waiting for the queue to produce the next batch.
-			presetQueueSize = 2 * batchSizeForPreset * presetNumConsumers
-			if presetQueueSize > maxQueueEvents {
-				// Large host lists would otherwise demand unbounded in-flight events.
-				// Scale back proportionally: halving numConsumers also halves connections,
-				// keeping the queue-to-batch ratio constant at the memory ceiling.
-				presetQueueSize = maxQueueEvents
-				presetNumConsumers = max(1, presetQueueSize/(2*batchSizeForPreset))
+			// Read the preset's queue.mem.events as the throughput floor before we
+			// overwrite it with the OTel-adjusted value below.
+			if floor, err2 := output.Int("queue.mem.events", -1); err2 == nil {
+				presetFloor = int(floor)
 			}
-			// ApplyPreset wrote the preset's queue.mem.events into output; that is the
-			// throughput floor the user implicitly accepted by choosing this preset —
-			// never deliver fewer events than it promises.
-			if floor, err2 := output.Int("queue.mem.events", -1); err2 == nil && int(floor) > presetQueueSize {
-				presetQueueSize = int(floor)
-			}
-
-			// Write the OTel-adjusted queue size back into output so later decode
-			// and the exporter both see the correct value.
-			if err := output.SetInt("queue.mem.events", -1, int64(presetQueueSize)); err != nil {
-				return nil, nil, fmt.Errorf("failed setting queue.mem.events: %w", err)
-			}
-
-			// Build a log copy with the OTel-effective queue.mem.events. presetConfig
-			// is the global preset table entry, must not mutate it directly.
-			logCopy := config.MustNewConfigFrom(map[string]any{})
-			_ = logCopy.Merge(presetConfig)
-			_ = logCopy.SetInt("queue.mem.events", -1, int64(presetQueueSize))
-			logger.Infof("Applying performance preset '%v': %v", preset, config.DebugString(logCopy, false))
-		} else {
-			logger.Infof("Applying performance preset '%v': %v", preset, config.DebugString(presetConfig, false))
 		}
 
-		logger.Warnf("Performance preset '%v' overrides user setting for field(s): %s",
-			preset, strings.Join(overriddenFields, ","))
+		if len(overriddenFields) > 0 {
+			logger.Warnf("Performance preset '%v' overrides user setting for field(s): %s",
+				preset, strings.Join(overriddenFields, ","))
+		}
+	}
+
+	// maxConns and batchSize are computed once here, after ApplyPreset has written
+	// the preset's worker count and queue parameters into output.
+	maxConns := getTotalNumConnections(output)
+	batchSize := min(getFlushMinEvents(logger, output), getBulkMaxSize(output))
+
+	var queueSize, numConsumers int
+	if isNamedPreset {
+		queueSize, numConsumers = calcNamedPresetSizing(maxConns, batchSize, presetFloor)
+
+		// Write the OTel-adjusted queue size back into output so the subsequent
+		// decode picks up the correct value.
+		if err := output.SetInt("queue.mem.events", -1, int64(queueSize)); err != nil {
+			return nil, nil, fmt.Errorf("failed setting queue.mem.events: %w", err)
+		}
+
+		// Build a log copy with the OTel-effective queue.mem.events. storedPresetConfig
+		// is the global preset table entry; must not mutate it directly.
+		logCopy := config.MustNewConfigFrom(map[string]any{})
+		_ = logCopy.Merge(storedPresetConfig)
+		_ = logCopy.SetInt("queue.mem.events", -1, int64(queueSize))
+		logger.Infof("Applying performance preset '%v': %v", storedPreset, config.DebugString(logCopy, false))
+	} else {
+		if storedPresetConfig != nil {
+			logger.Infof("Applying performance preset '%v': %v", storedPreset, config.DebugString(storedPresetConfig, false))
+		}
+		// num_consumers has no beats equivalent (users never set it) so apply the
+		// same two-per-connection staging model regardless of preset.
+		numConsumers = 2 * maxConns
+		// queue.mem.events is user-configurable in beats and must not be overridden.
+		queueSize = getQueueSize(logger, output)
+		if suggested := min(2*batchSize*numConsumers, maxQueueEvents); queueSize < suggested {
+			logger.Infof("queue.mem.events (%d) is below the suggested minimum for %d connection(s); consider setting queue.mem.events: %d", queueSize, maxConns, suggested)
+		}
 	}
 
 	unpackedMap := make(map[string]any)
@@ -168,26 +175,6 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 	hosts, err := getURL(escfg, output)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating hosts:%w", err)
-	}
-	maxConns := getTotalNumConnections(output)
-
-	// batchSize is what the exporter's batcher will actually emit per bulk request.
-	batchSize := min(getFlushMinEvents(logger, output), escfg.BulkMaxSize)
-
-	var queueSize, numConsumers int
-
-	if isNamedPreset {
-		queueSize = presetQueueSize
-		numConsumers = presetNumConsumers
-	} else {
-		// num_consumers has no beats equivalent (users never set it) so apply the
-		// same two-per-connection staging model regardless of preset.
-		numConsumers = 2 * maxConns
-		// queue.mem.events is user-configurable in beats and must not be overridden.
-		queueSize = getQueueSize(logger, output)
-		if suggested := min(2*batchSize*numConsumers, maxQueueEvents); queueSize < suggested {
-			logger.Infof("queue.mem.events (%d) is below the suggested minimum for %d connection(s); consider setting queue.mem.events: %d", queueSize, maxConns, suggested)
-		}
 	}
 
 	otelYAMLCfg := map[string]any{
@@ -251,6 +238,47 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 	// caller of this method should take care of integrating the extension
 
 	return otelYAMLCfg, nil, nil
+}
+
+// calcNamedPresetSizing computes the OTel queue size and consumer count for a
+// named performance preset (balanced/throughput/scale/latency).
+//
+// maxConns is the total connection count (hosts × workers) after the preset has
+// been applied. batchSize is queue.mem.flush.min_events capped at bulk_max_size.
+// floor is the preset's own queue.mem.events value — the throughput minimum the
+// user implicitly accepted by choosing that preset, which we never go below.
+func calcNamedPresetSizing(maxConns, batchSize, floor int) (queueSize, numConsumers int) {
+	if batchSize <= 0 {
+		// Presets always set a positive batch size; guard against zero to avoid
+		// divide-by-zero if config parsing somehow yields an empty value.
+		batchSize = 1
+	}
+	// Two consumers per connection: one sends while the other stages the next
+	// batch, keeping each connection continuously fed without stalling.
+	numConsumers = 2 * maxConns
+	// Two batches per consumer in the queue at any moment so no consumer ever
+	// stalls waiting for the queue to produce the next batch.
+	queueSize = 2 * batchSize * numConsumers
+	if queueSize > maxQueueEvents {
+		// Large host lists would otherwise demand unbounded in-flight events.
+		// Scale back proportionally: halving numConsumers also halves connections,
+		// keeping the queue-to-batch ratio constant at the memory ceiling.
+		queueSize = maxQueueEvents
+		numConsumers = max(1, queueSize/(2*batchSize))
+		// A future preset whose queue.mem.events exceeds the ceiling would leave
+		// numConsumers clamped to the ceiling value; honour the floor here too
+		// and scale numConsumers proportionally from the larger queue size.
+		if floor > queueSize {
+			queueSize = floor
+			numConsumers = max(1, queueSize/(2*batchSize))
+		}
+	} else if floor > queueSize {
+		// The floor is above the formula result but below the memory ceiling.
+		// Only the queue size needs to grow; numConsumers stays at 2*maxConns
+		// because the cap path has not changed it from the connection-model value.
+		queueSize = floor
+	}
+	return queueSize, numConsumers
 }
 
 // getTotalNumConnections returns the number of connections that beats would
