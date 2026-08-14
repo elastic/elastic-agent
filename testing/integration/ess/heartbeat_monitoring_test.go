@@ -128,8 +128,8 @@ func (runner *HeartbeatRunner) SetupSuite() {
 }
 
 // validateHeartbeatEvents polls Elasticsearch until at least one heartbeat HTTP
-// summary document appears for the given agent, filtered to events after `since`.
-// It returns the first matching document.
+// summary document with monitor state appears for the given agent, filtered to
+// events after `since`. It returns the newest matching document.
 func (runner *HeartbeatRunner) validateHeartbeatEvents(t *testing.T, ctx context.Context, agentID string, since time.Time) mapstr.M {
 	now := time.Now()
 	var query map[string]any
@@ -150,12 +150,15 @@ func (runner *HeartbeatRunner) validateHeartbeatEvents(t *testing.T, ctx context
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		query = genESQuery(agentID, [][]string{
 			{"exists", "field", "monitor.status"},
+			{"exists", "field", "state.id"},
+			{"exists", "field", "state.started_at"},
 		})
 		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
 			"range": map[string]any{
 				"@timestamp": map[string]any{"gte": since.UTC().Format("2006-01-02T15:04:05.000Z")},
 			},
 		}
+		query["sort"] = []any{map[string]any{"@timestamp": map[string]any{"order": "desc"}}}
 		now = time.Now()
 		res, err := estools.PerformQueryForRawQuery(ctx, query, "synthetics-http*", runner.info.ESClient)
 		require.NoError(collect, err)
@@ -196,6 +199,23 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 		}, 2*time.Minute, 5*time.Second, "heartbeat component should be running as a process")
 
 		processDoc = runner.validateHeartbeatEvents(t, ctx, agentStatus.Info.ID, testStart)
+
+		t.Run("restores monitor state from Elasticsearch after restart", func(t *testing.T) {
+			stateIDBefore := heartbeatStateField(t, processDoc, "state.id")
+			stateStartedAtBefore := heartbeatStateField(t, processDoc, "state.started_at")
+
+			require.NoError(t, runner.agentFixture.ExecRestart(ctx), "could not restart agent")
+			restartedAt := time.Now()
+			require.EventuallyWithT(t, func(collect *assert.CollectT) {
+				assert.NoError(collect, runner.agentFixture.IsHealthy(ctx))
+			}, 2*time.Minute, 5*time.Second, "agent did not become healthy after restart")
+
+			afterRestartDoc := runner.validateHeartbeatEvents(t, ctx, agentStatus.Info.ID, restartedAt)
+			assert.Equal(t, stateIDBefore, heartbeatStateField(t, afterRestartDoc, "state.id"),
+				"Heartbeat should continue the monitor state loaded from Elasticsearch")
+			assert.Equal(t, stateStartedAtBefore, heartbeatStateField(t, afterRestartDoc, "state.started_at"),
+				"Heartbeat should preserve the monitor state start time loaded from Elasticsearch")
+		})
 	})
 
 	// Switch to OTel runtime and validate the same data
@@ -237,6 +257,13 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 		AssertMapstrKeysEqual(t, processDoc, otelDoc, RuntimeComparisonIgnoredFields,
 			"expected heartbeat document keys to be equal between process and otel modes")
 	})
+}
+
+func heartbeatStateField(t *testing.T, doc mapstr.M, field string) interface{} {
+	t.Helper()
+	value, err := doc.GetValue(field)
+	require.NoError(t, err, "heartbeat event is missing %s", field)
+	return value
 }
 
 // scheduleMissingErr is the Permanent failure message emitted by the OTel
