@@ -601,6 +601,11 @@ func Package(ctx context.Context) error {
 		return errors.New("elastic-agent package is expected to build at least one platform package")
 	}
 
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
+
 	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return fmt.Errorf("error loading agent package spec: %w", err)
@@ -665,6 +670,10 @@ func Package(ctx context.Context) error {
 func DownloadManifest(ctx context.Context) error {
 	// Load elastic-agent packaging specs to correctly load component dependencies
 	cfg := devtools.SettingsFromContext(ctx)
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return err
@@ -1029,6 +1038,11 @@ func (Cloud) Image(ctx context.Context) {
 // DOCKER_IMPORT_SOURCE - override source for import
 func (Cloud) Load(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
+	// Resolve the version the same way Package does so the artifact filename matches.
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	agentVersion := cfg.AgentPackageVersion()
 
 	source := devtools.DistributionsDir + "/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
@@ -1046,6 +1060,11 @@ func (Cloud) Load(ctx context.Context) error {
 // Previous login to elastic registry is required!
 func (Cloud) Push(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
+	// Resolve the version the same way Package does so the source image tag matches.
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	agentVersion := cfg.AgentPackageVersion()
 
 	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s-SNAPSHOT", agentVersion)
@@ -1066,7 +1085,7 @@ func (Cloud) Push(ctx context.Context) error {
 	}
 
 	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
-	err := sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
+	err = sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
 	if err != nil {
 		return fmt.Errorf("failed setting a docker image tag: %w", err)
 	}
@@ -2131,7 +2150,11 @@ func Ironbank(ctx context.Context) error {
 		return nil
 	}
 	cfg := devtools.SettingsFromContext(ctx)
-	cfg, err := cfg.WithManifestInfo(ctx)
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
+	cfg, err = cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
@@ -3018,6 +3041,13 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 func (Integration) TestOnRemote(ctx context.Context) error {
 	cfg := devtools.SettingsFromContextWithOptions(ctx, devtools.LoadOptions{SkipVCS: true})
 	mg.Deps(Build.TestBinaries)
+	// Default the agent version from .package-version (the repo copy is
+	// present on the remote host); an explicit AGENT_VERSION env var wins.
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
+
 	version := cfg.IntegrationTest.AgentVersion
 	if version == "" {
 		return errors.New("AGENT_VERSION environment variable must be set")
@@ -3089,6 +3119,12 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 
 func (Integration) Buildkite(ctx context.Context) error {
 	envCfg := devtools.SettingsFromContext(ctx)
+	// Default the agent and stack versions from .package-version; explicit
+	// AGENT_VERSION / AGENT_STACK_VERSION env vars win.
+	envCfg, err := envCfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	goTestFlags := envCfg.IntegrationTest.GoTestFlags
 	batches, err := define.DetermineBatches("testing/integration/ess", goTestFlags, "integration")
 	if err != nil {
@@ -3167,6 +3203,13 @@ func integRunner(ctx context.Context, testDir string, matrix bool, singleTest st
 
 func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTest string) (int, error) {
 	cfg := devtools.SettingsFromContext(ctx)
+	// Default the agent and stack versions from .package-version so tests run
+	// against the published snapshot build; explicit AGENT_VERSION /
+	// AGENT_STACK_VERSION env vars win.
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return 0, fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	goTestFlags := cfg.IntegrationTest.GoTestFlags
 
 	batches, err := define.DetermineBatches(testDir, goTestFlags, "integration")
@@ -4186,7 +4229,16 @@ func (h Helm) Package(ctx context.Context) error {
 
 	cfg := devtools.SettingsFromContext(ctx)
 
-	cfg, err := cfg.WithManifestInfo(ctx)
+	// Use package-version overrides so the Helm chart version matches the
+	// other snapshot artifacts built in the same DRA run. Use
+	// USE_PACKAGE_VERSION=false to disable this (e.g. during a GHA-triggered
+	// Helm chart release, where the chart version comes from the release tag).
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
+
+	cfg, err = cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}

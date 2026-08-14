@@ -320,7 +320,12 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("EXTERNAL=%v", cfg.Build.ExternalBuild),
 		"--env", fmt.Sprintf("FIPS=%v", cfg.Build.FIPSBuild),
 		"--env", fmt.Sprintf("OTEL_COMPONENT=%v", cfg.Build.OTELComponentBuild),
-		"--env", fmt.Sprintf("USE_PACKAGE_VERSION=%v", cfg.Packaging.UsePackageVersion),
+		// The container re-runs LoadSettings for the inner mage target, so
+		// forward the resolved core version instead of USE_PACKAGE_VERSION:
+		// the inner build must not re-derive values from .package-version,
+		// which would bypass the opt-in decision the host target already made
+		// (see Settings.WithPackageVersionOverrides).
+		"--env", fmt.Sprintf("BEAT_VERSION=%s", cfg.AgentCoreVersion()),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 	)
 
