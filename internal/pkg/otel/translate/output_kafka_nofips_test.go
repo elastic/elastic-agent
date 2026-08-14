@@ -98,7 +98,7 @@ kerberos:
 			cfg, err := config.NewConfigFrom(tc.input)
 			require.NoError(t, err, "error creating kafka config")
 
-			gotMap, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
+			gotMap, _, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating kafka to kafka exporter")
 
 			gotKerberos, ok := gotMap["auth"]

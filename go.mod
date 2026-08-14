@@ -45,6 +45,7 @@ require (
 	github.com/moby/moby/client v0.5.1
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.157.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.157.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.157.0
 	github.com/otiai10/copy v1.14.1
 	github.com/rs/zerolog v1.35.1
@@ -190,6 +191,7 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gohugoio/hashstructure v0.6.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect

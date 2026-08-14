@@ -1223,6 +1223,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/internal/cre
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/internal/credentialsfile v0.157.0/go.mod h1:DmgMHE51n8CcKWw81i+f7+JpQODs9524mcrujeyUQes=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.157.0 h1:m3I+evlb09zoNKA8UJlHqK0rod9gbDM64OGMdaA4cSU=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.157.0/go.mod h1:j2oP3qNrkDGmoiyG1QLz2qTWNP6sMvo7B3iOw9+Y+Ws=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.157.0 h1:O88SR2BTHN/NAFLNgSY7Ku3+HsPjy/DMPCYGRdwrp1s=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.157.0/go.mod h1:f8MCS4tVZy5IwjRFJWIwAmVmEDNf086uSovAfwntxxo=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.157.0 h1:4t8wbN7CzwAra4dW7EjtqO+Gt3qJoAEP87vu/KuKfZ8=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.157.0/go.mod h1:fc+AF4Np1AMkDIxtZSPduXV/FTl6VeME3rp+ZsawcfY=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.157.0 h1:0xUrrhzv3PrItJDQ5qep9icbbVY7zC8hHaAsLNGOsLc=

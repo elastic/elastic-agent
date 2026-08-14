@@ -24,9 +24,7 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
-	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
-	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -73,8 +71,8 @@ func ComponentIDFromReceiverName(name string) (string, bool) {
 
 type (
 	// exporter translation logic takes output config, output name, logger
-	// and returns exporter config, processor config (if any) and error
-	exporterConfigTranslationFunc func(*config.C, string, *logp.Logger) (map[string]any, map[string]any, error)
+	// and returns exporter config, processor config (if any), extension config (if any) and error
+	exporterConfigTranslationFunc func(*config.C, string, *logp.Logger) (map[string]any, map[string]any, map[string]any, error)
 )
 
 var (
@@ -204,7 +202,7 @@ func VerifyOutputIsOtelSupported(outputType string, outputCfg map[string]any) er
 		return err
 	}
 
-	_, _, err = OutputConfigToExporterConfig(logp.NewNopLogger(), exporterType, outputCfgC, "")
+	_, _, _, err = OutputConfigToExporterConfig(logp.NewNopLogger(), exporterType, outputCfgC, "")
 	if errors.Is(err, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", outputType, err)
 	}
@@ -256,20 +254,6 @@ func GetExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 func GetProcessorID(name string) otelcomponent.ID {
 	processorName := fmt.Sprintf("%s%s", OtelNamePrefix, name)
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("beat"), processorName)
-}
-
-// getBeatsAuthExtensionID returns the id for beatsauth extension
-// outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
-func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
-}
-
-// getKafkaPartitionerExtensionID returns the id for kafkapartitioner extension
-// outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
-func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartitioner"), extensionName)
 }
 
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
@@ -688,7 +672,7 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 	}
 
 	// Config translation function can mutate queue settings defined under output config
-	exporterConfig, processorConfig, err := OutputConfigToExporterConfig(logger, exporterType, outputCfgC, outputName)
+	exporterConfig, processorConfig, extensionConfig, err := OutputConfigToExporterConfig(logger, exporterType, outputCfgC, outputName)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
 	}
@@ -717,49 +701,29 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 		return nil, nil, nil, nil, err
 	}
 
-	// beatsauth extension is not required with output other than elasticsearch
 	if exporterType.String() == "elasticsearch" {
-		// get extension ID
-		extensionID := getBeatsAuthExtensionID(outputName)
-		extensionConfig, err := getBeatsAuthExtensionConfig(outputCfgC)
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("error supporting http parameters for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
+		if extensionOverrideCfg, found := extensionsOverrideCfg[BeatsAuthExtensionType]; found {
+			extensionID := getBeatsAuthExtensionID(outputName).String()
+			if extensionConfig == nil {
+				extensionConfig = map[string]any{}
+			}
+			beatsAuthCfg, ok := extensionConfig[extensionID].(map[string]any)
+			if !ok {
+				beatsAuthCfg = map[string]any{}
+				extensionConfig[extensionID] = beatsAuthCfg
+			}
+			koanfmaps.Merge(extensionOverrideCfg, beatsAuthCfg)
 		}
 
-		if beatsauthOverrideCfg, found := extensionsOverrideCfg[BeatsAuthExtensionType]; found {
-			koanfmaps.Merge(beatsauthOverrideCfg, extensionConfig)
-		}
-
-		// sets extensionCfg
-		extensionCfg = map[string]any{
-			extensionID.String(): extensionConfig,
-		}
-		// add authenticator to ES config
-		exporterConfig["auth"] = map[string]any{
-			"authenticator": extensionID.String(),
-		}
 		if fbfeatures.IsElasticsearchStateStoreEnabled() {
 			// Add elasticsearch state store extension for agentless mode
 			// We paste the config as is, without any translation.
 			// The state store extension will pick up relevant settings from it and ignore the rest.
-			extensionCfg[elasticsearchStateStoreExtensionName] = unitConfigMap
-		}
-	} else if exporterType.String() == "kafka" {
-		extensionID := getKafkaPartitionerExtensionID(outputName)
-		extensionCfg = map[string]any{}
-		partitioner, ok := unitConfigMap["partition"]
-		if ok {
-			extensionCfg[extensionID.String()] = partitioner
-		} else {
-			// Specifying empty map will make the extension use the default hash partitioner.
-			extensionCfg[extensionID.String()] = map[string]any{}
-		}
-		exporterConfig["record_partitioner"] = map[string]any{
-			"extension": extensionID.String(),
+			extensionConfig[elasticsearchStateStoreExtensionName] = unitConfigMap
 		}
 	}
 
-	return exporterConfig, queueSettings, extensionCfg, processorConfig, nil
+	return exporterConfig, queueSettings, extensionConfig, processorConfig, nil
 }
 
 // getInputsForUnit returns the beat inputs for a unit. These can directly be plugged into a beats receiver config.
@@ -1000,18 +964,18 @@ func OutputConfigToExporterConfig(logger *logp.Logger,
 	exporterType otelcomponent.Type,
 	outputConfig *config.C,
 	outputName string,
-) (map[string]any, map[string]any, error) {
+) (map[string]any, map[string]any, map[string]any, error) {
 	configTranslationFunc, ok := configTranslationFuncForExporter[exporterType]
 	if !ok {
-		return nil, nil, fmt.Errorf("no config translation function for exporter type: %s", exporterType)
+		return nil, nil, nil, fmt.Errorf("no config translation function for exporter type: %s", exporterType)
 	}
 
-	exporterConfig, processorConfig, err := configTranslationFunc(outputConfig, outputName, logger)
+	exporterConfig, processorConfig, extensionConfig, err := configTranslationFunc(outputConfig, outputName, logger)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return exporterConfig, processorConfig, nil
+	return exporterConfig, processorConfig, extensionConfig, nil
 }
 
 // getDefaultDatastreamTypeForComponent returns the default datastream type for a given component.
@@ -1089,49 +1053,4 @@ func getOutputOtelOverrideExtensionsConfig(otelOverrideCfg *config.C) (map[strin
 
 func BeatDataPath(componentId string) string {
 	return filepath.Join(paths.Run(), componentId)
-}
-
-// getBeatsAuthExtensionConfig sets http transport settings on beatsauth
-// this is only required for elasticsearch output
-func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
-	authSettings := beatsauthextension.BeatsAuthConfig{
-		Transport: elasticsearch.ESDefaultTransportSettings(),
-	}
-
-	if err := outputCfg.Unpack(&authSettings); err != nil {
-		return nil, err
-	}
-
-	newConfig, err := config.NewConfigFrom(authSettings)
-	if err != nil {
-		return nil, err
-	}
-
-	// proxy_url on newConfig is of type url.URL. Beatsauth extension expects it to be of string type instead
-	// this logic here converts url.URL to string type similar to what a user would set on filebeat config
-	if authSettings.Transport.Proxy.URL != nil {
-		err = newConfig.SetString("proxy_url", -1, authSettings.Transport.Proxy.URL.String())
-		if err != nil {
-			return nil, fmt.Errorf("error settingg proxy url:%w ", err)
-		}
-	}
-
-	if authSettings.Kerberos != nil {
-		err = newConfig.SetString("kerberos.auth_type", -1, authSettings.Kerberos.AuthType.String())
-		if err != nil {
-			return nil, fmt.Errorf("error setting kerberos auth type url:%w ", err)
-		}
-	}
-
-	var newMap map[string]any
-	err = newConfig.Unpack(&newMap)
-	if err != nil {
-		return nil, err
-	}
-
-	// required to make the extension not cause the collector to fail and exit
-	// on startup
-	newMap["continue_on_error"] = true
-
-	return newMap, nil
 }

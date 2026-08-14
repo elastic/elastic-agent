@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 
@@ -15,20 +16,24 @@ import (
 	"github.com/elastic/beats/v7/libbeat/outputs/kafka"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/go-viper/mapstructure/v2"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension"
 )
 
 const transformProcessorType = "transform"
+const oauth2ClientExtensionType = "oauth2client"
 
 // KafkaToOTelConfig translates kafka output to OTel config
-// It returns kafka exporter, transform processor (if required) and error
-func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger) (map[string]any, map[string]any, error) {
+// It returns kafka exporter, transform processor (if required), extension config (if required) and error
+func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger) (exporterCfg map[string]any, processorCfg map[string]any, extensionCfg map[string]any, err error) {
 	kConfig, err := kafka.ReadConfig(config)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error reading kafka config: %w", err)
+	// Ignore invalid SASL mechanism error for OAUTHBEARER because beats does not support it yet
+	if err != nil && !strings.Contains(err.Error(), "not valid SASL mechanism 'OAUTHBEARER'") {
+		return nil, nil, nil, fmt.Errorf("error reading kafka config: %w", err)
 	}
 
 	if err := checkUnsupportedKafkaConfig(config, logger); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	maxMessageBytes := 1000000
@@ -84,8 +89,27 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		},
 	}
 
-	// Enables SASL authentication
-	if kConfig.Username != "" {
+	extensionCfg = make(map[string]any)
+
+	// Set SASL authentication
+	if strings.ToUpper(kConfig.Sasl.SaslMechanism) == "OAUTHBEARER" {
+		kafkaExporter["auth"] = map[string]any{
+			"sasl": map[string]any{
+				"mechanism":                "OAUTHBEARER",
+				"oauthbearer_token_source": getOauth2ClientExtensionID(outputName).String(),
+			},
+		}
+
+		oauthCfg, err := config.Child("oauth2client", -1)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("oauth2client config is required when sasl.mechanism is OAUTHBEARER: %w", err)
+		}
+		oauth2ClientExtensionCfg, err := getOauth2ClientExtensionConfig(oauthCfg, outputName)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("error translating oauth2client extension config: %w", err)
+		}
+		extensionCfg[getOauth2ClientExtensionID(outputName).String()] = oauth2ClientExtensionCfg
+	} else if kConfig.Username != "" {
 		if kConfig.Sasl.SaslMechanism == "" {
 			kConfig.Sasl.SaslMechanism = "PLAIN"
 		}
@@ -107,29 +131,40 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 
 	tlsCfg, err := TLSToOTel(kConfig.TLS, logger)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error translating tls config :%w", err)
+		return nil, nil, nil, fmt.Errorf("error translating tls config :%w", err)
 	}
 
 	setIfNotNil(kafkaExporter, "tls", tlsCfg)
 	setIfNotNil(kafkaExporter, "record_headers", headers)
 
+	// Set partitioner extension config
+	partitionerExtensionCfg, err := getKafkaPartitionerExtensionConfig(kConfig.Partition, outputName)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error translating kafka partitioner config: %w", err)
+	}
+	kafkaExporter["record_partitioner"] = map[string]any{
+		"extension": getKafkaPartitionerExtensionID(outputName).String(),
+	}
+	extensionCfg[getKafkaPartitionerExtensionID(outputName).String()] = partitionerExtensionCfg
+
 	// compiles topic and validates against any malformed strings
 	fmtstr, err := fmtstr.CompileEvent(kConfig.Topic)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not parse topic: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not parse topic: %w", err)
 	}
 
 	if !fmtstr.IsConst() {
 		kafkaExporter["topic_from_attribute"] = "topic"
 		processor, err := dynamicTopicSetterProcessor(kConfig.Topic, outputName)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error translating kafka topic: %w", err)
+			return nil, nil, nil, fmt.Errorf("error translating kafka topic: %w", err)
 		}
 		// delete topic set under logs
 		delete(kafkaExporter["logs"].(map[string]any), "topic")
-		return kafkaExporter, processor, nil
+		return kafkaExporter, processor, partitionerExtensionCfg, nil
 	}
-	return kafkaExporter, nil, nil
+
+	return kafkaExporter, nil, extensionCfg, nil
 }
 
 func getKerberosConfig(kConfig *kafka.KafkaConfig) map[string]any {
@@ -218,6 +253,70 @@ func dynamicTopicSetterProcessor(topic string, outputName string) (map[string]an
 	}, nil
 }
 
+func getKafkaPartitionerExtensionConfig(partition map[string]*config.C, outputName string) (extensionCfg map[string]any, err error) {
+	extensionID := getKafkaPartitionerExtensionID(outputName)
+
+	extensionCfg = map[string]any{}
+	if len(partition) == 0 {
+		// default use `hash` partitioner + all partitions (block if unreachable)
+		extensionCfg[extensionID.String()] = map[string]any{}
+		return extensionCfg, nil
+	}
+
+	// extract partitioner from config
+	var name string
+	var config *config.C
+	for n, c := range partition {
+		name, config = n, c
+	}
+
+	var partitionMap map[string]any = make(map[string]any)
+	err = config.Unpack(&partitionMap)
+	if err != nil {
+		return nil, fmt.Errorf("error unpacking partition config: %w", err)
+	}
+
+	partitionerCfg := map[string]any{
+		name: partitionMap,
+	}
+
+	return partitionerCfg, nil
+}
+
+func getOauth2ClientExtensionConfig(cfg *config.C, outputName string) (extensionCfg map[string]any, err error) {
+	var oauthMap map[string]any
+	err = cfg.Unpack(&oauthMap)
+	if err != nil {
+		return nil, fmt.Errorf("error unpacking oauth2client extension config: %w", err)
+	}
+
+	defaultConfig := oauth2clientauthextension.Config{
+		ExpiryBuffer: 5 * time.Minute,
+	}
+
+	err = mapstructure.Decode(oauthMap, &defaultConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding oauth2client extension config: %w", err)
+	}
+
+	if err = defaultConfig.Validate(); err != nil {
+		return nil, fmt.Errorf("error validating oauth2client extension config: %w", err)
+	}
+
+	var newMap map[string]any
+	mapstructure.Decode(defaultConfig, &newMap)
+
+	extensionID := getOauth2ClientExtensionID(outputName)
+	return map[string]any{
+		extensionID.String(): newMap,
+	}, nil
+}
+
+func getOauth2ClientExtensionID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(oauth2ClientExtensionType), extensionName)
+}
+
 func extractField(field string) string {
 	if len(field) == 0 {
 		return ""
@@ -249,6 +348,13 @@ func getLogBody(field string) string {
 func getTransformProcessorID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(transformProcessorType), extensionName)
+}
+
+// getKafkaPartitionerExtensionID returns the id for kafkapartitioner extension
+// outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
+func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartitioner"), extensionName)
 }
 
 // log warning for unsupported config

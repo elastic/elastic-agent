@@ -104,6 +104,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/azureauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/cgroupruntimeextension"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/azureencodingextension"
 	headersetterextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension"
@@ -279,6 +280,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			filestorage.NewFactory(),
 			healthcheckextension.NewFactory(),
 			bearertokenauthextension.NewFactory(),
+			oauth2clientauthextension.NewFactory(),
 			pprofextension.NewFactory(),
 			k8sobserver.NewFactory(),
 			apikeyauthextension.NewFactory(),
