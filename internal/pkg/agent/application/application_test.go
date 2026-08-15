@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -27,11 +29,22 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
+
+func newTestOpAMPServer(t *testing.T) *otelmanager.OpAMPServer {
+	t.Helper()
+	log, err := logger.New("test", false)
+	require.NoError(t, err)
+	srv, err := otelmanager.NewOpAMPServer(log, "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = srv.Stop(context.Background()) })
+	return srv
+}
 
 func TestLimitsLog(t *testing.T) {
 	log, obs := loggertest.New("TestLimitsLog")
@@ -56,6 +69,8 @@ func TestLimitsLog(t *testing.T) {
 		configuration.DefaultConfiguration(),
 		nil,
 		rollbackSrc,
+		newTestOpAMPServer(t),
+		nil, // grpcLis
 	)
 	require.NoError(t, err)
 
@@ -518,6 +533,8 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		cfg,
 		nil,
 		nil,
+		newTestOpAMPServer(t),
+		nil, // grpcLis
 	)
 	require.NoError(t, err)
 
@@ -546,6 +563,8 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		cfg,
 		nil,
 		nil,
+		newTestOpAMPServer(t),
+		nil, // grpcLis
 	)
 	require.NoError(t, err)
 	encBytes2, err := os.ReadFile(paths.AgentConfigFile())
@@ -580,6 +599,8 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		cfg,
 		nil,
 		nil,
+		newTestOpAMPServer(t),
+		nil, // grpcLis
 	)
 	require.NoError(t, err)
 	encBytes3, err := os.ReadFile(paths.AgentConfigFile())
@@ -616,6 +637,8 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		cfg,
 		nil,
 		nil,
+		newTestOpAMPServer(t),
+		nil, // grpcLis
 	)
 	require.NoError(t, err)
 }
@@ -696,6 +719,8 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 		cfg,
 		nil,
 		nil,
+		newTestOpAMPServer(t),
+		nil, // grpcLis
 	)
 	require.NoError(t, err)
 

@@ -44,12 +44,14 @@ require (
 	github.com/magefile/mage v1.17.2
 	github.com/moby/moby/client v0.5.1
 	github.com/oklog/ulid/v2 v2.1.2
+	github.com/open-telemetry/opamp-go v0.23.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.157.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.157.0
 	github.com/otiai10/copy v1.14.1
 	github.com/rs/zerolog v1.35.1
 	github.com/sajari/regression v1.0.1
 	github.com/schollz/progressbar/v3 v3.19.1
+	github.com/soheilhy/cmux v0.1.5
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
