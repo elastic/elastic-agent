@@ -1,3 +1,4 @@
+# REQUIRED
 # Kind can be one of:
 # - breaking-change: a change to previously-documented behavior
 # - deprecation: functionality that is being removed in a later release
@@ -8,32 +9,37 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: bug-fix
+kind: enhancement
 
+# REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Fix OTel heartbeat runtime breaking Synthetics browser monitors on Private Locations
+summary: Update Go to 1.26.6
 
+# REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: |
-  When heartbeat runs via the OTel heartbeatreceiver, a Synthetics browser monitor
-  compiles into a single synthetics/browser input with three streams: the scheduled
-  "browser" monitor stream plus schedule-less "browser.network" and "browser.screenshot"
-  auxiliary streams used only for data-stream routing. The beat-receiver translation
-  emitted one monitor per stream, so the schedule-less auxiliary streams were rejected
-  ("missing required field accessing 'heartbeat.monitors.0.schedule'") and the whole
-  browser component failed to start. The auxiliary streams are now dropped during
-  translation, matching classic process-runtime heartbeat behavior.
+# description:
 
+# REQUIRED for breaking-change, deprecation, known-issue
+# impact:
+
+# REQUIRED for breaking-change, deprecation, known-issue
+# action:
+
+# REQUIRED for all kinds
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
 
-# PR URL; optional; the PR number that added the changeset.
+# AUTOMATED
+# OPTIONAL to manually add other PR URLs
+# PR URL: A link the PR that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-# pr: https://github.com/owner/repo/1234
+pr: https://github.com/elastic/elastic-agent/pull/16203
 
+# AUTOMATED
+# OPTIONAL to manually add other issue URLs
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
-issue: https://github.com/elastic/elastic-agent/issues/15968
+# issue: https://github.com/owner/repo/1234

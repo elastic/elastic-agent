@@ -1,9 +1,0 @@
-kind: enhancement
-summary: "Rename EDOT Collector to Elastic Agent and EDOT Cloud Forwarder to Elastic Cloud Forwarder"
-description: |
-  The EDOT Collector is now built into Elastic Agent as its OpenTelemetry mode. Deploy
-  Elastic Agent and run it in OpenTelemetry mode to collect and forward traces, metrics,
-  and logs to Elastic Observability. Configuration and components are unchanged.
-
-  The EDOT Cloud Forwarder has been renamed to the Elastic Cloud Forwarder.
-component: elastic-agent

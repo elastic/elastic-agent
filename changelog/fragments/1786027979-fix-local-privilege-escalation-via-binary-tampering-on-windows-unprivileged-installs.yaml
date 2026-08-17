@@ -1,19 +1,22 @@
-kind: bug-fix
+# Kind can be one of:
+# - breaking-change: a change to previously-documented behavior
+# - deprecation: functionality that is being removed in a later release
+# - bug-fix: fixes a problem in a previous version
+# - enhancement: extends functionality but does not break or fix existing behavior
+# - feature: new functionality
+# - known-issue: problems that we are aware of in a given version
+# - security: impacts on the security of a product or a user’s deployment.
+# - upgrade: important information for someone upgrading from a prior version
+# - other: does not fit into any of the other categories
+kind: security
 
 # Change summary; a 80ish characters long description of the change.
-summary: Bake Synthetics browser binaries into the elastic-agent-complete image
+summary: Fix local privilege escalation via binary tampering on Windows unprivileged installs
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: |
-  npm 12 no longer runs a dependency's `install` lifecycle script during `npm i` by
-  default, so the transitive playwright-chromium `install` hook that used to download
-  the Playwright browsers into the elastic-agent-complete image during build stopped
-  running. As a result the 9.5.0 complete image shipped with no browsers and all
-  Synthetics browser monitors on Fleet-managed Private Locations failed with
-  "browserType.launch: Executable doesn't exist at .../chromium_headless_shell-<rev>/...".
-  The image build now installs the browsers explicitly with the bundled Playwright CLI
-  after `npm i`, independent of npm's install-script policy.
+# NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
+#description:
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
@@ -22,8 +25,8 @@ component: elastic-agent
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-# pr: https://github.com/owner/repo/1234
+#pr: https://github.com/owner/repo/1234
 
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
-issue: https://github.com/elastic/elastic-agent/issues/15993
+#issue: https://github.com/owner/repo/1234
