@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260813224100-dc6b95c03756
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260814230142-98fba7791314
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.46.3
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -320,14 +320,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.35 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.35 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.36 // indirect
-	github.com/aws/aws-sdk-go-v2/service/apigateway v1.42.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/apigatewayv2 v1.37.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/apigateway v1.42.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/apigatewayv2 v1.37.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.66.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.82.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.67.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.321.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.58.5 // indirect
-	github.com/aws/aws-sdk-go-v2/service/health v1.40.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/health v1.40.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/iam v1.58.1
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.28 // indirect
