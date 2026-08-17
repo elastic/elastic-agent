@@ -187,8 +187,8 @@ The {{es}} exporter uses the [{{es}} Bulk API](https://www.elastic.co/docs/api/d
 | `retry::max_retries` | `2` | Number of HTTP request retries. To turn off retries, set `retry::enabled` to `false` instead of setting `max_retries` to `0`. |
 | `retry::initial_interval` | `100ms` | Initial waiting time if an HTTP request failed. |
 | `retry::max_interval` | `1m` | Max waiting time if an HTTP request failed. |
-| `retry::retry_on_status` | `[429]` | Status codes that trigger request-level retries. |
-| `retry::retry_on_document_status` | `retry::retry_on_status` | Status codes that trigger document-level retries. If unset, uses `retry::retry_on_status`. |
+| `retry::retry_on_status` | `[429]` | Status codes that trigger request-level retries. To avoid duplicates, it defaults to `[429]`. |
+| `retry::retry_on_document_status` | `retry::retry_on_status` | Status codes that trigger retries for failed documents in a successful bulk HTTP response. If unset, uses `retry::retry_on_status`. |
 
 When Elastic Agent translates an Elasticsearch output for the OTel runtime, request-level retries include every `3xx` through `5xx` status except `413`, matching Beats Elasticsearch output behavior. Document-level retries include `429` and `5xx` statuses, so document-level authorization failures do not block unrelated documents.
 
