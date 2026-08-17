@@ -77,7 +77,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 60
+  num_consumers: 120
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -142,7 +142,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -206,7 +206,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -272,7 +272,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -361,8 +361,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
-  queue_size: 3200
+  num_consumers: 2
+  queue_size: 6400
   wait_for_result: true
 suppress_conflict_errors: true
  `,
@@ -379,8 +379,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 4
-  queue_size: 12800
+  num_consumers: 8
+  queue_size: 25600
   wait_for_result: true
 suppress_conflict_errors: true
  `,
@@ -422,8 +422,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
-  queue_size: 3200
+  num_consumers: 2
+  queue_size: 6400
   wait_for_result: true
 suppress_conflict_errors: true
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
@@ -449,7 +449,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 4100
   wait_for_result: true
 suppress_conflict_errors: true
@@ -467,7 +467,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -540,7 +540,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 60
+  num_consumers: 120
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -603,7 +603,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 60
+  num_consumers: 120
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -677,7 +677,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 2
+  num_consumers: 4
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -731,6 +731,77 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 
 			_, _, err = ESToOTelConfig(cfg, "", logger)
 			require.ErrorContains(t, err, c.wantErrContains)
+		})
+	}
+}
+
+func TestCalcNamedPresetSizing(t *testing.T) {
+	cases := []struct {
+		name          string
+		maxConns      int
+		batchSize     int
+		floor         int
+		wantQueueSize int
+		wantConsumers int
+	}{
+		{
+			name:          "balanced single host",
+			maxConns:      1,
+			batchSize:     1600,
+			floor:         3200,
+			wantQueueSize: 6400, // 2*1600*2=6400 > floor 3200
+			wantConsumers: 2,
+		},
+		{
+			name:          "throughput single host",
+			maxConns:      4,
+			batchSize:     1600,
+			floor:         12800,
+			wantQueueSize: 25600, // 2*1600*8=25600 > floor 12800
+			wantConsumers: 8,
+		},
+		{
+			name:      "latency preset floor kicks in without cap",
+			maxConns:  1,
+			batchSize: 50,
+			floor:     4100,
+			// formula gives 2*50*2=200, below floor 4100 but no cap applied;
+			// queueSize takes the floor, numConsumers stays at connection-model value
+			wantQueueSize: 4100,
+			wantConsumers: 2,
+		},
+		{
+			name:          "large host list capped at maxQueueEvents",
+			maxConns:      30,
+			batchSize:     1600,
+			floor:         3200,
+			wantQueueSize: maxQueueEvents,                  // 2*1600*60=192000 > 64000
+			wantConsumers: max(1, maxQueueEvents/(2*1600)), // 20
+		},
+		{
+			name:      "cap applies then floor above ceiling recalculates consumers",
+			maxConns:  30,
+			batchSize: 1600,
+			floor:     maxQueueEvents + 10000, // hypothetical: preset floor above memory ceiling
+			// formula 192000 > 64000: cap to 64000, numConsumers=20;
+			// then floor 74000 > 64000: apply floor and recalculate
+			wantQueueSize: maxQueueEvents + 10000,
+			wantConsumers: max(1, (maxQueueEvents+10000)/(2*1600)),
+		},
+		{
+			name:          "zero batchSize guarded",
+			maxConns:      1,
+			batchSize:     0,
+			floor:         0,
+			wantQueueSize: 4, // batchSize clamped to 1: 2*1*2=4
+			wantConsumers: 2,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			gotQueueSize, gotConsumers := calcNamedPresetSizing(c.maxConns, c.batchSize, c.floor)
+			assert.Equal(t, c.wantQueueSize, gotQueueSize, "queueSize")
+			assert.Equal(t, c.wantConsumers, gotConsumers, "numConsumers")
 		})
 	}
 }
