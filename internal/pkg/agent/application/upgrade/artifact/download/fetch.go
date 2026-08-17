@@ -180,6 +180,20 @@ func copyFile(log *logger.Logger, sourcePath string, targetPath string, ops file
 	}()
 
 	sourcePath = strings.TrimPrefix(sourcePath, "file://")
+
+	sourceInfo, err := os.Stat(sourcePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("no file found at %s: %w", sourcePath, err)
+		}
+		return fmt.Errorf("could not stat %s: %w", sourcePath, err)
+	}
+
+	if targetInfo, err := os.Stat(targetPath); err == nil && os.SameFile(sourceInfo, targetInfo) {
+		// no copy needed
+		return nil
+	}
+
 	sourceFile, err := ops.openFile(sourcePath, os.O_RDONLY, 0)
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("opening %s file failed", sourcePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, sourcePath))
