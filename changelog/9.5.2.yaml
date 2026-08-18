@@ -5,9 +5,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16220
-        - https://github.com/elastic/elastic-agent/pull/16235
-        - https://github.com/elastic/elastic-agent/pull/16237
+        - https://github.com/elastic/elastic-agent/pull/16005
       issue: []
       impact: ""
       action: ""
@@ -26,9 +24,7 @@ entries:
         presets roughly double their event rate as a result, at an unchanged connection count.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16220
-        - https://github.com/elastic/elastic-agent/pull/16235
-        - https://github.com/elastic/elastic-agent/pull/16237
+        - https://github.com/elastic/elastic-agent/pull/16204
       issue: []
       impact: ""
       action: ""
@@ -41,9 +37,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16220
-        - https://github.com/elastic/elastic-agent/pull/16235
-        - https://github.com/elastic/elastic-agent/pull/16237
+        - https://github.com/elastic/elastic-agent/pull/16024
       issue: []
       impact: ""
       action: ""
@@ -64,9 +58,7 @@ entries:
         triggers a re-enrollment.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16220
-        - https://github.com/elastic/elastic-agent/pull/16235
-        - https://github.com/elastic/elastic-agent/pull/16237
+        - https://github.com/elastic/elastic-agent/pull/16020
       issue:
         - https://github.com/elastic/elastic-agent/issues/15922
       impact: ""
@@ -80,9 +72,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16220
-        - https://github.com/elastic/elastic-agent/pull/16235
-        - https://github.com/elastic/elastic-agent/pull/16237
+        - https://github.com/elastic/elastic-agent/pull/16084
       issue: []
       impact: ""
       action: ""
@@ -95,9 +85,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16220
-        - https://github.com/elastic/elastic-agent/pull/16235
-        - https://github.com/elastic/elastic-agent/pull/16237
+        - https://github.com/elastic/elastic-agent/pull/16046
       issue: []
       impact: ""
       action: ""
@@ -110,9 +98,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16220
-        - https://github.com/elastic/elastic-agent/pull/16235
-        - https://github.com/elastic/elastic-agent/pull/16237
+        - https://github.com/elastic/elastic-agent/pull/16153
       issue: []
       impact: ""
       action: ""
@@ -125,9 +111,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16220
-        - https://github.com/elastic/elastic-agent/pull/16235
-        - https://github.com/elastic/elastic-agent/pull/16237
+        - https://github.com/elastic/elastic-agent/pull/16086
       issue: []
       impact: ""
       action: ""
@@ -140,9 +124,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16220
-        - https://github.com/elastic/elastic-agent/pull/16235
-        - https://github.com/elastic/elastic-agent/pull/16237
+        - https://github.com/elastic/elastic-agent/pull/16077
       issue: []
       impact: ""
       action: ""
@@ -158,9 +140,7 @@ entries:
         in the OTel runtime are addressed.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16220
-        - https://github.com/elastic/elastic-agent/pull/16235
-        - https://github.com/elastic/elastic-agent/pull/16237
+        - https://github.com/elastic/elastic-agent/pull/16139
       issue: []
       impact: ""
       action: ""
@@ -173,9 +153,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16220
-        - https://github.com/elastic/elastic-agent/pull/16235
-        - https://github.com/elastic/elastic-agent/pull/16237
+        - https://github.com/elastic/elastic-agent/pull/16165
       issue: []
       impact: ""
       action: ""
@@ -188,9 +166,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16220
-        - https://github.com/elastic/elastic-agent/pull/16235
-        - https://github.com/elastic/elastic-agent/pull/16237
+        - https://github.com/elastic/elastic-agent/pull/16175
       issue: []
       impact: ""
       action: ""
