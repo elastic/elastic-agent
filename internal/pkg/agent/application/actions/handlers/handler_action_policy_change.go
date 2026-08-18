@@ -294,38 +294,16 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return runtimeErr
 	}
 
-	// Step 5: Commit. Both disk writes must succeed before we return nil so
-	// that Fleet re-delivers the action if either write fails. Disk failures
-	// must not propagate as ACK failures — see
-	// https://github.com/elastic/elastic-agent/issues/13677.
+	// Step 5: Commit. Both writes must succeed; Fleet re-delivers the action on
+	// the next checkin if either fails.
 	//
-	// Write order: saveConfig first, stateStore second.
-	//
-	// If saveConfig fails, stateStore is untouched. On restart the agent
-	// loads the old stateStore action and reports the old policy_revision_idx
-	// to Fleet, which re-delivers the policy — clean recovery.
-	//
-	// If stateStore fails after saveConfig succeeded, we restore the
-	// in-memory stateStore action so the fleet gateway continues to report
-	// the old policy_revision_idx via the checkin heartbeat (Fleet Server
-	// advances agent.policy_revision from that field without waiting for an
-	// explicit ACK). On restart the agent loads the old stateStore action
-	// from disk and Fleet re-delivers; saveConfig is idempotently
-	// overwritten on the second delivery.
-	snap := h.snapshotConfig()
-	hasEventLoggingChanged := h.applyEventLoggingOutputChange(cfg, partialCfg)
-	hasLoggingChanged := h.applyLoggingConfigChange(cfg, loggingConfig)
+	// If saveConfig succeeds but SaveAction fails, fleet.enc holds the new config
+	// while state.enc still records the old action. On restart Fleet re-delivers
+	// the policy and the agent re-applies it; this is safe because policies are
+	// idempotent.
+	patch, needsReExec := h.buildConfigPatch(cfg, partialCfg, validatedFleetConfig, loggingConfig)
 
-	if validatedFleetConfig != nil {
-		h.config.Fleet.Client = *validatedFleetConfig
-	}
-	if loggingConfig != nil {
-		h.config.Settings.LoggingConfig.Level = loggingConfig.Level
-	}
-	h.applyMonitoringConfigChange(partialCfg)
-
-	if err := saveConfig(h.agentInfo, h.config, h.store, h.log); err != nil {
-		h.restoreConfig(snap)
+	if err := saveConfig(h.agentInfo, h.configWithPatch(patch), h.store, h.log); err != nil {
 		return fmt.Errorf("failed to persist policy config: %w", err)
 	}
 	if h.stateStore != nil {
@@ -334,8 +312,8 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		}
 	}
 
-	// Re-exec so the new event logging output is applied on restart.
-	if hasEventLoggingChanged || hasLoggingChanged {
+	h.commitConfig(patch)
+	if needsReExec {
 		h.runtimeLogLevelSetter.ReExec(nil)
 	}
 
@@ -365,11 +343,9 @@ func (h *PolicyChangeHandler) parsePolicyConfiguration(c *config.Config) (*confi
 	return cfg, nil
 }
 
-// handlerConfigSnapshot captures the h.config fields that handlePolicyChange
-// mutates before calling saveConfig, so they can be restored atomically if
-// saveConfig fails. Add a field here whenever a new mutation is introduced
-// before the saveConfig call.
-type handlerConfigSnapshot struct {
+// configPatch holds the pending new values for h.config fields that
+// handlePolicyChange may update.
+type configPatch struct {
 	eventLogging    logger.Config
 	logging         logger.Config
 	fleetClient     remote.Config
@@ -377,79 +353,112 @@ type handlerConfigSnapshot struct {
 	monitoringPprof *monitoringCfg.PprofConfig
 }
 
-func (h *PolicyChangeHandler) snapshotConfig() handlerConfigSnapshot {
-	return handlerConfigSnapshot{
+// buildConfigPatch computes the pending config values from the incoming policy.
+// Returns the patch and whether a re-exec is needed.
+func (h *PolicyChangeHandler) buildConfigPatch(
+	cfg *configuration.Configuration,
+	partialCfg *configuration.Configuration,
+	validatedFleetConfig *remote.Config,
+	loggingConfig *logger.Config,
+) (configPatch, bool) {
+	patch := configPatch{
 		eventLogging:    *h.config.Settings.EventLoggingConfig,
 		logging:         *h.config.Settings.LoggingConfig,
 		fleetClient:     h.config.Fleet.Client,
 		monitoringHTTP:  h.config.Settings.MonitoringConfig.HTTP,
 		monitoringPprof: h.config.Settings.MonitoringConfig.Pprof,
 	}
+	needsReExec := false
+
+	// Event logging output change.
+	if (h.fallbackConfig != nil || (partialCfg != nil &&
+		partialCfg.Settings != nil &&
+		partialCfg.Settings.EventLoggingConfig != nil)) &&
+		cfg != nil &&
+		cfg.Settings != nil &&
+		cfg.Settings.EventLoggingConfig != nil {
+		incoming := cfg.Settings.EventLoggingConfig
+		if patch.eventLogging.ToFiles != incoming.ToFiles || patch.eventLogging.ToStderr != incoming.ToStderr {
+			patch.eventLogging.ToFiles = incoming.ToFiles
+			patch.eventLogging.ToStderr = incoming.ToStderr
+			needsReExec = true
+		}
+	}
+
+	// Logging output change (ToFiles/ToStderr/Files.Path drive re-exec; Level is set separately).
+	if (h.fallbackConfig != nil || loggingConfig != nil) &&
+		cfg != nil &&
+		cfg.Settings != nil &&
+		cfg.Settings.LoggingConfig != nil {
+		incoming := cfg.Settings.LoggingConfig
+		if patch.logging.ToFiles != incoming.ToFiles ||
+			patch.logging.ToStderr != incoming.ToStderr ||
+			patch.logging.Files.Path != incoming.Files.Path {
+			patch.logging.ToFiles = incoming.ToFiles
+			patch.logging.ToStderr = incoming.ToStderr
+			patch.logging.Files.Path = incoming.Files.Path
+			needsReExec = true
+		}
+	}
+	if loggingConfig != nil {
+		patch.logging.Level = loggingConfig.Level
+	}
+
+	// Fleet client.
+	if validatedFleetConfig != nil {
+		patch.fleetClient = *validatedFleetConfig
+	}
+
+	// Monitoring config — only override when the policy explicitly carries the
+	// section (partialCfg is unpacked without defaults, so nil means absent).
+	// This preserves locally configured values (e.g. agent.monitoring.http.host)
+	// instead of clobbering them with library defaults on every policy check-in.
+	// See https://github.com/elastic/elastic-agent/issues/4582.
+	if partialCfg != nil && partialCfg.Settings != nil && partialCfg.Settings.MonitoringConfig != nil {
+		if partialCfg.Settings.MonitoringConfig.HTTP != nil {
+			patch.monitoringHTTP = partialCfg.Settings.MonitoringConfig.HTTP
+		}
+		if partialCfg.Settings.MonitoringConfig.Pprof != nil {
+			patch.monitoringPprof = partialCfg.Settings.MonitoringConfig.Pprof
+		}
+	}
+
+	return patch, needsReExec
 }
 
-func (h *PolicyChangeHandler) restoreConfig(snap handlerConfigSnapshot) {
-	*h.config.Settings.EventLoggingConfig = snap.eventLogging
-	*h.config.Settings.LoggingConfig = snap.logging
-	h.config.Fleet.Client = snap.fleetClient
-	h.config.Settings.MonitoringConfig.HTTP = snap.monitoringHTTP
-	h.config.Settings.MonitoringConfig.Pprof = snap.monitoringPprof
+// configWithPatch returns a copy of h.config with the patch fields applied.
+func (h *PolicyChangeHandler) configWithPatch(patch configPatch) *configuration.Configuration {
+	cfgCopy := *h.config
+	settingsCopy := *h.config.Settings
+	cfgCopy.Settings = &settingsCopy
+
+	eventLoggingCopy := patch.eventLogging
+	settingsCopy.EventLoggingConfig = &eventLoggingCopy
+
+	loggingCopy := patch.logging
+	settingsCopy.LoggingConfig = &loggingCopy
+
+	// Fleet is a shared pointer after the shallow copy; isolate before modifying Client.
+	fleetCopy := *h.config.Fleet
+	cfgCopy.Fleet = &fleetCopy
+	fleetCopy.Client = patch.fleetClient
+
+	// MonitoringConfig is likewise a shared pointer; isolate before replacing HTTP and Pprof.
+	monitoringCopy := *h.config.Settings.MonitoringConfig
+	settingsCopy.MonitoringConfig = &monitoringCopy
+	monitoringCopy.HTTP = patch.monitoringHTTP
+	monitoringCopy.Pprof = patch.monitoringPprof
+
+	return &cfgCopy
 }
 
-func (h *PolicyChangeHandler) applyEventLoggingOutputChange(new, partial *configuration.Configuration) bool {
-	if h.fallbackConfig == nil && (partial == nil || partial.Settings == nil || partial.Settings.EventLoggingConfig == nil) {
-		return false
-	}
-	if new == nil || new.Settings == nil || new.Settings.EventLoggingConfig == nil {
-		return false
-	}
-
-	current := h.config.Settings.EventLoggingConfig
-	incoming := new.Settings.EventLoggingConfig
-
-	if current.ToFiles == incoming.ToFiles && current.ToStderr == incoming.ToStderr {
-		return false
-	}
-
-	current.ToFiles = incoming.ToFiles
-	current.ToStderr = incoming.ToStderr
-	return true
-}
-
-// applyMonitoringConfigChange updates h.config.Settings.MonitoringConfig.HTTP/Pprof only when the
-// incoming policy explicitly sets them (partialCfg is unpacked without defaults, so a nil HTTP/Pprof
-// means the policy didn't carry that section at all). Fleet policies don't have a way to set
-// monitoring.http today, so this preserves whatever was configured locally (e.g.
-// agent.monitoring.http.host in elastic-agent.yml) instead of clobbering it with library defaults
-// on every policy check-in. Mirrors the EnabledIsSet safeguard in monitoring/reload/reload.go,
-// see https://github.com/elastic/elastic-agent/issues/4582.
-func (h *PolicyChangeHandler) applyMonitoringConfigChange(partialCfg *configuration.Configuration) {
-	if partialCfg == nil || partialCfg.Settings == nil || partialCfg.Settings.MonitoringConfig == nil {
-		return
-	}
-
-	if partialCfg.Settings.MonitoringConfig.HTTP != nil {
-		h.config.Settings.MonitoringConfig.HTTP = partialCfg.Settings.MonitoringConfig.HTTP
-	}
-	if partialCfg.Settings.MonitoringConfig.Pprof != nil {
-		h.config.Settings.MonitoringConfig.Pprof = partialCfg.Settings.MonitoringConfig.Pprof
-	}
-}
-
-func (h *PolicyChangeHandler) applyLoggingConfigChange(new *configuration.Configuration, loggingConfig *logger.Config) bool {
-	if h.fallbackConfig == nil && loggingConfig == nil {
-		return false
-	}
-	current := h.config.Settings.LoggingConfig
-	incoming := new.Settings.LoggingConfig
-	if current.ToFiles == incoming.ToFiles && current.ToStderr == incoming.ToStderr && current.Files.Path == incoming.Files.Path {
-		// if there is no change in the logging output settings, we consider that there is no change to the logging config
-		return false
-	}
-
-	current.ToFiles = incoming.ToFiles
-	current.ToStderr = incoming.ToStderr
-	current.Files.Path = incoming.Files.Path
-	return true
+// commitConfig applies the patch to h.config.
+func (h *PolicyChangeHandler) commitConfig(patch configPatch) {
+	*h.config.Settings.EventLoggingConfig = patch.eventLogging
+	*h.config.Settings.LoggingConfig = patch.logging
+	h.config.Fleet.Client = patch.fleetClient
+	h.config.Settings.MonitoringConfig.HTTP = patch.monitoringHTTP
+	h.config.Settings.MonitoringConfig.Pprof = patch.monitoringPprof
 }
 
 func validateLoggingConfig(cfg *configuration.Configuration) (*logger.Config, error) {

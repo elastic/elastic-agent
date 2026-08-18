@@ -265,9 +265,9 @@ func (s *StateStore) Queue() []fleetapi.ScheduledAction {
 }
 
 // SaveAction atomically persists the action to disk and, on success, updates
-// the in-memory state. The write lock is held for the entire operation so
-// concurrent Action() calls always observe either the old or the new action —
-// never a state that has been set in memory but not yet written to disk.
+// the in-memory state. Concurrent reads always observe either the old or the
+// new action — never a partially committed state.
+// If the action is already current (same ID), the call is a no-op and returns nil.
 func (s *StateStore) SaveAction(a fleetapi.Action) error {
 	if isNilAction(a) {
 		return fmt.Errorf("cannot save nil action")
@@ -287,8 +287,7 @@ func (s *StateStore) SaveAction(a fleetapi.Action) error {
 		return nil
 	}
 
-	// Serialize state with the new action without mutating s.state yet.
-	// tmp is a shallow copy; safe because mx.Lock() is held for the entire operation.
+	// tmp is a shallow copy; safe because the write lock is held throughout.
 	tmp := s.state
 	tmp.ActionSerializer.Action = a
 	reader, err := jsonToReader(&tmp)
@@ -299,9 +298,6 @@ func (s *StateStore) SaveAction(a fleetapi.Action) error {
 		return err
 	}
 
-	// Disk write succeeded — commit to memory.
-	// s.dirty tracks whether in-memory state is synced with on-disk state;
-	// clear it since both are now consistent.
 	s.state.ActionSerializer.Action = a
 	s.dirty = false
 	return nil

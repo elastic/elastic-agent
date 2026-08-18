@@ -95,7 +95,7 @@ func TestPolicyChangeNotAcknowledgedOnStateStoreFail(t *testing.T) {
 	require.NoError(t, err, "failed to set immutable flag on state dir: %s", out)
 	t.Cleanup(func() {
 		if out, err := exec.CommandContext(context.TODO(), "chattr", "-i", stateDir).CombinedOutput(); err != nil {
-			t.Logf("warning: failed to clear immutable flag on state dir: %v: %s", err, out)
+			t.Errorf("failed to clear immutable flag on state dir: %v: %s", err, out)
 		}
 	})
 
