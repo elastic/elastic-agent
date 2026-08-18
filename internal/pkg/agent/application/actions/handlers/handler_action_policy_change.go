@@ -328,17 +328,8 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		h.restoreConfig(snap)
 		return fmt.Errorf("failed to persist policy config: %w", err)
 	}
-	if h.stateStore != nil && action != nil {
-		prevAction := h.stateStore.Action()
-		h.stateStore.SetAction(action)
-		if err := h.stateStore.Save(); err != nil {
-			// Restore so the fleet gateway does not report the new revision to
-			// Fleet Server before it is on disk; Fleet Server advances
-			// agent.policy_revision from the checkin's policy_revision_idx
-			// without waiting for an explicit ACK. Restore unconditionally
-			// (even when prevAction is nil) so the in-memory action always
-			// mirrors what is on disk.
-			h.stateStore.SetAction(prevAction)
+	if h.stateStore != nil {
+		if err := h.stateStore.SaveAction(action); err != nil {
 			return fmt.Errorf("failed to persist policy action to state store: %w", err)
 		}
 	}
