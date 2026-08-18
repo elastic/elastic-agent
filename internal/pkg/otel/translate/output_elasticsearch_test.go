@@ -43,6 +43,8 @@ headers:
   X-Bar-Header: bar`
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
@@ -111,6 +113,8 @@ api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
 `
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200
 logs_index: some-index
@@ -175,6 +179,8 @@ parameters:
 `
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200?somekey=somevalue
 logs_index: some-index
@@ -234,13 +240,15 @@ logs_dynamic_pipeline:
 hosts: "localhost:9200"
 index: "some-index"
 api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
-ssl.certificate_authorities: "/not/a/real/path/ca.pem"
+ssl.certificate_authorities: "testdata/certs/rootCA.crt"
 ssl.supported_protocols: "TLSv1.3"
 ssl.cipher_suites: "ECDHE-ECDSA-AES-256-CBC-SHA"
 ssl.curve_types: "P-256"
 `
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200
 logs_index: some-index
@@ -309,6 +317,8 @@ preset: %s
 `
 
 		commonOTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 logs_dynamic_pipeline:
   enabled: true
 endpoints:
@@ -388,6 +398,8 @@ suppress_conflict_errors: true
 			{
 				presetName: "scale",
 				output: `
+auth:
+  authenticator: beatsauth/_agent-component/
 logs_dynamic_pipeline:
   enabled: true
 endpoints:
@@ -506,6 +518,8 @@ headers:
   X-Bar-Header: bar`
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
@@ -585,6 +599,8 @@ headers:
   X-Bar-Header: bar`
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
@@ -642,6 +658,8 @@ index: "some-index"
 compression_level: %d`
 
 	otelConfig := `
+auth:
+  authenticator: beatsauth/_agent-component/
 logs_dynamic_pipeline:
   enabled: true
 endpoints:

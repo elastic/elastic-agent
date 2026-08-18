@@ -7,10 +7,14 @@ package translate
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"net/url"
+	"reflect"
 	"strings"
 	"time"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/config/configopaque"
 
 	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
 	"github.com/elastic/beats/v7/libbeat/outputs/kafka"
@@ -108,7 +112,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("error translating oauth2client extension config: %w", err)
 		}
-		extensionCfg[getOauth2ClientExtensionID(outputName).String()] = oauth2ClientExtensionCfg
+		maps.Copy(extensionCfg, oauth2ClientExtensionCfg)
 	} else if kConfig.Username != "" {
 		if kConfig.Sasl.SaslMechanism == "" {
 			kConfig.Sasl.SaslMechanism = "PLAIN"
@@ -290,6 +294,7 @@ func getOauth2ClientExtensionConfig(cfg *config.C, outputName string) (extension
 		return nil, fmt.Errorf("error unpacking oauth2client extension config: %w", err)
 	}
 
+	// Default settings are taken from https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/cbc5a870545d7a25c8bbd62404a025978c907d57/extension/oauth2clientauthextension/factory.go#L28
 	defaultConfig := oauth2clientauthextension.Config{
 		ExpiryBuffer: 5 * time.Minute,
 	}
@@ -303,13 +308,43 @@ func getOauth2ClientExtensionConfig(cfg *config.C, outputName string) (extension
 		return nil, fmt.Errorf("error validating oauth2client extension config: %w", err)
 	}
 
+	// Struct-to-map copies values as-is, so DecodeHook is not applied per field.
+	// Re-decode the map so the hook can stringify durations, opaque secrets, and url.Values.
+	if err = mapstructure.Decode(defaultConfig, &oauthMap); err != nil {
+		return nil, fmt.Errorf("error encoding oauth2client extension config: %w", err)
+	}
+
 	var newMap map[string]any
-	mapstructure.Decode(defaultConfig, &newMap)
+	encoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:     &newMap,
+		DecodeHook: oauth2MapEncodeHook(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed creating encoder: %w", err)
+	}
+	if err = encoder.Decode(oauthMap); err != nil {
+		return nil, fmt.Errorf("error encoding oauth2client extension config: %w", err)
+	}
 
 	extensionID := getOauth2ClientExtensionID(outputName)
 	return map[string]any{
 		extensionID.String(): newMap,
 	}, nil
+}
+
+func oauth2MapEncodeHook() mapstructure.DecodeHookFunc {
+	return func(_ reflect.Type, _ reflect.Type, data any) (any, error) {
+		switch v := data.(type) {
+		case time.Duration:
+			return v.String(), nil
+		case configopaque.String:
+			return string(v), nil
+		case url.Values:
+			return v.Encode(), nil
+		default:
+			return data, nil
+		}
+	}
 }
 
 func getOauth2ClientExtensionID(outputName string) otelcomponent.ID {
