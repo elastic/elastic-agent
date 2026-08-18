@@ -38,7 +38,16 @@ If none of the previous settings are specified, the exporter relies on the `ELAS
 The exporter supports standard OpenTelemetry [authentication configuration](https://github.com/open-telemetry/opentelemetry-collector/blob/main/config/configauth/README.md#authentication-configuration). You can also use these simplified authentication options:
 
 - `user` and `password`: For HTTP Basic Authentication
-- `api_key`: For [{{es}} API key authentication](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-security-create-api-key)
+- `api_key`: For [Elasticsearch API key authentication](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-security-create-api-key) 
+
+:::{admonition} Authentication to and from the EDOT Collector
+
+{{es}} exporter authentication settings (as covered in this section) enable _outbound_ communication from the EDOT Collector to {{es}} for bulk indexing.
+
+This is different from the _`apikeyauth`_ used to authenticate _incoming_ OTLP/SDK traffic to the EDOT Collector as covered in [Authentication methods for the EDOT Collector](/reference/edot-collector/config/authentication-methods.md).
+
+Using the same key for both inbound and outbound authentication is possible with additional configuration, but is _not_ recommended from a security perspective. 
+:::
 
 ### TLS and security settings
 
