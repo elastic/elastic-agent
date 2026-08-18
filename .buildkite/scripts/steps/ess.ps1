@@ -132,15 +132,32 @@ function ess_load_secrets {
     return 1
   }
 
+  # `oblt-cli cluster create --wait` returns as soon as the cluster config lands
+  # on the observability-test-environments default branch, but the credentials
+  # secret is published by a later step of the cluster-manager workflow and has
+  # been observed to lag by several minutes. Poll rather than reading it once.
+  $timeoutSeconds = if ($Env:ESS_SECRETS_TIMEOUT_SECONDS) { [int]$Env:ESS_SECRETS_TIMEOUT_SECONDS } else { 600 }
+  $intervalSeconds = if ($Env:ESS_SECRETS_POLL_INTERVAL_SECONDS) { [int]$Env:ESS_SECRETS_POLL_INTERVAL_SECONDS } else { 15 }
+
   # --output-file must be absolute (oblt-cli resolves relative paths against
   # its own config dir). Pipe stdout to Out-Host so it's visible in logs but
   # doesn't pollute the function's return value captured by `$rc =
   # ess_load_secrets` in the caller.
   $envFile = Join-Path $PWD "secrets.env"
-  & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file $envFile | Out-Host
-  if ($LASTEXITCODE -ne 0) {
-    Write-Error "Error: oblt-cli cluster secrets env failed (exit=$LASTEXITCODE)"
-    return 1
+  $deadline = (Get-Date).AddSeconds($timeoutSeconds)
+  $attempt = 0
+  while ($true) {
+    $attempt++
+    & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file $envFile | Out-Host
+    if ($LASTEXITCODE -eq 0) {
+      break
+    }
+    if ((Get-Date) -ge $deadline) {
+      Write-Error "Error: oblt-cli cluster secrets env failed for cluster '$ClusterName' after ${timeoutSeconds}s and $attempt attempts (last exit=$LASTEXITCODE)"
+      return 1
+    }
+    Write-Host "Secrets for cluster '$ClusterName' are not available yet (attempt $attempt); retrying in ${intervalSeconds}s..."
+    Start-Sleep -Seconds $intervalSeconds
   }
 
   if (-not (Test-Path $envFile)) {

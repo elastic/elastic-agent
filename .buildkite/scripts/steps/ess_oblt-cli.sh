@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# `oblt-cli cluster create --wait` returns as soon as the cluster config lands on
+# the observability-test-environments default branch, but the credentials secret
+# is published by a later step of the cluster-manager workflow and has been
+# observed to lag by several minutes, so ess_load_secrets polls for it.
+ESS_SECRETS_TIMEOUT_SECONDS="${ESS_SECRETS_TIMEOUT_SECONDS:-600}"
+ESS_SECRETS_POLL_INTERVAL_SECONDS="${ESS_SECRETS_POLL_INTERVAL_SECONDS:-15}"
+
 function ess_up() {
   : "${1:?Error: Specify stack version: ess_up [stack_version] [stack_build_id]}"
 
@@ -105,9 +112,20 @@ function ess_load_secrets() {
     CLUSTER_NAME="$(buildkite-agent meta-data get "${METADATA_PREFIX}cluster-name")"
   fi
 
-  # Load the ESS stack secrets
+  # Load the ESS stack secrets, polling until the cluster-manager workflow has
+  # published them (see the note at the top of this file).
   local secrets_file="secrets.env.sh"
-  oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${secrets_file}"
+  local deadline=$((SECONDS + ESS_SECRETS_TIMEOUT_SECONDS))
+  local attempt=0
+  until oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${secrets_file}"; do
+    attempt=$((attempt + 1))
+    if [ "${SECONDS}" -ge "${deadline}" ]; then
+      echo "Error: oblt-cli cluster secrets env failed for cluster '${CLUSTER_NAME}' after ${ESS_SECRETS_TIMEOUT_SECONDS}s and ${attempt} attempts" >&2
+      return 1
+    fi
+    echo "Secrets for cluster '${CLUSTER_NAME}' are not available yet (attempt ${attempt}); retrying in ${ESS_SECRETS_POLL_INTERVAL_SECONDS}s..."
+    sleep "${ESS_SECRETS_POLL_INTERVAL_SECONDS}"
+  done
 
   # Source the secrets file with allexport to make variables available outside the function
   local src_rc=0
