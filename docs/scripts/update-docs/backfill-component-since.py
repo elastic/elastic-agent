@@ -64,11 +64,8 @@ def extract_name(line):
     return name
 
 
-def components_at_tag(tag):
-    """Return the set of component names present in go.mod at the given tag."""
-    content = read_at_tag(gomod_path(tag), tag)
-    if not content:
-        return set()
+def parse_components_from_gomod(content):
+    """Extract EDOT component names from go.mod content."""
     names = set()
     for line in content.splitlines():
         if line.endswith('// indirect') or '=>' in line:
@@ -79,6 +76,33 @@ def components_at_tag(tag):
             if name:
                 names.add(name)
     return names
+
+
+def components_at_tag(tag, known_edot_components=None):
+    """Return the set of EDOT component names present at the given tag.
+
+    Tries internal/edot/go.mod first (exists from v9.2.2 onward). For earlier
+    tags falls back to the main go.mod, filtering to only known EDOT components
+    to avoid treating arbitrary transitive deps as EDOT components.
+    """
+    content = read_at_tag('internal/edot/go.mod', tag)
+    if content:
+        return parse_components_from_gomod(content)
+
+    # internal/edot/go.mod didn't exist yet — check the main go.mod but only
+    # for component names we already know belong to EDOT.
+    if known_edot_components:
+        content = read_at_tag('go.mod', tag)
+        if content:
+            found = set()
+            for line in content.splitlines():
+                if line.endswith('// indirect') or '=>' in line:
+                    continue
+                name = extract_name(line)
+                if name in known_edot_components:
+                    found.add(name)
+            return found
+    return set()
 
 
 def build_since_block(since_map):
@@ -137,8 +161,18 @@ def main():
 
     first_seen = dict(existing)
 
+    # Collect the full set of known EDOT components from all tags where
+    # internal/edot/go.mod exists, so we can filter the main go.mod for
+    # tags that predate it.
+    known_edot_components: set = set()
     for tag in tags:
-        comps = components_at_tag(tag)
+        content = read_at_tag('internal/edot/go.mod', tag)
+        if content:
+            known_edot_components |= parse_components_from_gomod(content)
+    print(f'Known EDOT components (from internal/edot/go.mod history): {len(known_edot_components)}\n')
+
+    for tag in tags:
+        comps = components_at_tag(tag, known_edot_components)
         new = sorted(c for c in comps if c not in first_seen)
         if new:
             for name in new:
