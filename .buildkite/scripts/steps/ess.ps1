@@ -111,6 +111,13 @@ function ess_down {
   }
 }
 
+# True when oblt-cli failed because GCP Secret Manager does not have the
+# cluster env secret yet (gRPC NotFound). Other failures should not be polled.
+function Test-EssSecretsNotFoundYet {
+  param([string]$Output)
+  return $Output -match '(?i)code = NotFound|not found or has no versions'
+}
+
 function ess_load_secrets {
   # Use Write-Host for informational output so callers that capture the return
   # value (e.g. `$rc = ess_load_secrets`) get a scalar exit code, not an array
@@ -140,23 +147,36 @@ function ess_load_secrets {
   $intervalSeconds = if ($Env:ESS_SECRETS_POLL_INTERVAL_SECONDS) { [int]$Env:ESS_SECRETS_POLL_INTERVAL_SECONDS } else { 15 }
 
   # --output-file must be absolute (oblt-cli resolves relative paths against
-  # its own config dir). Pipe stdout to Out-Host so it's visible in logs but
-  # doesn't pollute the function's return value captured by `$rc =
-  # ess_load_secrets` in the caller.
+  # its own config dir). Capture output so retry attempts stay to one line
+  # and don't pollute the function's return value captured by `$rc =
+  # ess_load_secrets` in the caller. Dump the last oblt-cli output only when
+  # giving up. Retry only GCP NotFound (secret not published yet); fail fast
+  # on auth, permission, or other errors.
   $envFile = Join-Path $PWD "secrets.env"
   $deadline = (Get-Date).AddSeconds($timeoutSeconds)
   $attempt = 0
   while ($true) {
     $attempt++
-    & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file $envFile | Out-Host
-    if ($LASTEXITCODE -eq 0) {
+    $output = & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file $envFile 2>&1
+    $lastExit = $LASTEXITCODE
+    $lastOutput = $output | Out-String
+    if ($lastExit -eq 0) {
+      if ($lastOutput.Trim()) {
+        Write-Host $lastOutput
+      }
       break
     }
-    if ((Get-Date) -ge $deadline) {
-      Write-Error "Error: oblt-cli cluster secrets env failed for cluster '$ClusterName' after ${timeoutSeconds}s and $attempt attempts (last exit=$LASTEXITCODE)"
+    if (-not (Test-EssSecretsNotFoundYet $lastOutput)) {
+      Write-Host $lastOutput
+      Write-Error "Error: oblt-cli cluster secrets env failed for cluster '$ClusterName' (exit=$lastExit); not retrying"
       return 1
     }
-    Write-Host "Secrets for cluster '$ClusterName' are not available yet (attempt $attempt); retrying in ${intervalSeconds}s..."
+    if ((Get-Date) -ge $deadline) {
+      Write-Host $lastOutput
+      Write-Error "Error: oblt-cli cluster secrets env failed for cluster '$ClusterName' after ${timeoutSeconds}s and $attempt attempts (last exit=$lastExit)"
+      return 1
+    }
+    Write-Host "Secrets for cluster '$ClusterName' are not available yet (attempt $attempt, exit=$lastExit); retrying in ${intervalSeconds}s..."
     Start-Sleep -Seconds $intervalSeconds
   }
 
