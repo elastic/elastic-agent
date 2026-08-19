@@ -693,6 +693,142 @@ agent.internal.runtime.filebeat.filestream: otel
 	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
 }
 
+// TestContainerDiagnostics verifies that `elastic-agent diagnostics` collects
+// input request-tracer logs when the agent runs via the `elastic-agent container`
+// entrypoint with a custom STATE_PATH that diverges from the install tree
+// (https://github.com/elastic/elastic-agent/issues/15771).
+func TestContainerDiagnostics(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: "container",
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
+	// Mock HTTP server polled by the httpjson tracer.
+	httpjsonServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"message":"hello"}`)
+	}))
+	t.Cleanup(httpjsonServer.Close)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
+	require.NoError(t, err)
+
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	// State path is intentionally a subdirectory of the fixture's work dir,
+	// distinct from the install tree (<workDir>/data/elastic-agent-<hash>).
+	// This reproduces the container path layout: paths.Components() points at
+	// the install tree while topPath resolves to STATE_PATH/data.
+	statePath := filepath.Join(agentFixture.WorkDir(), "agent-state")
+	env := []string{"STATE_PATH=" + statePath}
+
+	configTmpl := `
+inputs:
+  - type: httpjson
+    id: httpjson-container-diag-test
+    use_output: default
+    streams:
+      - id: httpjson-container-stream
+        data_stream:
+          dataset: httpjson.generic
+          type: logs
+        request.url: {{ .MockServerURL }}
+        request.tracer.filename: http-request-trace-*.ndjson
+        interval: 1s
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{ .ESHost }}]
+    api_key: placeholder
+agent.monitoring.enabled: false
+# otel mode does not initialise paths.Paths.Logs, so the tracer filename validation fails
+agent.internal.runtime.filebeat.httpjson: process
+`
+	var cfgBuf bytes.Buffer
+	require.NoError(t, template.Must(template.New("cfg").Parse(configTmpl)).Execute(&cfgBuf, map[string]any{
+		"MockServerURL": httpjsonServer.URL,
+		"ESHost":        esURL.Host,
+	}))
+
+	cfgFile := filepath.Join(t.TempDir(), "elastic-agent.yml")
+	require.NoError(t, os.WriteFile(cfgFile, cfgBuf.Bytes(), 0o600))
+
+	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container", "-c", cfgFile}, env)
+	t.Logf("starting agent with: %v", cmd.Args)
+	require.NoError(t, cmd.Start(), "failed to start container cmd")
+	t.Cleanup(func() {
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+		}
+	})
+
+	require.Eventuallyf(t, func() bool {
+		err = agentFixture.IsHealthy(ctx, integrationtest.WithCmdOptions(withEnv(env)))
+		return err == nil
+	}, 5*time.Minute, time.Second,
+		"agent did not become healthy. Error: %v\nAgent output:\n%s", err, agentOutput)
+
+	// Wait for the tracer to flush; httpjson fires every 1s so 10s is generous.
+	select {
+	case <-time.After(10 * time.Second):
+	case <-ctx.Done():
+		t.Fatal("context cancelled waiting for tracer flush")
+	}
+
+	// Collect diagnostics with STATE_PATH env so the CLI resolves the same control socket.
+	zipPath := filepath.Join(t.TempDir(), "container-diag.zip")
+	_, err = agentFixture.Exec(ctx, []string{"diagnostics", "-f", zipPath}, withEnv(env))
+	require.NoError(t, err, "diagnostics command failed")
+
+	// Verify the trace file is present in the bundle. Before the fix the bundle had an
+	// empty logs/data/components/ directory and no trace files anywhere.
+	extractionDir := t.TempDir()
+	extractZipArchive(t, zipPath, extractionDir)
+
+	traceLogs, err := filepath.Glob(filepath.Join(extractionDir, "logs", "elastic-agent-*", "components", "httpjson", "http-request-trace-*.ndjson"))
+	require.NoError(t, err)
+	require.NotEmpty(t, traceLogs,
+		"container diagnostics bundle is missing httpjson request-tracer logs (reproduces #15771); "+
+			"bundle contents:\n%s", listZipEntries(t, zipPath))
+
+	for _, f := range traceLogs {
+		info, err := os.Stat(f)
+		require.NoError(t, err)
+		assert.Greaterf(t, info.Size(), int64(0), "trace log file %q is empty", f)
+	}
+
+	if t.Failed() {
+		agentFixture.MoveToDiagnosticsDir(zipPath)
+	}
+}
+
+// listZipEntries returns a newline-separated list of all entries in the zip archive,
+// used to produce helpful failure messages.
+func listZipEntries(t *testing.T, zipPath string) string {
+	t.Helper()
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return fmt.Sprintf("(failed to open zip: %v)", err)
+	}
+	defer r.Close()
+	var sb strings.Builder
+	for _, f := range r.File {
+		sb.WriteString(f.Name)
+		sb.WriteByte('\n')
+	}
+	return sb.String()
+}
+
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string, checkBeatReceiverTraceLogs bool, extraPatterns ...filePattern) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
 		// If any required extra patterns are present (e.g. the metrics file
