@@ -7,6 +7,11 @@ package manager
 import (
 	"bytes"
 	"context"
+<<<<<<< HEAD
+=======
+	"encoding/gob"
+	"encoding/json"
+>>>>>>> 4b9cb7fba (Use json as the wire format for otel configuration (#16243))
 	"errors"
 	"fmt"
 	"net/http"
@@ -27,6 +32,11 @@ import (
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
+<<<<<<< HEAD
+=======
+
+	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
+>>>>>>> 4b9cb7fba (Use json as the wire format for otel configuration (#16243))
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -100,12 +110,17 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 		return nil, fmt.Errorf("could not find port for collector: %w", err)
 	}
 
+<<<<<<< HEAD
 	if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
 		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
 	}
 
 	confMap := cfg.ToStringMap()
 	confBytes, err := yaml.Marshal(confMap)
+=======
+	// prepare and serialize config first so we can exit early if there's a problem
+	cfgBytes, err := prepareAndSerializeConfig(cfg)
+>>>>>>> 4b9cb7fba (Use json as the wire format for otel configuration (#16243))
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
 	}
@@ -247,6 +262,19 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 		r.reportErrFn(ctx, processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
 	}()
 
+<<<<<<< HEAD
+=======
+	ctl := newProcHandle(processInfo, agentLogger, collectorLevel, r.healthCheckExtensionID, httpHealthCheckPort,
+		forceFetchStatusCh,
+		func(ctx context.Context, st *otelstatus.AggregateStatus) {
+			reportCollectorStatus(ctx, statusCh, cloneCollectorStatus(st))
+		},
+		func(ctx context.Context, err error) { r.reportErrFn(ctx, processErrCh, err) },
+		stdOutLast, stdErrLast,
+	)
+	ctl.startBackgroundWorkers()
+	ctl.updateConfigBytes(cfgBytes)
+>>>>>>> 4b9cb7fba (Use json as the wire format for otel configuration (#16243))
 	return ctl, nil
 }
 
@@ -370,6 +398,57 @@ func (s *procHandle) Stopped() bool {
 	return false
 }
 
+<<<<<<< HEAD
+=======
+// UpdateConfig submits a new configuration to the collector process.
+func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
+	cfgBytes, err := prepareAndSerializeConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	s.updateConfigBytes(cfgBytes)
+
+	return nil
+}
+
+// updateConfigBytes submits a new serialized configuration to the collector process.
+func (s *procHandle) updateConfigBytes(cfgBytes []byte) {
+	// Drain any pending config (latest-wins semantics).
+	select {
+	case <-s.configCh:
+	default:
+	}
+	s.configCh <- cfgBytes
+}
+
+// LogLevel return the otel collector's log level.
+func (s *procHandle) LogLevel() logp.Level {
+	return s.collectorLogLevel
+}
+
+// prepareAndSerializeConfig serializes the configuration to JSON.
+// JSON is used rather than YAML because yaml.Marshal can corrupt or fail to
+// round-trip multi-line strings whose content lines have inconsistent leading
+// whitespace (e.g. audit_rules block scalars). JSON strings always use explicit
+// \n escaping, which avoids the YAML block-scalar indentation ambiguity.
+// confmap.NewRetrievedFromYAML on the receiver side accepts JSON because JSON
+// is a strict subset of YAML.
+func prepareAndSerializeConfig(cfg *confmap.Conf) ([]byte, error) {
+	if cfg == nil {
+		return nil, errors.New("no configuration provided")
+	}
+
+	confMap := cfg.ToStringMap()
+	jsonBytes, err := json.Marshal(confMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config to json: %w", err)
+	}
+
+	return jsonBytes, nil
+}
+
+>>>>>>> 4b9cb7fba (Use json as the wire format for otel configuration (#16243))
 type zapWriter interface {
 	Write(zapcore.Entry, []zapcore.Field) error
 }
