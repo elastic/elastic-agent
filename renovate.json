@@ -120,6 +120,16 @@
       "groupName": "k8s-ecosystem"
     },
     {
+      "description": "Disabled: replace directives are manually managed Elastic forks; Renovate must not touch them",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchDepTypes": [
+        "replace"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Disabled: beats (git submodule), sarama (manual path handling), OTel packages (own release cycle)",
       "matchManagers": [
         "gomod"
