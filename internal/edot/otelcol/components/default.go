@@ -134,6 +134,7 @@ import (
 
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	elasticmonitoringconnector "github.com/elastic/elastic-agent/internal/edot/connectors/elasticmonitoring"
+	elasticmonitoringprocessor "github.com/elastic/elastic-agent/internal/edot/processors/elasticmonitoring"
 	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
 	profilingmetricsconnector "github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector"
 
@@ -235,6 +236,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			tailsamplingprocessor.NewFactory(),
 			logdedupprocessor.NewFactory(),
 			beatprocessor.NewFactory(),
+			elasticmonitoringprocessor.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err

@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package elasticmonitoring
+package elasticmonitoringprocessor
 
 // Smoke tests against real OTLP metrics captured from a running elastic-agent
 // (testdata/diagnostics-metrics.json). The fixture covers combinations that
@@ -19,10 +19,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
-	"go.uber.org/zap"
 
-	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
 )
 
 func loadRealDataFixture(t *testing.T) pmetric.Metrics {
@@ -35,7 +35,22 @@ func loadRealDataFixture(t *testing.T) pmetric.Metrics {
 	return md
 }
 
-// TestSmoke_ReceiverPipelineEvents verifies that buildReceiverPipelineEvents
+// collectComponentIDs returns all component.id scope attribute values in out.
+func collectComponentIDs(out pmetric.Metrics) []string {
+	ids := make([]string, 0, out.ResourceMetrics().Len())
+	for i := 0; i < out.ResourceMetrics().Len(); i++ {
+		rm := out.ResourceMetrics().At(i)
+		if rm.ScopeMetrics().Len() == 0 {
+			continue
+		}
+		if v, ok := rm.ScopeMetrics().At(0).Scope().Attributes().Get(internaltelemetry.ComponentIDAttr); ok {
+			ids = append(ids, v.Str())
+		}
+	}
+	return ids
+}
+
+// TestSmoke_ReceiverPipelineEvents verifies that buildReceiverPipelineMetrics
 // correctly extracts component IDs from real RegistryBridge metric scopes.
 //
 // Expected behaviour:
@@ -47,25 +62,16 @@ func loadRealDataFixture(t *testing.T) pmetric.Metrics {
 //     treated as a per-container separator.
 func TestSmoke_ReceiverPipelineEvents(t *testing.T) {
 	md := loadRealDataFixture(t)
+	out := pmetric.NewMetrics()
+	buildReceiverPipelineMetrics(pcommon.NewResource(), md, out)
 
-	events := buildReceiverPipelineEvents(&Config{}, md)
+	componentIDs := collectComponentIDs(out)
 
-	componentIDs := make([]string, 0, len(events))
-	for _, e := range events {
-		id, err := e.GetValue("component.id")
-		require.NoError(t, err)
-		componentIDs = append(componentIDs, id.(string))
-	}
-
-	// Both monitoring receiver streams must aggregate to the full comp.ID.
 	assert.Contains(t, componentIDs, "http/metrics-monitoring",
 		"monitoring component with slash in comp.ID must not be truncated to 'http'")
-
-	// Both per-container filestream-default receivers must aggregate to the base comp.ID.
 	assert.Contains(t, componentIDs, "filestream-default",
 		"per-container receivers must be aggregated under the base component ID")
 
-	// The two http/metrics-monitoring streams must produce exactly one event, not two.
 	count := 0
 	for _, id := range componentIDs {
 		if id == "http/metrics-monitoring" {
@@ -74,7 +80,6 @@ func TestSmoke_ReceiverPipelineEvents(t *testing.T) {
 	}
 	assert.Equal(t, 1, count, "two per-stream monitoring receivers must produce exactly one aggregated event")
 
-	// The two filestream-default container receivers must produce exactly one event.
 	count = 0
 	for _, id := range componentIDs {
 		if id == "filestream-default" {
@@ -83,7 +88,6 @@ func TestSmoke_ReceiverPipelineEvents(t *testing.T) {
 	}
 	assert.Equal(t, 1, count, "two per-container filestream receivers must produce exactly one aggregated event")
 
-	// Truncated IDs must not appear.
 	assert.NotContains(t, componentIDs, "http",
 		"component.id must not be 'http' — that indicates baseComponentID cut at the wrong slash")
 }
@@ -96,31 +100,40 @@ func TestSmoke_ReceiverPipelineEvents(t *testing.T) {
 // "beat.stats.metricbeat.http.json.events".
 func TestSmoke_MetricNamePrefixing(t *testing.T) {
 	md := loadRealDataFixture(t)
+	out := pmetric.NewMetrics()
+	buildReceiverPipelineMetrics(pcommon.NewResource(), md, out)
 
-	events := buildReceiverPipelineEvents(&Config{}, md)
-
-	var monEv mapstr.M
-	for _, e := range events {
-		id, _ := e.GetValue("component.id")
-		if id == "http/metrics-monitoring" {
-			monEv = e
+	var targetIdx int = -1
+	for i := 0; i < out.ResourceMetrics().Len(); i++ {
+		rm := out.ResourceMetrics().At(i)
+		if rm.ScopeMetrics().Len() == 0 {
+			continue
+		}
+		if v, ok := rm.ScopeMetrics().At(0).Scope().Attributes().Get(internaltelemetry.ComponentIDAttr); ok && v.Str() == "http/metrics-monitoring" {
+			targetIdx = i
 			break
 		}
 	}
-	require.NotNil(t, monEv, "expected event for http/metrics-monitoring component")
+	require.NotEqual(t, -1, targetIdx, "expected event for http/metrics-monitoring component")
 
-	// metricbeat.http.json.events = 4 in the fixture — should map to
-	// "beat.stats.metricbeat.http.json.events", not the double-prefixed form.
+	// metricbeat.http.json.events = 4 in the fixture
 	assert.Equal(t, int64(4),
-		eventValue(t, monEv, "beat.stats.metricbeat.http.json.events"),
+		findMetricValue(t, out, targetIdx, "beat.stats.metricbeat.http.json.events"),
 		"metricbeat.* metric must be prefixed with beat.stats.metricbeat., not double-prefixed")
 
-	// The double-prefixed form must not exist.
-	_, err := monEv.GetValue("beat.stats.metricbeat.metricbeat.http.json.events")
-	assert.Error(t, err, "double-prefixed metric name must not appear in the event")
+	// Confirm the double-prefixed form is absent by checking the fixture value doesn't
+	// appear under the wrong name — we check this by scanning for the bad name directly.
+	badName := "beat.stats.metricbeat.metricbeat.http.json.events"
+	rm := out.ResourceMetrics().At(targetIdx)
+	for i := 0; i < rm.ScopeMetrics().Len(); i++ {
+		sm := rm.ScopeMetrics().At(i)
+		for j := 0; j < sm.Metrics().Len(); j++ {
+			assert.NotEqual(t, badName, sm.Metrics().At(j).Name(), "double-prefixed metric name must not appear")
+		}
+	}
 }
 
-// TestSmoke_ExporterEvents verifies that buildExporterEvents maps the monitoring
+// TestSmoke_ExporterEvents verifies that buildExporterMetrics maps the monitoring
 // ES exporter metrics to the configured component name and correctly surfaces
 // queue capacity and docs.processed from real exporter scopes.
 func TestSmoke_ExporterEvents(t *testing.T) {
@@ -135,26 +148,36 @@ func TestSmoke_ExporterEvents(t *testing.T) {
 		},
 	}
 
-	events := buildExporterEvents(zap.NewNop(), cfg, md)
+	out := pmetric.NewMetrics()
+	buildExporterMetrics(nil, cfg, pcommon.NewResource(), md, out)
 
-	byComponent := make(map[string]map[string]any, len(events))
-	for _, e := range events {
-		id, err := e.GetValue("component.id")
-		require.NoError(t, err)
-		byComponent[id.(string)] = e
+	// Find each exporter by component ID
+	monIdx := -1
+	defIdx := -1
+	for i := 0; i < out.ResourceMetrics().Len(); i++ {
+		rm := out.ResourceMetrics().At(i)
+		if rm.ScopeMetrics().Len() == 0 {
+			continue
+		}
+		v, ok := rm.ScopeMetrics().At(0).Scope().Attributes().Get(internaltelemetry.ComponentIDAttr)
+		if !ok {
+			continue
+		}
+		switch v.Str() {
+		case "monitoring":
+			monIdx = i
+		case "elasticsearch-default":
+			defIdx = i
+		}
 	}
 
-	// Monitoring exporter: queue capacity from exporterhelper scope.
-	monEv, ok := byComponent["monitoring"]
-	require.True(t, ok, "expected event for monitoring exporter")
+	require.NotEqual(t, -1, monIdx, "expected event for monitoring exporter")
 	assert.Equal(t, int64(3200),
-		eventValue(t, monEv, "beat.stats.libbeat.pipeline.queue.max_events"),
+		findMetricValue(t, out, monIdx, beatsQueueMaxEventsKey),
 		"queue capacity from exporterhelper scope")
 
-	// Default exporter: docs.processed from elasticsearchexporter scope.
-	defEv, ok := byComponent["elasticsearch-default"]
-	require.True(t, ok, "expected event for default exporter")
+	require.NotEqual(t, -1, defIdx, "expected event for default exporter")
 	assert.Equal(t, int64(447),
-		eventValue(t, defEv, "beat.stats.libbeat.output.events.total"),
+		findMetricValue(t, out, defIdx, beatsOutputEventsTotalKey),
 		"docs.processed from elasticsearchexporter scope")
 }
