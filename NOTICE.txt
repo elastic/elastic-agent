@@ -1053,11 +1053,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-l
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-system-metrics
-Version: v0.14.4
+Version: v0.14.5
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.14.4/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.14.5/LICENSE.txt:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3258,11 +3258,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/stretchr/testify
-Version: v1.11.1
+Version: v1.12.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/stretchr/testify@v1.11.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/stretchr/testify@v1.12.1/LICENSE:
 
 MIT License
 
@@ -7794,11 +7794,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : go.yaml.in/yaml/v3
-Version: v3.0.4
+Version: v3.0.5
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.yaml.in/yaml/v3@v3.0.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.yaml.in/yaml/v3@v3.0.5/LICENSE:
 
 
 This project is covered by two different licenses: MIT and Apache.
@@ -79875,11 +79875,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-docappender/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/go-elasticsearch/v8
-Version: v8.19.6
+Version: v8.19.7
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/go-elasticsearch/v8@v8.19.6/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-elasticsearch/v8@v8.19.7/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
