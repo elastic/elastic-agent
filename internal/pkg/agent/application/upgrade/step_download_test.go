@@ -262,6 +262,27 @@ func TestDownloadArtifact(t *testing.T) {
 			},
 		},
 		{
+			name: "remote sourceURI checks drop path without copying if drop path and target directory are equal",
+			run: func(t *testing.T, fx *fixture) {
+				require.NoError(t, os.MkdirAll(fx.settings.TargetDirectory, 0o755))
+				dropPath := fx.settings.TargetDirectory
+				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()), archiveContent, 0o644))
+				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()+".sha512"), hashFile, 0o644))
+				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()+".asc"), signature, 0o644))
+
+				serverURL, requestCounts := newFileServer(t, nil)
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+					fx.upgradeDetails, false, true, pgpSource)
+				require.NoError(t, err)
+				require.Empty(t, requestCounts)
+				got, err := os.ReadFile(artifactPath)
+				require.NoError(t, err)
+				require.Equal(t, archiveContent, got)
+				require.FileExists(t, download.AddHashExtension(artifactPath))
+			},
+		},
+		{
 			name: "remote sourceURI uses remote source when drop path is set but artifact is missing",
 			run: func(t *testing.T, fx *fixture) {
 				fx.settings.DropPath = t.TempDir()
