@@ -132,16 +132,22 @@ It will pull the remaining dependencies from a manifest specified in [.package-v
 This process can be controlled through the following environment variables:
 
 - `AGENT_CORE_SOURCE=local|manifest`: Build the aforementioned binaries locally or pull from the manifest. Default is `local`. Manifest is defined either by [.package-version](/.package-version) or the `MANIFEST_URL` environment variable.
-- `USE_PACKAGE_VERSION=true|false`: Use the content of [.package-version](/.package-version) for configuring the package, most importantly the manifest url, but the version is effective as well. Mutually exclusive with `MANIFEST_URL`. Default is `true`.
-- `MANIFEST_URL`: The manifest url from which to pull the dependencies. Mutually exclusive with `USE_PACKAGE_VERSION=true`. Default is empty.
+- `USE_PACKAGE_VERSION=true|false`: Use the content of [.package-version](/.package-version) for configuring the package, most importantly the manifest url, but the version is effective as well. Default is `true`.
+  Only targets that need consistency with the published snapshot build read this file (`package` and the targets built on it,
+  `downloadManifest`, `ironbank`, the `cloud:*` image targets, and the `integration:*` test runners); it has no effect on any
+  other target (for example `helm:package` or plain builds). Providing `MANIFEST_URL` also disables it, since the manifest is
+  then authoritative; explicitly setting both `MANIFEST_URL` and `USE_PACKAGE_VERSION=true` is an error.
+- `MANIFEST_URL`: The manifest url from which to pull the dependencies. Takes precedence over [.package-version](/.package-version). Default is empty.
 - `SNAPSHOT=true|false`: Create a snapshot build. This is just versioning metadata indicating that the
   package doesn't contain a release build. Read from the manifest if present, otherwise defaults to `true`.
+  For targets that read [.package-version](/.package-version), an explicit value that contradicts the file is an error,
+  because mixing snapshot dependencies with a release package (or vice versa) produces a broken artifact.
 - `EXTERNAL=true|false`: If you want to build with dependencies you've provided locally (you have a custom build of endpoint, for example), then set this to `false` and `USE_PACKAGE_VERSION=false`. Default is `true`.
 
 For example, if you want to create a package the same way as the unified release job, you'd run:
 
 ```bash
-USE_PACKAGE_VERSION=false MANIFEST_URL=... AGENT_CORE_SOURCE=manifest mage package
+MANIFEST_URL=... AGENT_CORE_SOURCE=manifest mage package
 ```
 
 ### Running the tests

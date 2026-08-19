@@ -76,10 +76,23 @@ const writeMask = windows.ACCESS_MASK(
 		windows.DELETE | windows.WRITE_DAC | windows.WRITE_OWNER,
 )
 
-// HasStrictExecPerms ensures that no non-privileged SID has write access to
-// the file at path. Privileged SIDs (SYSTEM, Administrators, and the file
-// owner) may have any access; all other SIDs must not hold write-capable bits.
+// HasStrictExecPerms ensures that no untrusted SID has write access to the file
+// at path. SYSTEM, Administrators, the file owner, and the user running Elastic
+// Agent may have any access; all other SIDs must not hold write-capable bits.
 func HasStrictExecPerms(path string) error {
+	currentOwner, err := CurrentFileOwner()
+	if err != nil {
+		return fmt.Errorf("failed to get current process owner: %w", err)
+	}
+	currentUserSID, err := windows.StringToSid(currentOwner.UID)
+	if err != nil {
+		return fmt.Errorf("failed to parse current process user SID: %w", err)
+	}
+
+	return hasStrictExecPerms(path, currentUserSID)
+}
+
+func hasStrictExecPerms(path string, currentUserSID *windows.SID) error {
 	sd, err := windows.GetNamedSecurityInfo(
 		path,
 		windows.SE_FILE_OBJECT,
@@ -123,8 +136,11 @@ func HasStrictExecPerms(path string) error {
 
 		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
 
-		// SYSTEM, Administrators, and the file owner may hold any access.
-		if sid.Equals(systemSID) || sid.Equals(adminsSID) || (ownerSID != nil && sid.Equals(ownerSID)) {
+		// The current process user already controls this Agent process, so
+		// trusting it does not permit binary tampering by another account. This
+		// also supports Windows tokens whose default file owner differs from the
+		// token user, such as a non-elevated member of Administrators.
+		if isTrustedExecWriter(sid, systemSID, adminsSID, ownerSID, currentUserSID) {
 			continue
 		}
 
@@ -138,6 +154,13 @@ func HasStrictExecPerms(path string) error {
 	// memory subject to a GC finalizer.
 	runtime.KeepAlive(sd)
 	return nil
+}
+
+func isTrustedExecWriter(sid, systemSID, adminsSID, ownerSID, currentUserSID *windows.SID) bool {
+	return sid.Equals(systemSID) ||
+		sid.Equals(adminsSID) ||
+		(ownerSID != nil && sid.Equals(ownerSID)) ||
+		sid.Equals(currentUserSID)
 }
 
 // HasStrictExecPermsAndOwnership ensures that the path is executable by the
