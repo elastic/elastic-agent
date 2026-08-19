@@ -15,8 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
-
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
@@ -41,56 +39,6 @@ func defaultFileOps() fileOps {
 		copyFile: io.Copy,
 		openFile: os.OpenFile,
 	}
-}
-
-type downloadFunc func(ctx context.Context, source, dst string) error
-
-func downloadWithRetries(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, source string, dst string, downloadFn downloadFunc) error {
-	cancelDeadline := time.Now().Add(config.Timeout)
-	cancelCtx, cancel := context.WithDeadline(ctx, cancelDeadline)
-	defer cancel()
-
-	upgradeDetails.SetRetryUntil(&cancelDeadline)
-
-	expBo := backoff.NewExponentialBackOff()
-	expBo.InitialInterval = config.RetrySleepInitDuration
-	boCtx := backoff.WithContext(expBo, cancelCtx)
-
-	var attempt uint
-	opFn := func() error {
-		attempt++
-		log.Infof("download attempt %d", attempt)
-		if err := downloadFn(cancelCtx, source, dst); err != nil {
-			if upgradeErrors.IsPermanentHTTPError(err) {
-				return backoff.Permanent(err)
-			}
-			if upgradeErrors.IsDiskSpaceError(err) {
-				log.Infof("insufficient disk space error detected, stopping retries")
-				return backoff.Permanent(err)
-			}
-			var agentErr errors.Error
-			if goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem {
-				log.Infof("filesystem error detected, stopping retries")
-				return backoff.Permanent(err)
-			}
-			return err
-		}
-		return nil
-	}
-
-	opFailureNotificationFn := func(err error, retryAfter time.Duration) {
-		log.Warnf("download attempt %d failed: %s; retrying in %s.",
-			attempt, err.Error(), retryAfter)
-		upgradeDetails.SetRetryableError(err)
-	}
-
-	if err := backoff.RetryNotify(opFn, boCtx, opFailureNotificationFn); err != nil {
-		return err
-	}
-
-	upgradeDetails.SetRetryableError(nil)
-	upgradeDetails.SetRetryUntil(nil)
-	return nil
 }
 
 func download(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, client *http.Client, sourceURI string, targetPath string, ops fileOps) (err error) {
@@ -217,10 +165,7 @@ func Fetch(ctx context.Context, log *logger.Logger, config *artifact.Config, upg
 	if IsLocal(source) {
 		err = copyFile(log, source, targetPath, defaultFileOps())
 	} else {
-		err = downloadWithRetries(ctx, log, config, upgradeDetails, source, targetPath,
-			func(ctx context.Context, source, dst string) error {
-				return download(ctx, log, config, upgradeDetails, nil, source, dst, defaultFileOps())
-			})
+		err = download(ctx, log, config, upgradeDetails, nil, source, targetPath, defaultFileOps())
 	}
 
 	if err != nil {
