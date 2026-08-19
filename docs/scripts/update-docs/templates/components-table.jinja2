@@ -2,47 +2,47 @@
 
 These components are included in {{ "{{agent}}" }} version {{version.edot_collector}}.
 
-| Component | GitHub Repo | Support status | Version |
-|:---|:---|:---|:---|
+| Component | GitHub Repo | Support status | Component version | Added in Elastic Agent |
+|:---|:---|:---|:---|:---|
 {%if grouped_components['Receivers'] -%}
-|***Receivers***||||
+|***Receivers***|||||
 {% for comp in grouped_components['Receivers'] -%}
-| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} |
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} | {{ comp.get('since', '') }} |
 {% endfor %}
 {%- endif -%}
 
 {%- if grouped_components['Exporters'] -%}
-|***Exporters***||||
+|***Exporters***|||||
 {% for comp in grouped_components['Exporters'] -%}
-| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} |
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} | {{ comp.get('since', '') }} |
 {% endfor %}
 {%- endif -%}
 
 {%- if grouped_components['Processors'] -%}
-|***Processors***||||
+|***Processors***|||||
 {% for comp in grouped_components['Processors'] -%}
-| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} |
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} | {{ comp.get('since', '') }} |
 {% endfor %}
 {%- endif -%}
 
 {%- if grouped_components['Connectors'] -%}
-|***Connectors***||||
+|***Connectors***|||||
 {% for comp in grouped_components['Connectors'] -%}
-| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} |
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} | {{ comp.get('since', '') }} |
 {% endfor %}
 {%- endif -%}
 
 {%- if grouped_components['Extensions'] -%}
-|***Extensions***||||
+|***Extensions***|||||
 {% for comp in grouped_components['Extensions'] -%}
-| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} |
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} | {{ comp.get('since', '') }} |
 {% endfor %}
 {%- endif -%}
 
 {%- if grouped_components['Providers'] -%}
-|***Providers***||||
+|***Providers***|||||
 {% for comp in grouped_components['Providers'] -%}
-| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} |
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} | {{ comp.get('since', '') }} |
 {% endfor %}
 {% endif %}
 {%- if annotations %}
