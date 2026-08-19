@@ -52,7 +52,7 @@ require (
 	github.com/schollz/progressbar/v3 v3.19.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.0
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/winlabs/gowin32 v0.0.0-20260308155911-6a6dc53430f0
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.12
