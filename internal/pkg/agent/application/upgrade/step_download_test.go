@@ -703,8 +703,7 @@ func TestResolve(t *testing.T) {
 				fileName = strings.Replace(fileName, tt.version.String(), tt.version.VersionWithPrerelease(), 1)
 			}
 
-			upgradeDetails := details.NewDetails(tt.version.String(), details.StateRequested, "")
-			source, err := Resolve(t.Context(), &artifact.Config{}, target, tt.sourceURI, "beats/elastic-agent", fileName, upgradeDetails)
+			source, err := Resolve(t.Context(), &artifact.Config{}, target, tt.sourceURI, "beats/elastic-agent", fileName)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, source)
 		})
@@ -723,79 +722,18 @@ func TestLatestSnapshotBuildID(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
-		upgradeDetails, _, _, _ := mockUpgradeDetails(version)
-
-		buildID, err := latestSnapshotBuildID(t.Context(), config, version, upgradeDetails)
+		buildID, err := latestSnapshotBuildID(t.Context(), config, version)
 		require.NoError(t, err)
 		assert.Equal(t, "6d69ee76", buildID)
-	})
-
-	t.Run("success after one retry", func(t *testing.T) {
-		requests := 0
-		config := newMockResolveConfig(t, func(rw http.ResponseWriter, _ *http.Request) {
-			requests++
-			if requests == 1 {
-				rw.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			_, err := rw.Write(snapshotInfo)
-			assert.NoError(t, err)
-		})
-		config.RetrySleepInitDuration = 10 * time.Millisecond
-
-		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(version)
-
-		buildID, err := latestSnapshotBuildID(t.Context(), config, version, upgradeDetails)
-		require.NoError(t, err)
-		assert.Equal(t, "6d69ee76", buildID)
-		assert.Equal(t, 2, requests)
-
-		// Retry details were set while retrying and cleared upon success.
-		assert.NotZero(t, *upgradeDetailsRetryUntil)
-		assert.True(t, *upgradeDetailsRetryUntilWasUnset)
-		assert.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
-		assert.Nil(t, upgradeDetails.Metadata.RetryUntil)
-		assert.Empty(t, upgradeDetails.Metadata.RetryErrorMsg)
 	})
 
 	t.Run("failure not found", func(t *testing.T) {
-		requests := 0
 		config := newMockResolveConfig(t, func(rw http.ResponseWriter, _ *http.Request) {
-			requests++
 			rw.WriteHeader(http.StatusNotFound)
 		})
 
-		upgradeDetails, _, _, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(version)
-
-		_, err := latestSnapshotBuildID(t.Context(), config, version, upgradeDetails)
+		_, err := latestSnapshotBuildID(t.Context(), config, version)
 		require.ErrorContains(t, err, "not found")
-
-		// A 404 is a permanent error: no retries and no retryable error reported.
-		assert.Equal(t, 1, requests)
-		assert.Empty(t, *upgradeDetailsRetryErrorMsg)
-	})
-
-	t.Run("failure timeout", func(t *testing.T) {
-		config := newMockResolveConfig(t, func(rw http.ResponseWriter, _ *http.Request) {
-			rw.WriteHeader(http.StatusInternalServerError)
-		})
-		config.Timeout = time.Second
-		config.RetrySleepInitDuration = 10 * time.Millisecond
-
-		upgradeDetails, _, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(version)
-
-		started := time.Now()
-		_, err := latestSnapshotBuildID(t.Context(), config, version, upgradeDetails)
-		elapsed := time.Since(started)
-
-		require.Error(t, err)
-		assert.Less(t, elapsed, 10*time.Second)
-
-		// Retry details remain set after exhausting the retry deadline.
-		require.NotNil(t, upgradeDetails.Metadata.RetryUntil)
-		assert.WithinDuration(t, started.Add(config.Timeout), *upgradeDetails.Metadata.RetryUntil, 500*time.Millisecond)
-		assert.False(t, *upgradeDetailsRetryUntilWasUnset)
-		assert.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
 	})
 }
 
