@@ -2,7 +2,7 @@
 
 These components are included in {{ "{{agent}}" }} version {{version.edot_collector}}.
 
-| Component | GitHub Repo | Support status | Component version | Added in [^since] |
+| Component | GitHub Repo | Support status | Component version | Added in Elastic Agent |
 |:---|:---|:---|:---|:---|
 {%if grouped_components['Receivers'] -%}
 |***Receivers***|||||
@@ -50,6 +50,4 @@ These components are included in {{ "{{agent}}" }} version {{version.edot_collec
 {% for annotation in annotations %}
 [^{{ annotation['number'] }}]: {{ annotation['text'] }}
 {% endfor %}
-{%- endif %}
-
-[^since]: Elastic Stack version when this component was first included in the {{ "{{agent}}" }} Elastic OpenTelemetry Collector.
+{%- endif -%}

@@ -34,7 +34,7 @@ Components marked as "Deprecated" in the table are retained in {{agent}} 9.x to 
 
 These components are included in {{agent}} version 9.5.1.
 
-| Component | GitHub Repo | Support status | Component version | Added in [^since] |
+| Component | GitHub Repo | Support status | Component version | Added in Elastic Agent |
 |:---|:---|:---|:---|:---|
 |***Receivers***|||||
 | [akamaisiemreceiver](https://github.com/elastic/opentelemetry-collector-components/tree/main/receiver/akamaisiemreceiver) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Extended] | v0.1.0 | v9.5.0 |
@@ -155,8 +155,6 @@ These components are included in {{agent}} version 9.5.1.
 - Encoding options other than `otlp_proto` or `otlp_json`
 - Using the Sarama client (i.e. opting out of the `exporter.kafkaexporter.UseFranzGo` feature gate is not supported)
 
-
-[^since]: Elastic Stack version when this component was first included in the {{agent}} Elastic OpenTelemetry Collector.
 % end:edot-collector-components-table
 
 [Extended]: opentelemetry://reference/compatibility/nomenclature.md#extended-components
