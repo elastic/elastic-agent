@@ -110,14 +110,6 @@ func (p *provisioner) Supported(os define.OS) bool {
 }
 
 func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches []common.OSBatch) ([]common.Instance, error) {
-	// The runner reaches sshd on the container's bridge IP at port 22, which only
-	// works when the host can route to the docker bridge (i.e. a Linux host). On
-	// macOS the container IP isn't routable and the SSH port would have to be
-	// published, which the test framework's SSH client doesn't support yet.
-	if runtime.GOOS != "linux" {
-		return nil, fmt.Errorf("the %q instance provisioner currently supports Linux hosts only "+
-			"(macOS would require publishing the SSH port); host is %s", Name, runtime.GOOS)
-	}
 	if err := p.checkDocker(ctx); err != nil {
 		return nil, err
 	}
