@@ -52,7 +52,7 @@ require (
 	github.com/schollz/progressbar/v3 v3.19.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/winlabs/gowin32 v0.0.0-20260308155911-6a6dc53430f0
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.12
@@ -70,7 +70,7 @@ require (
 	go.opentelemetry.io/collector/pipeline/xpipeline v0.157.0
 	go.opentelemetry.io/otel/sdk/metric v1.44.0
 	go.uber.org/zap v1.28.0
-	go.yaml.in/yaml/v3 v3.0.4
+	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.55.0
 	golang.org/x/exp v0.0.0-20260813180055-c1d0aacb2297
 	golang.org/x/mod v0.40.0
