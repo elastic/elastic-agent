@@ -9,7 +9,6 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
-	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/processor"
 	"go.uber.org/zap"
 )
@@ -42,21 +41,17 @@ func createProcessor(
 	next consumer.Metrics,
 ) (processor.Metrics, error) {
 	cfg := baseCfg.(*Config)
-	res := pcommon.NewResource()
-	set.Resource.CopyTo(res)
 	return &monitoringProcessor{
-		logger:   set.Logger,
-		config:   cfg,
-		resource: res,
-		next:     next,
+		logger: set.Logger,
+		config: cfg,
+		next:   next,
 	}, nil
 }
 
 type monitoringProcessor struct {
-	logger   *zap.Logger
-	config   *Config
-	resource pcommon.Resource
-	next     consumer.Metrics
+	logger *zap.Logger
+	config *Config
+	next   consumer.Metrics
 }
 
 func (p *monitoringProcessor) Start(_ context.Context, _ component.Host) error { return nil }

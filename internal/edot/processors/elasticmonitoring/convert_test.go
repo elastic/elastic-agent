@@ -208,12 +208,12 @@ func TestBuildProcessedMetrics_ServiceResourcePropagated(t *testing.T) {
 	md, sm := newMetricsWithExporterScope(exporterID)
 	appendGaugeInt(sm, otelQueueCapacityKey, 1)
 
-	res := pcommon.NewResource()
-	res.Attributes().PutStr("service.name", "elastic-otel-collector")
-	res.Attributes().PutStr("service.version", "9.6.0")
+	// Simulate service attrs set by the receiver from the SDK meter provider resource.
+	md.ResourceMetrics().At(0).Resource().Attributes().PutStr("service.name", "elastic-otel-collector")
+	md.ResourceMetrics().At(0).Resource().Attributes().PutStr("service.version", "9.6.0")
 
 	cfg := &Config{ExporterNames: map[string]string{exporterID: "monitoring"}}
-	out := buildProcessedMetrics(zap.NewNop(), cfg, res, md)
+	out := buildProcessedMetrics(zap.NewNop(), cfg, md)
 
 	require.Equal(t, 1, out.ResourceMetrics().Len())
 	resAttrs := out.ResourceMetrics().At(0).Resource().Attributes()

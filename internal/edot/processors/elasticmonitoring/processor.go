@@ -13,7 +13,7 @@ import (
 )
 
 func (p *monitoringProcessor) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) error {
-	processed := buildProcessedMetrics(p.logger, p.config, p.resource, md)
+	processed := buildProcessedMetrics(p.logger, p.config, md)
 	if processed.ResourceMetrics().Len() == 0 {
 		return nil
 	}
@@ -23,10 +23,17 @@ func (p *monitoringProcessor) ConsumeMetrics(ctx context.Context, md pmetric.Met
 // buildProcessedMetrics transforms raw collector internal-telemetry metrics into
 // a canonical form where each ResourceMetrics represents one monitoring event.
 // Scope attributes encode the event type and component identity; resource attributes
-// carry the collector's own service metadata (service.name, service.version, etc.).
+// from the input (set by the receiver from the SDK meter provider's resource) are
+// propagated to each output ResourceMetrics.
 // Metrics carry Beats-compatible field names and aggregated values.
-func buildProcessedMetrics(logger *zap.Logger, cfg *Config, res pcommon.Resource, md pmetric.Metrics) pmetric.Metrics {
+func buildProcessedMetrics(logger *zap.Logger, cfg *Config, md pmetric.Metrics) pmetric.Metrics {
 	out := pmetric.NewMetrics()
+	var res pcommon.Resource
+	if md.ResourceMetrics().Len() > 0 {
+		res = md.ResourceMetrics().At(0).Resource()
+	} else {
+		res = pcommon.NewResource()
+	}
 	buildExporterMetrics(logger, cfg, res, md, out)
 	buildInputMetrics(res, md, out)
 	buildReceiverPipelineMetrics(res, md, out)
