@@ -703,7 +703,7 @@ func TestResolve(t *testing.T) {
 				fileName = strings.Replace(fileName, tt.version.String(), tt.version.VersionWithPrerelease(), 1)
 			}
 
-			source, err := Resolve(t.Context(), &artifact.Config{}, target, tt.sourceURI, "beats/elastic-agent", fileName)
+			source, err := Resolve(t.Context(), target, tt.sourceURI, "beats/elastic-agent", fileName)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, source)
 		})

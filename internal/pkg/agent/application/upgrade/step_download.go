@@ -110,7 +110,25 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 
 	var errs []error
 	for _, src := range sources {
-		resolvedSource, err := Resolve(ctx, &settings, target, src, defaultRemoteSourceSubdir, fileName)
+		if target.Version.IsSnapshot() && src == artifact.DefaultSourceURI && target.Version.BuildMetadata() == "" {
+			buildID, err := latestSnapshotBuildID(ctx, &settings, target.Version)
+			if err != nil {
+				e := fmt.Errorf("couldn't retrieve latest snapshot build ID: %w", err)
+				a.log.Debugf("%v", e)
+				errs = append(errs, e)
+				continue
+			}
+
+			target.Version = agtversion.NewParsedSemVer(
+				target.Version.Major(),
+				target.Version.Minor(),
+				target.Version.Patch(),
+				target.Version.Prerelease(),
+				buildID,
+			)
+		}
+
+		resolvedSource, err := Resolve(ctx, target, src, defaultRemoteSourceSubdir, fileName)
 		if err != nil {
 			e := fmt.Errorf("could not resolve source %s: %w", src, err)
 			a.log.Debugf("%v", e)
@@ -165,18 +183,9 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 }
 
 // Resolve computes the fully resolved download URI for an artifact.
-func Resolve(ctx context.Context, config *artifact.Config, target artifact.Artifact, sourceURI, sourceSubdir, fileName string) (string, error) {
+func Resolve(ctx context.Context, target artifact.Artifact, sourceURI, sourceSubdir, fileName string) (string, error) {
 	if target.Version.IsSnapshot() && sourceURI == artifact.DefaultSourceURI {
-		// Only use the special snapshot URI format when the default source URI is used
 		buildID := target.Version.BuildMetadata()
-		if buildID == "" {
-			var err error
-			buildID, err = latestSnapshotBuildID(ctx, config, target.Version)
-			if err != nil {
-				return "", fmt.Errorf("retrieving latest snapshot build ID: %w", err)
-			}
-		}
-
 		sourceURI = fmt.Sprintf(snapshotURIFormat, target.Version.CoreVersion(), buildID)
 	}
 
