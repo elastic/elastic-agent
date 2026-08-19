@@ -23,6 +23,25 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+::::{dropdown} Kafka Kerberos authentication is dropped when using the OTel runtime
+
+**Applies to: {{agent}} 9.4.0 to 9.4.5, 9.5.0 to 9.5.1**
+
+On August 10, 2026, a known issue was discovered where Kafka outputs configured with Kerberos authentication do not fall back to the process runtime. The OTel runtime starts successfully but silently drops Kerberos settings during config translation, so Kafka authentication fails. A fix will be included in {{agent}} 9.4.6 and 9.5.2.
+
+**Workaround**
+
+Force the process runtime for Kafka outputs:
+
+```yaml
+agent.internal.runtime.output:
+  kafka: process
+```
+
+Alternatively, set `_runtime_experimental: process` on the affected inputs.
+
+For more information, check [Issue #16118](https://github.com/elastic/elastic-agent/issues/16118).
+::::
 :::{dropdown} Osquery live and scheduled query results are missing in Kibana on {{agent}} 9.5.0
 
 **Applies to: {{agent}} 9.5.0**

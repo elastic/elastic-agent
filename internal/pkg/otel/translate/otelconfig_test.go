@@ -460,8 +460,8 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"sending_queue": map[string]any{
 				"enabled":           true,
-				"num_consumers":     1,
-				"queue_size":        3200,
+				"num_consumers":     2,
+				"queue_size":        6400,
 				"block_on_overflow": true,
 				"wait_for_result":   true,
 				"batch": map[string]any{
@@ -535,7 +535,7 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"queue": map[string]any{
 				"mem": map[string]any{
-					"events": uint64(3200),
+					"events": int64(6400),
 					"flush": map[string]any{
 						"min_events": uint64(1600),
 						"timeout":    "10s",
@@ -703,7 +703,7 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"queue": map[string]any{
 				"mem": map[string]any{
-					"events": uint64(3200),
+					"events": int64(6400),
 					"flush": map[string]any{
 						"min_events": uint64(1600),
 						"timeout":    "10s",
@@ -1809,7 +1809,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
-								"events": uint64(3200),
+								"events": int64(6400),
 								"flush": map[string]any{
 									"min_events": uint64(1600),
 									"timeout":    "10s",
@@ -1920,7 +1920,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
-								"events": uint64(3200),
+								"events": int64(6400),
 								"flush": map[string]any{
 									"min_events": uint64(1600),
 									"timeout":    "10s",

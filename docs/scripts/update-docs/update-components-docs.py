@@ -34,6 +34,7 @@ TEMPLATE_SAMPLES_LINKS = 'templates/samples-links.jinja2'
 COMPONENT_DOCS_YAML = '../../../docs/reference/edot-collector/component-docs.yml'
 DEFAULT_CONFIG_FILE = '../../../docs/reference/edot-collector/config/default-config-standalone.md'
 COMPONENTS_YAML = '../../../internal/edot/components.yml'
+COMPONENTS_YAML_LOCAL = Path(__file__).parent / '../../../internal/edot/components.yml'
 # Path migration configuration
 # Each entry defines: new_path, old_path, and the version where the change occurred
 PATH_MIGRATIONS = {
@@ -280,6 +281,49 @@ def get_component_annotations(version='main'):
         print(f"Warning: Error parsing components.yml from tag {version_tag}: {e}")
         return {}
 
+def get_component_since():
+    """Read the 'since' mapping from the local components.yml (disk, not git tag)."""
+    try:
+        with open(COMPONENTS_YAML_LOCAL, 'r') as f:
+            data = yaml.safe_load(f)
+        return data.get('since') or {}
+    except FileNotFoundError:
+        print(f"Warning: {COMPONENTS_YAML_LOCAL} not found; since data unavailable.")
+        return {}
+    except yaml.YAMLError as e:
+        print(f"Warning: Error parsing components.yml for since data: {e}")
+        return {}
+
+
+def write_component_since(since_map):
+    """Update the 'since' section in the local components.yml."""
+    path = Path(COMPONENTS_YAML_LOCAL)
+    content = path.read_text()
+
+    inner = '\n'.join(f'  {n}: {v}' for n, v in sorted(since_map.items()))
+
+    if re.search(r'^since:', content, re.MULTILINE):
+        content = re.sub(
+            r'^since:.*?(?=\n\S|\Z)',
+            'since:\n' + inner,
+            content,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+    else:
+        header = (
+            '\n# Component version introduction\n'
+            '#\n'
+            '# Records the first Elastic Agent release where each component was introduced.\n'
+            '# Used to populate the "Added in" column in the components documentation table.\n'
+            '# Automatically updated by the update-docs workflow on each new release.\n'
+            '#\n'
+        )
+        content = content.rstrip('\n') + '\n' + header + 'since:\n' + inner + '\n'
+
+    path.write_text(content)
+    print(f'Updated since data for {len(since_map)} components in components.yml')
+
+
 def dep_to_component(dep):
     url = dep[:dep.rfind(' v')].strip()
     html_url = url
@@ -333,7 +377,7 @@ def get_collector_version():
     """Get the collector version from latest release tag"""
     return get_latest_version()
     
-def get_otel_components(version='main', component_docs_mapping=None):
+def get_otel_components(version='main', component_docs_mapping=None, auto_stamp=False):
     """Read OpenTelemetry components from go.mod file"""
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
@@ -356,6 +400,10 @@ def get_otel_components(version='main', component_docs_mapping=None):
     # Get component annotations
     component_annotations = get_component_annotations(version)
     print(f"Found {len(component_annotations)} component annotations")
+
+    # Get since data from local components.yml (disk, not git tag)
+    component_since = get_component_since()
+    print(f"Found {len(component_since)} component since entries")
 
     lines = elastic_agent_go_mod.splitlines()
     components_type = ['receiver', 'connector', 'processor', 'exporter', 'extension', 'provider']
@@ -412,6 +460,20 @@ def get_otel_components(version='main', component_docs_mapping=None):
         else:
             comp['annotation_number'] = None
 
+        # Add since version; stamp new components with the current release version.
+        # Use 'profiling' as the key for the ebpf-profiler dep to match the
+        # backfill script convention (the name is renamed to 'profiling' later).
+        since_key = 'profiling' if 'ebpf-profiler' in comp.get('dep', '') else comp_name
+        if since_key in component_since:
+            comp['since'] = component_since[since_key]
+        elif auto_stamp:
+            stamped = f'v{latest_version}'
+            comp['since'] = stamped
+            component_since[since_key] = stamped
+            print(f"  Stamped new component '{since_key}' with since={stamped}")
+        else:
+            comp['since'] = ''
+
     components_grouped = defaultdict(list)
 
     for comp in otel_components:
@@ -437,7 +499,8 @@ def get_otel_components(version='main', component_docs_mapping=None):
     
     return {
         'grouped_components': components_grouped,
-        'annotations': annotation_list
+        'annotations': annotation_list,
+        'component_since': component_since,
     }
 
 def find_files_with_substring(directory, substring):
@@ -651,13 +714,16 @@ def generate_markdown():
     component_docs_mapping = get_component_docs_mapping(COMPONENT_DOCS_YAML)
     print(f"Loaded {len(component_docs_mapping)} component documentation mappings")
     
-    # Read components from local files
-    components_result = get_otel_components(col_version, component_docs_mapping)
-    
+    # Read components from local files, stamping any new ones with the current version
+    components_result = get_otel_components(col_version, component_docs_mapping, auto_stamp=True)
+
     if components_result is None:
         print("Failed to read components from local files")
         return
-        
+
+    # Persist any newly stamped 'since' entries back to components.yml
+    write_component_since(components_result['component_since'])
+
     otel_col_version = get_otel_col_upstream_version()
     data = {
         'grouped_components': components_result['grouped_components'],
