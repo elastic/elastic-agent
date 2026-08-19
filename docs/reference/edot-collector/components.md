@@ -34,7 +34,7 @@ Components marked as "Deprecated" in the table are retained in {{agent}} 9.x to 
 
 These components are included in {{agent}} version 9.5.1.
 
-| Component | GitHub Repo | Support status | Version | Added in |
+| Component | GitHub Repo | Support status | Component version | Added in Elastic Agent |
 |:---|:---|:---|:---|:---|
 |***Receivers***|||||
 | [akamaisiemreceiver](https://github.com/elastic/opentelemetry-collector-components/tree/main/receiver/akamaisiemreceiver) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Extended] | v0.1.0 | v9.5.0 |
