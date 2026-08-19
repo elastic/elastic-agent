@@ -14,7 +14,7 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260818015954-8f4fe1e5dec0
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.46.3
-	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
+	github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.62.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.62.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.62.0
@@ -393,11 +393,11 @@ require (
 	github.com/elastic/apm-data v1.22.0 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.18.1 // indirect
-	github.com/elastic/elastic-agent-system-metrics v0.14.4 // indirect
+	github.com/elastic/elastic-agent-system-metrics v0.14.5 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.14.1 // indirect
-	github.com/elastic/go-elasticsearch/v8 v8.19.6 // indirect
+	github.com/elastic/go-elasticsearch/v8 v8.19.7 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.2.0 // indirect
