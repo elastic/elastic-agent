@@ -119,12 +119,13 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 
 	a.log.Infow("Getting upgrade artifact", "filename", fileName, "version", target.Version, "drop_path", settings.DropPath, "target_path", targetPath, "install_path", settings.InstallPath)
 
-	retryDeadline := time.Now().Add(a.retryTimeout)
+	retryTimeout := min(a.retryTimeout, settings.Timeout)
+	retryDeadline := time.Now().Add(retryTimeout)
 	upgradeDetails.SetRetryUntil(&retryDeadline)
 
 	retrier := backoff.NewExponentialBackOff(
 		backoff.WithInitialInterval(settings.RetrySleepInitDuration),
-		backoff.WithMaxElapsedTime(a.retryTimeout),
+		backoff.WithMaxElapsedTime(retryTimeout),
 	)
 	retryCtx := backoff.WithContext(retrier, ctx)
 
