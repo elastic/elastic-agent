@@ -129,7 +129,7 @@ Resolution:
 - Tune queue and batch settings  
 - Scale the Collector instance or deployment
 
-For more information, refer to [Export failures when sending telemetry data](docs-content://troubleshoot/ingest/opentelemetry/otel-collector/trace-export-errors.md) (`sending_queue` overflow, exporter timeouts), [429 errors when using the mOTLP endpoint](docs-content://troubleshoot/ingest/opentelemetry/429-errors-motlp.md) (rate limiting and backpressure).
+For more information, refer to [Export failures when sending telemetry data](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/trace-export-errors.md) (`sending_queue` overflow, exporter timeouts), [429 errors when using the mOTLP endpoint](docs-content://troubleshoot/ingest/opentelemetry/429-errors-motlp.md) (rate limiting and backpressure).
 
 ### High exporter failure rates
 
@@ -147,7 +147,7 @@ Resolution:
 - Review ingestion limits and retry logic  
 - Investigate latency or firewall constraints
 
-For more information, refer to [Export failures when sending telemetry data](docs-content://troubleshoot/ingest/opentelemetry/otel-collector/trace-export-errors.md) (export failures, retries), [429 errors when using the mOTLP endpoint](docs-content://troubleshoot/ingest/opentelemetry/429-errors-motlp.md) (rate limiting), [Connectivity issues with {{agent}}](docs-content://troubleshoot/ingest/opentelemetry/connectivity.md) (network, authorization, firewall).
+For more information, refer to [Export failures when sending telemetry data](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/trace-export-errors.md) (export failures, retries), [429 errors when using the mOTLP endpoint](docs-content://troubleshoot/ingest/opentelemetry/429-errors-motlp.md) (rate limiting), [Connectivity issues with {{agent}}](docs-content://troubleshoot/ingest/opentelemetry/connectivity.md) (network, authorization, firewall).
 
 ### Excessive memory or CPU usage
 
@@ -166,7 +166,7 @@ Resolution:
 - Increase resource limits  
 - Horizontally scale Collector instances
 
-For more information, refer to [Collector out of memory](docs-content://troubleshoot/ingest/opentelemetry/otel-collector/collector-oomkilled.md) (OOM errors, memory exhaustion), [Insufficient resources in Kubernetes](docs-content://troubleshoot/ingest/opentelemetry/otel-collector/insufficient-resources-kubestack.md) (resource limits, scaling).
+For more information, refer to [Collector out of memory](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/collector-oomkilled.md) (OOM errors, memory exhaustion), [Insufficient resources in Kubernetes](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/insufficient-resources-kubestack.md) (resource limits, scaling).
 
 ## Dashboards and alerting
 
@@ -183,4 +183,4 @@ Example alert scenarios:
 - [Contrib OpenTelemetry Collector internal telemetry documentation](https://opentelemetry.io/docs/collector/internal-telemetry/)
 - [Contrib OpenTelemetry metrics reference](https://opentelemetry.io/docs/specs/otel/metrics/)
 - [{{agent}} configuration reference](/reference/otel-collector/config/index.md)
-- [{{agent}} troubleshooting](docs-content://troubleshoot/ingest/opentelemetry/otel-collector/index.md)
+- [{{agent}} troubleshooting](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/index.md)
