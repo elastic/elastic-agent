@@ -29,6 +29,7 @@ import (
 	couchdbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver"
 	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
+	googlecloudmonitoringreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/googlecloudmonitoringreceiver"
 	haproxyreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/haproxyreceiver"
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
@@ -198,6 +199,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			azureeventhubreceiver.NewFactory(),
 			awscloudwatchreceiver.NewFactory(),
 			awss3receiver.NewFactory(),
+			googlecloudmonitoringreceiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
 			prometheusremotewritereceiver.NewFactory(),
 			akamaisiemreceiver.NewFactory(),
