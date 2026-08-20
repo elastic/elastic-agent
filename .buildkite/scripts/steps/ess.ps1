@@ -96,7 +96,7 @@ function ess_down {
       $ClusterName = (Get-Content -Path $clusterInfoPath | ConvertFrom-Json).ClusterName
     }
     if (-not $ClusterName) {
-      $ClusterName = & buildkite-agent meta-data get cluster-name 2>$null
+      $ClusterName = Get-EssClusterNameFromMetadata
     }
     if (-not $ClusterName) {
       Write-Output "No cluster-name found; nothing to destroy."
@@ -118,6 +118,59 @@ function Test-EssSecretsNotFoundYet {
   return $Output -match '(?i)code = NotFound|not found or has no versions'
 }
 
+# Runs a native command and returns its exit code, its stdout, and its combined
+# stdout/stderr as strings.
+#
+# Redirecting the stderr of a native command (`2>&1`, `2>$null`, ...) makes
+# PowerShell wrap every stderr line in a NativeCommandError record. The
+# Buildkite agent runs job commands through a wrapper that sets
+# `$ErrorActionPreference = "STOP"`, which turns the first such record into a
+# terminating error - even for a command that goes on to succeed. oblt-cli logs
+# everything, including `[info]` lines, to stderr, so it always tripped this.
+# Relax the preference for the duration of the call and flatten the records
+# back into strings.
+function Invoke-NativeCommand {
+  param(
+    [string]$FilePath,
+    [string[]]$ArgumentList = @()
+  )
+
+  $previousPreference = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $captured = & $FilePath @ArgumentList 2>&1
+  } finally {
+    $ErrorActionPreference = $previousPreference
+  }
+  $exitCode = $LASTEXITCODE
+
+  # Merged stderr arrives as ErrorRecord objects, stdout as plain strings.
+  $stdOut = [System.Collections.Generic.List[string]]::new()
+  $combined = [System.Collections.Generic.List[string]]::new()
+  foreach ($item in $captured) {
+    $line = "$item"
+    if ($item -isnot [System.Management.Automation.ErrorRecord]) {
+      $stdOut.Add($line)
+    }
+    $combined.Add($line)
+  }
+
+  return [pscustomobject]@{
+    ExitCode = $exitCode
+    StdOut   = ($stdOut -join [Environment]::NewLine)
+    Output   = ($combined -join [Environment]::NewLine)
+  }
+}
+
+# Reads the shared cluster name from Buildkite meta-data, or $null when unset.
+function Get-EssClusterNameFromMetadata {
+  $metadata = Invoke-NativeCommand -FilePath 'buildkite-agent' -ArgumentList @('meta-data', 'get', 'cluster-name')
+  if ($metadata.ExitCode -ne 0) {
+    return $null
+  }
+  return $metadata.StdOut.Trim()
+}
+
 function ess_load_secrets {
   # Use Write-Host for informational output so callers that capture the return
   # value (e.g. `$rc = ess_load_secrets`) get a scalar exit code, not an array
@@ -132,7 +185,7 @@ function ess_load_secrets {
     $ClusterName = (Get-Content -Path $clusterInfoPath | ConvertFrom-Json).ClusterName
   }
   if (-not $ClusterName) {
-    $ClusterName = & buildkite-agent meta-data get cluster-name 2>$null
+    $ClusterName = Get-EssClusterNameFromMetadata
   }
   if (-not $ClusterName) {
     Write-Error "Error: no cluster-name available (neither cluster-info.json nor meta-data); cannot load secrets."
@@ -157,9 +210,13 @@ function ess_load_secrets {
   $attempt = 0
   while ($true) {
     $attempt++
-    $output = & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file $envFile 2>&1
-    $lastExit = $LASTEXITCODE
-    $lastOutput = $output | Out-String
+    $result = Invoke-NativeCommand -FilePath 'oblt-cli' -ArgumentList @(
+      'cluster', 'secrets', 'env',
+      '--cluster-name', $ClusterName,
+      '--output-file', $envFile
+    )
+    $lastExit = $result.ExitCode
+    $lastOutput = $result.Output
     if ($lastExit -eq 0) {
       if ($lastOutput.Trim()) {
         Write-Host $lastOutput
