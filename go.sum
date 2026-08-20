@@ -517,8 +517,6 @@ github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260818141804-6e0a53393487 h1:lSIx9
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260818141804-6e0a53393487/go.mod h1:fweQyx4VMDezsvj+NTRzO2V0tn1KhUAe11Coat3i52I=
 github.com/elastic/cloud-on-k8s/v3 v3.4.1 h1:phOuio2iExpzRK/5VgERH6nByxpURmJGQ7/mOcMStUY=
 github.com/elastic/cloud-on-k8s/v3 v3.4.1/go.mod h1:C0y4c22pL3Lh/Dn/D+l+2OGpUDjRUBs6QuiJ9AWQ15s=
-github.com/elastic/elastic-agent-autodiscover v0.10.3 h1:3pGm0wOVOK5dNdqAypZzQCIjclVtjjvHwuFoLRw0GU4=
-github.com/elastic/elastic-agent-autodiscover v0.10.3/go.mod h1:HyjdiEVP/A7iMN0jeac2EoUohpHKAZIFRDQsvPDg2Dw=
 github.com/elastic/elastic-agent-client/v7 v7.18.1 h1:WnM53JjaukeysrAuiTyrhDPmFxJG07ZAByc2TrkcKcs=
 github.com/elastic/elastic-agent-client/v7 v7.18.1/go.mod h1:uDpSGZ+YCKgqgtkwCA0qjwX0gU/wmixDsVbPjY3GkPs=
 github.com/elastic/elastic-agent-libs v0.46.3 h1:TaD1qPDWgokwODbgayIeiQ1+vkONFbolKPzq4DbAzho=
