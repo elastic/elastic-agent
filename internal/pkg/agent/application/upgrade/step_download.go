@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	goerrors "errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -44,6 +45,7 @@ type artifactDownloader struct {
 	fleetServerURI string
 	getPGPSources  func(log *logger.Logger, fleetServerURI string, targetVersion *agtversion.ParsedSemVer, pgpSources []string) []string
 	retryTimeout   time.Duration
+	fileOps        download.FileOps
 }
 
 func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artifactDownloader {
@@ -52,6 +54,10 @@ func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artif
 		settings:      settings,
 		getPGPSources: download.AppendFallbackPGP,
 		retryTimeout:  defaultRetryTimeout,
+		fileOps: download.FileOps{
+			CopyFile: io.Copy,
+			OpenFile: os.OpenFile,
+		},
 	}
 }
 
@@ -164,7 +170,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				a.log.Infow("Downloading artifact", "source_uri", sourceURI, "proxy_uri", settings.Proxy.URL, "proxy_disable", settings.Proxy.Disable)
 			}
 
-			if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, sourceURI, targetPath); err != nil {
+			if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, sourceURI, targetPath, a.fileOps); err != nil {
 				if downloaderrors.IsDiskSpaceError(err) {
 					return backoff.Permanent(err)
 				}
@@ -191,7 +197,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 			}
 
 			if !skipVerifyOverride {
-				if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, download.AddHashExtension(sourceURI), download.AddHashExtension(targetPath)); err != nil {
+				if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, download.AddHashExtension(sourceURI), download.AddHashExtension(targetPath), a.fileOps); err != nil {
 					if downloaderrors.IsDiskSpaceError(err) {
 						return backoff.Permanent(err)
 					}
