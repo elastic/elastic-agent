@@ -166,10 +166,10 @@ No `elasticsearch` exporter and no `elasticapm`/`elasticinframetrics` components
 :::{note}
 With a self-managed Gateway, you own authentication (TLS/mTLS, or optionally the `apikeyauth` extension), scaling, and availability. Authentication to {{es}} is configured on the Gateway Collector, not on the Agent Collector, meaning that no Elastic API key is needed on the `otlp/gateway` exporter.
 
-The `sending_queue` batching tuning described in the [Batching configuration for contrib OpenTelemetry Collector](#batching-configuration-for-contrib-opentelemetry-collector) section applies to this OTLP output as well and is already included in the {{edot}} Collector.
+The `sending_queue` batching tuning described in the [Batching configuration for contrib OpenTelemetry Collector](#batching-configuration-for-contrib-opentelemetry-collector) section applies to this OTLP output as well and is already included in the {{agent}}.
 :::
 
-For information on sending data from an upstream OpenTelemetry Collector to an {{edot}} Gateway, refer to [Send data from an upstream OpenTelemetry Collector](docs-content://solutions/observability/get-started/opentelemetry/use-cases/upstream-collector/index.md).
+For information on sending data from an upstream OpenTelemetry Collector to an {{agent}} in Gateway mode, refer to [Send data from an upstream OpenTelemetry Collector](docs-content://solutions/observability/get-started/opentelemetry/use-cases/upstream-collector/index.md).
 
 ### Batching configuration for contrib OpenTelemetry Collector
 
