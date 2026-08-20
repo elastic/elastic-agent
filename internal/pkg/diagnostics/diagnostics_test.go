@@ -612,7 +612,7 @@ func TestZipLogsComponentsLogs(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now(), topPath, true, io.Discard))
+	require.NoError(t, zipLogs(w, time.Now(), topPath, filepath.Join(paths.HomeFrom(topPath), "components"), true, io.Discard))
 	require.NoError(t, w.Close())
 
 	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
@@ -644,7 +644,7 @@ func TestZipLogsComponentsLogsMultiVersionedHome(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now(), topPath, true, io.Discard))
+	require.NoError(t, zipLogs(w, time.Now(), topPath, filepath.Join(paths.HomeFrom(topPath), "components"), true, io.Discard))
 	require.NoError(t, w.Close())
 
 	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
@@ -688,7 +688,7 @@ func TestZipLogsConflictingNames(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now(), topPath, true, io.Discard))
+	require.NoError(t, zipLogs(w, time.Now(), topPath, filepath.Join(paths.HomeFrom(topPath), "components"), true, io.Discard))
 	require.NoError(t, w.Close())
 
 	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
@@ -738,7 +738,8 @@ func TestZipLogsUnversionedHome(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now(), topPath, true, io.Discard))
+	componentsPath := filepath.Join(topPath, "components")
+	require.NoError(t, zipLogs(w, time.Now(), topPath, componentsPath, true, io.Discard))
 	require.NoError(t, w.Close())
 
 	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
@@ -752,6 +753,50 @@ func TestZipLogsUnversionedHome(t *testing.T) {
 	base := filepath.Base(topPath)
 	assert.Contains(t, names, "logs/"+base+"/log.ndjson", "agent log should be in zip")
 	assert.Contains(t, names, "logs/"+base+"/components/httpjson/trace.ndjson", "component log should be in zip")
+}
+
+// TestZipLogsUnversionedHomeDivergentComponents covers the container layout where
+// the configured data/state path (topPath) differs from the install home where
+// components run — both trees must appear in the bundle (see https://github.com/elastic/elastic-agent/issues/15771).
+func TestZipLogsUnversionedHomeDivergentComponents(t *testing.T) {
+	originalVersionHome := paths.IsVersionHome()
+	t.Cleanup(func() { paths.SetVersionHome(originalVersionHome) })
+	paths.SetVersionHome(false)
+
+	root := t.TempDir()
+
+	// Simulate the configured data/state path (topPath = STATE_PATH/data).
+	topPath := filepath.Join(root, "state", "data")
+	require.NoError(t, os.MkdirAll(filepath.Join(topPath, "logs"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(topPath, "logs", "elastic-agent.ndjson"), []byte(".\n"), 0o600))
+
+	// Simulate the install tree (paths.Components() origin), separate from topPath.
+	installHash := "elastic-agent-abc123"
+	installHome := filepath.Join(root, "data", installHash)
+	componentsPath := filepath.Join(installHome, "components")
+	require.NoError(t, os.MkdirAll(filepath.Join(componentsPath, "logs", "cel"), 0o700))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(componentsPath, "logs", "cel", "http-request-trace-test.ndjson"),
+		[]byte(".\n"), 0o600))
+
+	buf := new(bytes.Buffer)
+	w := zip.NewWriter(buf)
+	require.NoError(t, zipLogs(w, time.Now(), topPath, componentsPath, true, io.Discard))
+	require.NoError(t, w.Close())
+
+	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	require.NoError(t, err)
+
+	names := make(map[string]struct{}, len(r.File))
+	for _, f := range r.File {
+		names[f.Name] = struct{}{}
+	}
+
+	base := filepath.Base(topPath) // "data"
+	assert.Contains(t, names, "logs/"+base+"/elastic-agent.ndjson",
+		"agent log under topPath should be in zip")
+	assert.Contains(t, names, "logs/"+installHash+"/components/cel/http-request-trace-test.ndjson",
+		"component trace log under install tree should be in zip")
 }
 
 // TestSaveLogs verifies the error-handling contract of saveLogs:
@@ -808,7 +853,8 @@ func zipLogsAndAssertFiles(t *testing.T, topPath string, excludeEvents bool, exp
 	// Zip the logs directory.
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now(), topPath, excludeEvents, io.Discard))
+	componentsPath := filepath.Join(paths.HomeFrom(topPath), "components")
+	require.NoError(t, zipLogs(w, time.Now(), topPath, componentsPath, excludeEvents, io.Discard))
 	require.NoError(t, w.Close())
 
 	// Read back the contents.

@@ -115,6 +115,9 @@ annotations:
   elastictraceprocessor:
     comment: |
       Deprecated in 9.2.0. Replaced by the `elasticapm` processor. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
+  googlecloudmonitoringreceiver:
+    comment: |
+      Authentication is only supported via ambient Google Cloud Application Default Credentials (ADC). Explicit credentials configuration (for example, a service account key file referenced directly in the receiver config) is **NOT** supported.
   kafkareceiver:
     comment: |
       The following features and configuration options are **NOT** officially supported in {{agent}} with the Kafka receiver:
@@ -129,3 +132,108 @@ annotations:
   jmxreceiver:
     comment: |
       Deprecated in 9.3.1. JMX Scraper is recommended to run as a standalone Java program. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
+
+# Component version introduction
+#
+# Records the first Elastic Agent release where each component was introduced.
+# Used to populate the "Added in" column in the components documentation table.
+# Automatically updated by the update-docs workflow on each new release.
+#
+since:
+  akamaisiemreceiver: v9.5.0
+  apachereceiver: v9.2.0
+  apikeyauthextension: v9.1.0
+  apmconfigextension: v9.1.0
+  attributesprocessor: v9.0.0
+  awscloudwatchreceiver: v9.5.0
+  awscredentialsproviderextension: v9.5.0
+  awslogsencodingextension: v9.3.0
+  awss3receiver: v9.3.0
+  azureauthextension: v9.3.6
+  azureencodingextension: v9.3.5
+  azureeventhubreceiver: v9.5.0
+  azuremonitorreceiver: v9.3.5
+  batchprocessor: v9.0.0
+  bearertokenauthextension: v9.1.0
+  cgroupruntimeextension: v9.4.0
+  couchdbreceiver: v9.4.0
+  cumulativetodeltaprocessor: v9.0.3
+  debugexporter: v9.0.0
+  dockerstatsreceiver: v9.1.4
+  elasticapmconnector: v9.0.0
+  elasticapmintakereceiver: v9.2.0
+  elasticapmprocessor: v9.2.0
+  elasticinframetricsprocessor: v9.0.0
+  elasticsearchexporter: v9.0.0
+  elastictraceprocessor: v9.0.0
+  envprovider: v9.0.0
+  fileexporter: v9.0.0
+  filelogreceiver: v9.0.0
+  fileprovider: v9.0.0
+  filestorage: v9.0.0
+  filterprocessor: v9.0.0
+  forwardconnector: v9.1.0
+  geoipprocessor: v9.0.0
+  haproxyreceiver: v9.4.0
+  headerssetterextension: v9.1.5
+  healthcheckextension: v9.0.0
+  healthcheckv2extension: v9.2.0
+  hostmetricsreceiver: v9.0.0
+  httpcheckreceiver: v9.0.0
+  httpprovider: v9.0.0
+  httpsprovider: v9.0.0
+  iisreceiver: v9.2.0
+  jaegerreceiver: v9.0.0
+  jmxreceiver: v9.0.0
+  k8sattributesprocessor: v9.0.0
+  k8sclusterreceiver: v9.0.0
+  k8seventsreceiver: v9.2.0
+  k8sleaderelector: v9.1.1
+  k8sobjectsreceiver: v9.0.0
+  k8sobserver: v9.0.0
+  kafkaexporter: v9.0.0
+  kafkametricsreceiver: v9.4.0
+  kafkareceiver: v9.0.0
+  kubeletstatsreceiver: v9.0.0
+  loadbalancingexporter: v9.0.0
+  logdedupprocessor: v9.3.1
+  memcachedreceiver: v9.4.0
+  memorylimiterextension: v9.0.0
+  memorylimiterprocessor: v9.0.0
+  mongodbreceiver: v9.4.0
+  mysqlreceiver: v9.2.0
+  nginxreceiver: v9.0.0
+  nopexporter: v9.0.1
+  nopreceiver: v9.0.0
+  opampextension: v9.2.6
+  oracledbreceiver: v9.4.0
+  otlpexporter: v9.0.0
+  otlphttpexporter: v9.0.0
+  otlpjsonconnector: v9.4.0
+  otlpreceiver: v9.0.0
+  postgresqlreceiver: v9.2.0
+  pprofextension: v9.0.0
+  profiling: v9.2.0
+  profilingmetricsconnector: v9.2.0
+  prometheusreceiver: v9.0.0
+  prometheusremotewritereceiver: v9.3.0
+  rabbitmqreceiver: v9.4.0
+  ratelimitprocessor: v9.4.0
+  receivercreator: v9.0.0
+  receivertest: v9.4.0
+  redisreceiver: v9.0.0
+  resourcedetectionprocessor: v9.0.0
+  resourceprocessor: v9.0.0
+  routingconnector: v9.0.0
+  snmpreceiver: v9.3.0
+  spanmetricsconnector: v9.0.0
+  sqlserverreceiver: v9.2.0
+  statsdreceiver: v9.2.6
+  tailsamplingprocessor: v9.2.0
+  transformprocessor: v9.0.0
+  vcenterreceiver: v9.4.0
+  windowseventlogreceiver: v9.2.0
+  windowsperfcountersreceiver: v9.2.3
+  yamlprovider: v9.0.0
+  zipkinreceiver: v9.0.0
+  zookeeperreceiver: v9.4.0
