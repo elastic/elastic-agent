@@ -82,7 +82,7 @@ func TestBeatsAuthExtensionKerberos(t *testing.T) {
 	}
 }
 
-func TestGetOtelConfigKafkaOAuth2(t *testing.T) { //nolint:gosec // G101: dummy oauth client values in test fixtures, not real credentials
+func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 	agentInfo := &info.AgentInfo{}
 	beatProcessorID := "beat/_agent-component/beat-metrics-monitoring"
 	beatMetricsConfig := map[string]any{
@@ -199,7 +199,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) { //nolint:gosec // G101: dummy 
 							"queue.mem.flush.timeout":    "10s",
 							"sasl.mechanism":             "OAUTHBEARER",
 							"oauth": map[string]any{
-								"oauth2client": map[string]any{
+								"oauth2client": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
 									"client_id":     "my-client",
 									"client_secret": "my-secret",
 									"token_url":     "https://example.com/oauth2/token",
@@ -248,7 +248,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) { //nolint:gosec // G101: dummy 
 				},
 				"timeout": 10 * time.Second,
 				"auth": map[string]any{
-					"sasl": map[string]any{
+					"sasl": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
 						"mechanism":                "OAUTHBEARER",
 						"oauthbearer_token_source": "oauth2client/_agent-component/default",
 					},
@@ -260,7 +260,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) { //nolint:gosec // G101: dummy 
 		},
 		"extensions": map[string]any{
 			"kafkapartitioner/_agent-component/default": map[string]any{},
-			"oauth2client/_agent-component/default": map[string]any{
+			"oauth2client/_agent-component/default": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
 				"client_certificate_key":      "",
 				"client_certificate_key_file": "",
 				"client_certificate_key_id":   "",

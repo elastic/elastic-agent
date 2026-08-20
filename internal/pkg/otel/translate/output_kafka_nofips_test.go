@@ -16,7 +16,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
-func TestKafkaOAuth2Translation(t *testing.T) { //nolint:gosec // G101: dummy oauth client values in test fixtures, not real credentials
+func TestKafkaOAuth2Translation(t *testing.T) {
 	input := `
 hosts: ["kafka1:9092"]
 topic: static-topic
@@ -63,7 +63,7 @@ oauth:
 		},
 		"timeout": 10 * time.Second,
 		"auth": map[string]any{
-			"sasl": map[string]any{
+			"sasl": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
 				"mechanism":                "OAUTHBEARER",
 				"oauthbearer_token_source": "oauth2client/_agent-component/default",
 			},
