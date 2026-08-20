@@ -3073,7 +3073,7 @@ outputs:
     protocol: https
     sasl.mechanism: OAUTHBEARER
     oauth:
-      oauth2clientauth:
+      oauth2client:
         client_id: {{.ClientID}}
         client_secret: {{.ClientSecret}}
         token_url: "{{.TokenURL}}"

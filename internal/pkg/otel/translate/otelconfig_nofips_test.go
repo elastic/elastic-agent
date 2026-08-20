@@ -199,7 +199,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 							"queue.mem.flush.timeout":    "10s",
 							"sasl.mechanism":             "OAUTHBEARER",
 							"oauth": map[string]any{
-								"oauth2clientauth": map[string]any{
+								"oauth2client": map[string]any{
 									"client_id":     "my-client",
 									"client_secret": "my-secret",
 									"token_url":     "https://example.com/oauth2/token",

@@ -31,9 +31,9 @@ const oauth2ClientExtensionType = "oauth2client"
 // KafkaToOTelConfig translates kafka output to OTel config
 // It returns kafka exporter, transform processor (if required), extension config (if required) and error
 func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger) (exporterCfg map[string]any, processorCfg map[string]any, extensionCfg map[string]any, err error) {
-	kConfig, err := kafka.ReadConfig(config)
+	kConfig, err := readKafkaConfig(config)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error reading kafka config: %w", err)
+		return nil, nil, nil, err
 	}
 
 	if err := checkUnsupportedKafkaConfig(config, logger); err != nil {
@@ -106,16 +106,16 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 
 		oauthCfg, err := config.Child("oauth", -1)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("oauth2 config is required when sasl.mechanism is OAUTHBEARER: %w", err)
+			return nil, nil, nil, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER: %w", err)
 		}
 
 		if len(oauthCfg.GetFields()) == 0 {
-			return nil, nil, nil, fmt.Errorf("oauth2 config is required when sasl.mechanism is OAUTHBEARER")
+			return nil, nil, nil, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER")
 		}
 
 		switch oauthCfg.GetFields()[0] {
-		case "oauth2clientauth":
-			oauth2ClientCfg, err := oauthCfg.Child("oauth2clientauth", -1)
+		case "oauth2client":
+			oauth2ClientCfg, err := oauthCfg.Child("oauth2client", -1)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("error translating oauth2client extension config: %w", err)
 			}
@@ -123,11 +123,14 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("error translating oauth2client extension config: %w", err)
 			}
+
 			maps.Copy(extensionCfg, oauth2ClientExtensionCfg)
-		// In case we choose to support more oauth2 style extensions, we can add a case for each extension here.
+
+		// In case we choose to support more oauth style extensions, we can add a case for each extension here.
 		// For example, azureauth extension https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/azureauthextension
+
 		default:
-			return nil, nil, nil, fmt.Errorf("unsupported oauth2 config: %v", oauthCfg.GetFields()[0])
+			return nil, nil, nil, fmt.Errorf("unsupported oauth config: %v", oauthCfg.GetFields()[0])
 		}
 
 	} else if kConfig.Username != "" {
@@ -402,6 +405,43 @@ func getTransformProcessorID(outputName string) otelcomponent.ID {
 func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartitioner"), extensionName)
+}
+
+// readKafkaConfig unpacks the kafka output config. Beats process runtime does
+// not support OAUTHBEARER, so ReadConfig rejects it; OTel translation still
+// needs the rest of the kafka settings, so we unpack with a supported mechanism
+// and restore OAUTHBEARER afterwards.
+func readKafkaConfig(cfg *config.C) (*kafka.KafkaConfig, error) {
+	kConfig, err := kafka.ReadConfig(cfg)
+	if err == nil {
+		return kConfig, nil
+	}
+	if !strings.Contains(err.Error(), "not valid SASL mechanism 'OAUTHBEARER'") {
+		return nil, fmt.Errorf("error reading kafka config: %w", err)
+	}
+
+	var raw map[string]any
+	if unpackErr := cfg.Unpack(&raw); unpackErr != nil {
+		return nil, fmt.Errorf("error reading kafka config: %w", err)
+	}
+	sasl, _ := raw["sasl"].(map[string]any)
+	if sasl == nil {
+		sasl = map[string]any{}
+		raw["sasl"] = sasl
+	}
+	sasl["mechanism"] = "PLAIN"
+	delete(raw, "sasl.mechanism")
+
+	tmp, tmpErr := config.NewConfigFrom(raw)
+	if tmpErr != nil {
+		return nil, fmt.Errorf("error reading kafka config: %w", tmpErr)
+	}
+	kConfig, err = kafka.ReadConfig(tmp)
+	if err != nil {
+		return nil, fmt.Errorf("error reading kafka config: %w", err)
+	}
+	kConfig.Sasl.SaslMechanism = "OAUTHBEARER"
+	return kConfig, nil
 }
 
 // log warning for unsupported config

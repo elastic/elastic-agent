@@ -24,7 +24,7 @@ username: elastic
 password: changeme
 sasl.mechanism: OAUTHBEARER
 oauth:
-  oauth2clientauth:
+  oauth2client:
     client_id: my-client
     client_secret: my-secret
     token_url: https://example.com/oauth2/token
@@ -82,7 +82,7 @@ oauth:
 	require.Contains(t, extensionCfg, "oauth2client/_agent-component/default")
 }
 
-func TestKafkaOAuth2RequiresOauth2Config(t *testing.T) {
+func TestKafkaOAuthRequiresOauthConfig(t *testing.T) {
 	testCases := []struct {
 		name    string
 		input   string
@@ -95,7 +95,7 @@ hosts: ["kafka1:9092"]
 topic: static-topic
 sasl.mechanism: OAUTHBEARER
 `,
-			wantErr: "oauth2 config is required when sasl.mechanism is OAUTHBEARER",
+			wantErr: "oauth config is required when sasl.mechanism is OAUTHBEARER",
 		},
 		{
 			name: "empty oauth",
@@ -105,7 +105,7 @@ topic: static-topic
 sasl.mechanism: OAUTHBEARER
 oauth: {}
 `,
-			wantErr: "oauth2 config is required when sasl.mechanism is OAUTHBEARER",
+			wantErr: "oauth config is required when sasl.mechanism is OAUTHBEARER",
 		},
 		{
 			name: "unsupported oauth type",
@@ -117,7 +117,7 @@ oauth:
   unknown:
     client_id: my-client
 `,
-			wantErr: "unsupported oauth2 config",
+			wantErr: "unsupported oauth config",
 		},
 	}
 
