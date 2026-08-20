@@ -108,6 +108,8 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 		return "", fmt.Errorf("failed to create target directory %s: %w", settings.TargetDirectory, err)
 	}
 
+	a.log.Infow("Getting upgrade artifact", "filename", fileName, "version", target.Version, "drop_path", settings.DropPath, "target_path", targetPath, "install_path", settings.InstallPath)
+
 	var errs []error
 	for _, src := range sources {
 		if target.Version.IsSnapshot() && src == artifact.DefaultSourceURI && target.Version.BuildMetadata() == "" {
@@ -135,16 +137,10 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 			errs = append(errs, e)
 			continue
 		}
-
 		if download.IsLocal(resolvedSource) {
-			a.log.Infow("Using local upgrade artifact", "version", target.Version,
-				"source_uri", resolvedSource, "drop_path", settings.DropPath,
-				"target_path", targetPath, "install_path", settings.InstallPath)
+			a.log.Infow("Copying local artifact", "source_uri", resolvedSource)
 		} else {
-			a.log.Infow("Downloading upgrade artifact", "version", target.Version,
-				"source_uri", resolvedSource, "drop_path", settings.DropPath,
-				"target_path", targetPath, "install_path", settings.InstallPath,
-				"proxy_uri", settings.Proxy.URL, "proxy_disable", settings.Proxy.Disable)
+			a.log.Infow("Downloading artifact", "source_uri", resolvedSource, "proxy_uri", settings.Proxy.URL, "proxy_disable", settings.Proxy.Disable)
 		}
 
 		if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, resolvedSource, targetPath); err != nil {
