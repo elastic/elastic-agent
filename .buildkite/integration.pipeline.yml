@@ -293,3 +293,5 @@ steps:
       machineType: "n2-standard-8"
       diskSizeGb: 200
       image: "${IMAGE_UBUNTU_2204_X86_64}"
+    plugins:
+      - *google_oidc_plugin

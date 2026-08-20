@@ -750,11 +750,28 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 				case "-tags":
 					foundTags = true
 					require.Contains(t, setting.Value, "requirefips")
+<<<<<<< HEAD
 
 					// Check if the ms_tls13kdf build tag is set only if the binary was built
 					// with go1.24.x (see https://github.com/microsoft/go/pull/1662).
 					if strings.HasPrefix(info.GoVersion, "go1.24") {
 						require.Contains(t, setting.Value, "ms_tls13kdf")
+=======
+					continue
+				case "GOFIPS140":
+					foundFIPS = true
+					// Go embeds a commit hash suffix (e.g. v1.0.0-c2097c7c), so check by prefix.
+					require.True(t, strings.HasPrefix(setting.Value, "v1.0.0"), "GOFIPS140 must reference the certified module version v1.0.0, got: %s", setting.Value)
+					continue
+				case "DefaultGODEBUG":
+					for _, entry := range strings.Split(setting.Value, ",") {
+						// Accept both "on" (default when GOFIPS140 is set) and "only" (stricter
+						// mode set via //go:debug fips140=only, which disallows non-FIPS fallbacks).
+						if key, val, ok := strings.Cut(entry, "="); ok && key == "fips140" && (val == "on" || val == "only") {
+							foundFIPSDefault = true
+							break
+						}
+>>>>>>> 05489316d (Fix packaging test (#16256))
 					}
 					continue
 				case "GOEXPERIMENT":
@@ -765,6 +782,7 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 			}
 
 			require.True(t, foundTags, "Did not find -tags within binary version information")
+<<<<<<< HEAD
 			require.True(t, foundExperiment, "Did not find GOEXPERIMENT within binary version information")
 
 			// TODO only elf is supported at the moment, in the future we will need to use macho (darwin) and pe (windows)
@@ -785,6 +803,10 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 				}
 			}
 			require.True(t, hasOpenSSL, "unable to find OpenSSL_version symbol")
+=======
+			require.True(t, foundFIPS, "Did not find GOFIPS140 within binary version information")
+			require.True(t, foundFIPSDefault, "Did not find fips140=on or fips140=only in DefaultGODEBUG — binary will not enforce FIPS mode at runtime")
+>>>>>>> 05489316d (Fix packaging test (#16256))
 		})
 	}
 }
