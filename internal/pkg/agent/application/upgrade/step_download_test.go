@@ -446,6 +446,126 @@ func TestDownloadArtifact(t *testing.T) {
 			},
 		},
 		{
+			name: "multiple remote sourceURIs retries transient failures only",
+			run: func(t *testing.T, fx *fixture) {
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+
+				firstRequestCounts := map[string]int{}
+				firstServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					firstRequestCounts[r.URL.Path]++
+					if firstRequestCounts[r.URL.Path] == 1 {
+						// fail transiently once before becoming a permanent failure
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					w.WriteHeader(http.StatusNotFound)
+				}))
+				t.Cleanup(firstServer.Close)
+
+				secondRequestCounts := map[string]int{}
+				secondServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					secondRequestCounts[r.URL.Path]++
+					switch r.URL.Path {
+					case remotePath:
+						if secondRequestCounts[r.URL.Path] == 1 {
+							// fail first attempt only
+							w.WriteHeader(http.StatusInternalServerError)
+							return
+						}
+						_, _ = w.Write(archiveContent)
+					case remotePath + ".sha512":
+						_, _ = w.Write(hashFile)
+					case remotePath + ".asc":
+						_, _ = w.Write(signature)
+					default:
+						w.WriteHeader(http.StatusNotFound)
+					}
+				}))
+				t.Cleanup(secondServer.Close)
+
+				upgradeDetails, retryUntil, retryUntilWasUnset, retryErrorMsg := mockUpgradeDetails(fx.target.Version)
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{firstServer.URL, secondServer.URL}, upgradeDetails, false, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 2, firstRequestCounts[remotePath])
+				require.Equal(t, 2, secondRequestCounts[remotePath])
+				require.Equal(t, 1, secondRequestCounts[remotePath+".sha512"])
+				require.Equal(t, 1, secondRequestCounts[remotePath+".asc"])
+				require.FileExists(t, artifactPath)
+				require.FileExists(t, download.AddHashExtension(artifactPath))
+
+				require.NotZero(t, *retryUntil)
+				require.True(t, *retryUntilWasUnset)
+				require.NotEmpty(t, *retryErrorMsg)
+				require.Nil(t, upgradeDetails.Metadata.RetryUntil)
+				require.Empty(t, upgradeDetails.Metadata.RetryErrorMsg)
+			},
+		},
+		{
+			name: "multiple remote sourceURIs times out when every source keeps failing transiently",
+			run: func(t *testing.T, fx *fixture) {
+				fx.downloader.retryTimeout = 200 * time.Millisecond
+
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				requests := map[string]int{}
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					requests[r.URL.Path]++
+					w.WriteHeader(http.StatusInternalServerError)
+				}))
+				t.Cleanup(server.Close)
+
+				upgradeDetails, _, retryUntilWasUnset, retryErrorMsg := mockUpgradeDetails(fx.target.Version)
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{server.URL + "/first", server.URL + "/second"}, upgradeDetails, false, true, pgpSource)
+				require.Error(t, err)
+				require.Greater(t, requests["/first"+remotePath], 1)
+				require.Greater(t, requests["/second"+remotePath], 1)
+				require.NoFileExists(t, artifactPath)
+
+				// final error should include last error encountered for each source.
+				require.Contains(t, err.Error(), fmt.Sprintf("source %s/first failed: could not fetch artifact from %s/first", server.URL, server.URL))
+				require.Contains(t, err.Error(), fmt.Sprintf("source %s/second failed: could not fetch artifact from %s/second", server.URL, server.URL))
+
+				require.NotNil(t, upgradeDetails.Metadata.RetryUntil)
+				require.False(t, *retryUntilWasUnset)
+				require.NotEmpty(t, *retryErrorMsg)
+			},
+		},
+		{
+			name: "multiple remote sourceURIs stop retrying entirely when the target path cannot be written",
+			run: func(t *testing.T, fx *fixture) {
+				fx.downloader.retryTimeout = 200 * time.Millisecond
+				firstURL, firstRequests := newFileServer(t, nil)
+				secondURL, secondRequests := newFileServer(t, nil)
+
+				openAttempts := 0
+				fx.downloader.fileOps.OpenFile = func(string, int, os.FileMode) (*os.File, error) {
+					openAttempts++
+					return nil, os.ErrPermission
+				}
+				targetPath := filepath.Join(fx.settings.TargetDirectory, fx.target.FileName())
+
+				upgradeDetails, _, retryUntilWasUnset, retryErrorMsg := mockUpgradeDetails(fx.target.Version)
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{firstURL, secondURL}, upgradeDetails, false, true, pgpSource)
+				require.Error(t, err)
+				require.ErrorContains(t, err, fmt.Sprintf("creating %s failed", targetPath))
+				require.Equal(t, targetPath, artifactPath)
+
+				require.Equal(t, 1, openAttempts)
+				require.Empty(t, firstRequests)
+				require.Empty(t, secondRequests)
+				require.NoFileExists(t, download.AddHashExtension(artifactPath))
+
+				require.NotNil(t, upgradeDetails.Metadata.RetryUntil)
+				require.False(t, *retryUntilWasUnset)
+				require.Empty(t, *retryErrorMsg)
+			},
+		},
+		{
 			name:    "remote snapshot sourceURI with buildID uses the stripped file name for the drop path",
 			version: agtversion.NewParsedSemVer(8, 14, 0, "SNAPSHOT", "6d69ee76"),
 			run: func(t *testing.T, fx *fixture) {
