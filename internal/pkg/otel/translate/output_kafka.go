@@ -289,8 +289,11 @@ func getOauth2ClientExtensionConfig(cfg *config.C, outputName string) (extension
 		return nil, fmt.Errorf("error unpacking oauth2client extension config: %w", err)
 	}
 
-	// Perform config validation
-	defaultConfig := oauth2clientauthextension.Config{}
+	// Default settings are taken from https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/cbc5a870545d7a25c8bbd62404a025978c907d57/extension/oauth2clientauthextension/factory.go#L28
+	defaultConfig := oauth2clientauthextension.Config{
+		ExpiryBuffer: 5 * time.Minute,
+	}
+
 	err = mapstructure.Decode(oauthMap, &defaultConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding oauth2client extension config: %w", err)

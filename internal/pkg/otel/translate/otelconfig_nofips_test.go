@@ -7,6 +7,7 @@
 package translate
 
 import (
+	"net/url"
 	"path/filepath"
 	"testing"
 	"time"
@@ -265,7 +266,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 				"client_id_file":              "",
 				"client_secret":               "my-secret",
 				"client_secret_file":          "",
-				"endpoint_params":             "",
+				"endpoint_params":             url.Values(nil),
 				"expiry_buffer":               "5m0s",
 				"grant_type":                  "",
 				"tls": map[string]any{
