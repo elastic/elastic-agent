@@ -128,6 +128,49 @@ Data from OTel SDKs is piped through the [`OTLP`] receiver directly to the OTLP 
 
 With the {{motlp}}, there is no need to configure any Elastic-specific components, such as the [`elasticinframetrics`] and [`elasticapm`] processors, the [`elasticapm`] connector, or the [`elasticsearch`] exporter. Edge setup and configuration can be fully vendor agnostic.
 
+### Forwarding to a self-managed Gateway Collector
+
+When the {{motlp}} isn't an option (for example in self-managed Elastic deployments), the Collector can forward all signals to a self-managed Gateway Collector over OTLP instead.
+
+Like the {{motlp}} path, this approach keeps the edge configuration vendor-agnostic, meaning that no Elastic-specific components are required in the Agent Collector. Data enrichment and the authenticated export to {{es}} happen centrally at the Gateway Collector. For guidance on when to use a Gateway Collector and the required Gateway components for self-managed environments, refer to [Deployment modes](/reference/otel-collector/modes.md).
+
+The local-collection pipelines (receivers and processors) are the same as the {{motlp}} configuration. Only the exporter destination changes to targeting your own Gateway Collector's OTLP endpoint:
+
+```yaml
+exporters:
+  # Forward all signals to a self-managed Gateway Collector over OTLP/gRPC.
+  otlp/gateway:
+    endpoint: "gateway-host:4317"
+    tls:
+      insecure: false
+      ca_file: /path/to/gateway-ca.crt
+
+service:
+  pipelines:
+    logs:
+      receivers: [file_log/platformlogs, otlp/fromsdk]
+      processors: [resourcedetection]
+      exporters: [otlp/gateway]
+    metrics:
+      receivers: [hostmetrics/system, otlp/fromsdk]
+      processors: [resourcedetection]
+      exporters: [otlp/gateway]
+    traces:
+      receivers: [otlp/fromsdk]
+      processors: []
+      exporters: [otlp/gateway]
+```
+
+No `elasticsearch` exporter and no `elasticapm`/`elasticinframetrics` components are needed in the Agent Collector configuration, because the enrichment and the authenticated export to Elastic are the Gateway's responsibility. For configuring the receiving Gateway Collector, refer to the [Gateway Collector configuration](#gateway-mode) section.
+
+:::{note}
+With a self-managed Gateway, you own authentication (TLS/mTLS, or optionally the `apikeyauth` extension), scaling, and availability. Authentication to {{es}} is configured on the Gateway Collector, not on the Agent Collector, meaning that no Elastic API key is needed on the `otlp/gateway` exporter.
+
+The `sending_queue` batching tuning described in the [Batching configuration for contrib OpenTelemetry Collector](#batching-configuration-for-contrib-opentelemetry-collector) section applies to this OTLP output as well and is already included in the EDOT Collector.
+:::
+
+For information on sending data from a non-EDOT upstream OpenTelemetry Collector to an EDOT Gateway, refer to [Send data from an upstream OpenTelemetry Collector](docs-content://solutions/observability/get-started/opentelemetry/use-cases/upstream-collector/index.md).
+
 ### Batching configuration for contrib OpenTelemetry Collector
 
 When using contrib or upstream OpenTelemetry collectors, the following batching configuration is recommended when sending data to the {{motlp}}:
