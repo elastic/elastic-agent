@@ -39,6 +39,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.157.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.157.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.157.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.157.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.157.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.157.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.157.0
@@ -146,7 +147,6 @@ require (
 	github.com/moby/moby/api v1.55.0 // indirect
 	github.com/moby/moby/client v0.5.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/internal/credentialsfile v0.157.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.157.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sinventory v0.157.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.157.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.157.0 // indirect
