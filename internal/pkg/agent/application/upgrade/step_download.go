@@ -130,20 +130,20 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 			)
 		}
 
-		resolvedSource, err := Resolve(ctx, target, src, defaultRemoteSourceSubdir, fileName)
+		sourceURI, err := Resolve(ctx, target, src, defaultRemoteSourceSubdir, fileName)
 		if err != nil {
 			e := fmt.Errorf("could not resolve source %s: %w", src, err)
 			a.log.Debugf("%v", e)
 			errs = append(errs, e)
 			continue
 		}
-		if download.IsLocal(resolvedSource) {
-			a.log.Infow("Copying local artifact", "source_uri", resolvedSource)
+		if download.IsLocal(sourceURI) {
+			a.log.Infow("Copying local artifact", "source_uri", sourceURI)
 		} else {
-			a.log.Infow("Downloading artifact", "source_uri", resolvedSource, "proxy_uri", settings.Proxy.URL, "proxy_disable", settings.Proxy.Disable)
+			a.log.Infow("Downloading artifact", "source_uri", sourceURI, "proxy_uri", settings.Proxy.URL, "proxy_disable", settings.Proxy.Disable)
 		}
 
-		if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, resolvedSource, targetPath); err != nil {
+		if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, sourceURI, targetPath); err != nil {
 			e := fmt.Errorf("could not fetch artifact from %s: %w", src, err)
 			a.log.Debugf("%v", e)
 			errs = append(errs, e)
@@ -154,7 +154,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 		}
 
 		if !skipVerifyOverride {
-			if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, download.AddHashExtension(resolvedSource), download.AddHashExtension(targetPath)); err != nil {
+			if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, download.AddHashExtension(sourceURI), download.AddHashExtension(targetPath)); err != nil {
 				e := fmt.Errorf("could not fetch artifact sha512 from %s: %w", src, err)
 				a.log.Debugf("%v", e)
 				errs = append(errs, e)
@@ -164,7 +164,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				continue
 			}
 
-			if err = download.Verify(ctx, a.log, &settings, release.PGP(), resolvedSource, targetPath, skipDefaultPgp, pgpBytes...); err != nil {
+			if err = download.Verify(ctx, a.log, &settings, release.PGP(), sourceURI, targetPath, skipDefaultPgp, pgpBytes...); err != nil {
 				e := fmt.Errorf("verification failed for %s: %w", src, err)
 				a.log.Debugf("%v", e)
 				errs = append(errs, e)
