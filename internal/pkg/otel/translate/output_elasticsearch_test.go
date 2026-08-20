@@ -242,7 +242,7 @@ index: "some-index"
 api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
 ssl.certificate_authorities: "testdata/certs/rootCA.crt"
 ssl.supported_protocols: "TLSv1.3"
-ssl.cipher_suites: "ECDHE-ECDSA-AES-256-CBC-SHA"
+ssl.cipher_suites: "ECDHE-ECDSA-AES-128-GCM-SHA256"
 ssl.curve_types: "P-256"
 `
 
