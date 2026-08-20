@@ -3811,22 +3811,45 @@ func (Otel) StripOsquerydGolangCrossBuild(ctx context.Context) error {
 			continue
 		}
 
-		var stripCmd string
-		var binaryPath string
-		switch platform.Arch() {
-		case "amd64":
-			stripCmd = "x86_64-linux-gnu-strip"
-			binaryPath = "build/data/install/linux/amd64/osqueryd"
-		case "arm64":
-			stripCmd = "aarch64-linux-gnu-strip"
-			binaryPath = "build/data/install/linux/arm64/osqueryd"
-		default:
-			return fmt.Errorf("unsupported architecture %s", platform.Arch())
-		}
+		switch platform.GOOS() {
+		case "linux":
+			var stripCmd string
+			var binaryPath string
+			switch platform.Arch() {
+			case "amd64":
+				stripCmd = "x86_64-linux-gnu-strip"
+				binaryPath = "build/data/install/linux/amd64/osqueryd"
+			case "arm64":
+				stripCmd = "aarch64-linux-gnu-strip"
+				binaryPath = "build/data/install/linux/arm64/osqueryd"
+			default:
+				return fmt.Errorf("unsupported linux architecture %s", platform.Arch())
+			}
+			if err := sh.RunV(stripCmd, binaryPath); err != nil {
+				return fmt.Errorf("failed to strip osqueryd: %w", err)
+			}
 
-		err := sh.RunV(stripCmd, binaryPath)
-		if err != nil {
-			return fmt.Errorf("failed to strip osqueryd: %w", err)
+		case "darwin":
+			var lipoArch string
+			switch platform.Arch() {
+			case "amd64":
+				lipoArch = "x86_64"
+			case "arm64":
+				lipoArch = "arm64"
+			default:
+				return fmt.Errorf("unsupported darwin architecture %s", platform.Arch())
+			}
+			binaryPath := filepath.Join("build", "data", "install", "darwin", platform.Arch(),
+				"osquery.app", "Contents", "MacOS", "osqueryd")
+			if err := sh.RunV("lipo", "-thin", lipoArch, binaryPath, "-output", binaryPath); err != nil {
+				return fmt.Errorf("failed to thin osqueryd for darwin/%s: %w", platform.Arch(), err)
+			}
+			if err := sh.RunV("llvm-strip", binaryPath); err != nil {
+				return fmt.Errorf("failed to strip osqueryd for darwin/%s: %w", platform.Arch(), err)
+			}
+
+		default:
+			return fmt.Errorf("unsupported OS %s for osqueryd stripping", platform.GOOS())
 		}
 	}
 
@@ -3839,7 +3862,7 @@ func (Otel) OsquerybeatFetchOsqueryDistros(ctx context.Context) error {
 
 	// crossBuild container is used to strip the osqueryd binary (strip needs to be built for the specific
 	// os/architecture for it to work properly)
-	opts := []devtools.CrossBuildOption{devtools.WithName("strip-osqueryd"), devtools.WithTarget("otel:stripOsquerydGolangCrossBuild"), devtools.ForPlatforms("linux")}
+	opts := []devtools.CrossBuildOption{devtools.WithName("strip-osqueryd"), devtools.WithTarget("otel:stripOsquerydGolangCrossBuild"), devtools.ForPlatforms("linux darwin")}
 	return devtools.CrossBuild(ctx, cfg, opts...)
 }
 
