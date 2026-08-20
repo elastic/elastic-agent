@@ -81,6 +81,29 @@ func TestCopy(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("source missing", func(t *testing.T) {
+		baseDir := t.TempDir()
+		src := filepath.Join(baseDir, "source")
+		dst := filepath.Join(baseDir, "artifact")
+
+		log, _ := loggertest.New(t.Name())
+		require.ErrorIs(t, copyFile(log, src, dst, defaultFileOps()), os.ErrNotExist)
+		require.NoFileExists(t, dst)
+	})
+
+	t.Run("source and target are the same file", func(t *testing.T) {
+		baseDir := t.TempDir()
+		path := filepath.Join(baseDir, "artifact")
+		content := []byte("fake archive")
+		require.NoError(t, os.WriteFile(path, content, 0o666))
+
+		log, _ := loggertest.New(t.Name())
+		require.NoError(t, copyFile(log, path, path, defaultFileOps()))
+		read, err := os.ReadFile(path)
+		require.NoError(t, err)
+		require.Equal(t, content, read)
+	})
 }
 
 func TestDownload(t *testing.T) {

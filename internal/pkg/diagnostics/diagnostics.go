@@ -330,7 +330,7 @@ func ZipArchive(
 	}
 
 	// Gather Logs:
-	return zipLogs(zw, ts, topPath, excludeEvents, errOut)
+	return zipLogs(zw, ts, topPath, paths.Components(), excludeEvents, errOut)
 }
 
 func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
@@ -414,7 +414,7 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 	return err
 }
 
-func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool, errOut io.Writer) error {
+func zipLogs(zw *zip.Writer, ts time.Time, topPath string, componentsPath string, excludeEvents bool, errOut io.Writer) error {
 	homePath := paths.HomeFrom(topPath)
 	dataPath := paths.DataFrom(topPath)
 	currentDir := filepath.Base(homePath)
@@ -435,7 +435,16 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool, e
 	if !paths.IsVersionHome() {
 		// running in a container with custom top path set
 		// logs are directly under top path
-		return zipLogsWithPath(homePath, currentDir, excludeEvents, zw, ts, errOut)
+		if err := zipLogsWithPath(homePath, currentDir, excludeEvents, zw, ts, errOut); err != nil {
+			return err
+		}
+		// Components run from the install tree, which is a different directory than topPath
+		// when a custom state path is set, so it needs its own walk.
+		installHome := filepath.Dir(componentsPath)
+		if installHome == homePath {
+			return nil
+		}
+		return zipLogsWithPath(installHome, filepath.Base(installHome), excludeEvents, zw, ts, errOut)
 	}
 
 	dataDir, err := os.Open(dataPath)
