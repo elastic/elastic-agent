@@ -256,9 +256,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 			},
 		},
 		"extensions": map[string]any{
-			"kafkapartitioner/_agent-component/default": map[string]any{
-				"kafkapartitioner/_agent-component/default": map[string]any{},
-			},
+			"kafkapartitioner/_agent-component/default": map[string]any{},
 			"oauth2client/_agent-component/default": map[string]any{
 				"client_certificate_key":      "",
 				"client_certificate_key_file": "",

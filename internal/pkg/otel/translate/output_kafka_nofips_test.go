@@ -74,9 +74,31 @@ oauth2client:
 
 	cfg, err := config.NewConfigFrom(input)
 	require.NoError(t, err, "error creating kafka config")
-	gotMap, _, _, err := KafkaToOTelConfig(cfg, "default", logp.NewNopLogger())
+	gotMap, processorCfg, extensionCfg, err := KafkaToOTelConfig(cfg, "default", logp.NewNopLogger())
 	require.NoError(t, err, "error translating kafka to kafka exporter")
 	require.Equal(t, expectedMap, gotMap)
+	require.Nil(t, processorCfg)
+	require.Contains(t, extensionCfg, "oauth2client/_agent-component/default")
+}
+
+func TestKafkaOAuth2TranslationDynamicTopic(t *testing.T) {
+	input := `
+hosts: ["kafka1:9092"]
+topic: '%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}'
+sasl.mechanism: OAUTHBEARER
+oauth2client:
+  client_id: my-client
+  client_secret: my-secret
+  token_url: https://example.com/oauth2/token
+`
+	cfg, err := config.NewConfigFrom(input)
+	require.NoError(t, err, "error creating kafka config")
+	gotMap, processorCfg, extensionCfg, err := KafkaToOTelConfig(cfg, "default", logp.NewNopLogger())
+	require.NoError(t, err, "error translating kafka to kafka exporter")
+	require.Equal(t, "oauth2client/_agent-component/default", gotMap["auth"].(map[string]any)["sasl"].(map[string]any)["oauthbearer_token_source"])
+	require.NotNil(t, processorCfg)
+	require.Contains(t, extensionCfg, "oauth2client/_agent-component/default")
+	require.Contains(t, extensionCfg, "kafkapartitioner/_agent-component/default")
 }
 
 func TestKafkaOAuth2RequiresOauth2ClientConfig(t *testing.T) {

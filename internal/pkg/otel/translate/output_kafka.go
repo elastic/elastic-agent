@@ -31,8 +31,7 @@ const oauth2ClientExtensionType = "oauth2client"
 // It returns kafka exporter, transform processor (if required), extension config (if required) and error
 func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger) (exporterCfg map[string]any, processorCfg map[string]any, extensionCfg map[string]any, err error) {
 	kConfig, err := kafka.ReadConfig(config)
-	// Ignore invalid SASL mechanism error for OAUTHBEARER because beats does not support it yet
-	if err != nil && !strings.Contains(err.Error(), "not valid SASL mechanism 'OAUTHBEARER'") {
+	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error reading kafka config: %w", err)
 	}
 
@@ -165,7 +164,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		}
 		// delete topic set under logs
 		delete(kafkaExporter["logs"].(map[string]any), "topic")
-		return kafkaExporter, processor, partitionerExtensionCfg, nil
+		return kafkaExporter, processor, extensionCfg, nil
 	}
 
 	return kafkaExporter, nil, extensionCfg, nil
@@ -257,14 +256,10 @@ func dynamicTopicSetterProcessor(topic string, outputName string) (map[string]an
 	}, nil
 }
 
-func getKafkaPartitionerExtensionConfig(partition map[string]*config.C, outputName string) (extensionCfg map[string]any, err error) {
-	extensionID := getKafkaPartitionerExtensionID(outputName)
-
-	extensionCfg = map[string]any{}
+func getKafkaPartitionerExtensionConfig(partition map[string]*config.C, _ string) (extensionCfg map[string]any, err error) {
 	if len(partition) == 0 {
 		// default use `hash` partitioner + all partitions (block if unreachable)
-		extensionCfg[extensionID.String()] = map[string]any{}
-		return extensionCfg, nil
+		return map[string]any{}, nil
 	}
 
 	// extract partitioner from config
@@ -294,11 +289,8 @@ func getOauth2ClientExtensionConfig(cfg *config.C, outputName string) (extension
 		return nil, fmt.Errorf("error unpacking oauth2client extension config: %w", err)
 	}
 
-	// Default settings are taken from https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/cbc5a870545d7a25c8bbd62404a025978c907d57/extension/oauth2clientauthextension/factory.go#L28
-	defaultConfig := oauth2clientauthextension.Config{
-		ExpiryBuffer: 5 * time.Minute,
-	}
-
+	// Perform config validation
+	defaultConfig := oauth2clientauthextension.Config{}
 	err = mapstructure.Decode(oauthMap, &defaultConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding oauth2client extension config: %w", err)
@@ -308,8 +300,7 @@ func getOauth2ClientExtensionConfig(cfg *config.C, outputName string) (extension
 		return nil, fmt.Errorf("error validating oauth2client extension config: %w", err)
 	}
 
-	// Struct-to-map copies values as-is, so DecodeHook is not applied per field.
-	// Re-decode the map so the hook can stringify durations, opaque secrets, and url.Values.
+	// Convert config back to map[string]any
 	if err = mapstructure.Decode(defaultConfig, &oauthMap); err != nil {
 		return nil, fmt.Errorf("error encoding oauth2client extension config: %w", err)
 	}
@@ -339,8 +330,8 @@ func oauth2MapEncodeHook() mapstructure.DecodeHookFunc {
 			return v.String(), nil
 		case configopaque.String:
 			return string(v), nil
-		case url.Values:
-			return v.Encode(), nil
+		case url.URL:
+			return v.String(), nil
 		default:
 			return data, nil
 		}
