@@ -2,7 +2,7 @@
 navigation_title: Use the contrib Collector
 description: Learn how to send data to Elastic Observability using the contrib OpenTelemetry Collector instead of Elastic Agent.
 applies_to:
-  stack:
+  stack: ga
   serverless:
     observability:
   product:
@@ -55,9 +55,6 @@ service:
 
 ### {{ech}} [elastic-cloud-hosted-ech]
 
-::::{applies-switch}
-
-:::{applies-item} stack: ga 9.0+
 {{ech}} supports the [Managed OTLP Endpoint](opentelemetry://reference/motlp.md), which accepts OpenTelemetry data natively. To find your endpoint URL, go to the [{{ecloud}} Console](https://cloud.elastic.co/), select your deployment, and in the **Application endpoints** section, select **Managed OTLP**.
 
 The following configuration example shows how to send data to the Managed OTLP Endpoint:
@@ -78,13 +75,6 @@ service:
     logs:
       exporters: [otlp]
 ```
-:::
-
-:::{applies-item} stack: ga 8.0-8.19
-Set up {{agent}} as a gateway. Point your contrib Collector OTLP exporter to the {{agent}} gateway. Refer to [Gateway configuration](/reference/edot-collector/config/default-config-standalone.md#gateway-mode) for more information.
-:::
-
-::::
 
 ### {{product.self}} [self-managed-elastic-stack]
 
