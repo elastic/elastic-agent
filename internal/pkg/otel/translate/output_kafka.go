@@ -104,15 +104,32 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			},
 		}
 
-		oauthCfg, err := config.Child("oauth2client", -1)
+		oauthCfg, err := config.Child("oauth", -1)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("oauth2client config is required when sasl.mechanism is OAUTHBEARER: %w", err)
+			return nil, nil, nil, fmt.Errorf("oauth2 config is required when sasl.mechanism is OAUTHBEARER: %w", err)
 		}
-		oauth2ClientExtensionCfg, err := getOauth2ClientExtensionConfig(oauthCfg, outputName)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("error translating oauth2client extension config: %w", err)
+
+		if len(oauthCfg.GetFields()) == 0 {
+			return nil, nil, nil, fmt.Errorf("oauth2 config is required when sasl.mechanism is OAUTHBEARER")
 		}
-		maps.Copy(extensionCfg, oauth2ClientExtensionCfg)
+
+		switch oauthCfg.GetFields()[0] {
+		case "oauth2clientauth":
+			oauth2ClientCfg, err := oauthCfg.Child("oauth2clientauth", -1)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("error translating oauth2client extension config: %w", err)
+			}
+			oauth2ClientExtensionCfg, err := getOauth2ClientExtensionConfig(oauth2ClientCfg, outputName)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("error translating oauth2client extension config: %w", err)
+			}
+			maps.Copy(extensionCfg, oauth2ClientExtensionCfg)
+		// In case we choose to support more oauth2 style extensions, we can add a case for each extension here.
+		// For example, azureauth extension https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/azureauthextension
+		default:
+			return nil, nil, nil, fmt.Errorf("unsupported oauth2 config: %v", oauthCfg.GetFields()[0])
+		}
+
 	} else if kConfig.Username != "" {
 		if kConfig.Sasl.SaslMechanism == "" {
 			kConfig.Sasl.SaslMechanism = "PLAIN"

@@ -3072,10 +3072,11 @@ outputs:
       verification_mode: full
     protocol: https
     sasl.mechanism: OAUTHBEARER
-    oauth2client:
-      client_id: {{.ClientID}}
-      client_secret: {{.ClientSecret}}
-      token_url: "{{.TokenURL}}"
+    oauth:
+      oauth2clientauth:
+        client_id: {{.ClientID}}
+        client_secret: {{.ClientSecret}}
+        token_url: "{{.TokenURL}}"
     headers:
     - some-key: some-value
     - some-key: another-value

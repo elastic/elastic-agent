@@ -23,10 +23,11 @@ topic: static-topic
 username: elastic
 password: changeme
 sasl.mechanism: OAUTHBEARER
-oauth2client:
-  client_id: my-client
-  client_secret: my-secret
-  token_url: https://example.com/oauth2/token
+oauth:
+  oauth2clientauth:
+    client_id: my-client
+    client_secret: my-secret
+    token_url: https://example.com/oauth2/token
 `
 	expectedMap := map[string]any{
 		"brokers":   []string{"kafka1:9092"},
@@ -81,20 +82,57 @@ oauth2client:
 	require.Contains(t, extensionCfg, "oauth2client/_agent-component/default")
 }
 
-func TestKafkaOAuth2RequiresOauth2ClientConfig(t *testing.T) {
-	input := `
+func TestKafkaOAuth2RequiresOauth2Config(t *testing.T) {
+	testCases := []struct {
+		name    string
+		input   string
+		wantErr string
+	}{
+		{
+			name: "missing oauth",
+			input: `
 hosts: ["kafka1:9092"]
 topic: static-topic
 sasl.mechanism: OAUTHBEARER
-`
-	cfg, err := config.NewConfigFrom(input)
-	require.NoError(t, err, "error creating kafka config")
-	gotMap, processorCfg, extensionCfg, err := KafkaToOTelConfig(cfg, "default", logp.NewNopLogger())
-	require.Error(t, err)
-	require.ErrorContains(t, err, "oauth2client config is required when sasl.mechanism is OAUTHBEARER")
-	require.Nil(t, gotMap)
-	require.Nil(t, processorCfg)
-	require.Nil(t, extensionCfg)
+`,
+			wantErr: "oauth2 config is required when sasl.mechanism is OAUTHBEARER",
+		},
+		{
+			name: "empty oauth",
+			input: `
+hosts: ["kafka1:9092"]
+topic: static-topic
+sasl.mechanism: OAUTHBEARER
+oauth: {}
+`,
+			wantErr: "oauth2 config is required when sasl.mechanism is OAUTHBEARER",
+		},
+		{
+			name: "unsupported oauth type",
+			input: `
+hosts: ["kafka1:9092"]
+topic: static-topic
+sasl.mechanism: OAUTHBEARER
+oauth:
+  unknown:
+    client_id: my-client
+`,
+			wantErr: "unsupported oauth2 config",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := config.NewConfigFrom(tc.input)
+			require.NoError(t, err, "error creating kafka config")
+			gotMap, processorCfg, extensionCfg, err := KafkaToOTelConfig(cfg, "default", logp.NewNopLogger())
+			require.Error(t, err)
+			require.ErrorContains(t, err, tc.wantErr)
+			require.Nil(t, gotMap)
+			require.Nil(t, processorCfg)
+			require.Nil(t, extensionCfg)
+		})
+	}
 }
 
 func TestKafkaKerberosTranslation(t *testing.T) {
