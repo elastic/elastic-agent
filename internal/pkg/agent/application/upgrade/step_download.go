@@ -33,6 +33,7 @@ import (
 )
 
 const (
+	defaultRetryTimeout       = 15 * time.Minute
 	defaultRemoteSourceSubdir = "beats/elastic-agent"
 	snapshotURIFormat         = "https://snapshots.elastic.co/%s-%s/downloads/"
 )
@@ -42,6 +43,7 @@ type artifactDownloader struct {
 	settings       *artifact.Config
 	fleetServerURI string
 	getPGPSources  func(log *logger.Logger, fleetServerURI string, targetVersion *agtversion.ParsedSemVer, pgpSources []string) []string
+	retryTimeout   time.Duration
 }
 
 func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artifactDownloader {
@@ -49,6 +51,7 @@ func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artif
 		log:           log,
 		settings:      settings,
 		getPGPSources: download.AppendFallbackPGP,
+		retryTimeout:  defaultRetryTimeout,
 	}
 }
 
@@ -110,72 +113,154 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 
 	a.log.Infow("Getting upgrade artifact", "filename", fileName, "version", target.Version, "drop_path", settings.DropPath, "target_path", targetPath, "install_path", settings.InstallPath)
 
-	var errs []error
-	for _, src := range sources {
-		if target.Version.IsSnapshot() && src == artifact.DefaultSourceURI && target.Version.BuildMetadata() == "" {
-			buildID, err := latestSnapshotBuildID(ctx, &settings, target.Version)
-			if err != nil {
-				e := fmt.Errorf("couldn't retrieve latest snapshot build ID: %w", err)
-				a.log.Debugf("%v", e)
-				errs = append(errs, e)
+	retryDeadline := time.Now().Add(a.retryTimeout)
+	upgradeDetails.SetRetryUntil(&retryDeadline)
+
+	retrier := backoff.NewExponentialBackOff(
+		backoff.WithInitialInterval(settings.RetrySleepInitDuration),
+		backoff.WithMaxElapsedTime(a.retryTimeout),
+	)
+	retryCtx := backoff.WithContext(retrier, ctx)
+
+	attempt := 0
+	skip := make([]bool, len(sources))
+	errs := make([]error, len(sources))
+
+	fetchSources := func() error {
+		for i, src := range sources {
+			if skip[i] {
 				continue
 			}
 
-			target.Version = agtversion.NewParsedSemVer(
-				target.Version.Major(),
-				target.Version.Minor(),
-				target.Version.Patch(),
-				target.Version.Prerelease(),
-				buildID,
-			)
-		}
-
-		sourceURI, err := Resolve(ctx, target, src, defaultRemoteSourceSubdir, fileName)
-		if err != nil {
-			e := fmt.Errorf("could not resolve source %s: %w", src, err)
-			a.log.Debugf("%v", e)
-			errs = append(errs, e)
-			continue
-		}
-		if download.IsLocal(sourceURI) {
-			a.log.Infow("Copying local artifact", "source_uri", sourceURI)
-		} else {
-			a.log.Infow("Downloading artifact", "source_uri", sourceURI, "proxy_uri", settings.Proxy.URL, "proxy_disable", settings.Proxy.Disable)
-		}
-
-		if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, sourceURI, targetPath); err != nil {
-			e := fmt.Errorf("could not fetch artifact from %s: %w", src, err)
-			a.log.Debugf("%v", e)
-			errs = append(errs, e)
-			if downloaderrors.IsDiskSpaceError(err) {
-				break
-			}
-			continue
-		}
-
-		if !skipVerifyOverride {
-			if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, download.AddHashExtension(sourceURI), download.AddHashExtension(targetPath)); err != nil {
-				e := fmt.Errorf("could not fetch artifact sha512 from %s: %w", src, err)
-				a.log.Debugf("%v", e)
-				errs = append(errs, e)
-				if downloaderrors.IsDiskSpaceError(err) {
-					break
+			if target.Version.IsSnapshot() && src == artifact.DefaultSourceURI && target.Version.BuildMetadata() == "" {
+				buildID, err := latestSnapshotBuildID(ctx, &settings, target.Version)
+				if err != nil {
+					e := fmt.Errorf("couldn't retrieve latest snapshot build ID: %w", err)
+					a.log.Debugf("%v", e)
+					errs[i] = e
+					continue
 				}
+
+				target.Version = agtversion.NewParsedSemVer(
+					target.Version.Major(),
+					target.Version.Minor(),
+					target.Version.Patch(),
+					target.Version.Prerelease(),
+					buildID,
+				)
+			}
+
+			sourceURI, err := Resolve(ctx, target, src, defaultRemoteSourceSubdir, fileName)
+			if err != nil {
+				e := fmt.Errorf("could not resolve source %s: %w", src, err)
+				a.log.Debugf("%v", e)
+				errs[i] = e
+				skip[i] = true
+				continue
+			}
+			if download.IsLocal(sourceURI) {
+				a.log.Infow("Copying local artifact", "source_uri", sourceURI)
+			} else {
+				a.log.Infow("Downloading artifact", "source_uri", sourceURI, "proxy_uri", settings.Proxy.URL, "proxy_disable", settings.Proxy.Disable)
+			}
+
+			if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, sourceURI, targetPath); err != nil {
+				if downloaderrors.IsDiskSpaceError(err) {
+					return backoff.Permanent(err)
+				}
+				var agentErr errors.Error
+				if goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem && !errors.Is(err, os.ErrNotExist) {
+					if agentErr.Meta()[errors.MetaKeyPath] == targetPath {
+						// can't write to target
+						return backoff.Permanent(err)
+					}
+				}
+
+				if download.IsLocal(sourceURI) {
+					// don't retry local sources
+					skip[i] = true
+				}
+				if downloaderrors.IsPermanentHTTPError(err) {
+					skip[i] = true
+				}
+
+				e := fmt.Errorf("could not fetch artifact from %s: %w", src, err)
+				a.log.Debugf("%v", e)
+				errs[i] = e
 				continue
 			}
 
-			if err = download.Verify(ctx, a.log, &settings, release.PGP(), sourceURI, targetPath, skipDefaultPgp, pgpBytes...); err != nil {
-				e := fmt.Errorf("verification failed for %s: %w", src, err)
-				a.log.Debugf("%v", e)
-				errs = append(errs, e)
-				continue
+			if !skipVerifyOverride {
+				if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, download.AddHashExtension(sourceURI), download.AddHashExtension(targetPath)); err != nil {
+					if downloaderrors.IsDiskSpaceError(err) {
+						return backoff.Permanent(err)
+					}
+					var agentErr errors.Error
+					if goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem && !errors.Is(err, os.ErrNotExist) {
+						if agentErr.Meta()[errors.MetaKeyPath] == download.AddHashExtension(targetPath) {
+							// can't write to target
+							return backoff.Permanent(err)
+						}
+					}
+
+					if download.IsLocal(sourceURI) {
+						// don't retry local sources
+						skip[i] = true
+					}
+					if downloaderrors.IsPermanentHTTPError(err) {
+						skip[i] = true
+					}
+
+					e := fmt.Errorf("could not fetch artifact sha512 from %s: %w", src, err)
+					a.log.Debugf("%v", e)
+					errs[i] = e
+					continue
+				}
+
+				if err = download.Verify(ctx, a.log, &settings, release.PGP(), sourceURI, targetPath, skipDefaultPgp, pgpBytes...); err != nil {
+					e := fmt.Errorf("verification failed for %s: %w", src, err)
+					a.log.Debugf("%v", e)
+					if !errors.IsNetworkError(err) {
+						skip[i] = true
+					}
+					errs[i] = e
+					continue
+				}
 			}
+
+			return nil
 		}
 
-		return targetPath, nil
+		attempt++
+		sourceErrs := []error{}
+		for i, err := range errs {
+			if err != nil {
+				sourceErrs = append(sourceErrs, fmt.Errorf("source %s failed: %w", sources[i], err))
+			}
+		}
+		err := goerrors.Join(sourceErrs...)
+
+		if !slices.Contains(skip, false) {
+			// all sources exhausted
+			return backoff.Permanent(err)
+		}
+		return err
 	}
 
-	return targetPath, fmt.Errorf("failed to obtain agent artifact: %w", goerrors.Join(errs...))
+	retryFailure := func(err error, retryAfter time.Duration) {
+		a.log.Warnf("artifact download attempt %d failed: %s; retrying in %s.",
+			attempt, err.Error(), retryAfter)
+		upgradeDetails.SetRetryableError(err)
+	}
+
+	if err := backoff.RetryNotify(fetchSources, retryCtx, retryFailure); err != nil {
+		return targetPath, fmt.Errorf("failed to get upgrade artifact: %w", err)
+	}
+
+	upgradeDetails.SetRetryableError(nil)
+	upgradeDetails.SetRetryUntil(nil)
+
+	return targetPath, nil
 }
 
 // Resolve computes the fully resolved download URI for an artifact.
