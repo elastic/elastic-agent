@@ -82,7 +82,7 @@ func TestBeatsAuthExtensionKerberos(t *testing.T) {
 	}
 }
 
-func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
+func TestGetOtelConfigKafkaOAuth2(t *testing.T) { //nolint:gosec // G101: dummy oauth client values in test fixtures, not real credentials
 	agentInfo := &info.AgentInfo{}
 	beatProcessorID := "beat/_agent-component/beat-metrics-monitoring"
 	beatMetricsConfig := map[string]any{

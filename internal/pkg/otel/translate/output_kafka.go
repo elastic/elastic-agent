@@ -290,7 +290,7 @@ func getKafkaPartitionerExtensionConfig(partition map[string]*config.C, _ string
 		name, config = n, c
 	}
 
-	var partitionMap map[string]any = make(map[string]any)
+	var partitionMap = make(map[string]any)
 	err = config.Unpack(&partitionMap)
 	if err != nil {
 		return nil, fmt.Errorf("error unpacking partition config: %w", err)

@@ -16,7 +16,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
-func TestKafkaOAuth2Translation(t *testing.T) {
+func TestKafkaOAuth2Translation(t *testing.T) { //nolint:gosec // G101: dummy oauth client values in test fixtures, not real credentials
 	input := `
 hosts: ["kafka1:9092"]
 topic: static-topic

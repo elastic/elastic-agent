@@ -3003,7 +3003,7 @@ func TestSystemMetricsWithKafkaOutputOAuth2(t *testing.T) {
 
 	const (
 		clientID     = "kafka-test-client"
-		clientSecret = "kafka-test-secret"
+		clientSecret = "kafka-test-secret" //nolint:gosec // G101: dummy secret for the mock OAuth2 token server
 	)
 
 	tokenServer := newOAuth2TokenMockServer(t, clientID, clientSecret)
