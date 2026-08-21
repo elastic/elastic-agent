@@ -3743,16 +3743,21 @@ agent.monitoring:
 
 		outFileURL := filepath.Join(logstash_testdata, fmt.Sprintf("%s.json", testCaseName))
 
-		// wait for logs to be published over HTTP
+		// wait for logs to be published and for the file to contain a valid JSON record
+		var outData mapstr.M
 		require.EventuallyWithTf(t,
 			func(ct *assert.CollectT) {
-				_, err := os.Stat(outFileURL)
-				require.NoError(ct, err)
+				data, err := os.ReadFile(outFileURL)
+				if err != nil {
+					// file not present yet
+					return
+				}
+				outData = parseFirstJSONLine(data)
+				assert.NotNil(ct, outData, "file exists but contains no JSON record yet")
 			},
 			2*time.Minute, 10*time.Second, "expected documents to be published to logstash output for %s mode", tt.name)
 
-		// download files from Logstash into testdata directory
-		logstash[tt.name] = downloadData(t, outFileURL)
+		logstash[tt.name] = outData
 
 		cancel()
 		_ = cmd.Wait()
@@ -3796,6 +3801,24 @@ func downloadData(t *testing.T, file string) mapstr.M {
 		}
 		var m mapstr.M
 		require.NoError(t, json.Unmarshal(line, &m), "failed to unmarshal line from %s", file)
+		return m
+	}
+	return nil
+}
+
+// parseFirstJSONLine returns the first non-empty JSON object from data, or nil
+// if no valid JSON line is found.
+func parseFirstJSONLine(data []byte) mapstr.M {
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var m mapstr.M
+		if err := json.Unmarshal(line, &m); err != nil {
+			return nil
+		}
 		return m
 	}
 	return nil
