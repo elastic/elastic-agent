@@ -92,7 +92,7 @@ Both issues are addressed in 9.5.1. There is no supported workaround on 9.5.0 th
 
 On July 9, 2026, a known issue was discovered where {{agent}} can restart repeatedly when it is deployed in a {{fleet}}-managed container. When it processes a policy update, the agent uses the default logging values instead of the configuration already active in the container. It incorrectly detects a logging change, restarts and repeats this process indefinitely.
 
-This restart does not increment the container restart count. On Linux, the agent replaces its own process image in place (`execve`), so the PID and container stay alive while the agent loops. Confirm the issue by counting the initialisation banner in the agent logs — a healthy agent prints it once, a looping agent prints it tens or hundreds of times within minutes:
+This restart does not increment the container restart count. On Linux, the agent replaces its own process image in place (`execve`), so the PID and container stay alive while the agent loops. Confirm the issue by counting the initialization banner in the agent logs — a healthy agent prints it once, a looping agent prints it tens or hundreds of times within minutes:
 
 ```bash
 grep -c 'agent container initialisation - chown paths' <agent-container-logs>
