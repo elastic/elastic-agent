@@ -23,17 +23,40 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
-::::{dropdown} {{agent}} Synthetics browser monitors fail to start on private locations when Heartbeat uses the OTel runtime
+::::{dropdown} Kafka Kerberos authentication is dropped when using the OTel runtime
 
-**Applies to: {{agent}} 9.5.0**
+**Applies to: {{agent}} 9.4.0 to 9.4.5, 9.5.0 to 9.5.1**
 
-On August 3, 2026, a known issue was discovered where browser (journey) monitors assigned to a {{fleet}}-managed private location never start. {{agent}} reports the Synthetics browser component as permanently failed with `missing required field accessing 'heartbeat.monitors.0.schedule'`. Lightweight monitors (HTTP, TCP, and ICMP) are not affected. This happens because Heartbeat runs under the OTel runtime by default in this version, which rejects the schedule-less data-routing sub-streams (`browser.network` and `browser.screenshot`) that a browser monitor emits.
+On August 10, 2026, a known issue was discovered where Kafka outputs configured with Kerberos authentication do not fall back to the process runtime. The OTel runtime starts successfully but silently drops Kerberos settings during config translation, so Kafka authentication fails. A fix will be included in {{agent}} 9.4.6 and 9.5.2.
 
 **Workaround**
 
-Pin Heartbeat back to the process runtime on the {{fleet}} agent policy that backs the affected private location:
+Force the process runtime for Kafka outputs:
 
-1. In {{kib}}, go to **Fleet > Agent policies** and open the agent policy for the private location.
+```yaml
+agent.internal.runtime.output:
+  kafka: process
+```
+
+Alternatively, set `_runtime_experimental: process` on the affected inputs.
+
+For more information, check [Issue #16118](https://github.com/elastic/elastic-agent/issues/16118).
+::::
+:::{dropdown} Osquery live and scheduled query results are missing in Kibana on {{agent}} 9.5.0
+
+**Applies to: {{agent}} 9.5.0**
+
+On August 3, 2026, a known issue was confirmed where {{agent}} 9.5.0 running the `osquery_manager` integration (version 1.30 or later) with default settings causes live and scheduled query results to not appear in the Kibana Osquery UI. Queries appear stuck in "pending" status and the Results column shows 0.
+
+The issue occurs because the OTel runtime, which is the default runtime for Osquerybeat in {{agent}} 9.5, incorrectly routes action response documents to the `osquery_manager.query_profile` data stream instead of `osquery_manager.action.responses`. This only affects agents using a three-stream `osquery_manager` policy, which is the default for newly created policies with `osquery_manager` 1.30 or later.
+
+Agents using policies created before osquery_manager 1.30 added the `query_profile` data stream are not affected.
+
+**Workaround**
+
+Pin Osquerybeat back to the process runtime on the {{fleet}} agent policy using the `osquery_manager` integration:
+
+1. In {{kib}}, go to **Fleet > Agent policies** and open the agent policy.
 
 2. On the **Settings** tab, expand **Advanced settings** and locate **Advanced internal YAML settings**.
 
@@ -41,15 +64,26 @@ Pin Heartbeat back to the process runtime on the {{fleet}} agent policy that bac
 
     ```yaml
     runtime:
-      heartbeat:
+      osquerybeat:
         default: process
     ```
 
-This is equivalent to the agent policy override `{ "agent": { "internal": { "runtime": { "heartbeat": { "default": "process" } } } } }` ({{fleet}} stores the field as `advanced_settings.agent_internal`). The change takes effect on the next policy revision and is fully reversible: remove the setting to return Heartbeat to its default runtime.
+For more information, check [Issue #15964](https://github.com/elastic/elastic-agent/issues/15964).
+:::
 
-To avoid downtime when upgrading from 9.3.x or 9.4.x, apply this override **before** you upgrade. It has no effect on those versions (Heartbeat already runs in the process runtime there), and because the setting lives on the agent policy it is already in effect the moment the agent upgrades to 9.5.0 — so browser monitors keep running through the upgrade.
+::::{dropdown} {{agent}} Synthetics browser monitors fail on private locations on 9.5.0
 
-For more information, check [Issue #15968](https://github.com/elastic/elastic-agent/issues/15968).
+**Applies to: {{agent}} 9.5.0**
+
+**Do not upgrade private location {{agents}} that run Synthetics browser (journey) monitors to 9.5.0.** Keep those agents on **9.4.x** (for example 9.4.4) and wait for **9.5.1**. It is supported to run an older {{agent}} version (such as 9.4.4) against a 9.5.0 {{stack}}. Lightweight monitors (HTTP, TCP, and ICMP) and Elastic-managed locations are not affected.
+
+On 9.5.0, browser monitors on {{fleet}}-managed private locations fail for two independent reasons:
+
+1. **Missing Playwright browser binaries** in the `elastic-agent-complete` image. Journeys fail at launch with `browserType.launch: Executable doesn't exist at .../chromium_headless_shell-<rev>/...`. For more information, check [Issue #15993](https://github.com/elastic/elastic-agent/issues/15993).
+
+2. **OTel Heartbeat runtime** rejects browser monitor config and reports the component as permanently failed with `missing required field accessing 'heartbeat.monitors.0.schedule'`. For more information, check [Issue #15968](https://github.com/elastic/elastic-agent/issues/15968).
+
+Both issues are addressed in 9.5.1. There is no supported workaround on 9.5.0 that restores browser monitors without changing the agent version.
 ::::
 
 ::::{dropdown} {{agent}} restarts repeatedly in containers after a {{fleet}} policy update

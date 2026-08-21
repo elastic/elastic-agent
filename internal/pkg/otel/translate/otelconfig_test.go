@@ -452,16 +452,17 @@ func TestGetOtelConfig(t *testing.T) {
 			"user":               "elastic",
 			"max_conns_per_host": 1,
 			"retry": map[string]any{
-				"enabled":          true,
-				"initial_interval": 1 * time.Second,
-				"max_interval":     1 * time.Minute,
-				"max_retries":      3,
-				"retry_on_status":  []int{429, 500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511},
+				"enabled":                  true,
+				"initial_interval":         1 * time.Second,
+				"max_interval":             1 * time.Minute,
+				"max_retries":              3,
+				"retry_on_status":          defaultRetryOnStatus(),
+				"retry_on_document_status": []int{429, 500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511},
 			},
 			"sending_queue": map[string]any{
 				"enabled":           true,
-				"num_consumers":     1,
-				"queue_size":        3200,
+				"num_consumers":     2,
+				"queue_size":        6400,
 				"block_on_overflow": true,
 				"wait_for_result":   true,
 				"batch": map[string]any{
@@ -535,7 +536,7 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"queue": map[string]any{
 				"mem": map[string]any{
-					"events": uint64(3200),
+					"events": int64(6400),
 					"flush": map[string]any{
 						"min_events": uint64(1600),
 						"timeout":    "10s",
@@ -703,7 +704,7 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"queue": map[string]any{
 				"mem": map[string]any{
-					"events": uint64(3200),
+					"events": int64(6400),
 					"flush": map[string]any{
 						"min_events": uint64(1600),
 						"timeout":    "10s",
@@ -1809,7 +1810,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
-								"events": uint64(3200),
+								"events": int64(6400),
 								"flush": map[string]any{
 									"min_events": uint64(1600),
 									"timeout":    "10s",
@@ -1920,7 +1921,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
-								"events": uint64(3200),
+								"events": int64(6400),
 								"flush": map[string]any{
 									"min_events": uint64(1600),
 									"timeout":    "10s",

@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v3/pkg/cli/values"
 
@@ -1125,7 +1126,7 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 					// to match the test namespace
 					if volume.Name == "elastic-agent-state" {
 						hostPathType := corev1.HostPathDirectoryOrCreate
-						pod.Volumes[volumeIdx].VolumeSource.HostPath = &corev1.HostPathVolumeSource{
+						pod.Volumes[volumeIdx].HostPath = &corev1.HostPathVolumeSource{
 							Type: &hostPathType,
 							Path: fmt.Sprintf("/var/lib/elastic-agent-standalone/%s/state", namespace),
 						}
@@ -1185,9 +1186,15 @@ func k8sStepForEachAgentID(agentPodLabelSelector string, expectedPodNumber int, 
 		require.Equal(t, expectedPodNumber, len(perNodePodList.Items), "unexpected number of pods found with selector ", perNodePodList)
 		var stdout, stderr bytes.Buffer
 		for _, pod := range perNodePodList.Items {
-			id, err := k8sGetAgentID(ctx, kCtx.client, &stdout, &stderr, namespace, pod.Name, containerName)
-			require.NoError(t, err, "failed to unenroll agent %s", pod.Name)
-			require.NotEmpty(t, id, "agent id should not be empty")
+			// The agent may be healthy but not yet have a populated ID immediately after
+			// startup or pod restart, so retry until the ID is non-empty.
+			var id string
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				var err error
+				id, err = k8sGetAgentID(ctx, kCtx.client, &stdout, &stderr, namespace, pod.Name, containerName)
+				assert.NoErrorf(c, err, "failed to get agent ID for pod %s (stderr: %s)", pod.Name, stderr.String())
+				assert.NotEmptyf(c, id, "agent id for pod %s should not be empty", pod.Name)
+			}, 2*time.Minute, 5*time.Second)
 			require.NoError(t, cb(ctx, id), "callback for each agent id failed")
 		}
 	}
@@ -1547,7 +1554,7 @@ func k8sStepHintsRedisCheckAgentStatus(agentPodLabelSelector string, hintDeploye
 			require.NotEmpty(t, redisPodList.Items, "no redis pods found with selector ", redisPodSelector)
 			// check that redis pods have the correct annotations
 			for _, redisPod := range redisPodList.Items {
-				hintPackage, ok := redisPod.ObjectMeta.Annotations["co.elastic.hints/package"]
+				hintPackage, ok := redisPod.Annotations["co.elastic.hints/package"]
 				require.True(t, ok, "missing hints annotation")
 				require.Equal(t, "redis", hintPackage, "hints annotation package wrong value")
 			}

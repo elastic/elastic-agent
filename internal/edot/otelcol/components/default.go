@@ -29,6 +29,7 @@ import (
 	couchdbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/couchdbreceiver"
 	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
+	googlecloudmonitoringreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/googlecloudmonitoringreceiver"
 	haproxyreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/haproxyreceiver"
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
@@ -65,6 +66,7 @@ import (
 
 	abreceiver "github.com/elastic/beats/v7/x-pack/auditbeat/abreceiver"
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
+	hbreceiver "github.com/elastic/beats/v7/x-pack/heartbeat/hbreceiver"
 	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 
 	// Processors:
@@ -173,6 +175,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			verifierreceiver.NewFactory(),
 			abreceiver.NewFactoryWithSettings(abreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			fbreceiver.NewFactoryWithSettings(fbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
+			hbreceiver.NewFactoryWithSettings(hbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			mbreceiver.NewFactoryWithSettings(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
@@ -196,6 +199,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			azureeventhubreceiver.NewFactory(),
 			awscloudwatchreceiver.NewFactory(),
 			awss3receiver.NewFactory(),
+			googlecloudmonitoringreceiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
 			prometheusremotewritereceiver.NewFactory(),
 			akamaisiemreceiver.NewFactory(),
