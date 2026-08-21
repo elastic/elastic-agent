@@ -1085,7 +1085,13 @@ func TestOTelElasticsearchRetryStatusLevels(t *testing.T) {
 	t.Cleanup(mockESServer.Close)
 
 	inputPath := filepath.Join(t.TempDir(), "input.log")
-	require.NoError(t, os.WriteFile(inputPath, []byte("Line 0\nLine 1\nLine 2\n"), 0o600))
+	const linePadding = 512
+	require.NoError(t, os.WriteFile(inputPath, fmt.Appendf(nil,
+		"Line 0 %s\nLine 1 %s\nLine 2 %s\n",
+		strings.Repeat("x", linePadding),
+		strings.Repeat("x", linePadding),
+		strings.Repeat("x", linePadding),
+	), 0o600))
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -1294,7 +1300,7 @@ agent:
 		_ = cmd.Wait()
 	})
 
-	integration.GenerateLogFile(t, inputPath, 100*time.Millisecond, 1)
+	integration.GenerateLogFile(t, inputPath, 100*time.Millisecond, 20)
 
 	var requestTimes []time.Time
 	require.Eventually(t, func() bool {
