@@ -31,32 +31,95 @@ import (
 type esToOTelOptions struct {
 	elasticsearch.ElasticsearchConfig `config:",inline"`
 
-	Index         string `config:"index"`
-	Preset        string `config:"preset"`
-	RetryOnStatus []int  `config:"retry_on_status"`
+	Index                 string `config:"index"`
+	Preset                string `config:"preset"`
+	RetryOnStatus         []int  `config:"retry_on_status"`
+	RetryOnDocumentStatus []int  `config:"retry_on_document_status"`
+}
+
+// defaultRetryOnDocumentStatus matches Beats' retry behavior for individual
+// bulk response items.
+var defaultRetryOnDocumentStatus = []int{
+	// 429
+	http.StatusTooManyRequests,
+	// 5xx
+	http.StatusInternalServerError,
+	http.StatusNotImplemented,
+	http.StatusBadGateway,
+	http.StatusServiceUnavailable,
+	http.StatusGatewayTimeout,
+	http.StatusHTTPVersionNotSupported,
+	http.StatusVariantAlsoNegotiates,
+	http.StatusInsufficientStorage,
+	http.StatusLoopDetected,
+	http.StatusNotExtended,
+	http.StatusNetworkAuthenticationRequired,
+}
+
+func defaultRetryOnStatus() []int {
+	// Beats retries every failed bulk request except 413, which it handles by
+	// splitting the batch or dropping it when it cannot be split.
+	return []int{
+		// 3xx
+		http.StatusMultipleChoices,   // 300
+		http.StatusMovedPermanently,  // 301
+		http.StatusFound,             // 302
+		http.StatusSeeOther,          // 303
+		http.StatusNotModified,       // 304
+		http.StatusUseProxy,          // 305
+		http.StatusTemporaryRedirect, // 307
+		http.StatusPermanentRedirect, // 308
+		// 4xx, excluding 413 (Request Entity Too Large)
+		http.StatusBadRequest,                   // 400
+		http.StatusUnauthorized,                 // 401
+		http.StatusPaymentRequired,              // 402
+		http.StatusForbidden,                    // 403
+		http.StatusNotFound,                     // 404
+		http.StatusMethodNotAllowed,             // 405
+		http.StatusNotAcceptable,                // 406
+		http.StatusProxyAuthRequired,            // 407
+		http.StatusRequestTimeout,               // 408
+		http.StatusConflict,                     // 409
+		http.StatusGone,                         // 410
+		http.StatusLengthRequired,               // 411
+		http.StatusPreconditionFailed,           // 412
+		http.StatusRequestURITooLong,            // 414
+		http.StatusUnsupportedMediaType,         // 415
+		http.StatusRequestedRangeNotSatisfiable, // 416
+		http.StatusExpectationFailed,            // 417
+		http.StatusTeapot,                       // 418
+		http.StatusMisdirectedRequest,           // 421
+		http.StatusUnprocessableEntity,          // 422
+		http.StatusLocked,                       // 423
+		http.StatusFailedDependency,             // 424
+		http.StatusTooEarly,                     // 425
+		http.StatusUpgradeRequired,              // 426
+		http.StatusPreconditionRequired,         // 428
+		http.StatusTooManyRequests,              // 429
+		http.StatusRequestHeaderFieldsTooLarge,  // 431
+		http.StatusUnavailableForLegalReasons,   // 451
+		// 5xx
+		http.StatusInternalServerError,           // 500
+		http.StatusNotImplemented,                // 501
+		http.StatusBadGateway,                    // 502
+		http.StatusServiceUnavailable,            // 503
+		http.StatusGatewayTimeout,                // 504
+		http.StatusHTTPVersionNotSupported,       // 505
+		http.StatusVariantAlsoNegotiates,         // 506
+		http.StatusInsufficientStorage,           // 507
+		http.StatusLoopDetected,                  // 508
+		http.StatusNotExtended,                   // 510
+		http.StatusNetworkAuthenticationRequired, // 511
+	}
 }
 
 var defaultOptions = esToOTelOptions{
 	ElasticsearchConfig: elasticsearch.DefaultConfig(),
 
-	Index:  "",       // Dynamic routing is disabled if index is set
-	Preset: "custom", // default is custom if not set
-	RetryOnStatus: []int{
-		// 429
-		http.StatusTooManyRequests,
-		// 5xx
-		http.StatusInternalServerError,
-		http.StatusNotImplemented,
-		http.StatusBadGateway,
-		http.StatusServiceUnavailable,
-		http.StatusGatewayTimeout,
-		http.StatusHTTPVersionNotSupported,
-		http.StatusVariantAlsoNegotiates,
-		http.StatusInsufficientStorage,
-		http.StatusLoopDetected,
-		http.StatusNotExtended,
-		http.StatusNetworkAuthenticationRequired,
-	},
+	Index:                 "",       // Dynamic routing is disabled if index is set
+	Preset:                "custom", // default is custom if not set
+	RetryOnDocumentStatus: append([]int(nil), defaultRetryOnDocumentStatus...),
+	RetryOnStatus:         defaultRetryOnStatus(),
 }
 
 // ToOTelConfig converts a Beat config into OTel elasticsearch exporter config
@@ -208,6 +271,65 @@ func getTotalNumWorkers(cfg *config.C) int {
 	return len(hostList)
 }
 
+<<<<<<< HEAD
+=======
+func getRetryConfig(escfg esToOTelOptions) map[string]any {
+	// Retries
+	retryCfg := map[string]any{
+		"enabled":                  true,
+		"max_retries":              escfg.MaxRetries,
+		"initial_interval":         escfg.Backoff.Init, // backoff.init
+		"max_interval":             escfg.Backoff.Max,  // backoff.max
+		"retry_on_status":          escfg.RetryOnStatus,
+		"retry_on_document_status": escfg.RetryOnDocumentStatus,
+	}
+
+	if escfg.MaxRetries == 0 {
+		// Disable retries
+		retryCfg = map[string]any{
+			"enabled": false,
+		}
+	}
+	return retryCfg
+}
+
+func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
+	// Create url using host name, protocol and path
+	outputHosts, err := outputs.ReadHostList(output)
+	if err != nil {
+		return nil, fmt.Errorf("error reading host list: %w", err)
+	}
+
+	hosts := []string{}
+	for _, h := range outputHosts {
+		esURL, err := common.MakeURL(escfg.Protocol, escfg.Path, h, 9200)
+		if err != nil {
+			return nil, fmt.Errorf("cannot generate ES URL from host %w", err)
+		}
+		if !slices.Contains(hosts, esURL) {
+			hosts = append(hosts, esURL)
+		}
+	}
+
+	if len(escfg.Params) != 0 {
+		// convert params to map[string][]string
+		params := make(map[string][]string, 0)
+		for key, value := range escfg.Params {
+			params[key] = []string{value}
+		}
+
+		decodedParam := url.Values(params)
+		// It is enough to add params as encoded query to any one host
+		// Elasticsearch exporter will make sure to add these for every outgoing request
+		for i := range hosts {
+			hosts[i] = strings.Join([]string{hosts[0], decodedParam.Encode()}, "?")
+		}
+	}
+
+	return hosts, nil
+}
+
+>>>>>>> 7aa2902a1 (fix(otel): separate Elasticsearch request and document retries (#16089))
 // log warning for unsupported config
 func checkUnsupportedConfig(cfg *config.C) error {
 	if cfg.HasField("indices") {
