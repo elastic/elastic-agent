@@ -13,13 +13,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-<<<<<<< HEAD
-=======
-	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
->>>>>>> 7aa2902a1 (fix(otel): separate Elasticsearch request and document retries (#16089))
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,6 +26,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,11 +40,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/go-elasticsearch/v8"
-<<<<<<< HEAD
-=======
 	mockes "github.com/elastic/mock-es/pkg/api"
-	"github.com/elastic/sarama"
->>>>>>> 7aa2902a1 (fix(otel): separate Elasticsearch request and document retries (#16089))
 )
 
 const apmProcessingContent = `2023-06-19 05:20:50 ERROR This is a test error message

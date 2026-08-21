@@ -222,11 +222,12 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 	}
 	// Retries
 	retryCfg := map[string]any{
-		"enabled":          true,
-		"max_retries":      escfg.MaxRetries,
-		"initial_interval": escfg.Backoff.Init, // backoff.init
-		"max_interval":     escfg.Backoff.Max,  // backoff.max
-		"retry_on_status":  escfg.RetryOnStatus,
+		"enabled":                  true,
+		"max_retries":              escfg.MaxRetries,
+		"initial_interval":         escfg.Backoff.Init, // backoff.init
+		"max_interval":             escfg.Backoff.Max,  // backoff.max
+		"retry_on_status":          escfg.RetryOnStatus,
+		"retry_on_document_status": escfg.RetryOnDocumentStatus,
 	}
 	if escfg.MaxRetries == 0 {
 		// Disable retries
@@ -271,8 +272,6 @@ func getTotalNumWorkers(cfg *config.C) int {
 	return len(hostList)
 }
 
-<<<<<<< HEAD
-=======
 func getRetryConfig(escfg esToOTelOptions) map[string]any {
 	// Retries
 	retryCfg := map[string]any{
@@ -329,7 +328,6 @@ func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
 	return hosts, nil
 }
 
->>>>>>> 7aa2902a1 (fix(otel): separate Elasticsearch request and document retries (#16089))
 // log warning for unsupported config
 func checkUnsupportedConfig(cfg *config.C) error {
 	if cfg.HasField("indices") {
