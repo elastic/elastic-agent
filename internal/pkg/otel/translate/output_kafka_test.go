@@ -80,6 +80,9 @@ headers:
 					"value": "another value",
 				},
 			},
+			"record_partitioner": map[string]any{
+				"extension": "kafkapartitioner/_agent-component/default",
+			},
 		},
 	},
 		{
@@ -132,6 +135,9 @@ max_message_bytes: 1000000`,
 						"mechanism": "PLAIN",
 					},
 				},
+				"record_partitioner": map[string]any{
+					"extension": "kafkapartitioner/_agent-component/default",
+				},
 			},
 		},
 		{
@@ -144,7 +150,7 @@ compression: gzip
 max_message_bytes: 1000000`,
 			expectedMap: map[string]any{
 				"brokers":              []string{"kafka1:9092", "kafka2:9092", "kafka3:9092"},
-				"topic_from_attribute": "topic", // this field is an the addition
+				"topic_from_attribute": "topic", // this field is added when dynamic topic is set in the config
 				"client_id":            "beats",
 				"metadata": map[string]any{
 					"refresh_interval": 10 * time.Minute,
@@ -175,6 +181,9 @@ max_message_bytes: 1000000`,
 					"encoding": "raw",
 				},
 				"timeout": 10 * time.Second,
+				"record_partitioner": map[string]any{
+					"extension": "kafkapartitioner/_agent-component/default",
+				},
 			},
 		},
 	}
@@ -183,7 +192,7 @@ max_message_bytes: 1000000`,
 		t.Run(testc.name, func(t *testing.T) {
 			cfg, err := config.NewConfigFrom(testc.input)
 			require.NoError(t, err, "error creating kafka config")
-			gotMap, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
+			gotMap, _, _, err := KafkaToOTelConfig(cfg, "default", logp.NewNopLogger())
 			require.NoError(t, err, "error translating kafka to kafka exporter")
 			require.Equal(t, testc.expectedMap, gotMap)
 		})
@@ -327,7 +336,7 @@ ssl:
 		t.Run(test.name, func(t *testing.T) {
 			cfg, err := config.NewConfigFrom(test.input)
 			require.NoError(t, err)
-			_, _, err = KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
+			_, _, _, err = KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
 			require.ErrorIs(t, err, errors.ErrUnsupported)
 		})
 	}
