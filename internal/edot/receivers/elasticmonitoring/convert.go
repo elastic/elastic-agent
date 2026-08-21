@@ -13,13 +13,18 @@ import (
 )
 
 // metricdataToPdata converts an OTel SDK ResourceMetrics (from the internal
-// telemetry ManualReader) into a pdata.Metrics, preserving scope names, scope
-// attributes, metric names/units, and all data point values and attributes.
-// Resource attributes are not currently emitted by the internal telemetry
-// reader so they are not copied.
+// telemetry ManualReader) into a pdata.Metrics, preserving resource attributes,
+// scope names, scope attributes, metric names/units, and all data point values
+// and attributes.
 func metricdataToPdata(rm *metricdata.ResourceMetrics) pmetric.Metrics {
 	md := pmetric.NewMetrics()
 	pRM := md.ResourceMetrics().AppendEmpty()
+
+	iter := rm.Resource.Iter()
+	for iter.Next() {
+		kv := iter.Attribute()
+		setAttrValue(pRM.Resource().Attributes(), string(kv.Key), kv.Value)
+	}
 
 	for _, sm := range rm.ScopeMetrics {
 		pSM := pRM.ScopeMetrics().AppendEmpty()

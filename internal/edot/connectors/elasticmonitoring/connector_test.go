@@ -11,9 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/consumer/consumertest"
+	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.uber.org/zap"
 
-	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
 )
 
 func newTestConnector(sink *consumertest.LogsSink) *monitoringConnector {
@@ -24,119 +25,146 @@ func newTestConnector(sink *consumertest.LogsSink) *monitoringConnector {
 	}
 }
 
-// TestConsumeMetrics_SingleBatchedConsumeLogsCall verifies that all monitoring
-// events derived from one ConsumeMetrics call (exporter, input, and receiver
-// pipeline metrics) are forwarded in a single ConsumeLogs call rather than one
-// call per event.
-func TestConsumeMetrics_SingleBatchedConsumeLogsCall(t *testing.T) {
-	const exporterID = "elasticsearch/_agent-component/monitoring"
-	md, sm := newMetricsWithExporterScope(exporterID)
-	appendGaugeInt(sm, otelQueueCapacityKey, 100)
-
-	appendScopeToMetrics(md, fbreceiverScopeName,
-		otelComponentKindKey, "receiver",
-		otelComponentIDKey, "filebeatreceiver/_agent-component/filebeat-default",
-	)
-	inputSM := md.ResourceMetrics().At(0).ScopeMetrics().At(1)
-	appendGaugeIntWithAttrs(inputSM, "beat.input.events.published", 42, otelInputIDKey, "logs.my-input")
-
-	registrySM := appendScopeToMetrics(md, registryBridgeScopeName)
-	appendSumIntWithAttrs(registrySM, "libbeat.output.events.acked", 7, registryBridgeReceiverKey, "filebeatreceiver/_agent-component/filestream-default")
-
-	sink := &consumertest.LogsSink{}
-	c := newTestConnector(sink)
-	c.config.ExporterNames = map[string]string{exporterID: "monitoring"}
-
-	require.NoError(t, c.ConsumeMetrics(t.Context(), md))
-
-	assert.Len(t, sink.AllLogs(), 1, "expected exactly one ConsumeLogs call, all events should be batched together")
-	assert.Equal(t, 3, sink.LogRecordCount(), "expected one log record per generated monitoring event")
+// newProcessorOutputEvent creates a minimal pmetric.Metrics in the format
+// produced by the elasticmonitoringprocessor — one ResourceMetrics per event,
+// with elastic.monitoring.event.type and component.id as scope attributes.
+func newProcessorOutputEvent(eventType, componentID string) pmetric.Metrics {
+	md := pmetric.NewMetrics()
+	sm := md.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
+	sm.Scope().SetName(internaltelemetry.ScopeName)
+	sm.Scope().Attributes().PutStr(internaltelemetry.EventTypeAttr, eventType)
+	sm.Scope().Attributes().PutStr(internaltelemetry.ComponentIDAttr, componentID)
+	return md
 }
 
-// TestConsumeMetrics_NoData verifies that ConsumeMetrics doesn't call
-// ConsumeLogs at all when there's nothing to report, rather than sending an
-// empty batch.
-func TestConsumeMetrics_NoData(t *testing.T) {
-	md, _ := newMetricsWithScope("some.unrelated.scope")
+// appendMetricToMD appends a gauge int metric to the first (and only)
+// ScopeMetrics inside the first ResourceMetrics of md.
+func appendMetricToMD(md pmetric.Metrics, name string, value int64) {
+	sm := md.ResourceMetrics().At(0).ScopeMetrics().At(0)
+	m := sm.Metrics().AppendEmpty()
+	m.SetName(name)
+	m.SetEmptyGauge().DataPoints().AppendEmpty().SetIntValue(value)
+}
+
+// TestConsumeMetrics_SingleBatchedConsumeLogsCall verifies that all monitoring
+// events (one per ResourceMetrics) are forwarded in a single ConsumeLogs call
+// rather than one call per event.
+func TestConsumeMetrics_SingleBatchedConsumeLogsCall(t *testing.T) {
+	md := pmetric.NewMetrics()
+
+	// Exporter event
+	sm1 := md.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
+	sm1.Scope().Attributes().PutStr(internaltelemetry.EventTypeAttr, internaltelemetry.EventTypeExporter)
+	sm1.Scope().Attributes().PutStr(internaltelemetry.ComponentIDAttr, "monitoring")
+
+	// Input event
+	sm2 := md.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
+	sm2.Scope().Attributes().PutStr(internaltelemetry.EventTypeAttr, internaltelemetry.EventTypeInput)
+	sm2.Scope().Attributes().PutStr(internaltelemetry.ComponentIDAttr, "filebeat-default")
+	sm2.Scope().Attributes().PutStr(internaltelemetry.InputIDAttr, "logs.my-input")
+
+	// Receiver event
+	sm3 := md.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
+	sm3.Scope().Attributes().PutStr(internaltelemetry.EventTypeAttr, internaltelemetry.EventTypeReceiver)
+	sm3.Scope().Attributes().PutStr(internaltelemetry.ComponentIDAttr, "filestream-default")
 
 	sink := &consumertest.LogsSink{}
 	c := newTestConnector(sink)
+	require.NoError(t, c.ConsumeMetrics(t.Context(), md))
 
+	assert.Len(t, sink.AllLogs(), 1, "expected exactly one ConsumeLogs call")
+	assert.Equal(t, 3, sink.LogRecordCount(), "expected one log record per event")
+}
+
+// TestConsumeMetrics_NoData verifies that ConsumeMetrics does not call ConsumeLogs
+// when no ResourceMetrics carry a recognised event type.
+func TestConsumeMetrics_NoData(t *testing.T) {
+	md := pmetric.NewMetrics()
+	md.ResourceMetrics().AppendEmpty() // no elastic.monitoring.event.type attribute
+
+	sink := &consumertest.LogsSink{}
+	c := newTestConnector(sink)
 	require.NoError(t, c.ConsumeMetrics(context.Background(), md))
 
 	assert.Empty(t, sink.AllLogs())
 }
 
-// eventValue looks up a dotted field path in a Beats-format event, the same
-// way mapstr.M.Put interprets the paths used to build these events.
-func eventValue(t *testing.T, event mapstr.M, key string) any {
-	t.Helper()
-	val, err := event.GetValue(key)
-	require.NoError(t, err, "key %q not found in event", key)
-	return val
+// TestConsumeMetrics_ExporterEventFields verifies that an exporter event sets the
+// component.id field and metric values on the log record body.
+func TestConsumeMetrics_ExporterEventFields(t *testing.T) {
+	md := newProcessorOutputEvent(internaltelemetry.EventTypeExporter, "my-output")
+	appendMetricToMD(md, "beat.stats.libbeat.pipeline.queue.max_events", 1000)
+
+	sink := &consumertest.LogsSink{}
+	c := newTestConnector(sink)
+	c.config.EventTemplate.Fields = map[string]any{
+		"data_stream": map[string]any{"dataset": "elastic_agent.elastic_agent"},
+	}
+	require.NoError(t, c.ConsumeMetrics(t.Context(), md))
+
+	require.Equal(t, 1, sink.LogRecordCount())
+	body := sink.AllLogs()[0].ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).Body().Map()
+
+	compID, ok := body.Get("component.id")
+	require.True(t, ok)
+	assert.Equal(t, "my-output", compID.Str())
+
+	queueMax, ok := body.Get("beat.stats.libbeat.pipeline.queue.max_events")
+	require.True(t, ok)
+	assert.Equal(t, int64(1000), queueMax.Int())
 }
 
-func TestBuildExporterEvents(t *testing.T) {
-	const exporterID = "elasticsearch/_agent-component/monitoring"
-	md, sm := newMetricsWithExporterScope(exporterID)
-	appendGaugeInt(sm, otelQueueCapacityKey, 100)
+// TestConsumeMetrics_InputEventFields verifies that an input event sets the
+// filebeat_input.* fields from resource attributes and metrics.
+func TestConsumeMetrics_InputEventFields(t *testing.T) {
+	md := pmetric.NewMetrics()
+	sm := md.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
+	sm.Scope().Attributes().PutStr(internaltelemetry.EventTypeAttr, internaltelemetry.EventTypeInput)
+	sm.Scope().Attributes().PutStr(internaltelemetry.ComponentIDAttr, "filebeat-default")
+	sm.Scope().Attributes().PutStr(internaltelemetry.InputIDAttr, "logs.my-input")
+	sm.Scope().Attributes().PutStr(internaltelemetry.InputTypeAttr, "log")
+	m := sm.Metrics().AppendEmpty()
+	m.SetName("filebeat_input.beat.input.events.published")
+	m.SetEmptyGauge().DataPoints().AppendEmpty().SetIntValue(42)
 
-	cfg := &Config{ExporterNames: map[string]string{exporterID: "monitoring"}}
+	sink := &consumertest.LogsSink{}
+	c := newTestConnector(sink)
+	require.NoError(t, c.ConsumeMetrics(t.Context(), md))
 
-	events := buildExporterEvents(zap.NewNop(), cfg, md)
+	require.Equal(t, 1, sink.LogRecordCount())
+	body := sink.AllLogs()[0].ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).Body().Map()
 
-	require.Len(t, events, 1)
-	assert.Equal(t, "monitoring", eventValue(t, events[0], "component.id"))
-	assert.Equal(t, int64(100), eventValue(t, events[0], "beat.stats.libbeat.pipeline.queue.max_events"))
+	inputID, ok := body.Get("filebeat_input.id")
+	require.True(t, ok)
+	assert.Equal(t, "logs.my-input", inputID.Str())
+
+	inputType, ok := body.Get("filebeat_input.input")
+	require.True(t, ok)
+	assert.Equal(t, "log", inputType.Str())
+
+	published, ok := body.Get("filebeat_input.beat.input.events.published")
+	require.True(t, ok)
+	assert.Equal(t, int64(42), published.Int())
 }
 
-func TestBuildExporterEvents_UnknownExporterFallsBackToExporterID(t *testing.T) {
-	const exporterID = "elasticsearch/_agent-component/monitoring"
-	md, sm := newMetricsWithExporterScope(exporterID)
-	appendGaugeInt(sm, otelQueueCapacityKey, 1)
+// TestConsumeMetrics_EventTemplateApplied verifies that fields from the event
+// template appear in the log record body.
+func TestConsumeMetrics_EventTemplateApplied(t *testing.T) {
+	md := newProcessorOutputEvent(internaltelemetry.EventTypeReceiver, "filestream-default")
 
-	events := buildExporterEvents(zap.NewNop(), &Config{}, md)
+	sink := &consumertest.LogsSink{}
+	c := newTestConnector(sink)
+	c.config.EventTemplate.Fields = map[string]any{
+		"elastic_agent": map[string]any{"version": "9.0.0"},
+	}
+	require.NoError(t, c.ConsumeMetrics(t.Context(), md))
 
-	require.Len(t, events, 1)
-	assert.Equal(t, exporterID, eventValue(t, events[0], "component.id"))
-}
+	require.Equal(t, 1, sink.LogRecordCount())
+	body := sink.AllLogs()[0].ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).Body().Map()
 
-func TestBuildInputEvents(t *testing.T) {
-	md, sm := newMetricsWithReceiverScope(fbreceiverScopeName, "filebeatreceiver/_agent-component/filebeat-default")
-	appendGaugeIntWithAttrs(sm, "beat.input.events.published", 42, otelInputIDKey, "logs.my-input")
-
-	events := buildInputEvents(&Config{}, md)
-
-	require.Len(t, events, 1)
-	assert.Equal(t, "filebeat-default", eventValue(t, events[0], "component.id"))
-	assert.Equal(t, int64(42), eventValue(t, events[0], "filebeat_input.beat.input.events.published"))
-}
-
-func TestBuildInputEvents_IgnoresNonFilebeatComponents(t *testing.T) {
-	md, sm := newMetricsWithReceiverScope(mbreceiverScopeName, "metricbeatreceiver/_agent-component/metricbeat-default")
-	appendGaugeIntWithAttrs(sm, "beat.input.events.published", 1, otelInputIDKey, "some-input")
-
-	events := buildInputEvents(&Config{}, md)
-
-	assert.Empty(t, events)
-}
-
-func TestBuildReceiverPipelineEvents(t *testing.T) {
-	const receiverID = "filebeatreceiver/_agent-component/filestream-default"
-	md, sm := newMetricsWithRegistryBridgeScope()
-	appendSumIntWithAttrs(sm, "libbeat.output.events.acked", 7, registryBridgeReceiverKey, receiverID)
-
-	events := buildReceiverPipelineEvents(&Config{}, md)
-
-	require.Len(t, events, 1)
-	assert.Equal(t, "filestream-default", eventValue(t, events[0], "component.id"))
-	assert.Equal(t, int64(7), eventValue(t, events[0], "beat.stats.libbeat.output.events.acked"))
-}
-
-func TestBuildReceiverPipelineEvents_NoData(t *testing.T) {
-	md, _ := newMetricsWithScope("some.unrelated.scope")
-
-	events := buildReceiverPipelineEvents(&Config{}, md)
-
-	assert.Empty(t, events)
+	elasticAgent, ok := body.Get("elastic_agent")
+	require.True(t, ok, "elastic_agent field must be present from event template")
+	version, ok := elasticAgent.Map().Get("version")
+	require.True(t, ok)
+	assert.Equal(t, "9.0.0", version.Str())
 }

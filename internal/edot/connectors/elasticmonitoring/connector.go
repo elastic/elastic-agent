@@ -19,6 +19,8 @@ import (
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+
+	"github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
 )
 
 type monitoringConnector struct {
@@ -48,8 +50,14 @@ func (c *monitoringConnector) Capabilities() consumer.Capabilities {
 	return consumer.Capabilities{MutatesData: false}
 }
 
-// ConsumeMetrics converts all monitoring metrics to Beats-format log records and
-// forwards them as a single ConsumeLogs call.
+// ConsumeMetrics converts pre-processed monitoring metrics (from the
+// elasticmonitoringprocessor) to Beats-format log records and forwards them as
+// a single ConsumeLogs call.
+//
+// Each ResourceMetrics in md represents one monitoring event. The event type
+// (exporter, input, or receiver) is read from the elastic.monitoring.event.type
+// resource attribute; the appropriate event template is cloned and all metrics
+// in the ResourceMetrics are written as fields on the event.
 func (c *monitoringConnector) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) error {
 	pLogs := plog.NewLogs()
 	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
@@ -58,19 +66,8 @@ func (c *monitoringConnector) ConsumeMetrics(ctx context.Context, md pmetric.Met
 
 	now := time.Now()
 
-	// exporter events
-	for _, beatEvent := range buildInputEvents(c.config, md) {
-		c.appendLogRecord(scopeLogs, beatEvent, now)
-	}
-
-	// input events
-	for _, beatEvent := range buildExporterEvents(c.logger, c.config, md) {
-		c.appendLogRecord(scopeLogs, beatEvent, now)
-	}
-
-	// receiver pipeline events
-	for _, beatEvent := range buildReceiverPipelineEvents(c.config, md) {
-		c.appendLogRecord(scopeLogs, beatEvent, now)
+	for i := 0; i < md.ResourceMetrics().Len(); i++ {
+		c.appendMonitoringEvent(scopeLogs, md.ResourceMetrics().At(i), now)
 	}
 
 	if pLogs.LogRecordCount() == 0 {
@@ -83,62 +80,79 @@ func (c *monitoringConnector) ConsumeMetrics(ctx context.Context, md pmetric.Met
 	return nil
 }
 
-// buildExporterEvents builds one Beats-format monitoring event per exporter
-// reporting metrics in md, using cfg.EventTemplate for static fields and
-// cfg.ExporterNames to resolve the agent component name.
-func buildExporterEvents(logger *zap.Logger, cfg *Config, md pmetric.Metrics) []mapstr.M {
-	exporterMetricsMap := convertScopeMetrics(md)
-	events := make([]mapstr.M, 0, len(exporterMetricsMap))
-	for exporter, metrics := range exporterMetricsMap {
-		componentID, ok := cfg.ExporterNames[exporter]
-		if !ok {
-			logger.Warn("Reporting metrics for exporter with no specified component name", zap.String("exporter_id", exporter))
-			componentID = exporter
-		}
-		beatEvent := mapstr.M(cfg.EventTemplate.Fields).Clone()
-		addMetricsToEventFields(logger, metrics, &beatEvent)
-		_, _ = beatEvent.Put("component.id", componentID)
-		events = append(events, beatEvent)
+// appendMonitoringEvent converts one ResourceMetrics event to a log record.
+func (c *monitoringConnector) appendMonitoringEvent(scopeLogs plog.ScopeLogs, rm pmetric.ResourceMetrics, now time.Time) {
+	if rm.ScopeMetrics().Len() == 0 {
+		return
 	}
-	return events
-}
+	scopeAttrs := rm.ScopeMetrics().At(0).Scope().Attributes()
 
-// buildInputEvents builds one Beats-format monitoring event per filebeat input
-// reporting metrics in md, using cfg.InputEventTemplate for static fields.
-func buildInputEvents(cfg *Config, md pmetric.Metrics) []mapstr.M {
-	var events []mapstr.M
-	for compID, compData := range collectComponentInputMetrics(md) {
-		if compData.beatType != "filebeat" {
-			continue
+	eventTypeVal, ok := scopeAttrs.Get(internaltelemetry.EventTypeAttr)
+	if !ok {
+		return
+	}
+
+	var template mapstr.M
+	switch eventTypeVal.Str() {
+	case internaltelemetry.EventTypeExporter, internaltelemetry.EventTypeReceiver:
+		template = mapstr.M(c.config.EventTemplate.Fields).Clone()
+	case internaltelemetry.EventTypeInput:
+		template = mapstr.M(c.config.InputEventTemplate.Fields).Clone()
+	default:
+		return
+	}
+
+	if compID, ok := scopeAttrs.Get(internaltelemetry.ComponentIDAttr); ok {
+		template["component.id"] = compID.Str()
+	}
+
+	if eventTypeVal.Str() == internaltelemetry.EventTypeInput {
+		if inputID, ok := scopeAttrs.Get(internaltelemetry.InputIDAttr); ok {
+			template["filebeat_input.id"] = inputID.Str()
 		}
-		for _, inputMetrics := range compData.inputs {
-			beatEvent := mapstr.M(cfg.InputEventTemplate.Fields).Clone()
-			_, _ = beatEvent.Put("component.id", compID)
-			namespace := compData.beatType + "_input"
-			for k, v := range inputMetrics {
-				_, _ = beatEvent.Put(namespace+"."+k, v)
+		if inputType, ok := scopeAttrs.Get(internaltelemetry.InputTypeAttr); ok {
+			template["filebeat_input.input"] = inputType.Str()
+		}
+	}
+
+	for j := 0; j < rm.ScopeMetrics().Len(); j++ {
+		sm := rm.ScopeMetrics().At(j)
+		for k := 0; k < sm.Metrics().Len(); k++ {
+			m := sm.Metrics().At(k)
+			name := m.Name()
+			if val := firstMetricValue(m); val != nil {
+				template[name] = val
 			}
-			events = append(events, beatEvent)
 		}
 	}
-	return events
+
+	c.appendLogRecord(scopeLogs, template, now)
 }
 
-// buildReceiverPipelineEvents builds one Beats-format monitoring event per
-// component reporting RegistryBridge pipeline metrics in md, using
-// cfg.EventTemplate for static fields.
-func buildReceiverPipelineEvents(cfg *Config, md pmetric.Metrics) []mapstr.M {
-	receiverPipelineMetrics := collectReceiverMetrics(md)
-	events := make([]mapstr.M, 0, len(receiverPipelineMetrics))
-	for compID, fields := range receiverPipelineMetrics {
-		beatEvent := mapstr.M(cfg.EventTemplate.Fields).Clone()
-		_, _ = beatEvent.Put("component.id", compID)
-		for k, v := range fields {
-			_, _ = beatEvent.Put(k, v)
+// firstMetricValue returns the value of the first data point, or nil if there
+// are no data points or the metric type is unsupported.
+func firstMetricValue(m pmetric.Metric) any {
+	switch m.Type() {
+	case pmetric.MetricTypeGauge:
+		if m.Gauge().DataPoints().Len() > 0 {
+			return dataPointNumericValue(m.Gauge().DataPoints().At(0))
 		}
-		events = append(events, beatEvent)
+	case pmetric.MetricTypeSum:
+		if m.Sum().DataPoints().Len() > 0 {
+			return dataPointNumericValue(m.Sum().DataPoints().At(0))
+		}
 	}
-	return events
+	return nil
+}
+
+func dataPointNumericValue(dp pmetric.NumberDataPoint) any {
+	switch dp.ValueType() {
+	case pmetric.NumberDataPointValueTypeInt:
+		return dp.IntValue()
+	case pmetric.NumberDataPointValueTypeDouble:
+		return dp.DoubleValue()
+	}
+	return nil
 }
 
 func (c *monitoringConnector) appendLogRecord(scopeLogs plog.ScopeLogs, beatEvent mapstr.M, now time.Time) {
