@@ -3800,3 +3800,123 @@ func downloadData(t *testing.T, file string) mapstr.M {
 	}
 	return nil
 }
+
+// Regression test for https://github.com/elastic/sdh-beats/issues/7489:
+// Elastic Agent must reach healthy state when the Kafka output uses lz4 compression.
+// Before the fix, the OTel translation layer unconditionally passed compression_params.level=4
+// which the OTel kafkaexporter rejects for codecs that don't support levels.
+func TestKafkaOutputLz4CompressionStartsHealthy(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok, "failed to get current file path")
+	kafkaPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "beats", "testing", "environments", "docker", "kafka")
+
+	composeContent := fmt.Sprintf(`
+services:
+  kafka:
+    build: %s
+    ports:
+      - 9092:9092
+      - 9093:9093
+      - 9094:9094
+      - 2181:2181
+    environment:
+      - KAFKA_ADVERTISED_HOST=localhost
+`, kafkaPath)
+
+	stack := newDockerCompose(t, composeContent)
+	t.Cleanup(func() { _ = stack.down(context.Background()) }) //nolint:forbidigo // t.Context() is cancelled by cleanup time
+	err := stack.up(t.Context())
+	require.NoError(t, err)
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	agentConfig := fmt.Sprintf(`
+agent.internal.runtime.output:
+  kafka: otel
+agent.grpc.port: 6799
+inputs:
+  - type: system/metrics
+    id: system-metrics-lz4-test
+    use_output: default
+    streams:
+    - metricsets:
+       - cpu
+      period: 1s
+      data_stream:
+        dataset: e2e
+        namespace: lz4test
+outputs:
+  default:
+    type: kafka
+    hosts: ["localhost:9093"]
+    topic: metrics-e2e-lz4test
+    compression: lz4
+    max_message_bytes: 1000000
+    required_acks: 1
+    broker_timeout: 30s
+    queue.mem.flush.timeout: 1s
+    ssl:
+      certificate_authorities:
+        - %s
+      supported_protocols:
+       - TLSv1.3
+      verification_mode: full
+    username: beats
+    password: KafkaTest
+    protocol: https
+    sasl.mechanism: SCRAM-SHA-256
+agent.monitoring:
+  metrics: false
+  logs: false
+  http:
+    enabled: true
+    port: 6791
+`, filepath.Join(kafkaPath, "certs", "ca-cert"))
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(3*time.Minute))
+	defer cancel()
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, []byte(agentConfig))
+	require.NoError(t, err)
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	err = cmd.Start()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = cmd.Wait() })
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 30*time.Second, 1*time.Second, "agent must reach healthy state with lz4 kafka output")
+}
