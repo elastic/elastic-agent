@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent/internal/edot
 
-go 1.26.6
+go 1.26.7
 
 replace github.com/elastic/elastic-agent => ../../
 
