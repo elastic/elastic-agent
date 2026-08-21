@@ -292,42 +292,6 @@ func getRetryConfig(escfg esToOTelOptions) map[string]any {
 	return retryCfg
 }
 
-func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
-	// Create url using host name, protocol and path
-	outputHosts, err := outputs.ReadHostList(output)
-	if err != nil {
-		return nil, fmt.Errorf("error reading host list: %w", err)
-	}
-
-	hosts := []string{}
-	for _, h := range outputHosts {
-		esURL, err := common.MakeURL(escfg.Protocol, escfg.Path, h, 9200)
-		if err != nil {
-			return nil, fmt.Errorf("cannot generate ES URL from host %w", err)
-		}
-		if !slices.Contains(hosts, esURL) {
-			hosts = append(hosts, esURL)
-		}
-	}
-
-	if len(escfg.Params) != 0 {
-		// convert params to map[string][]string
-		params := make(map[string][]string, 0)
-		for key, value := range escfg.Params {
-			params[key] = []string{value}
-		}
-
-		decodedParam := url.Values(params)
-		// It is enough to add params as encoded query to any one host
-		// Elasticsearch exporter will make sure to add these for every outgoing request
-		for i := range hosts {
-			hosts[i] = strings.Join([]string{hosts[0], decodedParam.Encode()}, "?")
-		}
-	}
-
-	return hosts, nil
-}
-
 // log warning for unsupported config
 func checkUnsupportedConfig(cfg *config.C) error {
 	if cfg.HasField("indices") {
