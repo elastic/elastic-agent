@@ -867,7 +867,10 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 			require.NoError(t, err)
 
 			foundTags := false
+			// foundFIPS is set by either the old signal (GOEXPERIMENT=systemcrypto) or the
+			// new signal (GOFIPS140). On 9.4 the two toolchains coexist across components.
 			foundFIPS := false
+			foundGOFIPS140 := false
 			foundFIPSDefault := false
 			for _, setting := range info.Settings {
 				switch setting.Key {
@@ -875,9 +878,16 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 					foundTags = true
 					require.Contains(t, setting.Value, "requirefips")
 					continue
+				case "GOEXPERIMENT":
+					// Old microsoft/go toolchain: FIPS is signalled via GOEXPERIMENT=systemcrypto.
+					if strings.Contains(setting.Value, "systemcrypto") {
+						foundFIPS = true
+					}
+					continue
 				case "GOFIPS140":
-					foundFIPS = true
-					// Go embeds a commit hash suffix (e.g. v1.0.0-c2097c7c), so check by prefix.
+					// New Go FIPS module: Go embeds a commit hash suffix (e.g. v1.0.0-c2097c7c),
+					// so check by prefix.
+					foundGOFIPS140 = true
 					require.True(t, strings.HasPrefix(setting.Value, "v1.0.0"), "GOFIPS140 must reference the certified module version v1.0.0, got: %s", setting.Value)
 					continue
 				case "DefaultGODEBUG":
@@ -893,9 +903,14 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 				}
 			}
 
+			if foundGOFIPS140 {
+				// New toolchain: also require DefaultGODEBUG to enforce FIPS mode at runtime.
+				require.True(t, foundFIPSDefault, "Did not find fips140=on or fips140=only in DefaultGODEBUG — binary will not enforce FIPS mode at runtime")
+				foundFIPS = true
+			}
+
 			require.True(t, foundTags, "Did not find -tags within binary version information")
-			require.True(t, foundFIPS, "Did not find GOFIPS140 within binary version information")
-			require.True(t, foundFIPSDefault, "Did not find fips140=on or fips140=only in DefaultGODEBUG — binary will not enforce FIPS mode at runtime")
+			require.True(t, foundFIPS, "Did not find FIPS build signals (GOEXPERIMENT=systemcrypto or GOFIPS140) within binary version information")
 		})
 	}
 }
