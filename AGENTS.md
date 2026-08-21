@@ -165,6 +165,37 @@ Principles and repo-specific process: [CONTRIBUTING.md](./CONTRIBUTING.md).
   Commit the updated files. This is part of **`make check-ci`**. Use **`mage tidy`** so all modules in the repo stay in sync.
 - **Integration / E2E:** When changes affect multi-component or Elasticsearch-backed behavior, run the relevant integration or E2E targets described in the magefile and [docs/test-framework-dev-guide.md](./docs/test-framework-dev-guide.md).
 
+## Mandatory pre-push CI gate
+
+**Run these commands before every `git push`.** CI will fail if they are skipped.
+
+```bash
+# 1. Format + license headers
+mage fmt
+
+# 2. Lint changed files (golangci-lint across all build-tag sets)
+make lint
+
+# 3. Tidy ALL modules — root, internal/edot, wrapper/windows/archive-proxy
+mage tidy
+
+# 4. Regenerate files that mage check runs as registered deps — must be committed before check-ci
+#    otel:readme reads internal/edot/go.mod to regenerate internal/edot/README.md
+mage otel:readme
+#    notice regenerates NOTICE.txt + NOTICE-fips.txt from transitive deps
+mage notice
+
+# 5. make check-ci: runs mage check (vet + tidy + clean-tree assert) + NOTICE regen + Helm/K8s gen + check-no-changes
+make check-ci
+
+# 6. Assert the tree is clean after the above
+git diff-index --exit-code HEAD --
+```
+
+If `make check-ci` fails with a dirty tree, commit the regenerated files and repeat until clean.
+
+Steps 1–6 are **non-negotiable** — skip none of them. If any step fails, fix the root cause before pushing.
+
 ## PR Preferences
 
 Always use the [pull request template](.github/PULL_REQUEST_TEMPLATE.md) when creating a pull request.

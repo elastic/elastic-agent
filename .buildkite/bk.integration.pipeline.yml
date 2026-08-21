@@ -78,7 +78,7 @@ common:
     - fleet-endpoint-security
     - fleet-privileged
     - fleet-upgrade-to-pr-build
-    - fqdn
+    - hostname
     - install-uninstall
     - standalone-upgrade
     - upgrade

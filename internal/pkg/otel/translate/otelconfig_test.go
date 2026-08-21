@@ -24,6 +24,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pipeline"
@@ -4058,4 +4059,62 @@ func TestInjectOsqueryConfig(t *testing.T) {
 			assert.NotNil(t, got[0].config["osquery"], "result stream must have osquery config injected")
 		})
 	}
+}
+
+func TestGetReceiversConfigForComponentHostnameOverride(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-hostname-test",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-hostname-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"streams": []any{
+						map[string]any{
+							"id":    "stream-1",
+							"paths": []any{"/var/log/*.log"},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	t.Run("env_var_set", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "override-node")
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.Equal(t, "override-node", cfg["hostname"],
+				"receiver %s: hostname not injected into shared config", id)
+		}
+	})
+
+	t.Run("env_var_unset", func(t *testing.T) {
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.NotContains(t, cfg, "hostname",
+				"receiver %s: hostname should not be present when env var is unset", id)
+		}
+	})
 }

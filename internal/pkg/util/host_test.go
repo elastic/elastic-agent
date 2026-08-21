@@ -16,6 +16,12 @@ import (
 	"github.com/elastic/go-sysinfo/types"
 )
 
+func TestGetHostNameEnvOverride(t *testing.T) {
+	t.Setenv(EnvHostName, "my-node")
+	hostname := GetHostName(false, types.HostInfo{Hostname: "pod-xyz"}, nil, nil)
+	require.Equal(t, "my-node", hostname)
+}
+
 func TestGetHostName(t *testing.T) {
 	cases := map[string]struct {
 		fqdnFeatureEnabled bool
