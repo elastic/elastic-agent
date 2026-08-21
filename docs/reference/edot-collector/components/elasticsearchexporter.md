@@ -53,19 +53,21 @@ Refer to [Authentication methods for {{agent}}](/reference/edot-collector/config
 
 The API key used in the `api_key` setting authenticates bulk indexing requests to {{es}}. The key must have index-level privileges on the data streams that the exporter writes to.
 
-For logs, metrics, and traces (the default signals) {{agent}} writes to OTel-native data streams matching `logs-*-*`, `metrics-*-*`, and `traces-*-*`. The required index privileges are:
+For logs, metrics, and traces (the default signals) {{agent}} writes to OTel-native data streams matching `logs-*-*`, `metrics-*-*`, and `traces-*-*`. Bulk indexing requires the following index privileges:
 
 - `auto_configure`: Allows automatic creation and configuration of data stream templates.
 - `create_doc`: Allows writing documents using the Bulk API.
 
+If you turn on [{{es}} node discovery](#es-node-discovery), the key also needs the `monitor` cluster privilege. Without it, discovery fails with a 403 that is only visible in the {{agent}} logs.
+
 :::{note}
-Profiling data requires [universal profiling](https://www.elastic.co/docs/solutions/observability/infra-and-hosts/get-started-with-universal-profiling#profiling-configure-data-ingestion) to be configured in {{es}} separately, which manages its own index setup and permissions. The following API key example covers logs, metrics, and traces only.
+Profiling data requires [universal profiling](docs-content://solutions/observability/infra-and-hosts/get-started-with-universal-profiling.md#profiling-configure-data-ingestion) to be configured in {{es}} separately, which manages its own index setup and permissions. The following API key example covers logs, metrics, and traces only.
 :::
 
 Create the API key using the {{es}} Security API:
 
 ::::{dropdown} Example: Create an API key for the {{es}} exporter
-```json
+```console
 POST /_security/api_key
 {
   "name": "edot-collector-exporter",
@@ -122,7 +124,7 @@ exporters:
       ca_file: "/path/to/ca.crt"
 ```
 
-The `ca_file` path must be readable by the {{agent}} process. To skip verification entirely during testing, you can set `insecure_skip_verify: true`, but this is not recommended for production.
+The `ca_file` path must be readable by the {{agent}} process. Setting `ca_file` replaces the system trust store rather than adding to it, so if the same exporter also needs to trust publicly-signed certificates, set `include_system_ca_certs_pool: true` as well. To skip verification entirely during testing, you can set `insecure_skip_verify: true`, but this is not recommended for production.
 
 #### Mutual TLS (mTLS)
 
