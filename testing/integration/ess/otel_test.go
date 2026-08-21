@@ -2367,6 +2367,7 @@ exporters:
       queue_size: 3200
       wait_for_result: true
 processors:
+  elasticmonitoringprocessor: {}
   beat/1:
     processors:
       - add_host_metadata: null
@@ -2375,6 +2376,7 @@ service:
   pipelines:
     metrics:
       receivers: [elasticmonitoringreceiver]
+      processors: [elasticmonitoringprocessor]
       exporters: [elasticmonitoringconnector]
     logs:
       receivers: [elasticmonitoringconnector]
