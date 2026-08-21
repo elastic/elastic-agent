@@ -3789,23 +3789,6 @@ agent.monitoring:
 
 }
 
-func downloadData(t *testing.T, file string) mapstr.M {
-	data, err := os.ReadFile(file)
-	require.NoError(t, err, "failed to copy data from %s", file)
-
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
-		var m mapstr.M
-		require.NoError(t, json.Unmarshal(line, &m), "failed to unmarshal line from %s", file)
-		return m
-	}
-	return nil
-}
-
 // parseFirstJSONLine returns the first non-empty JSON object from data, or nil
 // if no valid JSON line is found.
 func parseFirstJSONLine(data []byte) mapstr.M {
