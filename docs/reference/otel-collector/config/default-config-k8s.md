@@ -29,7 +29,7 @@ The following `values.yaml` files are used depending on the ingest scenario:
 ::::{important}
 **Configuration compatibility with {{stack}} versions**
 
-If you're running {{agent}} 9.x with {{stack}} 8.18 or 8.19, use the Helm `values.yaml` files and configuration aligned with your Stack version to ensure proper functionality with {{product.kibana}} Observability UIs. For more details, refer to [Configuration compatibility with {{stack}} versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions).
+If you're running {{agent}} 9.x with {{stack}} 8.18 or 8.19, use the Helm `values.yaml` files and configuration aligned with your Stack version to ensure proper functionality with {{product.kibana}} Observability UIs. For more details, refer to [Configuration compatibility with {{stack}} versions](/reference/otel-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions).
 ::::
 
 The following sections describe the default pipelines for the different roles of {{agent}} in a Kubernetes setup.
@@ -73,7 +73,7 @@ The Gateway collectors pipelines differ between the two different deployment use
 
 In self-managed and {{ech}} Stack deployment use cases, the main purpose of the Gateway Collector is the central enrichment of data before the OpenTelemetry data is being ingested directly into {{es}} using the [`elasticsearch`] exporter.
 
-The Gateway Collector configuration comprises the pipelines for data enrichment of [application telemetry](/reference/edot-collector/config/default-config-standalone.md#application-and-traces-collection-pipeline) and [host metrics](/reference/edot-collector/config/default-config-standalone.md#host-metrics-collection-pipeline). For more details, refer to the linked descriptions of the corresponding standalone use cases.
+The Gateway Collector configuration comprises the pipelines for data enrichment of [application telemetry](/reference/otel-collector/config/default-config-standalone.md#application-and-traces-collection-pipeline) and [host metrics](/reference/otel-collector/config/default-config-standalone.md#host-metrics-collection-pipeline). For more details, refer to the linked descriptions of the corresponding standalone use cases.
 
 The [`routing`] connector separates the infrastructure metrics from other metrics and routes them into the ECS-based pipeline, with ECS-compatibility exporter mode. Other metrics are exported in OTel-native format to {{es}}.
 

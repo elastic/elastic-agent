@@ -182,5 +182,5 @@ Example alert scenarios:
 
 - [Contrib OpenTelemetry Collector internal telemetry documentation](https://opentelemetry.io/docs/collector/internal-telemetry/)
 - [Contrib OpenTelemetry metrics reference](https://opentelemetry.io/docs/specs/otel/metrics/)
-- [{{agent}} configuration reference](/reference/edot-collector/config/index.md)
+- [{{agent}} configuration reference](/reference/otel-collector/config/index.md)
 - [{{agent}} troubleshooting](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/index.md)

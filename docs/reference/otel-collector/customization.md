@@ -15,11 +15,11 @@ products:
 
 # {{agent}} customization
 
-{{agent}} comes with a [curated list](/reference/edot-collector/components.md) of OTel Collector components and some opinionated [configuration samples](https://github.com/elastic/elastic-agent/tree/main/internal/edot/samples).
+{{agent}} comes with a [curated list](/reference/otel-collector/components.md) of OTel Collector components and some opinionated [configuration samples](https://github.com/elastic/elastic-agent/tree/main/internal/edot/samples).
 
 If your use case requires additional components, you have two options:
 
-1. [Build a custom Collector](/reference/edot-collector/custom-collector.md)
+1. [Build a custom Collector](/reference/otel-collector/custom-collector.md)
 2. [Open a request](https://github.com/elastic/elastic-agent/issues/new/choose) to add those components to {{agent}}.
 
 Requests for adding new components will be reviewed on the basis of popularity, technical suitability, and other criteria.

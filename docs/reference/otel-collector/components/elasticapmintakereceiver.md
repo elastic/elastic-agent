@@ -21,7 +21,7 @@ Real user monitoring (RUM) intake and older intake protocols are not supported.
 
 ## Get started
 
-To use the Elastic APM intake receiver, include it in the receiver definitions of the [Collector configuration](/reference/edot-collector/config/index.md):
+To use the Elastic APM intake receiver, include it in the receiver definitions of the [Collector configuration](/reference/otel-collector/config/index.md):
 
 ```yaml
 receivers:

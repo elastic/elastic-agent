@@ -91,7 +91,7 @@ Application-related OTel data is ingested into {{es}} in OTel-native format usin
 Both the `elasticapm` processor and the `elasticapm` connector are required for Elastic APM UIs to work properly. As they aren't included in the OpenTelemetry [Collector Contrib repository](https://github.com/open-telemetry/opentelemetry-collector-contrib), you can:
 
 * Use the {{agent}} with the available configuration to ingest data into {{es}}.
-* [Build a custom Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
+* [Build a custom Collector](/reference/otel-collector/custom-collector.md) for ingesting data into {{es}}.
 * Use Elastic's [managed OTLP endpoint](docs-content://solutions/observability/get-started/opentelemetry/quickstart/serverless/index.md) that does the enrichment for you.
 
 If you're running {{agent}} 9.x with Elastic Stack 8.18 or 8.19, use the deprecated `elastictrace` processor instead of `elasticapm` processor as specified in the configuration for your Stack version.
@@ -482,7 +482,7 @@ For {{ecloud}} and {{serverless-full}} deployments, mTLS is not required. TLS an
 
 ## Configuration compatibility with Elastic Stack versions
 
-While {{agent}} 9.x is compatible with {{stack}} 8.18 and 8.19, users running these Stack versions should use the {{agent}} configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs. Refer to [Migrate components](/reference/edot-collector/components/migrate-components.md) to migrate your configuration to the new components.
+While {{agent}} 9.x is compatible with {{stack}} 8.18 and 8.19, users running these Stack versions should use the {{agent}} configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs. Refer to [Migrate components](/reference/otel-collector/components/migrate-components.md) to migrate your configuration to the new components.
 
 ::::{important}
 If you're upgrading {{agent}} to 9.x but keeping your {{stack}} on 8.18 or 8.19:

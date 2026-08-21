@@ -5,46 +5,46 @@
 components:
   # Exporters
   elasticsearchexporter:
-    doc_path: "/reference/edot-collector/components/elasticsearchexporter.md"
+    doc_path: "/reference/otel-collector/components/elasticsearchexporter.md"
     title: "Elasticsearch exporter"
     
   # Receivers  
   elasticapmintakereceiver:
-    doc_path: "/reference/edot-collector/components/elasticapmintakereceiver.md"
+    doc_path: "/reference/otel-collector/components/elasticapmintakereceiver.md"
     title: "Elastic APM intake receiver"
 
   elasticapmprocessor:
-    doc_path: "/reference/edot-collector/components/elasticapmprocessor.md"
+    doc_path: "/reference/otel-collector/components/elasticapmprocessor.md"
     title: "Elastic APM processor"
 
   filelogreceiver:
-    doc_path: "/reference/edot-collector/components/filelogreceiver.md"
+    doc_path: "/reference/otel-collector/components/filelogreceiver.md"
     title: "File log receiver"
 
   apikeyauthextension:
-    doc_path: "/reference/edot-collector/config/authentication-methods.md"
+    doc_path: "/reference/otel-collector/config/authentication-methods.md"
     title: "Authentication methods"
 
   bearertokenauthextension:
-    doc_path: "/reference/edot-collector/config/authentication-methods.md"
+    doc_path: "/reference/otel-collector/config/authentication-methods.md"
     title: "Authentication methods"
 
   hostmetricsreceiver:
-    doc_path: "/reference/edot-collector/components/hostmetricsreceiver.md"
+    doc_path: "/reference/otel-collector/components/hostmetricsreceiver.md"
     title: "Host metrics receiver"
 
   prometheusremotewritereceiver:
-    doc_path: "/reference/edot-collector/components/prometheusremotewritereceiver.md"
+    doc_path: "/reference/otel-collector/components/prometheusremotewritereceiver.md"
     title: "Prometheus remote write receiver"
 
   # Processors
   elasticapmprocessor:
-    doc_path: "/reference/edot-collector/components/elasticapmprocessor.md"
+    doc_path: "/reference/otel-collector/components/elasticapmprocessor.md"
     title: "Elastic APM processor"
 
   # Connectors
   elasticapmconnector:
-    doc_path: "/reference/edot-collector/components/elasticapmconnector.md"
+    doc_path: "/reference/otel-collector/components/elasticapmconnector.md"
     title: "Elastic APM connector"
 
   # Add more components as documentation is created

@@ -57,7 +57,7 @@ service:
 
 Because {{motlp}} is not yet available for {{ech}}, you need to set up {{agent}} as a gateway, handling processing required for some use cases, like deriving metrics from events in {{product.apm}}, and writing data directly to {{es}}.
 
-Point your contrib Collector OTLP exporter to the {{agent}} gateway. Refer to [Gateway configuration](/reference/edot-collector/config/default-config-standalone.md#gateway-mode) for more information.
+Point your contrib Collector OTLP exporter to the {{agent}} gateway. Refer to [Gateway configuration](/reference/otel-collector/config/default-config-standalone.md#gateway-mode) for more information.
 
 ### {{product.self}} [self-managed-elastic-stack]
 
@@ -132,7 +132,7 @@ Using the contrib OpenTelemetry Collector instead of {{agent}} comes with some t
 
 ## Next steps
 
-- [Build a custom Collector](/reference/edot-collector/custom-collector.md) for more control.
-- [Configure {{agent}}](/reference/edot-collector/config/index.md) for optimal Elastic integration.
-- [Learn about {{agent}} components](/reference/edot-collector/components.md) to understand what's included.
+- [Build a custom Collector](/reference/otel-collector/custom-collector.md) for more control.
+- [Configure {{agent}}](/reference/otel-collector/config/index.md) for optimal Elastic integration.
+- [Learn about {{agent}} components](/reference/otel-collector/components.md) to understand what's included.
 - [Explore deployment architectures](opentelemetry://reference/architecture/index.md) for different environments.

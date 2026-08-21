@@ -112,4 +112,4 @@ Use this feature only when necessary and validate in non-production environments
 ## Additional resources
 
 - [Data stream routing reference](docs-content://solutions/observability/apm/opentelemetry/data-stream-routing.md)
-- [{{agent}} configuration examples](/reference/edot-collector/config/index.md)
+- [{{agent}} configuration examples](/reference/otel-collector/config/index.md)

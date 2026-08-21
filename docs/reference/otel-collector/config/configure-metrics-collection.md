@@ -209,10 +209,10 @@ The {{agent}} supports a wide range of metrics receivers for popular software sy
 
  - Redis ([redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver)): Retrieve Redis INFO data from a single Redis instance.
 
- - JMX-based applications: The `jmxreceiver` was removed in {{agent}} 9.4.0. Use [JMX Scraper](https://github.com/open-telemetry/opentelemetry-java-contrib/tree/main/jmx-scraper) as a standalone Java program instead. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
+ - JMX-based applications: The `jmxreceiver` was removed in {{agent}} 9.4.0. Use [JMX Scraper](https://github.com/open-telemetry/opentelemetry-java-contrib/tree/main/jmx-scraper) as a standalone Java program instead. Refer to [Migrate from deprecated components](/reference/otel-collector/components/migrate-components.md) for migration instructions.
 
  - Prometheus scrape targets ([prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)): Receives metric data in [Prometheus](https://prometheus.io/) format.
 
  - Kafka ([kafkareceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kafkareceiver)): Receives telemetry data from Kafka, with configurable topics and encodings.
 
-For a full list of supported receivers, see the {{agent}} components [reference](/reference/edot-collector/components.md).
+For a full list of supported receivers, see the {{agent}} components [reference](/reference/otel-collector/components.md).

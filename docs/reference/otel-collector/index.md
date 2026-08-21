@@ -28,19 +28,19 @@ To install {{agent}} with basic settings in your environment, follow the [quicks
 
 ## Deployment modes
 
-You can deploy {{agent}} in different modes to meet your architectural needs. The two primary modes are Agent and Gateway. Depending on your Elastic deployment type, various {{agent}} instances might be required in each mode to support the target architecture. Refer to [Deployment modes](/reference/edot-collector/modes.md) for more details.
+You can deploy {{agent}} in different modes to meet your architectural needs. The two primary modes are Agent and Gateway. Depending on your Elastic deployment type, various {{agent}} instances might be required in each mode to support the target architecture. Refer to [Deployment modes](/reference/otel-collector/modes.md) for more details.
 
 ## Configure
 
 You can configure {{agent}} to use the standard OTel Collector configuration file or `values.yml` file if you have deployed it using Helm.
 
-For full details on each option, see [Configuration](/reference/edot-collector/config/index.md).
+For full details on each option, see [Configuration](/reference/otel-collector/config/index.md).
 
 ## Components
 
 Built on OpenTelemetry's modular architecture, {{agent}} offers a curated and fully supported selection of components designed for production-grade reliability.
 
-Refer to [Components](/reference/edot-collector/components.md) for the full list of components included in {{agent}}.
+Refer to [Components](/reference/otel-collector/components.md) for the full list of components included in {{agent}}.
 
 To request a component to be added, submit a [GitHub issue](https://github.com/elastic/elastic-agent/issues/new/choose).
 

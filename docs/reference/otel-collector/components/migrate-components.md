@@ -28,7 +28,7 @@ Follow these steps to migrate your existing {{agent}} configuration.
 :::::{stepper}
 
 ::::{step} Download the latest default configuration
-Download the configuration sample that matches your use case from the [default configuration samples](/reference/edot-collector/config/default-config-standalone.md#agent-mode). For Gateway mode, refer to the [Gateway mode section](/reference/edot-collector/config/default-config-standalone.md#gateway-mode).
+Download the configuration sample that matches your use case from the [default configuration samples](/reference/otel-collector/config/default-config-standalone.md#agent-mode). For Gateway mode, refer to the [Gateway mode section](/reference/otel-collector/config/default-config-standalone.md#gateway-mode).
 
 The latest configurations for {{stack}} 9.x use the latest components instead of the deprecated ones.
 ::::
@@ -67,5 +67,5 @@ If you're upgrading {{agent}} to 9.x but keeping your {{stack}} on 8.18 or 8.19:
 
 ## Related pages
 
-- [Default configuration (standalone)](/reference/edot-collector/config/default-config-standalone.md)
-- [Components included in {{agent}}](/reference/edot-collector/components.md)
+- [Default configuration (standalone)](/reference/otel-collector/config/default-config-standalone.md)
+- [Components included in {{agent}}](/reference/otel-collector/components.md)

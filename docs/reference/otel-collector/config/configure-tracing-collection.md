@@ -63,7 +63,7 @@ Both the [`elasticapm` processor](../components/elasticapmprocessor.md) and the 
 As they aren't included in the OpenTelemetry [Collector Contrib repository](https://github.com/open-telemetry/opentelemetry-collector-contrib), you can:
 
 * Use the {{agent}} with the available configuration to ingest data into {{es}}.
-* [Build a custom, {{agent}}-like Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
+* [Build a custom, {{agent}}-like Collector](/reference/otel-collector/custom-collector.md) for ingesting data into {{es}}.
 * Use Elastic's [managed OTLP endpoint](docs-content://solutions/observability/get-started/opentelemetry/quickstart/serverless/index.md) that does the enrichment for you.
 :::
 
