@@ -98,7 +98,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, rollback bool, sources []string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -879,7 +879,7 @@ func WithRollback(rollback bool) UpgradeOpt {
 
 // Upgrade runs the upgrade process.
 // Called from external goroutines.
-func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, opts ...UpgradeOpt) error {
+func (c *Coordinator) Upgrade(ctx context.Context, version string, sources []string, action *fleetapi.ActionUpgrade, opts ...UpgradeOpt) error {
 	var uOpts upgradeOpts
 	for _, opt := range opts {
 		opt(&uOpts)
@@ -944,14 +944,15 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 	// early check capabilities to ensure this upgrade actions is allowed
 	if c.caps != nil {
-		if !c.caps.AllowUpgrade(version, sourceURI) {
+		if !c.caps.AllowUpgrade(version, sources) {
 			c.ClearOverrideState()
 			det.Fail(ErrNotUpgradable)
 			return ErrNotUpgradable
 		}
+		sources = c.caps.FilterUpgradeSources(version, sources)
 	}
 
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes, uOpts.upgradeOpts...)
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sources, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes, uOpts.upgradeOpts...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {

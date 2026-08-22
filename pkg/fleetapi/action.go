@@ -299,11 +299,45 @@ type ActionUpgrade struct {
 }
 
 type ActionUpgradeData struct {
-	Version   string `json:"version" yaml:"version,omitempty" mapstructure:"-"`
-	SourceURI string `json:"source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
+	Version string   `json:"version" yaml:"version,omitempty" mapstructure:"-"`
+	Sources []string `json:"sources,omitempty" yaml:"sources,omitempty" mapstructure:"-"`
 	// TODO: update fleet open api schema
 	Retry    int  `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty" mapstructure:"-"`
 	Rollback bool `json:"rollback,omitempty" yaml:"rollback,omitempty" mapstructure:"-"`
+}
+
+func (a ActionUpgradeData) MarshalJSON() ([]byte, error) {
+	type Alias ActionUpgradeData
+	encoded := struct {
+		SourceURI string `json:"source_uri,omitempty"`
+		Alias
+	}{
+		Alias: Alias(a),
+	}
+	if len(a.Sources) > 0 {
+		encoded.SourceURI = a.Sources[0]
+	}
+
+	return json.Marshal(encoded)
+}
+
+func (a *ActionUpgradeData) UnmarshalJSON(data []byte) error {
+	type Alias ActionUpgradeData
+	var decoded struct {
+		SourceURI string `json:"source_uri"`
+		Alias
+	}
+
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+
+	// Fold deprecated SourceURI field into Sources.
+	*a = ActionUpgradeData(decoded.Alias)
+	if len(a.Sources) == 0 && decoded.SourceURI != "" {
+		a.Sources = []string{decoded.SourceURI}
+	}
+	return nil
 }
 
 func (a *ActionUpgrade) String() string {

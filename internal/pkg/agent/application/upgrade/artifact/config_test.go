@@ -76,6 +76,17 @@ func TestConfig_Unpack(t *testing.T) {
 	assert.Equal(t, DefaultConfig(), defaultcfg)
 }
 
+func TestConfig_Unpack_LegacySourceURI(t *testing.T) {
+	cfg := DefaultConfig()
+
+	oldcfg, err := agentlibsconfig.NewConfigFrom(`sourceURI: https://example.test/downloads/`)
+	require.NoError(t, err, "could not create config from yaml")
+
+	err = cfg.Unpack(oldcfg)
+	require.NoError(t, err, "Unpack failed")
+	assert.Equal(t, []string{"https://example.test/downloads/"}, cfg.Sources)
+}
+
 // TestConfig_Unpack_RetrySleepInitDuration covers the validation of
 // retry_sleep_init_duration during YAML unpack. A non-positive value would feed
 // directly into cenkalti/backoff's InitialInterval and produce a 0-duration

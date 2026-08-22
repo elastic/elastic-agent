@@ -69,7 +69,7 @@ var (
 )
 
 type artifactDownloadHandler interface {
-	downloadArtifact(ctx context.Context, target artifact.Artifact, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error)
+	downloadArtifact(ctx context.Context, target artifact.Artifact, sources []string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error)
 	withFleetServerURI(fleetServerURI string)
 }
 type unpackHandler interface {
@@ -186,31 +186,31 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 		return fmt.Errorf("invalid config: %w", err)
 	}
 
-	// the source URI coming from fleet which uses a different naming.
-	type fleetCfg struct {
-		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
-		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
-	}
-	fleetSourceURI := &fleetCfg{}
-	if err := rawConfig.UnpackTo(&fleetSourceURI); err != nil {
+	// the source URI coming from fleet which may use a different naming for sourceURI
+	fleetCfg := struct {
+		Sources   []string `json:"agent.download.sources" config:"agent.download.sources"`
+		SourceURI string   `json:"agent.download.source_uri" config:"agent.download.source_uri"`
+	}{}
+	if err := rawConfig.UnpackTo(&fleetCfg); err != nil {
 		return errors.New(err, "failed to unpack config during reload")
 	}
 
-	// fleet configuration takes precedence
-	if fleetSourceURI.FleetSourceURI != "" {
-		cfg.Settings.DownloadConfig.SourceURI = fleetSourceURI.FleetSourceURI
+	if len(fleetCfg.Sources) == 0 && fleetCfg.SourceURI != "" {
+		fleetCfg.Sources = []string{fleetCfg.SourceURI}
 	}
 
-	if cfg.Settings.DownloadConfig.SourceURI != "" {
-		u.log.Infof("Source URI changed from %q to %q",
-			u.settings.SourceURI,
-			cfg.Settings.DownloadConfig.SourceURI)
-	} else {
-		// source uri unset, reset to default
-		u.log.Infof("Source URI reset from %q to %q",
-			u.settings.SourceURI,
-			artifact.DefaultSourceURI)
-		cfg.Settings.DownloadConfig.SourceURI = artifact.DefaultSourceURI
+	// fleet configuration takes precedence.
+	if len(fleetCfg.Sources) > 0 {
+		cfg.Settings.DownloadConfig.Sources = fleetCfg.Sources
+		u.log.Infof("Download sources changed from %q to %q",
+			u.settings.Sources,
+			cfg.Settings.DownloadConfig.Sources)
+	} else if cfg.Settings.DownloadConfig.Sources == nil {
+		// Sources unset, reset to the default.
+		cfg.Settings.DownloadConfig.Sources = []string{artifact.DefaultSourceURI}
+		u.log.Infof("Download sources reset from %q to %q",
+			u.settings.Sources,
+			cfg.Settings.DownloadConfig.Sources)
 	}
 
 	u.settings = cfg.Settings.DownloadConfig
@@ -268,7 +268,7 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...Option) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sources []string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...Option) (_ reexec.ShutdownCallbackFn, err error) {
 
 	var uOpts upgradeOptions
 	for _, opt := range opts {
@@ -279,7 +279,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return u.rollbackToPreviousVersion(ctx, paths.Top(), time.Now(), version, action)
 	}
 
-	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
+	u.log.Infow("Upgrading agent", "version", version, "sources", sources)
 	var markerWritten bool
 	// postSymlinkPhase is set immediately after changeSymlink succeeds.
 	// Once the symlink points at the new install any failure must preserve the upgrade marker so the failure can be reported to Fleet, and restore active.commit if markUpgrade has already updated it.
@@ -405,7 +405,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("failed to build agent artifact: %w", err)
 	}
 
-	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, target, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, target, sources, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 
 	// If the artifactPath is not empty, then the artifact was downloaded.
 	// There may still be an error in the download process, so we need to add

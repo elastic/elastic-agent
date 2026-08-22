@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -86,7 +87,7 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 
 	go func() {
 		h.log.Infof("starting upgrade to version %s in background", action.Data.Version)
-		if err := h.coord.Upgrade(asyncCtx, action.Data.Version, action.Data.SourceURI, action, uOpts...); err != nil {
+		if err := h.coord.Upgrade(asyncCtx, action.Data.Version, action.Data.Sources, action, uOpts...); err != nil {
 			h.log.Errorf("upgrade to version %s failed: %v", action.Data.Version, err)
 			// If context is cancelled in getAsyncContext, the actions are acked there
 			if !errors.Is(asyncCtx.Err(), context.Canceled) {
@@ -153,10 +154,10 @@ func (h *Upgrade) getAsyncContext(ctx context.Context, upgradeAction *fleetapi.A
 	}
 
 	if upgradeAction.Data.Version == bkgAction.Data.Version &&
-		upgradeAction.Data.SourceURI == bkgAction.Data.SourceURI {
+		slices.Equal(upgradeAction.Data.Sources, bkgAction.Data.Sources) {
 		// not the same action this one needs to be acked
-		h.log.Infof("Duplicate upgrade request to same version %s and sourceURI %s, acknowledging new action (ActionID: %s) while keeping existing upgrade running (ActionID: %s)",
-			upgradeAction.Data.Version, upgradeAction.Data.SourceURI, upgradeAction.ActionID, bkgAction.ActionID)
+		h.log.Infof("Duplicate upgrade request to same version %s and sources %v, acknowledging new action (ActionID: %s) while keeping existing upgrade running (ActionID: %s)",
+			upgradeAction.Data.Version, upgradeAction.Data.Sources, upgradeAction.ActionID, bkgAction.ActionID)
 
 		go func() {
 			// kick it off and don't block, lock to prevent race with ackActions from finished upgrade
