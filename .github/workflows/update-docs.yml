@@ -92,6 +92,59 @@ jobs:
         run: |
           cd docs/scripts/update-docs
           python update-components-docs.py
+        env:
+          NEW_COMPONENTS_FILE: ${{ runner.temp }}/new-components.json
+
+      - name: Build PR body
+        id: pr_body
+        run: |
+          python3 - <<'EOF'
+          import json, os, pathlib
+
+          new_components_file = pathlib.Path(os.environ["RUNNER_TEMP"]) / "new-components.json"
+          version = "${{ needs.check-latest.outputs.version }}"
+
+          new_section = ""
+          if new_components_file.exists():
+              data = json.loads(new_components_file.read_text())
+              names = data.get("newly_stamped", [])
+              if names:
+                  bullet_list = "\n".join(f"- `{n}`" for n in names)
+                  new_section = f"""
+
+          ## ⚠️ New components detected
+
+          The following components appear in `{version}` for the first time.
+          Please review each one and update `internal/edot/components.yml` as needed:
+
+          {bullet_list}
+
+          For each new component, consider:
+          - Should it be listed under `core_components`?
+          - Does it need a `deprecated` entry?
+          - Does it need an `annotations` comment (e.g., support caveats)?
+          """
+
+          body = f"""This PR updates the generated documentation based on the latest released version **{version}**.
+
+          ## Changes
+          - Updates Elastic Agent component tables
+          - Updates OpenTelemetry Collector Builder (OCB) configuration
+          - Uses data from the latest released version tag: `{version}`
+
+          ## References
+          - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/{version}/go.mod
+          - **Source components.yaml**: https://github.com/elastic/elastic-agent/blob/{version}/internal/edot/components.yaml
+          - **Release tag**: https://github.com/elastic/elastic-agent/tree/{version}
+          {new_section}
+          cc @elastic/ski-docs
+
+          This is an automated PR created by the documentation update workflow."""
+
+          out = pathlib.Path(os.environ["RUNNER_TEMP"]) / "pr-body.md"
+          out.write_text(body)
+          print(f"PR body written to {out}")
+          EOF
 
       - name: Check if branch already exists
         id: check_branch
@@ -112,22 +165,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "docs: update generated documentation for ${{ needs.check-latest.outputs.version }}"
           title: "Update generated documentation for ${{ needs.check-latest.outputs.version }}"
-          body: |
-            This PR updates the generated documentation based on the latest released version **${{ needs.check-latest.outputs.version }}**.
-
-            ## Changes
-            - Updates Elastic Agent component tables
-            - Updates OpenTelemetry Collector Builder (OCB) configuration
-            - Uses data from the latest released version tag: `${{ needs.check-latest.outputs.version }}`
-
-            ## References
-            - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/${{ needs.check-latest.outputs.version }}/go.mod
-            - **Source components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ needs.check-latest.outputs.version }}/internal/edot/components.yaml
-            - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ needs.check-latest.outputs.version }}
-
-            cc @elastic/ski-docs
-
-            This is an automated PR created by the documentation update workflow.
+          body-path: ${{ runner.temp }}/pr-body.md
           branch: update-docs-${{ needs.check-latest.outputs.version }}
           base: main
           delete-branch: true
