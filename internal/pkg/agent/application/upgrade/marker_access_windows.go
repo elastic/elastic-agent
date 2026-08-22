@@ -62,6 +62,28 @@ func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool) er
 	return nil
 }
 
+// On Windows, removeMarkerFile tries to remove the marker file, retrying with
+// randomized exponential backoff up to markerAccessTimeout duration. This retry
+// mechanism is necessary since the marker file could be accessed by multiple
+// processes (the Upgrade Watcher and the main Agent process) at the same time,
+// which could fail on Windows.
+func removeMarkerFile(markerFile string) error {
+	removeFn := func() error {
+		err := os.Remove(markerFile)
+		if errors.Is(err, os.ErrNotExist) {
+			// Already gone; treat as success, same as readMarkerFile.
+			return nil
+		}
+		return err
+	}
+
+	if err := accessMarkerFileWithRetries(removeFn); err != nil {
+		return fmt.Errorf("failed to remove upgrade marker file [%s] despite retrying: %w", markerFile, err)
+	}
+
+	return nil
+}
+
 func accessMarkerFileWithRetries(accessFn func() error) error {
 	expBackoff := backoff.NewExponentialBackOff()
 	expBackoff.InitialInterval = markerAccessBackoffInitialInterval
@@ -91,6 +113,6 @@ func accessMarkerFileWithRetries(accessFn func() error) error {
 		count++
 	}
 
-	return fmt.Errorf("could not write narker after %s and %d retries. Last error: %w",
+	return fmt.Errorf("could not access marker file after %s and %d retries. Last error: %w",
 		time.Since(start), count, err)
 }

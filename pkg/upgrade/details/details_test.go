@@ -75,7 +75,8 @@ func TestDetailsObserver(t *testing.T) {
 
 	det.SetState(StateCompleted)
 	require.Equal(t, StateCompleted, det.State)
-	require.Nil(t, nil, observedDetails)
+	require.NotNil(t, observedDetails)
+	require.Equal(t, StateCompleted, observedDetails.State)
 }
 
 func TestDetailsDownloadRateJSON(t *testing.T) {

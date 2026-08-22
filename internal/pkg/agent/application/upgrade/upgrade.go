@@ -66,6 +66,8 @@ var (
 	Version_9_3_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 3, 0, "SNAPSHOT", "")
 	// Version_9_4_0_SNAPSHOT is the minimum version that manages the Windows Add/Remove Programs registry entry
 	Version_9_4_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 4, 0, "SNAPSHOT", "")
+	// Version_9_5_0_SNAPSHOT is the minimum version where the coordinator owns upgrade marker cleanup after a successful upgrade.
+	Version_9_5_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 5, 0, "SNAPSHOT", "")
 )
 
 type artifactDownloadHandler interface {
