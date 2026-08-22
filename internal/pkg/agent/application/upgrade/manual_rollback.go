@@ -46,6 +46,30 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 		// there is no upgrade marker (the rollback was requested after the watcher grace period had elapsed), we need
 		// to extract available rollbacks from agent installs
 		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingAgentInstalls(u.log, u.watcherHelper, u.availableRollbacksSource, topDir, now, version, u.markUpgrade, action)
+		if err == nil {
+			// If a watcher is still in its cleanup phase, take it over before
+			// starting the rollback watcher, which would otherwise exit immediately.
+			quickLocker := filelock.NewAppLocker(topDir, watcherApplockerFileName)
+			lockErr := quickLocker.TryLock()
+			switch {
+			case lockErr == nil:
+				u.log.Debugw("no lingering upgrade watcher, proceeding with rollback")
+				_ = quickLocker.Unlock()
+			case errors.Is(lockErr, filelock.ErrAppAlreadyRunning):
+				u.log.Infow("lingering upgrade watcher detected; taking it over before starting rollback watcher")
+				if tErr := withTakeOverWatcher(ctx, u.log, topDir, u.watcherHelper, func() error { return nil }); tErr != nil {
+					if cleanErr := os.Remove(updateMarkerPath); cleanErr != nil {
+						u.log.Errorf("Error cleaning up fake upgrade marker: %v", cleanErr)
+					}
+					return nil, fmt.Errorf("taking over lingering upgrade watcher before rollback: %w", tErr)
+				}
+			default:
+				if cleanErr := os.Remove(updateMarkerPath); cleanErr != nil {
+					u.log.Errorf("Error cleaning up fake upgrade marker: %v", cleanErr)
+				}
+				return nil, fmt.Errorf("checking for lingering watcher: %w", lockErr)
+			}
+		}
 	} else {
 		// If upgrade marker is available, we need to gracefully stop any watcher process, read the available rollbacks from
 		// the TTL registry and then proceed with rollback
